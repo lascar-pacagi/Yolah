@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/Yolah.dir/main.cpp.o game/CMakeFiles/game.dir/game.cpp.o game/CMakeFiles/game.dir/magic.cpp.o game/CMakeFiles/game.dir/move.cpp.o misc/CMakeFiles/misc.dir/misc.cpp.o -o Yolah 

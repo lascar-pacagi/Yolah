@@ -1,0 +1,72 @@
+#ifndef GAME_H
+#define GAME_H
+
+#include <iostream>
+#include <vector>
+#include <utility>
+#include "types.h"
+#include "move.h"
+#include "json.hpp"
+
+using json = nlohmann::json;
+
+/*
+
+    a   b   c   d   e   f   g   h
+  +---+---+---+---+---+---+---+---+
+8 | O | . | . | . | . | . | . | X | 8
+  +---+---+---+---+---+---+---+---+
+7 | . | . | . | . | . | . | . | . | 7
+  +---+---+---+---+---+---+---+---+
+6 | . | . | . | . | . | . | . | . | 6
+  +---+---+---+---+---+---+---+---+
+5 | . | . | . | X | O | . | . | . | 5
+  +---+---+---+---+---+---+---+---+
+4 | . | . | . | O | X | . | . | . | 4
+  +---+---+---+---+---+---+---+---+
+3 | . | . | . | . | . | . | . | . | 3
+  +---+---+---+---+---+---+---+---+
+2 | . | . | . | . | . | . | . | . | 2
+  +---+---+---+---+---+---+---+---+
+1 | X | . | . | . | . | . | . | O | 1
+  +---+---+---+---+---+---+---+---+
+    a   b   c   d   e   f   g   h
+
+*/
+
+class Yolah {
+    uint64_t black = BLACK_INITIAL_POSITION;
+    uint64_t white = WHITE_INITIAL_POSITION;
+    uint64_t empty = 0;
+    uint16_t black_score = 0;
+    uint16_t white_score = 0;
+    uint16_t ply = 0;
+
+public:
+    static constexpr uint16_t MAX_NB_MOVES = 75;
+    class MoveList {
+      Move moveList[MAX_NB_MOVES], *last;
+    public:
+      explicit MoveList() : last(moveList) {}
+      const Move* begin() const { return moveList; }
+      const Move* end() const { return last; }
+      size_t size() const { return last - moveList; }
+      const Move& operator[](size_t i) const { return moveList[i]; }
+      friend class Yolah;
+    };
+    static constexpr uint8_t BLACK = 0;
+    static constexpr uint8_t WHITE = 1;
+    std::pair<int, int> score() const;
+    uint8_t current_player() const;
+    bool game_over() const;
+    void play(Move m);
+    void undo(Move m);
+    void moves(MoveList& moves) const;
+    std::string to_json() const;
+    static Yolah from_json(std::istream& is);
+    friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
+};
+
+std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
+
+#endif
