@@ -24,5 +24,6 @@ public:
 };
 
 std::ostream& operator<<(std::ostream& os, const Move& m);
+std::istream& operator>>(std::istream& is, Move& m);
 
 #endif

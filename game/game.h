@@ -56,12 +56,13 @@ public:
     };
     static constexpr uint8_t BLACK = 0;
     static constexpr uint8_t WHITE = 1;
-    std::pair<int, int> score() const;
+    std::pair<uint16_t, uint16_t> score() const;
     uint8_t current_player() const;
     bool game_over() const;
     void play(Move m);
     void undo(Move m);
     void moves(MoveList& moves) const;
+    bool valid(Move m) const;
     std::string to_json() const;
     static Yolah from_json(std::istream& is);
     friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);

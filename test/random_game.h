@@ -1,5 +1,10 @@
-#pragma once
-#include <utility>
+#ifndef RANDOM_GAME_H
+#define RANDOM_GAME_H
+#include <cstddef>
 
-void play_random_game();
-void play_random_games(std::size_t n);
+namespace test {
+    void play_random_game();
+    void play_random_games(std::size_t n);
+}
+
+#endif

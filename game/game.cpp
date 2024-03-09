@@ -5,7 +5,7 @@
 using std::ostream, std::pair, std::vector, std::istream;
 using std::string, std::to_string, std::stoi, std::stoull; 
 
-pair<int, int> Yolah::score() const {
+pair<uint16_t, uint16_t> Yolah::score() const {
     return { black_score, white_score };
 }
 
@@ -32,6 +32,16 @@ bool Yolah::game_over() const {
         (shift<NORTH_WEST>(white) & possible) == 0 &&
         (shift<SOUTH_EAST>(white) & possible) == 0 &&
         (shift<SOUTH_WEST>(white) & possible) == 0;     
+}
+
+bool Yolah::valid(Move m) const {
+    uint64_t pos1 = square_bb(m.from_sq());
+    uint64_t pos2 = square_bb(m.to_sq());
+    uint64_t possible = ~empty & ~black & ~white;
+    if (current_player() == BLACK) {
+        return (black & pos1) && (possible & pos2);
+    }
+    return (white & pos1) && (possible & pos2);
 }
     
 void Yolah::play(Move m) {
