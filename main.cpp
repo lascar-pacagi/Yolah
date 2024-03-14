@@ -2,6 +2,7 @@
 #include "magic.h"
 #include "play.h"
 #include "game.h"
+#include "random_game.h"
 #include "random_player.h"
 #include "human_player.h"
 #include "monte_carlo_player.h"
@@ -11,7 +12,7 @@ using std::cout;
 int main() {
     magic::init();
     //test::play_random_game();
-    //test::play_random_games(100000);
+    //test::play_random_games(1000000);
     // Yolah yolah;
     // cout << yolah.to_json() << '\n';
     // std::stringstream ss;
@@ -19,5 +20,5 @@ int main() {
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';
-    test::play(std::make_unique<RandomPlayer>(), std::make_unique<RandomPlayer>(), 1000000);
+    test::play(std::make_unique<MonteCarloPlayer>(50), std::make_unique<MonteCarloPlayer>(500), 100);
 }

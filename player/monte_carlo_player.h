@@ -5,13 +5,13 @@
 #include "BS_thread_pool.h"
 
 class MonteCarloPlayer : public Player {
-    const std::size_t nb_iter;
+    const uint64_t thinking_time;
     BS::thread_pool pool;
 
     uint64_t random_game(Yolah& yolah, uint8_t player);
 public:
-    MonteCarloPlayer(std::size_t nb_iter);
-    MonteCarloPlayer(std::size_t nb_iter, std::size_t nb_threads);
+    explicit MonteCarloPlayer(uint64_t microseconds);
+    explicit MonteCarloPlayer(uint64_t microseconds, std::size_t nb_threads);
     Move play(Yolah yolah) override;
 };
 
