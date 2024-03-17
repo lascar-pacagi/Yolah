@@ -6,6 +6,7 @@
 #include "random_player.h"
 #include "human_player.h"
 #include "monte_carlo_player.h"
+#include "MCTS_player.h"
 
 using std::cout;
 
