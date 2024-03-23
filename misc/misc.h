@@ -53,7 +53,7 @@ inline uint64_t mul_hi64(uint64_t a, uint64_t b) {
     return aH * bH + (c2 >> 32) + (c3 >> 32);
 }
 
-static constexpr bool DEBUG = 0;
+static constexpr bool DEBUG = false;
 
 void debug(auto&& print) {
     if constexpr (DEBUG) {

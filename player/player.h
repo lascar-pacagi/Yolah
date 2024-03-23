@@ -3,6 +3,7 @@
 #include "game.h"
 
 struct Player {
+    virtual ~Player() = default;
     virtual Move play(Yolah yolah) = 0;
 };
 

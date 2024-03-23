@@ -6,7 +6,7 @@
 class RandomPlayer : public Player {
     PRNG prng;
 public:
-    RandomPlayer();
+    explicit RandomPlayer();
     Move play(Yolah yolah) override;
 };
 

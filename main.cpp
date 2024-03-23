@@ -7,6 +7,7 @@
 #include "human_player.h"
 #include "monte_carlo_player.h"
 #include "MCTS_player.h"
+#include "MCTS_mem_player.h"
 
 using std::cout;
 
@@ -20,6 +21,6 @@ int main() {
     // ss << yolah.to_json();
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
-    // cout << yolah << '\n';
-    test::play(std::make_unique<MonteCarloPlayer>(50), std::make_unique<MonteCarloPlayer>(500), 100);
+    // cout << yolah << '\n';   
+    test::play(std::make_unique<MCTSMemPlayer>(5000000), std::make_unique<RandomPlayer>());//std::make_unique<MCTSPlayer>(1000000, 1));
 }

@@ -23,8 +23,8 @@ namespace test {
             print_score();
             Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);
             cout << m << '\n';
-            // std::string _;
-            // std::getline(std::cin, _);
+            std::string _;
+            std::getline(std::cin, _);
             yolah.play(m);
         }
         cout << yolah << '\n';

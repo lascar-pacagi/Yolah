@@ -46,7 +46,7 @@ Move MonteCarloPlayer::play(Yolah yolah) {
             n++;
             mu = duration_cast<microseconds>(steady_clock::now() - t1);
         } while (mu.count() < thinking_time);
-        return res / static_cast<double>(n);
+        return res / n;
     });
     std::vector<double> action_values = futures.get();
     auto pos = std::distance(begin(action_values), std::max_element(begin(action_values), end(action_values)));
