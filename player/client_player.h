@@ -4,12 +4,11 @@
 #include "player.h"
 
 class ClientPlayer {
-    Yolah yolah;
     std::unique_ptr<Player> player;
     std::string host;
     std::string port;
 public:
-    ClientPlayer(Yolah yolah, std::unique_ptr<Player> player, std::string host, std::string port);
+    ClientPlayer(std::unique_ptr<Player> player, std::string host, std::string port);
     void run();
 };
 

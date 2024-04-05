@@ -36,7 +36,6 @@ class MCTSPlayer : public Player {
 
     static constexpr uint32_t VIRTUAL_LOSS = 4;
     static constexpr uint32_t NB_VISITS_BEFORE_EXPANSION = 8;
-    static_assert(NB_VISITS_BEFORE_EXPANSION > 0);
     const uint64_t thinking_time;
     Node root;
     BS::thread_pool pool;
