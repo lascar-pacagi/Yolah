@@ -114,14 +114,20 @@
             return res;
         }
 
+        function atLeastOneMove(player) {
+
+        }
+
         function fromSquareState(event) {
-            console.log("fromSquareState");
+            console.log("fromSquareState");            
             fromSquare = clickToSquare(event);
-            if (possibleMoves(grid, fromSquare).length === 0) return;
+            if (possibleMoves(grid, fromSquare).length === 0 || isSet(emptyBb, fromSquare)) return;
             if (currentPlayer === "Black") {
+                if (!isSet(blackBb, fromSquare)) return;
                 blackBb = unsetBitboard(blackBb, fromSquare);
                 blackScore++;
             } else {
+                if (!isSet(whiteBb, fromSquare)) return;
                 whiteBb = unsetBitboard(whiteBb, fromSquare);
                 whiteScore++;
             }
@@ -209,14 +215,24 @@
         }
 
         function drawScore(blackScore, whiteScore) {
-
+            let b = document.getElementById("black_score");
+            b.textContent = blackScore.toString();
+            let w = document.getElementById("white_score");
+            w.textContent = whiteScore.toString();
         }
 
         function drawTurn(player) {
-
+            let turn = document.getElementById("to_play");
+            if (player === "Black") {
+                turn.textContent = "\u2B24";
+            } else {
+                turn.textContent = "\u25EF";
+            }
         }
 
         function draw() {
+            drawScore(blackScore, whiteScore);
+            drawTurn(currentPlayer);
             drawGrid(grid);
             if (state === toSquareState) {
                 drawPossibleMoves(moves);
@@ -260,6 +276,10 @@
 
         function squareToBitboard(square) {
             return 1n << BigInt(square);
+        }
+
+        function isSet(bitboard, square) {
+            return (bitboard & squareToBitboard(square)) !== 0n;
         }
 
         function setBitboard(bitboard, square) {
