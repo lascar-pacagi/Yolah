@@ -22,5 +22,5 @@ int main() {
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';   
-    test::play(std::make_unique<MCTSMemPlayer>(5000000), std::make_unique<RandomPlayer>());//std::make_unique<MCTSPlayer>(1000000, 1));
+    test::play(std::make_unique<MCTSMemPlayer>(1000000), std::make_unique<RandomPlayer>());//std::make_unique<MCTSPlayer>(1000000, 1));
 }

@@ -61,19 +61,19 @@
         const BACKGROUND_COLOR = "black";
         const RADIUS_FACTOR = 0.5 * 0.7;
         const BOARD_DIM_FACTOR = 1;
-        let blackBb = 0b1000000000000000000000000000100000010000000000000000000000000001n;
-        let whiteBb = 0b0000000100000000000000000001000000001000000000000000000010000000n;
-        let emptyBb = 0n;
-        let currentPlayer = "Black";
-        let blackScore = 0;
-        let whiteScore = 0;
+        let blackBb;
+        let whiteBb;
+        let emptyBb;
+        let currentPlayer;
+        let blackScore;
+        let whiteScore;
         let canvas;
         let ctx;
         let fromSquare;
         let toSquare;
         let moves;
-        let grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
-        let state = fromSquareState;
+        let grid;
+        let state;
 
         function canvasWidth() {
             return Math.round(BOARD_DIM_FACTOR * canvas.width);
@@ -114,14 +114,26 @@
             return res;
         }
 
-        function atLeastOneMove(player) {
-
+        function atLeastOneMove(grid, bitboard) {
+            let square = 0;
+            while (bitboard) {
+                if (bitboard & 1n) {
+                    if (possibleMoves(grid, square).length !== 0) {
+                        return true;
+                    }
+                }
+                square++;
+                bitboard >>= 1n;
+            } 
+            return false;
         }
 
         function fromSquareState(event) {
             console.log("fromSquareState");            
             fromSquare = clickToSquare(event);
-            if (possibleMoves(grid, fromSquare).length === 0 || isSet(emptyBb, fromSquare)) return;
+            if (possibleMoves(grid, fromSquare).length === 0 || isSet(emptyBb, fromSquare)) {
+                return;
+            } 
             if (currentPlayer === "Black") {
                 if (!isSet(blackBb, fromSquare)) return;
                 blackBb = unsetBitboard(blackBb, fromSquare);
@@ -133,7 +145,7 @@
             }
             emptyBb = setBitboard(emptyBb, fromSquare);
             grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
-            moves = possibleMoves(grid, fromSquare);             
+            moves = possibleMoves(grid, fromSquare);    
             state = toSquareState;
             draw();
         }
@@ -145,17 +157,30 @@
             if (!moves.some(([i1, j1]) => i === i1 && j === j1)) return;
             if (currentPlayer === "Black") {
                 blackBb = setBitboard(blackBb, square);
-                currentPlayer = "White";
+                grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+                if (atLeastOneMove(grid, whiteBb)) {
+                    currentPlayer = "White";
+                }
             } else {
                 whiteBb = setBitboard(whiteBb, square);
-                currentPlayer = "Black";
+                grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+                if (atLeastOneMove(grid, blackBb)) {
+                    currentPlayer = "Black";
+                }
             }
-            grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
             moves = [];            
-            state = fromSquareState;
+            state = gameOver(grid, blackBb, whiteBb) ? gameOverState : fromSquareState;
             draw();
         }
+
+        function gameOver(grid, blackBb, whiteBb) {
+            return !(atLeastOneMove(grid, blackBb) || atLeastOneMove(grid, whiteBb));
+        }
         
+        function gameOverState(event) {
+            console.log("gameOverState");
+        }
+
         function bitboardsToGrid(blackBb, whiteBb, emptyBb) {
             let grid = Array(GRID_DIM).fill().map(() => Array(GRID_DIM).fill(FREE));
             for (let i = 0; i < GRID_DIM; i++) {
@@ -223,10 +248,14 @@
 
         function drawTurn(player) {
             let turn = document.getElementById("to_play");
-            if (player === "Black") {
-                turn.textContent = "\u2B24";
-            } else {
-                turn.textContent = "\u25EF";
+            if (state === gameOverState) {
+                turn.textContent = "";
+            } else {                
+                if (player === "Black") {
+                    turn.textContent = "\u2B24";
+                } else {
+                    turn.textContent = "\u25EF";
+                }
             }
         }
 
@@ -236,6 +265,19 @@
             drawGrid(grid);
             if (state === toSquareState) {
                 drawPossibleMoves(moves);
+            } else if (state === gameOverState) {
+                ctx.font = "58px Brush Script MT";
+                ctx.fillStyle = "white";
+                let txt = "Draw";
+                if (blackScore > whiteScore) {
+                    txt = "Black won";
+                } else if (blackScore < whiteScore) {
+                    txt = "White won";
+                }              
+                let dx = (canvas.width - ctx.measureText(txt).width) / 2;  
+                ctx.fillText(txt, dx, canvas.height / 2);
+                ctx.strokeStyle = "black";
+                ctx.strokeText(txt, dx, canvas.height / 2);
             }
         }
 
@@ -318,10 +360,18 @@
 
         function init() {    
             canvas = document.getElementById("canvas");
-            ctx = canvas.getContext("2d");   
+            ctx = canvas.getContext("2d");
+            //canvas.addEventListener("mousemove", mouseMove);
+            blackBb = 0b1000000000000000000000000000100000010000000000000000000000000001n;
+            whiteBb = 0b0000000100000000000000000001000000001000000000000000000010000000n;
+            emptyBb = 0n;
+            currentPlayer = "Black";
+            blackScore = 0;
+            whiteScore = 0;
+            grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+            state = fromSquareState;
             canvas.addEventListener("click", choice);
-            //canvas.addEventListener("mousemove", mouseMove);            
-            draw();                                  
+            draw();
         }
     </script>
 </head>
