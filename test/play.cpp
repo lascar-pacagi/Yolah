@@ -12,25 +12,6 @@ namespace {
 }
 
 namespace test {
-    void play(std::unique_ptr<Player> p1, std::unique_ptr<Player> p2) {
-        Yolah yolah;
-        auto print_score = [&]{
-            const auto [black_score, white_score] = yolah.score();
-            cout << "score: " << black_score << '/' << white_score << '\n';
-        };
-        while (!yolah.game_over()) {                 
-            cout << yolah << '\n';
-            print_score();
-            Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);
-            cout << m << '\n';
-            //std::string _;
-            //std::getline(std::cin, _);
-            yolah.play(m);
-        }
-        cout << yolah << '\n';
-        print_score();
-    }
-
     void play(std::unique_ptr<Player> p1, std::unique_ptr<Player> p2, size_t nb_games) {
         using namespace indicators;
         ProgressBar bar{

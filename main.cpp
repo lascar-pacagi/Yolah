@@ -4,10 +4,12 @@
 #include "game.h"
 #include "random_game.h"
 #include "random_player.h"
-#include "human_player.h"
+#include "player/human_player.h"
 #include "monte_carlo_player.h"
 #include "MCTS_player.h"
 #include "MCTS_mem_player.h"
+#include "misc.h"
+#include "ascii_observer.h"
 
 using std::cout;
 
@@ -22,5 +24,7 @@ int main() {
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';   
-    test::play(std::make_unique<MCTSMemPlayer>(1000000), std::make_unique<RandomPlayer>());//std::make_unique<MCTSPlayer>(1000000, 1));
+    test::play(std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
+               std::make_unique<MCTSPlayer>(1000000),
+               AsciiObserver());
 }

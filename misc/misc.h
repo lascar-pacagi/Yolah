@@ -1,6 +1,11 @@
 #ifndef MISC_H 
 #define MISC_H 
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/websocket.hpp>
 #include <cstdint>
+#include <memory>
+#include <optional>
 
 // xorshift64star Pseudo-Random Number Generator
 // This class is based on original code written and dedicated
@@ -60,5 +65,32 @@ void debug(auto&& print) {
         print();
     }
 }
+
+namespace net = boost::asio;
+namespace beast = boost::beast;
+namespace websocket = beast::websocket;
+using tcp = boost::asio::ip::tcp;
+
+class SocketServerSync {
+protected:
+    net::io_context ioc;
+    tcp::socket socket;
+public:
+    SocketServerSync(const std::string& host, uint16_t port);
+};
+
+class WebsocketServerSync : public SocketServerSync {    
+    websocket::stream<tcp::socket> ws;
+public:
+    WebsocketServerSync(const std::string& host, uint16_t port);
+    void read(auto&& buffer) {
+        ws.read(buffer);
+    }
+    void write(auto&& buffer) {
+        ws.write(buffer);
+    }
+    void close();
+    static std::shared_ptr<WebsocketServerSync> create(const std::string& host, uint16_t port);
+};
 
 #endif

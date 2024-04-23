@@ -160,5 +160,7 @@ ostream& operator<<(ostream& os, const Yolah& yolah) {
     }
     os << line << '\n';
     os << letters << '\n';
+    const auto [black_score, white_score] = yolah.score();
+    os << "score: " << black_score << '/' << white_score << '\n';
     return os;
 }

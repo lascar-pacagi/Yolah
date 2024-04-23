@@ -91,6 +91,10 @@ constexpr uint64_t square_bb(Square s) {
 
 constexpr Square make_square(File f, Rank r) { return Square((r << 3) + f); }
 
+inline Square make_square(const std::string& s) { 
+    return Square(((s[1] - '1') << 3) + s[0] - 'a');
+}
+
 constexpr uint64_t rank_bb(Rank r) { return Rank1BB << (8 * r); }
 
 constexpr uint64_t rank_bb(Square s) { return rank_bb(rank_of(s)); }

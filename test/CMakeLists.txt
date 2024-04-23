@@ -3,4 +3,4 @@ add_library(test OBJECT
 )
 target_include_directories(test PUBLIC .)
 
-include_directories(../misc ../game ../player)
+include_directories(../misc ../game ../player ../ui)

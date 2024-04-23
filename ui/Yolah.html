@@ -12,7 +12,7 @@
             grid-template-rows: 600px;
             grid-gap: 30px;
         }
-        #right_grid {            
+        #rightGrid {            
             display: grid;
             grid-template-columns: 80px 40px;
             grid-template-rows: 70px 30px;
@@ -23,7 +23,7 @@
             grid-column: 1;
             grid-row: 2;
         }
-        #black_score {      
+        #blackScore {      
             font-size: 20px;      
             grid-column: 2;
             grid-row: 2;
@@ -34,7 +34,7 @@
             grid-column: 1;
             grid-row: 3;
         }
-        #white_score {      
+        #whiteScore {      
             font-size: 20px;      
             grid-column: 2;
             grid-row: 3;
@@ -45,88 +45,33 @@
             grid-column: 1;
             grid-row: 1;
         }
-        #to_play {
+        #toPlay {
             font-size: 20px;
             font-weight: bold;      
             grid-column: 2;
             grid-row: 1;
         }
     </style> 
+    <script src="common.js"></script>
     <script>        
-        const FREE = 3;
-        const EMPTY = 2;
-        const BLACK = 0;
-        const WHITE = 1;
-        const GRID_DIM = 8;        
-        const BACKGROUND_COLOR = "black";
-        const RADIUS_FACTOR = 0.5 * 0.7;
-        const BOARD_DIM_FACTOR = 1;
         let blackBb;
         let whiteBb;
         let emptyBb;
         let currentPlayer;
         let blackScore;
         let whiteScore;
-        let canvas;
-        let ctx;
         let fromSquare;
         let toSquare;
         let moves;
         let grid;
         let state;
-
-        function canvasWidth() {
-            return Math.round(BOARD_DIM_FACTOR * canvas.width);
-        }
-
-        function canvasHeight() {
-            return Math.round(BOARD_DIM_FACTOR * canvas.height);
-        }
-
-        function squareToCoordinate(square) {
-            return [Math.floor(square / GRID_DIM), square % GRID_DIM];
-        }
-
-        function possiblePosition(grid, i, j) {
-            return i >= 0 && i < GRID_DIM && j >= 0 && j < GRID_DIM && grid[i][j] === FREE;
-        }
-
-        function possibleMoves(grid, square) {
-            let res = [];
-            let [i, j] = squareToCoordinate(square);
-            function line(di, dj) {
-                let res = [];
-                let ii = i + di;
-                let jj = j + dj;
-                while (possiblePosition(grid, ii, jj)) {
-                    res.push([ii, jj]);
-                    ii += di;
-                    jj += dj;
-                }
-                return res;
-            }
-            for (let di = -1; di <= 1; di++) {
-                for (let dj = -1; dj <= 1; dj++) {
-                    if (di === 0 && dj === 0) continue;
-                    res = res.concat(line(di, dj));    
-                }
-            } 
-            return res;
-        }
-
-        function atLeastOneMove(grid, bitboard) {
-            let square = 0;
-            while (bitboard) {
-                if (bitboard & 1n) {
-                    if (possibleMoves(grid, square).length !== 0) {
-                        return true;
-                    }
-                }
-                square++;
-                bitboard >>= 1n;
-            } 
-            return false;
-        }
+        let ws;
+        let uri;
+        let connect;        
+        let disconnect;
+        let send;
+        let sendMessage;
+        let messages;
 
         function fromSquareState(event) {
             console.log("fromSquareState");            
@@ -153,101 +98,42 @@
         function toSquareState(event) {
             console.log("toSquareState");
             const square = clickToSquare(event);
-            let [i, j] = squareToCoordinate(square);            
+            let [i, j] = squareToCoordinates(square);            
             if (!moves.some(([i1, j1]) => i === i1 && j === j1)) return;
+            toSquare = square;
             if (currentPlayer === "Black") {
                 blackBb = setBitboard(blackBb, square);
+                showMessage("[Black move] " + squaresToMove(fromSquare, toSquare));
                 grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
                 if (atLeastOneMove(grid, whiteBb)) {
                     currentPlayer = "White";
                 }
             } else {
                 whiteBb = setBitboard(whiteBb, square);
+                showMessage("[White move] " + squaresToMove(fromSquare, toSquare));
                 grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
                 if (atLeastOneMove(grid, blackBb)) {
                     currentPlayer = "Black";
                 }
-            }
+            }            
             moves = [];            
             state = gameOver(grid, blackBb, whiteBb) ? gameOverState : fromSquareState;
             draw();
-        }
-
-        function gameOver(grid, blackBb, whiteBb) {
-            return !(atLeastOneMove(grid, blackBb) || atLeastOneMove(grid, whiteBb));
         }
         
         function gameOverState(event) {
             console.log("gameOverState");
         }
 
-        function bitboardsToGrid(blackBb, whiteBb, emptyBb) {
-            let grid = Array(GRID_DIM).fill().map(() => Array(GRID_DIM).fill(FREE));
-            for (let i = 0; i < GRID_DIM; i++) {
-                for (let j = 0; j < GRID_DIM; j++) {
-                    const idx = 1n << BigInt(i * GRID_DIM + j);
-                    if (blackBb & idx) grid[i][j] = BLACK;
-                    else if (whiteBb & idx) grid[i][j] = WHITE;
-                    else if (emptyBb & idx) grid[i][j] = EMPTY;
-                }
-            }
-            return grid;
-        }
-
-        function drawStone(x, y, radius, player) {
-            ctx.fillStyle = "black";
-            if (player === "White") ctx.fillStyle = "white";
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.stroke();          
-            ctx.strokeStyle = "white";
-            if (player === "White") ctx.strokeStyle = "black";
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.stroke();
-        }
-
-        function drawSquareContent(i, j, content, dx, dy) {
-            if (content === EMPTY) {
-                ctx.fillStyle = BACKGROUND_COLOR;
-                ctx.fillRect(j * dx, i * dy, dx, dy);    
-            } else if (content === BLACK || content === WHITE) {
-                drawStone(j * dx + dx / 2, i * dy + dy / 2, Math.min(dx, dy) * RADIUS_FACTOR, content === BLACK ? "Black" : "White");                 
-            }
-        }
-
-        function drawLine(x1, y1, x2, y2) {
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
-        }
-
-        function drawPossibleMoves(moves) {
-            const dx = canvasWidth() / GRID_DIM;
-            const dy = canvasHeight() / GRID_DIM;
-            ctx.save();
-            ctx.strokeStyle = "DarkOrange";
-            ctx.lineWidth = 4;
-            for (const idx in moves) {
-                let [i, j] = moves[idx];                
-                ctx.beginPath();
-                ctx.rect(dx * j, dy * (GRID_DIM - 1 - i), dx, dy);
-                ctx.stroke();
-            }
-            ctx.restore();
-        }
-
         function drawScore(blackScore, whiteScore) {
-            let b = document.getElementById("black_score");
+            let b = document.getElementById("blackScore");
             b.textContent = blackScore.toString();
-            let w = document.getElementById("white_score");
+            let w = document.getElementById("whiteScore");
             w.textContent = whiteScore.toString();
         }
 
         function drawTurn(player) {
-            let turn = document.getElementById("to_play");
+            let turn = document.getElementById("toPlay");
             if (state === gameOverState) {
                 turn.textContent = "";
             } else {                
@@ -281,66 +167,6 @@
             }
         }
 
-        function drawGrid(grid) {           
-            const dx = canvasWidth() / GRID_DIM;
-            const dy = canvasHeight() / GRID_DIM;
-            ctx.fillStyle = BACKGROUND_COLOR;
-            ctx.fillRect(0, 0, canvasWidth(), canvasHeight());            
-            for (let i = 0; i < GRID_DIM; i++) {                
-                for (let j = 0; j < GRID_DIM; j++) {
-                    if ((i + j) & 1) ctx.fillStyle = "maroon";
-                    else ctx.fillStyle = "grey";
-                    ctx.fillRect(j * dx, i * dy, dx, dy);
-                }
-            }
-            for (let i = 0; i < GRID_DIM; i++) {                
-                for (let j = 0; j < GRID_DIM; j++) {
-                    drawSquareContent(GRID_DIM - 1 - i, j, grid[i][j], dx, dy);
-                }
-            }
-            ctx.strokeStyle = "black";
-            ctx.lineWidth = 1;
-            for (let i = 0; i < GRID_DIM; i++) {                
-                drawLine(0, i * dy, canvasWidth(), i * dy);                
-            }
-            for (let j = 0; j < GRID_DIM; j++) {
-                drawLine(j * dx, 0, j * dx, canvasHeight());
-            }
-        }
-
-        function clickToSquare(event) {
-            const dx = canvasWidth() / GRID_DIM;
-            const dy = canvasHeight() / GRID_DIM;
-            const x = event.clientX;
-            const y = event.clientY;
-            return Math.floor(x / dx) + (GRID_DIM - Math.floor(y / dy)) * GRID_DIM;
-        }
-
-        function squareToBitboard(square) {
-            return 1n << BigInt(square);
-        }
-
-        function isSet(bitboard, square) {
-            return (bitboard & squareToBitboard(square)) !== 0n;
-        }
-
-        function setBitboard(bitboard, square) {
-            return bitboard | squareToBitboard(square); 
-        }
-
-        function unsetBitboard(bitboard, square) {
-            return bitboard & ~squareToBitboard(square); 
-        }
-
-        function bitboardToSquare(bitboard) {
-            let pos = 0;
-            while (!(bitboard & 1n)) {
-                bitboard = bitboard >> 1n;
-                pos++;
-            }
-            return pos;
-        }
-
         function choice(event) {
             console.log(event);
             console.log("choice");
@@ -357,6 +183,11 @@
         //         drawStone(event.offsetX, event.offsetY, Math.min(dx, dy) * RADIUS_FACTOR, currentPlayer);
         //     }
         // }
+                
+        function showMessage(msg) {
+            messages.innerText += msg + "\n";
+            messages.scrollTop = messages.scrollHeight - messages.clientHeight;
+        }        
 
         function init() {    
             canvas = document.getElementById("canvas");
@@ -370,6 +201,41 @@
             whiteScore = 0;
             grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
             state = fromSquareState;
+            connect     = document.getElementById("connect");
+            disconnect  = document.getElementById("disconnect");
+            send        = document.getElementById("send");
+            sendMessage = document.getElementById("sendMessage");
+            messages    = document.getElementById("messages");
+            uri         = document.getElementById("uri");
+            connect.onclick = function() {            
+                ws = new WebSocket(uri.value);            
+                ws.onopen = function(ev) {
+                    showMessage("[connection opened]");
+                };            
+                ws.onclose = function(ev) {
+                    showMessage("[connection closed]");
+                };
+                ws.onmessage = function(ev) {
+                    showMessage(ev.data);
+                };
+                ws.onerror = function(ev) {
+                    showMessage("[error]");
+                    console.log(ev);
+                };
+            };
+            disconnect.onclick = function() {
+                ws.close();
+            };
+            send.onclick = function() {
+                ws.send(userName.value + ": " + sendMessage.value);
+                sendMessage.value = "";
+            };
+            sendMessage.onkeyup = function(ev) {
+                ev.preventDefault();
+                if (ev.keyCode === 13) {
+                    send.click();
+                }
+            };
             canvas.addEventListener("click", choice);
             draw();
         }
@@ -387,11 +253,11 @@
                 Your browser doesn't support the HTML5 element canvas.
             </canvas>
         </div>
-        <div id="right_grid">
-            <p id="turn">Turn</p><p id="to_play">&#11044;</p> 
+        <div id="rightGrid">
+            <p id="turn">Turn</p><p id="toPlay">&#11044;</p> 
             <!-- &#9711; -->
-            <p id="black">Black</p> <p id="black_score">0</p>
-            <p id="white">White</p> <p id="white_score">0</p>
+            <p id="black">Black</p> <p id="blackScore">0</p>
+            <p id="white">White</p> <p id="whiteScore">0</p>
         </div>
     </div>
     <pre id="messages" style="width: 600px; height: 180px; white-space: normal; overflow: auto; border: solid 1px #cccccc; margin-bottom: 5px;"></pre>    
