@@ -13,9 +13,11 @@ using tcp = boost::asio::ip::tcp;
 
 class HumanPlayer : public Player {
     std::shared_ptr<WebsocketServerSync> connexion;
+    void send_game_state(Yolah);
 public:
     HumanPlayer(std::shared_ptr<WebsocketServerSync>);
-    Move play(Yolah yolah) override;
+    Move play(Yolah) override;
+    void game_over(Yolah) override;
     ~HumanPlayer() override;
 };
 

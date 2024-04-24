@@ -4,7 +4,9 @@
 
 struct Player {
     virtual ~Player() = default;
-    virtual Move play(Yolah yolah) = 0;
+    virtual Move play(Yolah) = 0;
+    virtual void game_over(Yolah) {
+    }
 };
 
 #endif

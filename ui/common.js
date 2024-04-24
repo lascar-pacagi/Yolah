@@ -6,6 +6,10 @@ const GRID_DIM = 8;
 const BACKGROUND_COLOR = "black";
 const RADIUS_FACTOR = 0.5 * 0.7;
 const BOARD_DIM_FACTOR = 1;
+const INITIAL_BLACK_BB = 0b1000000000000000000000000000100000010000000000000000000000000001n;
+const INITIAL_WHITE_BB = 0b0000000100000000000000000001000000001000000000000000000010000000n;
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+const RANKS = ['1', '2', '3', '4', '5', '6', '7', '8'];
 let canvas;
 let ctx;
 
@@ -65,9 +69,7 @@ function atLeastOneMove(grid, bitboard) {
 function squaresToMove(fromSquare, toSquare) {
     let [i1, j1] = squareToCoordinates(fromSquare);
     let [i2, j2] = squareToCoordinates(toSquare);
-    let xAxis = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-    let yAxis = ['1', '2', '3', '4', '5', '6', '7', '8'];
-    return xAxis[j1] + yAxis[i1] + ':' + xAxis[j2] + yAxis[i2];
+    return FILES[j1] + RANKS[i1] + ':' + FILES[j2] + RANKS[i2];
 }
 
 function gameOver(grid, blackBb, whiteBb) {
@@ -192,3 +194,28 @@ function bitboardToSquare(bitboard) {
     return pos;
 }
 
+function ctz(n) {
+    let res = 0;
+    while (n) {
+        if (n & 1n) return res;
+        res++;
+        n >>= 1n;
+    }
+    return res;
+}
+
+function findMove(oldBb, newBb) {
+    const fromSquare = ctz(oldBb & ~newBb); 
+    const toSquare   = ctz(newBb & ~oldBb);
+    return squaresToMove(Number(fromSquare), Number(toSquare));
+}
+
+function lastMove(oldBlackBb, oldWhiteBb, newBlackBb, newWhiteBb) {
+    if (oldBlackBb === newBlackBb && oldWhiteBb === newWhiteBb) {
+        return "";
+    }
+    if (oldBlackBb === newBlackBb) {
+        return `[white move] ${findMove(oldWhiteBb, newWhiteBb)}`;
+    }
+    return `[black move] ${findMove(oldBlackBb, newBlackBb)}`;    
+}

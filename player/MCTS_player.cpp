@@ -13,19 +13,20 @@ namespace {
 size_t MCTSPlayer::Node::NB_NODES = 0;
 
 void MCTSPlayer::Node::expand(const Yolah& yolah) { 
-    if (bool desired = false; nodes.empty() && nb_visits >= NB_VISITS_BEFORE_EXPANSION && 
-        expanded.compare_exchange_strong(desired, true, std::memory_order::acq_rel, std::memory_order_relaxed)) {
+    if (uint8_t desired = 0; expanded == 0 && nb_visits >= NB_VISITS_BEFORE_EXPANSION && 
+        expanded.compare_exchange_strong(desired, 1, std::memory_order::acq_rel, std::memory_order_relaxed)) {
         Yolah::MoveList moves;
         yolah.moves(moves);
         nodes.resize(moves.size());            
         for (size_t i = 0; i < moves.size(); i++) {
             nodes[i].action = moves[i];
         }
+        expanded.store(2, std::memory_order_release);
     }
 }
 
 bool MCTSPlayer::Node::is_leaf() const {
-    return nodes.empty();
+    return expanded != 2;
 }
         
 void MCTSPlayer::Node::update(float v) {
@@ -41,7 +42,8 @@ uint32_t MCTSPlayer::Node::select() const {
     auto nb_children = static_cast<uint32_t>(nodes.size());
     uint32_t k = prng.rand<uint32_t>() % nodes.size();
     uint32_t res = k;
-    float best_value = std::numeric_limits<float>::lowest(); 
+    if (k > 1000) std::cout << "problem " << k << " " << nodes.size() << " " << (prng.rand<uint32_t>() % nodes.size()) << std::endl;
+    float best_value = std::numeric_limits<float>::lowest();
     for (uint32_t i = 0; i < nb_children; i++) {        
         auto n = static_cast<float>(nodes[k].nb_visits + nodes[k].virtual_loss);
         if (float v = -nodes[k].value / n + C * std::sqrt(log_N / n); v > best_value) {
@@ -156,8 +158,8 @@ Move MCTSPlayer::play(Yolah yolah) {
             k = 0;
         }
     }
-    //std::cout << root;
-    //std::cout << Node::NB_NODES << '\n';
+    std::cout << root;
+    std::cout << Node::NB_NODES << '\n';
     reset();    
     return res;
 }

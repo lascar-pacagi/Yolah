@@ -25,6 +25,6 @@ int main() {
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';   
     test::play(std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
-               std::make_unique<MCTSPlayer>(1000000),
+               std::make_unique<MCTSMemPlayer>(4000000),
                AsciiObserver());
 }

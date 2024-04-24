@@ -4,19 +4,23 @@
 #include <regex>
 
 namespace {
-    const std::regex pattern("\\[(.*)\\]\\s*(\\w\\d):(\\w\\d)\\s*");
+    const std::regex pattern("\\[(.*)\\]\\s*(\\w\\d):(\\w\\d)\\s*");    
 }
 
 HumanPlayer::HumanPlayer(std::shared_ptr<WebsocketServerSync> connexion) : connexion(connexion) {
 }
 
-Move HumanPlayer::play(Yolah yolah) {    
+void HumanPlayer::send_game_state(Yolah yolah) {
     std::stringbuf wbuffer;
     std::ostream os(&wbuffer);
     os << "[game state]" << yolah.to_json();
     connexion->write(net::buffer(wbuffer.str()));
+}
+
+Move HumanPlayer::play(Yolah yolah) {    
+    send_game_state(yolah);    
     beast::flat_buffer rbuffer;
-    connexion->read(rbuffer);    
+    connexion->read(rbuffer);  
     std::smatch m;
     std::string s = beast::buffers_to_string(rbuffer.data());
     std::regex_match(s, m, pattern);
@@ -26,6 +30,10 @@ Move HumanPlayer::play(Yolah yolah) {
         return Move(from, to);
     }
     return Move::none();
+}
+
+void HumanPlayer::game_over(Yolah yolah) {
+    send_game_state(yolah);
 }
 
 HumanPlayer::~HumanPlayer() {

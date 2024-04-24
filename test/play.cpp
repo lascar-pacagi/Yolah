@@ -34,6 +34,8 @@ namespace test {
                 Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);
                 yolah.play(m);
             }
+            p1->game_over(yolah);
+            p2->game_over(yolah);
             const auto [black_score, white_score] = yolah.score();           
             if (black_score > white_score) {
                 black_victories++;

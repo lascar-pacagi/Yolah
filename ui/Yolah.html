@@ -193,8 +193,8 @@
             canvas = document.getElementById("canvas");
             ctx = canvas.getContext("2d");
             //canvas.addEventListener("mousemove", mouseMove);
-            blackBb = 0b1000000000000000000000000000100000010000000000000000000000000001n;
-            whiteBb = 0b0000000100000000000000000001000000001000000000000000000010000000n;
+            blackBb = INITIAL_BLACK_BB;
+            whiteBb = INITIAL_WHITE_BB;
             emptyBb = 0n;
             currentPlayer = "Black";
             blackScore = 0;

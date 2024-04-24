@@ -72,6 +72,7 @@
         let send;
         let sendMessage;
         let messages;
+        const noneMove = "a1:a1";
         const pattern = /^\[([^\]]*)\](.*)/;
         
         function drawScore(blackScore, whiteScore) {
@@ -204,7 +205,8 @@
         }
          
         function onMessage(ev) {
-            showMessage(ev.data);
+            let msg = ev.data;
+            console.log(msg);
             let res = pattern.exec(ev.data);
             if (state === getGameState) {
                 if (res && res.length == 3 && res[1] === 'game state') {
@@ -216,19 +218,32 @@
                     const wScore = json['white_score'];
                     const bScore = json['black_score'];
                     if (black && white && empty && ply && wScore && bScore) {
-                        blackBb = BigInt(black);
-                        whiteBb = BigInt(white);
+                        msg = "";
+                        const b = BigInt(black);
+                        const w = BigInt(white);
+                        const move = lastMove(blackBb, whiteBb, b, w);
+                        if (move !== "") showMessage(move);
+                        blackBb = b;
+                        whiteBb = w;
                         emptyBb = BigInt(empty);
                         whiteScore = BigInt(wScore);
                         blackScore = BigInt(bScore);
                         currentPlayer = BigInt(ply) & 1n ? "White" : "Black";               
                         grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
-                        if (atLeastOneMove(grid, (currentPlayer === "White" ? whiteBb : blackBb))) {
+                        if (gameOver(grid, blackBb, whiteBb)) {
+                            state = gameOverState;
+                        } else if (atLeastOneMove(grid, (currentPlayer === "White" ? whiteBb : blackBb))) {
                             state = fromSquareState;   
-                        }                        
+                        } else {
+                            const msg = `[${currentPlayer === "White" ? "white" : "black"} move] ${noneMove}`;
+                            ws.send(msg);
+                            showMessage(msg);
+                            currentPlayer = currentPlayer === "White" ? "Black" : "White";                            
+                        }
                     }
                 } 
-            }           
+            }
+            if (msg !== "") showMessage(msg);
             draw(); 
         }
         
@@ -237,8 +252,8 @@
         }
 
         function initGame() {
-            blackBb = 0b1000000000000000000000000000100000010000000000000000000000000001n;
-            whiteBb = 0b0000000100000000000000000001000000001000000000000000000010000000n;
+            blackBb = INITIAL_BLACK_BB;
+            whiteBb = INITIAL_WHITE_BB;
             emptyBb = 0n;
             blackScore = 0;
             whiteScore = 0;

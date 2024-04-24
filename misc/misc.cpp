@@ -24,7 +24,7 @@ WebsocketServerSync::WebsocketServerSync(const std::string& host, uint16_t port)
 
 void WebsocketServerSync::close() {
     try {
-        ws.close(websocket::close_code::normal);
+        ws.close(websocket::close_code::normal);        
     } catch (std::exception const& e) {
         std::cerr << "WebsocketServerSync::close error: " << e.what() << std::endl;
         throw;

@@ -13,7 +13,7 @@ class MCTSPlayer : public Player {
         std::atomic<uint32_t> nb_visits = 1;
         std::atomic<uint32_t> virtual_loss = 0;
         std::atomic<float> value = 0;
-        std::atomic<bool> expanded = false;
+        std::atomic<uint8_t> expanded = 0;
         Move action;
         std::pmr::vector<Node> nodes;
         

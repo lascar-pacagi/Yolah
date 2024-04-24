@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Yolah!</title>   
+    <style>
+        #grid {
+            padding: 0; 
+            /* margin: 12px; */
+            display: grid;
+            grid-template-columns: 600px 200px;
+            grid-template-rows: 600px;
+            grid-gap: 30px;
+        }
+        #rightGrid {            
+            display: grid;
+            grid-template-columns: 80px 40px;
+            grid-template-rows: 70px 30px;
+        }
+        #black {
+            font-size: 20px;
+            font-weight: bold;
+            grid-column: 1;
+            grid-row: 2;
+        }
+        #blackScore {      
+            font-size: 20px;      
+            grid-column: 2;
+            grid-row: 2;
+        }
+        #white {
+            font-size: 20px;
+            font-weight: bold;
+            grid-column: 1;
+            grid-row: 3;
+        }
+        #whiteScore {      
+            font-size: 20px;      
+            grid-column: 2;
+            grid-row: 3;
+        }
+        #turn {
+            font-size: 20px;
+            font-weight: bold;      
+            grid-column: 1;
+            grid-row: 1;
+        }
+        #toPlay {
+            font-size: 20px;
+            font-weight: bold;      
+            grid-column: 2;
+            grid-row: 1;
+        }
+    </style> 
+    <script src="common.js"></script>
+    <script>        
+        let blackBb;
+        let whiteBb;
+        let emptyBb;
+        let currentPlayer;
+        let blackScore;
+        let whiteScore;
+        let fromSquare;
+        let toSquare;
+        let moves;
+        let grid;
+        let state;
+        let ws;
+        let uri;
+        let connect;        
+        let disconnect;
+        let send;
+        let sendMessage;
+        let messages;
+        const noneMove = "a1:a1";
+        const pattern = /^\[([^\]]*)\](.*)/;
+        
+        function drawScore(blackScore, whiteScore) {
+            let b = document.getElementById("blackScore");
+            b.textContent = blackScore.toString();
+            let w = document.getElementById("whiteScore");
+            w.textContent = whiteScore.toString();
+        }
+
+        function drawTurn(player) {
+            let turn = document.getElementById("toPlay");
+            if (state === gameOverState) {
+                turn.textContent = "";
+            } else {                
+                if (player === "Black") {
+                    turn.textContent = "\u2B24";
+                } else {
+                    turn.textContent = "\u25EF";
+                }
+            }
+        }
+
+        function draw() {
+            drawScore(blackScore, whiteScore);
+            drawTurn(currentPlayer);
+            drawGrid(grid);
+            if (state === toSquareState) {
+                drawPossibleMoves(moves);
+            } else if (state === gameOverState) {
+                ctx.font = "58px Brush Script MT";
+                ctx.fillStyle = "white";
+                let txt = "Draw";
+                if (blackScore > whiteScore) {
+                    txt = "Black won";
+                } else if (blackScore < whiteScore) {
+                    txt = "White won";
+                }              
+                let dx = (canvas.width - ctx.measureText(txt).width) / 2;  
+                ctx.fillText(txt, dx, canvas.height / 2);
+                ctx.strokeStyle = "black";
+                ctx.strokeText(txt, dx, canvas.height / 2);
+            }
+        }
+
+        function choice(event) {
+            console.log(event);
+            console.log("choice");
+            state(event);
+        }
+                
+        function showMessage(msg) {
+            messages.innerText += msg + "\n";
+            messages.scrollTop = messages.scrollHeight - messages.clientHeight;
+        }        
+
+        function waitingForConnexion() {
+            console.log("waiting for connexion");
+        }
+
+        function getGameState() {
+            console.log("get game state");
+        }
+
+        function fromSquareState(event) {
+            console.log("fromSquareState");            
+            fromSquare = clickToSquare(event);
+            if (possibleMoves(grid, fromSquare).length === 0 || isSet(emptyBb, fromSquare)) {
+                return;
+            } 
+            if (currentPlayer === "Black") {
+                if (!isSet(blackBb, fromSquare)) return;
+                blackBb = unsetBitboard(blackBb, fromSquare);
+                blackScore++;
+            } else {
+                if (!isSet(whiteBb, fromSquare)) return;
+                whiteBb = unsetBitboard(whiteBb, fromSquare);
+                whiteScore++;
+            }
+            emptyBb = setBitboard(emptyBb, fromSquare);
+            grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+            moves = possibleMoves(grid, fromSquare);    
+            state = toSquareState;
+            draw();
+        }
+
+        function toSquareState(event) {
+            console.log("toSquareState");
+            const square = clickToSquare(event);
+            let [i, j] = squareToCoordinates(square);         
+            if (!moves.some(([i1, j1]) => i === i1 && j === j1)) return;
+            toSquare = square;
+            if (currentPlayer === "Black") {
+                const msg = `[black move] ${squaresToMove(fromSquare, toSquare)}`;
+                ws.send(msg);
+                blackBb = setBitboard(blackBb, square);
+                showMessage(msg);
+                grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+                if (atLeastOneMove(grid, whiteBb)) {
+                    currentPlayer = "White";
+                }
+            } else {
+                const msg = `[white move] ${squaresToMove(fromSquare, toSquare)}`;
+                ws.send(msg);
+                whiteBb = setBitboard(whiteBb, square);
+                showMessage(msg);
+                grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+                if (atLeastOneMove(grid, blackBb)) {
+                    currentPlayer = "Black";
+                }
+            }
+            moves = [];            
+            state = gameOver(grid, blackBb, whiteBb) ? gameOverState : getGameState;
+            draw();
+        }
+
+        function gameOverState(event) {
+            console.log("gameOverState");
+        }
+
+        function onOpenConnexion(ev) {
+            showMessage("[connexion opened]");
+            initGame();
+            state = getGameState;
+            draw();            
+        }
+                
+        function onCloseConnexion(ev) {
+            showMessage(`[connexion closed, code=${ev.code}, reason=${ev.reason}]`);
+            draw();
+        }
+         
+        function onMessage(ev) {
+            let msg = ev.data;
+            console.log(msg);
+            let res = pattern.exec(ev.data);
+            if (state === getGameState) {
+                if (res && res.length == 3 && res[1] === 'game state') {
+                    const json = JSON.parse(res[2])                    
+                    const black = json['black'];
+                    const white = json['white'];
+                    const empty = json['empty'];
+                    const ply   = json['ply'];
+                    const wScore = json['white_score'];
+                    const bScore = json['black_score'];
+                    if (black && white && empty && ply && wScore && bScore) {
+                        msg = "";
+                        const b = BigInt(black);
+                        const w = BigInt(white);
+                        const move = lastMove(blackBb, whiteBb, b, w);
+                        if (move !== "") showMessage(move);
+                        blackBb = b;
+                        whiteBb = w;
+                        emptyBb = BigInt(empty);
+                        whiteScore = BigInt(wScore);
+                        blackScore = BigInt(bScore);
+                        currentPlayer = BigInt(ply) & 1n ? "White" : "Black";               
+                        grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+                        if (gameOver(grid, blackBb, whiteBb)) {
+                            state = gameOverState;
+                        } else if (atLeastOneMove(grid, (currentPlayer === "White" ? whiteBb : blackBb))) {
+                            state = fromSquareState;   
+                        } else {
+                            const msg = `[${currentPlayer === "White" ? "white" : "black"} move] ${noneMove}`;
+                            ws.send(msg);
+                            showMessage(msg);
+                            currentPlayer = currentPlayer === "White" ? "Black" : "White";                            
+                        }
+                    }
+                } 
+            }
+            if (msg !== "") showMessage(msg);
+            draw(); 
+        }
+        
+        function onError(ev) {
+            showMessage(`[error, code=${ev.code}, reason=${ev.reason}]`);
+        }
+
+        function initGame() {
+            blackBb = INITIAL_BLACK_BB;
+            whiteBb = INITIAL_WHITE_BB;
+            emptyBb = 0n;
+            blackScore = 0;
+            whiteScore = 0;
+            currentPlayer = "Black";
+            grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+        }
+
+        function init() {
+            state = waitingForConnexion;
+            canvas = document.getElementById("canvas");
+            ctx = canvas.getContext("2d");
+            initGame();
+            connect     = document.getElementById("connect");
+            disconnect  = document.getElementById("disconnect");
+            send        = document.getElementById("send");
+            sendMessage = document.getElementById("sendMessage");
+            messages    = document.getElementById("messages");
+            uri         = document.getElementById("uri");
+            connect.onclick = function() {            
+                ws = new WebSocket(uri.value);            
+                ws.onopen = function(ev) {
+                    onOpenConnexion(ev);
+                };
+                ws.onclose = function(ev) {
+                    onCloseConnexion(ev);
+                };
+                ws.onmessage = function(ev) {
+                    onMessage(ev);
+                };
+                ws.onerror = function(ev) {
+                    onError(ev);
+                };
+            };
+            disconnect.onclick = function() {
+                ws.close();
+            };
+            send.onclick = function() {
+                ws.send(userName.value + ": " + sendMessage.value);
+                sendMessage.value = "";
+            };
+            sendMessage.onkeyup = function(ev) {
+                ev.preventDefault();
+                if (ev.keyCode === 13) {
+                    send.click();
+                }
+            };
+            canvas.addEventListener("click", choice);
+            draw();
+        }
+    </script>
+</head>
+
+<body onLoad="init();">
+    Server URI: <input class="draw-border" id="uri" size="47" value="ws://localhost:4242" style="margin-bottom: 5px;">
+    <button class="echo-button" id="connect">Connect</button>
+    <button class="echo-button" id="disconnect">Disconnect</button><br>
+    Your name: <input class="draw-border" id="userName" size=47 style="margin-bottom: 5px;"><br>    
+    <div id="grid">
+        <div class="left">
+            <canvas id="canvas" width="600px" height="600px" style="border:3px solid black">
+                Your browser doesn't support the HTML5 element canvas.
+            </canvas>
+        </div>
+        <div id="rightGrid">
+            <p id="turn">Turn</p><p id="toPlay">&#11044;</p> 
+            <!-- &#9711; -->
+            <p id="black">Black</p> <p id="blackScore">0</p>
+            <p id="white">White</p> <p id="whiteScore">0</p>
+        </div>
+    </div>
+    <pre id="messages" style="width: 600px; height: 180px; white-space: normal; overflow: auto; border: solid 1px #cccccc; margin-bottom: 5px;"></pre>    
+    <div style="margin-bottom: 5px;">
+        Message<br>
+        <input class="draw-border" id="sendMessage" size="74" value="">
+        <button class="echo-button" id="send">Send</button>
+    </div>
+</body>
+
+</html>
