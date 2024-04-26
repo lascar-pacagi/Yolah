@@ -123,10 +123,12 @@ function drawPossibleMoves(moves) {
     const dx = canvasWidth() / GRID_DIM;
     const dy = canvasHeight() / GRID_DIM;
     ctx.save();
-    ctx.strokeStyle = "DarkOrange";
-    ctx.lineWidth = 4;
+    ctx.fillStyle = "DarkOrange";
+    ctx.strokeStyle = "Black";
+    ctx.lineWidth = 1.5;
     for (const idx in moves) {
         let [i, j] = moves[idx];                
+        ctx.fillRect(dx * j, dy * (GRID_DIM - 1 - i), dx, dy);
         ctx.beginPath();
         ctx.rect(dx * j, dy * (GRID_DIM - 1 - i), dx, dy);
         ctx.stroke();
@@ -218,4 +220,77 @@ function lastMove(oldBlackBb, oldWhiteBb, newBlackBb, newWhiteBb) {
         return `[white move] ${findMove(oldWhiteBb, newWhiteBb)}`;
     }
     return `[black move] ${findMove(oldBlackBb, newBlackBb)}`;    
+}
+
+function doSleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms)); 
+}
+
+async function sleep(ms) {
+    await doSleep(ms);
+}
+
+function drawArrow(fromx, fromy, tox, toy, arrowWidth, color){
+    const headlen = 10;
+    const angle = Math.atan2(toy-fromy,tox-fromx);
+ 
+    ctx.save();
+    ctx.strokeStyle = color;
+ 
+    //starting path of the arrow from the start square to the end square
+    //and drawing the stroke
+    ctx.beginPath();
+    ctx.moveTo(fromx, fromy);
+    ctx.lineTo(tox, toy);
+    ctx.lineWidth = arrowWidth;
+    ctx.stroke();
+ 
+    //starting a new path from the head of the arrow to one of the sides of
+    //the point
+    ctx.beginPath();
+    ctx.moveTo(tox, toy);
+    ctx.lineTo(tox-headlen*Math.cos(angle-Math.PI/7),
+               toy-headlen*Math.sin(angle-Math.PI/7));
+ 
+    //path from the side point of the arrow, to the other side point
+    ctx.lineTo(tox-headlen*Math.cos(angle+Math.PI/7),
+               toy-headlen*Math.sin(angle+Math.PI/7));
+ 
+    //path from the side point back to the tip of the arrow, and then
+    //again to the opposite side point
+    ctx.lineTo(tox, toy);
+    ctx.lineTo(tox-headlen*Math.cos(angle-Math.PI/7),
+               toy-headlen*Math.sin(angle-Math.PI/7));
+ 
+    ctx.stroke();
+    ctx.restore();
+}
+
+function squareToXY([i, j]) {
+    const dx = canvasWidth() / GRID_DIM;
+    const dy = canvasHeight() / GRID_DIM;
+    const x = j * dy + dy / 2;
+    const y = (GRID_DIM - i - 1) * dx + dx / 2;
+    return [x, y];
+}
+
+function drawArrowBetweenSquares([[i1, j1], [i2, j2]], arrowWidth, color) {
+    const [x1, y1] = squareToXY([i1, j1]);
+    const [x2, y2] = squareToXY([i2, j2]);
+    drawArrow(x1, y1, x2, y2, arrowWidth, color);
+}
+
+function lastMoveCoordinates(oldBlackBb, oldWhiteBb, newBlackBb, newWhiteBb) {
+    function findMove(oldBb, newBb) {
+        const fromSquare = ctz(oldBb & ~newBb); 
+        const toSquare   = ctz(newBb & ~oldBb);
+        return [squareToCoordinates(fromSquare), squareToCoordinates(toSquare)];
+    }
+    if (oldBlackBb === newBlackBb && oldWhiteBb === newWhiteBb) {
+        return [[0, 0], [0, 0]];
+    }
+    if (oldBlackBb === newBlackBb) {
+        return findMove(oldWhiteBb, newWhiteBb);
+    }
+    return findMove(oldBlackBb, newBlackBb);
 }

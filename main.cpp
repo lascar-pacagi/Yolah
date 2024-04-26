@@ -10,6 +10,7 @@
 #include "MCTS_mem_player.h"
 #include "misc.h"
 #include "ascii_observer.h"
+#include "html_observer.h"
 
 using std::cout;
 
@@ -24,7 +25,10 @@ int main() {
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';   
-    test::play(std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
-               std::make_unique<MCTSMemPlayer>(4000000),
+    test::play(std::make_unique<MCTSMemPlayer>(4000000),
+               std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
                AsciiObserver());
+    // test::play(std::make_unique<MCTSMemPlayer>(400000),
+    //             std::make_unique<RandomPlayer>(), 
+    //             HtmlObserver("127.0.0.1", 4242));
 }

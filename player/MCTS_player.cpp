@@ -26,27 +26,26 @@ void MCTSPlayer::Node::expand(const Yolah& yolah) {
 }
 
 bool MCTSPlayer::Node::is_leaf() const {
-    return expanded != 2;
+    return expanded.load(std::memory_order_acquire) != 2;
 }
         
-void MCTSPlayer::Node::update(float v) {
+void MCTSPlayer::Node::update(int32_t v) {
     nb_visits += 1;
     virtual_loss -= VIRTUAL_LOSS;
     value += v;
 }
 
 uint32_t MCTSPlayer::Node::select() const {
-    auto N = static_cast<float>(nb_visits);
-    float log_N = std::log(N);
+    auto N = static_cast<double>(nb_visits);
+    double log_N = std::log(N);
     // TO DO: SIMD
     auto nb_children = static_cast<uint32_t>(nodes.size());
     uint32_t k = prng.rand<uint32_t>() % nodes.size();
     uint32_t res = k;
-    if (k > 1000) std::cout << "problem " << k << " " << nodes.size() << " " << (prng.rand<uint32_t>() % nodes.size()) << std::endl;
-    float best_value = std::numeric_limits<float>::lowest();
+    double best_value = std::numeric_limits<double>::lowest();
     for (uint32_t i = 0; i < nb_children; i++) {        
-        auto n = static_cast<float>(nodes[k].nb_visits + nodes[k].virtual_loss);
-        if (float v = -nodes[k].value / n + C * std::sqrt(log_N / n); v > best_value) {
+        auto n = static_cast<double>(nodes[k].nb_visits + nodes[k].virtual_loss);
+        if (double v = -nodes[k].value / n + C * std::sqrt(log_N / n); v > best_value) {
             best_value = v;
             res = k;
         }
@@ -60,7 +59,7 @@ uint32_t MCTSPlayer::Node::select() const {
 
 std::ostream& operator<<(std::ostream& os, const MCTSPlayer::Node& n) {
     os << "[ # visits ]: " << n.nb_visits << '\n';
-    os << "[   value  ]: " << n.value << '\n';
+    os << "[   value  ]: " << static_cast<double>(n.value) / n.nb_visits << '\n';
     os << "[ children ]:\n";
     for (const auto& node : n.nodes) {
         os << "  "  << node.action << " (" << node.nb_visits << " / " << node.value << ")\n"; 
@@ -69,7 +68,7 @@ std::ostream& operator<<(std::ostream& os, const MCTSPlayer::Node& n) {
 }
 
 namespace {
-    float game_value(const Yolah& yolah, uint8_t player) {
+    int32_t game_value(const Yolah& yolah, uint8_t player) {
         const auto [black_score, white_score] = yolah.score();        
         if (int v = (player == Yolah::BLACK ? 1 : -1) * (black_score - white_score); v > 0) return 1;
         else if (v < 0) return -1;
@@ -77,7 +76,7 @@ namespace {
     }
 }
 
-float MCTSPlayer::playout(Yolah yolah) const {
+int32_t MCTSPlayer::playout(Yolah yolah) const {
     uint8_t player = yolah.current_player();
     Yolah::MoveList moves;
     while (!yolah.game_over()) {
@@ -100,16 +99,14 @@ void MCTSPlayer::think(Yolah yolah) {
         size_t size = 1;
         Node* current = &root;
         visited[0] = current;
-        ++current->nb_visits;
         current->virtual_loss += VIRTUAL_LOSS;
         while (!yolah.game_over() && !current->is_leaf()) {
             current = &current->nodes[current->select()];
             yolah.play(current->action);
-            ++current->nb_visits;
             current->virtual_loss += VIRTUAL_LOSS;
             visited[size++] = current;
         }
-        float game_value = 0;
+        int32_t game_value = 0;
         if (yolah.game_over()) {            
             game_value = ::game_value(yolah, yolah.current_player());
         } else {

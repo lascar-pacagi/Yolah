@@ -72,6 +72,7 @@
         let send;
         let sendMessage;
         let messages;
+        let arrow;
         const noneMove = "a1:a1";
         const pattern = /^\[([^\]]*)\](.*)/;
         
@@ -99,6 +100,9 @@
             drawScore(blackScore, whiteScore);
             drawTurn(currentPlayer);
             drawGrid(grid);
+            if (arrow.length !== 0) {
+                drawArrowBetweenSquares(arrow, 10, "DarkOrange");
+            }
             if (state === toSquareState) {
                 drawPossibleMoves(moves);
             } else if (state === gameOverState) {
@@ -222,7 +226,10 @@
                         const b = BigInt(black);
                         const w = BigInt(white);
                         const move = lastMove(blackBb, whiteBb, b, w);
-                        if (move !== "") showMessage(move);
+                        if (move !== "") {                            
+                            showMessage(move);
+                            arrow = lastMoveCoordinates(blackBb, whiteBb, b, w);
+                        }
                         blackBb = b;
                         whiteBb = w;
                         emptyBb = BigInt(empty);
@@ -258,6 +265,7 @@
             blackScore = 0;
             whiteScore = 0;
             currentPlayer = "Black";
+            arrow = [];
             grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
         }
 

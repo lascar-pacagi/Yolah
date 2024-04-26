@@ -72,6 +72,7 @@
         let send;
         let sendMessage;
         let messages;
+        let arrow;
         const noneMove = "a1:a1";
         const pattern = /^\[([^\]]*)\](.*)/;
         
@@ -99,9 +100,10 @@
             drawScore(blackScore, whiteScore);
             drawTurn(currentPlayer);
             drawGrid(grid);
-            if (state === toSquareState) {
-                drawPossibleMoves(moves);
-            } else if (state === gameOverState) {
+            if (arrow.length !== 0) {
+                drawArrowBetweenSquares(arrow, 10, "DarkOrange");
+            }
+            if (state === gameOverState) {
                 ctx.font = "58px Brush Script MT";
                 ctx.fillStyle = "white";
                 let txt = "Draw";
@@ -116,12 +118,6 @@
                 ctx.strokeText(txt, dx, canvas.height / 2);
             }
         }
-
-        function choice(event) {
-            console.log(event);
-            console.log("choice");
-            state(event);
-        }
                 
         function showMessage(msg) {
             messages.innerText += msg + "\n";
@@ -135,59 +131,7 @@
         function getGameState() {
             console.log("get game state");
         }
-
-        function fromSquareState(event) {
-            console.log("fromSquareState");            
-            fromSquare = clickToSquare(event);
-            if (possibleMoves(grid, fromSquare).length === 0 || isSet(emptyBb, fromSquare)) {
-                return;
-            } 
-            if (currentPlayer === "Black") {
-                if (!isSet(blackBb, fromSquare)) return;
-                blackBb = unsetBitboard(blackBb, fromSquare);
-                blackScore++;
-            } else {
-                if (!isSet(whiteBb, fromSquare)) return;
-                whiteBb = unsetBitboard(whiteBb, fromSquare);
-                whiteScore++;
-            }
-            emptyBb = setBitboard(emptyBb, fromSquare);
-            grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
-            moves = possibleMoves(grid, fromSquare);    
-            state = toSquareState;
-            draw();
-        }
-
-        function toSquareState(event) {
-            console.log("toSquareState");
-            const square = clickToSquare(event);
-            let [i, j] = squareToCoordinates(square);         
-            if (!moves.some(([i1, j1]) => i === i1 && j === j1)) return;
-            toSquare = square;
-            if (currentPlayer === "Black") {
-                const msg = `[black move] ${squaresToMove(fromSquare, toSquare)}`;
-                ws.send(msg);
-                blackBb = setBitboard(blackBb, square);
-                showMessage(msg);
-                grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
-                if (atLeastOneMove(grid, whiteBb)) {
-                    currentPlayer = "White";
-                }
-            } else {
-                const msg = `[white move] ${squaresToMove(fromSquare, toSquare)}`;
-                ws.send(msg);
-                whiteBb = setBitboard(whiteBb, square);
-                showMessage(msg);
-                grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
-                if (atLeastOneMove(grid, blackBb)) {
-                    currentPlayer = "Black";
-                }
-            }
-            moves = [];            
-            state = gameOver(grid, blackBb, whiteBb) ? gameOverState : getGameState;
-            draw();
-        }
-
+        
         function gameOverState(event) {
             console.log("gameOverState");
         }
@@ -222,7 +166,10 @@
                         const b = BigInt(black);
                         const w = BigInt(white);
                         const move = lastMove(blackBb, whiteBb, b, w);
-                        if (move !== "") showMessage(move);
+                        if (move !== "") {
+                            showMessage(move);
+                            arrow = lastMoveCoordinates(blackBb, whiteBb, b, w);                            
+                        }
                         blackBb = b;
                         whiteBb = w;
                         emptyBb = BigInt(empty);
@@ -231,14 +178,8 @@
                         currentPlayer = BigInt(ply) & 1n ? "White" : "Black";               
                         grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
                         if (gameOver(grid, blackBb, whiteBb)) {
+                            console.log("game over");
                             state = gameOverState;
-                        } else if (atLeastOneMove(grid, (currentPlayer === "White" ? whiteBb : blackBb))) {
-                            state = fromSquareState;   
-                        } else {
-                            const msg = `[${currentPlayer === "White" ? "white" : "black"} move] ${noneMove}`;
-                            ws.send(msg);
-                            showMessage(msg);
-                            currentPlayer = currentPlayer === "White" ? "Black" : "White";                            
                         }
                     }
                 } 
@@ -258,6 +199,7 @@
             blackScore = 0;
             whiteScore = 0;
             currentPlayer = "Black";
+            arrow = [];
             grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
         }
 
@@ -300,7 +242,6 @@
                     send.click();
                 }
             };
-            canvas.addEventListener("click", choice);
             draw();
         }
     </script>

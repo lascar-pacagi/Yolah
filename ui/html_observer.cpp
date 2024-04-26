@@ -11,8 +11,8 @@ void HtmlObserver::operator()(Yolah yolah) {
 }
 
 void HtmlObserver::operator()(uint8_t player, Move m) {
-    std::stringbuf buffer;
-    std::ostream os(&buffer);
-    os << "[" << (player == Yolah::BLACK ? "black" : "white") <<  " move]" << m;
-    ws.write(net::buffer(buffer.str()));
+    // std::stringbuf buffer;
+    // std::ostream os(&buffer);
+    // os << "[" << (player == Yolah::BLACK ? "black" : "white") <<  " move]" << m;
+    // ws.write(net::buffer(buffer.str()));
 }

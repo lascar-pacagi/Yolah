@@ -12,7 +12,7 @@ class MCTSPlayer : public Player {
         static constexpr float C = std::numbers::sqrt2_v<float>;
         std::atomic<uint32_t> nb_visits = 1;
         std::atomic<uint32_t> virtual_loss = 0;
-        std::atomic<float> value = 0;
+        std::atomic<int32_t> value = 0;
         std::atomic<uint8_t> expanded = 0;
         Move action;
         std::pmr::vector<Node> nodes;
@@ -29,7 +29,7 @@ class MCTSPlayer : public Player {
         }    
         bool is_leaf() const;
         void expand(const Yolah&);
-        void update(float);
+        void update(int32_t);
         uint32_t select() const;        
     };
     friend std::ostream& operator<<(std::ostream&, const Node&);
@@ -39,7 +39,7 @@ class MCTSPlayer : public Player {
     const uint64_t thinking_time;
     Node root;
     BS::thread_pool pool;
-    float playout(Yolah) const;
+    int32_t playout(Yolah) const;
     void think(Yolah);
     void reset();
 public:
