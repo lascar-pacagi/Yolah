@@ -58,11 +58,17 @@ public:
     static constexpr uint8_t WHITE = 1;
     std::pair<uint16_t, uint16_t> score() const;
     uint8_t current_player() const;
+    static constexpr uint8_t other_player(uint8_t player) {
+      return 1 - player;
+    }
     bool game_over() const;
     void play(Move m);
     void undo(Move m);
+    void moves(uint8_t player, MoveList& moves) const;
     void moves(MoveList& moves) const;
     bool valid(Move m) const;
+    uint64_t free_squares() const;
+    uint64_t bitboard(uint8_t player) const;
     std::string to_json() const;
     static Yolah from_json(std::istream& is);
     friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);

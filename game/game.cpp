@@ -74,9 +74,9 @@ void Yolah::undo(Move m) {
     ply--;
 }
 
-void Yolah::moves(MoveList& moves) const {
+void Yolah::moves(uint8_t player, MoveList& moves) const {
     Move* moveList = moves.moveList;
-    uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (ply & 1); 
+    uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (player == WHITE); 
     uint64_t black_mask = ~white_mask;
     uint64_t occupied = black | white | empty;
     uint64_t bb = (black_mask & black) | (white_mask & white);
@@ -105,7 +105,20 @@ void Yolah::moves(MoveList& moves) const {
             std::cout << '\n' << moves.size() << '\n';
         }
         std::cout << "end moves" << std::endl;
-    });    
+    });
+}
+
+void Yolah::moves(MoveList& moves) const {
+    Yolah::moves(current_player(), moves);
+}
+
+uint64_t Yolah::free_squares() const {
+    uint64_t occupied = black | white | empty;
+    return FULL & ~occupied;
+}
+
+uint64_t Yolah::bitboard(uint8_t player) const {
+    return player == BLACK ? black : white;
 }
 
 string Yolah::to_json() const {

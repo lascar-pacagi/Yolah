@@ -122,23 +122,28 @@ function drawLine(x1, y1, x2, y2) {
 function drawPossibleMoves(moves) {
     const dx = canvasWidth() / GRID_DIM;
     const dy = canvasHeight() / GRID_DIM;
+    //console.log(dx, dy, canvasWidth(), canvasHeight());
+    const marginX = dx * 0.75;
+    const marginY = dy * 0.75;
+    const w = dx - 2 * marginX;
+    const h = dy - 2 * marginY;
     ctx.save();
     ctx.fillStyle = "DarkOrange";
     ctx.strokeStyle = "Black";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1;
     for (const idx in moves) {
         let [i, j] = moves[idx];                
-        ctx.fillRect(dx * j, dy * (GRID_DIM - 1 - i), dx, dy);
+        ctx.fillRect(dx * j + marginX, dy * (GRID_DIM - 1 - i) + marginY, w, h);
         ctx.beginPath();
-        ctx.rect(dx * j, dy * (GRID_DIM - 1 - i), dx, dy);
+        ctx.rect(dx * j + marginX, dy * (GRID_DIM - 1 - i) + marginY, w, h);
         ctx.stroke();
     }
     ctx.restore();
 }
 
 function drawGrid(grid) {
-    const dx = canvasWidth() / GRID_DIM;
-    const dy = canvasHeight() / GRID_DIM;
+    const dx = Math.floor(canvasWidth() / GRID_DIM);
+    const dy = Math.floor(canvasHeight() / GRID_DIM);
     ctx.fillStyle = BACKGROUND_COLOR;
     ctx.fillRect(0, 0, canvasWidth(), canvasHeight());            
     for (let i = 0; i < GRID_DIM; i++) {                

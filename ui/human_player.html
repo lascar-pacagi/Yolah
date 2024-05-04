@@ -99,13 +99,14 @@
         function draw() {
             drawScore(blackScore, whiteScore);
             drawTurn(currentPlayer);
-            drawGrid(grid);
+            drawGrid(grid);            
+            if (state === toSquareState) {
+                drawPossibleMoves(moves);
+            }
             if (arrow.length !== 0) {
                 drawArrowBetweenSquares(arrow, 10, "DarkOrange");
             }
-            if (state === toSquareState) {
-                drawPossibleMoves(moves);
-            } else if (state === gameOverState) {
+            if (state === gameOverState) {
                 ctx.font = "58px Brush Script MT";
                 ctx.fillStyle = "white";
                 let txt = "Draw";
