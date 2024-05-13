@@ -3,9 +3,11 @@ project(Yolah CXX)
 set (CMAKE_CXX_STANDARD 20)
 
 find_package(Boost 1.74 REQUIRED)
+find_package(TBB REQUIRED)
 
 add_executable(Yolah main.cpp)
 
+target_link_libraries(Yolah PRIVATE TBB::tbb)
 add_subdirectory(game)
 target_link_libraries(Yolah PRIVATE game)
 add_subdirectory(misc)
@@ -16,3 +18,5 @@ add_subdirectory(player)
 target_link_libraries(Yolah PRIVATE player)
 add_subdirectory(ui)
 target_link_libraries(Yolah PRIVATE ui)
+add_subdirectory(ga)
+target_link_libraries(Yolah PRIVATE ga)

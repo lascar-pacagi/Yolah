@@ -4,7 +4,7 @@
 #include "game.h"
 #include "random_game.h"
 #include "random_player.h"
-#include "player/human_player.h"
+#include "human_player.h"
 #include "monte_carlo_player.h"
 #include "MCTS_player.h"
 #include "MCTS_mem_player.h"
@@ -12,6 +12,8 @@
 #include "ascii_observer.h"
 #include "html_observer.h"
 #include "do_nothing_observer.h"
+#include "cem_test.h"
+#include "basic_minmax_player.h"
 
 using std::cout;
 
@@ -26,10 +28,20 @@ int main() {
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';   
-    test::play(std::make_unique<MCTSMemPlayer>(2000000),
-               std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
-               DoNothingObserver());
+    // test::play(std::make_unique<BasicMinMaxPlayer>(5),
+    //            std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
+    //            DoNothingObserver());
     // test::play(std::make_unique<MCTSMemPlayer>(100000),
     //             std::make_unique<MCTSMemPlayer>(2000000), 
     //             HtmlObserver("127.0.0.1", 4242));
+    // test::play(std::make_unique<BasicMinMaxPlayer>(4),
+    //             std::make_unique<BasicMinMaxPlayer>(4), 
+    //             HtmlObserver("127.0.0.1", 4242));
+    // test::cem_beale_function();
+    // test::cem_sphere_function();
+    // test::cem_rastrigin_function(); 
+    // test::play(std::make_unique<BasicMinMaxPlayer>(5),
+    //            std::make_unique<MonteCarloPlayer>(100000), 
+    //            HtmlObserver("127.0.0.1", 4242));
+    BasicMinMaxPlayer::learn_weights();   
 }

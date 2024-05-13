@@ -9,6 +9,10 @@ pair<uint16_t, uint16_t> Yolah::score() const {
     return { black_score, white_score };
 }
 
+int16_t Yolah::score(uint8_t player) const {
+    return (black_score - white_score) * (player == WHITE) * -1; 
+}
+
 uint8_t Yolah::current_player() const {
     return uint8_t(ply & 1);
 }
@@ -60,6 +64,7 @@ void Yolah::play(Move m) {
 }
     
 void Yolah::undo(Move m) {
+    ply--;
     if (m != Move::none()) [[likely]] {
         uint64_t pos1 = square_bb(m.from_sq());
         uint64_t pos2 = square_bb(m.to_sq());    
@@ -71,7 +76,6 @@ void Yolah::undo(Move m) {
         black_score -= black_mask & 1;
         white_score -= white_mask & 1;
     }
-    ply--;
 }
 
 void Yolah::moves(uint8_t player, MoveList& moves) const {

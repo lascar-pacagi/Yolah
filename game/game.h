@@ -50,13 +50,17 @@ public:
       explicit MoveList() : last(moveList) {}
       const Move* begin() const { return moveList; }
       const Move* end() const { return last; }
+      Move* begin() { return moveList; }
+      Move* end() { return last; }
       size_t size() const { return last - moveList; }
       const Move& operator[](size_t i) const { return moveList[i]; }
+      Move* data() { return moveList; }
       friend class Yolah;
     };
     static constexpr uint8_t BLACK = 0;
     static constexpr uint8_t WHITE = 1;
     std::pair<uint16_t, uint16_t> score() const;
+    int16_t score(uint8_t player) const;
     uint8_t current_player() const;
     static constexpr uint8_t other_player(uint8_t player) {
       return 1 - player;

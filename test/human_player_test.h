@@ -1,5 +1,5 @@
-#ifndef HUMAN_PLAYER_H
-#define HUMAN_PLAYER_H
+#ifndef HUMAN_PLAYER_TEST_H
+#define HUMAN_PLAYER_TEST_H
 #include "player.h"
 
 namespace test {

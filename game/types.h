@@ -78,7 +78,7 @@ constexpr uint64_t Rank8BB = Rank1BB << (8 * 7);
 constexpr uint64_t BLACK_INITIAL_POSITION = uint64_t(0b10000000'00000000'00000000'00001000'00010000'00000000'00000000'00000001);
 constexpr uint64_t WHITE_INITIAL_POSITION = uint64_t(0b00000001'00000000'00000000'00010000'00001000'00000000'00000000'10000000); 
 constexpr uint64_t FULL = uint64_t(0xFFFFFFFFFFFFFFFF);
-    
+
 constexpr bool is_ok(Square s) { return s >= SQ_A1 && s <= SQ_H8; }
 
 constexpr File file_of(Square s) { return File(s & 7); }
