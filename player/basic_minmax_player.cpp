@@ -5,6 +5,8 @@
 #include <chrono>
 #include <array>
 #include "monte_carlo_player.h"
+#include "MCTS_player.h"
+#include "MCTS_mem_player.h"
 
 BasicMinMaxPlayer::BasicMinMaxPlayer(uint16_t depth, heuristic_eval h) : depth(depth), heuristic(h) {
 }
@@ -94,13 +96,15 @@ void BasicMinMaxPlayer::learn_weights() {
     using std::vector, std::array;
     NoisyCrossEntropyMethod::Builder builder;
     builder
-    .population_size(30)
+    .population_size(40)
     .nb_iterations(100)
     .elite_fraction(0.2)
     .stddev(5)
     .extra_stddev(10)
     .weights(vector<double>(heuristic::NB_WEIGHTS))
-    .fitness([](const vector<double>& w, const vector<vector<double>>& population) {             
+    .fitness([](const vector<double>& w, const vector<vector<double>>& population) {    
+        size_t tournament_size = 4;
+        std::uniform_int_distribution<size_t> choose(0, tournament_size - 1);         
         std::mt19937 generator(std::chrono::system_clock::now().time_since_epoch().count());
         array<double, heuristic::NB_WEIGHTS> me_weights;
         for (size_t i = 0; double x : w) {
@@ -109,18 +113,46 @@ void BasicMinMaxPlayer::learn_weights() {
         auto play = [&](Player& p1, Player& p2) {
             Yolah yolah;
             while (!yolah.game_over()) {                 
-                Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2).play(yolah);
+                Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2).play(yolah);                
                 yolah.play(m);
-            }
+            }            
             return yolah.score(Yolah::BLACK);
         };
         double res = 0;        
         BasicMinMaxPlayer me(4, [&](uint8_t player, const Yolah& yolah) {
             return heuristic::eval(player, yolah, me_weights);
         });            
-        MonteCarloPlayer opponent(100000, 1);
-        res += play(me, opponent);
-        res -= play(opponent, me);
+        MonteCarloPlayer opponent1(200000, 1);                
+        MCTSMemPlayer opponent2(200000, 1);
+        MCTSMemPlayer opponent3(400000, 1);
+        BasicMinMaxPlayer opponent4(4, [](uint8_t player, const Yolah& yolah) {
+            return heuristic::eval(player, yolah, array<double, heuristic::NB_WEIGHTS>{-4.62405, 40.16631771383602, 116.7234963166842, 31.01379690685892, 109.9407672972486, 79.33243204035541});
+        });
+        auto update = [&](Player& me, Player& opponent) {
+            constexpr double W1 = 1e5;
+            constexpr double W2 = 1;
+            auto score = play(me, opponent);
+            res += W1 * ((score > 0) + (score < 0) * -1);
+            res += W2 * score;
+            score = play(opponent, me);
+            res += W1 * ((score > 0) * -1 + (score < 0));
+            res -= W2 * score;
+        };
+        update(me, opponent1);        
+        update(me, opponent2);
+        update(me, opponent3);
+        update(me, opponent4);
+        // for (size_t i = 0; i < tournament_size; i++) {
+        //     array<double, heuristic::NB_WEIGHTS> opponent_weights;
+        //     for (size_t i = 0; double x : population[choose(generator)]) {
+        //         opponent_weights[i] = x;
+        //     }        
+        //     BasicMinMaxPlayer opponent(4, [&](uint8_t player, const Yolah& yolah) {
+        //         return heuristic::eval(player, yolah, opponent_weights);
+        //     });
+        //     res += play(me, opponent);
+        //     res -= play(opponent, me);
+        // }
         return res;
     });
     // .fitness([](const vector<double>& w, const vector<vector<double>>& population) {             

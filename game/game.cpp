@@ -10,7 +10,7 @@ pair<uint16_t, uint16_t> Yolah::score() const {
 }
 
 int16_t Yolah::score(uint8_t player) const {
-    return (black_score - white_score) * (player == WHITE) * -1; 
+    return (black_score - white_score) * ((player == WHITE) * -1 + player == BLACK); 
 }
 
 uint8_t Yolah::current_player() const {

@@ -7,6 +7,8 @@
 #include <iterator>
 #include <iostream>
 #include "indicators.h"
+#include <sstream>
+#include <iomanip>
 
 NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::weights(const std::vector<double>& w) {
     weights_ = w;
@@ -103,7 +105,15 @@ void NoisyCrossEntropyMethod::run() {
         if (fitness_index[0].first > best_fitness) {
             best_fitness = fitness_index[0].first;
             optimized_weights = population[fitness_index[0].second];
-            bar.set_option(option::PostfixText{"Best fitness: " + std::to_string(best_fitness)});            
+            std::stringbuf buf;
+            std::ostream os(&buf);
+            os << "Best fitness: " << best_fitness;
+            os << " {" << optimized_weights[0];
+            for (size_t i = 1; i < optimized_weights.size(); i++) {
+                os << ", " << std::setprecision(std::numeric_limits<double>::digits10 + 1) << optimized_weights[i];
+            }
+            os << "}";
+            bar.set_option(option::PostfixText{buf.str()});            
         }
         for (size_t i = 0; i < weights_size; ++i) {
             weights_mean[i] = 0;

@@ -14,7 +14,7 @@
 #include "do_nothing_observer.h"
 #include "cem_test.h"
 #include "basic_minmax_player.h"
-
+#include <iomanip>
 using std::cout;
 
 int main() {

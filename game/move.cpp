@@ -1,6 +1,7 @@
 #include "move.h"
 #include <string>
 #include <cassert>
+#include <algorithm>
 
 using std::string;
 
