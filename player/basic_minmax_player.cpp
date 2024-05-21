@@ -96,10 +96,10 @@ void BasicMinMaxPlayer::learn_weights() {
     using std::vector, std::array;
     NoisyCrossEntropyMethod::Builder builder;
     builder
-    .population_size(40)
+    .population_size(20)
     .nb_iterations(100)
     .elite_fraction(0.2)
-    .stddev(5)
+    .stddev(1)
     .extra_stddev(10)
     .weights(vector<double>(heuristic::NB_WEIGHTS))
     .fitness([](const vector<double>& w, const vector<vector<double>>& population) {    
@@ -121,13 +121,14 @@ void BasicMinMaxPlayer::learn_weights() {
         double res = 0;        
         BasicMinMaxPlayer me(4, [&](uint8_t player, const Yolah& yolah) {
             return heuristic::eval(player, yolah, me_weights);
-        });            
+        });                    
         MonteCarloPlayer opponent1(200000, 1);                
         MCTSMemPlayer opponent2(200000, 1);
         MCTSMemPlayer opponent3(400000, 1);
-        BasicMinMaxPlayer opponent4(4, [](uint8_t player, const Yolah& yolah) {
-            return heuristic::eval(player, yolah, array<double, heuristic::NB_WEIGHTS>{-4.62405, 40.16631771383602, 116.7234963166842, 31.01379690685892, 109.9407672972486, 79.33243204035541});
-        });
+        MCTSMemPlayer opponent4(600000, 1);
+        // BasicMinMaxPlayer opponent4(4, [](uint8_t player, const Yolah& yolah) {
+        //     return heuristic::eval(player, yolah, array<double, heuristic::NB_WEIGHTS>{-4.62405, 40.16631771383602, 116.7234963166842, 31.01379690685892, 109.9407672972486, 79.33243204035541});
+        // });
         auto update = [&](Player& me, Player& opponent) {
             constexpr double W1 = 1e5;
             constexpr double W2 = 1;

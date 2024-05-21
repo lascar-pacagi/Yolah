@@ -28,7 +28,7 @@ int main() {
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';   
-    // test::play(std::make_unique<BasicMinMaxPlayer>(5),
+    // test::play(std::make_unique<MCTSMemPlayer>(400000),
     //            std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
     //            DoNothingObserver());
     // test::play(std::make_unique<MCTSMemPlayer>(100000),
@@ -40,8 +40,8 @@ int main() {
     // test::cem_beale_function();
     // test::cem_sphere_function();
     // test::cem_rastrigin_function(); 
-    test::play(std::make_unique<BasicMinMaxPlayer>(4),
-               std::make_unique<MCTSMemPlayer>(400000, 1), 
-               HtmlObserver("127.0.0.1", 4242));
-    //BasicMinMaxPlayer::learn_weights();   
+    // test::play(std::make_unique<BasicMinMaxPlayer>(4),
+    //            std::make_unique<MCTSMemPlayer>(400000, 1), 
+    //            HtmlObserver("127.0.0.1", 4242));
+    BasicMinMaxPlayer::learn_weights();   
 }

@@ -11,6 +11,8 @@ namespace heuristic {
         4. Connectivity: sum of squares connected to each piece.
         5. Connectivity set: sum of squares connected to each piece without counting the same square twice.
         6. Alone: number of squares owns by the player.
+        7. Closer: number of squares closer to us moving one square in each direction.
+        8. First: number of squares we can reach first in one move.
     */
     enum {
         NO_MOVE_WEIGHT,
@@ -19,15 +21,19 @@ namespace heuristic {
         CONNECTIVITY_WEIGHT,
         CONNECTIVITY_SET_WEIGHT,
         ALONE_WEIGHT,
+        CLOSER_WEIGHT,
+        FIRST_WEIGHT,
         NB_WEIGHTS
     };
     constexpr int32_t MAX_VALUE = 1000000;
     constexpr int32_t MIN_VALUE = -MAX_VALUE;
-    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{36.6023, 65.04737770450171, 554.1119972762815, 86.54276988986744, 42.05588289904526, 69.83660444100575};
+    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-1, 1, 1, 1, 1, 1, 1, 1};
     int32_t mobility(const Yolah::MoveList&);
     int32_t connectivity(uint8_t player, const Yolah&);
     int32_t connectivity_set(uint8_t player, const Yolah&);
     int32_t alone(uint8_t player, const Yolah&);
+    int32_t closer(uint8_t player, const Yolah&);
+    int32_t first(const Yolah::MoveList&, const Yolah::MoveList&);
     int32_t eval(uint8_t player, const Yolah&, const std::array<double, NB_WEIGHTS>& weights = WEIGHTS);
     int32_t evaluation(uint8_t player, const Yolah&);
 }
