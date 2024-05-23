@@ -146,6 +146,27 @@ namespace heuristic {
     int32_t first(const Yolah::MoveList& player_moves, const Yolah::MoveList& opponent_moves) {
         return first_fast(player_moves, opponent_moves).first;
     }
+    int32_t blocked(uint8_t player, const Yolah& yolah) {
+        uint64_t player_bb = yolah.bitboard(player);
+        uint64_t free = yolah.free_squares();
+        int32_t res = 0;
+        while (player_bb) {
+            uint64_t bb = player_bb & -player_bb;
+            //std::cout << Bitboard::pretty(bb) << std::endl;
+            uint64_t north = shift<NORTH>(bb);
+            uint64_t south = shift<SOUTH>(bb);
+            uint64_t east = shift<EAST>(bb);
+            uint64_t west = shift<WEST>(bb);
+            uint64_t north_east = shift<NORTH_EAST>(bb);
+            uint64_t south_east = shift<SOUTH_EAST>(bb);
+            uint64_t north_west = shift<NORTH_WEST>(bb);
+            uint64_t south_west = shift<SOUTH_WEST>(bb);
+            res += ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
+            //std::cout << res << std::endl;
+            player_bb &= ~bb;
+        }
+        return res;
+    }
     int32_t eval(uint8_t player, const Yolah& yolah, const std::array<double, NB_WEIGHTS>& weights) {
         //std::cout << yolah << std::endl;
         //std::cout << Bitboard::pretty(yolah.free_squares()) << std::endl;
@@ -161,7 +182,8 @@ namespace heuristic {
               weights[CONNECTIVITY_SET_WEIGHT] * pair{ connectivity_set(Yolah::BLACK, yolah), connectivity_set(Yolah::WHITE, yolah) } +
               weights[ALONE_WEIGHT] * pair{ alone(Yolah::BLACK, yolah), alone(Yolah::WHITE, yolah) } +
               weights[CLOSER_WEIGHT] * pair{ closer(Yolah::BLACK, yolah), closer(Yolah::WHITE, yolah) } +
-              weights[FIRST_WEIGHT] * first_fast(black_moves, white_moves);
+              weights[FIRST_WEIGHT] * first_fast(black_moves, white_moves) +
+              weights[BLOCKED_WEIGHT] * pair{ blocked(Yolah::BLACK, yolah), blocked(Yolah::WHITE, yolah) };
         int32_t value = static_cast<int32_t>((res.first - res.second) * (player == Yolah::BLACK ? 1 : -1));
         return std::max(MIN_VALUE, std::min(MAX_VALUE, value));
     }

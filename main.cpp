@@ -40,8 +40,8 @@ int main() {
     // test::cem_beale_function();
     // test::cem_sphere_function();
     // test::cem_rastrigin_function(); 
-    // test::play(std::make_unique<BasicMinMaxPlayer>(4),
-    //            std::make_unique<MCTSMemPlayer>(400000, 1), 
+    // test::play(std::make_unique<BasicMinMaxPlayer>(2),
+    //            std::make_unique<MCTSMemPlayer>(1000000, 1),               
     //            HtmlObserver("127.0.0.1", 4242));
     BasicMinMaxPlayer::learn_weights();   
 }
