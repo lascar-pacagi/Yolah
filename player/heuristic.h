@@ -29,7 +29,7 @@ namespace heuristic {
     };
     constexpr int32_t MAX_VALUE = 1000000;
     constexpr int32_t MIN_VALUE = -MAX_VALUE;
-    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{308.755, 701.724480280371, 552.4728494536939, 155.0070966975447, 135.4288310876355, 487.7408002345935, 1791.897311989448, 143.5039434206708};
+    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-636.978, 273.2707380666952, 210.5981963162676, 81.94436607719085, -136.0643874108966, 109.9212999814895, 600.6084192081971, 85.04415954324477, -1005.019936214849};
     int32_t mobility(const Yolah::MoveList&);
     int32_t connectivity(uint8_t player, const Yolah&);
     int32_t connectivity_set(uint8_t player, const Yolah&);

@@ -50,15 +50,21 @@ NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::elite_fracti
     return *this;
 }
 
+NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::transform(transform_weight t) {
+    transform_ = t;
+    return *this;
+}
+
 NoisyCrossEntropyMethod NoisyCrossEntropyMethod::Builder::build() const {
-    return { weights_, nb_iterations_, population_size_, elite_fraction_, stddev_, extra_stddev_, fitness_ };
+    return { weights_, nb_iterations_, population_size_, elite_fraction_, stddev_, extra_stddev_, fitness_, transform_ };
 }
 
 NoisyCrossEntropyMethod::NoisyCrossEntropyMethod(const std::vector<double>& weights, uint32_t nb_iterations, 
                                                  uint32_t population_size, double elite_fraction, double stddev, double extra_stddev, 
-                                                 fitness_function fitness) 
+                                                 fitness_function fitness, transform_weight transform) 
         : optimized_weights(weights), nb_iterations(nb_iterations), population_size(population_size), 
-          stddev(stddev), extra_stddev(extra_stddev), fitness(fitness), elite_size(population_size * elite_fraction) {
+          stddev(stddev), extra_stddev(extra_stddev), fitness(fitness), elite_size(population_size * elite_fraction),
+          transform(transform) {
 }
 
 void NoisyCrossEntropyMethod::run() {
@@ -94,7 +100,7 @@ void NoisyCrossEntropyMethod::run() {
         for (size_t i = 0; i < population_size; ++i) {
             fitness_index[i].second = i;
             for (size_t j = 0; j < weights_size; ++j) {
-                population[i][j] = distributions[j](generator);
+                population[i][j] = transform(j, distributions[j](generator));
             }
         }
         std::for_each(std::execution::par_unseq, begin(fitness_index), end(fitness_index), [&](pair<double, size_t>& p) {
