@@ -204,6 +204,6 @@ void NelderMead::run() {
     bar.set_progress(100);
 }
 
-void NelderMead::run_parallel(size_t nb_threads = std::thread::hardware_concurrency()) {
+void NelderMead::run_parallel(size_t nb_threads) {
 
 }
