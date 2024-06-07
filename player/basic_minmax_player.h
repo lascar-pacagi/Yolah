@@ -13,7 +13,6 @@ class BasicMinMaxPlayer : public Player {
     void sort_moves(Yolah&, Yolah::MoveList&);
 public:
     BasicMinMaxPlayer(uint16_t depth, heuristic_eval = heuristic::evaluation);
-    static void learn_weights();
     Move play(Yolah) override;
 };
 

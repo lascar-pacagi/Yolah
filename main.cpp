@@ -13,7 +13,9 @@
 #include "html_observer.h"
 #include "do_nothing_observer.h"
 #include "cem_test.h"
+#include "nelder_mead_test.h"
 #include "basic_minmax_player.h"
+#include "heuristic_weights_learner.h"
 #include <iomanip>
 using std::cout;
 
@@ -37,11 +39,26 @@ int main() {
     // test::play(std::make_unique<BasicMinMaxPlayer>(4),
     //             std::make_unique<BasicMinMaxPlayer>(4), 
     //             HtmlObserver("127.0.0.1", 4242));
-    test::cem_beale_function();
-    test::cem_sphere_function();
-    test::cem_rastrigin_function(); 
+    // test::cem_beale_function();
+    // test::cem_sphere_function();
+    // test::cem_rastrigin_function(); 
     // test::play(std::make_unique<BasicMinMaxPlayer>(4),
-    //            std::make_unique<MCTSMemPlayer>(500000),                                             
+    //            std::make_unique<MCTSMemPlayer>(100000, 1),
     //            HtmlObserver("127.0.0.1", 4242));
-    //BasicMinMaxPlayer::learn_weights();   
+    // test::play(std::make_unique<BasicMinMaxPlayer>(4),
+    //            std::make_unique<MonteCarloPlayer>(500000),
+    //            20);
+    // test::nelder_mead_beale_function();
+    // test::nelder_mead_sphere_function();
+    // test::nelder_mead_rastrigin_function();
+    heuristic::learn_weights(std::make_unique<heuristic::NelderMeadLearner>([](const std::vector<double>& weights) {
+        return std::make_unique<BasicMinMaxPlayer>(4, [&](uint8_t player, const Yolah& yolah) {
+            assert(weights.size() == heuristic::NB_WEIGHTS);
+            std::array<double, heuristic::NB_WEIGHTS> weights1;
+            for (size_t i = 0; i < heuristic::NB_WEIGHTS; i++) {
+                weights1[i] = weights[i];
+            }
+            return heuristic::eval(player, yolah, weights1);
+        });
+    }));
 }

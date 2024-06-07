@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <numeric>
+#include <algorithm>
 
 // xorshift64star Pseudo-Random Number Generator
 // This class is based on original code written and dedicated
@@ -92,5 +94,24 @@ public:
     void close();
     static std::shared_ptr<WebsocketServerSync> create(const std::string& host, uint16_t port);
 };
+
+template<typename T, typename U>
+void sort_small(std::vector<T>& elements, std::vector<U>& scores) {
+    const size_t N = elements.size();
+    std::vector<int> indexes(N);
+    std::iota(begin(indexes), end(indexes), 0);
+    for (size_t i = 1; i < N; i++) {
+        int j = i;
+        while (j > 0 && scores[j - 1] > scores[j]) {
+            std::swap(scores[j - 1], scores[j]);
+            std::swap(indexes[j - 1], indexes[j]);
+            j--;
+        }
+    }
+    std::vector<T> old_elements = elements;
+    for (size_t i = 0; i < N; i++) {
+        elements[i] = old_elements[indexes[i]];
+    }
+}
 
 #endif

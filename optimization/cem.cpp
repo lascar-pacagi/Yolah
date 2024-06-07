@@ -40,7 +40,7 @@ NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::extra_stddev
     return *this;
 }
 
-NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::fitness(fitness_function f) {
+NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::fitness(FitnessFunction f) {
     fitness_ = f;
     return *this;
 }
@@ -50,7 +50,7 @@ NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::elite_fracti
     return *this;
 }
 
-NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::transform(transform_weight t) {
+NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::transform(TransformWeight t) {
     transform_ = t;
     return *this;
 }
@@ -61,7 +61,7 @@ NoisyCrossEntropyMethod NoisyCrossEntropyMethod::Builder::build() const {
 
 NoisyCrossEntropyMethod::NoisyCrossEntropyMethod(const std::vector<double>& weights, uint32_t nb_iterations, 
                                                  uint32_t population_size, double elite_fraction, double stddev, double extra_stddev, 
-                                                 fitness_function fitness, transform_weight transform) 
+                                                 FitnessFunction fitness, TransformWeight transform) 
         : optimized_weights(weights), nb_iterations(nb_iterations), population_size(population_size), 
           stddev(stddev), extra_stddev(extra_stddev), fitness(fitness), elite_size(population_size * elite_fraction),
           transform(transform) {

@@ -1,12 +1,14 @@
 cmake_minimum_required(VERSION 3.20.0)
 project(Yolah CXX)
-set (CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Boost 1.71 REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Threads REQUIRED)
 
 add_executable(Yolah main.cpp)
+target_compile_options(Yolah PRIVATE -Wall)
 
 target_link_libraries(Yolah PRIVATE TBB::tbb)
 target_link_libraries(Yolah PRIVATE Threads::Threads)
@@ -20,5 +22,5 @@ add_subdirectory(player)
 target_link_libraries(Yolah PRIVATE player)
 add_subdirectory(ui)
 target_link_libraries(Yolah PRIVATE ui)
-add_subdirectory(ga)
-target_link_libraries(Yolah PRIVATE ga)
+add_subdirectory(optimization)
+target_link_libraries(Yolah PRIVATE optimization)
