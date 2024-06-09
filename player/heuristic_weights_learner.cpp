@@ -92,6 +92,13 @@ namespace heuristic {
             update(me, opponent);        
             update(me, opponent);
             update(me, opponent);
+            update(me, opponent);        
+            update(me, opponent);
+            update(me, opponent);
+            update(me, opponent);        
+            update(me, opponent);
+            update(me, opponent);
+            update(me, opponent);
             return res;
         });
         nelder_mead = builder.build();
@@ -102,6 +109,7 @@ namespace heuristic {
     
     std::vector<double> NelderMeadLearner::learn() {
         nelder_mead.run();
+        
         return nelder_mead.best_weights();
     }
 

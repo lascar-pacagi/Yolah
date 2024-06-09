@@ -40,7 +40,6 @@ public:
     NelderMead(const std::vector<BoundingBox>& bounding_boxes, size_t nb_iterations, 
                double reflexion, double expansion, double contraction, double shrinkage, FitnessFunction fitness);
     void run();
-    void run_parallel(size_t nb_threads = std::thread::hardware_concurrency());
     std::vector<double> best_weights() const;
 private:
     std::vector<BoundingBox> bounding_boxes;
@@ -50,7 +49,7 @@ private:
     double contraction;
     double shrinkage;
     FitnessFunction fitness;
-    std::vector<std::vector<double>> weights;
+    std::vector<double> best_weights_;
 };
 
 #endif
