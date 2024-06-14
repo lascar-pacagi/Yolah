@@ -12,10 +12,10 @@ namespace net = boost::asio;
 using tcp = boost::asio::ip::tcp;
 
 class HumanPlayer : public Player {
-    std::shared_ptr<WebsocketServerSync> connexion;
+    std::unique_ptr<WebsocketServerSync> connexion;
     void send_game_state(Yolah);
 public:
-    HumanPlayer(std::shared_ptr<WebsocketServerSync>);
+    HumanPlayer(std::unique_ptr<WebsocketServerSync>);
     Move play(Yolah) override;
     void game_over(Yolah) override;
     ~HumanPlayer() override;

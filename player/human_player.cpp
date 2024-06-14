@@ -8,7 +8,7 @@ namespace {
     const std::regex pattern("\\[(.*)\\]\\s*(\\w\\d):(\\w\\d)\\s*");    
 }
 
-HumanPlayer::HumanPlayer(std::shared_ptr<WebsocketServerSync> connexion) : connexion(connexion) {
+HumanPlayer::HumanPlayer(std::unique_ptr<WebsocketServerSync> connexion) : connexion(std::move(connexion)) {
 }
 
 void HumanPlayer::send_game_state(Yolah yolah) {

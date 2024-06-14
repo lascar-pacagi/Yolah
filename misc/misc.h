@@ -85,6 +85,7 @@ class WebsocketServerSync : public SocketServerSync {
     websocket::stream<tcp::socket> ws;
 public:
     WebsocketServerSync(const std::string& host, uint16_t port);
+    ~WebsocketServerSync();
     void read(auto&& buffer) {
         ws.read(buffer);
     }
@@ -92,7 +93,23 @@ public:
         ws.write(buffer);
     }
     void close();
-    static std::shared_ptr<WebsocketServerSync> create(const std::string& host, uint16_t port);
+    static std::unique_ptr<WebsocketServerSync> create(const std::string& host, uint16_t port);
+};
+
+class WebsocketClientSync {    
+    net::io_context ioc;
+    websocket::stream<tcp::socket> ws;
+public:
+    WebsocketClientSync(const std::string& host, uint16_t port);
+    ~WebsocketClientSync();
+    void read(auto&& buffer) {
+        ws.read(buffer);
+    }
+    void write(auto&& buffer) {
+        ws.write(buffer);
+    }
+    void close();
+    static std::unique_ptr<WebsocketClientSync> create(const std::string& host, uint16_t port);
 };
 
 template<typename T, typename U>
@@ -113,5 +130,7 @@ void sort_small(std::vector<T>& elements, std::vector<U>& scores) {
         elements[i] = old_elements[indexes[i]];
     }
 }
+
+void* aligned_pages_alloc(size_t alloc_size);
 
 #endif
