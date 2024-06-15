@@ -2,7 +2,7 @@
 #include <thread>
 
 void TranspositionTableEntry::save(uint64_t k, int16_t v, Bound b, uint8_t d, Move m, uint8_t generation) {
-    uint32_t key32 = uint32_t(k >> 32);
+    uint32_t key32 = uint32_t(k);
     if (b == BOUND_EXACT || uint16_t(key32) != key_lo || uint16_t(key32 >> 16) != key_hi || 
         d > depth8 || relative_age(generation)) {
         key_lo     = uint16_t(key32);
