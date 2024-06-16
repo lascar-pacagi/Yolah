@@ -16,7 +16,7 @@ void HumanPlayer::send_game_state(Yolah yolah) {
     std::ostream os(&wbuffer);
     os << "[game state]" << yolah.to_json();
     connexion->write(net::buffer(wbuffer.str()));
-    connexion->write(net::buffer(std::to_string(heuristic::eval(yolah.current_player(), yolah))));
+    //connexion->write(net::buffer(std::to_string(heuristic::eval(yolah.current_player(), yolah))));
 }
 
 Move HumanPlayer::play(Yolah yolah) {    
