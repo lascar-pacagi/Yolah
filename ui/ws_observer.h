@@ -1,12 +1,12 @@
-#ifndef HTML_OBSERVER_H
-#define HTML_OBSERVER_H
+#ifndef WS_OBSERVER_H
+#define WS_OBSERVER_H
 #include "game.h"
 #include "misc.h"
 
-class HtmlObserver {
+class WSObserver {
     WebsocketServerSync ws;
 public:
-    HtmlObserver(const std::string& host, uint16_t port);
+    WSObserver(const std::string& host, uint16_t port);
     void operator()(Yolah);
     void operator()(uint8_t player, Move);
 };

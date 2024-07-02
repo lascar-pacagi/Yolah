@@ -67,14 +67,14 @@
         let state;
         let ws;
         let uri;
-        let connect;        
+        let connect;  
         let disconnect;
         let send;
         let sendMessage;
         let messages;
         let arrow;
-        const noneMove = "a1:a1";
-        const pattern = /^\[([^\]]*)\](.*)/;
+        let uid;
+        const PATTERN = /^\[([^\]]*)\]\s?(.*)/;
         
         function drawScore(blackScore, whiteScore) {
             let b = document.getElementById("blackScore");
@@ -133,7 +133,7 @@
         }
         
         function gameOverState(event) {
-            console.log("gameOverState");
+            console.log("game over state");
         }
 
         function onOpenConnexion(ev) {
@@ -146,48 +146,61 @@
         function onCloseConnexion(ev) {
             showMessage(`[connexion closed, code=${ev.code}, reason=${ev.reason}]`);
             draw();
-        }
-         
+        }         
+                
         function onMessage(ev) {
-            let msg = ev.data;
-            console.log(msg);
-            let res = pattern.exec(ev.data);
-            if (state === getGameState) {
-                if (res && res.length == 3 && res[1] === 'game state') {
-                    const json = JSON.parse(res[2])                    
-                    const black = json['black'];
-                    const white = json['white'];
-                    const empty = json['empty'];
-                    const ply   = json['ply'];
-                    const wScore = json['white_score'];
-                    const bScore = json['black_score'];
-                    if (black && white && empty && ply && wScore && bScore) {
-                        msg = "";
-                        const b = BigInt(black);
-                        const w = BigInt(white);
-                        const move = lastMove(blackBb, whiteBb, b, w);
-                        if (move !== "") {
-                            showMessage(move);
-                            arrow = lastMoveCoordinates(blackBb, whiteBb, b, w);                            
+            console.log(ev.data);
+            try {
+                const msg = JSON.parse(ev.data)
+                switch (messageType(msg)) {
+                    case Message.Error: 
+                        showMessage(`[error]: ${Message.getError(msg)}`);
+                        break;
+                    case Message.Init: break;
+                    case Message.New: break;
+                    case Message.Join: break;
+                    case Message.Watch: break;
+                    case Message.Chat: 
+                        showMessage(Message.getChat(msg));
+                        break;
+                    case Message.Info: break;
+                    case Message.GameState: {
+                        const gameState = Message.getGameState();
+                        if (gameState) {
+                            const black = BigInt(gameState['black']);
+                            const white = BigInt(gameState['white']);
+                            const empty = BigInt(gameState['empty']);
+                            const ply   = BigInt(gameState['ply']);
+                            const wScore = BigInt(gameState['white_score']);
+                            const bScore = BigInt(gameState['black_score']);
+                            const move = lastMove(blackBb, whiteBb, black, white);
+                            if (move !== "") {
+                                showMessage(move);
+                                arrow = lastMoveCoordinates(blackBb, whiteBb, black, white);                            
+                            }
+                            blackBb = black;
+                            whiteBb = white;
+                            emptyBb = empty;
+                            whiteScore = wScore;
+                            blackScore = bScore;
+                            currentPlayer = ply & 1n ? "White" : "Black";               
+                            grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
+                            if (gameOver(grid, blackBb, whiteBb)) {
+                                console.log("game over");
+                                state = gameOverState;
+                            }
+                            draw();
                         }
-                        blackBb = b;
-                        whiteBb = w;
-                        emptyBb = BigInt(empty);
-                        whiteScore = BigInt(wScore);
-                        blackScore = BigInt(bScore);
-                        currentPlayer = BigInt(ply) & 1n ? "White" : "Black";               
-                        grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
-                        if (gameOver(grid, blackBb, whiteBb)) {
-                            console.log("game over");
-                            state = gameOverState;
-                        }
+                        break;
                     }
-                } 
+                    case Message.YourMove: break;
+                    case Message.MyMove: break;
+                }
+            } catch (error) {                
+                showMessage(`[error: ${error.name} ${error.message}]`);
             }
-            if (msg !== "") showMessage(msg);
-            draw(); 
         }
-        
+
         function onError(ev) {
             showMessage(`[error, code=${ev.code}, reason=${ev.reason}]`);
         }
@@ -203,6 +216,10 @@
             grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
         }
 
+        function getUserName() {
+            return userName.value + "_o-o_" + uid;
+        }
+
         function init() {
             state = waitingForConnexion;
             canvas = document.getElementById("canvas");
@@ -214,7 +231,8 @@
             sendMessage = document.getElementById("sendMessage");
             messages    = document.getElementById("messages");
             uri         = document.getElementById("uri");
-            connect.onclick = function() {            
+            uid         = makeId(ID_LENGTH);            
+            connect.onclick = function() {
                 ws = new WebSocket(uri.value);            
                 ws.onopen = function(ev) {
                     onOpenConnexion(ev);
@@ -233,7 +251,20 @@
                 ws.close();
             };
             send.onclick = function() {
-                ws.send(userName.value + ": " + sendMessage.value);
+                let msg = "";
+                let command = PATTERN.exec(sendMessage.value);       
+                if (command) {
+                    switch (command[1]) {
+                        case "watch key":
+                            msg = MESSAGE.watch(command[2], getUserName());
+                            break;
+                    }
+                } else {
+                    msg = MESSAGE.chat(`[${getUserName()}]: ${sendMessage.value}`);                    
+                }
+                if (msg !== "") {
+                    ws.send(msg);
+                }
                 sendMessage.value = "";
             };
             sendMessage.onkeyup = function(ev) {

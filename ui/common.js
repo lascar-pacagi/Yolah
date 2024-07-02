@@ -10,6 +10,7 @@ const INITIAL_BLACK_BB = 0b10000000000000000000000000001000000100000000000000000
 const INITIAL_WHITE_BB = 0b0000000100000000000000000001000000001000000000000000000010000000n;
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const RANKS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+const ID_LENGTH = 8;
 let canvas;
 let ctx;
 
@@ -298,4 +299,99 @@ function lastMoveCoordinates(oldBlackBb, oldWhiteBb, newBlackBb, newWhiteBb) {
         return findMove(oldWhiteBb, newWhiteBb);
     }
     return findMove(oldBlackBb, newBlackBb);
+}
+
+function makeId(length) {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      counter += 1;
+    }
+    return result;
+}
+
+const MESSAGE = {
+    Error: 0,
+    Init: 1,
+    New: 2,
+    Join: 3,
+    Watch: 4,
+    Chat: 5,
+    Info: 6,
+    GameState: 7,
+    YourMove: 8,
+    MyMove: 9,
+    new: function(info) {
+        return JSON.stringify({
+            type: "new",
+            info: info
+        });
+    },
+    join: function(key, info) {
+        return JSON.stringify({
+            type: "join",
+            "join key": key,
+            "info": info
+        });
+    },
+    getJoinKey: function(msg) {
+        return msg["join key"];
+    },
+    watch: function(key, info) {
+        return JSON.stringify({
+            type: "watch",
+            "watch key": key,
+            "info": info
+        });
+    },
+    getWatchKey: function(msg) {
+        return msg["watch key"];
+    },
+    getGameState: function(msg) {
+        return msg["game state"];
+    },
+    getChat: function(msg) {
+        return msg["message"];
+    },
+    chat: function(msg) {
+        return JSON.stringify({
+            type: "chat",
+            message: msg
+        });
+    },
+    getError: function(msg) {
+        return msg["message"];
+    },
+    error: function(msg) {
+        return JSON.stringify({
+            type: "error",
+            message: msg
+        });
+    },
+    my_move: function(move) {
+        return JSON.stringify({
+            type: "my move",
+            move: move
+        });
+    },
+};
+
+const TYPE_TO_ENUM = {
+    "error": MESSAGE.Error,
+    "init":  MESSAGE.Init,
+    "new":   MESSAGE.New,
+    "join":  MESSAGE.Join,
+    "watch": MESSAGE.Watch,
+    "chat":  MESSAGE.Chat,
+    "info":  MESSAGE.Info,
+    "game state": MESSAGE.GameState,
+    "your move":  MESSAGE.YourMove,
+    "my move":    MESSAGE.MyMove
+};
+
+function messageType(msg) {
+    return msg[TYPE_TO_ENUM["type"]];
 }

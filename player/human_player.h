@@ -17,6 +17,7 @@ class HumanPlayer : public Player {
 public:
     HumanPlayer(std::unique_ptr<WebsocketServerSync>);
     Move play(Yolah) override;
+    std::string info() override;
     void game_over(Yolah) override;
     ~HumanPlayer() override;
 };

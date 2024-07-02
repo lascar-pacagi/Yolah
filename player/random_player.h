@@ -8,6 +8,7 @@ class RandomPlayer : public Player {
 public:
     explicit RandomPlayer();
     Move play(Yolah yolah) override;
+    std::string info() override;
 };
 
 #endif

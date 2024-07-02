@@ -11,6 +11,7 @@ class MinMaxPlayer : public Player {
 public:
     //MinMaxPlayer(uint64_t microseconds, std::size_t nb_threads = 1);
     Move play(Yolah) override;
+    std::string info() override;
 };
 
 #endif

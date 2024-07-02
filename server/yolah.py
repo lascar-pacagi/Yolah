@@ -1,4 +1,5 @@
 from enum import Enum
+import json
 
 def bit_not(n, numbits=64):
     return (1 << numbits) - 1 - n
@@ -193,6 +194,26 @@ class Yolah:
             self.white_score -= 1
         self.empty &= bit_not(from_bb)
 
+    def to_json(self):
+        state = {
+            "black": str(self.black),
+            "white": str(self.white),
+            "empty": str(self.empty),
+            "black score": str(self.black_score),
+            "white score": str(self.white_score),
+            "ply": str(self.ply)
+        }
+        return json.dumps(state)
+
+    def from_json(self, state):
+        state = json.loads(state)
+        self.black = int(state["black"])
+        self.white = int(state["white"])
+        self.empty = int(state["empty"])
+        self.black_score = int(state["black score"])
+        self.white_score = int(state["white score"])
+        self.ply = int(state["ply"])
+
     def __str__(self):
         g = self.grid()
         letters = '  a  b  c  d  e  f  g  h'
@@ -212,6 +233,7 @@ class Yolah:
 
 if __name__ == '__main__':
     y = Yolah()
+    print(y.to_json())
     # while not y.game_over():
     #     print(y)
     #     for m in y.moves():

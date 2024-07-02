@@ -14,6 +14,7 @@ class BasicMinMaxPlayer : public Player {
 public:
     BasicMinMaxPlayer(uint16_t depth, heuristic_eval = heuristic::evaluation);
     Move play(Yolah) override;
+    std::string info() override;
 };
 
 #endif

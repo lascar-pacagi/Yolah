@@ -11,3 +11,7 @@ Move RandomPlayer::play(Yolah yolah) {
     if (moves.size() == 0) return Move::none();
     return moves[prng.rand<std::size_t>() % moves.size()];
 }
+
+std::string RandomPlayer::info() {
+    return "random player";
+}

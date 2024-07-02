@@ -50,6 +50,7 @@ public:
         : thinking_time(microseconds), root(Move::none(), alloc), pool(static_cast<BS::concurrency_t>(nb_threads)) {  
     } 
     Move play(Yolah) override;
+    std::string info() override;
 };
 
 std::ostream& operator<<(std::ostream& os, const MCTSPlayer::Node& n);

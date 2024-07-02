@@ -10,7 +10,7 @@
 #include "MCTS_mem_player.h"
 #include "misc.h"
 #include "ascii_observer.h"
-#include "html_observer.h"
+#include "ws_observer.h"
 #include "do_nothing_observer.h"
 #include "cem_test.h"
 #include "nelder_mead_test.h"
@@ -18,7 +18,9 @@
 #include "heuristic_weights_learner.h"
 #include <iomanip>
 #include "client_player.h"
+#include <boost/program_options.hpp>
 
+namespace po = boost::program_options;
 using std::cout;
 
 int main() {
@@ -32,21 +34,21 @@ int main() {
     // yolah = Yolah::from_json(ss);
     // cout << yolah.to_json() << '\n';
     // cout << yolah << '\n';   
-    test::play(std::make_unique<MCTSMemPlayer>(400000),
-               std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
-               DoNothingObserver());
+    // test::play(std::make_unique<MCTSMemPlayer>(1000000),
+    //            std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
+    //            DoNothingObserver());
     // test::play(std::make_unique<MCTSMemPlayer>(100000),
     //             std::make_unique<MCTSMemPlayer>(2000000), 
-    //             HtmlObserver("127.0.0.1", 4242));
+    //             WSObserver("127.0.0.1", 4242));
     // test::play(std::make_unique<BasicMinMaxPlayer>(4),
     //             std::make_unique<BasicMinMaxPlayer>(4), 
-    //             HtmlObserver("127.0.0.1", 4242));
+    //             WSObserver("127.0.0.1", 4242));
     // test::cem_beale_function();
     // test::cem_sphere_function();
     // test::cem_rastrigin_function(); 
     // test::play(std::make_unique<BasicMinMaxPlayer>(4),
     //            std::make_unique<MCTSMemPlayer>(100000, 1),
-    //            HtmlObserver("127.0.0.1", 4242));
+    //            WSObserver("127.0.0.1", 4242));
     // test::play(std::make_unique<BasicMinMaxPlayer>(4),
     //            std::make_unique<MonteCarloPlayer>(500000),
     //            20);

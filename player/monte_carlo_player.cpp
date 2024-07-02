@@ -52,3 +52,7 @@ Move MonteCarloPlayer::play(Yolah yolah) {
     auto pos = std::distance(begin(action_values), std::max_element(begin(action_values), end(action_values)));
     return moves[pos];
 }
+
+std::string MonteCarloPlayer::info() {
+    return "monte carlo player";
+}

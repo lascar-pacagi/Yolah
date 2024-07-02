@@ -34,6 +34,10 @@ Move HumanPlayer::play(Yolah yolah) {
     return Move::none();
 }
 
+std::string HumanPlayer::info() {
+    return "human player";
+}
+
 void HumanPlayer::game_over(Yolah yolah) {
     send_game_state(yolah);
 }

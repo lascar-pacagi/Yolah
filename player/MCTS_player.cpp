@@ -160,3 +160,7 @@ Move MCTSPlayer::play(Yolah yolah) {
     reset();    
     return res;
 }
+
+std::string MCTSPlayer::info() {
+    return "mcts player";
+}

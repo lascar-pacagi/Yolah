@@ -13,6 +13,7 @@ public:
     explicit MCTSMemPlayer(uint64_t microseconds, std::size_t nb_threads) : player(microseconds, nb_threads, &resource) {        
     } 
     Move play(Yolah) override;
+    std::string info() override;
 };
 
 #endif

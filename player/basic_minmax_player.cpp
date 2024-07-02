@@ -91,3 +91,7 @@ Move BasicMinMaxPlayer::play(Yolah yolah) {
     //std::cout << "BasicMinMax value: " << value << std::endl;
     return m;
 }
+
+std::string BasicMinMaxPlayer::info() {
+    return "basic minmax player";
+}
