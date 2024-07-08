@@ -75,7 +75,7 @@
         let arrow;
         let uid;
         const NONE_MOVE = "a1:a1";
-        const PATTERN = /^\[([^\]]*)\](.*)/;
+        const PATTERN = /^\[([^\]]*)\]\s?(.*)/;
         
         function drawScore(blackScore, whiteScore) {
             let b = document.getElementById("blackScore");
@@ -173,7 +173,7 @@
             if (currentPlayer === "Black") {
                 const move = squaresToMove(fromSquare, toSquare)
                 showMessage(`[black move] ${move}`);
-                ws.send(Message.my_move(move));
+                ws.send(MESSAGE.my_move(move));
                 blackBb = setBitboard(blackBb, square);                
                 grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
                 if (atLeastOneMove(grid, whiteBb)) {
@@ -181,8 +181,8 @@
                 }
             } else {
                 const move = squaresToMove(fromSquare, toSquare);
-                showMessage(msg);
-                ws.send(Message.my_move(move));
+                showMessage(`[white move] ${move}`);
+                ws.send(MESSAGE.my_move(move));
                 whiteBb = setBitboard(whiteBb, square);
                 grid = bitboardsToGrid(blackBb, whiteBb, emptyBb);
                 if (atLeastOneMove(grid, blackBb)) {
@@ -215,29 +215,29 @@
             try {
                 const msg = JSON.parse(ev.data)
                 switch (messageType(msg)) {
-                    case Message.Error: 
-                        showMessage(`[error]: ${Message.getError(msg)}`);
+                    case MESSAGE.Error: 
+                        showMessage(`[error]: ${MESSAGE.getError(msg)}`);
                         break;
-                    case Message.Init: 
-                        showMessage(`[join key]  ${Message.getJoinKey(msg)}`);
-                        showMessage(`[watch key] ${Message.getWatchKey(msg)}`);
+                    case MESSAGE.Init: 
+                        showMessage(`[join key]  ${MESSAGE.getJoinKey(msg)}`);
+                        showMessage(`[watch key] ${MESSAGE.getWatchKey(msg)}`);
                         break;
-                    case Message.New: break;
-                    case Message.Join: break;
-                    case Message.Watch: break;
-                    case Message.Chat: 
-                        showMessage(Message.getChat(msg));
+                    case MESSAGE.New: break;
+                    case MESSAGE.Join: break;
+                    case MESSAGE.Watch: break;
+                    case MESSAGE.Chat: 
+                        showMessage(MESSAGE.getChat(msg));
                         break;
-                    case Message.Info: break;
-                    case Message.GameState: {
-                        const gameState = Message.getGameState();
+                    case MESSAGE.Info: break;
+                    case MESSAGE.GameState: {
+                        const gameState = MESSAGE.getGameState(msg);
                         if (gameState) {
-                            const black = BigInt(gameState['black']);
-                            const white = BigInt(gameState['white']);
-                            const empty = BigInt(gameState['empty']);
-                            const ply   = BigInt(gameState['ply']);
-                            const wScore = BigInt(gameState['white_score']);
-                            const bScore = BigInt(gameState['black_score']);
+                            const black = BigInt(gameState["black"]);
+                            const white = BigInt(gameState["white"]);
+                            const empty = BigInt(gameState["empty"]);
+                            const ply   = BigInt(gameState["ply"]);
+                            const wScore = BigInt(gameState["white score"]);
+                            const bScore = BigInt(gameState["black score"]);
                             const move = lastMove(blackBb, whiteBb, black, white);
                             if (move !== "") {
                                 showMessage(move);
@@ -257,7 +257,7 @@
                         }
                         break;
                     }
-                    case Message.YourMove:
+                    case MESSAGE.YourMove:
                         if (atLeastOneMove(grid, (currentPlayer === "White" ? whiteBb : blackBb))) {
                             state = fromSquareState;
                         } else {
@@ -329,17 +329,21 @@
                     switch (command[1]) {
                         case "new":
                             msg = MESSAGE.new(getUserName());
+                            initGame();
+                            state = getGameState;
+                            draw();
                             break;
                         case "join key":
                             msg = MESSAGE.join(command[2], getUserName());
+                            initGame();
+                            state = getGameState;
+                            draw();
                             break;
                     }
                 } else {
                     msg = MESSAGE.chat(`[${getUserName()}]: ${sendMessage.value}`);                    
-                }
-                if (msg !== "") {
-                    ws.send(msg);
-                }
+                }             
+                ws.send(msg);             
                 sendMessage.value = "";
             };
             sendMessage.onkeyup = function(ev) {
@@ -355,7 +359,7 @@
 </head>
 
 <body onLoad="init();">
-    Server URI: <input class="draw-border" id="uri" size="47" value="ws://localhost:4242" style="margin-bottom: 5px;">
+    Server URI: <input class="draw-border" id="uri" size="47" value="ws://localhost:8001" style="margin-bottom: 5px;">
     <button class="echo-button" id="connect">Connect</button>
     <button class="echo-button" id="disconnect">Disconnect</button><br>
     Your name: <input class="draw-border" id="userName" size=47 style="margin-bottom: 5px;"><br>    

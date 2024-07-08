@@ -152,27 +152,29 @@
             console.log(ev.data);
             try {
                 const msg = JSON.parse(ev.data)
+                console.log(messageType(msg))
                 switch (messageType(msg)) {
-                    case Message.Error: 
-                        showMessage(`[error]: ${Message.getError(msg)}`);
+                    case MESSAGE.Error: 
+                        showMessage(`[error]: ${MESSAGE.getError(msg)}`);
                         break;
-                    case Message.Init: break;
-                    case Message.New: break;
-                    case Message.Join: break;
-                    case Message.Watch: break;
-                    case Message.Chat: 
-                        showMessage(Message.getChat(msg));
+                    case MESSAGE.Init: break;
+                    case MESSAGE.New: break;
+                    case MESSAGE.Join: break;
+                    case MESSAGE.Watch: break;
+                    case MESSAGE.Chat: 
+                        showMessage(MESSAGE.getChat(msg));
                         break;
-                    case Message.Info: break;
-                    case Message.GameState: {
-                        const gameState = Message.getGameState();
+                    case MESSAGE.Info: break;
+                    case MESSAGE.GameState: {
+                        const gameState = MESSAGE.getGameState(msg);
+                        console.log(gameState);
                         if (gameState) {
-                            const black = BigInt(gameState['black']);
-                            const white = BigInt(gameState['white']);
-                            const empty = BigInt(gameState['empty']);
-                            const ply   = BigInt(gameState['ply']);
-                            const wScore = BigInt(gameState['white_score']);
-                            const bScore = BigInt(gameState['black_score']);
+                            const black = BigInt(gameState["black"]);
+                            const white = BigInt(gameState["white"]);
+                            const empty = BigInt(gameState["empty"]);
+                            const ply   = BigInt(gameState["ply"]);
+                            const wScore = BigInt(gameState["white score"]);
+                            const bScore = BigInt(gameState["black score"]);
                             const move = lastMove(blackBb, whiteBb, black, white);
                             if (move !== "") {
                                 showMessage(move);
@@ -188,13 +190,13 @@
                             if (gameOver(grid, blackBb, whiteBb)) {
                                 console.log("game over");
                                 state = gameOverState;
-                            }
+                            }                          
                             draw();
                         }
                         break;
                     }
-                    case Message.YourMove: break;
-                    case Message.MyMove: break;
+                    case MESSAGE.YourMove: break;
+                    case MESSAGE.MyMove: break;
                 }
             } catch (error) {                
                 showMessage(`[error: ${error.name} ${error.message}]`);
@@ -257,14 +259,15 @@
                     switch (command[1]) {
                         case "watch key":
                             msg = MESSAGE.watch(command[2], getUserName());
+                            initGame();
+                            state = getGameState;
+                            draw();
                             break;
                     }
                 } else {
                     msg = MESSAGE.chat(`[${getUserName()}]: ${sendMessage.value}`);                    
                 }
-                if (msg !== "") {
-                    ws.send(msg);
-                }
+                ws.send(msg);
                 sendMessage.value = "";
             };
             sendMessage.onkeyup = function(ev) {
@@ -279,7 +282,7 @@
 </head>
 
 <body onLoad="init();">
-    Server URI: <input class="draw-border" id="uri" size="47" value="ws://localhost:4242" style="margin-bottom: 5px;">
+    Server URI: <input class="draw-border" id="uri" size="47" value="ws://localhost:8001" style="margin-bottom: 5px;">
     <button class="echo-button" id="connect">Connect</button>
     <button class="echo-button" id="disconnect">Disconnect</button><br>
     Your name: <input class="draw-border" id="userName" size=47 style="margin-bottom: 5px;"><br>    

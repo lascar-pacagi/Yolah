@@ -4,7 +4,7 @@ const BLACK = 0;
 const WHITE = 1;
 const GRID_DIM = 8;
 const BACKGROUND_COLOR = "black";
-const RADIUS_FACTOR = 0.5 * 0.7;
+const RADIUS_FACTOR = 0.35;
 const BOARD_DIM_FACTOR = 1;
 const INITIAL_BLACK_BB = 0b1000000000000000000000000000100000010000000000000000000000000001n;
 const INITIAL_WHITE_BB = 0b0000000100000000000000000001000000001000000000000000000010000000n;
@@ -96,7 +96,7 @@ function drawStone(x, y, radius, player) {
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, 2 * Math.PI);
     ctx.fill();
-    ctx.stroke();          
+    ctx.stroke();   
     ctx.strokeStyle = "white";
     if (player === "White") ctx.strokeStyle = "black";
     ctx.beginPath();
@@ -109,7 +109,7 @@ function drawSquareContent(i, j, content, dx, dy) {
         ctx.fillStyle = BACKGROUND_COLOR;
         ctx.fillRect(j * dx, i * dy, dx, dy);    
     } else if (content === BLACK || content === WHITE) {
-        drawStone(j * dx + dx / 2, i * dy + dy / 2, Math.min(dx, dy) * RADIUS_FACTOR, content === BLACK ? "Black" : "White");                 
+        drawStone(j * dx + dx / 2, i * dy + dy / 2, Math.round(Math.min(dx, dy) * RADIUS_FACTOR), content === BLACK ? "Black" : "White");                 
     }
 }
 
@@ -143,6 +143,7 @@ function drawPossibleMoves(moves) {
 }
 
 function drawGrid(grid) {
+    console.log(grid);
     const dx = Math.floor(canvasWidth() / GRID_DIM);
     const dy = Math.floor(canvasHeight() / GRID_DIM);
     ctx.fillStyle = BACKGROUND_COLOR;
@@ -351,7 +352,7 @@ const MESSAGE = {
         return msg["watch key"];
     },
     getGameState: function(msg) {
-        return msg["game state"];
+        return msg["state"];
     },
     getChat: function(msg) {
         return msg["message"];
@@ -393,5 +394,5 @@ const TYPE_TO_ENUM = {
 };
 
 function messageType(msg) {
-    return msg[TYPE_TO_ENUM["type"]];
+    return TYPE_TO_ENUM[msg["type"]];
 }

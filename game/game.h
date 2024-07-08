@@ -75,6 +75,7 @@ public:
     uint64_t bitboard(uint8_t player) const;
     std::string to_json() const;
     static Yolah from_json(std::istream& is);
+    static Yolah from_json(const std::string&);
     friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
 };
 

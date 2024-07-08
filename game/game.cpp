@@ -1,6 +1,7 @@
 #include "game.h"
 #include "magic.h"
 #include "misc.h"
+#include <sstream>
 
 using std::ostream, std::pair, std::vector, std::istream;
 using std::string, std::to_string, std::stoi, std::stoull; 
@@ -131,8 +132,8 @@ string Yolah::to_json() const {
     j["black"] = to_string(black);
     j["white"] = to_string(white);
     j["empty"] = to_string(empty);
-    j["black_score"] = to_string(black_score);
-    j["white_score"] = to_string(white_score);
+    j["black score"] = to_string(black_score);
+    j["white score"] = to_string(white_score);
     return j.dump();
 }
 
@@ -143,9 +144,15 @@ Yolah Yolah::from_json(std::istream& is) {
     res.black = stoull(j["black"].get<string>());
     res.white = stoull(j["white"].get<string>());
     res.empty = stoull(j["empty"].get<string>());
-    res.black_score = static_cast<uint16_t>(stoi(j["black_score"].get<string>()));
-    res.white_score = static_cast<uint16_t>(stoi(j["white_score"].get<string>()));
+    res.black_score = static_cast<uint16_t>(stoi(j["black score"].get<string>()));
+    res.white_score = static_cast<uint16_t>(stoi(j["white score"].get<string>()));
     return res;
+}
+
+Yolah Yolah::from_json(const std::string& s) {
+    std::stringstream ss;
+    ss << s;
+    return from_json(ss);
 }
 
 ostream& operator<<(ostream& os, const Yolah& yolah) {

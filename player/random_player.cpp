@@ -4,6 +4,9 @@
 RandomPlayer::RandomPlayer() : prng(std::chrono::system_clock::now().time_since_epoch().count()) {
 }
 
+RandomPlayer::RandomPlayer(uint64_t seed) : prng(seed) {
+}
+
 Move RandomPlayer::play(Yolah yolah) {
     if (yolah.game_over()) return Move::none();
     Yolah::MoveList moves;

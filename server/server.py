@@ -76,14 +76,14 @@ class Connected:
         self.observers.append((websocket, info))
 
     def remove(self, websocket):
-        self.players = list(filter(self.players, lambda x: x[0] != websocket))
-        self.observers = list(filter(self.observers, lambda x: x[0] != websocket))
+        self.players = list(filter(lambda x: x[0] != websocket, self.players))
+        self.observers = list(filter(lambda x: x[0] != websocket, self.observers))
 
     def other_player(self, websocket):
-        return next(filter(lambda x: x[0] != websocket, self.players))
+        return next(map(lambda x: x[0], filter(lambda x: x[0] != websocket, self.players)))
 
     def others(self, websocket):
-        return list(map(lambda x: x[0], filter(self.players + self.observers, lambda x: x[0] != websocket)))
+        return list(map(lambda x: x[0], filter(lambda x: x[0] != websocket, self.players + self.observers)))
 
     def connections(self):
         return list(map(lambda x: x[0], self.players + self.observers))
@@ -147,19 +147,43 @@ class Message(Enum):
             "chat": msg
         })
 
+    @staticmethod
+    def get_info(msg):
+        return msg["info"]
+    
+    @staticmethod
+    def get_join_key(msg):
+        return msg["join key"]
+    
+    @staticmethod
+    def get_watch_key(msg):
+        return msg["watch key"]
+
+    @staticmethod
+    def get_move(msg):
+        return Move.from_str(msg["move"])
+    
+    @staticmethod
+    def get_chat(msg):
+        return msg["message"]
+
 
 JOIN  = {}
 WATCH = {}
 
 
 async def error(websocket, msg):
+    print(f'[error] {msg}')
     await websocket.send(Message.error(msg))
 
 
 async def handle_message(websocket, msg, game, connected):
     match Message.type(msg):
         case Message.CHAT:
-            await websockets.broadcast(connected.others(websocket), json.dumps(msg))
+            others = connected.others(websocket)
+            print(Message.get_chat(msg))
+            if others:
+                websockets.broadcast(others, json.dumps(msg))
         case Message.INFO:
             pass
 
@@ -169,7 +193,7 @@ async def play(websocket, game, connected):
         msg = json.loads(message)
         match Message.type(msg):
             case Message.MY_MOVE:
-                m = Message.move(msg)
+                m = Message.get_move(msg)
                 game.play(m)
                 websockets.broadcast(connected.connections(), Message.game_state(json.loads(game.to_json())))
                 if game.game_over():
@@ -182,14 +206,14 @@ async def play(websocket, game, connected):
 
 async def join(websocket, msg):
     try:
-        game, connected = JOIN[Message.join_key(msg)]
+        game, connected = JOIN[Message.get_join_key(msg)]
     except KeyError:
         await error(websocket, "Game not found.")
         return
-    connected.add_player(websocket, Message.info(msg))
+    connected.add_player(websocket, Message.get_info(msg))
     try:
         await websocket.send(Message.game_state(json.loads(game.to_json())))
-        await connected.other_player(websocket).sent(Message.your_move())
+        await connected.other_player(websocket).send(Message.your_move())
         await play(websocket, game, connected)
     finally:
         connected.remove(websocket)
@@ -197,11 +221,11 @@ async def join(websocket, msg):
 
 async def watch(websocket, msg):
     try:
-        game, connected = WATCH[Message.watch_key(msg)]
+        game, connected = WATCH[Message.get_watch_key(msg)]
     except KeyError:
         await error(websocket, "Game not found.")
         return
-    connected.add_observer(websocket, Message.info(msg))
+    connected.add_observer(websocket, Message.get_info(msg))
     try:
         await websocket.send(Message.game_state(json.loads(game.to_json())))
         async for message in websocket:
@@ -214,7 +238,7 @@ async def watch(websocket, msg):
 async def start(websocket, msg):
     game = Yolah()
     connected = Connected()
-    connected.add_player(websocket, Message.info(msg))
+    connected.add_player(websocket, Message.get_info(msg))
     join_key = secrets.token_urlsafe(12)
     JOIN[join_key] = game, connected
     watch_key = secrets.token_urlsafe(12)
@@ -230,6 +254,8 @@ async def start(websocket, msg):
 async def connect(websocket):
     message = await websocket.recv()
     msg = json.loads(message)
+    print("[connexion]")
+    print(msg)
     match Message.type(msg):
         case Message.NEW: 
             await start(websocket, msg)
