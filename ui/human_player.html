@@ -228,7 +228,9 @@
                     case MESSAGE.Chat: 
                         showMessage(MESSAGE.getChat(msg));
                         break;
-                    case MESSAGE.Info: break;
+                    case MESSAGE.Info: 
+                        showMessage(`[info]: ${MESSAGE.getInfoResult(msg)}`);
+                        break;
                     case MESSAGE.GameState: {
                         const gameState = MESSAGE.getGameState(msg);
                         if (gameState) {
@@ -324,6 +326,7 @@
             };
             send.onclick = function() {
                 let msg = "";
+                let send = true;
                 let command = PATTERN.exec(sendMessage.value);       
                 if (command) {
                     switch (command[1]) {
@@ -333,19 +336,36 @@
                             state = getGameState;
                             draw();
                             break;
-                        case "join key":
+                        case "join":
                             msg = MESSAGE.join(command[2], getUserName());
                             initGame();
                             state = getGameState;
                             draw();
+                            break;
+                        case "available":
+                            msg = MESSAGE.info("join list");
+                            break;
+                        case "help":
+                            const help = 
+`[help]           : this message
+[new]            : create a new game, the <join key> and <watch key> are displayed
+[available]      : list of available games to join
+[join] <join key>: join a game with the key <join key>                                
+[clear]          : clear the screen`;
+                            showMessage(help);
+                            send = false;
+                            break;
+                        case "clear": 
+                            messages.innerText = "";
+                            messages.scrollTop = messages.scrollHeight - messages.clientHeight;
                             break;
                     }
                 } else {                    
                     showMessage(sendMessage.value)
                     msg = MESSAGE.chat(`[${getUserName()}]: ${sendMessage.value}`);                    
                 }             
-                ws.send(msg);             
                 sendMessage.value = "";
+                if (send) ws.send(msg);                             
             };
             sendMessage.onkeyup = function(ev) {
                 ev.preventDefault();
@@ -377,7 +397,7 @@
             <p id="white">White</p> <p id="whiteScore">0</p>
         </div>
     </div>
-    <pre id="messages" style="width: 600px; height: 180px; white-space: normal; overflow: auto; border: solid 1px #cccccc; margin-bottom: 5px;"></pre>    
+    <pre id="messages" style="width: 600px; height: 180px; white-space: pre-wrap; overflow: auto; border: solid 1px #cccccc; margin-bottom: 5px;"></pre>
     <div style="margin-bottom: 5px;">
         Message<br>
         <input class="draw-border" id="sendMessage" size="74" value="">

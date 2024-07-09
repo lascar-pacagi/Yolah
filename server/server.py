@@ -86,7 +86,19 @@ class Connected:
         return list(map(lambda x: x[0], filter(lambda x: x[0] != websocket, self.players + self.observers)))
 
     def connections(self):
-        return list(map(lambda x: x[0], self.players + self.observers))
+        return list(map(lambda x: x[0], self.players + self.observers))    
+
+    def nb_players(self):
+        return len(self.players)
+
+    def nb_observers(self):
+        return len(self.nb_observers)
+
+    def players_info(self):
+        return ", ".join((info for (_, info) in self.players))
+
+    def observers_info(self):
+        return ", ".join((info for (_, info) in self.observers))
 
     def __len__(self):
         return len(self.players) + len(self.observers)
@@ -148,6 +160,10 @@ class Message(Enum):
         })
 
     @staticmethod
+    def get_command(msg):
+        return msg["command"]
+    
+    @staticmethod
     def get_info(msg):
         return msg["info"]
     
@@ -166,6 +182,13 @@ class Message(Enum):
     @staticmethod
     def get_chat(msg):
         return msg["message"]
+    
+    @staticmethod
+    def info(result):
+        return json.dumps({
+            "type": "info",
+            "result": result
+        })
 
 
 JOIN  = {}
@@ -177,18 +200,40 @@ async def error(websocket, msg):
     await websocket.send(Message.error(msg))
 
 
-async def handle_message(websocket, msg, game, connected):
+async def handle_message(websocket, msg, game = None, connected = None):
     match Message.type(msg):
         case Message.CHAT:
-            others = connected.others(websocket)
-            print(Message.get_chat(msg))
-            if others:
-                websockets.broadcast(others, json.dumps(msg))
+            if connected:
+                others = connected.others(websocket)
+                print(Message.get_chat(msg))
+                if others:
+                    websockets.broadcast(others, json.dumps(msg))
         case Message.INFO:
-            pass
+            match Message.get_command(msg):
+                case "join list":
+                    result = "\n"
+                    if len(JOIN.items()):
+                        result += "available games\n---------------" if len(JOIN) else "available game\n--------------"
+                        result += "\n"
+                        for k, (_, c) in JOIN.items():
+                            if c.nb_players() == 1:
+                                result += k + ": " + c.players_info() + "\n"
+                    else:
+                        result = "no game\n"
+                    await websocket.send(Message.info(result))
+                case "watch list":
+                    result = "\n"
+                    if len(WATCH.items()):
+                        result += "available games to follow\n-------------------------" if len(JOIN) else "available game to follow\n-------------------------"
+                        result += "\n"
+                        for k, (_, c) in WATCH.items():
+                            result += k + ": " + c.players_info() + "\n"
+                    else:
+                        result = "no game\n"
+                    await websocket.send(Message.info(result))
 
 
-async def play(websocket, game, connected):    
+async def play(websocket, game, connected):
     async for message in websocket:
         msg = json.loads(message)
         match Message.type(msg):
@@ -252,17 +297,23 @@ async def start(websocket, msg):
 
 
 async def connect(websocket):
-    message = await websocket.recv()
-    msg = json.loads(message)
     print("[connexion]")
-    print(msg)
-    match Message.type(msg):
-        case Message.NEW: 
-            await start(websocket, msg)
-        case Message.JOIN:
-            await join(websocket, msg)
-        case Message.WATCH:
-            await watch(websocket, msg)
+    while True:
+        message = await websocket.recv()
+        msg = json.loads(message)
+        print(msg)
+        match Message.type(msg):
+            case Message.NEW: 
+                await start(websocket, msg)
+                break
+            case Message.JOIN:
+                await join(websocket, msg)
+                break
+            case Message.WATCH:
+                await watch(websocket, msg)
+                break
+            case _:
+                await handle_message(websocket, msg)
 
 
 async def main():

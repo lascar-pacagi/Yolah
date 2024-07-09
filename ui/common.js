@@ -4,7 +4,7 @@ const BLACK = 0;
 const WHITE = 1;
 const GRID_DIM = 8;
 const BACKGROUND_COLOR = "black";
-const RADIUS_FACTOR = 0.42;
+const RADIUS_FACTOR = 0.43;
 const BOARD_DIM_FACTOR = 1;
 const INITIAL_BLACK_BB = 0b1000000000000000000000000000100000010000000000000000000000000001n;
 const INITIAL_WHITE_BB = 0b0000000100000000000000000001000000001000000000000000000010000000n;
@@ -238,7 +238,7 @@ async function sleep(ms) {
 }
 
 function drawArrow(fromx, fromy, tox, toy, arrowWidth, color){
-    const headlen = arrowWidth * 1.5;
+    const headlen = arrowWidth * 2;
     const angle = Math.atan2(toy-fromy, tox-fromx);
  
     ctx.save();
@@ -378,6 +378,15 @@ const MESSAGE = {
             move: move
         });
     },
+    info: function(command) {
+        return JSON.stringify({
+            type: "info",
+            command: command
+        });
+    },
+    getInfoResult: function(msg) {
+        return msg["result"];
+    }
 };
 
 const TYPE_TO_ENUM = {
