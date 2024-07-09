@@ -265,6 +265,7 @@
                             break;
                     }
                 } else {
+                    showMessage(sendMessage.value)
                     msg = MESSAGE.chat(`[${getUserName()}]: ${sendMessage.value}`);                    
                 }
                 ws.send(msg);
