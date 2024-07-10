@@ -54,6 +54,7 @@ public:
       Move* end() { return last; }
       size_t size() const { return last - moveList; }
       const Move& operator[](size_t i) const { return moveList[i]; }
+      Move& operator[](size_t i) { return moveList[i]; }
       Move* data() { return moveList; }
       friend class Yolah;
     };

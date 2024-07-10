@@ -12,31 +12,20 @@ BasicMinMaxPlayer::BasicMinMaxPlayer(uint16_t depth, heuristic_eval h) : depth(d
 }
 
 void BasicMinMaxPlayer::sort_moves(Yolah& yolah, Yolah::MoveList& moves) {
-    #define XOR_SWAP(a, b) a = a ^ b; b = a ^ b; a = a ^ b
-    int32_t scores[Yolah::MAX_NB_MOVES];
-    uint8_t indexes[Yolah::MAX_NB_MOVES];
+    std::vector<std::pair<uint32_t, Move>> tmp;
     size_t nb_moves = moves.size();
     auto current_player = yolah.current_player();
     for (size_t i = 0; i < nb_moves; i++) {
         yolah.play(moves[i]);
-        scores[i] = heuristic(current_player, yolah);
+        tmp.emplace_back(heuristic(current_player, yolah), moves[i]);
         yolah.undo(moves[i]);
-        indexes[i] = i;
     }
-    for (size_t i = 1; i < nb_moves; i++) {
-        int j = i;
-        while (j > 0 && scores[j - 1] < scores[j]) {
-            XOR_SWAP(scores[j - 1], scores[j]);
-            XOR_SWAP(indexes[j - 1], indexes[j]);
-            j--;
-        }
-    }
-    Yolah::MoveList tmp;
-    std::memcpy(tmp.data(), moves.data(), sizeof(Move) * nb_moves);
+    std::sort(begin(tmp), end(tmp), [](const auto& p1, const auto& p2) {
+        return p1.first > p2.first;
+    });
     for (size_t i = 0; i < nb_moves; i++) {
-        moves.data()[i] = tmp[indexes[i]];
+        moves[i] = tmp[i].second;
     }
-    #undef XOR_SWAP
 }
 
 int32_t BasicMinMaxPlayer::negamax(Yolah& yolah, int32_t alpha, int32_t beta, uint16_t depth) {

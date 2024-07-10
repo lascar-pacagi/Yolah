@@ -7,7 +7,7 @@
 using std::size_t;
 
 namespace {
-    thread_local PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
+    thread_local PRNG prng(42);//std::chrono::system_clock::now().time_since_epoch().count());
 }
 
 size_t MCTSPlayer::Node::NB_NODES = 0;
@@ -17,7 +17,8 @@ void MCTSPlayer::Node::expand(const Yolah& yolah) {
         expanded.compare_exchange_strong(desired, 1, std::memory_order::acq_rel, std::memory_order_relaxed)) {
         Yolah::MoveList moves;
         yolah.moves(moves);
-        nodes.resize(moves.size());            
+        nodes.resize(moves.size());
+        NB_NODES += moves.size();            
         for (size_t i = 0; i < moves.size(); i++) {
             nodes[i].action = moves[i];
         }
@@ -95,7 +96,7 @@ void MCTSPlayer::think(Yolah yolah) {
     Yolah backup = yolah;    
     std::array<Node*, SQUARE_NB> visited;
     size_t nb_iter = 0;
-    do {
+    for(;;) {
         size_t size = 1;
         Node* current = &root;
         visited[0] = current;
@@ -119,8 +120,11 @@ void MCTSPlayer::think(Yolah yolah) {
         }
         yolah = backup;
         ++nb_iter;
-        mu = duration_cast<microseconds>(steady_clock::now() - start);
-    } while (mu.count() < thinking_time);
+        if ((nb_iter & 0x1F) == 0) {
+            mu = duration_cast<microseconds>(steady_clock::now() - start);
+            if (mu.count() > thinking_time) break;
+        }
+    }
 }
 
 void MCTSPlayer::reset() {
@@ -155,8 +159,8 @@ Move MCTSPlayer::play(Yolah yolah) {
             k = 0;
         }
     }
-    // std::cout << root;
-    // std::cout << Node::NB_NODES << '\n';
+    //std::cout << root;
+    std::cout << Node::NB_NODES << '\n';
     reset();    
     return res;
 }

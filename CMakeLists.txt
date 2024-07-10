@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Boost 1.71 COMPONENTS program_options REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Threads REQUIRED)
+find_package(benchmark REQUIRED)
 
 add_executable(Yolah main.cpp)
 target_compile_options(Yolah PRIVATE -Wall)

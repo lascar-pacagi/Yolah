@@ -67,6 +67,7 @@ int main(int argc, char* argv[]) {
     //         return heuristic::eval(player, yolah, weights1);
     //     });
     // }));
+    
     po::options_description general("General options");
     general.add_options()
     ("help", "produce help message")
