@@ -11,13 +11,31 @@ pair<uint16_t, uint16_t> Yolah::score() const {
 }
 
 int16_t Yolah::score(uint8_t player) const {
-    return (black_score - white_score) * ((player == WHITE) * -1 + player == BLACK); 
+    return (black_score - white_score) * ((player == WHITE) * -1 + (player == BLACK)); 
 }
 
 uint8_t Yolah::current_player() const {
     return uint8_t(ply & 1);
 }
-    
+
+uint8_t Yolah::get(Square s) const {
+    uint64_t pos = square_bb(s); 
+    if (black & (uint64_t(1) << pos)) {
+        return BLACK;
+    }
+    if (white & (uint64_t(1) << pos)) {
+        return WHITE;
+    }
+    if (empty & (uint64_t(1) << pos)) {
+        return EMPTY;
+    }
+    return FREE;
+}
+
+uint8_t Yolah::get(File f, Rank r) const {
+    return get(make_square(f, r));
+}
+
 bool Yolah::game_over() const {
     uint64_t possible = ~empty & ~black & ~white;
     return
@@ -69,7 +87,7 @@ void Yolah::undo(Move m) {
     if (m != Move::none()) [[likely]] {
         uint64_t pos1 = square_bb(m.from_sq());
         uint64_t pos2 = square_bb(m.to_sq());    
-        uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (ply & 1); 
+        uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (ply & 1);
         uint64_t black_mask = ~white_mask;
         black ^= (black_mask & pos1) ^ (black_mask & pos2);
         white ^= (white_mask & pos1) ^ (white_mask & pos2);

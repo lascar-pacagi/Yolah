@@ -5,7 +5,7 @@
 #include "MCTS_mem_player.h"
 #include "MCTS_player.h"
 #include "basic_minmax_player.h"
-#include "minmax_player.h"
+#include "minmax_player_v1.h"
 #include "human_player.h"
 #include "monte_carlo_player.h"
 #include <stdexcept>
@@ -37,6 +37,9 @@ unique_ptr<Player> Player::create(const json& j) {
                 } else {
                     throw invalid_argument("hardware concurrency expected in nb threads");
                 }
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
+                }
                 return make_unique<MCTSMemPlayer>(j["microseconds"].get<uint64_t>(), nb_threads);
             }
         },
@@ -50,6 +53,9 @@ unique_ptr<Player> Player::create(const json& j) {
                     nb_threads = std::thread::hardware_concurrency();
                 } else {
                     throw invalid_argument("hardware concurrency expected in nb threads");
+                }
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
                 }
                 return make_unique<MCTSPlayer>(j["microseconds"].get<uint64_t>(), nb_threads);
             }
@@ -65,6 +71,9 @@ unique_ptr<Player> Player::create(const json& j) {
                 } else {
                     throw invalid_argument("hardware concurrency expected in nb threads");
                 }
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
+                }
                 return make_unique<MonteCarloPlayer>(j["microseconds"].get<uint64_t>(), nb_threads);
             }
         },
@@ -74,7 +83,28 @@ unique_ptr<Player> Player::create(const json& j) {
                 if (!j["depth"].is_number()) {
                     throw invalid_argument("number expected for depth");
                 } 
-                return make_unique<BasicMinMaxPlayer>(j["depth"].get<uint16_t>());
+                return make_unique<BasicMinMaxPlayer>(j["depth"].get<uint8_t>());
+            }
+        },
+        {
+            "MinMaxPlayerV1",
+            [](const json& j) {                                
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
+                }
+                if (!j["tt size"].is_number()) {
+                    throw invalid_argument("number expected for tt size");
+                }
+                uint8_t R;
+                if (j["null move reduction"].is_string()) {
+                    if (j["null move reduction"].get<string>() == "none") R = 0;
+                    else throw invalid_argument("none expected in null move reduction");
+                } else if (!j["null move reduction"].is_number()) {
+                    throw invalid_argument("number expected in null move reduction");
+                } else {
+                    R = j["null move reduction"].get<uint8_t>();
+                }
+                return make_unique<MinMaxPlayerV1>(j["microseconds"].get<uint64_t>(), j["tt size"].get<size_t>(), R);
             }
         },
     };

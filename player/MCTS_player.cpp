@@ -7,7 +7,7 @@
 using std::size_t;
 
 namespace {
-    thread_local PRNG prng(42);//std::chrono::system_clock::now().time_since_epoch().count());
+    thread_local PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
 }
 
 size_t MCTSPlayer::Node::NB_NODES = 0;

@@ -21,12 +21,15 @@
 #include <boost/program_options.hpp>
 #include "json.hpp"
 #include <fstream>
+#include "zobrist.h"
+#include "variability_timer_multithreads.h"
 
 namespace po = boost::program_options;
 using std::cout, std::string;
 
 int main(int argc, char* argv[]) {
     magic::init();
+    zobrist::init();
     //test::play_random_game();
     //test::play_random_games(1000000);
     // Yolah yolah;
@@ -67,7 +70,16 @@ int main(int argc, char* argv[]) {
     //         return heuristic::eval(player, yolah, weights1);
     //     });
     // }));
-    
+
+    // auto values = heuristic::sampling_heuristic_values(1000000);
+    // for (int32_t v : values) {
+    //     cout << v << ' ';
+    // }
+    // cout << '\n';
+    // cout << values.size() << '\n';
+
+    //test::variability_timer_multithreads(12, 2000000);
+
     po::options_description general("General options");
     general.add_options()
     ("help", "produce help message")

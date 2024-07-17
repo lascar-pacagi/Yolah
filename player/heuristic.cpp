@@ -2,6 +2,7 @@
 #include <utility>
 #include <bitset>
 #include <bit>
+#include "misc.h"
 
 namespace heuristic {
     namespace {
@@ -189,5 +190,22 @@ namespace heuristic {
     }
     int32_t evaluation(uint8_t player, const Yolah& yolah) {
         return eval(player, yolah);
+    }
+    std::set<int32_t> sampling_heuristic_values(size_t nb_random_games) {
+        std::set<int32_t> res;
+        PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
+        for (size_t i = 0; i < nb_random_games; i++) {
+            Yolah yolah;
+            res.insert(evaluation(yolah.current_player(), yolah));
+            Yolah::MoveList moves;
+            while (!yolah.game_over()) {
+                yolah.moves(moves);
+                if (moves.size() == 0) continue;
+                Move m = moves[prng.rand<size_t>() % moves.size()];
+                yolah.play(m);
+                res.insert(evaluation(yolah.current_player(), yolah));
+            }
+        }
+        return res;
     }
 }

@@ -60,12 +60,16 @@ public:
     };
     static constexpr uint8_t BLACK = 0;
     static constexpr uint8_t WHITE = 1;
+    static constexpr uint8_t EMPTY = 2;
+    static constexpr uint8_t FREE  = 3;
     std::pair<uint16_t, uint16_t> score() const;
     int16_t score(uint8_t player) const;
     uint8_t current_player() const;
     static constexpr uint8_t other_player(uint8_t player) {
       return 1 - player;
     }
+    uint8_t get(Square) const;
+    uint8_t get(File f, Rank r) const;
     bool game_over() const;
     void play(Move m);
     void undo(Move m);
@@ -74,6 +78,9 @@ public:
     bool valid(Move m) const;
     uint64_t free_squares() const;
     uint64_t bitboard(uint8_t player) const;
+    uint16_t nb_plies() const {
+      return ply;
+    }
     std::string to_json() const;
     static Yolah from_json(std::istream& is);
     static Yolah from_json(const std::string&);

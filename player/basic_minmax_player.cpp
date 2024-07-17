@@ -8,11 +8,11 @@
 #include "MCTS_player.h"
 #include "MCTS_mem_player.h"
 
-BasicMinMaxPlayer::BasicMinMaxPlayer(uint16_t depth, heuristic_eval h) : depth(depth), heuristic(h) {
+BasicMinMaxPlayer::BasicMinMaxPlayer(uint8_t depth, heuristic_eval h) : depth(depth), heuristic(h) {
 }
 
 void BasicMinMaxPlayer::sort_moves(Yolah& yolah, Yolah::MoveList& moves) {
-    std::vector<std::pair<uint32_t, Move>> tmp;
+    std::vector<std::pair<int32_t, Move>> tmp;
     size_t nb_moves = moves.size();
     auto current_player = yolah.current_player();
     for (size_t i = 0; i < nb_moves; i++) {
@@ -28,9 +28,11 @@ void BasicMinMaxPlayer::sort_moves(Yolah& yolah, Yolah::MoveList& moves) {
     }
 }
 
-int32_t BasicMinMaxPlayer::negamax(Yolah& yolah, int32_t alpha, int32_t beta, uint16_t depth) {
+int32_t BasicMinMaxPlayer::negamax(Yolah& yolah, int32_t alpha, int32_t beta, uint8_t depth) {
+    nb_nodes++;
     if (yolah.game_over()) {
-        return yolah.score(yolah.current_player()) * heuristic::MAX_VALUE;
+        int32_t score = yolah.score(yolah.current_player());
+        return score + (score >= 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
     if (depth == 0) {
         return heuristic(yolah.current_player(), yolah);
@@ -76,8 +78,10 @@ int32_t BasicMinMaxPlayer::search(Yolah& yolah, Move& res) {
 
 Move BasicMinMaxPlayer::play(Yolah yolah) {
     Move m;
+    nb_nodes = 0;
     auto value = search(yolah, m);
-    //std::cout << "BasicMinMax value: " << value << std::endl;
+    std::cout << "value  : " << value << '\n';
+    std::cout << "# nodes: " << nb_nodes << std::endl;
     return m;
 }
 

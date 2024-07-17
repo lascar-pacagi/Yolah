@@ -264,7 +264,7 @@
                             state = fromSquareState;
                         } else {
                             showMessage(`[${currentPlayer === "White" ? "white" : "black"} move] ${NONE_MOVE}`);
-                            ws.send(Message.my_move(NONE_MOVE));
+                            ws.send(MESSAGE.my_move(NONE_MOVE));
                             currentPlayer = currentPlayer === "White" ? "Black" : "White";
                         }
                         draw();
@@ -358,6 +358,7 @@
                         case "clear": 
                             messages.innerText = "";
                             messages.scrollTop = messages.scrollHeight - messages.clientHeight;
+                            send = false;
                             break;
                     }
                 } else {                    

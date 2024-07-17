@@ -235,7 +235,7 @@
             sendMessage = document.getElementById("sendMessage");
             messages    = document.getElementById("messages");
             uri         = document.getElementById("uri");
-            uid         = makeId(ID_LENGTH);            
+            uid         = makeId(ID_LENGTH);
             connect.onclick = function() {
                 ws = new WebSocket(uri.value);            
                 ws.onopen = function(ev) {
@@ -281,6 +281,7 @@
                         case "clear": 
                             messages.innerText = "";
                             messages.scrollTop = messages.scrollHeight - messages.clientHeight;
+                            send = false;
                             break;
                     }
                 } else {
@@ -297,7 +298,7 @@
                 }
             };
             draw();
-        }
+        }        
     </script>
 </head>
 

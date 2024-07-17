@@ -2,6 +2,7 @@
 #define HEURISTIC_H
 #include "game.h"
 #include <array>
+#include <set>
 
 namespace heuristic {
     /*
@@ -41,6 +42,8 @@ namespace heuristic {
     int32_t blocked(uint8_t player, const Yolah&);
     int32_t eval(uint8_t player, const Yolah&, const std::array<double, NB_WEIGHTS>& weights = WEIGHTS);
     int32_t evaluation(uint8_t player, const Yolah&);
+
+    std::set<int32_t> sampling_heuristic_values(size_t nb_random_games);    
 }
 
 #endif
