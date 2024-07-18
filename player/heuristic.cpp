@@ -39,12 +39,12 @@ namespace heuristic {
             // std::cout << Bitboard::pretty(flood) << std::endl;
             return flood;
         }
-        int32_t connectivity(uint64_t player_bb, uint64_t free) {
+        int16_t connectivity(uint64_t player_bb, uint64_t free) {
             return std::popcount(floodfill(player_bb, free));
         }        
-        int32_t nb_connected_components(const Yolah& yolah) {
+        int16_t nb_connected_components(const Yolah& yolah) {
             uint64_t free = yolah.free_squares();
-            int32_t res = 0;
+            int16_t res = 0;
             while (free) {
                 uint64_t bb = free & -free;
                 uint64_t flood = floodfill(bb, free);                
@@ -53,11 +53,11 @@ namespace heuristic {
             }
             return res;
         }
-        int32_t reachable_first(uint8_t player, const Yolah& yolah, auto&& one_step) {
+        int16_t reachable_first(uint8_t player, const Yolah& yolah, auto&& one_step) {
             uint64_t player_flood = yolah.bitboard(player);
             uint64_t opponent_flood = yolah.bitboard(Yolah::other_player(player));
             uint64_t free = yolah.free_squares();            
-            int32_t res = 0;
+            int16_t res = 0;
             uint64_t prev_player_flood = 0;
             while (player_flood ^ prev_player_flood) {
                 prev_player_flood = player_flood;
@@ -84,9 +84,9 @@ namespace heuristic {
                      std::popcount(opponent_moves_bb & ~player_moves_bb) };
         }
     }
-    int32_t mobility(const Yolah::MoveList& moves) {
+    int16_t mobility(const Yolah::MoveList& moves) {
         uint64_t seen = 0;        
-        int32_t res = 0;
+        int16_t res = 0;
         for (Move m : moves) {
             uint64_t bb = square_bb(m.to_sq());
             if (!(seen & bb)) {
@@ -96,10 +96,10 @@ namespace heuristic {
         }
         return res;
     }
-    int32_t connectivity(uint8_t player, const Yolah& yolah) {
+    int16_t connectivity(uint8_t player, const Yolah& yolah) {
         uint64_t player_bb = yolah.bitboard(player);
         uint64_t free = yolah.free_squares();             
-        int32_t res = 0;
+        int16_t res = 0;
         while (player_bb) {
             uint64_t bb = player_bb & -player_bb;
             res += connectivity(bb, free);
@@ -107,16 +107,16 @@ namespace heuristic {
         }
         return res;
     }
-    int32_t connectivity_set(uint8_t player, const Yolah& yolah) {
+    int16_t connectivity_set(uint8_t player, const Yolah& yolah) {
         return connectivity(yolah.bitboard(player), yolah.free_squares());
     }
-    int32_t alone(uint8_t player, const Yolah& yolah) {
+    int16_t alone(uint8_t player, const Yolah& yolah) {
         uint64_t player_bb = yolah.bitboard(player);
         uint64_t opponent_bb = yolah.bitboard(Yolah::other_player(player));
         uint64_t free = yolah.free_squares();
         uint64_t flood_opponent = floodfill(opponent_bb, free);
         //std::cout << Bitboard::pretty(flood_opponent) << std::endl;
-        int32_t res = 0;
+        int16_t res = 0;
         while (player_bb) {
             uint64_t bb = player_bb & -player_bb;
             //std::cout << Bitboard::pretty(bb) << std::endl;
@@ -130,7 +130,7 @@ namespace heuristic {
         }
         return res;
     }
-    int32_t closer(uint8_t player, const Yolah& yolah) {
+    int16_t closer(uint8_t player, const Yolah& yolah) {
         auto one_step = [&](uint64_t flood, uint64_t free) {
             uint64_t flood1 = shift<NORTH>(flood) & free;
             uint64_t flood2 = shift<SOUTH>(flood) & free;
@@ -144,13 +144,13 @@ namespace heuristic {
         };
         return reachable_first(player, yolah, one_step);
     }
-    int32_t first(const Yolah::MoveList& player_moves, const Yolah::MoveList& opponent_moves) {
+    int16_t first(const Yolah::MoveList& player_moves, const Yolah::MoveList& opponent_moves) {
         return first_fast(player_moves, opponent_moves).first;
     }
-    int32_t blocked(uint8_t player, const Yolah& yolah) {
+    int16_t blocked(uint8_t player, const Yolah& yolah) {
         uint64_t player_bb = yolah.bitboard(player);
         uint64_t free = yolah.free_squares();
-        int32_t res = 0;
+        int16_t res = 0;
         while (player_bb) {
             uint64_t bb = player_bb & -player_bb;
             //std::cout << Bitboard::pretty(bb) << std::endl;
@@ -168,7 +168,7 @@ namespace heuristic {
         }
         return res;
     }
-    int32_t eval(uint8_t player, const Yolah& yolah, const std::array<double, NB_WEIGHTS>& weights) {
+    int16_t eval(uint8_t player, const Yolah& yolah, const std::array<double, NB_WEIGHTS>& weights) {
         //std::cout << yolah << std::endl;
         //std::cout << Bitboard::pretty(yolah.free_squares()) << std::endl;
         Yolah::MoveList black_moves, white_moves;
@@ -185,14 +185,14 @@ namespace heuristic {
               weights[CLOSER_WEIGHT] * pair{ closer(Yolah::BLACK, yolah), closer(Yolah::WHITE, yolah) } +
               weights[FIRST_WEIGHT] * first_fast(black_moves, white_moves) +
               weights[BLOCKED_WEIGHT] * pair{ blocked(Yolah::BLACK, yolah), blocked(Yolah::WHITE, yolah) };
-        int32_t value = static_cast<int32_t>((res.first - res.second) * (player == Yolah::BLACK ? 1 : -1));
+        int16_t value = static_cast<int16_t>((res.first - res.second) * (player == Yolah::BLACK ? 1 : -1));
         return std::max(MIN_VALUE, std::min(MAX_VALUE, value));
     }
-    int32_t evaluation(uint8_t player, const Yolah& yolah) {
+    int16_t evaluation(uint8_t player, const Yolah& yolah) {
         return eval(player, yolah);
     }
-    std::set<int32_t> sampling_heuristic_values(size_t nb_random_games) {
-        std::set<int32_t> res;
+    std::set<int16_t> sampling_heuristic_values(size_t nb_random_games) {
+        std::set<int16_t> res;
         PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
         for (size_t i = 0; i < nb_random_games; i++) {
             Yolah yolah;

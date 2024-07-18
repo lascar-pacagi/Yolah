@@ -15,6 +15,7 @@ class NoisyCrossEntropyMethod {
     double extra_stddev;
     FitnessFunction fitness;
     uint32_t elite_size;
+    bool keep_overall_best;
     TransformWeight transform;
 public:
     class Builder {
@@ -27,6 +28,7 @@ public:
             return 0;
         };
         double elite_fraction_ = 0.2;
+        bool keep_overall_best_ = true;
         TransformWeight transform_ = [](size_t, double weight) {
             return weight;
         };
@@ -40,12 +42,13 @@ public:
         Builder& extra_stddev(double);
         Builder& fitness(FitnessFunction);
         Builder& elite_fraction(double);
+        Builder& keep_overall_best(bool);
         Builder& transform(TransformWeight);
         NoisyCrossEntropyMethod build() const;
     };
     NoisyCrossEntropyMethod() = default;
     NoisyCrossEntropyMethod(const std::vector<double>& weights, uint32_t nb_iterations, uint32_t population_size, double elite_fraction, 
-                            double stddev, double extra_stddev, FitnessFunction fitness, TransformWeight transform);
+                            bool keep_overall_best, double stddev, double extra_stddev, FitnessFunction fitness, TransformWeight transform);
     void run();
     std::vector<double> best_weights() const;
 };

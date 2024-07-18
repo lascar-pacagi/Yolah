@@ -1,7 +1,7 @@
 #include "transposition_table.h"
 #include <thread>
 
-void TranspositionTableEntry::save(uint64_t k, int32_t v, Bound b, uint8_t d, Move m, uint8_t generation) {
+void TranspositionTableEntry::save(uint64_t k, int16_t v, Bound b, uint8_t d, Move m, uint8_t generation) {
     uint32_t key32 = uint32_t(k);
     if (uint16_t(key32) != key_lo || uint16_t(key32 >> 16) != key_hi || 
         d > depth8 || (d == depth8 && b == BOUND_EXACT) || relative_age(generation)) {
@@ -9,8 +9,8 @@ void TranspositionTableEntry::save(uint64_t k, int32_t v, Bound b, uint8_t d, Mo
         key_hi     = uint16_t(key32 >> 16);
         depth8     = d;
         gen_bound8 = generation | b;
-        move16 = m;
-        value32    = v;
+        move16     = m;
+        value16    = v;
     }
 }
 
@@ -69,7 +69,7 @@ void TranspositionTable::set_move(uint64_t key, Move m) {
 void TranspositionTable::resize(size_t mb_size, size_t thread_count) {
     std::free(table);
     cluster_count = mb_size * 1024 * 1024 / sizeof(Cluster);
-    std::cout << "cluster count: " << cluster_count << std::endl;
+    //std::cout << "cluster count: " << cluster_count << std::endl;
     table = static_cast<Cluster*>(aligned_pages_alloc(cluster_count * sizeof(Cluster)));
     if (!table) {
         std::cerr << "Failed to allocate " << mb_size << "MB for transposition table." << std::endl;
@@ -85,18 +85,18 @@ void TranspositionTable::clear(size_t thread_count) {
             const size_t stride = size_t(cluster_count / thread_count);
             const size_t start  = size_t(stride * idx);
             const size_t len = idx != thread_count - 1 ? stride : cluster_count - start;
-            std::cout << start << ' ' << len << std::endl;
+            //std::cout << start << ' ' << len << std::endl;
             std::memset(&table[start], 0, len * sizeof(Cluster));
         });
     }
 }
 
-void TranspositionTable::update(uint64_t k, int32_t v, Bound b, uint8_t d, Move m) {
+void TranspositionTable::update(uint64_t k, int16_t v, Bound b, uint8_t d, Move m) {
     bool found;
     TranspositionTableEntry* entry = probe(k, found);
     entry->save(k, v, b, d, m, generation8);
 }
 
-void TranspositionTable::update(uint64_t k, int32_t v, Bound b, uint8_t d) {
+void TranspositionTable::update(uint64_t k, int16_t v, Bound b, uint8_t d) {
     update(k, v, b, d, Move::none());
 }

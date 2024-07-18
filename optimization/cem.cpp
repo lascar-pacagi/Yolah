@@ -50,21 +50,27 @@ NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::elite_fracti
     return *this;
 }
 
+NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::keep_overall_best(bool b) {
+    keep_overall_best_ = b;
+    return *this;
+}
+
 NoisyCrossEntropyMethod::Builder& NoisyCrossEntropyMethod::Builder::transform(TransformWeight t) {
     transform_ = t;
     return *this;
 }
 
 NoisyCrossEntropyMethod NoisyCrossEntropyMethod::Builder::build() const {
-    return { weights_, nb_iterations_, population_size_, elite_fraction_, stddev_, extra_stddev_, fitness_, transform_ };
+    return { weights_, nb_iterations_, population_size_, elite_fraction_, keep_overall_best_, stddev_, extra_stddev_, fitness_, transform_ };
 }
 
 NoisyCrossEntropyMethod::NoisyCrossEntropyMethod(const std::vector<double>& weights, uint32_t nb_iterations, 
-                                                 uint32_t population_size, double elite_fraction, double stddev, double extra_stddev, 
-                                                 FitnessFunction fitness, TransformWeight transform) 
+                                                 uint32_t population_size, double elite_fraction, bool keep_overall_best,
+                                                 double stddev, double extra_stddev, 
+                                                 FitnessFunction fitness, TransformWeight transform)
         : optimized_weights(weights), nb_iterations(nb_iterations), population_size(population_size), 
           stddev(stddev), extra_stddev(extra_stddev), fitness(fitness), elite_size(population_size * elite_fraction),
-          transform(transform) {
+          keep_overall_best(keep_overall_best), transform(transform) {
 }
 
 void NoisyCrossEntropyMethod::run() {
@@ -108,7 +114,7 @@ void NoisyCrossEntropyMethod::run() {
             p.first = fitness(population[i], population);
         });
         sort(begin(fitness_index), end(fitness_index), std::greater<pair<double, size_t>>());      
-        if (fitness_index[0].first > best_fitness) {
+        if (!keep_overall_best || fitness_index[0].first > best_fitness) {
             best_fitness = fitness_index[0].first;
             optimized_weights = population[fitness_index[0].second];
             std::stringbuf buf;
@@ -146,7 +152,7 @@ void NoisyCrossEntropyMethod::run() {
         for (int i = 0; i < weights_size; ++i) {
             weights_std[i] = std::sqrt(weights_std[i] / elite_size);
         }
-        bar.set_progress(iter * 100 / nb_iterations);        
+        bar.set_progress(iter * 100 / nb_iterations);
     } 
     bar.set_progress(100);
     cout << "best fitness: " << best_fitness << endl;

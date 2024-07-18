@@ -160,7 +160,7 @@ Move MCTSPlayer::play(Yolah yolah) {
         }
     }
     //std::cout << root;
-    std::cout << Node::NB_NODES << '\n';
+    //std::cout << Node::NB_NODES << '\n';
     reset();    
     return res;
 }

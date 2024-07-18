@@ -19,7 +19,7 @@ Move TranspositionTableSlow::get_move(uint64_t k) {
     return entry->move;
 }
 
-void TranspositionTableSlow::update(uint64_t k, int32_t v, Bound b, uint8_t d, Move m) {
+void TranspositionTableSlow::update(uint64_t k, int16_t v, Bound b, uint8_t d, Move m) {
     Entry* entry = &table[k & mask];
     if (entry->bound == BOUND_NONE || entry->key != k || d >= entry->depth) {
         entry->key = k;

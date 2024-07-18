@@ -17,14 +17,14 @@ class TranspositionTableEntry {
     uint8_t  depth8;
     uint8_t  gen_bound8;
     Move     move16;
-    int32_t  value32;
+    int16_t  value16;
 
 public:
     Move    move() const { return move16; }
-    int32_t value() const { return value32; }
+    int16_t value() const { return value16; }
     uint8_t depth() const { return depth8; }
     Bound   bound() const { return Bound(gen_bound8 & 3); }
-    void    save(uint64_t k, int32_t v, Bound b, uint8_t d, Move m, uint8_t generation);
+    void    save(uint64_t k, int16_t v, Bound b, uint8_t d, Move m, uint8_t generation);
     uint8_t relative_age(uint8_t generation) const;
 };
 
@@ -35,7 +35,7 @@ class TranspositionTable {
         TranspositionTableEntry entries[CLUSTER_SIZE];
         char padding[2];
     };
-    //static_assert(sizeof(Cluster) == 32, "Unexpected Cluster size");
+    static_assert(sizeof(Cluster) == 32, "Unexpected Cluster size");
     static constexpr unsigned GENERATION_BITS = 2;
     static constexpr int GENERATION_DELTA = (1 << GENERATION_BITS);
     static constexpr int GENERATION_CYCLE = 255 + GENERATION_DELTA;
@@ -58,8 +58,8 @@ public:
     uint8_t generation() const {
         return generation8;
     }
-    void update(uint64_t k, int32_t v, Bound b, uint8_t d, Move m);
-    void update(uint64_t k, int32_t v, Bound b, uint8_t d);
+    void update(uint64_t k, int16_t v, Bound b, uint8_t d, Move m);
+    void update(uint64_t k, int16_t v, Bound b, uint8_t d);
 };
 
 #endif
