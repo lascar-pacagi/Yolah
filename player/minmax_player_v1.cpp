@@ -110,14 +110,14 @@ int16_t MinMaxPlayerV1::root_search(Yolah& yolah, uint64_t hash, uint8_t depth, 
 void MinMaxPlayerV1::sort_moves(Yolah& yolah, uint64_t hash, Yolah::MoveList& moves) {
     std::vector<std::pair<int16_t, Move>> tmp;
     size_t nb_moves = moves.size();
-    auto current_player = yolah.current_player();
+    auto player = yolah.current_player();
     Move best = table.get_move(hash);
     for (size_t i = 0; i < nb_moves; i++) {
         if (best == moves[i]) {
             tmp.emplace_back(std::numeric_limits<int16_t>::max(), best);
         } else {
             yolah.play(moves[i]);
-            tmp.emplace_back(heuristic(current_player, yolah), moves[i]);
+            tmp.emplace_back(heuristic(player, yolah), moves[i]);
             yolah.undo(moves[i]);
         }
     }

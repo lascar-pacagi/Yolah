@@ -9,7 +9,7 @@ class MinMaxPlayerV2 : public Player {
     using heuristic_eval = std::function<int16_t(uint8_t, const Yolah&)>;
     const uint64_t thinking_time;
     TranspositionTable table;
-    size_t nb_moves_at_full_depth;
+    double percentage_moves_at_full_depth;
     uint8_t R;
     heuristic_eval heuristic;
     uint64_t hash = 0;
@@ -22,8 +22,9 @@ class MinMaxPlayerV2 : public Player {
     void sort_moves(Yolah&, uint64_t hash, Yolah::MoveList&);
     Move iterative_deepening(Yolah&);
     void print_pv(Yolah, uint64_t hash, int8_t depth);
+    
 public:
-    MinMaxPlayerV2(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, uint8_t R, 
+    MinMaxPlayerV2(uint64_t microseconds, size_t tt_size_mb, double percentage_moves_at_full_depth, uint8_t R, 
                    heuristic_eval heuristic = heuristic::evaluation);
     Move play(Yolah) override;
     std::string info() override;

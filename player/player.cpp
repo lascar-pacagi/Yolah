@@ -138,8 +138,8 @@ unique_ptr<Player> Player::create(const json& j) {
                 if (!j.contains("tt size")) {
                     throw invalid_argument("tt size key expected");
                 }
-                if (!j.contains("nb moves at full depth")) {
-                    throw invalid_argument("nb moves at full depth key expected");
+                if (!j.contains("% moves at full depth")) {
+                    throw invalid_argument("% moves at full depth key expected");
                 }
                 if (!j.contains("move reduction")) {
                     throw invalid_argument("move reduction key expected");
@@ -150,15 +150,15 @@ unique_ptr<Player> Player::create(const json& j) {
                 if (!j["tt size"].is_number()) {
                     throw invalid_argument("number expected for tt size");
                 }                
-                if (!j["nb moves at full depth"].is_number()) {
-                    throw invalid_argument("number expected for number of moves at full depth");
+                if (!j["% moves at full depth"].is_number()) {
+                    throw invalid_argument("number expected for percentage of moves at full depth");
                 }
                 if (!j["move reduction"].is_number()) {
                     throw invalid_argument("number expected in move reduction");
                 }
                 return make_unique<MinMaxPlayerV2>(j["microseconds"].get<uint64_t>(), 
                                                    j["tt size"].get<size_t>(),
-                                                   j["nb moves at full depth"].get<size_t>(),
+                                                   j["% moves at full depth"].get<double>(),
                                                    j["move reduction"].get<uint8_t>());
             }
         },
