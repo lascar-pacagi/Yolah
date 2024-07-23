@@ -10,6 +10,7 @@ public:
     explicit RandomPlayer(uint64_t seed);
     Move play(Yolah yolah) override;
     std::string info() override;
+    json config() override;
 };
 
 #endif

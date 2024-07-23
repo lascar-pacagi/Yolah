@@ -14,6 +14,7 @@ public:
     explicit MonteCarloPlayer(uint64_t microseconds, std::size_t nb_threads);
     Move play(Yolah yolah) override;
     std::string info() override;
+    json config() override;
 };
 
 #endif

@@ -8,10 +8,10 @@ namespace heuristic {
         NoisyCrossEntropyMethod::Builder builder;
         builder
         .population_size(30)
-        .nb_iterations(50)
+        .nb_iterations(20)
         .elite_fraction(0.2)
         .stddev(1)
-        .extra_stddev(20)
+        .extra_stddev(10)
         .weights(vector<double>(heuristic::NB_WEIGHTS))
         .transform([](size_t i, double w) {
             if (i == heuristic::NO_MOVE_WEIGHT || i == heuristic::BLOCKED_WEIGHT) {

@@ -43,7 +43,7 @@ class Yolah {
     uint16_t ply = 0;
 
 public:
-    static constexpr uint16_t MAX_NB_MOVES = 75;
+    static constexpr uint16_t MAX_NB_MOVES = 205;
     class MoveList {
       Move moveList[MAX_NB_MOVES], *last;
     public:

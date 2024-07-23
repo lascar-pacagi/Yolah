@@ -1,25 +1,25 @@
-#include "minmax_player_v2.h"
+#include "minmax_player_v3.h"
 #include <thread>
 #include <chrono>
 #include "zobrist.h"
 
 using std::cout, std::endl;
 
-MinMaxPlayerV2::MinMaxPlayerV2(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, 
-                               uint8_t late_move_reduction, heuristic_eval h) 
-    : thinking_time(microseconds), table(tt_size_mb),
-      nb_moves_at_full_depth(nb_moves_at_full_depth), late_move_reduction(late_move_reduction), heuristic(h) {
+MinMaxPlayerV3::MinMaxPlayerV3(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, 
+                               uint8_t late_move_reduction, uint8_t null_move_reduction, heuristic_eval h) 
+    : thinking_time(microseconds), table(tt_size_mb), nb_moves_at_full_depth(nb_moves_at_full_depth), 
+      late_move_reduction(late_move_reduction), null_move_reduction(null_move_reduction), heuristic(h) {
 }
 
-Move MinMaxPlayerV2::play(Yolah yolah) {
+Move MinMaxPlayerV3::play(Yolah yolah) {
     return iterative_deepening(yolah);
 }
 
-std::string MinMaxPlayerV2::info() {
-    return "minmax player v2 (v1 + late move reduction)";
+std::string MinMaxPlayerV3::info() {
+    return "minmax player v3 (v2 + null move reduction)";
 }
 
-int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth) {
+int16_t MinMaxPlayerV3::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth, bool null_move_allowed) {
     nb_nodes++;
     if (yolah.game_over()) {
         int16_t score = yolah.score(yolah.current_player());
@@ -44,6 +44,16 @@ int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
             if (v <= alpha) return v;
             beta = std::min(beta, v);
         }
+    }        
+    if (null_move_allowed) {
+        auto player = yolah.current_player();
+        yolah.play(Move::none());
+        int32_t v = -negamax(yolah, zobrist::update(hash, player, Move::none()), -beta, -beta + 1, depth - null_move_reduction, false);
+        yolah.undo(Move::none());
+        if (v >= beta) {
+            table.update(hash, v, BOUND_LOWER, depth, Move::none());
+            return v;
+        }
     }
     Yolah::MoveList moves;
     yolah.moves(moves);
@@ -55,12 +65,12 @@ int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
         Move m = moves[i];
         if (i >= nb_moves_at_full_depth) {
             yolah.play(m);
-            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction);
+            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction, false);
             yolah.undo(m);
             if (v <= alpha) continue;
         }
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1, false);
         yolah.undo(m);
         if (v >= beta) {
             table.update(hash, v, BOUND_LOWER, depth, m);
@@ -79,7 +89,7 @@ int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
     return alpha;
 }
     
-int16_t MinMaxPlayerV2::root_search(Yolah& yolah, uint64_t hash, int8_t depth, Move& res) {
+int16_t MinMaxPlayerV3::root_search(Yolah& yolah, uint64_t hash, int8_t depth, Move& res) {
     res = Move::none();
     Yolah::MoveList moves;
     yolah.moves(moves);
@@ -91,12 +101,12 @@ int16_t MinMaxPlayerV2::root_search(Yolah& yolah, uint64_t hash, int8_t depth, M
         Move m = moves[i];
         if (i >= nb_moves_at_full_depth) {
             yolah.play(m);
-            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction);
+            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction, true);
             yolah.undo(m);
             if (v <= alpha) continue;
         }   
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), alpha, beta, depth - 1);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), alpha, beta, depth - 1, true);
         yolah.undo(m);
         if (v > alpha) {
             alpha = v;
@@ -110,7 +120,7 @@ int16_t MinMaxPlayerV2::root_search(Yolah& yolah, uint64_t hash, int8_t depth, M
     return alpha;
 }
     
-void MinMaxPlayerV2::sort_moves(Yolah& yolah, uint64_t hash, Yolah::MoveList& moves) {
+void MinMaxPlayerV3::sort_moves(Yolah& yolah, uint64_t hash, Yolah::MoveList& moves) {
     std::vector<std::pair<int16_t, Move>> tmp;
     size_t nb_moves = moves.size();
     auto player = yolah.current_player();
@@ -133,7 +143,7 @@ void MinMaxPlayerV2::sort_moves(Yolah& yolah, uint64_t hash, Yolah::MoveList& mo
     }
 }
 
-void MinMaxPlayerV2::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
+void MinMaxPlayerV3::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     if (yolah.game_over() || depth == 0) return;
     bool found;
     TranspositionTableEntry* entry = table.probe(hash, found);
@@ -144,7 +154,7 @@ void MinMaxPlayerV2::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     print_pv(yolah, zobrist::update(hash, player, entry->move()), depth - 1);
 }
 
-Move MinMaxPlayerV2::iterative_deepening(Yolah& yolah) {
+Move MinMaxPlayerV3::iterative_deepening(Yolah& yolah) {
     this->stop = false;
     std::jthread clock([this]{
         std::this_thread::sleep_for(std::chrono::microseconds(this->thinking_time));
@@ -173,12 +183,13 @@ Move MinMaxPlayerV2::iterative_deepening(Yolah& yolah) {
     return res;
 }
 
-json MinMaxPlayerV2::config() {
+json MinMaxPlayerV3::config() {
     json j;
-    j["name"] = "MinMaxPlayerV2";
+    j["name"] = "MinMaxPlayerV3";
     j["microseconds"] = thinking_time;
     j["tt size"] = table.size();
     j["nb moves at full depth"] = nb_moves_at_full_depth;
     j["late move reduction"] = late_move_reduction;
+    j["null move reduction"] = null_move_reduction;
     return j;
 }

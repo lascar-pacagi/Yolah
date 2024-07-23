@@ -38,6 +38,10 @@ class PRNG {
         s(seed) {
     }
 
+    uint64_t seed() {
+        return s;
+    }
+
     template<typename T>
     T rand() {
         return T(rand64());

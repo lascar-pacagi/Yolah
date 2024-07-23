@@ -81,8 +81,7 @@ int32_t MCTSPlayer::playout(Yolah yolah) const {
     uint8_t player = yolah.current_player();
     Yolah::MoveList moves;
     while (!yolah.game_over()) {
-        yolah.moves(moves);
-        if (moves.size() == 0) continue;
+        yolah.moves(moves);        
         Move m = moves[prng.rand<size_t>() % moves.size()];
         yolah.play(m);
     }
@@ -121,7 +120,7 @@ void MCTSPlayer::think(Yolah yolah) {
         yolah = backup;
         ++nb_iter;
         if ((nb_iter & 0x1F) == 0) {
-            mu = duration_cast<microseconds>(steady_clock::now() - start);
+            mu = duration_cast<std::chrono::microseconds>(steady_clock::now() - start);
             if (mu.count() > thinking_time) break;
         }
     }
@@ -167,4 +166,16 @@ Move MCTSPlayer::play(Yolah yolah) {
 
 std::string MCTSPlayer::info() {
     return "mcts player";
+}
+
+json MCTSPlayer::config() {
+    json j;
+    j["name"] = "MCTSPlayer";
+    j["microseconds"] = thinking_time;
+    if (pool.get_thread_count() == std::thread::hardware_concurrency()) {
+        j["nb threads"] = "hardware concurrency";
+    } else {
+        j["nb threads"] = pool.get_thread_count();
+    }
+    return j;
 }

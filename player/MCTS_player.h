@@ -49,8 +49,15 @@ public:
     explicit MCTSPlayer(uint64_t microseconds, std::size_t nb_threads, std::pmr::polymorphic_allocator<> alloc = {}) 
         : thinking_time(microseconds), root(Move::none(), alloc), pool(static_cast<BS::concurrency_t>(nb_threads)) {  
     } 
+    uint64_t microseconds() const {
+        return thinking_time;
+    }
+    size_t nb_threads() const {
+        return pool.get_thread_count();
+    }
     Move play(Yolah) override;
     std::string info() override;
+    json config() override;
 };
 
 std::ostream& operator<<(std::ostream& os, const MCTSPlayer::Node& n);

@@ -48,6 +48,9 @@ public:
     ~TranspositionTable();
     void new_search();
     TranspositionTableEntry* probe(uint64_t key, bool& found) const;
+    size_t size() const {
+        return cluster_count * sizeof(Cluster) / (1024 * 1024);
+    }
     Move get_move(uint64_t key) const;
     void set_move(uint64_t key, Move m);
     void resize(size_t mb_size, size_t thread_count);

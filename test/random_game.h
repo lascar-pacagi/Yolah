@@ -4,7 +4,7 @@
 
 namespace test {
     void play_random_game();
-    void play_random_games(std::size_t n);
+    void play_random_games(size_t n);
 }
 
 #endif

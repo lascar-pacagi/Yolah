@@ -211,25 +211,23 @@
 //     }
 // }
 namespace heuristic {
-    namespace {
-        uint64_t floodfill(uint64_t player_bb, uint64_t free) {
-            uint64_t prev_flood = 0;   
-            uint64_t flood = player_bb;            
-            while (prev_flood ^ flood) {
-                prev_flood = flood;
-                uint64_t flood1 = shift<NORTH>(flood) & free;
-                uint64_t flood2 = shift<SOUTH>(flood) & free;
-                uint64_t flood3 = shift<EAST>(flood) & free;
-                uint64_t flood4 = shift<WEST>(flood) & free;
-                uint64_t flood5 = shift<NORTH_EAST>(flood) & free;
-                uint64_t flood6 = shift<SOUTH_EAST>(flood) & free;
-                uint64_t flood7 = shift<NORTH_WEST>(flood) & free;
-                uint64_t flood8 = shift<SOUTH_WEST>(flood) & free;
-                flood |= flood1 | flood2 | flood3 | flood4 | flood5 | flood6 | flood7 | flood8;
-            }
-            flood ^= player_bb;
-            return flood;
+    uint64_t floodfill(uint64_t player_bb, uint64_t free) {
+        uint64_t prev_flood = 0;   
+        uint64_t flood = player_bb;            
+        while (prev_flood ^ flood) {
+            prev_flood = flood;
+            uint64_t flood1 = shift<NORTH>(flood) & free;
+            uint64_t flood2 = shift<SOUTH>(flood) & free;
+            uint64_t flood3 = shift<EAST>(flood) & free;
+            uint64_t flood4 = shift<WEST>(flood) & free;
+            uint64_t flood5 = shift<NORTH_EAST>(flood) & free;
+            uint64_t flood6 = shift<SOUTH_EAST>(flood) & free;
+            uint64_t flood7 = shift<NORTH_WEST>(flood) & free;
+            uint64_t flood8 = shift<SOUTH_WEST>(flood) & free;
+            flood |= flood1 | flood2 | flood3 | flood4 | flood5 | flood6 | flood7 | flood8;
         }
+        flood ^= player_bb;
+        return flood;
     }
 
     int16_t blocked(uint8_t player, const Yolah& yolah) {
@@ -270,6 +268,23 @@ namespace heuristic {
         return std::popcount(floodfill(player_bb, free));
     }
 
+    int16_t alone(uint8_t player, const Yolah& yolah) {
+        uint64_t player_bb = yolah.bitboard(player);
+        uint64_t opponent_bb = yolah.bitboard(Yolah::other_player(player));
+        uint64_t free = yolah.free_squares();
+        uint64_t flood_opponent = floodfill(opponent_bb, free);
+        int16_t res = 0;
+        while (player_bb) {
+            uint64_t bb = player_bb & -player_bb;
+            uint64_t flood = floodfill(bb, free);
+            if (!(flood & flood_opponent)) {
+                res += std::popcount(flood);
+            }
+            player_bb &= ~bb;
+        }
+        return res;
+    }
+
     int16_t eval(uint8_t player, const Yolah& yolah, const std::array<double, NB_WEIGHTS>& weights) {
         Yolah::MoveList black_moves, white_moves;
         yolah.moves(Yolah::BLACK, black_moves);
@@ -279,8 +294,9 @@ namespace heuristic {
         res += weights[NB_MOVES_WEIGHT] * int(black_moves.size() - white_moves.size());
         res += weights[BLOCKED_WEIGHT] * (blocked(Yolah::BLACK, yolah) - blocked(Yolah::WHITE, yolah));
         res += weights[FIRST_WEIGHT] * first(black_moves, white_moves);
-        res += weights[CONNECTIVITY_SET_WEIGHT] * int(connectivity_set(yolah.bitboard(Yolah::BLACK), yolah.free_squares()) - 
-                                                        connectivity_set(yolah.bitboard(Yolah::WHITE), yolah.free_squares()));
+        res += weights[CONNECTIVITY_SET_WEIGHT] * (connectivity_set(yolah.bitboard(Yolah::BLACK), yolah.free_squares()) - 
+                                                    connectivity_set(yolah.bitboard(Yolah::WHITE), yolah.free_squares()));
+        res += weights[ALONE_WEIGHT] * (alone(Yolah::BLACK, yolah) - alone(Yolah::WHITE, yolah));                                                        
         int16_t value = static_cast<int16_t>(res * (player == Yolah::BLACK ? 1 : -1));
         return std::max(MIN_VALUE, std::min(MAX_VALUE, value));
     }

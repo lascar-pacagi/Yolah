@@ -56,3 +56,15 @@ Move MonteCarloPlayer::play(Yolah yolah) {
 std::string MonteCarloPlayer::info() {
     return "monte carlo player";
 }
+
+json MonteCarloPlayer::config() {
+    json j;
+    j["name"] = "MonteCarloPlayer";
+    j["microseconds"] = thinking_time;
+    if (pool.get_thread_count() == std::thread::hardware_concurrency()) {
+        j["nb threads"] = "hardware concurrency";
+    } else {
+        j["nb threads"] = pool.get_thread_count();
+    } 
+    return j;
+}

@@ -205,3 +205,11 @@ Move MinMaxPlayerV1::iterative_deepening(Yolah& yolah) {
     }
     return res;
 }
+
+json MinMaxPlayerV1::config() {
+    json j;
+    j["name"] = "MinMaxPlayerV1";
+    j["microseconds"] = thinking_time;
+    j["tt size"] = table.size();
+    return j;
+}

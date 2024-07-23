@@ -18,3 +18,10 @@ Move RandomPlayer::play(Yolah yolah) {
 std::string RandomPlayer::info() {
     return "random player";
 }
+
+json RandomPlayer::config() {
+    json j;
+    j["name"] = "RandomPlayer";
+    j["seed"] = prng.seed();
+    return j;
+}

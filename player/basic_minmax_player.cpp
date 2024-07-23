@@ -88,3 +88,10 @@ Move BasicMinMaxPlayer::play(Yolah yolah) {
 std::string BasicMinMaxPlayer::info() {
     return "basic minmax player";
 }
+
+json BasicMinMaxPlayer::config() {
+    json j;
+    j["name"] = "BasicMinMaxPlayer";
+    j["depth"] = depth;
+    return j;
+}

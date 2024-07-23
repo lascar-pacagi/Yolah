@@ -11,6 +11,7 @@ struct Player {
     }
     virtual void game_over(Yolah) {
     }
+    virtual json config() = 0;
     static std::unique_ptr<Player> create(const json&);
 };
 
