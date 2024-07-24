@@ -71,6 +71,7 @@ namespace heuristic {
         NB_MOVES_WEIGHT,
         CONNECTIVITY_SET_WEIGHT,
         ALONE_WEIGHT,
+//        CLOSER_WEIGHT,
         FIRST_WEIGHT,
         BLOCKED_WEIGHT,
         NB_WEIGHTS
@@ -79,15 +80,15 @@ namespace heuristic {
     constexpr int16_t MIN_VALUE = -MAX_VALUE;
     // Weights from Noisy Cross Entropy Method: {-7.21127, 17.6285, 2.58455, 66.348, -1.25687}
     // Weights from Nelder Mead:
-    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{0, 0, 0, 0, 0, 0};
+    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-31.6403, 9.073064350669991, 7.984522448273223, 8.212840305143182, 58.24374586858186, -57.56191351427309};
     // int16_t mobility(const Yolah::MoveList&);
     // int16_t connectivity(uint8_t player, const Yolah&);
     // int16_t closer(uint8_t player, const Yolah&);
     uint64_t floodfill(uint64_t player_bb, uint64_t free);
-    int16_t first(const Yolah::MoveList&, const Yolah::MoveList&);
-    int16_t blocked(uint8_t player, const Yolah&);
     int16_t connectivity_set(uint64_t player_bb, uint64_t free);    
     int16_t alone(uint8_t player, const Yolah&);
+    int16_t first(const Yolah::MoveList&, const Yolah::MoveList&);
+    int16_t blocked(uint8_t player, const Yolah&);
     int16_t eval(uint8_t player, const Yolah&, const std::array<double, NB_WEIGHTS>& weights = WEIGHTS);
     int16_t evaluation(uint8_t player, const Yolah&);
 

@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
     // test::nelder_mead_sphere_function();
     // test::nelder_mead_rastrigin_function();
     heuristic::learn_weights(std::make_unique<heuristic::CrossEntropyMethodLearner>([](const std::vector<double>& weights) {
-        return std::make_unique<MinMaxPlayerV2>(1000000, 100, 3, 3, [&](uint8_t player, const Yolah& yolah) {
+        return std::make_unique<MinMaxPlayerV2>(1000000, 50, 3, 3, [&](uint8_t player, const Yolah& yolah) {
             assert(weights.size() == heuristic::NB_WEIGHTS);
             std::array<double, heuristic::NB_WEIGHTS> w;
             for (size_t i = 0; i < heuristic::NB_WEIGHTS; i++) {
@@ -72,7 +72,6 @@ int main(int argc, char* argv[]) {
             return heuristic::eval(player, yolah, w);
         });
     }));
-
     // auto values = heuristic::sampling_heuristic_values(1000000);
     // for (int32_t v : values) {
     //     cout << v << ' ';

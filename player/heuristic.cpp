@@ -230,21 +230,24 @@ namespace heuristic {
         return flood;
     }
 
-    int16_t blocked(uint8_t player, const Yolah& yolah) {
+    int16_t connectivity_set(uint64_t player_bb, uint64_t free) {
+        return std::popcount(floodfill(player_bb, free));
+    }
+
+    int16_t alone(uint8_t player, const Yolah& yolah) {
         uint64_t player_bb = yolah.bitboard(player);
+        uint64_t opponent_bb = yolah.bitboard(Yolah::other_player(player));
         uint64_t free = yolah.free_squares();
+        uint64_t flood_opponent = floodfill(opponent_bb, free);
+        uint64_t total_player_flood = 0;
         int16_t res = 0;
         while (player_bb) {
             uint64_t bb = player_bb & -player_bb;
-            uint64_t north = shift<NORTH>(bb);
-            uint64_t south = shift<SOUTH>(bb);
-            uint64_t east = shift<EAST>(bb);
-            uint64_t west = shift<WEST>(bb);
-            uint64_t north_east = shift<NORTH_EAST>(bb);
-            uint64_t south_east = shift<SOUTH_EAST>(bb);
-            uint64_t north_west = shift<NORTH_WEST>(bb);
-            uint64_t south_west = shift<SOUTH_WEST>(bb);
-            res += ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
+            uint64_t flood = floodfill(bb, free);
+            if (!(flood & flood_opponent)) {
+                res += std::popcount(flood & ~total_player_flood);
+            }
+            total_player_flood |= flood;
             player_bb &= ~bb;
         }
         return res;
@@ -264,22 +267,21 @@ namespace heuristic {
                 std::popcount(opponent_moves_bb & ~player_moves_bb);
     }
 
-    int16_t connectivity_set(uint64_t player_bb, uint64_t free) {
-        return std::popcount(floodfill(player_bb, free));
-    }
-
-    int16_t alone(uint8_t player, const Yolah& yolah) {
+    int16_t blocked(uint8_t player, const Yolah& yolah) {
         uint64_t player_bb = yolah.bitboard(player);
-        uint64_t opponent_bb = yolah.bitboard(Yolah::other_player(player));
         uint64_t free = yolah.free_squares();
-        uint64_t flood_opponent = floodfill(opponent_bb, free);
         int16_t res = 0;
         while (player_bb) {
             uint64_t bb = player_bb & -player_bb;
-            uint64_t flood = floodfill(bb, free);
-            if (!(flood & flood_opponent)) {
-                res += std::popcount(flood);
-            }
+            uint64_t north = shift<NORTH>(bb);
+            uint64_t south = shift<SOUTH>(bb);
+            uint64_t east = shift<EAST>(bb);
+            uint64_t west = shift<WEST>(bb);
+            uint64_t north_east = shift<NORTH_EAST>(bb);
+            uint64_t south_east = shift<SOUTH_EAST>(bb);
+            uint64_t north_west = shift<NORTH_WEST>(bb);
+            uint64_t south_west = shift<SOUTH_WEST>(bb);
+            res += ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
             player_bb &= ~bb;
         }
         return res;

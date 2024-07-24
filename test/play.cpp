@@ -7,6 +7,7 @@
 #include <atomic>
 #include <execution>
 #include <mutex>
+#include <thread>
 
 using std::cout, std::size_t;
 

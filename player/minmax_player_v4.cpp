@@ -69,7 +69,7 @@ int16_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
         if (v > alpha) {
             alpha = v;
             b = BOUND_EXACT;
-            move = m;            
+            move = m;
         }
         if (stop) {
             return 0;
@@ -79,12 +79,10 @@ int16_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
     return alpha;
 }
     
-int16_t MinMaxPlayerV4::root_search(Yolah& yolah, uint64_t hash, int8_t depth, Move& res) {
+int16_t MinMaxPlayerV4::root_search(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth, Move& res) {
     res = Move::none();
     Yolah::MoveList moves;
     yolah.moves(moves);
-    int16_t alpha = -std::numeric_limits<int16_t>::max();
-    int16_t beta  = std::numeric_limits<int16_t>::max();
     sort_moves(yolah, hash, moves);
     auto player = yolah.current_player();
     for (size_t i = 0; i < moves.size(); i++) {     
@@ -96,7 +94,7 @@ int16_t MinMaxPlayerV4::root_search(Yolah& yolah, uint64_t hash, int8_t depth, M
             if (v <= alpha) continue;
         }   
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), alpha, beta, depth - 1);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
         yolah.undo(m);
         if (v > alpha) {
             alpha = v;
@@ -153,11 +151,29 @@ Move MinMaxPlayerV4::iterative_deepening(Yolah& yolah) {
     table.new_search();
     uint64_t hash = zobrist::hash(yolah);
     Move res = Move::none();
+    int16_t value = 0;
     for (uint8_t depth = 1; depth < 64; depth++) {
+        int16_t lo = 40;
+        int16_t hi = 40;
         nb_nodes = 0;
         nb_hits  = 0;
-        Move m;
-        auto value = root_search(yolah, hash, depth, m);      
+        Move m = Move::none();
+        for (;;) {
+            //std::cout << lo << ' ' << value << ' ' << hi << std::endl;
+            int16_t alpha = value - lo;
+            int16_t beta  = value + hi; 
+            value = root_search(yolah, hash, alpha, beta, depth, m);      
+            if (stop) {
+                break;
+            }
+            if (value <= alpha) {
+                lo *= 2;
+            } else if (value >= beta) {
+                hi *= 2;
+            } else {
+                break;
+            }
+        }
         if (stop) {
             break;
         }
