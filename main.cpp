@@ -25,6 +25,8 @@
 #include "variability_timer_multithreads.h"
 #include "minmax_player_v1.h"
 #include "minmax_player_v2.h"
+#include "minmax_player_v3.h"
+#include "minmax_player_v4.h"
 
 namespace po = boost::program_options;
 using std::cout, std::string;
@@ -63,7 +65,7 @@ int main(int argc, char* argv[]) {
     // test::nelder_mead_sphere_function();
     // test::nelder_mead_rastrigin_function();
     heuristic::learn_weights(std::make_unique<heuristic::CrossEntropyMethodLearner>([](const std::vector<double>& weights) {
-        return std::make_unique<MinMaxPlayerV2>(1000000, 50, 3, 3, [&](uint8_t player, const Yolah& yolah) {
+        return std::make_unique<MinMaxPlayerV4>(1000000, 100, 3, 3, [&](uint8_t player, const Yolah& yolah) {
             assert(weights.size() == heuristic::NB_WEIGHTS);
             std::array<double, heuristic::NB_WEIGHTS> w;
             for (size_t i = 0; i < heuristic::NB_WEIGHTS; i++) {
@@ -80,6 +82,31 @@ int main(int argc, char* argv[]) {
     // cout << values.size() << '\n';
 
     //test::variability_timer_multithreads(12, 2000000);
+
+    // Yolah yolah;
+    // Yolah::MoveList moves;
+    // PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
+    // auto print_score = [&]{
+    //     const auto [black_score, white_score] = yolah.score();
+    //     cout << "score: " << black_score << '/' << white_score << '\n';
+    // };
+    // while (!yolah.game_over()) {                 
+    //     yolah.moves(moves);
+    //     Move m = moves[prng.rand<size_t>() % moves.size()];        
+    //     cout << yolah << '\n';
+    //     print_score();
+    //     cout << m << '\n';
+    //     const auto [black_influence, white_influence] = heuristic::influence(yolah);
+    //     cout << "black influence\n";
+    //     cout << Bitboard::pretty(black_influence) << '\n';
+    //     cout << "white influence\n";
+    //     cout << Bitboard::pretty(white_influence) << '\n';
+    //     std::string _;
+    //     std::getline(std::cin, _);
+    //     yolah.play(m);
+    // }
+    // cout << yolah << '\n';
+    // print_score();
 
     // po::options_description general("General options");
     // general.add_options()

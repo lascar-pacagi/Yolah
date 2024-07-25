@@ -5,90 +5,36 @@
 #include <set>
 
 namespace heuristic {
-    // /*
-    //     1. No move
-    //     2. Mobility: sum of squares reachable by each piece.
-    //     3. Mobility set: sum of squares reachable by each piece without counting the same square twice.
-    //     4. Connectivity: sum of squares connected to each piece.
-    //     5. Connectivity set: sum of squares connected to each piece without counting the same square twice.
-    //     6. Alone: number of squares owns by the player.
-    //     7. Closer: number of squares closer to us moving one square in each direction.
-    //     8. First: number of squares we can reach first in one move.
-    //     9. Blocked: number of pieces that cannot move.
-    // */
-    // enum {
-    //     NO_MOVE_WEIGHT,
-    //     NB_MOVES_WEIGHT,
-    //     MOBILITY_WEIGHT,
-    //     CONNECTIVITY_WEIGHT,
-    //     CONNECTIVITY_SET_WEIGHT,
-    //     ALONE_WEIGHT,
-    //     CLOSER_WEIGHT,
-    //     FIRST_WEIGHT,
-    //     BLOCKED_WEIGHT,
-    //     NB_WEIGHTS
-    // };
-    // constexpr int16_t MAX_VALUE = 30000;
-    // constexpr int16_t MIN_VALUE = -MAX_VALUE;
-    // // Weights from Noisy Cross Entropy Method: {-43.6389, 186.0898207582441, 212.3614455787967, 99.4115486162837, -26.71184784352851, 129.6799782468804, 376.060077184592, 73.21603455275256, -40.82948984807577}
-    // // Weights from Nelder Mead:
-    // constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-43.6389, 186.0898207582441, 212.3614455787967, 99.4115486162837, -26.71184784352851, 129.6799782468804, 376.060077184592, 73.21603455275256, -40.82948984807577};
-    // int16_t mobility(const Yolah::MoveList&);
-    // int16_t connectivity(uint8_t player, const Yolah&);
-    // int16_t connectivity_set(uint8_t player, const Yolah&);
-    // int16_t alone(uint8_t player, const Yolah&);
-    // int16_t closer(uint8_t player, const Yolah&);
-    // int16_t first(const Yolah::MoveList&, const Yolah::MoveList&);
-    // int16_t blocked(uint8_t player, const Yolah&);
-    // int16_t eval(uint8_t player, const Yolah&, const std::array<double, NB_WEIGHTS>& weights = WEIGHTS);
-    // int16_t evaluation(uint8_t player, const Yolah&);
-
     /*
         1. No move
-        2. Mobility: sum of squares reachable by each piece.
-        3. Mobility set: sum of squares reachable by each piece without counting the same square twice.
-        4. Connectivity: sum of squares connected to each piece.
-        5. Connectivity set: sum of squares connected to each piece without counting the same square twice.
-        6. Alone: number of squares owns by the player.
-        7. Closer: number of squares closer to us moving one square in each direction.
-        8. First: number of squares we can reach first in one move.
-        9. Blocked: number of pieces that cannot move.
+        2. Number of moves
+        3. Connectivity set: sum of squares connected to each piece without counting the same square twice.
+        4. Alone: number of squares owns by the player.
+        5. First: number of squares we can reach first in one move.
+        6. Blocked: number of pieces that cannot move.
+        7. Influence: number of squares closer to us moving one square in each direction.
     */
-    // enum {
-    //     NO_MOVE_WEIGHT,
-    //     NB_MOVES_WEIGHT,
-    //     MOBILITY_WEIGHT,
-    //     CONNECTIVITY_WEIGHT,
-    //     CONNECTIVITY_SET_WEIGHT,
-    //     ALONE_WEIGHT,
-    //     CLOSER_WEIGHT,
-    //     FIRST_WEIGHT,
-    //     BLOCKED_WEIGHT,
-    //     NB_WEIGHTS
-    // };
     enum {
         NO_MOVE_WEIGHT,
         NB_MOVES_WEIGHT,
         CONNECTIVITY_SET_WEIGHT,
         ALONE_WEIGHT,
-//        CLOSER_WEIGHT,
         FIRST_WEIGHT,
         BLOCKED_WEIGHT,
+        INFLUENCE_WEIGHT,
         NB_WEIGHTS
     };
     constexpr int16_t MAX_VALUE = 30000;
     constexpr int16_t MIN_VALUE = -MAX_VALUE;
-    // Weights from Noisy Cross Entropy Method: {-7.21127, 17.6285, 2.58455, 66.348, -1.25687}
+    // Weights from Noisy Cross Entropy Method: {-111.992, 90.21378399160479, 52.49865808645329, 50.42318298234584, 283.1766910783845, -40.24676272184804}
     // Weights from Nelder Mead:
-    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-31.6403, 9.073064350669991, 7.984522448273223, 8.212840305143182, 58.24374586858186, -57.56191351427309};
-    // int16_t mobility(const Yolah::MoveList&);
-    // int16_t connectivity(uint8_t player, const Yolah&);
-    // int16_t closer(uint8_t player, const Yolah&);
+    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-111.992, 90.21378399160479, 52.49865808645329, 50.42318298234584, 283.1766910783845, -40.24676272184804};    
     uint64_t floodfill(uint64_t player_bb, uint64_t free);
     int16_t connectivity_set(uint64_t player_bb, uint64_t free);    
     int16_t alone(uint8_t player, const Yolah&);
-    int16_t first(const Yolah::MoveList&, const Yolah::MoveList&);
+    std::pair<uint64_t, uint64_t> first(const Yolah::MoveList&, const Yolah::MoveList&);
     int16_t blocked(uint8_t player, const Yolah&);
+    std::pair<uint64_t, uint64_t> influence(const Yolah&);
     int16_t eval(uint8_t player, const Yolah&, const std::array<double, NB_WEIGHTS>& weights = WEIGHTS);
     int16_t evaluation(uint8_t player, const Yolah&);
 
