@@ -153,8 +153,8 @@ Move MinMaxPlayerV4::iterative_deepening(Yolah& yolah) {
     Move res = Move::none();
     int16_t value = 0;
     for (uint8_t depth = 1; depth < 64; depth++) {
-        int16_t lo = 40;
-        int16_t hi = 40;
+        int16_t lo = 10;
+        int16_t hi = 10;
         nb_nodes = 0;
         nb_hits  = 0;
         Move m = Move::none();
@@ -167,9 +167,9 @@ Move MinMaxPlayerV4::iterative_deepening(Yolah& yolah) {
                 break;
             }
             if (value <= alpha) {
-                lo *= 2;
+                lo *= 5;
             } else if (value >= beta) {
-                hi *= 2;
+                hi *= 5;
             } else {
                 break;
             }
