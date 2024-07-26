@@ -93,7 +93,7 @@ int16_t MinMaxPlayerV1::root_search(Yolah& yolah, uint64_t hash, uint8_t depth, 
     auto player = yolah.current_player();
     for (const Move& m : moves) {        
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), alpha, beta, depth - 1);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
         yolah.undo(m);
         if (v > alpha) {
             alpha = v;

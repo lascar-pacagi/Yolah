@@ -66,7 +66,7 @@ int32_t BasicMinMaxPlayer::search(Yolah& yolah, Move& res) {
     sort_moves(yolah, moves);
     for (const Move& m : moves) {
         yolah.play(m);
-        int32_t v = -negamax(yolah, alpha, beta, depth - 1);
+        int32_t v = -negamax(yolah, -beta, -alpha, depth - 1);
         yolah.undo(m);        
         if (v > alpha) {
             alpha = v;

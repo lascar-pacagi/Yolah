@@ -96,7 +96,7 @@ int16_t MinMaxPlayerV2::root_search(Yolah& yolah, uint64_t hash, int8_t depth, M
             if (v <= alpha) continue;
         }   
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), alpha, beta, depth - 1);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
         yolah.undo(m);
         if (v > alpha) {
             alpha = v;

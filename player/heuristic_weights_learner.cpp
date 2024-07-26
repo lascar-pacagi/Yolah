@@ -23,7 +23,8 @@ namespace heuristic {
         .fitness([&](const vector<double>& w, const vector<vector<double>>& population) {    
             auto play = [&](const auto& p1, const auto& p2) {
                 Yolah yolah;
-                while (!yolah.game_over()) {                 
+                while (!yolah.game_over()) {    
+                    std::cout << yolah << std::endl;             
                     Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);                
                     yolah.play(m);
                 }            
@@ -48,7 +49,7 @@ namespace heuristic {
             }
             return res;
         });
-        cem = builder.build();    
+        cem = builder.build();
     }
     
     CrossEntropyMethodLearner::CrossEntropyMethodLearner(const NoisyCrossEntropyMethod& cem) : cem(cem) {
@@ -72,7 +73,7 @@ namespace heuristic {
         .fitness([&](const vector<double>& w) {    
             auto play = [&](const auto& p1, const auto& p2) {
                 Yolah yolah;
-                while (!yolah.game_over()) {                 
+                while (!yolah.game_over()) {    
                     Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);                
                     yolah.play(m);
                 }            
