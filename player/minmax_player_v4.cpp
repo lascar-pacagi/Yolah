@@ -19,7 +19,7 @@ std::string MinMaxPlayerV4::info() {
     return "minmax player v4 (v2 + aspiration window)";
 }
 
-int16_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth) {
+int16_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth, bool in_reduction) {
     nb_nodes++;
     if (yolah.game_over()) {
         int16_t score = yolah.score(yolah.current_player());
@@ -53,14 +53,14 @@ int16_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
     auto player = yolah.current_player();
     for (size_t i = 0; i < moves.size(); i++) {        
         Move m = moves[i];
-        if (i >= nb_moves_at_full_depth) {
+        if (!in_reduction && depth > 3 && i >= nb_moves_at_full_depth) {
             yolah.play(m);
-            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction);
+            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction, true);
             yolah.undo(m);
             if (v <= alpha) continue;
         }
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1, in_reduction);
         yolah.undo(m);
         if (v >= beta) {
             table.update(hash, v, BOUND_LOWER, depth, m);
@@ -87,14 +87,14 @@ int16_t MinMaxPlayerV4::root_search(Yolah& yolah, uint64_t hash, int16_t alpha, 
     auto player = yolah.current_player();
     for (size_t i = 0; i < moves.size(); i++) {     
         Move m = moves[i];
-        if (i >= nb_moves_at_full_depth) {
+        if (depth > 3 && i >= nb_moves_at_full_depth) {
             yolah.play(m);
-            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction);
+            int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction, true);
             yolah.undo(m);
             if (v <= alpha) continue;
         }   
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1, false);
         yolah.undo(m);
         if (v > alpha) {
             alpha = v;
