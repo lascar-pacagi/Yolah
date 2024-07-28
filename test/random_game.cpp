@@ -22,7 +22,7 @@ namespace test {
         cout << yolah << '\n';
         while (!yolah.game_over()) {                 
             yolah.moves(moves);
-            Move m = moves[prng.rand<size_t>() % moves.size()];        
+            Move m = moves[prng.rand<size_t>() % moves.size()];
             cout << yolah << '\n';
             print_score();
             cout << m << '\n';

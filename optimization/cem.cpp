@@ -84,18 +84,18 @@ void NoisyCrossEntropyMethod::run() {
     vector<normal_distribution<double>> distributions(weights_size);
     double best_fitness = numeric_limits<double>::lowest();
     std::mt19937 generator(std::chrono::system_clock::now().time_since_epoch().count());
-    using namespace indicators;
-    ProgressBar bar{
-        option::BarWidth{50},
-        option::Start{"["},
-        option::Fill{"="},
-        option::Lead{">"},
-        option::Remainder{" "},
-        option::End{"]"},
-        option::PostfixText{""},
-        option::ForegroundColor{Color::green},
-        option::FontStyles{std::vector<FontStyle>{FontStyle::bold}}
-    };
+    // using namespace indicators;
+    // ProgressBar bar{
+    //     option::BarWidth{50},
+    //     option::Start{"["},
+    //     option::Fill{"="},
+    //     option::Lead{">"},
+    //     option::Remainder{" "},
+    //     option::End{"]"},
+    //     option::PostfixText{""},
+    //     option::ForegroundColor{Color::green},
+    //     option::FontStyles{std::vector<FontStyle>{FontStyle::bold}}
+    // };
     for (size_t iter = 0; iter < nb_iterations; ++iter) {
         for (size_t i = 0; i < weights_size; ++i) {
             distributions[i] = normal_distribution<double>(weights_mean[i],
@@ -119,13 +119,15 @@ void NoisyCrossEntropyMethod::run() {
             optimized_weights = population[fitness_index[0].second];
             std::stringbuf buf;
             std::ostream os(&buf);
+            os << iter << '/' << nb_iterations << '\n';
             os << "Best fitness: " << best_fitness;
             os << " {" << optimized_weights[0];
             for (size_t i = 1; i < optimized_weights.size(); i++) {
                 os << ", " << std::setprecision(std::numeric_limits<double>::digits10 + 1) << optimized_weights[i];
             }
             os << "}";
-            bar.set_option(option::PostfixText{buf.str()});            
+            cout << buf.str() << endl;
+            //bar.set_option(option::PostfixText{buf.str()});            
         }
         for (size_t i = 0; i < weights_size; ++i) {
             weights_mean[i] = 0;
@@ -152,9 +154,9 @@ void NoisyCrossEntropyMethod::run() {
         for (int i = 0; i < weights_size; ++i) {
             weights_std[i] = std::sqrt(weights_std[i] / elite_size);
         }
-        bar.set_progress(iter * 100 / nb_iterations);
+        //bar.set_progress(iter * 100 / nb_iterations);
     } 
-    bar.set_progress(100);
+    //bar.set_progress(100);
     cout << "best fitness: " << best_fitness << endl;
     cout << "{" << optimized_weights[0];
     for (size_t i = 1; i < optimized_weights.size(); i++) {

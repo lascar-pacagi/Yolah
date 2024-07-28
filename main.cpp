@@ -124,6 +124,7 @@ int main(int argc, char* argv[]) {
     // evaluate.add_options()
     // ("player1,1", po::value<string>(), "configuration file for first AI player")
     // ("player2,2", po::value<string>(), "configuration file for second AI player")
+    // ("nb-random-moves,r", po::value<size_t>()->default_value(0), "number of random moves at the beginning of the game")
     // ("nb-games,n", po::value<size_t>()->default_value(100), "number of games for the evaluation");
 
     // po::options_description all("Allowed options");

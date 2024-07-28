@@ -102,8 +102,8 @@ namespace heuristic {
         uint64_t neutral = 0;
         while ((prev_black_influence != black_influence) || 
                 (prev_white_influence != white_influence)) {
-            black_frontier = one_step(black_frontier, free);
-            white_frontier = one_step(white_frontier, free);
+            black_frontier = one_step(black_frontier, free) & ~white_influence;
+            white_frontier = one_step(white_frontier, free) & ~black_influence;
             neutral |= one_step(neutral, free) | (black_frontier & white_frontier);
             black_frontier &= ~neutral;
             white_frontier &= ~neutral;

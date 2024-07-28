@@ -92,7 +92,16 @@ namespace test {
     }
 
     void play(std::unique_ptr<Player> p1, std::unique_ptr<Player> p2, size_t nb_random_moves, size_t nb_games) {
-        /*using namespace indicators;
+        auto first_n_moves_random = [](Yolah& yolah, uint64_t seed, size_t n) {
+            PRNG prng(seed);
+            Yolah::MoveList moves;
+            while (!yolah.game_over()) {                 
+                yolah.moves(moves);
+                Move m = moves[prng.rand<size_t>() % moves.size()];
+                yolah.play(m);
+            }
+        };
+        using namespace indicators;
         ProgressBar bar{
             option::BarWidth{50},
             option::Start{"["},
@@ -129,6 +138,9 @@ namespace test {
                             auto black = Player::create(configs[0]);
                             auto white = Player::create(configs[1]);
                             Yolah yolah;
+                            if (nb_random_moves) {
+                                first_n_moves_random(yolah, j, nb_random_moves);
+                            }
                             while (!yolah.game_over()) {                 
                                 Move m = (yolah.current_player() == Yolah::BLACK ? black : white)->play(yolah);
                                 yolah.play(m);
@@ -164,6 +176,5 @@ namespace test {
         cout << "[ player 1 % of white victories ]: " << (p1_white_victories / nb_games * 100) << '\n';
         cout << "[ player 2 % of white victories ]: " << (p2_white_victories / nb_games * 100) << '\n';
         cout << "[          % of draws           ]: " << (draws / nb_games * 100) << '\n';
-        */
     }
 }
