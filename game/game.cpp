@@ -20,13 +20,13 @@ uint8_t Yolah::current_player() const {
 
 uint8_t Yolah::get(Square s) const {
     uint64_t pos = square_bb(s); 
-    if (black & (uint64_t(1) << pos)) {
+    if (black & pos) {
         return BLACK;
     }
-    if (white & (uint64_t(1) << pos)) {
+    if (white & pos) {
         return WHITE;
     }
-    if (empty & (uint64_t(1) << pos)) {
+    if (empty & pos) {
         return EMPTY;
     }
     return FREE;

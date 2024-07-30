@@ -4,7 +4,7 @@
 RandomPlayer::RandomPlayer() : prng(std::chrono::system_clock::now().time_since_epoch().count()) {
 }
 
-RandomPlayer::RandomPlayer(uint64_t seed) : prng(seed) {
+RandomPlayer::RandomPlayer(uint64_t seed) : prng(seed), init_with_clock(false) {
 }
 
 Move RandomPlayer::play(Yolah yolah) {
@@ -22,6 +22,10 @@ std::string RandomPlayer::info() {
 json RandomPlayer::config() {
     json j;
     j["name"] = "RandomPlayer";
-    j["seed"] = prng.seed();
+    if (init_with_clock) {
+        j["seed"] = "clock";
+    } else {
+        j["seed"] = prng.seed();
+    }
     return j;
 }

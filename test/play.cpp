@@ -49,7 +49,7 @@ namespace test {
                     double p2_white_victories_ = 0;
                     double draws_ = 0;
                     std::vector<json> configs{p1->config(), p2->config()};
-                    for (size_t i = 0; i < 2; i++) {
+                    for (size_t side = 0; side < 2; side++) {
                         for (size_t j = 0; j < n; j++) {                       
                             auto black = Player::create(configs[0]);
                             auto white = Player::create(configs[1]);
@@ -62,9 +62,9 @@ namespace test {
                             white->game_over(yolah);
                             const auto [black_score, white_score] = yolah.score();           
                             if (black_score > white_score) {
-                                (i == 0 ? p1_black_victories_ : p2_black_victories_) += 1;
+                                (side == 0 ? p1_black_victories_ : p2_black_victories_) += 1;
                             } else if (white_score > black_score) {
-                                (i == 0 ? p2_white_victories_ : p1_white_victories_) += 1;
+                                (side == 0 ? p2_white_victories_ : p1_white_victories_) += 1;
                             } else {
                                 draws_ += 1;
                             }
@@ -89,16 +89,20 @@ namespace test {
         cout << "[ player 1 % of white victories ]: " << (p1_white_victories / nb_games * 100) << '\n';
         cout << "[ player 2 % of white victories ]: " << (p2_white_victories / nb_games * 100) << '\n';
         cout << "[          % of draws           ]: " << (draws / nb_games * 100) << '\n';
+        cout << "[   player 1 % of victories     ]: " << ((p1_black_victories + p1_white_victories + draws / 2) / nb_games * 100) << '\n';
+        cout << "[   player 2 % of victories     ]: " << ((p2_black_victories + p2_white_victories + draws / 2) / nb_games * 100) << '\n';
     }
 
     void play(std::unique_ptr<Player> p1, std::unique_ptr<Player> p2, size_t nb_random_moves, size_t nb_games) {
         auto first_n_moves_random = [](Yolah& yolah, uint64_t seed, size_t n) {
             PRNG prng(seed);
             Yolah::MoveList moves;
+            size_t i = 0;
             while (!yolah.game_over()) {                 
                 yolah.moves(moves);
                 Move m = moves[prng.rand<size_t>() % moves.size()];
                 yolah.play(m);
+                if (++i >= n) break;
             }
         };
         using namespace indicators;
@@ -133,8 +137,8 @@ namespace test {
                     double p2_white_victories_ = 0;
                     double draws_ = 0;
                     std::vector<json> configs{p1->config(), p2->config()};
-                    for (size_t i = 0; i < 2; i++) {
-                        for (size_t j = 0; j < n; j++) {                       
+                    for (size_t side = 0; side < 2; side++) {
+                        for (size_t j = 0; j < n; j++) {
                             auto black = Player::create(configs[0]);
                             auto white = Player::create(configs[1]);
                             Yolah yolah;
@@ -149,9 +153,9 @@ namespace test {
                             white->game_over(yolah);
                             const auto [black_score, white_score] = yolah.score();           
                             if (black_score > white_score) {
-                                (i == 0 ? p1_black_victories_ : p2_black_victories_) += 1;
+                                (side == 0 ? p1_black_victories_ : p2_black_victories_) += 1;
                             } else if (white_score > black_score) {
-                                (i == 0 ? p2_white_victories_ : p1_white_victories_) += 1;
+                                (side == 0 ? p2_white_victories_ : p1_white_victories_) += 1;
                             } else {
                                 draws_ += 1;
                             }
@@ -176,5 +180,7 @@ namespace test {
         cout << "[ player 1 % of white victories ]: " << (p1_white_victories / nb_games * 100) << '\n';
         cout << "[ player 2 % of white victories ]: " << (p2_white_victories / nb_games * 100) << '\n';
         cout << "[          % of draws           ]: " << (draws / nb_games * 100) << '\n';
+        cout << "[   player 1 % of victories     ]: " << ((p1_black_victories + p1_white_victories + draws / 2) / nb_games * 100) << '\n';
+        cout << "[   player 2 % of victories     ]: " << ((p2_black_victories + p2_white_victories + draws / 2) / nb_games * 100) << '\n';
     }
 }

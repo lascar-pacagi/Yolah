@@ -5,6 +5,7 @@
 
 class RandomPlayer : public Player {
     PRNG prng;
+    bool init_with_clock = true;
 public:
     explicit RandomPlayer();
     explicit RandomPlayer(uint64_t seed);

@@ -1,25 +1,25 @@
-#include "minmax_player_v4.h"
+#include "minmax_player_v5.h"
 #include <thread>
 #include <chrono>
 #include "zobrist.h"
 
 using std::cout, std::endl;
 
-MinMaxPlayerV4::MinMaxPlayerV4(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, 
+MinMaxPlayerV5::MinMaxPlayerV5(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, 
                                uint8_t late_move_reduction, heuristic_eval h) 
     : thinking_time(microseconds), table(tt_size_mb),
       nb_moves_at_full_depth(nb_moves_at_full_depth), late_move_reduction(late_move_reduction), heuristic(h) {
 }
 
-Move MinMaxPlayerV4::play(Yolah yolah) {
+Move MinMaxPlayerV5::play(Yolah yolah) {
     return iterative_deepening(yolah);
 }
 
-std::string MinMaxPlayerV4::info() {
-    return "minmax player v4 (v2 + aspiration window)";
+std::string MinMaxPlayerV5::info() {
+    return "minmax player v5 (v2 + mtdbi)";
 }
 
-int32_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int32_t alpha, int32_t beta, int8_t depth) {
+int32_t MinMaxPlayerV5::negamax(Yolah& yolah, uint64_t hash, int32_t alpha, int32_t beta, int8_t depth) {
     nb_nodes++;
     if (yolah.game_over()) {
         int32_t score = yolah.score(yolah.current_player());
@@ -79,7 +79,7 @@ int32_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int32_t alpha, int3
     return alpha;
 }
     
-int32_t MinMaxPlayerV4::root_search(Yolah& yolah, uint64_t hash, int32_t alpha, int32_t beta, int8_t depth, Move& res) {
+int32_t MinMaxPlayerV5::root_search(Yolah& yolah, uint64_t hash, int32_t alpha, int32_t beta, int8_t depth, Move& res) {
     res = Move::none();
     Yolah::MoveList moves;
     yolah.moves(moves);
@@ -96,10 +96,6 @@ int32_t MinMaxPlayerV4::root_search(Yolah& yolah, uint64_t hash, int32_t alpha, 
         yolah.play(m);
         int32_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
         yolah.undo(m);
-        if (v >= beta) {
-            table.update(hash, v, BOUND_LOWER, depth, m);
-            return v;
-        }
         if (v > alpha) {
             alpha = v;
             res = m;
@@ -112,7 +108,7 @@ int32_t MinMaxPlayerV4::root_search(Yolah& yolah, uint64_t hash, int32_t alpha, 
     return alpha;
 }
     
-void MinMaxPlayerV4::sort_moves(Yolah& yolah, uint64_t hash, Yolah::MoveList& moves) {
+void MinMaxPlayerV5::sort_moves(Yolah& yolah, uint64_t hash, Yolah::MoveList& moves) {
     std::vector<std::pair<int16_t, Move>> tmp;
     size_t nb_moves = moves.size();
     auto player = yolah.current_player();
@@ -135,7 +131,7 @@ void MinMaxPlayerV4::sort_moves(Yolah& yolah, uint64_t hash, Yolah::MoveList& mo
     }
 }
 
-void MinMaxPlayerV4::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
+void MinMaxPlayerV5::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     if (yolah.game_over() || depth == 0) return;
     bool found;
     TranspositionTableEntry* entry = table.probe(hash, found);
@@ -146,7 +142,7 @@ void MinMaxPlayerV4::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     print_pv(yolah, zobrist::update(hash, player, entry->move()), depth - 1);
 }
 
-Move MinMaxPlayerV4::iterative_deepening(Yolah& yolah) {
+Move MinMaxPlayerV5::iterative_deepening(Yolah& yolah) {
     this->stop = false;
     std::jthread clock([this]{
         std::this_thread::sleep_for(std::chrono::microseconds(this->thinking_time));
@@ -155,40 +151,31 @@ Move MinMaxPlayerV4::iterative_deepening(Yolah& yolah) {
     table.new_search();
     uint64_t hash = zobrist::hash(yolah);
     Move res = Move::none();
-    int32_t value = 0;
-    for (uint8_t depth = 1; depth < 64; depth++) {
-        int32_t lo = 150;
-        int32_t hi = 150;
+    int32_t value;
+    for (uint8_t depth = 2; depth < 64; depth++) {
+        int32_t lo = 30;
+        int32_t hi = 30;
         nb_nodes = 0;
         nb_hits  = 0;
-        Move m = Move::none();
-        for (;;) {
-            int32_t alpha = value - lo;
-            int32_t beta  = value + hi; 
-            //std::cout << alpha << ' ' << beta << std::endl;
-            //std::cout << lo << ' ' << value << ' ' << hi << std::endl;
-            value = root_search(yolah, hash, alpha, beta, depth, m);      
-            //cout << int(depth) << ' ' << value << endl;
+        int32_t alpha = 0;
+        Move m = Move::none();        
+        while (lo < hi) {
             if (stop) {
                 break;
             }
-            if (value <= alpha) {
-                lo *= 5;
-            } else if (value >= beta) {                
-                hi *= 5;
-            } else {
-                break;
-            }
+            int32_t value = root_search(yolah, hash, alpha, alpha + 1, depth, m);
+            if (value <= alpha) hi = value;
+            else lo = value;
+            int32_t mid = lo + (hi - lo) / 2;
+            alpha = mid;
         }
         if (stop) {
             break;
         }
-        res = m;//table.get_move(hash);
-        // cout << yolah << '\n';
-        // cout << "hash   : " << hash << '\n';
+        res = m;
         // cout << "depth  : " << int(depth) << '\n';
-        // cout << "value  : " << value << '\n';
-        // cout << "move   : " << res << '\n';
+        // cout << "value  : " << lo << '\n';
+        // cout << "move   : " << m << '\n';
         // cout << "# nodes: " << nb_nodes << '\n';
         // cout << "# hits : " << nb_hits << '\n';
         // print_pv(yolah, hash, depth);
@@ -206,3 +193,4 @@ json MinMaxPlayerV4::config() {
     j["late move reduction"] = late_move_reduction;
     return j;
 }
+
