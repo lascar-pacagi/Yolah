@@ -1,6 +1,7 @@
 #include "heuristic_weights_learner.h"
 #include "heuristic.h"
 #include "MCTS_mem_player.h"
+#include "misc.h"
 
 namespace heuristic {
     CrossEntropyMethodLearner::CrossEntropyMethodLearner(CreatePlayer factory) {
@@ -20,9 +21,21 @@ namespace heuristic {
             }
             return w;    
         })
-        .fitness([&](const vector<double>& w, const vector<vector<double>>& population) {    
-            auto play = [&](const auto& p1, const auto& p2) {
+        .fitness([&](const vector<double>& w, const vector<vector<double>>& population) {   
+            auto first_n_moves_random = [](Yolah& yolah, uint64_t seed, size_t n) {
+                PRNG prng(seed);
+                Yolah::MoveList moves;
+                size_t i = 0;
+                while (!yolah.game_over()) {                 
+                    yolah.moves(moves);
+                    Move m = moves[prng.rand<size_t>() % moves.size()];
+                    yolah.play(m);
+                    if (++i >= n) break;
+                }
+            }; 
+            auto play = [&](const auto& p1, const auto& p2, uint64_t seed) {
                 Yolah yolah;
+                first_n_moves_random(yolah, seed, 2);
                 while (!yolah.game_over()) {
                     Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);                
                     yolah.play(m);
@@ -31,20 +44,20 @@ namespace heuristic {
             };
             double res = 0;                                        
             std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(2000000, 1);
-            auto update = [&]{
+            auto update = [&](uint64_t seed) {
                 constexpr double W1 = 1e5;
                 constexpr double W2 = 1;
                 auto me = factory(w);
-                auto score = play(me, opponent);
+                auto score = play(me, opponent, seed);
                 res += W1 * ((score > 0) + (score < 0) * -1);
                 res += W2 * score;
                 me = factory(w);
-                score = play(opponent, me);
+                score = play(opponent, me, seed);
                 res += W1 * ((score > 0) * -1 + (score < 0));
                 res -= W2 * score;
             };
-            for (size_t i = 0; i < 10; i++) {
-                update();
+            for (uint64_t i = 0; i < 10; i++) {
+                update(i);
             }
             return res;
         });

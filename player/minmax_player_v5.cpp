@@ -184,9 +184,9 @@ Move MinMaxPlayerV5::iterative_deepening(Yolah& yolah) {
     return res;
 }
 
-json MinMaxPlayerV4::config() {
+json MinMaxPlayerV5::config() {
     json j;
-    j["name"] = "MinMaxPlayerV4";
+    j["name"] = "MinMaxPlayerV5";
     j["microseconds"] = thinking_time;
     j["tt size"] = table.size();
     j["nb moves at full depth"] = nb_moves_at_full_depth;
