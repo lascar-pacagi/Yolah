@@ -26,9 +26,9 @@ namespace heuristic {
     };
     constexpr int16_t MAX_VALUE = 30000;
     constexpr int16_t MIN_VALUE = -MAX_VALUE;
-    // Weights from Noisy Cross Entropy Method: {-34.4065, 64.83924743403338, 103.7900444416, 4.362961653499696, 282.9855854171332, -100.2886519939804, 201.2133178442031}
+    // Weights from Noisy Cross Entropy Method: {-261.299, 105.4702532154874, -48.32193088939683, 115.9949267398348, 195.8689144128958, -354.2752260588214, 360.3292424090679}
     // Weights from Nelder Mead:
-    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-34.4065, 64.83924743403338, 103.7900444416, 4.362961653499696, 282.9855854171332, -100.2886519939804, 201.2133178442031};
+    constexpr std::array<double, NB_WEIGHTS> WEIGHTS{-261.299, 105.4702532154874, -48.32193088939683, 115.9949267398348, 195.8689144128958, -354.2752260588214, 360.3292424090679};
     uint64_t floodfill(uint64_t player_bb, uint64_t free);
     int16_t connectivity_set(uint64_t player_bb, uint64_t free);    
     int16_t alone(uint8_t player, const Yolah&);

@@ -1,11 +1,11 @@
-#ifndef MINMAX_PLAYER_V4_H
-#define MINMAX_PLAYER_V4_H
+#ifndef MINMAX_PLAYER_V6_H
+#define MINMAX_PLAYER_V6_H
 #include "player.h"
 #include "heuristic.h"
 #include "transposition_table.h"
 #include <atomic>
 
-class MinMaxPlayerV4 : public Player {
+class MinMaxPlayerV6 : public Player {
     using heuristic_eval = std::function<int16_t(uint8_t, const Yolah&)>;
     const uint64_t thinking_time;
     TranspositionTable table;
@@ -17,14 +17,14 @@ class MinMaxPlayerV4 : public Player {
     size_t nb_nodes = 0;
     size_t nb_hits  = 0;
 
-    int32_t negamax(Yolah& yolah, uint64_t hash, int32_t alpha, int32_t beta, int8_t depth);
-    //int32_t root_search(Yolah& yolah, uint64_t hash, int32_t alpha, int32_t beta, int8_t depth, Move& res);
+    int16_t negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth);
+    int16_t root_search(Yolah&, uint64_t hash, int8_t depth, Move&);
     void sort_moves(Yolah&, uint64_t hash, Yolah::MoveList&);
     Move iterative_deepening(Yolah&);
     void print_pv(Yolah, uint64_t hash, int8_t depth);
     
 public:
-    MinMaxPlayerV4(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, uint8_t late_move_reduction, 
+    MinMaxPlayerV6(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, uint8_t late_move_reduction, 
                    heuristic_eval heuristic = heuristic::evaluation);
     Move play(Yolah) override;
     std::string info() override;

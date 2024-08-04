@@ -9,6 +9,7 @@
 #include "minmax_player_v2.h"
 #include "minmax_player_v3.h"
 #include "minmax_player_v4.h"
+#include "minmax_player_v5.h"
 #include "human_player.h"
 #include "monte_carlo_player.h"
 #include <stdexcept>
@@ -232,6 +233,39 @@ unique_ptr<Player> Player::create(const json& j) {
                     throw invalid_argument("number expected in late move reduction");
                 }
                 return make_unique<MinMaxPlayerV4>(j["microseconds"].get<uint64_t>(), 
+                                                   j["tt size"].get<size_t>(),
+                                                   j["nb moves at full depth"].get<size_t>(),
+                                                   j["late move reduction"].get<uint8_t>());
+            }
+        },
+        {
+            "MinMaxPlayerV5",
+            [](const json& j) {
+                if (!j.contains("microseconds")) {
+                    throw invalid_argument("microseconds key expected");
+                }
+                if (!j.contains("tt size")) {
+                    throw invalid_argument("tt size key expected");
+                }
+                if (!j.contains("nb moves at full depth")) {
+                    throw invalid_argument("nb moves at full depth key expected");
+                }
+                if (!j.contains("late move reduction")) {
+                    throw invalid_argument("late move reduction key expected");
+                }
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
+                }
+                if (!j["tt size"].is_number()) {
+                    throw invalid_argument("number expected for tt size");
+                }                
+                if (!j["nb moves at full depth"].is_number()) {
+                    throw invalid_argument("number expected for number of moves at full depth");
+                }
+                if (!j["late move reduction"].is_number()) {
+                    throw invalid_argument("number expected in late move reduction");
+                }
+                return make_unique<MinMaxPlayerV5>(j["microseconds"].get<uint64_t>(), 
                                                    j["tt size"].get<size_t>(),
                                                    j["nb moves at full depth"].get<size_t>(),
                                                    j["late move reduction"].get<uint8_t>());

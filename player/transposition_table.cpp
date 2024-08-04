@@ -9,7 +9,7 @@ void TranspositionTableEntry::save(uint64_t k, int16_t v, Bound b, uint8_t d, Mo
         key_hi     = uint16_t(key32 >> 16);
         depth8     = d;
         gen_bound8 = generation | b;
-        move16     = m;
+        if (m != Move::none()) move16 = m;
         value16    = v;
     }
 }
