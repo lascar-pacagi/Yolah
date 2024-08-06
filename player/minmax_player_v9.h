@@ -15,13 +15,17 @@ class MinMaxPlayerV9 : public Player {
     BS::thread_pool pool;
     heuristic_eval heuristic;
     std::atomic_bool stop = false;
-    size_t nb_nodes = 0;
-    size_t nb_hits  = 0;
+    
+    struct Search {
+        uint8_t depth   = 0;
+        int16_t value   = 0;
+        Move move       = Move::none();
+    };
 
     int16_t negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth);
     int16_t root_search(Yolah&, uint64_t hash, int8_t depth, Move&);
     void sort_moves(Yolah&, uint64_t hash, Yolah::MoveList&);
-    Move iterative_deepening(Yolah&);
+    void iterative_deepening(Yolah, Search&);
     void print_pv(Yolah, uint64_t hash, int8_t depth);
     
 public:

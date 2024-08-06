@@ -5,6 +5,7 @@ add_library(player OBJECT
     heuristic_weights_learner.cpp player.cpp tt.cpp minmax_player_v2.cpp minmax_player_v3.cpp
     minmax_player_v4.cpp minmax_player_v5.cpp minmax_player_v6.cpp minmax_player_v7.cpp
     minmax_player_v8.cpp minmax_player_v9.cpp minmax_player_v10.cpp
+    minmax_player.cpp
 )
 target_include_directories(player PUBLIC .)
 

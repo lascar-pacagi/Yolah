@@ -8,11 +8,11 @@ namespace heuristic {
         using std::vector, std::array;
         NoisyCrossEntropyMethod::Builder builder;
         builder
-        .population_size(42)
+        .population_size(110)
         .nb_iterations(300)
-        .elite_fraction(0.2)
+        .elite_fraction(0.15)
         .keep_overall_best(false)
-        .stddev(10)
+        .stddev(20)
         .extra_stddev(1)
         .weights({-261.299, 105.4702532154874, -48.32193088939683, 115.9949267398348, 195.8689144128958, -354.2752260588214, 360.3292424090679})
         .transform([](size_t i, double w) {
@@ -35,7 +35,7 @@ namespace heuristic {
             }; 
             auto play = [&](const auto& p1, const auto& p2, uint64_t seed) {
                 Yolah yolah;
-                first_n_moves_random(yolah, seed, 4);
+                first_n_moves_random(yolah, seed, 2);
                 while (!yolah.game_over()) {
                     Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);                
                     yolah.play(m);

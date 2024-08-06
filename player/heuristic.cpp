@@ -122,7 +122,7 @@ namespace heuristic {
         double res = 0;
         res += weights[NO_MOVE_WEIGHT] * ((black_moves[0] == Move::none()) - (white_moves[0] == Move::none()));
      
-        res += weights[NB_MOVES_WEIGHT] * int(black_moves.size() - white_moves.size());
+        res += weights[NB_MOVES_WEIGHT] * (int(black_moves.size()) - int(white_moves.size()));
      
         res += weights[BLOCKED_WEIGHT] * (blocked(Yolah::BLACK, yolah) - blocked(Yolah::WHITE, yolah));
      
