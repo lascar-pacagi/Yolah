@@ -70,7 +70,7 @@ int16_t MinMaxPlayerV3::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
             if (v <= alpha) continue;
         }
         yolah.play(m);
-        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1, false);
+        int16_t v = -negamax(yolah, zobrist::update(hash, player, m), -beta, -alpha, depth - 1, null_move_allowed);
         yolah.undo(m);
         if (v >= beta) {
             table.update(hash, v, BOUND_LOWER, depth, m);
