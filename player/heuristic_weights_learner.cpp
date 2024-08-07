@@ -8,13 +8,13 @@ namespace heuristic {
         using std::vector, std::array;
         NoisyCrossEntropyMethod::Builder builder;
         builder
-        .population_size(110)
+        .population_size(42)
         .nb_iterations(300)
-        .elite_fraction(0.15)
+        .elite_fraction(0.2)
         .keep_overall_best(false)
         .stddev(20)
-        .extra_stddev(1)
-        .weights({-261.299, 105.4702532154874, -48.32193088939683, 115.9949267398348, 195.8689144128958, -354.2752260588214, 360.3292424090679})
+        .extra_stddev(5)
+        .weights(vector<double>(heuristic::NB_WEIGHTS))
         .transform([](size_t i, double w) {
             if (i == heuristic::NO_MOVE_WEIGHT || i == heuristic::BLOCKED_WEIGHT) {
                 return std::min(0.0, w);
@@ -43,7 +43,7 @@ namespace heuristic {
                 return yolah.score(Yolah::BLACK);
             };
             double res = 0;                                        
-            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(1000000, 1);
+            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(200000, 1);
             auto update = [&](uint64_t seed) {
                 constexpr double W1 = 1e5;
                 constexpr double W2 = 1;

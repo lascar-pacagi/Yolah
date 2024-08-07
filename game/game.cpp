@@ -135,6 +135,66 @@ void Yolah::moves(MoveList& moves) const {
     Yolah::moves(current_player(), moves);
 }
 
+void Yolah::blocking_moves(uint8_t player, MoveList& moves) const {
+    Move* moveList = moves.moveList;
+    uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (player == WHITE); 
+    uint64_t black_mask = ~white_mask;
+    uint64_t occupied = black | white | empty;
+    uint64_t bb = (black_mask & black) | (white_mask & white);    
+    while (bb) {
+        Square   from = pop_lsb(bb);
+        uint64_t b    = attacks_bb(from, occupied) & ~occupied;        
+        while (b) {
+            Move m = Move(from, pop_lsb(b));
+            if (is_blocking_move(player, m)) {
+                *moveList++ = m;
+            }            
+        }
+    }
+    moves.last = moveList;
+}
+
+void Yolah::blocking_moves(MoveList& moves) const {
+    blocking_moves(current_player(), moves);
+}
+
+bool Yolah::is_blocking_move(uint8_t player, Move m) const {    
+    uint64_t other_bb   = bitboard(other_player(player));
+    uint64_t to_bb      = square_bb(m.to_sq());
+    uint64_t free       = free_squares() & ~to_bb;
+    auto blocked = [&](uint64_t pos) {
+        uint64_t north = shift<NORTH>(pos);
+        uint64_t south = shift<SOUTH>(pos);
+        uint64_t east = shift<EAST>(pos);
+        uint64_t west = shift<WEST>(pos);
+        uint64_t north_east = shift<NORTH_EAST>(pos);
+        uint64_t south_east = shift<SOUTH_EAST>(pos);
+        uint64_t north_west = shift<NORTH_WEST>(pos);
+        uint64_t south_west = shift<SOUTH_WEST>(pos);
+        return ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
+    };
+    uint64_t north      = shift<NORTH>(to_bb);
+    uint64_t south      = shift<SOUTH>(to_bb);
+    uint64_t east       = shift<EAST>(to_bb);
+    uint64_t west       = shift<WEST>(to_bb);
+    uint64_t north_east = shift<NORTH_EAST>(to_bb);
+    uint64_t south_east = shift<SOUTH_EAST>(to_bb);
+    uint64_t north_west = shift<NORTH_WEST>(to_bb);
+    uint64_t south_west = shift<SOUTH_WEST>(to_bb);
+    return (other_bb & north) && blocked(north) ||
+        (other_bb & south) && blocked(south) ||
+        (other_bb & east) && blocked(east) ||
+        (other_bb & west) && blocked(west) ||
+        (other_bb & north_east) && blocked(north_east) ||
+        (other_bb & south_east) && blocked(south_east) ||
+        (other_bb & north_west) && blocked(north_west) ||
+        (other_bb & south_west) && blocked(south_west);
+}
+
+bool Yolah::is_blocking_move(Move m) const {
+    return is_blocking_move(current_player(), m);
+}
+
 uint64_t Yolah::free_squares() const {
     uint64_t occupied = black | white | empty;
     return FULL & ~occupied;

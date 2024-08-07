@@ -75,8 +75,15 @@ public:
     void undo(Move m);
     void moves(uint8_t player, MoveList& moves) const;
     void moves(MoveList& moves) const;
+    void blocking_moves(uint8_t player, MoveList& moves) const;
+    void blocking_moves(MoveList& moves) const;
+    bool is_blocking_move(uint8_t player, Move) const;
+    bool is_blocking_move(Move) const;
     bool valid(Move m) const;
     uint64_t free_squares() const;
+    uint64_t occupied_squares() const {
+      return black | white | empty;
+    }
     uint64_t bitboard(uint8_t player) const;
     uint16_t nb_plies() const {
       return ply;

@@ -28,6 +28,18 @@ namespace heuristic {
         return std::popcount(floodfill(player_bb, free));
     }
 
+    int16_t connectivity(uint8_t player, const Yolah& yolah) {
+        uint64_t player_bb = yolah.bitboard(player);
+        uint64_t free = yolah.free_squares();
+        int32_t res = 0;
+        while (player_bb) {
+            uint64_t bb = player_bb & -player_bb;
+            res += connectivity_set(bb, free);
+            player_bb &= ~bb;
+        }
+        return res;
+    }
+
     int16_t alone(uint8_t player, const Yolah& yolah) {
         uint64_t player_bb = yolah.bitboard(player);
         uint64_t opponent_bb = yolah.bitboard(Yolah::other_player(player));
@@ -129,6 +141,8 @@ namespace heuristic {
         const auto [black_first, white_first] = first(black_moves, white_moves);
         res += weights[FIRST_WEIGHT] * (std::popcount(black_first) - std::popcount(white_first));
      
+        res += weights[CONNECTIVITY_WEIGHT] * (connectivity(Yolah::BLACK, yolah) - connectivity(Yolah::WHITE, yolah));
+
         res += weights[CONNECTIVITY_SET_WEIGHT] * (connectivity_set(yolah.bitboard(Yolah::BLACK), yolah.free_squares()) - 
                                                     connectivity_set(yolah.bitboard(Yolah::WHITE), yolah.free_squares()));
         res += weights[ALONE_WEIGHT] * (alone(Yolah::BLACK, yolah) - alone(Yolah::WHITE, yolah));                                                        
