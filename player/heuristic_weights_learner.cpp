@@ -8,9 +8,9 @@ namespace heuristic {
         using std::vector, std::array;
         NoisyCrossEntropyMethod::Builder builder;
         builder
-        .population_size(42)
-        .nb_iterations(300)
-        .elite_fraction(0.2)
+        .population_size(110)
+        .nb_iterations(400)
+        .elite_fraction(0.15)
         .keep_overall_best(false)
         .stddev(20)
         .extra_stddev(5)
@@ -56,7 +56,7 @@ namespace heuristic {
                 res += W1 * ((score > 0) * -1 + (score < 0));
                 res -= W2 * score;
             };
-            for (uint64_t i = 0; i < 30; i++) {
+            for (uint64_t i = 0; i < 40; i++) {
                 update(i);
             }
             return res;
