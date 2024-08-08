@@ -22,7 +22,8 @@ std::string MinMaxPlayerV2::info() {
 int16_t MinMaxPlayerV2::quiescence(Yolah& yolah, int16_t alpha, int16_t beta) {
     if (yolah.game_over()) {
         int16_t score = yolah.score(yolah.current_player());
-        return score + (score >= 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
+        if (score == 0) return 0;
+        return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
     Yolah::MoveList moves;
     yolah.blocking_moves(moves);
@@ -52,7 +53,8 @@ int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
     nb_nodes++;
     if (yolah.game_over()) {
         int16_t score = yolah.score(yolah.current_player());
-        return score + (score >= 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
+        if (score == 0) return 0;
+        return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
     if (depth <= 0) {
         return quiescence(yolah, alpha, beta);//heuristic(yolah.current_player(), yolah);

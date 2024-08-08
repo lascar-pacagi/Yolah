@@ -23,7 +23,8 @@ int32_t MinMaxPlayerV4::negamax(Yolah& yolah, uint64_t hash, int32_t alpha, int3
     nb_nodes++;
     if (yolah.game_over()) {
         int16_t score = yolah.score(yolah.current_player());
-        return score + (score >= 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
+        if (score == 0) return 0;
+        return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
     if (depth <= 0) {
         return heuristic(yolah.current_player(), yolah);

@@ -12,9 +12,9 @@ namespace heuristic {
         .nb_iterations(800)
         .elite_fraction(0.15)
         .keep_overall_best(false)
-        .stddev(30)
+        .stddev(20)
         .extra_stddev(5)
-        .weights({-10.4281, 135.8600193093234, 25.74332821032138, -21.43164318580857, 42.39057311554222, 121.7537626624634, -244.0065210343193, 383.5705511402678})
+        .weights({-44.3446, 133.4904517790742, 70.20103468956634, -49.6205226975603, 9.403063029826711, 69.17421472991907, -241.4568098828146, 470.4684231911802})
         .transform([](size_t i, double w) {
             if (i == heuristic::NO_MOVE_WEIGHT || i == heuristic::BLOCKED_WEIGHT) {
                 return std::min(0.0, w);
@@ -57,10 +57,10 @@ namespace heuristic {
                 res += W1 * ((score > 0) * -1 + (score < 0));
                 res -= W2 * score;
             };
-            for (uint64_t i = 0; i < 50; i++) {
+            for (uint64_t i = 0; i < 30; i++) {
                 update(i, 0);
             }
-            for (uint64_t i = 0; i < 50; i++) {
+            for (uint64_t i = 0; i < 70; i++) {
                 update(i, 4);
             }
             return res;
