@@ -8,13 +8,13 @@ namespace heuristic {
         using std::vector, std::array;
         NoisyCrossEntropyMethod::Builder builder;
         builder
-        .population_size(110)
-        .nb_iterations(400)
+        .population_size(120)
+        .nb_iterations(800)
         .elite_fraction(0.15)
         .keep_overall_best(false)
-        .stddev(20)
+        .stddev(30)
         .extra_stddev(5)
-        .weights(vector<double>(heuristic::NB_WEIGHTS))
+        .weights({-10.4281, 135.8600193093234, 25.74332821032138, -21.43164318580857, 42.39057311554222, 121.7537626624634, -244.0065210343193, 383.5705511402678})
         .transform([](size_t i, double w) {
             if (i == heuristic::NO_MOVE_WEIGHT || i == heuristic::BLOCKED_WEIGHT) {
                 return std::min(0.0, w);
@@ -23,6 +23,7 @@ namespace heuristic {
         })
         .fitness([&](const vector<double>& w, const vector<vector<double>>& population) {   
             auto first_n_moves_random = [](Yolah& yolah, uint64_t seed, size_t n) {
+                if (n == 0) return;
                 PRNG prng(seed);
                 Yolah::MoveList moves;
                 size_t i = 0;
@@ -33,9 +34,9 @@ namespace heuristic {
                     if (++i >= n) break;
                 }
             }; 
-            auto play = [&](const auto& p1, const auto& p2, uint64_t seed) {
+            auto play = [&](const auto& p1, const auto& p2, uint64_t seed, size_t nb_random) {
                 Yolah yolah;
-                first_n_moves_random(yolah, seed, 2);
+                first_n_moves_random(yolah, seed, nb_random);
                 while (!yolah.game_over()) {
                     Move m = (yolah.current_player() == Yolah::BLACK ? p1 : p2)->play(yolah);                
                     yolah.play(m);
@@ -43,21 +44,24 @@ namespace heuristic {
                 return yolah.score(Yolah::BLACK);
             };
             double res = 0;                                        
-            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(200000, 1);
-            auto update = [&](uint64_t seed) {
+            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(300000, 1);
+            auto update = [&](uint64_t seed, size_t nb_random) {
                 constexpr double W1 = 1e5;
                 constexpr double W2 = 1;
                 auto me = factory(w);
-                auto score = play(me, opponent, seed);
+                auto score = play(me, opponent, seed, nb_random);
                 res += W1 * ((score > 0) + (score < 0) * -1);
                 res += W2 * score;
                 me = factory(w);
-                score = play(opponent, me, seed);
+                score = play(opponent, me, seed, nb_random);
                 res += W1 * ((score > 0) * -1 + (score < 0));
                 res -= W2 * score;
             };
-            for (uint64_t i = 0; i < 40; i++) {
-                update(i);
+            for (uint64_t i = 0; i < 50; i++) {
+                update(i, 0);
+            }
+            for (uint64_t i = 0; i < 50; i++) {
+                update(i, 4);
             }
             return res;
         });

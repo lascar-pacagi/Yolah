@@ -34,17 +34,20 @@ Move MinMaxPlayer::play(Yolah yolah) {
     uint8_t depth = 0;
     int16_t value = 0;
     Move res = Move::none();
+    size_t nb_nodes = 0;
     for (Search& s : results) {
         if (s.depth > depth) {
             depth = s.depth;
             res = s.move;
             value = s.value;
+            nb_nodes += s.nb_nodes;
         }
     }
-    // cout << depth << '\n';
-    // cout << value << '\n';
-    // print_pv(yolah, zobrist::hash(yolah), depth);
-    // cout << '\n';
+    cout << depth << '\n';
+    cout << value << '\n';
+    cout << nb_nodes << '\n';
+    print_pv(yolah, zobrist::hash(yolah), depth);
+    cout << '\n';
     // cout << heuristic::eval(yolah.current_player(), yolah) << endl;
     return res;
 }
@@ -186,12 +189,12 @@ void MinMaxPlayer::sort_moves(Yolah& yolah, const Search& s, uint64_t hash, Yola
         Move m = moves[i];
         if (m == best) {
             tmp.emplace_back(std::numeric_limits<int16_t>::max(), best);
-        } else if (yolah.is_blocking_move(m)) {
-            tmp.emplace_back(std::numeric_limits<int16_t>::max() - 1, m);
         } else if (m == s.killer1[yolah.nb_plies()]) {
-            tmp.emplace_back(std::numeric_limits<int16_t>::max() - 2, m);
+            tmp.emplace_back(std::numeric_limits<int16_t>::max() - 1, m);
         } else if (m == s.killer2[yolah.nb_plies()]) {
-            tmp.emplace_back(std::numeric_limits<int16_t>::max() - 3, m); 
+            tmp.emplace_back(std::numeric_limits<int16_t>::max() - 2, m); 
+        } else if (yolah.is_blocking_move(m)) {
+            tmp.emplace_back(std::numeric_limits<int16_t>::max() - 3, m);
         } else {
             yolah.play(m);
             tmp.emplace_back(heuristic(player, yolah), moves[i]);
