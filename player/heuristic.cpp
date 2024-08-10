@@ -127,29 +127,78 @@ namespace heuristic {
         return { black_influence, white_influence };
     }
 
+    namespace {
+        size_t phase(const Yolah& yolah) {
+            auto free = std::popcount(yolah.free_squares());
+            if (free <= END_GAME) return 2;
+            if (free <= MIDDLE_GAME)  return 1;
+            return 0;
+        }
+    }
+
+    double freedom(uint8_t player, const Yolah& yolah, const std::array<double, NB_WEIGHTS>& weights) {
+        double count[9]{};
+        auto around = [](uint64_t stone) {
+            uint64_t north      = shift<NORTH>(stone);
+            uint64_t south      = shift<SOUTH>(stone);
+            uint64_t east       = shift<EAST>(stone);
+            uint64_t west       = shift<WEST>(stone);
+            uint64_t north_east = shift<NORTH_EAST>(stone);
+            uint64_t south_east = shift<SOUTH_EAST>(stone);
+            uint64_t north_west = shift<NORTH_WEST>(stone);
+            uint64_t south_west = shift<SOUTH_WEST>(stone);
+            return north | south | east | west | north_east | south_east | north_west | south_west;
+        };
+        uint64_t player_bb = yolah.bitboard(player);
+        uint64_t free = yolah.free_squares();
+        while (player_bb) {
+            uint64_t b = player_bb & -player_bb;
+            ++count[std::popcount(around(b) & free)];
+            player_bb &= ~b;
+        }
+        size_t p = 9 * phase(yolah);
+        // std::cout << "player: " << int(player) << std::endl;
+        // std::cout << "phase: " << phase(yolah) << std::endl;
+        // for (size_t i = 0; i < 9; i++) {
+        //     std::cout << i << ' ' << count[i] << std::endl;
+        // }
+        return weights[FREEDOM_0_OPENING_WEIGTH + p]  * count[0] + 
+                weights[FREEDOM_1_OPENING_WEIGTH + p] * count[1] +
+                weights[FREEDOM_2_OPENING_WEIGTH + p] * count[2] +
+                weights[FREEDOM_3_OPENING_WEIGTH + p] * count[3] +
+                weights[FREEDOM_4_OPENING_WEIGTH + p] * count[4] +
+                weights[FREEDOM_5_OPENING_WEIGTH + p] * count[5] +
+                weights[FREEDOM_6_OPENING_WEIGTH + p] * count[6] +
+                weights[FREEDOM_7_OPENING_WEIGTH + p] * count[7] +
+                weights[FREEDOM_8_OPENING_WEIGTH + p] * count[8];
+    }
+
     int16_t eval(uint8_t player, const Yolah& yolah, const std::array<double, NB_WEIGHTS>& weights) {
         Yolah::MoveList black_moves, white_moves;
         yolah.moves(Yolah::BLACK, black_moves);
         yolah.moves(Yolah::WHITE, white_moves);
         double res = 0;
+        size_t p = phase(yolah);
         res += weights[NO_MOVE_WEIGHT] * ((black_moves[0] == Move::none()) - (white_moves[0] == Move::none()));
      
-        res += weights[NB_MOVES_WEIGHT] * (int(black_moves.size()) - int(white_moves.size()));
+        res += weights[NB_MOVES_OPENING_WEIGHT + p] * (int(black_moves.size()) - int(white_moves.size()));
      
-        res += weights[BLOCKED_WEIGHT] * (blocked(Yolah::BLACK, yolah) - blocked(Yolah::WHITE, yolah));
+        //res += weights[BLOCKED_WEIGHT] * (blocked(Yolah::BLACK, yolah) - blocked(Yolah::WHITE, yolah));
      
         const auto [black_first, white_first] = first(black_moves, white_moves);
-        res += weights[FIRST_WEIGHT] * (std::popcount(black_first) - std::popcount(white_first));
+        res += weights[FIRST_OPENING_WEIGHT + p] * (std::popcount(black_first) - std::popcount(white_first));
      
-        res += weights[CONNECTIVITY_WEIGHT] * (connectivity(Yolah::BLACK, yolah) - connectivity(Yolah::WHITE, yolah));
+        res += weights[CONNECTIVITY_OPENING_WEIGHT + p] * (connectivity(Yolah::BLACK, yolah) - connectivity(Yolah::WHITE, yolah));
 
-        res += weights[CONNECTIVITY_SET_WEIGHT] * (connectivity_set(yolah.bitboard(Yolah::BLACK), yolah.free_squares()) - 
+        res += weights[CONNECTIVITY_SET_OPENING_WEIGHT + p] * (connectivity_set(yolah.bitboard(Yolah::BLACK), yolah.free_squares()) - 
                                                     connectivity_set(yolah.bitboard(Yolah::WHITE), yolah.free_squares()));
-        res += weights[ALONE_WEIGHT] * (alone(Yolah::BLACK, yolah) - alone(Yolah::WHITE, yolah));                                                        
+        res += weights[ALONE_OPENING_WEIGHT + p] * (alone(Yolah::BLACK, yolah) - alone(Yolah::WHITE, yolah));                                                        
      
         const auto [black_influence, white_influence] = influence(yolah);
-        res += weights[INFLUENCE_WEIGHT] * (std::popcount(black_influence) - std::popcount(white_influence));
+        res += weights[INFLUENCE_OPENING_WEIGHT + p] * (std::popcount(black_influence) - std::popcount(white_influence));
      
+        res += freedom(Yolah::BLACK, yolah, weights) - freedom(Yolah::WHITE, yolah, weights);
+
         int16_t value = static_cast<int16_t>(res * (player == Yolah::BLACK ? 1 : -1));
         return std::max(MIN_VALUE, std::min(MAX_VALUE, value));
     }

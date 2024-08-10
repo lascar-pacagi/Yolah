@@ -12,15 +12,15 @@ namespace heuristic {
         .nb_iterations(800)
         .elite_fraction(0.15)
         .keep_overall_best(false)
-        .stddev(20)
+        .stddev(50)
         .extra_stddev(5)
-        .weights({-44.3446, 133.4904517790742, 70.20103468956634, -49.6205226975603, 9.403063029826711, 69.17421472991907, -241.4568098828146, 470.4684231911802})
-        .transform([](size_t i, double w) {
-            if (i == heuristic::NO_MOVE_WEIGHT || i == heuristic::BLOCKED_WEIGHT) {
-                return std::min(0.0, w);
-            }
-            return w;    
-        })
+        .weights(std::vector<double>(heuristic::NB_WEIGHTS))
+        // .transform([](size_t i, double w) {
+        //     if (i == heuristic::NO_MOVE_WEIGHT) {
+        //         return std::min(0.0, w);
+        //     }
+        //     return w;    
+        // })
         .fitness([&](const vector<double>& w, const vector<vector<double>>& population) {   
             auto first_n_moves_random = [](Yolah& yolah, uint64_t seed, size_t n) {
                 if (n == 0) return;
@@ -57,10 +57,10 @@ namespace heuristic {
                 res += W1 * ((score > 0) * -1 + (score < 0));
                 res -= W2 * score;
             };
-            for (uint64_t i = 0; i < 30; i++) {
+            for (uint64_t i = 0; i < 20; i++) {
                 update(i, 0);
             }
-            for (uint64_t i = 0; i < 70; i++) {
+            for (uint64_t i = 0; i < 80; i++) {
                 update(i, 4);
             }
             return res;

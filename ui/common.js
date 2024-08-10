@@ -143,7 +143,7 @@ function drawPossibleMoves(moves) {
 }
 
 function drawGrid(grid) {
-    console.log(grid);
+    console.log(grid);    
     const dx = Math.floor(canvasWidth() / GRID_DIM);
     const dy = Math.floor(canvasHeight() / GRID_DIM);
     ctx.fillStyle = BACKGROUND_COLOR;

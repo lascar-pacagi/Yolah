@@ -35,17 +35,30 @@ Move MinMaxPlayer::play(Yolah yolah) {
     int16_t value = 0;
     Move res = Move::none();
     size_t nb_nodes = 0;
+    size_t nb_hits = 0;
+    cout << "##########\n";
+    Yolah::MoveList moves;
+    yolah.encircling_or_escaping_moves(yolah.current_player(), moves);
+    for (Move m : moves) {
+        cout << m << ' ';
+    }
+    cout << '\n';
     for (Search& s : results) {
+        cout << int(s.depth) << ' ' << s.move << '\n';
         if (s.depth > depth) {
             depth = s.depth;
             res = s.move;
             value = s.value;
             nb_nodes += s.nb_nodes;
+            nb_hits += s.nb_hits;            
         }
     }
-    cout << depth << '\n';
-    cout << value << '\n';
-    cout << nb_nodes << '\n';
+    cout << "##########\n";
+    cout << "depth  : " << int(depth) << '\n';
+    cout << "value  : " << value << '\n';
+    cout << "# nodes: " << nb_nodes << '\n';
+    cout << "# hits : " << nb_hits << '\n';
+    cout << "tt load: " << table.load() << '\n';
     print_pv(yolah, zobrist::hash(yolah), depth);
     cout << '\n';
     // cout << heuristic::eval(yolah.current_player(), yolah) << endl;
@@ -63,9 +76,10 @@ int16_t MinMaxPlayer::quiescence(Yolah& yolah, int16_t alpha, int16_t beta) {
         return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
     Yolah::MoveList moves;
+    //yolah.encircling_or_escaping_moves(yolah.current_player(), moves);
     yolah.blocking_moves(moves);
     if (moves.size() == 0) {
-        return heuristic(yolah.current_player(), yolah); 
+        return heuristic(yolah.current_player(), yolah);
     }
     auto player = yolah.current_player();
     for (size_t i = 0; i < moves.size(); i++) {
@@ -92,10 +106,7 @@ int16_t MinMaxPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_t al
         int16_t score = yolah.score(yolah.current_player());
         if (score == 0) return 0;
         return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
-    }
-    if (depth <= 0) {
-        return quiescence(yolah, alpha, beta);//heuristic(yolah.current_player(), yolah);
-    }
+    }    
     bool found;
     TranspositionTableEntry* entry = table.probe(hash, found);
     if (found) s.nb_hits++;
@@ -112,6 +123,11 @@ int16_t MinMaxPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_t al
             if (v <= alpha) return v;
             beta = std::min(beta, v);
         }
+    }
+    if (depth <= 0) {
+        int16_t v = quiescence(yolah, alpha, beta);//heuristic(yolah.current_player(), yolah);
+        table.update(hash, v, BOUND_EXACT, 0);
+        return v;
     }
     Yolah::MoveList moves;
     yolah.moves(moves);

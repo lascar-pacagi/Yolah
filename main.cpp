@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
     // test::nelder_mead_sphere_function();
     // test::nelder_mead_rastrigin_function();
     heuristic::learn_weights(std::make_unique<heuristic::CrossEntropyMethodLearner>([](const std::vector<double>& weights) {
-        return std::make_unique<MinMaxPlayerV2>(300000, 200, 4, 3, [&](uint8_t player, const Yolah& yolah) {
+        return std::make_unique<MinMaxPlayerV2>(300000, 100, 4, 3, [&](uint8_t player, const Yolah& yolah) {
             assert(weights.size() == heuristic::NB_WEIGHTS);
             std::array<double, heuristic::NB_WEIGHTS> w;
             for (size_t i = 0; i < heuristic::NB_WEIGHTS; i++) {
@@ -107,6 +107,43 @@ int main(int argc, char* argv[]) {
     // }
     // cout << yolah << '\n';
     // print_score();
+
+    // constexpr size_t MIDDLE_GAME = 35;
+    // constexpr size_t END_GAME = 15;
+    // for (size_t i = 0; i < 100; i++) {
+    //     Yolah yolah;
+    //     Yolah::MoveList moves;
+    //     PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
+    //     while (!yolah.game_over()) {                 
+    //         yolah.moves(moves);
+    //         Move m = moves[prng.rand<size_t>() % moves.size()];        
+    //         size_t nb_free = std::popcount(yolah.free_squares()); 
+    //         if (nb_free == MIDDLE_GAME) {
+    //             cout << "middle game\n";
+    //             cout << yolah << '\n';
+    //         }
+    //         if (nb_free == END_GAME) {
+    //             cout << "end game\n";
+    //             cout << yolah << '\n';
+    //         }
+    //         yolah.play(m);
+    //     }
+    //     std::string _;
+    //     std::getline(std::cin, _);
+    // }
+    
+    // Yolah yolah;
+    // Yolah::MoveList moves;
+    // PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
+    // while (!yolah.game_over()) {
+    //     cout << yolah << '\n';
+    //     heuristic::evaluation(yolah.current_player(), yolah);
+    //     yolah.moves(moves);
+    //     Move m = moves[prng.rand<size_t>() % moves.size()];        
+    //     yolah.play(m);
+    //     std::string _;
+    //     std::getline(std::cin, _);
+    // }
 
     // po::options_description general("General options");
     // general.add_options()

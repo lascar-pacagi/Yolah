@@ -100,3 +100,14 @@ void TranspositionTable::update(uint64_t k, int16_t v, Bound b, uint8_t d, Move 
 void TranspositionTable::update(uint64_t k, int16_t v, Bound b, uint8_t d) {
     update(k, v, b, d, Move::none());
 }
+
+double TranspositionTable::load() const {
+    double cnt = 0;
+    for (size_t i = 0; i < cluster_count; ++i) {
+        for (size_t j = 0; j < CLUSTER_SIZE; ++j) {
+            cnt += table[i].entries[j].depth8
+                && (table[i].entries[j].gen_bound8 & GENERATION_MASK) == generation8;
+        }
+    }
+    return cnt / (cluster_count * CLUSTER_SIZE);
+}

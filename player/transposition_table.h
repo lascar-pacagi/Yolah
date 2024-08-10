@@ -63,6 +63,7 @@ public:
     }
     void update(uint64_t k, int16_t v, Bound b, uint8_t d, Move m);
     void update(uint64_t k, int16_t v, Bound b, uint8_t d);
+    double load() const;
 };
 
 #endif

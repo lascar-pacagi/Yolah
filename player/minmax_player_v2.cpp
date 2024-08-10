@@ -56,7 +56,7 @@ int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
         if (score == 0) return 0;
         return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
-    if (depth <= 0) {
+    if (depth <= 0) {        
         return quiescence(yolah, alpha, beta);//heuristic(yolah.current_player(), yolah);
     }    
     bool found;
@@ -75,7 +75,7 @@ int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
             if (v <= alpha) return v;
             beta = std::min(beta, v);
         }
-    }
+    }    
     Yolah::MoveList moves;
     yolah.moves(moves);
     sort_moves(yolah, hash, moves);
