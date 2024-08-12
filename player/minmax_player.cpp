@@ -36,15 +36,15 @@ Move MinMaxPlayer::play(Yolah yolah) {
     Move res = Move::none();
     size_t nb_nodes = 0;
     size_t nb_hits = 0;
-    cout << "##########\n";
-    Yolah::MoveList moves;
-    yolah.encircling_or_escaping_moves(yolah.current_player(), moves);
-    for (Move m : moves) {
-        cout << m << ' ';
-    }
-    cout << '\n';
+    // cout << "##########\n";
+    // Yolah::MoveList moves;
+    // yolah.encircling_or_escaping_moves(yolah.current_player(), moves);
+    // for (Move m : moves) {
+    //     cout << m << ' ';
+    // }
+    // cout << '\n';
     for (Search& s : results) {
-        cout << int(s.depth) << ' ' << s.move << '\n';
+        // cout << int(s.depth) << ' ' << s.move << '\n';
         if (s.depth > depth) {
             depth = s.depth;
             res = s.move;
@@ -53,7 +53,7 @@ Move MinMaxPlayer::play(Yolah yolah) {
             nb_hits += s.nb_hits;            
         }
     }
-    cout << "##########\n";
+    // cout << "##########\n";
     cout << "depth  : " << int(depth) << '\n';
     cout << "value  : " << value << '\n';
     cout << "# nodes: " << nb_nodes << '\n';
@@ -69,15 +69,17 @@ std::string MinMaxPlayer::info() {
     return "minmax player (transposition table + late move reduction + killer + lazy SMP)";
 }
 
-int16_t MinMaxPlayer::quiescence(Yolah& yolah, int16_t alpha, int16_t beta) {
+int16_t MinMaxPlayer::quiescence(Yolah& yolah, int16_t alpha, int16_t beta, int8_t depth) {
     if (yolah.game_over()) {
         int16_t score = yolah.score(yolah.current_player());
         if (score == 0) return 0;
         return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
+    if (depth <= 0) {
+        return heuristic(yolah.current_player(), yolah);
+    }
     Yolah::MoveList moves;
-    //yolah.encircling_or_escaping_moves(yolah.current_player(), moves);
-    yolah.blocking_moves(moves);
+    yolah.contact_moves(moves);
     if (moves.size() == 0) {
         return heuristic(yolah.current_player(), yolah);
     }
@@ -85,7 +87,7 @@ int16_t MinMaxPlayer::quiescence(Yolah& yolah, int16_t alpha, int16_t beta) {
     for (size_t i = 0; i < moves.size(); i++) {
         Move m = moves[i];
         yolah.play(m);
-        int16_t v = -quiescence(yolah, -beta, -alpha);
+        int16_t v = -quiescence(yolah, -beta, -alpha, depth - 1);
         yolah.undo(m);
         if (v >= beta) {
             return v;
@@ -125,7 +127,7 @@ int16_t MinMaxPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_t al
         }
     }
     if (depth <= 0) {
-        int16_t v = quiescence(yolah, alpha, beta);//heuristic(yolah.current_player(), yolah);
+        int16_t v = quiescence(yolah, alpha, beta, 6);//heuristic(yolah.current_player(), yolah);
         table.update(hash, v, BOUND_EXACT, 0);
         return v;
     }

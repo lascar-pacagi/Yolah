@@ -108,8 +108,6 @@ int main(int argc, char* argv[]) {
     // cout << yolah << '\n';
     // print_score();
 
-    // constexpr size_t MIDDLE_GAME = 35;
-    // constexpr size_t END_GAME = 15;
     // for (size_t i = 0; i < 100; i++) {
     //     Yolah yolah;
     //     Yolah::MoveList moves;
@@ -118,11 +116,11 @@ int main(int argc, char* argv[]) {
     //         yolah.moves(moves);
     //         Move m = moves[prng.rand<size_t>() % moves.size()];        
     //         size_t nb_free = std::popcount(yolah.free_squares()); 
-    //         if (nb_free == MIDDLE_GAME) {
+    //         if (nb_free == heuristic::MIDDLE_GAME) {
     //             cout << "middle game\n";
     //             cout << yolah << '\n';
     //         }
-    //         if (nb_free == END_GAME) {
+    //         if (nb_free == heuristic::END_GAME) {
     //             cout << "end game\n";
     //             cout << yolah << '\n';
     //         }

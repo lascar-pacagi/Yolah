@@ -75,12 +75,16 @@ public:
     void undo(Move m);
     void moves(uint8_t player, MoveList& moves) const;
     void moves(MoveList& moves) const;
-    void blocking_moves(uint8_t player, MoveList& moves) const;
     void moves(uint64_t bb, MoveList& moves) const;
+    void blocking_moves(uint8_t player, MoveList& moves) const;
     void blocking_moves(MoveList& moves) const;
     bool is_blocking_move(uint8_t player, Move) const;
     bool is_blocking_move(Move) const;
-    void encircling_or_escaping_moves(uint8_t player, MoveList& moves) const;
+    // TO DO : add definition of contact move
+    void contact_moves(uint8_t player, MoveList& moves) const;
+    void contact_moves(MoveList& moves) const;
+    bool is_contact_move(uint8_t player, Move) const;
+    bool is_contact_move(Move) const;
     bool valid(Move m) const;
     uint64_t free_squares() const;
     uint64_t occupied_squares() const {
@@ -94,8 +98,6 @@ public:
     static Yolah from_json(std::istream& is);
     static Yolah from_json(const std::string&);
     friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
-    uint64_t between_n_m_liberties(uint64_t player_bb, size_t n, size_t m) const;
-    uint64_t around(uint64_t bb) const;
 };
 
 std::ostream& operator<<(std::ostream& os, const Yolah& yolah);

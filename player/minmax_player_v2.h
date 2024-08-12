@@ -17,7 +17,7 @@ class MinMaxPlayerV2 : public Player {
     size_t nb_nodes = 0;
     size_t nb_hits  = 0;
 
-    int16_t quiescence(Yolah& yolah, int16_t alpha, int16_t beta);
+    int16_t quiescence(Yolah& yolah, int16_t alpha, int16_t beta, int8_t depth);
     int16_t negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth);
     int16_t root_search(Yolah&, uint64_t hash, int8_t depth, Move&);
     void sort_moves(Yolah&, uint64_t hash, Yolah::MoveList&);

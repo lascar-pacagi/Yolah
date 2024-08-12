@@ -192,6 +192,7 @@ namespace heuristic {
 
         res += weights[CONNECTIVITY_SET_OPENING_WEIGHT + p] * (connectivity_set(yolah.bitboard(Yolah::BLACK), yolah.free_squares()) - 
                                                     connectivity_set(yolah.bitboard(Yolah::WHITE), yolah.free_squares()));
+        
         res += weights[ALONE_OPENING_WEIGHT + p] * (alone(Yolah::BLACK, yolah) - alone(Yolah::WHITE, yolah));                                                        
      
         const auto [black_influence, white_influence] = influence(yolah);
