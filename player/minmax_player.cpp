@@ -127,7 +127,7 @@ int16_t MinMaxPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_t al
         }
     }
     if (depth <= 0) {
-        int16_t v = quiescence(yolah, alpha, beta, 6);//heuristic(yolah.current_player(), yolah);
+        int16_t v = quiescence(yolah, alpha, beta, 4);//heuristic(yolah.current_player(), yolah);
         table.update(hash, v, BOUND_EXACT, 0);
         return v;
     }

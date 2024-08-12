@@ -9,7 +9,7 @@ namespace heuristic {
         NoisyCrossEntropyMethod::Builder builder;
         builder
         .population_size(120)
-        .nb_iterations(800)
+        .nb_iterations(600)
         .elite_fraction(0.15)
         .keep_overall_best(false)
         .stddev(20)
