@@ -317,7 +317,7 @@ async def connect(websocket):
 
 
 async def main():
-    async with websockets.serve(connect, "", 8001):
+    async with websockets.serve(connect, "", 8001, ping_timeout=120):
         await asyncio.Future()
 
 

@@ -151,17 +151,30 @@ inline uint64_t operator|(Square s1, Square s2) { return square_bb(s1) | s2; }
 constexpr bool more_than_one(uint64_t b) { return b & (b - 1); }
 
 // Moves a bitboard one or two steps as specified by the direction D
+// template<Direction D>
+// constexpr uint64_t shift(uint64_t b) {
+//     return D == NORTH         ? b << 8
+//          : D == SOUTH         ? b >> 8
+//          : D == EAST          ? (b & ~FileHBB) << 1
+//          : D == WEST          ? (b & ~FileABB) >> 1
+//          : D == NORTH_EAST    ? (b & ~FileHBB) << 9
+//          : D == NORTH_WEST    ? (b & ~FileABB) << 7
+//          : D == SOUTH_EAST    ? (b & ~FileHBB) >> 7
+//          : D == SOUTH_WEST    ? (b & ~FileABB) >> 9
+//                               : 0;
+// }
+
 template<Direction D>
 constexpr uint64_t shift(uint64_t b) {
-    return D == NORTH         ? b << 8
-         : D == SOUTH         ? b >> 8
-         : D == EAST          ? (b & ~FileHBB) << 1
-         : D == WEST          ? (b & ~FileABB) >> 1
-         : D == NORTH_EAST    ? (b & ~FileHBB) << 9
-         : D == NORTH_WEST    ? (b & ~FileABB) << 7
-         : D == SOUTH_EAST    ? (b & ~FileHBB) >> 7
-         : D == SOUTH_WEST    ? (b & ~FileABB) >> 9
-                              : 0;
+    if constexpr (D == NORTH)           return b << 8;
+    else if constexpr (D == SOUTH)      return b >> 8;
+    else if constexpr (D == EAST)       return (b & ~FileHBB) << 1;
+    else if constexpr (D == WEST)       return (b & ~FileABB) >> 1;
+    else if constexpr (D == NORTH_EAST) return (b & ~FileHBB) << 9;
+    else if constexpr (D == NORTH_WEST) return (b & ~FileABB) << 7;
+    else if constexpr (D == SOUTH_EAST) return (b & ~FileHBB) >> 7;
+    else if constexpr (D == SOUTH_WEST) return (b & ~FileABB) >> 9;
+    else return 0;
 }
 
 #define ENABLE_INCR_OPERATORS_ON(T) \

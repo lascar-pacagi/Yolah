@@ -162,16 +162,19 @@ bool Yolah::is_blocking_move(uint8_t player, Move m) const {
     uint64_t other_bb   = bitboard(other_player(player));
     uint64_t to_bb      = square_bb(m.to_sq());
     uint64_t free       = free_squares() & ~to_bb;
+    // auto blocked = [&](uint64_t pos) {
+    //     uint64_t north = shift<NORTH>(pos);
+    //     uint64_t south = shift<SOUTH>(pos);
+    //     uint64_t east = shift<EAST>(pos);
+    //     uint64_t west = shift<WEST>(pos);
+    //     uint64_t north_east = shift<NORTH_EAST>(pos);
+    //     uint64_t south_east = shift<SOUTH_EAST>(pos);
+    //     uint64_t north_west = shift<NORTH_WEST>(pos);
+    //     uint64_t south_west = shift<SOUTH_WEST>(pos);
+    //     return ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
+    // };
     auto blocked = [&](uint64_t pos) {
-        uint64_t north = shift<NORTH>(pos);
-        uint64_t south = shift<SOUTH>(pos);
-        uint64_t east = shift<EAST>(pos);
-        uint64_t west = shift<WEST>(pos);
-        uint64_t north_east = shift<NORTH_EAST>(pos);
-        uint64_t south_east = shift<SOUTH_EAST>(pos);
-        uint64_t north_west = shift<NORTH_WEST>(pos);
-        uint64_t south_west = shift<SOUTH_WEST>(pos);
-        return ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
+        return (around(pos) & free) == 0;
     };
     uint64_t north      = shift<NORTH>(to_bb);
     uint64_t south      = shift<SOUTH>(to_bb);
@@ -219,17 +222,17 @@ void Yolah::contact_moves(MoveList& moves) const {
 }
 
 bool Yolah::is_contact_move(uint8_t player, Move m) const {
-    auto around = [](uint64_t bb) {
-        uint64_t north      = shift<NORTH>(bb);
-        uint64_t south      = shift<SOUTH>(bb);
-        uint64_t east       = shift<EAST>(bb);
-        uint64_t west       = shift<WEST>(bb);
-        uint64_t north_east = shift<NORTH_EAST>(bb);
-        uint64_t south_east = shift<SOUTH_EAST>(bb);
-        uint64_t north_west = shift<NORTH_WEST>(bb);
-        uint64_t south_west = shift<SOUTH_WEST>(bb);
-        return north | south | east | west | north_east | south_east | north_west | south_west;
-    };
+    // auto around = [](uint64_t bb) {
+    //     uint64_t north      = shift<NORTH>(bb);
+    //     uint64_t south      = shift<SOUTH>(bb);
+    //     uint64_t east       = shift<EAST>(bb);
+    //     uint64_t west       = shift<WEST>(bb);
+    //     uint64_t north_east = shift<NORTH_EAST>(bb);
+    //     uint64_t south_east = shift<SOUTH_EAST>(bb);
+    //     uint64_t north_west = shift<NORTH_WEST>(bb);
+    //     uint64_t south_west = shift<SOUTH_WEST>(bb);
+    //     return north | south | east | west | north_east | south_east | north_west | south_west;
+    // };
     uint64_t free = free_squares();
     auto liberties = [&](uint64_t stone) {
         return std::popcount(around(stone) & free);

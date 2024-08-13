@@ -64,16 +64,16 @@ int main(int argc, char* argv[]) {
     // test::nelder_mead_beale_function();
     // test::nelder_mead_sphere_function();
     // test::nelder_mead_rastrigin_function();
-    heuristic::learn_weights(std::make_unique<heuristic::CrossEntropyMethodLearner>([](const std::vector<double>& weights) {
-        return std::make_unique<MinMaxPlayerV2>(300000, 100, 4, 3, [&](uint8_t player, const Yolah& yolah) {
-            assert(weights.size() == heuristic::NB_WEIGHTS);
-            std::array<double, heuristic::NB_WEIGHTS> w;
-            for (size_t i = 0; i < heuristic::NB_WEIGHTS; i++) {
-                w[i] = weights[i];
-            }
-            return heuristic::eval(player, yolah, w);
-        });
-    }));
+    // heuristic::learn_weights(std::make_unique<heuristic::CrossEntropyMethodLearner>([](const std::vector<double>& weights) {
+    //     return std::make_unique<MinMaxPlayerV2>(300000, 100, 4, 3, [&](uint8_t player, const Yolah& yolah) {
+    //         assert(weights.size() == heuristic::NB_WEIGHTS);
+    //         std::array<double, heuristic::NB_WEIGHTS> w;
+    //         for (size_t i = 0; i < heuristic::NB_WEIGHTS; i++) {
+    //             w[i] = weights[i];
+    //         }
+    //         return heuristic::eval(player, yolah, w);
+    //     });
+    // }));
     // auto values = heuristic::sampling_heuristic_values(1000000);
     // for (int32_t v : values) {
     //     cout << v << ' ';
@@ -143,54 +143,54 @@ int main(int argc, char* argv[]) {
     //     std::getline(std::cin, _);
     // }
 
-    // po::options_description general("General options");
-    // general.add_options()
-    // ("help", "produce help message")
-    // ("version", "output the version number");
+    po::options_description general("General options");
+    general.add_options()
+    ("help", "produce help message")
+    ("version", "output the version number");
     
-    // po::options_description client("Client options");
-    // client.add_options()
-    // ("server,s", po::value<string>()->default_value("127.0.0.1"), "server ip adress")
-    // ("port,p", po::value<uint16_t>()->default_value(8001), "server port")
-    // ("key,k", po::value<string>(), "join key, if not present create a new game and get the join and watch keys by the server")
-    // ("player", po::value<string>(), "configuration file for player");
+    po::options_description client("Client options");
+    client.add_options()
+    ("server,s", po::value<string>()->default_value("127.0.0.1"), "server ip adress")
+    ("port,p", po::value<uint16_t>()->default_value(8001), "server port")
+    ("key,k", po::value<string>(), "join key, if not present create a new game and get the join and watch keys by the server")
+    ("player", po::value<string>(), "configuration file for player");
     
-    // po::options_description evaluate("Evaluate AI options");
-    // evaluate.add_options()
-    // ("player1,1", po::value<string>(), "configuration file for first AI player")
-    // ("player2,2", po::value<string>(), "configuration file for second AI player")
-    // ("nb-random-moves,r", po::value<size_t>()->default_value(0), "number of random moves at the beginning of the game")
-    // ("nb-games,n", po::value<size_t>()->default_value(100), "number of games for the evaluation");
+    po::options_description evaluate("Evaluate AI options");
+    evaluate.add_options()
+    ("player1,1", po::value<string>(), "configuration file for first AI player")
+    ("player2,2", po::value<string>(), "configuration file for second AI player")
+    ("nb-random-moves,r", po::value<size_t>()->default_value(0), "number of random moves at the beginning of the game")
+    ("nb-games,n", po::value<size_t>()->default_value(100), "number of games for the evaluation");
 
-    // po::options_description all("Allowed options");
-    // all.add(general).add(client).add(evaluate);
+    po::options_description all("Allowed options");
+    all.add(general).add(client).add(evaluate);
     
-    // po::variables_map vm;
-    // po::store(po::parse_command_line(argc, argv, all), vm);
-    // po::notify(vm);
-    // if (vm.count("help")) {
-    //     cout << all << "\n";
-    //     return EXIT_SUCCESS;
-    // }
-    // if (vm.count("version")) {
-    //     cout << "Yolah 0.1 by Pascal Garcia\n";
-    //     return EXIT_SUCCESS;
-    // }
-    // if (vm.count("player")) {
-    //     std::ifstream f(vm["player"].as<string>());
-    //     nlohmann::json j = nlohmann::json::parse(f);    
-    //     cout << j << '\n';
-    //     ClientPlayer player(Player::create(j),
-    //                         WebsocketClientSync::create(vm["server"].as<string>(), vm["port"].as<uint16_t>()));
-    //     player.run(vm.count("key") ? std::optional<string>(vm["key"].as<string>()) : std::nullopt);
-    // } else if (vm.count("player1") && vm.count("player2")) {
-    //     test::play(Player::create(nlohmann::json::parse(std::ifstream(vm["player1"].as<string>()))),
-    //                Player::create(nlohmann::json::parse(std::ifstream(vm["player2"].as<string>()))),
-    //                vm["nb-random-moves"].as<size_t>(),
-    //                vm["nb-games"].as<size_t>());
-    // } else {
-    //     cout << "wrong mix of options\n";
-    //     return EXIT_FAILURE;
-    // }
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, all), vm);
+    po::notify(vm);
+    if (vm.count("help")) {
+        cout << all << "\n";
+        return EXIT_SUCCESS;
+    }
+    if (vm.count("version")) {
+        cout << "Yolah 0.1 by Pascal Garcia\n";
+        return EXIT_SUCCESS;
+    }
+    if (vm.count("player")) {
+        std::ifstream f(vm["player"].as<string>());
+        nlohmann::json j = nlohmann::json::parse(f);    
+        cout << j << '\n';
+        ClientPlayer player(Player::create(j),
+                            WebsocketClientSync::create(vm["server"].as<string>(), vm["port"].as<uint16_t>()));
+        player.run(vm.count("key") ? std::optional<string>(vm["key"].as<string>()) : std::nullopt);
+    } else if (vm.count("player1") && vm.count("player2")) {
+        test::play(Player::create(nlohmann::json::parse(std::ifstream(vm["player1"].as<string>()))),
+                   Player::create(nlohmann::json::parse(std::ifstream(vm["player2"].as<string>()))),
+                   vm["nb-random-moves"].as<size_t>(),
+                   vm["nb-games"].as<size_t>());
+    } else {
+        cout << "wrong mix of options\n";
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

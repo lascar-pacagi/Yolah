@@ -5,20 +5,33 @@
 #include "misc.h"
 
 namespace heuristic {
+    // uint64_t floodfill(uint64_t player_bb, uint64_t free) {
+    //     uint64_t prev_flood = 0;   
+    //     uint64_t flood = player_bb;            
+    //     while (prev_flood != flood) {
+    //         prev_flood = flood;
+    //         uint64_t flood1 = shift<NORTH>(flood) & free;
+    //         uint64_t flood2 = shift<SOUTH>(flood) & free;
+    //         uint64_t flood3 = shift<EAST>(flood) & free;
+    //         uint64_t flood4 = shift<WEST>(flood) & free;
+    //         uint64_t flood5 = shift<NORTH_EAST>(flood) & free;
+    //         uint64_t flood6 = shift<SOUTH_EAST>(flood) & free;
+    //         uint64_t flood7 = shift<NORTH_WEST>(flood) & free;
+    //         uint64_t flood8 = shift<SOUTH_WEST>(flood) & free;
+    //         flood |= flood1 | flood2 | flood3 | flood4 | flood5 | flood6 | flood7 | flood8;
+    //     }
+    //     flood ^= player_bb;
+    //     return flood;
+    // }
+
     uint64_t floodfill(uint64_t player_bb, uint64_t free) {
         uint64_t prev_flood = 0;   
         uint64_t flood = player_bb;            
         while (prev_flood != flood) {
             prev_flood = flood;
-            uint64_t flood1 = shift<NORTH>(flood) & free;
-            uint64_t flood2 = shift<SOUTH>(flood) & free;
-            uint64_t flood3 = shift<EAST>(flood) & free;
-            uint64_t flood4 = shift<WEST>(flood) & free;
-            uint64_t flood5 = shift<NORTH_EAST>(flood) & free;
-            uint64_t flood6 = shift<SOUTH_EAST>(flood) & free;
-            uint64_t flood7 = shift<NORTH_WEST>(flood) & free;
-            uint64_t flood8 = shift<SOUTH_WEST>(flood) & free;
-            flood |= flood1 | flood2 | flood3 | flood4 | flood5 | flood6 | flood7 | flood8;
+            flood |= (shift<NORTH>(flood) | shift<SOUTH>(flood) | shift<EAST>(flood) | 
+                        shift<WEST>(flood) | shift<NORTH_EAST>(flood) | shift<SOUTH_EAST>(flood) | 
+                        shift<NORTH_WEST>(flood) | shift<SOUTH_WEST>(flood)) & free;
         }
         flood ^= player_bb;
         return flood;
@@ -72,21 +85,33 @@ namespace heuristic {
         return { player_moves_bb & ~opponent_moves_bb, opponent_moves_bb & ~player_moves_bb };
     }
 
+    // int16_t blocked(uint8_t player, const Yolah& yolah) {
+    //     uint64_t player_bb = yolah.bitboard(player);
+    //     uint64_t free = yolah.free_squares();
+    //     int16_t res = 0;
+    //     while (player_bb) {
+    //         uint64_t bb = player_bb & -player_bb;
+    //         uint64_t north = shift<NORTH>(bb);
+    //         uint64_t south = shift<SOUTH>(bb);
+    //         uint64_t east = shift<EAST>(bb);
+    //         uint64_t west = shift<WEST>(bb);
+    //         uint64_t north_east = shift<NORTH_EAST>(bb);
+    //         uint64_t south_east = shift<SOUTH_EAST>(bb);
+    //         uint64_t north_west = shift<NORTH_WEST>(bb);
+    //         uint64_t south_west = shift<SOUTH_WEST>(bb);
+    //         res += ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
+    //         player_bb &= ~bb;
+    //     }
+    //     return res;
+    // }
+
     int16_t blocked(uint8_t player, const Yolah& yolah) {
         uint64_t player_bb = yolah.bitboard(player);
         uint64_t free = yolah.free_squares();
         int16_t res = 0;
         while (player_bb) {
             uint64_t bb = player_bb & -player_bb;
-            uint64_t north = shift<NORTH>(bb);
-            uint64_t south = shift<SOUTH>(bb);
-            uint64_t east = shift<EAST>(bb);
-            uint64_t west = shift<WEST>(bb);
-            uint64_t north_east = shift<NORTH_EAST>(bb);
-            uint64_t south_east = shift<SOUTH_EAST>(bb);
-            uint64_t north_west = shift<NORTH_WEST>(bb);
-            uint64_t south_west = shift<SOUTH_WEST>(bb);
-            res += ((north | south | east | west | north_east | south_east | north_west | south_west) & free) == 0;
+            res += (around(bb) & free) == 0;
             player_bb &= ~bb;
         }
         return res;
@@ -94,15 +119,9 @@ namespace heuristic {
 
     std::pair<uint64_t, uint64_t> influence(const Yolah& yolah) {
         auto one_step = [&](uint64_t flood, uint64_t free) {
-            uint64_t flood1 = shift<NORTH>(flood) & free;
-            uint64_t flood2 = shift<SOUTH>(flood) & free;
-            uint64_t flood3 = shift<EAST>(flood) & free;
-            uint64_t flood4 = shift<WEST>(flood) & free;
-            uint64_t flood5 = shift<NORTH_EAST>(flood) & free;
-            uint64_t flood6 = shift<SOUTH_EAST>(flood) & free;
-            uint64_t flood7 = shift<NORTH_WEST>(flood) & free;
-            uint64_t flood8 = shift<SOUTH_WEST>(flood) & free;
-            return flood1 | flood2 | flood3 | flood4 | flood5 | flood6 | flood7 | flood8;            
+            return (shift<NORTH>(flood) | shift<SOUTH>(flood) | shift<EAST>(flood) | 
+                    shift<WEST>(flood) | shift<NORTH_EAST>(flood) | shift<SOUTH_EAST>(flood) | 
+                    shift<NORTH_WEST>(flood) | shift<SOUTH_WEST>(flood)) & free;            
         };
         uint64_t prev_black_influence = 0;
         uint64_t prev_white_influence = 0;
@@ -138,22 +157,22 @@ namespace heuristic {
 
     double freedom(uint8_t player, const Yolah& yolah, const std::array<double, NB_WEIGHTS>& weights) {
         double count[9]{};
-        auto around = [](uint64_t stone) {
-            uint64_t north      = shift<NORTH>(stone);
-            uint64_t south      = shift<SOUTH>(stone);
-            uint64_t east       = shift<EAST>(stone);
-            uint64_t west       = shift<WEST>(stone);
-            uint64_t north_east = shift<NORTH_EAST>(stone);
-            uint64_t south_east = shift<SOUTH_EAST>(stone);
-            uint64_t north_west = shift<NORTH_WEST>(stone);
-            uint64_t south_west = shift<SOUTH_WEST>(stone);
-            return north | south | east | west | north_east | south_east | north_west | south_west;
-        };
+        // auto around = [](uint64_t stone) {
+        //     uint64_t north      = shift<NORTH>(stone);
+        //     uint64_t south      = shift<SOUTH>(stone);
+        //     uint64_t east       = shift<EAST>(stone);
+        //     uint64_t west       = shift<WEST>(stone);
+        //     uint64_t north_east = shift<NORTH_EAST>(stone);
+        //     uint64_t south_east = shift<SOUTH_EAST>(stone);
+        //     uint64_t north_west = shift<NORTH_WEST>(stone);
+        //     uint64_t south_west = shift<SOUTH_WEST>(stone);
+        //     return north | south | east | west | north_east | south_east | north_west | south_west;
+        // };
         uint64_t player_bb = yolah.bitboard(player);
         uint64_t free = yolah.free_squares();
         while (player_bb) {
             uint64_t b = player_bb & -player_bb;
-            ++count[std::popcount(around(b) & free)];
+            ++count[std::popcount(AROUND[std::countr_zero(b)] & free)];
             player_bb &= ~b;
         }
         size_t p = 9 * phase(yolah);
