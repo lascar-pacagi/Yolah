@@ -177,6 +177,12 @@ constexpr uint64_t shift(uint64_t b) {
     else return 0;
 }
 
+constexpr uint64_t shift_all_directions(uint64_t b) {
+    uint64_t b1 = b & ~FileHBB;
+    uint64_t b2 = b & ~FileABB;
+    return b << 8 | b >> 8 | b1 << 1 | b1 << 9 | b1 >> 7 | b2 >> 1 | b2 << 7 | b2 >> 9;
+}
+
 #define ENABLE_INCR_OPERATORS_ON(T) \
         inline T& operator++(T& d) { return d = T(int(d) + 1); } \
         inline T& operator--(T& d) { return d = T(int(d) - 1); }

@@ -24,14 +24,25 @@ namespace heuristic {
     //     return flood;
     // }
 
+    // uint64_t floodfill(uint64_t player_bb, uint64_t free) {
+    //     uint64_t prev_flood = 0;   
+    //     uint64_t flood = player_bb;            
+    //     while (prev_flood != flood) {
+    //         prev_flood = flood;
+    //         flood |= (shift<NORTH>(flood) | shift<SOUTH>(flood) | shift<EAST>(flood) | 
+    //                     shift<WEST>(flood) | shift<NORTH_EAST>(flood) | shift<SOUTH_EAST>(flood) | 
+    //                     shift<NORTH_WEST>(flood) | shift<SOUTH_WEST>(flood)) & free;
+    //     }
+    //     flood ^= player_bb;
+    //     return flood;
+    // }
+
     uint64_t floodfill(uint64_t player_bb, uint64_t free) {
         uint64_t prev_flood = 0;   
         uint64_t flood = player_bb;            
         while (prev_flood != flood) {
             prev_flood = flood;
-            flood |= (shift<NORTH>(flood) | shift<SOUTH>(flood) | shift<EAST>(flood) | 
-                        shift<WEST>(flood) | shift<NORTH_EAST>(flood) | shift<SOUTH_EAST>(flood) | 
-                        shift<NORTH_WEST>(flood) | shift<SOUTH_WEST>(flood)) & free;
+            flood |= shift_all_directions(flood) & free;
         }
         flood ^= player_bb;
         return flood;

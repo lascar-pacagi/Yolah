@@ -6,18 +6,6 @@
 using std::ostream, std::pair, std::vector, std::istream;
 using std::string, std::to_string, std::stoi, std::stoull; 
 
-pair<uint16_t, uint16_t> Yolah::score() const {
-    return { black_score, white_score };
-}
-
-int16_t Yolah::score(uint8_t player) const {
-    return (black_score - white_score) * ((player == WHITE) * -1 + (player == BLACK)); 
-}
-
-uint8_t Yolah::current_player() const {
-    return uint8_t(ply & 1);
-}
-
 uint8_t Yolah::get(Square s) const {
     uint64_t pos = square_bb(s); 
     if (black & pos) {
@@ -103,32 +91,32 @@ void Yolah::moves(uint8_t player, MoveList& moves) const {
     uint64_t black_mask = ~white_mask;
     uint64_t occupied = black | white | empty;
     uint64_t bb = (black_mask & black) | (white_mask & white);
-    debug([&]{
-        std::cout << "begin moves" << std::endl;
-        std::cout << Bitboard::pretty(bb);
-    });    
+    // debug([&]{
+    //     std::cout << "begin moves" << std::endl;
+    //     std::cout << Bitboard::pretty(bb);
+    // });    
     while (bb) {
         Square   from = pop_lsb(bb);
         uint64_t b    = attacks_bb(from, occupied) & ~occupied;        
-        debug([&]{ std::cout << Bitboard::pretty(b); });
+        //debug([&]{ std::cout << Bitboard::pretty(b); });
         while (b) {
             *moveList++ = Move(from, pop_lsb(b));
-            debug([&]{ std::cout << *(moveList - 1) << '\n'; });
+            //debug([&]{ std::cout << *(moveList - 1) << '\n'; });
         }
     }    
     if (moveList == moves.moveList) [[unlikely]] {
         *moveList++ = Move::none();
     }
     moves.last = moveList;
-    debug([&]{
-        for (Move m : moves) {
-            std::cout << m << ' ';
-        }
-        if (moves.size()) {
-            std::cout << '\n' << moves.size() << '\n';
-        }
-        std::cout << "end moves" << std::endl;
-    });
+    // debug([&]{
+    //     for (Move m : moves) {
+    //         std::cout << m << ' ';
+    //     }
+    //     if (moves.size()) {
+    //         std::cout << '\n' << moves.size() << '\n';
+    //     }
+    //     std::cout << "end moves" << std::endl;
+    // });
 }
 
 void Yolah::moves(MoveList& moves) const {
@@ -198,24 +186,86 @@ bool Yolah::is_blocking_move(Move m) const {
     return is_blocking_move(current_player(), m);
 }
 
+// void Yolah::contact_moves(uint8_t player, MoveList& moves) const {
+//     Move* moveList = moves.moveList;
+//     uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (player == WHITE); 
+//     uint64_t black_mask = ~white_mask;
+//     uint64_t occupied = black | white | empty;
+//     uint64_t free = ~occupied;
+//     uint64_t bb = (black_mask & black) | (white_mask & white);    
+//     uint64_t tmp = (~black_mask & black) | (~white_mask & white);
+//     uint64_t other_bb = 0;
+//     while (tmp) {
+//         uint64_t b = tmp & -tmp;
+//         if (std::popcount(around(b) & free) <= 2) {
+//             other_bb |= b;
+//         }
+//         tmp &= ~b;
+//     }
+//     while (bb) {
+//         Square   from = pop_lsb(bb);
+//         //bool tight = std::popcount(square_bb(from) & free) <= 2;
+//         uint64_t b    = attacks_bb(from, occupied) & free;        
+//         while (b) {
+//             Square to = pop_lsb(b);
+//             if ((around(square_bb(to)) & other_bb)) {
+//                 *moveList++ = Move(from, to);
+//             }
+//         }
+//     }
+//     moves.last = moveList;
+// }
+
 void Yolah::contact_moves(uint8_t player, MoveList& moves) const {
     Move* moveList = moves.moveList;
     uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (player == WHITE); 
     uint64_t black_mask = ~white_mask;
     uint64_t occupied = black | white | empty;
+    uint64_t free = ~occupied;
     uint64_t bb = (black_mask & black) | (white_mask & white);    
+    uint64_t other_bb = (~black_mask & black) | (~white_mask & white);
+    uint64_t other_tight_bb = 0;
+    uint64_t tmp = other_bb;
+    while (tmp) {
+        uint64_t b = tmp & -tmp;
+        if (std::popcount(around(b) & free) <= 2) {
+            other_tight_bb |= b;
+        }
+        tmp &= ~b;
+    }
     while (bb) {
         Square   from = pop_lsb(bb);
-        uint64_t b    = attacks_bb(from, occupied) & ~occupied;        
+        bool tight = std::popcount(around(square_bb(from)) & free) <= 2;
+        uint64_t b    = attacks_bb(from, occupied) & free;        
         while (b) {
-            Move m = Move(from, pop_lsb(b));
-            if (is_contact_move(player, m)) {
-                *moveList++ = m;
-            }            
+            Square to = pop_lsb(b);
+            if ((around(square_bb(to)) & other_tight_bb) || (tight && (around(square_bb(to)) & other_bb))) {
+                *moveList++ = Move(from, to);
+            }
         }
     }
     moves.last = moveList;
 }
+
+// void Yolah::contact_moves(uint8_t player, MoveList& moves) const {
+//     Move* moveList = moves.moveList;
+//     uint64_t white_mask = uint64_t(0xFFFFFFFFFFFFFFFF) * (player == WHITE); 
+//     uint64_t black_mask = ~white_mask;
+//     uint64_t occupied = black | white | empty;
+//     uint64_t bb = (black_mask & black) | (white_mask & white);    
+//     while (bb) {
+//         Square   from = pop_lsb(bb);
+//         uint64_t b    = attacks_bb(from, occupied) & ~occupied;        
+//         while (b) {
+//             Square to = pop_lsb(b);
+//             Move m = Move(from, to);
+//             if (is_contact_move(player, m)) {
+//                 *moveList++ = m;
+//             }
+//         }
+//     }
+//     moves.last = moveList;
+// }
 
 void Yolah::contact_moves(MoveList& moves) const {
     contact_moves(current_player(), moves);
@@ -278,15 +328,6 @@ void Yolah::moves(uint64_t bb, MoveList& moves) const {
         *moveList++ = Move::none();
     }
     moves.last = moveList;
-}
-
-uint64_t Yolah::free_squares() const {
-    uint64_t occupied = black | white | empty;
-    return FULL & ~occupied;
-}
-
-uint64_t Yolah::bitboard(uint8_t player) const {
-    return player == BLACK ? black : white;
 }
 
 string Yolah::to_json() const {

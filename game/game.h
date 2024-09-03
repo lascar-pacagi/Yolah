@@ -7,6 +7,7 @@
 #include "types.h"
 #include "move.h"
 #include "json.hpp"
+#include "misc.h"
 
 using json = nlohmann::json;
 
@@ -62,9 +63,15 @@ public:
     static constexpr uint8_t WHITE = 1;
     static constexpr uint8_t EMPTY = 2;
     static constexpr uint8_t FREE  = 3;
-    std::pair<uint16_t, uint16_t> score() const;
-    int16_t score(uint8_t player) const;
-    uint8_t current_player() const;
+    constexpr std::pair<uint16_t, uint16_t> score() const {
+      return { black_score, white_score };
+    }
+    constexpr int16_t score(uint8_t player) const {
+      return (black_score - white_score) * ((player == WHITE) * -1 + (player == BLACK)); 
+    }
+    constexpr uint8_t current_player() const {
+      return uint8_t(ply & 1);
+    }
     static constexpr uint8_t other_player(uint8_t player) {
       return 1 - player;
     }
@@ -86,13 +93,20 @@ public:
     bool is_contact_move(uint8_t player, Move) const;
     bool is_contact_move(Move) const;
     bool valid(Move m) const;
-    uint64_t free_squares() const;
-    uint64_t occupied_squares() const {
+    constexpr uint64_t free_squares() const {
+      return FULL & ~occupied_squares();
+    }
+    constexpr uint64_t occupied_squares() const {
       return black | white | empty;
     }
-    uint64_t bitboard(uint8_t player) const;
-    uint16_t nb_plies() const {
+    constexpr uint64_t bitboard(uint8_t player) const {
+      return player == BLACK ? black : white;
+    }
+    constexpr uint16_t nb_plies() const {
       return ply;
+    }
+    constexpr bool contact(Move m) const {
+      return around(square_bb(m.to_sq())) & (black | white) & ~square_bb(m.from_sq());
     }
     std::string to_json() const;
     static Yolah from_json(std::istream& is);

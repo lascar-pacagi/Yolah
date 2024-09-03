@@ -205,7 +205,7 @@ constexpr uint64_t AROUND[65] = {
     0x302,
 };
 
-inline uint64_t around(uint64_t stone) {
+constexpr uint64_t around(uint64_t stone) {
     return AROUND[std::countr_zero(stone)];
 }
 
