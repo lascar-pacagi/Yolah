@@ -8,7 +8,7 @@ class MonteCarloPlayer : public Player {
     const uint64_t thinking_time;
     BS::thread_pool pool;
 
-    uint64_t random_game(Yolah& yolah, uint8_t player);
+    int16_t random_game(Yolah& yolah, uint8_t player);
 public:
     explicit MonteCarloPlayer(uint64_t microseconds);
     explicit MonteCarloPlayer(uint64_t microseconds, std::size_t nb_threads);
