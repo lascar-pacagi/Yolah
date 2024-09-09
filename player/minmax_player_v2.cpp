@@ -60,7 +60,7 @@ int16_t MinMaxPlayerV2::negamax(Yolah& yolah, uint64_t hash, int16_t alpha, int1
         return score + (score > 0 ? heuristic::MAX_VALUE : heuristic::MIN_VALUE);
     }
     if (depth <= 0) {        
-        return quiescence(yolah, alpha, beta, 4);//heuristic(yolah.current_player(), yolah);
+        return heuristic(yolah.current_player(), yolah);//quiescence(yolah, alpha, beta, 4);//heuristic(yolah.current_player(), yolah);
     }    
     bool found;
     TranspositionTableEntry* entry = table.probe(hash, found);

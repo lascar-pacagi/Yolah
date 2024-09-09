@@ -9,7 +9,7 @@ namespace heuristic {
         NoisyCrossEntropyMethod::Builder builder;
         builder
         .population_size(120)
-        .nb_iterations(100)
+        .nb_iterations(200)
         .elite_fraction(0.15)
         .keep_overall_best(true)
         .stddev(10)
@@ -44,7 +44,7 @@ namespace heuristic {
                 return yolah.score(Yolah::BLACK);
             };
             double res = 0;                                        
-            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(150000, 1);
+            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(200000, 1);
             auto update = [&](uint64_t seed, size_t nb_random) {
                 constexpr double W1 = 1e5;
                 constexpr double W2 = 1;
@@ -57,10 +57,10 @@ namespace heuristic {
                 res += W1 * ((score > 0) * -1 + (score < 0));
                 res -= W2 * score;
             };
-            for (uint64_t i = 0; i < 20; i++) {
+            for (uint64_t i = 0; i < 40; i++) {
                 update(i, 0);
             }
-            for (uint64_t i = 0; i < 80; i++) {
+            for (uint64_t i = 0; i < 160; i++) {
                 update(i, 4);
             }
             return res;

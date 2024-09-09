@@ -16,6 +16,7 @@
 #include "minmax_player_v8.h"
 #include "minmax_player_v9.h"
 #include "minmax_player_v10.h"
+#include "minmax_player_v11.h"
 #include "human_player.h"
 #include "monte_carlo_player.h"
 #include <stdexcept>
@@ -138,9 +139,6 @@ unique_ptr<Player> Player::create(const json& j) {
                  if (!j.contains("nb threads")) {
                     throw invalid_argument("nb threads key expected");
                 }                
-                if (!j["microseconds"].is_number()) {
-                    throw invalid_argument("number expected for microseconds");
-                }               
                 if (!j["microseconds"].is_number()) {
                     throw invalid_argument("number expected for microseconds");
                 }
@@ -510,6 +508,37 @@ unique_ptr<Player> Player::create(const json& j) {
                                                    j["nb moves at full depth"].get<size_t>(),
                                                    j["late move reduction"].get<uint8_t>(),
                                                    j["null move reduction"].get<uint8_t>());
+            }
+        },
+        {
+            "MinMaxPlayerV11",
+            [](const json& j) {
+                if (!j.contains("microseconds")) {
+                    throw invalid_argument("microseconds key expected");
+                }
+                if (!j.contains("tt size")) {
+                    throw invalid_argument("tt size key expected");
+                }
+                 if (!j.contains("nb threads")) {
+                    throw invalid_argument("nb threads key expected");
+                }                
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
+                }           
+                if (!j["tt size"].is_number()) {
+                    throw invalid_argument("number expected for tt size");
+                }
+                size_t nb_threads;
+                if (j["nb threads"].is_number()) {
+                    nb_threads = j["nb threads"].get<size_t>();
+                } else if (j["nb threads"].get<string>() == "hardware concurrency") {
+                    nb_threads = std::thread::hardware_concurrency();
+                } else {
+                    throw invalid_argument("hardware concurrency expected in nb threads");
+                }                
+                return make_unique<MinMaxPlayerV11>(j["microseconds"].get<uint64_t>(), 
+                                                    j["tt size"].get<size_t>(),
+                                                    nb_threads);
             }
         },
     };

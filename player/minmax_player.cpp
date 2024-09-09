@@ -143,6 +143,7 @@ int16_t MinMaxPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_t al
         if (i >= nb_moves_at_full_depth) {
             yolah.play(m);
             int16_t v = -negamax(yolah, s, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction);
+            //int16_t v = -negamax(yolah, s, zobrist::update(hash, player, m), -beta - 1, -alpha, depth - late_move_reduction);
             yolah.undo(m);
             if (v <= alpha) continue;
         }
