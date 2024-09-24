@@ -12,7 +12,7 @@ namespace heuristic {
         .nb_iterations(500)
         .elite_fraction(0.15)
         .keep_overall_best(true)
-        .stddev(10)
+        .stddev(5)
         .extra_stddev(1)
         .weights({-255.745, 81.62132957543031, 91.57609768985716, -177.6773616734466,
         68.16486241472865, 26.70495498502099, 154.383379630677,
@@ -58,7 +58,7 @@ namespace heuristic {
                 return yolah.score(Yolah::BLACK);
             };
             double res = 0;                                        
-            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(100000, 1);
+            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(300000, 1);
             auto update = [&](uint64_t seed, size_t nb_random) {
                 constexpr double W1 = 1e5;
                 constexpr double W2 = 1;
@@ -71,13 +71,13 @@ namespace heuristic {
                 res += W1 * ((score > 0) * -1 + (score < 0));
                 res -= W2 * score;
             };
-            for (uint64_t i = 0; i < 20; i++) {
+            for (uint64_t i = 0; i < 40; i++) {
                 update(i, 0);
             }
-            for (uint64_t i = 0; i < 100; i++) {
+            for (uint64_t i = 0; i < 50; i++) {
                 update(i, 2);
             }
-            for (uint64_t i = 0; i < 100; i++) {
+            for (uint64_t i = 0; i < 200; i++) {
                 update(i, 4);
             }
             return res;
