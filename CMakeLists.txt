@@ -27,3 +27,6 @@ add_subdirectory(ui)
 target_link_libraries(Yolah PRIVATE ui)
 add_subdirectory(optimization)
 target_link_libraries(Yolah PRIVATE optimization)
+add_subdirectory(data)
+target_link_libraries(Yolah PRIVATE data)
+
