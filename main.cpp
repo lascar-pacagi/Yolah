@@ -23,10 +23,6 @@
 #include <fstream>
 #include "zobrist.h"
 #include "variability_timer_multithreads.h"
-#include "minmax_player_v1.h"
-#include "minmax_player_v2.h"
-#include "minmax_player_v3.h"
-#include "minmax_player_v4.h"
 #include "minmax_player.h"
 
 namespace po = boost::program_options;
@@ -35,115 +31,7 @@ using std::cout, std::string;
 int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
-    //test::play_random_game();
-    //test::play_random_games(1000000000);
-    // Yolah yolah;
-    // cout << yolah.to_json() << '\n';
-    // std::stringstream ss;
-    // ss << yolah.to_json();
-    // yolah = Yolah::from_json(ss);
-    // cout << yolah.to_json() << '\n';
-    // cout << yolah << '\n';   
-    // test::play(std::make_unique<MCTSMemPlayer>(1000000),
-    //            std::make_unique<HumanPlayer>(WebsocketServerSync::create("127.0.0.1", 4242)), 
-    //            DoNothingObserver());
-    // test::play(std::make_unique<MCTSMemPlayer>(100000),
-    //             std::make_unique<MCTSMemPlayer>(2000000), 
-    //             WSObserver("127.0.0.1", 4242));
-    // test::play(std::make_unique<BasicMinMaxPlayer>(4),
-    //             std::make_unique<BasicMinMaxPlayer>(4), 
-    //             WSObserver("127.0.0.1", 4242));
-    // test::cem_beale_function();
-    // test::cem_sphere_function();
-    // test::cem_rastrigin_function(); 
-    // test::play(std::make_unique<BasicMinMaxPlayer>(4),
-    //            std::make_unique<MCTSMemPlayer>(100000, 1),
-    //            WSObserver("127.0.0.1", 4242));
-    // test::play(std::make_unique<BasicMinMaxPlayer>(4),
-    //            std::make_unique<MonteCarloPlayer>(500000),
-    //            20);
-    // test::nelder_mead_beale_function();
-    // test::nelder_mead_sphere_function();
-    // test::nelder_mead_rastrigin_function();
-    // heuristic::learn_weights(std::make_unique<heuristic::CrossEntropyMethodLearner>([](const std::vector<double>& weights) {
-    //     return std::make_unique<MinMaxPlayerV2>(300000, 100, 2, 3, [&](uint8_t player, const Yolah& yolah) {
-    //         assert(weights.size() == heuristic::NB_WEIGHTS);
-    //         std::array<double, heuristic::NB_WEIGHTS> w;
-    //         for (size_t i = 0; i < heuristic::NB_WEIGHTS; i++) {
-    //             w[i] = weights[i];
-    //         }
-    //         return heuristic::eval(player, yolah, w);
-    //     });
-    // }));
-    // auto values = heuristic::sampling_heuristic_values(1000000);
-    // for (int32_t v : values) {
-    //     cout << v << ' ';
-    // }
-    // cout << '\n';
-    // cout << values.size() << '\n';
-
-    //test::variability_timer_multithreads(12, 2000000);
-
-    // Yolah yolah;
-    // Yolah::MoveList moves;
-    // PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
-    // auto print_score = [&]{
-    //     const auto [black_score, white_score] = yolah.score();
-    //     cout << "score: " << black_score << '/' << white_score << '\n';
-    // };
-    // while (!yolah.game_over()) {                 
-    //     yolah.moves(moves);
-    //     Move m = moves[prng.rand<size_t>() % moves.size()];        
-    //     cout << yolah << '\n';
-    //     print_score();
-    //     cout << m << '\n';
-    //     const auto [black_influence, white_influence] = heuristic::influence(yolah);
-    //     cout << "black influence\n";
-    //     cout << Bitboard::pretty(black_influence) << '\n';
-    //     cout << "white influence\n";
-    //     cout << Bitboard::pretty(white_influence) << '\n';
-    //     std::string _;
-    //     std::getline(std::cin, _);
-    //     yolah.play(m);
-    // }
-    // cout << yolah << '\n';
-    // print_score();
-
-    // for (size_t i = 0; i < 100; i++) {
-    //     Yolah yolah;
-    //     Yolah::MoveList moves;
-    //     PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
-    //     while (!yolah.game_over()) {                 
-    //         yolah.moves(moves);
-    //         Move m = moves[prng.rand<size_t>() % moves.size()];        
-    //         size_t nb_free = std::popcount(yolah.free_squares()); 
-    //         if (nb_free == heuristic::MIDDLE_GAME) {
-    //             cout << "middle game\n";
-    //             cout << yolah << '\n';
-    //         }
-    //         if (nb_free == heuristic::END_GAME) {
-    //             cout << "end game\n";
-    //             cout << yolah << '\n';
-    //         }
-    //         yolah.play(m);
-    //     }
-    //     std::string _;
-    //     std::getline(std::cin, _);
-    // }
     
-    // Yolah yolah;
-    // Yolah::MoveList moves;
-    // PRNG prng(std::chrono::system_clock::now().time_since_epoch().count());
-    // while (!yolah.game_over()) {
-    //     cout << yolah << '\n';
-    //     heuristic::evaluation(yolah.current_player(), yolah);
-    //     yolah.moves(moves);
-    //     Move m = moves[prng.rand<size_t>() % moves.size()];        
-    //     yolah.play(m);
-    //     std::string _;
-    //     std::getline(std::cin, _);
-    // }
-
     po::options_description general("General options");
     general.add_options()
     ("help", "produce help message")
