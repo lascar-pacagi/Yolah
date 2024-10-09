@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 6, 10000, 12);
 
     data::generate_games(cout, std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 
-                        std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 5, 7000, 12);
+                        std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 7, 7000, 12);
 
     // po::options_description general("General options");
     // general.add_options()
