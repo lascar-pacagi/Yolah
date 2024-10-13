@@ -35,13 +35,14 @@ class GameHistory:
         return self.scores
 
     def play(self):
-        if self.yolah.game_over(): return;
+        if self.yolah.game_over(): return
         self.yolah.play(Move.from_str(self.moves[self.index]))
         self.index += 1
 
     def undo(self):
+        if self.index == 0: return
         self.index -= 1
-        self.yolah.undo(self.moves[self.index])
+        self.yolah.undo(Move.from_str(self.moves[self.index]))
 
     def __getitem__(self, i):
         if i < 0 or i >= len(self): raise IndexError
@@ -101,6 +102,10 @@ def next_move(canvas, game_infos_var):
     history.play()
     draw_game(canvas, game_infos_var)
 
+def previous_move(canvas, game_infos_var):
+    history.undo()
+    draw_game(canvas, game_infos_var)
+
 def main():
     root=Tk()
     root.title("Yolah Replayer")
@@ -132,7 +137,7 @@ def main():
     menu.add_cascade(label="File", menu=file)
     begin = Button(root, text="Begin", font=FONT)
     begin.grid(row=1, column=0) 
-    prev = Button(root, text="Previous", font=FONT)
+    prev = Button(root, text="Previous", font=FONT, command=lambda: previous_move(canvas, game_infos_var))
     prev.grid(row=1, column=1)
     play = Button(root, text="Play", font=FONT)
     play.grid(row=1, column=2)
