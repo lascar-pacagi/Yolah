@@ -1,6 +1,8 @@
 #include "generate_games.h"
 #include "misc.h"
 #include <thread>
+#include <set>
+#include <string>
 
 namespace data {
     void generate_games(std::ostream& os, std::unique_ptr<Player> black, std::unique_ptr<Player> white, 
@@ -48,5 +50,22 @@ namespace data {
                 });
             }
         }
-    }    
+    }  
+
+    void setify(std::istream& is, std::ostream& os) {
+        using namespace std;
+        set<string> games;
+        size_t number_of_duplicates = 0;
+        while (is) {
+            string line;
+            getline(is, line);
+            if (const auto [ignore, inserted] = games.insert(line); !inserted) {
+                number_of_duplicates++;
+            }
+        }
+        cerr << "duplicates: " << number_of_duplicates << '\n';
+        for (const auto& game : games) {
+            os << game << '\n';
+        }
+    }
 }

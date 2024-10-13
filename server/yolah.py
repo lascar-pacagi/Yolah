@@ -94,14 +94,17 @@ class Yolah:
     DIM = 8
     BLACK_PLAYER = 0
     WHITE_PLAYER = 1
-    def __init__(self):
+    def __init__(self):        
+        self.full = 0xFFFFFFFFFFFFFFFF
+        self.reset()
+
+    def reset(self):
         self.black = 0b1000000000000000000000000000100000010000000000000000000000000001
         self.white = 0b0000000100000000000000000001000000001000000000000000000010000000
         self.empty = 0
         self.black_score = 0
         self.white_score = 0
         self.ply = 0
-        self.full = 0xFFFFFFFFFFFFFFFF
 
     def positions(self, bitboard):
         res = []
