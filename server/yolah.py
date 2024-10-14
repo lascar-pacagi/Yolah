@@ -64,6 +64,9 @@ class Square(Enum):
         file, rank = s[0], s[1]
         return Square(RANKS.index(rank) * 8 + FILES.index(file))
 
+    def to_coordinates(self):
+        return (self.sq // 8, self.sq % 8)
+
     def to_bitboard(self):
         return 1 << self.sq
 
@@ -125,6 +128,9 @@ class Yolah:
         for i, j in self.positions(self.empty):
             g[i][j] = Cell.EMPTY
         return g
+
+    def nb_plies(self):
+        return self.ply
 
     def current_player(self):
         return Yolah.WHITE_PLAYER if self.ply & 1 else Yolah.BLACK_PLAYER 

@@ -14,18 +14,25 @@ class GameHistory:
         self.yolah = Yolah()
         self.moves = []
         self.scores = (0, 0)
-        self.index = -1
+        self.move_index = -1
+        self.game_index = -1
 
     def read(self, filename):
         with open(filename) as f:
+            self.games = []
             for line in f:
                 self.games.append(line.strip())
+            self.set_current_game(0)
+
+    def valid(self):
+        return self.games != []
 
     def set_current_game(self, index):
+        self.game_index = index
         self.yolah.reset()
         line = self.games[index]
         self.moves = GameHistory.GAME_RE.findall(line)
-        self.index = 0
+        self.move_index = 0
         self.scores = GameHistory.SCORE_RE.findall(line)[0]
 
     def get_current_game(self):
@@ -34,15 +41,30 @@ class GameHistory:
     def get_scores(self): 
         return self.scores
 
+    def previous_move(self):
+        if self.move_index == 0: return 
+        return Move.from_str(self.moves[self.move_index - 1])
+
     def play(self):
         if self.yolah.game_over(): return
-        self.yolah.play(Move.from_str(self.moves[self.index]))
-        self.index += 1
+        self.yolah.play(Move.from_str(self.moves[self.move_index]))
+        self.move_index += 1
 
     def undo(self):
-        if self.index == 0: return
-        self.index -= 1
-        self.yolah.undo(Move.from_str(self.moves[self.index]))
+        if self.move_index == 0: return
+        self.move_index -= 1
+        self.yolah.undo(Move.from_str(self.moves[self.move_index]))
+
+    def begin(self):
+        if self.move_index == 0:
+            return
+        while self.move_index != 0:
+            self.undo()
+
+    def end(self):
+        if self.yolah.game_over(): return
+        while not self.yolah.game_over():
+            self.play()
 
     def __getitem__(self, i):
         if i < 0 or i >= len(self): raise IndexError
@@ -59,34 +81,49 @@ GAME_INFOS_TXT = "Turn: {}\n\nBlack score: {}\nWhite score: {}"
 CANVAS_WIDTH  = 700
 CANVAS_HEIGHT = 700
 
-def update_yolah(index):
-    history.set_current_game(index)
-
 def read_file(entry, nb_games_var, canvas, game_infos_var):
     filename = askopenfilename()
     history.read(filename)
     entry.delete(0, END)
     entry.insert(0, "1")
     nb_games_var.set(NB_GAMES_TXT + str(len(history)))
-    update_yolah(0)
+    history.set_current_game(0)
     draw_game(canvas, game_infos_var)
     
 def entry_update(entry, canvas, game_infos_var):
-    update_yolah(int(entry.get()) - 1)
+    if not history.valid(): return
+    history.set_current_game(int(entry.get()) - 1)
     draw_game(canvas, game_infos_var)
 
+def play_game(play_var, canvas, game_infos_var):
+    if not history.valid(): return
+    if play_var.get() == "Play":
+        play_var.set("Pause")
+        history.play()
+        draw_game(canvas, game_infos_var)
+        canvas.after(1500, lambda: continue_game(play_var, canvas, game_infos_var))
+    else:
+        play_var.set("Play")
+
+def continue_game(play_var, canvas, game_infos_var):
+    if play_var.get() != "Play":
+        history.play()
+        draw_game(canvas, game_infos_var)
+        canvas.after(1500, lambda: continue_game(play_var, canvas, game_infos_var))
+
 def draw_game(canvas, game_infos_var):
+    if not history.valid(): return
     black_score, white_score = history.get_scores()
-    game_infos_var.set(GAME_INFOS_TXT.format("BLACK", black_score, white_score))
+    game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if history.get_current_game().nb_plies() & 1 else "BLACK", black_score, white_score))
     yolah = history.get_current_game()
     canvas.create_rectangle((0, 0), (CANVAS_WIDTH, CANVAS_HEIGHT), fill='black')
     w = CANVAS_WIDTH // Yolah.DIM
     h = CANVAS_HEIGHT // Yolah.DIM
+    dx, dy = w // 8, h // 8
     grid = yolah.grid()
     for i in range(Yolah.DIM):
         for j in range(Yolah.DIM):
-            x, y = i * w, j * h
-            dx, dy = w // 8, h // 8            
+            x, y = i * w, j * h            
             canvas.create_rectangle((x, y), (x + w, y + h), fill=['grey', 'maroon'][(i + j) % 2], outline='black')
             match grid[Yolah.DIM - 1 - i][j]:
                 case Cell.BLACK:
@@ -97,13 +134,55 @@ def draw_game(canvas, game_infos_var):
                     canvas.create_rectangle((x, y), (x + w, y + h), fill='black', outline='black')
                 case Cell.FREE:
                     ()
+    if yolah.nb_plies() != 0:
+        m = history.previous_move()
+        i1, j1 = m.from_sq.to_coordinates()
+        x1, y1 = (Yolah.DIM - 1 - i1) * w + w // 2, j1 * h + h // 2
+        i2, j2 = m.to_sq.to_coordinates()
+        x2, y2 = (Yolah.DIM - 1 - i2) * w + w // 2, j2 * h + h // 2
+        canvas.create_line((x1, y1), (x2, y2), width=w // 5, arrow='last', arrowshape=(w // 3, w // 2, w // 5), fill='orange')
 
-def next_move(canvas, game_infos_var):
-    history.play()
+def next_move(entry, canvas, game_infos_var):
+    if not history.valid(): return
+    if history.get_current_game().game_over():
+        n = int(entry.get())
+        if n - 1 < len(history):
+            entry.delete(0, END)
+            entry.insert(0, n + 1)
+            history.set_current_game(n)
+    else:
+        history.play()
     draw_game(canvas, game_infos_var)
 
-def previous_move(canvas, game_infos_var):
-    history.undo()
+def previous_move(entry, canvas, game_infos_var):
+    if not history.valid(): return
+    if history.get_current_game().nb_plies() == 0:
+        n = int(entry.get())
+        if n > 1:
+            entry.delete(0, END)
+            entry.insert(0, n - 1)
+            history.set_current_game(n - 2)
+    else:
+        history.undo()
+    draw_game(canvas, game_infos_var)
+
+def start_of_game(entry, canvas, game_infos_var):
+    if not history.valid(): return
+    if history.get_current_game().nb_plies() == 0:       
+        entry.delete(0, END)
+        entry.insert(0, 1)
+        history.set_current_game(0)
+    else:
+        history.begin()
+    draw_game(canvas, game_infos_var)
+
+def end_of_game(entry, canvas, game_infos_var):
+    if not history.valid(): return
+    if history.get_current_game().game_over():       
+        entry.delete(0, END)
+        entry.insert(0, len(history))
+        history.set_current_game(len(history) - 1)
+    else: history.end()
     draw_game(canvas, game_infos_var)
 
 def main():
@@ -135,18 +214,19 @@ def main():
     file.add_command(label="Load", command=lambda: read_file(entry, nb_games_var, canvas, game_infos_var))
     file.add_command(label="Exit", command=root.destroy)
     menu.add_cascade(label="File", menu=file)
-    begin = Button(root, text="Begin", font=FONT)
+    begin = Button(root, text="Begin", font=FONT, command=lambda: start_of_game(entry, canvas, game_infos_var))
     begin.grid(row=1, column=0) 
-    prev = Button(root, text="Previous", font=FONT, command=lambda: previous_move(canvas, game_infos_var))
+    prev = Button(root, text="Previous", font=FONT, command=lambda: previous_move(entry, canvas, game_infos_var))
     prev.grid(row=1, column=1)
-    play = Button(root, text="Play", font=FONT)
+    play_var = StringVar()
+    play_var.set("Play")
+    play = Button(root, textvariable=play_var, font=FONT, command=lambda: play_game(play_var, canvas, game_infos_var))
     play.grid(row=1, column=2)
-    nxt = Button(root, text="Next", font=FONT, command=lambda: next_move(canvas, game_infos_var))
+    nxt = Button(root, text="Next", font=FONT, command=lambda: next_move(entry, canvas, game_infos_var))
     nxt.grid(row=1, column=3)
-    end = Button(root, text="End", font=FONT)
+    end = Button(root, text="End", font=FONT, command=lambda: end_of_game(entry, canvas, game_infos_var))
     end.grid(row=1, column=4)
     draw_game(canvas, game_infos_var)
     root.mainloop()
 
 main()
-
