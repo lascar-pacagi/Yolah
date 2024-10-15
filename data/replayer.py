@@ -123,7 +123,7 @@ def draw_game(canvas, game_infos_var):
     grid = yolah.grid()
     for i in range(Yolah.DIM):
         for j in range(Yolah.DIM):
-            x, y = i * w, j * h            
+            y, x = i * w, j * h            
             canvas.create_rectangle((x, y), (x + w, y + h), fill=['grey', 'maroon'][(i + j) % 2], outline='black')
             match grid[Yolah.DIM - 1 - i][j]:
                 case Cell.BLACK:
@@ -137,9 +137,9 @@ def draw_game(canvas, game_infos_var):
     if yolah.nb_plies() != 0:
         m = history.previous_move()
         i1, j1 = m.from_sq.to_coordinates()
-        x1, y1 = (Yolah.DIM - 1 - i1) * w + w // 2, j1 * h + h // 2
+        y1, x1 = (Yolah.DIM - 1 - i1) * w + w // 2, j1 * h + h // 2
         i2, j2 = m.to_sq.to_coordinates()
-        x2, y2 = (Yolah.DIM - 1 - i2) * w + w // 2, j2 * h + h // 2
+        y2, x2 = (Yolah.DIM - 1 - i2) * w + w // 2, j2 * h + h // 2
         canvas.create_line((x1, y1), (x2, y2), width=w // 5, arrow='last', arrowshape=(w // 3, w // 2, w // 5), fill='orange')
 
 def next_move(entry, canvas, game_infos_var):
