@@ -123,7 +123,6 @@ namespace heuristic {
     int16_t connectivity_set(uint64_t player_bb, uint64_t free);        
     int16_t alone(uint8_t player, const Yolah&);
     std::pair<uint64_t, uint64_t> first(const Yolah::MoveList&, const Yolah::MoveList&);
-    int16_t blocked(uint8_t player, const Yolah&);
     std::pair<uint64_t, uint64_t> influence(const Yolah&);
     double freedom(uint8_t player, const Yolah&, const std::array<double, NB_WEIGHTS>& weights);
     int16_t eval(uint8_t player, const Yolah&, const std::array<double, NB_WEIGHTS>& weights = WEIGHTS);
