@@ -9,6 +9,7 @@ import sys
 sys.path.append("../server")
 from yolah import Yolah, Move
 import itertools
+import torch.nn.functional as F
 
 def bitboard64_to_list(n):
     b = [int(digit) for digit in bin(n)[2:]]
@@ -38,11 +39,11 @@ class GameDataset(Dataset):
                         black_score, white_score = GameDataset.SCORE_RE.findall(line)[0]                              
                         black_score = int(black_score)
                         white_score = int(white_score)
-                        res = 0 
+                        res = 0
                         if black_score > white_score: res = 1
-                        if white_score > black_score: res = 2                        
-                        #score = min(CLAMP_SCORE, max(-CLAMP_SCORE, black_score - white_score)) / CLAMP_SCORE
-                        self.outputs.append(torch.tensor(res, dtype=torch.long))
+                        if white_score > black_score: res = -1                        
+                        score = min(CLAMP_SCORE, max(-CLAMP_SCORE, black_score - white_score)) / CLAMP_SCORE
+                        self.outputs.append(torch.tensor([res, score], dtype=torch.float32))
                 self.infos.append((filename, r, nb_positions))
         self.size = nb_positions
 
@@ -56,7 +57,7 @@ class GameDataset(Dataset):
                     bitboard64_to_list(yolah.white), 
                     bitboard64_to_list(yolah.empty),
                     bitboard64_to_list(yolah.black | yolah.white | yolah.empty),
-                    [yolah.nb_plies() & 1]*64]))
+                    [yolah.nb_plies() & 1] * 64]))
         return torch.tensor(res, dtype=torch.float32)
 
     def get_infos(self):
@@ -91,27 +92,50 @@ class GameDataset(Dataset):
 # Q = 127 / 64
 
 # black positions + white positions + empty positions + occupied positions + turn 
-INPUT_SIZE = 64 + 64 + 64 + 64 + 64
+INPUT_SIZE = 64 + 64 + 64 + 64 + 1
 
-class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128):
+class ResNetBlock(nn.Module):
+    """Basic redisual block."""
+
+    def __init__(
+        self,
+        num_filters: int,
+    ) -> None:
         super().__init__()
-        self.fc1 = nn.Linear(input_size, l1_size)
-        self.fc2 = nn.Linear(l1_size, l2_size)
-        self.fc3 = nn.Linear(l2_size, l3_size)
-        self.fc4 = nn.Linear(l3_size, 3)
+        self.conv_block1 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=num_filters,
+                out_channels=num_filters,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(num_features=num_filters),
+            nn.ReLU(),
+        )
+        self.conv_block2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=num_filters,
+                out_channels=num_filters,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(num_features=num_filters),
+        )
 
-    def forward(self, x):
-        x = self.fc1(x)
-        x = torch.relu(x)
-        x = self.fc2(x)
-        x = torch.relu(x)
-        x = self.fc3(x)
-        x = torch.relu(x)
-        return self.fc4(x)
-        #res = torch.sigmoid(x[:,0])
-        #score = torch.clamp(x[:,1] / CLAMP_SCORE, -1, 1)
-        #return res#, score
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        residual = x
+        out = self.conv_block1(x)
+        out = self.conv_block2(out)
+        out += residual
+        out = F.relu(out)
+        return out
+    
+class Net(nn.Module):
+    pass
 
 NB_EPOCHS=1000
 MODEL_PATH="./nnue.pt"
@@ -124,16 +148,11 @@ def main():
     print(len(train_set), len(test_set))
     train_loader = DataLoader(train_set, batch_size=256, shuffle=True, num_workers=8)
     test_loader = DataLoader(test_set, batch_size=256, shuffle=True, num_workers=0)
-    net = Net()
-    if os.path.isfile(MODEL_PATH):
-        net.load_state_dict(torch.load(MODEL_PATH))
+    net = torch.load(MODEL_PATH, weights_only=False).to(device) if os.path.isfile(MODEL_PATH) else Net().to(device)
     print(net)
-    net.to(device)
-    #optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0)
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
-    loss_fn = nn.CrossEntropyLoss()
-    #res_loss_fn = nn.CrossEntropyLoss()
-    #score_loss_fn = nn.MSELoss()
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    res_loss_fn = nn.CrossEntropyLoss()
+    score_loss_fn = nn.MSELoss()
     running_loss = 0    
     for epoch in range(NB_EPOCHS):
         net.train()
@@ -141,8 +160,8 @@ def main():
             X = X.to(device)
             y = y.to(device)
             optimizer.zero_grad()
-            logits = net(X)
-            loss = loss_fn(logits, y)# + score_loss_fn(score, y[:,1])
+            res, score = net(X)
+            loss = 10 * res_loss_fn(res, y[:,0]) + score_loss_fn(score, y[:,1])
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -150,17 +169,23 @@ def main():
                 print('  batch {} loss: {}'.format(i + 1, running_loss / len(X) / 1000))
                 running_loss = 0
         net.eval()
-        torch.save(net.state_dict(), MODEL_PATH)
+        torch.save(net, MODEL_PATH)
         if epoch % 10 == 9:
-            accuracy = 0
+            accuracy_res = 0
+            accuracy_score = 0
             n = 0
+            res_values = torch.tensor([-1, 0, 1]).to(device)
             for (X, y) in tqdm(test_loader):
                 n += len(X)
                 X = X.to(device)
                 y = y.to(device)            
-                logits = net(X)                
-                accuracy += sum(torch.argmax(logits, dim=1) == y).item()
-            print('  Accuracy: {}'.format(accuracy / n))
+                res, score = net(X)
+                diff = abs(res.unsqueeze(1) - res_values)
+                nearest_indices = torch.argmin(diff, dim=1)
+                nearest_elements = res_values[nearest_indices]
+                accuracy_res += sum(nearest_elements == y[:,0])
+                accuracy_score += sum(abs(score - y[:,1])).item()
+            print('  Accuracy res: {}\n  Accuracy score: {}'.format(accuracy_res / n, 1.0 - accuracy_score / n))
 
 if __name__ == "__main__":
     main()
