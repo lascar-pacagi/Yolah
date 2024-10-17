@@ -14,15 +14,13 @@ def bitboard64_to_list(n):
     b = [int(digit) for digit in bin(n)[2:]]
     return [0]*(64 - len(b)) + b
 
-CLAMP_SCORE=10
-
 class GameDataset(Dataset):
     GAME_RE  = re.compile(r"""(\w\d:\w\d)""")
     SCORE_RE = re.compile(r"""(\d+)/(\d+)""")
     
     def __init__(self, games_dir):
         self.inputs = []
-        self.outputs = []        
+        self.outputs = []
         self.infos = []
         nb_positions = 0
         random_moves_re = re.compile(r""".*(\d)r.*""")
@@ -40,17 +38,13 @@ class GameDataset(Dataset):
                         white_score = int(white_score)
                         res = 0 
                         if black_score > white_score: res = 1
-                        if white_score > black_score: res = 2                        
-                        #score = min(CLAMP_SCORE, max(-CLAMP_SCORE, black_score - white_score)) / CLAMP_SCORE
+                        if white_score > black_score: res = 2                                               
                         self.outputs.append(torch.tensor(res, dtype=torch.long))
                 self.infos.append((filename, r, nb_positions))
         self.size = nb_positions
 
     @staticmethod
-    def encode(moves):
-        yolah = Yolah()
-        for m in map(lambda m: Move.from_str(m), moves):
-            yolah.play(m)
+    def encode_yolah(yolah):
         res = list(itertools.chain.from_iterable([
                     bitboard64_to_list(yolah.black), 
                     bitboard64_to_list(yolah.white), 
@@ -58,6 +52,13 @@ class GameDataset(Dataset):
                     bitboard64_to_list(yolah.black | yolah.white | yolah.empty),
                     [yolah.nb_plies() & 1]*64]))
         return torch.tensor(res, dtype=torch.float32)
+
+    @staticmethod
+    def encode(moves):
+        yolah = Yolah()
+        for m in map(lambda m: Move.from_str(m), moves):
+            yolah.play(m)
+        return GameDataset.encode_yolah(yolah)
 
     def get_infos(self):
         return self.infos
@@ -86,10 +87,6 @@ class GameDataset(Dataset):
         #print(n, moves, lo, r)
         return GameDataset.encode(moves[: r + idx - n]), self.outputs[lo]
 
-# # Q and -Q (+/- 1,98) are the minimum and maximum values allowed for weights and biases
-# # this opens the possibility to use a quantized version of the network post-training
-# Q = 127 / 64
-
 # black positions + white positions + empty positions + occupied positions + turn 
 INPUT_SIZE = 64 + 64 + 64 + 64 + 64
 
@@ -108,10 +105,7 @@ class Net(nn.Module):
         x = torch.relu(x)
         x = self.fc3(x)
         x = torch.relu(x)
-        return self.fc4(x)
-        #res = torch.sigmoid(x[:,0])
-        #score = torch.clamp(x[:,1] / CLAMP_SCORE, -1, 1)
-        #return res#, score
+        return torch.sigmoid(self.fc4(x))
 
 NB_EPOCHS=1000
 MODEL_PATH="./nnue.pt"
@@ -129,26 +123,23 @@ def main():
         net.load_state_dict(torch.load(MODEL_PATH))
     print(net)
     net.to(device)
-    #optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0)
     optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
     loss_fn = nn.CrossEntropyLoss()
-    #res_loss_fn = nn.CrossEntropyLoss()
-    #score_loss_fn = nn.MSELoss()
-    running_loss = 0    
     for epoch in range(NB_EPOCHS):
         net.train()
-        for i, (X, y) in enumerate(train_loader):
+        n = 0
+        running_loss = 0    
+        for _, (X, y) in enumerate(train_loader):
+            n += len(X)
             X = X.to(device)
             y = y.to(device)
             optimizer.zero_grad()
             logits = net(X)
-            loss = loss_fn(logits, y)# + score_loss_fn(score, y[:,1])
+            loss = loss_fn(logits, y)
             loss.backward()
             optimizer.step()
-            running_loss += loss.item()
-            if i % 1000 == 999:
-                print('  batch {} loss: {}'.format(i + 1, running_loss / len(X) / 1000))
-                running_loss = 0
+            running_loss += loss.item()            
+        print('epoch {} loss: {}'.format(epoch + 1, running_loss / n))
         net.eval()
         torch.save(net.state_dict(), MODEL_PATH)
         if epoch % 10 == 9:
@@ -160,7 +151,7 @@ def main():
                 y = y.to(device)            
                 logits = net(X)                
                 accuracy += sum(torch.argmax(logits, dim=1) == y).item()
-            print('  Accuracy: {}'.format(accuracy / n))
+            print('epoch {} accuracy: {}'.format(epoch + 1, accuracy / n))
 
 if __name__ == "__main__":
     main()

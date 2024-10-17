@@ -1,10 +1,14 @@
 from tkinter import Tk, Canvas, Button, Menu, Entry, Label, N
-from tkinter import StringVar, END, FALSE
+from tkinter import StringVar, END, FALSE, messagebox
 from tkinter.filedialog import askopenfilename
 import re
 import sys
 sys.path.append("../server")
 from yolah import Yolah, Move, Cell
+sys.path.append("../nnue")
+import nnue
+from pathlib import Path
+import torch
 
 class GameHistory:
     GAME_RE  = re.compile(r"""(\w\d:\w\d)""")
@@ -75,11 +79,24 @@ class GameHistory:
 
 history = GameHistory()
 
+net = None
+get_result_fn = None
+
 NB_GAMES_TXT = "# games: "
-GAME_INFOS_TXT = "Turn: {}\n\nBlack score: {}\nWhite score: {}"
+GAME_INFOS_TXT = "Turn: {}\n\nBlack score: {}\nWhite score: {}\n\nModel prediction\n * Draw         : {}\n * Black victory: {}\n * White victory: {}"
 
 CANVAS_WIDTH  = 700
 CANVAS_HEIGHT = 700
+
+def update_game_infos(game_infos_var):
+    if not history.valid(): return
+    black_score, white_score = history.get_scores()
+    yolah = history.get_current_game()
+    draw_p, black_victory_p, white_victory_p = "", "", ""
+    if net is not None: draw_p, black_victory_p, white_victory_p = get_result_fn(yolah)
+    game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if yolah.nb_plies() & 1 else "BLACK", 
+                        black_score, white_score, draw_p, black_victory_p, white_victory_p))
+    
 
 def read_file(entry, nb_games_var, canvas, game_infos_var):
     filename = askopenfilename()
@@ -113,8 +130,7 @@ def continue_game(play_var, canvas, game_infos_var):
 
 def draw_game(canvas, game_infos_var):
     if not history.valid(): return
-    black_score, white_score = history.get_scores()
-    game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if history.get_current_game().nb_plies() & 1 else "BLACK", black_score, white_score))
+    update_game_infos(game_infos_var)    
     yolah = history.get_current_game()
     canvas.create_rectangle((0, 0), (CANVAS_WIDTH, CANVAS_HEIGHT), fill='black')
     w = CANVAS_WIDTH // Yolah.DIM
@@ -185,11 +201,31 @@ def end_of_game(entry, canvas, game_infos_var):
     else: history.end()
     draw_game(canvas, game_infos_var)
 
+def load_model(canvas, game_infos_var):
+    filename = askopenfilename()
+    model = Path(filename).stem
+    match model:
+        case "nnue":
+            global net
+            net = nnue.Net()
+            net.load_state_dict(torch.load(filename))
+            net.eval()
+            def get_result(yolah):
+                logits = net(nnue.GameDataSet.encode_yolah(history.get_current_game().unsqueeze(0)))[0]
+                draw, black, white = logits[0].item(), logits[1].item(), logits[2].item()
+                total = draw + black + white
+                return draw / total, black / total, white / total
+            global get_result_fn
+            get_result_fn = get_result
+        case _:
+            messagebox.showerror("Model Error", f"{filename} does not represent a known model")
+    draw_game(canvas, game_infos_var)
+            
 def main():
     root=Tk()
     root.title("Yolah Replayer")
     root.resizable(width=FALSE, height=FALSE)
-    WIDTH  = 870
+    WIDTH  = 920
     HEIGHT = 800    
     FONT = "fixed 10 bold"
     x = (root.winfo_screenwidth() // 2) - (WIDTH // 2)
@@ -202,7 +238,7 @@ def main():
     nb_games = Label(root, textvariable=nb_games_var, font=FONT)
     nb_games.grid(row=2, column=5)
     game_infos_var = StringVar()
-    game_infos_var.set(GAME_INFOS_TXT.format("BLACK", 0, 0))
+    game_infos_var.set(GAME_INFOS_TXT.format("BLACK", 0, 0, "", "", ""))
     game_infos = Label(root, textvariable=game_infos_var, font=FONT, justify="left")
     game_infos.grid(row=0, column=7, pady=20, sticky=N)
     entry = Entry(root)
@@ -211,7 +247,8 @@ def main():
     menu = Menu(root)
     root.config(menu=menu)
     file = Menu(menu, tearoff=0)
-    file.add_command(label="Load", command=lambda: read_file(entry, nb_games_var, canvas, game_infos_var))
+    file.add_command(label="Load Games", command=lambda: read_file(entry, nb_games_var, canvas, game_infos_var))
+    file.add_command(label="Load Model", command=lambda: load_model(canvas, game_infos_var))
     file.add_command(label="Exit", command=root.destroy)
     menu.add_cascade(label="File", menu=file)
     begin = Button(root, text="Begin", font=FONT, command=lambda: start_of_game(entry, canvas, game_infos_var))
