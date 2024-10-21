@@ -85,7 +85,7 @@ class Model:
         self.prediction_fn = None
 
     def is_valid(self):
-        return self.net != None and self.get_result_fn != None 
+        return self.net != None and self.prediction_fn != None 
     
     def set_net(self, net):
         self.net = net
@@ -99,7 +99,7 @@ class Model:
 model = Model()
     
 NB_GAMES_TXT = "# games: "
-GAME_INFOS_TXT = "Turn: {}\n\nBlack score: {}\nWhite score: {}\n\nModel prediction\n * Draw         : {}\n * Black victory: {}\n * White victory: {}"
+GAME_INFOS_TXT = "Turn: {}\n\nBlack score: {}\nWhite score: {}\n\nModel prediction\n * Black victory: {}\n * Draw         : {}\n * White victory: {}"
 
 CANVAS_WIDTH  = 700
 CANVAS_HEIGHT = 700
@@ -228,9 +228,8 @@ def load_model(canvas, game_infos_var):
             net.eval()
             def get_prediction(yolah):
                 logits = net(nnue.GameDataSet.encode_yolah(history.get_current_game().unsqueeze(0)))[0]
-                draw, black, white = logits[0].item(), logits[1].item(), logits[2].item()
-                total = draw + black + white
-                return draw / total, black / total, white / total
+                black, draw, white = logits[0].item(), logits[1].item(), logits[2].item()
+                return black, draw, white
             model.set_fn(get_prediction)
         case _:
             messagebox.showerror("Model Error", f"{filename} does not represent a known model")

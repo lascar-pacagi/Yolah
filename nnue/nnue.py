@@ -1,6 +1,7 @@
 import os
 import torch
 from torch import nn
+from torch.nn.functional import relu, softmax
 from tqdm import tqdm
 import re
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -36,8 +37,8 @@ class GameDataset(Dataset):
                         black_score, white_score = GameDataset.SCORE_RE.findall(line)[0]                              
                         black_score = int(black_score)
                         white_score = int(white_score)
-                        res = 0 
-                        if black_score > white_score: res = 1
+                        res = 1 
+                        if black_score > white_score: res = 0
                         if white_score > black_score: res = 2                                               
                         self.outputs.append(torch.tensor(res, dtype=torch.long))
                 self.infos.append((filename, r, nb_positions))
@@ -100,12 +101,12 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = self.fc1(x)
-        x = torch.relu(x)
+        x = relu(x)
         x = self.fc2(x)
-        x = torch.relu(x)
+        x = relu(x)
         x = self.fc3(x)
-        x = torch.relu(x)
-        return torch.sigmoid(self.fc4(x))
+        x = relu(x)
+        return softmax(self.fc4(x), dim=1)
 
 NB_EPOCHS=1000
 MODEL_PATH="./nnue.pt"
@@ -124,7 +125,7 @@ def main():
     print(net)
     net.to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = torch.nn.CrossEntropyLoss()
     for epoch in range(NB_EPOCHS):
         net.train()
         n = 0
@@ -143,14 +144,15 @@ def main():
         net.eval()
         torch.save(net.state_dict(), MODEL_PATH)
         if epoch % 10 == 9:
-            accuracy = 0
-            n = 0
-            for (X, y) in tqdm(test_loader):
-                n += len(X)
-                X = X.to(device)
-                y = y.to(device)            
-                logits = net(X)                
-                accuracy += sum(torch.argmax(logits, dim=1) == y).item()
+            with torch.no_grad():
+                accuracy = 0
+                n = 0
+                for (X, y) in tqdm(test_loader):
+                    n += len(X)
+                    X = X.to(device)
+                    y = y.to(device)            
+                    logits = net(X)                
+                    accuracy += sum(torch.argmax(logits, dim=1) == y).item()
             print('epoch {} accuracy: {}'.format(epoch + 1, accuracy / n))
 
 if __name__ == "__main__":
