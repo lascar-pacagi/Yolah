@@ -8,16 +8,11 @@ From: nvidia/cuda:12.6.2-cudnn-devel-ubuntu24.04
         python3-pip \
         python3-tk \
         python3-setuptools \
-        build-essential g++ libtbb-dev libboost-all-dev \
-        libbenchmark-dev git cmake
+        build-essential git
     rm -rf /var/lib/apt/lists/*
     pip3 install --break-system-packages torch numpy matplotlib glob2 tqdm
     git clone https://github.com/lascar-pacagi/Yolah.git
-    cd Yolah
-    mkdir build
-    cd build
-    cmake -DCMAKE_BUILD_TYPE=Release ..
-    make
-
+    
 %runscript
-    python3 /Yolah/nnue/nnue.py
+    cd /Yolah/nnue
+    python3 nnue.py

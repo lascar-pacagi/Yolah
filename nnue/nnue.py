@@ -112,48 +112,50 @@ NB_EPOCHS=1000
 MODEL_PATH="./nnue.pt"
 
 def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    dataset = GameDataset("../data")
-    print(len(dataset))
-    train_set, test_set = random_split(dataset, [0.8, 0.2])
-    print(len(train_set), len(test_set))
-    train_loader = DataLoader(train_set, batch_size=256, shuffle=True, num_workers=8)
-    test_loader = DataLoader(test_set, batch_size=256, shuffle=True, num_workers=0)
     net = Net()
-    if os.path.isfile(MODEL_PATH):
-        net.load_state_dict(torch.load(MODEL_PATH))
-    print(net)
-    net.to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
-    loss_fn = torch.nn.CrossEntropyLoss()
-    for epoch in range(NB_EPOCHS):
-        net.train()
-        n = 0
-        running_loss = 0    
-        for _, (X, y) in enumerate(train_loader):
-            n += len(X)
-            X = X.to(device)
-            y = y.to(device)
-            optimizer.zero_grad()
-            logits = net(X)
-            loss = loss_fn(logits, y)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()            
-        print('epoch {} loss: {}'.format(epoch + 1, running_loss / n))
-        net.eval()
-        torch.save(net.state_dict(), MODEL_PATH)
-        if epoch % 10 == 9:
-            with torch.no_grad():
-                accuracy = 0
-                n = 0
-                for (X, y) in tqdm(test_loader):
-                    n += len(X)
-                    X = X.to(device)
-                    y = y.to(device)            
-                    logits = net(X)                
-                    accuracy += sum(torch.argmax(logits, dim=1) == y).item()
-            print('epoch {} accuracy: {}'.format(epoch + 1, accuracy / n))
+    torch.save(net.state_dict(), MODEL_PATH)
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # dataset = GameDataset("../data")
+    # print(len(dataset))
+    # train_set, test_set = random_split(dataset, [0.8, 0.2])
+    # print(len(train_set), len(test_set))
+    # train_loader = DataLoader(train_set, batch_size=256, shuffle=True, num_workers=8)
+    # test_loader = DataLoader(test_set, batch_size=256, shuffle=True, num_workers=0)
+    # net = Net()
+    # if os.path.isfile(MODEL_PATH):
+    #     net.load_state_dict(torch.load(MODEL_PATH))
+    # print(net)
+    # net.to(device)
+    # optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
+    # loss_fn = torch.nn.CrossEntropyLoss()
+    # for epoch in range(NB_EPOCHS):
+    #     net.train()
+    #     n = 0
+    #     running_loss = 0    
+    #     for _, (X, y) in enumerate(train_loader):
+    #         n += len(X)
+    #         X = X.to(device)
+    #         y = y.to(device)
+    #         optimizer.zero_grad()
+    #         logits = net(X)
+    #         loss = loss_fn(logits, y)
+    #         loss.backward()
+    #         optimizer.step()
+    #         running_loss += loss.item()            
+    #     print('epoch {} loss: {}'.format(epoch + 1, running_loss / n))
+    #     net.eval()
+    #     torch.save(net.state_dict(), MODEL_PATH)
+    #     if epoch % 10 == 9:
+    #         with torch.no_grad():
+    #             accuracy = 0
+    #             n = 0
+    #             for (X, y) in tqdm(test_loader):
+    #                 n += len(X)
+    #                 X = X.to(device)
+    #                 y = y.to(device)            
+    #                 logits = net(X)                
+    #                 accuracy += sum(torch.argmax(logits, dim=1) == y).item()
+    #         print('epoch {} accuracy: {}'.format(epoch + 1, accuracy / n))
 
 if __name__ == "__main__":
     main()
