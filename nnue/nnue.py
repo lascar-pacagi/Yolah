@@ -92,12 +92,13 @@ class GameDataset(Dataset):
 INPUT_SIZE = 64 + 64 + 64 + 64 + 64
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128, l4_size=32):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
         self.fc3 = nn.Linear(l2_size, l3_size)
-        self.fc4 = nn.Linear(l3_size, 3)
+        self.fc4 = nn.Linear(l3_size, l4_size)
+        self.fc5 = nn.Linear(l4_size, 3)
 
     def forward(self, x):
         x = self.fc1(x)
@@ -106,21 +107,22 @@ class Net(nn.Module):
         x = relu(x)
         x = self.fc3(x)
         x = relu(x)
-        return softmax(self.fc4(x), dim=1)
+        x = self.fc4(x)
+        x = relu(x)
+        return softmax(self.fc5(x), dim=1)
 
-NB_EPOCHS=1000
-MODEL_PATH="/mnt/nnue.pt"
+NB_EPOCHS=5000
+MODEL_PATH="/mnt/nnue2.pt"
 
 def main():
-    net = Net()
-    torch.save(net.state_dict(), MODEL_PATH)
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(device)
     dataset = GameDataset("../data")
     print(len(dataset))
     train_set, test_set = random_split(dataset, [0.8, 0.2])
     print(len(train_set), len(test_set))
-    train_loader = DataLoader(train_set, batch_size=256, shuffle=True, num_workers=8)
-    test_loader = DataLoader(test_set, batch_size=256, shuffle=True, num_workers=0)
+    train_loader = DataLoader(train_set, batch_size=8192, shuffle=True, num_workers=8)
+    test_loader = DataLoader(test_set, batch_size=8192, shuffle=True, num_workers=8)
     net = Net()
     if os.path.isfile(MODEL_PATH):
         net.load_state_dict(torch.load(MODEL_PATH))
