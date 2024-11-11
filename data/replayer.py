@@ -108,12 +108,13 @@ def update_game_infos(game_infos_var):
     if not history.valid(): return
     black_score, white_score = history.get_scores()
     yolah = history.get_current_game()
-    draw_p, black_victory_p, white_victory_p = "", "", ""
     if model.is_valid(): 
         draw_p, black_victory_p, white_victory_p = model.get_prediction(yolah)
-    game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if yolah.nb_plies() & 1 else "BLACK", 
-                        black_score, white_score, draw_p, black_victory_p, white_victory_p))
-    
+        game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if yolah.nb_plies() & 1 else "BLACK", 
+                            black_score, white_score, "{:.3f}".format(draw_p), "{:.3f}".format(black_victory_p), "{:.3f}".format(white_victory_p)))
+    else:
+        game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if yolah.nb_plies() & 1 else "BLACK", black_score, white_score, "", "", ""))
+        
 def read_file(entry, nb_games_var, canvas, game_infos_var):
     filename = askopenfilename()
     history.read(filename)
@@ -222,12 +223,16 @@ def load_model(canvas, game_infos_var):
     model_name = Path(filename).stem
     match model_name:
         case "nnue":
+            device = "cpu"
             net = nnue.Net()
+            net.to(device)
             model.set_net(net)
             net.load_state_dict(torch.load(filename))
             net.eval()
             def get_prediction(yolah):
-                logits = net(nnue.GameDataSet.encode_yolah(history.get_current_game().unsqueeze(0)))[0]
+                board = nnue.GameDataset.encode_yolah(history.get_current_game()).unsqueeze(0)
+                board.to(device)
+                logits = net(board)[0]
                 black, draw, white = logits[0].item(), logits[1].item(), logits[2].item()
                 return black, draw, white
             model.set_fn(get_prediction)
