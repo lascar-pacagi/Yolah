@@ -26,6 +26,7 @@
 #include "minmax_player.h"
 #include "generate_games.h"
 #include "analyze_games.h"
+#include "generate_symmetries.h"
 
 namespace po = boost::program_options;
 using std::cout, std::string;
@@ -34,15 +35,17 @@ int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
 
-    //auto input = std::ifstream("../data/games_9r_1s.txt");
-    //auto output = std::ofstream("../data/games_9r_1s_no_duplicates.txt");
+    auto input = std::ifstream("../data/games_9r_1s.txt");
+    auto output = std::ofstream("../data/games_9r_1s_symmetries.txt");
     //data::setify(input, output);
     //data::analyze_games(input, cout);
     // data::generate_games(cout, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 
     //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 6, 10000, 12);
 
-    data::generate_games(cout, std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 
-                        std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 4, 30000, 12);
+    // data::generate_games(cout, std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 
+    //                     std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 4, 30000, 12);
+
+    data::generate_symmetries(input, output);
 
     // po::options_description general("General options");
     // general.add_options()

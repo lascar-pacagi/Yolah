@@ -11,6 +11,9 @@ sys.path.append("../server")
 from yolah import Yolah, Move
 import itertools
 
+def bit_not(n, numbits=64):
+    return (1 << numbits) - 1 - n
+
 def bitboard64_to_list(n):
     b = [int(digit) for digit in bin(n)[2:]]
     return [0]*(64 - len(b)) + b
@@ -51,6 +54,7 @@ class GameDataset(Dataset):
                     bitboard64_to_list(yolah.white), 
                     bitboard64_to_list(yolah.empty),
                     bitboard64_to_list(yolah.black | yolah.white | yolah.empty),
+                    bitboard64_to_list(bit_not(yolah.black | yolah.white | yolah.empty)),
                     [yolah.nb_plies() & 1]*64]))
         return torch.tensor(res, dtype=torch.float32)
 
@@ -88,8 +92,8 @@ class GameDataset(Dataset):
         #print(n, moves, lo, r)
         return GameDataset.encode(moves[: r + idx - n]), self.outputs[lo]
 
-# black positions + white positions + empty positions + occupied positions + turn 
-INPUT_SIZE = 64 + 64 + 64 + 64 + 64
+# black positions + white positions + empty positions + occupied positions + free positions + turn 
+INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
 
 # class Net(nn.Module):
 #     def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128, l4_size=32):
@@ -111,25 +115,8 @@ INPUT_SIZE = 64 + 64 + 64 + 64 + 64
 #         x = relu(x)
 #         return softmax(self.fc5(x), dim=1)
 
-class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128):
-        super().__init__()
-        self.fc1 = nn.Linear(input_size, l1_size)
-        self.fc2 = nn.Linear(l1_size, l2_size)
-        self.fc3 = nn.Linear(l2_size, l3_size)
-        self.fc4 = nn.Linear(l3_size, 3)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = relu(x)
-        x = self.fc2(x)
-        x = relu(x)
-        x = self.fc3(x)
-        x = relu(x)
-        return softmax(self.fc4(x), dim=1)
-
 # class Net(nn.Module):
-#     def __init__(self, input_size=INPUT_SIZE, l1_size=2048, l2_size=512, l3_size=128):
+#     def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128):
 #         super().__init__()
 #         self.fc1 = nn.Linear(input_size, l1_size)
 #         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -145,8 +132,25 @@ class Net(nn.Module):
 #         x = relu(x)
 #         return softmax(self.fc4(x), dim=1)
 
+class Net(nn.Module):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=2048, l2_size=512, l3_size=128):
+        super().__init__()
+        self.fc1 = nn.Linear(input_size, l1_size)
+        self.fc2 = nn.Linear(l1_size, l2_size)
+        self.fc3 = nn.Linear(l2_size, l3_size)
+        self.fc4 = nn.Linear(l3_size, 3)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = relu(x)
+        x = self.fc2(x)
+        x = relu(x)
+        x = self.fc3(x)
+        x = relu(x)
+        return softmax(self.fc4(x), dim=1)
+
 NB_EPOCHS=1000
-MODEL_PATH="/mnt/nnue3.pt"
+MODEL_PATH="/mnt/nnue.pt"
 
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
