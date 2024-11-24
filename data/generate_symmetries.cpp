@@ -1,5 +1,6 @@
 #include "generate_symmetries.h"
 #include <regex>
+#include <map>
 
 namespace data {
     void generate_symmetries(std::istream& is, std::ostream& os) {

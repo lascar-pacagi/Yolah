@@ -35,8 +35,8 @@ int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
 
-    auto input = std::ifstream("../data/games_9r_1s.txt");
-    auto output = std::ofstream("../data/games_9r_1s_symmetries.txt");
+    auto input = std::ifstream("../data/games_2r_1s_d.txt");
+    auto output = std::ofstream("../data/games_2r_1s_d_symmetries.txt");
     //data::setify(input, output);
     //data::analyze_games(input, cout);
     // data::generate_games(cout, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 

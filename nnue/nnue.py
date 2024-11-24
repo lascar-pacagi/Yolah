@@ -95,43 +95,6 @@ class GameDataset(Dataset):
 # black positions + white positions + empty positions + occupied positions + free positions + turn 
 INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
 
-# class Net(nn.Module):
-#     def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128, l4_size=32):
-#         super().__init__()
-#         self.fc1 = nn.Linear(input_size, l1_size)
-#         self.fc2 = nn.Linear(l1_size, l2_size)
-#         self.fc3 = nn.Linear(l2_size, l3_size)
-#         self.fc4 = nn.Linear(l3_size, l4_size)
-#         self.fc5 = nn.Linear(l4_size, 3)
-
-#     def forward(self, x):
-#         x = self.fc1(x)
-#         x = relu(x)
-#         x = self.fc2(x)
-#         x = relu(x)
-#         x = self.fc3(x)
-#         x = relu(x)
-#         x = self.fc4(x)
-#         x = relu(x)
-#         return softmax(self.fc5(x), dim=1)
-
-# class Net(nn.Module):
-#     def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=512, l3_size=128):
-#         super().__init__()
-#         self.fc1 = nn.Linear(input_size, l1_size)
-#         self.fc2 = nn.Linear(l1_size, l2_size)
-#         self.fc3 = nn.Linear(l2_size, l3_size)
-#         self.fc4 = nn.Linear(l3_size, 3)
-
-#     def forward(self, x):
-#         x = self.fc1(x)
-#         x = relu(x)
-#         x = self.fc2(x)
-#         x = relu(x)
-#         x = self.fc3(x)
-#         x = relu(x)
-#         return softmax(self.fc4(x), dim=1)
-
 class Net(nn.Module):
     def __init__(self, input_size=INPUT_SIZE, l1_size=2048, l2_size=512, l3_size=128):
         super().__init__()
