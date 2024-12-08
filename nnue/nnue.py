@@ -96,7 +96,7 @@ class GameDataset(Dataset):
 INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=2048, l2_size=512, l3_size=128):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=8192, l2_size=32, l3_size=32):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -110,7 +110,7 @@ class Net(nn.Module):
         x = relu(x)
         x = self.fc3(x)
         x = relu(x)
-        return softmax(self.fc4(x), dim=1)
+        return self.fc4(x)#softmax(self.fc4(x), dim=1)
 
 NB_EPOCHS=1000
 MODEL_PATH="/mnt/nnue.pt"
@@ -122,14 +122,15 @@ def main():
     print(len(dataset))
     train_set, test_set = random_split(dataset, [0.8, 0.2])
     print(len(train_set), len(test_set))
-    train_loader = DataLoader(train_set, batch_size=128, shuffle=True, num_workers=8)
-    test_loader = DataLoader(test_set, batch_size=128, shuffle=True, num_workers=8)
+    train_loader = DataLoader(train_set, batch_size=512, shuffle=True, num_workers=20)
+    test_loader = DataLoader(test_set, batch_size=512, shuffle=True, num_workers=8)
     net = Net()
     if os.path.isfile(MODEL_PATH):
         net.load_state_dict(torch.load(MODEL_PATH))
     print(net)
     net.to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
+    #optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
     loss_fn = torch.nn.CrossEntropyLoss()
     for epoch in range(NB_EPOCHS):
         net.train()
@@ -148,7 +149,7 @@ def main():
         print('epoch {} loss: {}'.format(epoch + 1, running_loss / n))
         net.eval()
         torch.save(net.state_dict(), MODEL_PATH)
-        if epoch % 20 == 19:
+        if epoch % 10 == 9:
             with torch.no_grad():
                 accuracy = 0
                 n = 0
