@@ -110,7 +110,7 @@ class Net(nn.Module):
         x = relu(x)
         x = self.fc3(x)
         x = relu(x)
-        return self.fc4(x)#softmax(self.fc4(x), dim=1)
+        return softmax(self.fc4(x), dim=1)#self.fc4(x)
 
 NB_EPOCHS=1000
 MODEL_PATH="/mnt/nnue.pt"
@@ -129,7 +129,7 @@ def main():
         net.load_state_dict(torch.load(MODEL_PATH))
     print(net)
     net.to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
     #optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
     loss_fn = torch.nn.CrossEntropyLoss()
     for epoch in range(NB_EPOCHS):
