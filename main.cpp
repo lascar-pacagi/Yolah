@@ -35,17 +35,17 @@ int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
 
-    //auto input = std::ifstream("../data/games_4r_1s_bis_a.txt");
-    //auto output = std::ofstream("../data/games_4r_1s_bis_symmetries.txt");
+    auto input = std::ifstream("../data/games_7r_1s_bis_d.txt");
+    auto output = std::ofstream("../data/games_7r_1s_bis_d_symmetries.txt");
     //data::setify(input, output);
     //data::analyze_games(input, cout);
     // data::generate_games(cout, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 
     //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 6, 10000, 12);
 
-    data::generate_games(cout, std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 
-                        std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 7, 17000, 12);
+    // data::generate_games(cout, std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 
+    //                     std::make_unique<MinMaxPlayer>(1000000, 200, 2, 3, 9), 7, 17000, 12);
 
-    //data::generate_symmetries(input, output);
+    data::generate_symmetries(input, output);
 
     // po::options_description general("General options");
     // general.add_options()
