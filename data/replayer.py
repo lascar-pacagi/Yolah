@@ -5,6 +5,8 @@ import re
 import sys
 sys.path.append("../server")
 from yolah import Yolah, Move, Cell
+sys.path.append("../python_binding/build")
+from yolah_bind import heuristic
 sys.path.append("../nnue")
 import nnue
 from pathlib import Path
@@ -99,21 +101,28 @@ class Model:
 model = Model()
     
 NB_GAMES_TXT = "# games: "
-GAME_INFOS_TXT = "Turn: {}\n\nBlack score: {}\nWhite score: {}\n\nModel prediction\n * Black victory: {}\n * Draw         : {}\n * White victory: {}"
+GAME_INFOS_TXT = "Turn: {}\n\nBlack score: {}\nWhite score: {}\n\nModel prediction\n * Black victory: {}\n * Draw         : {}\n * White victory: {}\n\nHeuristic prediction\n * Black value: {}\n * White value: {}"
 
 CANVAS_WIDTH  = 700
 CANVAS_HEIGHT = 700
 
 def update_game_infos(game_infos_var):
     if not history.valid(): return
-    black_score, white_score = history.get_scores()
     yolah = history.get_current_game()
     if model.is_valid(): 
-        draw_p, black_victory_p, white_victory_p = model.get_prediction(yolah)
-        game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if yolah.nb_plies() & 1 else "BLACK", 
-                            black_score, white_score, "{:.3f}".format(draw_p), "{:.3f}".format(black_victory_p), "{:.3f}".format(white_victory_p)))
+        b, d, w = model.get_prediction(yolah)
+        black_victory_p = "{:.3f}".format(b)
+        draw_p = "{:.3f}".format(d)
+        white_victory_p = "{:.3f}".format(w)
     else:
-        game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if yolah.nb_plies() & 1 else "BLACK", black_score, white_score, "", "", ""))
+        black_victory_p, draw_p, white_victory_p = "", "", ""
+    (black, white, empty, black_score, white_score, ply) = yolah.get_state()
+    black_value = heuristic(Yolah.BLACK_PLAYER, black, white, empty, black_score, white_score, ply)
+    white_value = heuristic(Yolah.WHITE_PLAYER, black, white, empty, black_score, white_score, ply)
+    game_infos_var.set(GAME_INFOS_TXT.format("WHITE" if yolah.nb_plies() & 1 else "BLACK", 
+                        black_score, white_score, 
+                        black_victory_p, draw_p, white_victory_p,
+                        black_value, white_value))
         
 def read_file(entry, nb_games_var, canvas, game_infos_var):
     filename = askopenfilename()
@@ -257,7 +266,7 @@ def main():
     nb_games = Label(root, textvariable=nb_games_var, font=FONT)
     nb_games.grid(row=2, column=5)
     game_infos_var = StringVar()
-    game_infos_var.set(GAME_INFOS_TXT.format("BLACK", 0, 0, "", "", ""))
+    game_infos_var.set(GAME_INFOS_TXT.format("BLACK", 0, 0, "", "", "", "", ""))
     game_infos = Label(root, textvariable=game_infos_var, font=FONT, justify="left")
     game_infos.grid(row=0, column=7, pady=20, sticky=N)
     entry = Entry(root)

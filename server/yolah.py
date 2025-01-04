@@ -109,6 +109,9 @@ class Yolah:
         self.white_score = 0
         self.ply = 0
 
+    def get_state(self):
+        return (self.black, self.white, self.empty, self.black_score, self.white_score, self.ply)
+
     def positions(self, bitboard):
         res = []
         n = 0

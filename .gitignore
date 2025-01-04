@@ -3,3 +3,4 @@ build
 CMakefiles
 server/__pycache__
 nnue/__pycache__
+python_binding/build

@@ -112,6 +112,20 @@ public:
     static Yolah from_json(std::istream& is);
     static Yolah from_json(const std::string&);
     friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
+    
+    void set_state(uint64_t black, 
+                    uint64_t white,
+                    uint64_t empty,
+                    uint16_t black_score,
+                    uint16_t white_score,
+                    uint16_t ply) {      
+      this->black = black;
+      this->white = white;
+      this->empty = empty;
+      this->black_score = black_score;
+      this->white_score = white_score;
+      this->ply = ply;
+    }
 };
 
 std::ostream& operator<<(std::ostream& os, const Yolah& yolah);

@@ -96,7 +96,7 @@ class GameDataset(Dataset):
 INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=8192, l2_size=32, l3_size=32):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=4096, l2_size=64, l3_size=64):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -122,21 +122,21 @@ def main():
     print(len(dataset))
     train_set, test_set = random_split(dataset, [0.8, 0.2])
     print(len(train_set), len(test_set))
-    train_loader = DataLoader(train_set, batch_size=512, shuffle=True, num_workers=20)
-    test_loader = DataLoader(test_set, batch_size=512, shuffle=True, num_workers=8)
+    train_loader = DataLoader(train_set, batch_size=512, shuffle=True, num_workers=4)
+    test_loader = DataLoader(test_set, batch_size=512, shuffle=True, num_workers=0)
     net = Net()
     if os.path.isfile(MODEL_PATH):
         net.load_state_dict(torch.load(MODEL_PATH))
     print(net)
     net.to(device)
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0)
     #optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
     loss_fn = torch.nn.CrossEntropyLoss()
     for epoch in range(NB_EPOCHS):
         net.train()
         n = 0
         running_loss = 0    
-        for _, (X, y) in enumerate(train_loader):
+        for (X, y) in train_loader:
             n += len(X)
             X = X.to(device)
             y = y.to(device)

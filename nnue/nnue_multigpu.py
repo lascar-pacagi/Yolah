@@ -1,7 +1,11 @@
-import os
 import torch
 from torch import nn
 from torch.nn.functional import relu, softmax
+import torch.multiprocessing as mp
+from torch.utils.data.distributed import DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
+import os
 from tqdm import tqdm
 import re
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -115,51 +119,67 @@ class Net(nn.Module):
 NB_EPOCHS=1000
 MODEL_PATH="/mnt/nnue.pt"
 
-def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(device)
+def ddp_setup(rank, world_size):
+    """
+    Args:
+        rank: Unique identifier of each process
+        world_size: Total number of processes
+    """
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "65432"
+    torch.cuda.set_device(rank)
+    init_process_group(backend="nccl", rank=rank, world_size=world_size)
+
+def main(rank, world_size):
+    ddp_setup(rank, world_size)
     dataset = GameDataset("../data")
     print(len(dataset))
-    train_set, test_set = random_split(dataset, [0.8, 0.2])
+    train_set, test_set = random_split(dataset, [0.8, 0.2], generator=torch.Generator().manual_seed(42))
     print(len(train_set), len(test_set))
-    train_loader = DataLoader(train_set, batch_size=512, shuffle=True, num_workers=20)
-    test_loader = DataLoader(test_set, batch_size=512, shuffle=True, num_workers=8)
+    train_loader = DataLoader(train_set, batch_size=512, shuffle=True, pin_memory=True, num_workers=20, sampler=DistributedSampler(dataset))
+    if rank == 0: 
+        test_loader = DataLoader(test_set, batch_size=512, shuffle=True, pin_memory=True, num_workers=8)
     net = Net()
     if os.path.isfile(MODEL_PATH):
         net.load_state_dict(torch.load(MODEL_PATH))
     print(net)
-    net.to(device)
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
+    net.to(rank)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.005, momentum=0.9, weight_decay=0)
     #optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
+    model = DDP(net, device_ids=[rank])
     loss_fn = torch.nn.CrossEntropyLoss()
     for epoch in range(NB_EPOCHS):
-        net.train()
+        model.train()
         n = 0
         running_loss = 0    
         for _, (X, y) in enumerate(train_loader):
             n += len(X)
-            X = X.to(device)
-            y = y.to(device)
+            X = X.to(rank)
+            y = y.to(rank)
             optimizer.zero_grad()
-            logits = net(X)
+            logits = model(X)
             loss = loss_fn(logits, y)
             loss.backward()
             optimizer.step()
-            running_loss += loss.item()            
-        print('epoch {} loss: {}'.format(epoch + 1, running_loss / n))
-        net.eval()
-        torch.save(net.state_dict(), MODEL_PATH)
-        if epoch % 10 == 9:
-            with torch.no_grad():
-                accuracy = 0
-                n = 0
-                for (X, y) in tqdm(test_loader):
-                    n += len(X)
-                    X = X.to(device)
-                    y = y.to(device)            
-                    logits = net(X)                
-                    accuracy += sum(torch.argmax(logits, dim=1) == y).item()
-            print('epoch {} accuracy: {}'.format(epoch + 1, accuracy / n))
+            running_loss += loss.item()           
+        if rank == 0:
+            print('epoch {} loss: {}'.format(epoch + 1, running_loss / n))
+            net.eval()            
+            if epoch % 10 == 9:
+                torch.save(net.state_dict(), MODEL_PATH)
+                with torch.no_grad():
+                    accuracy = 0
+                    n = 0
+                    for (X, y) in tqdm(test_loader):
+                        n += len(X)
+                        X = X.to(rank)
+                        y = y.to(rank)            
+                        logits = net(X)                
+                        accuracy += sum(torch.argmax(logits, dim=1) == y).item()
+                print('epoch {} accuracy: {}'.format(epoch + 1, accuracy / n))
+    destroy_process_group()
 
 if __name__ == "__main__":
-    main()
+    world_size = torch.cuda.device_count()
+    print(world_size)
+    mp.spawn(main, args=(world_size,), nprocs=world_size)
