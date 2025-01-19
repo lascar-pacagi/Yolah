@@ -100,7 +100,7 @@ class GameDataset(Dataset):
 INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=8192, l2_size=32, l3_size=32):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=4096, l2_size=64, l3_size=64):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -114,72 +114,86 @@ class Net(nn.Module):
         x = relu(x)
         x = self.fc3(x)
         x = relu(x)
-        return softmax(self.fc4(x), dim=1)#self.fc4(x)
+        return self.fc4(x)
 
 NB_EPOCHS=1000
-MODEL_PATH="/mnt/nnue.pt"
+MODEL_PATH="/mnt/"
+MODEL_NAME="nnue"
+LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
 def ddp_setup(rank, world_size):
-    """
-    Args:
-        rank: Unique identifier of each process
-        world_size: Total number of processes
-    """
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "65432"
-    torch.cuda.set_device(rank)
     init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
-def main(rank, world_size):
+def dataloader_ddp(trainset, batch_size):
+    sampler_train = DistributedSampler(trainset)
+    train_loader = DataLoader(
+        trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train, num_workers=8
+    )
+    return train_loader, sampler_train
+
+class TrainerDDP:
+    def __init__(self, gpu_id, model, train_loader, sampler_train, lr_step_size=40, save_every=10):
+        self.gpu_id = gpu_id
+        self.model = model.to(self.gpu_id)
+        self.train_loader = train_loader
+        self.sampler_train = sampler_train
+        self.save_every = save_every
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, lr_step_size)
+        self.loss_fn = torch.nn.CrossEntropyLoss()
+        torch.cuda.set_device(gpu_id)
+        torch.cuda.empty_cache()
+        self.model = DDP(self.model, device_ids=[gpu_id])
+
+    def _save_checkpoint(self, epoch):
+        torch.save(self.model.state_dict(), f"{MODEL_PATH}{MODEL_NAME}{epoch}.pt")
+
+    def _run_epoch(self, epoch):
+        n = 0
+        running_loss = 0
+        accuracy = 0
+        for (X, y) in self.train_loader:
+            n += len(X)
+            X = X.to(self.gpu_id)
+            y = y.to(self.gpu_id)
+            self.optimizer.zero_grad()
+            logits = self.model(X)
+            loss = self.loss_fn(logits, y)
+            loss.backward()
+            self.optimizer.step()
+            running_loss += loss.item()
+            accuracy += sum(torch.argmax(logits, dim=1) == y).item()
+        if self.gpu_id == 0:
+            print('epoch {} loss: {} accuracy: {}'.format(epoch + 1, running_loss / n, accuracy / n))
+        self.lr_scheduler.step()
+
+    def train(self, nb_epochs):
+        self.model.train()
+        for epoch in range(nb_epochs):
+            self.sampler_train.set_epoch(epoch)
+            self._run_epoch(epoch)
+            if self.gpu_id == 0 and epoch % self.save_every == 0:
+                self._save_checkpoint(epoch)
+        self._save_checkpoint(nb_epochs - 1)
+
+def main(rank, world_size, batch_size):
     ddp_setup(rank, world_size)
     dataset = GameDataset("../data")
-    print(len(dataset))
-    train_set, test_set = random_split(dataset, [0.8, 0.2], generator=torch.Generator().manual_seed(42))
-    print(len(train_set), len(test_set))
-    train_loader = DataLoader(train_set, batch_size=512, shuffle=True, pin_memory=True, num_workers=20, sampler=DistributedSampler(dataset))
-    if rank == 0: 
-        test_loader = DataLoader(test_set, batch_size=512, shuffle=True, pin_memory=True, num_workers=8)
+    if rank == 0:
+        print(len(dataset))
+    train_loader, sampler_train = dataloader_ddp(dataset, batch_size) 
     net = Net()
-    if os.path.isfile(MODEL_PATH):
-        net.load_state_dict(torch.load(MODEL_PATH))
-    print(net)
-    net.to(rank)
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.005, momentum=0.9, weight_decay=0)
-    #optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
-    model = DDP(net, device_ids=[rank])
-    loss_fn = torch.nn.CrossEntropyLoss()
-    for epoch in range(NB_EPOCHS):
-        model.train()
-        n = 0
-        running_loss = 0    
-        for _, (X, y) in enumerate(train_loader):
-            n += len(X)
-            X = X.to(rank)
-            y = y.to(rank)
-            optimizer.zero_grad()
-            logits = model(X)
-            loss = loss_fn(logits, y)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()           
-        if rank == 0:
-            print('epoch {} loss: {}'.format(epoch + 1, running_loss / n))
-            net.eval()            
-            if epoch % 10 == 9:
-                torch.save(net.state_dict(), MODEL_PATH)
-                with torch.no_grad():
-                    accuracy = 0
-                    n = 0
-                    for (X, y) in tqdm(test_loader):
-                        n += len(X)
-                        X = X.to(rank)
-                        y = y.to(rank)            
-                        logits = net(X)                
-                        accuracy += sum(torch.argmax(logits, dim=1) == y).item()
-                print('epoch {} accuracy: {}'.format(epoch + 1, accuracy / n))
+    if os.path.isfile(LAST_MODEL):
+        net.load_state_dict(torch.load(LAST_MODEL))
+    if rank == 0:
+        print(net)
+    trainer = TrainerDDP(rank, net, train_loader, sampler_train)
+    trainer.train(NB_EPOCHS)
     destroy_process_group()
 
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size)
-    mp.spawn(main, args=(world_size,), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 512), nprocs=world_size)

@@ -16,7 +16,13 @@ namespace data {
             for (auto it = sregex_iterator(begin(line), end(line), re_moves); it != sregex_iterator(); ++it) {
                 smatch match = *it;
                 string match_str = match.str();
-                os << diag1[match[2].str()] << ':' << diag1[match[3].str()] << ' ';
+                string sq1 = match[2].str();
+                string sq2 = match[3].str();
+                if (sq1 == "a1" && sq2 == "a1") {
+                    os << "a1:a1" << ' ';
+                } else {
+                    os << diag1[sq1] << ':' << diag1[sq2] << ' ';
+                }                
             }
             smatch match;
             regex_search(line, match, re_scores);

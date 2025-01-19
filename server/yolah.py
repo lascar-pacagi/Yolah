@@ -245,7 +245,7 @@ class Yolah:
 
 if __name__ == '__main__':
     y = Yolah()
-    print(y.to_json())
+    # print(y.to_json())
     # while not y.game_over():
     #     print(y)
     #     for m in y.moves():

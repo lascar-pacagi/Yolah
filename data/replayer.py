@@ -37,6 +37,7 @@ class GameHistory:
         self.game_index = index
         self.yolah.reset()
         line = self.games[index]
+        print(line)
         self.moves = GameHistory.GAME_RE.findall(line)
         self.move_index = 0
         self.scores = GameHistory.SCORE_RE.findall(line)[0]
@@ -44,11 +45,11 @@ class GameHistory:
     def get_current_game(self):
         return self.yolah
 
-    def get_scores(self): 
+    def get_scores(self):
         return self.scores
 
     def previous_move(self):
-        if self.move_index == 0: return 
+        if self.move_index <= 0: return 
         return Move.from_str(self.moves[self.move_index - 1])
 
     def play(self):
@@ -57,18 +58,15 @@ class GameHistory:
         self.move_index += 1
 
     def undo(self):
-        if self.move_index == 0: return
+        if self.move_index <= 0: return
         self.move_index -= 1
         self.yolah.undo(Move.from_str(self.moves[self.move_index]))
 
     def begin(self):
-        if self.move_index == 0:
-            return
-        while self.move_index != 0:
+        while self.move_index > 0:
             self.undo()
 
     def end(self):
-        if self.yolah.game_over(): return
         while not self.yolah.game_over():
             self.play()
 
@@ -188,7 +186,7 @@ def next_move(entry, canvas, game_infos_var):
     if not history.valid(): return
     if history.get_current_game().game_over():
         n = int(entry.get())
-        if n - 1 < len(history):
+        if n < len(history):
             entry.delete(0, END)
             entry.insert(0, n + 1)
             history.set_current_game(n)
