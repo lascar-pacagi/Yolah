@@ -105,6 +105,9 @@ public:
     constexpr uint16_t nb_plies() const {
       return ply;
     }
+    constexpr uint64_t empty_bitboard() const {
+      return empty;
+    }
     constexpr bool contact(Move m) const {
       return around(square_bb(m.to_sq())) & (black | white) & ~square_bb(m.from_sq());
     }

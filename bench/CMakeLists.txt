@@ -8,13 +8,12 @@ find_package(TBB REQUIRED)
 find_package(Threads REQUIRED)
 find_package(benchmark REQUIRED)
 
-add_executable(Benchmarks main.cpp)
-target_compile_options(Benchmarks PRIVATE -Wall)
+include_directories(../misc ../game ../nnue ../vcl ../eigen)
+add_executable(Benchmarks main.cpp ../game/game.cpp ../game/zobrist.cpp ../game/magic.cpp)
+target_compile_options(Benchmarks PRIVATE -Wall -march=native -ffast-math -funroll-loops)
 
 target_include_directories(Benchmarks PRIVATE ${Boost_INCLUDE_DIR})
 target_link_libraries(Benchmarks PRIVATE ${Boost_LIBRARIES})
 target_link_libraries(Benchmarks PRIVATE TBB::tbb)
 target_link_libraries(Benchmarks PRIVATE Threads::Threads)
 target_link_libraries(Benchmarks PRIVATE benchmark::benchmark)
-
-#include_directories(../misc ../game)

@@ -172,14 +172,14 @@ bool Yolah::is_blocking_move(uint8_t player, Move m) const {
     uint64_t south_east = shift<SOUTH_EAST>(to_bb);
     uint64_t north_west = shift<NORTH_WEST>(to_bb);
     uint64_t south_west = shift<SOUTH_WEST>(to_bb);
-    return (other_bb & north) && blocked(north) ||
-        (other_bb & south) && blocked(south) ||
-        (other_bb & east) && blocked(east) ||
-        (other_bb & west) && blocked(west) ||
-        (other_bb & north_east) && blocked(north_east) ||
-        (other_bb & south_east) && blocked(south_east) ||
-        (other_bb & north_west) && blocked(north_west) ||
-        (other_bb & south_west) && blocked(south_west);
+    return ((other_bb & north) && blocked(north)) ||
+        ((other_bb & south) && blocked(south)) ||
+        ((other_bb & east) && blocked(east)) ||
+        ((other_bb & west) && blocked(west)) ||
+        ((other_bb & north_east) && blocked(north_east)) ||
+        ((other_bb & south_east) && blocked(south_east)) ||
+        ((other_bb & north_west) && blocked(north_west)) ||
+        ((other_bb & south_west) && blocked(south_west));
 }
 
 bool Yolah::is_blocking_move(Move m) const {

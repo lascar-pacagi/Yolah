@@ -32,7 +32,7 @@ class GameDataset(Dataset):
         self.infos = []
         nb_positions = 0
         random_moves_re = re.compile(r""".*(\d)r.*""")
-        for filename in tqdm(glob.glob(games_dir + "/games*")):
+        for filename in glob.glob(games_dir + "/games*"):
             l = random_moves_re.findall(filename)
             if l != []:
                 r = int(l[0])
@@ -114,10 +114,10 @@ class Net(nn.Module):
         x = relu(x)
         x = self.fc3(x)
         x = relu(x)
-        return self.fc4(x)
+        return softmax(self.fc4(x), dim=1)#self.fc4(x)#
 
 NB_EPOCHS=1000
-MODEL_PATH="/mnt/"
+MODEL_PATH="./"#"/mnt/"
 MODEL_NAME="nnue"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
@@ -145,10 +145,10 @@ class TrainerDDP:
         self.loss_fn = torch.nn.CrossEntropyLoss()
         torch.cuda.set_device(gpu_id)
         torch.cuda.empty_cache()
-        self.model = DDP(self.model, device_ids=[gpu_id])
+        self.model = DDP(self.model, device_ids=[self.gpu_id])
 
     def _save_checkpoint(self, epoch):
-        torch.save(self.model.state_dict(), f"{MODEL_PATH}{MODEL_NAME}{epoch}.pt")
+        torch.save(self.model.module.state_dict(), f"{MODEL_PATH}{MODEL_NAME}{epoch}.pt")
 
     def _run_epoch(self, epoch):
         n = 0
@@ -166,7 +166,7 @@ class TrainerDDP:
             running_loss += loss.item()
             accuracy += sum(torch.argmax(logits, dim=1) == y).item()
         if self.gpu_id == 0:
-            print('epoch {} loss: {} accuracy: {}'.format(epoch + 1, running_loss / n, accuracy / n))
+            print('epoch {} loss: {} accuracy: {}'.format(epoch + 1, running_loss / n, accuracy / n), flush=True)
         self.lr_scheduler.step()
 
     def train(self, nb_epochs):
@@ -181,19 +181,20 @@ class TrainerDDP:
 def main(rank, world_size, batch_size):
     ddp_setup(rank, world_size)
     dataset = GameDataset("../data")
+    print(rank)
     if rank == 0:
-        print(len(dataset))
+        print(len(dataset), flush=True)
     train_loader, sampler_train = dataloader_ddp(dataset, batch_size) 
     net = Net()
     if os.path.isfile(LAST_MODEL):
         net.load_state_dict(torch.load(LAST_MODEL))
     if rank == 0:
-        print(net)
+        print(net, flush=True)
     trainer = TrainerDDP(rank, net, train_loader, sampler_train)
     trainer.train(NB_EPOCHS)
     destroy_process_group()
 
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
-    print(world_size)
+    print(world_size, flush=True)
     mp.spawn(main, args=(world_size, 512), nprocs=world_size)

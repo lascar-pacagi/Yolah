@@ -37,7 +37,7 @@ class GameHistory:
         self.game_index = index
         self.yolah.reset()
         line = self.games[index]
-        print(line)
+        #print(line)
         self.moves = GameHistory.GAME_RE.findall(line)
         self.move_index = 0
         self.scores = GameHistory.SCORE_RE.findall(line)[0]
@@ -69,6 +69,9 @@ class GameHistory:
     def end(self):
         while not self.yolah.game_over():
             self.play()
+
+    def get_move_index(self):
+        return self.move_index
 
     def __getitem__(self, i):
         if i < 0 or i >= len(self): raise IndexError
@@ -292,4 +295,5 @@ def main():
     draw_game(canvas, game_infos_var)
     root.mainloop()
 
-main()
+if __name__ == "__main__":
+    main()

@@ -130,7 +130,6 @@ def main():
     print(net)
     net.to(device)
     optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0)
-    #optimizer = torch.optim.Adam(net.parameters(), lr=0.0001, weight_decay=0)
     loss_fn = torch.nn.CrossEntropyLoss()
     for epoch in range(NB_EPOCHS):
         net.train()

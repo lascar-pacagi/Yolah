@@ -29,5 +29,5 @@ add_subdirectory(optimization)
 target_link_libraries(Yolah PRIVATE optimization)
 add_subdirectory(data)
 target_link_libraries(Yolah PRIVATE data)
-
-
+add_subdirectory(nnue)
+target_link_libraries(Yolah PRIVATE nnue)
