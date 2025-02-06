@@ -8,6 +8,7 @@
 #include "minmax_player.h"
 #include "human_player.h"
 #include "monte_carlo_player.h"
+#include "minmax_nnue_player.h"
 #include <stdexcept>
 
 using std::unique_ptr, std::string, std::make_unique, std::invalid_argument;
@@ -152,6 +153,55 @@ unique_ptr<Player> Player::create(const json& j) {
                                                  j["tt size"].get<size_t>(),
                                                  j["nb moves at full depth"].get<size_t>(),
                                                  j["late move reduction"].get<uint8_t>(),
+                                                 nb_threads);
+            }
+        },
+        {
+            "MinMaxNNUEPlayer",
+            [](const json& j) {
+                if (!j.contains("microseconds")) {
+                    throw invalid_argument("microseconds key expected");
+                }
+                if (!j.contains("tt size")) {
+                    throw invalid_argument("tt size key expected");
+                }
+                if (!j.contains("nb moves at full depth")) {
+                    throw invalid_argument("nb moves at full depth key expected");
+                }
+                if (!j.contains("late move reduction")) {
+                    throw invalid_argument("late move reduction key expected");
+                }
+                 if (!j.contains("nb threads")) {
+                    throw invalid_argument("nb threads key expected");
+                }
+                if (!j.contains("weights")) {
+                    throw invalid_argument("weights key expected");
+                }                
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
+                }
+                if (!j["tt size"].is_number()) {
+                    throw invalid_argument("number expected for tt size");
+                }                
+                if (!j["nb moves at full depth"].is_number()) {
+                    throw invalid_argument("number expected for number of moves at full depth");
+                }
+                if (!j["late move reduction"].is_number()) {
+                    throw invalid_argument("number expected in late move reduction");
+                }
+                size_t nb_threads;
+                if (j["nb threads"].is_number()) {
+                    nb_threads = j["nb threads"].get<size_t>();
+                } else if (j["nb threads"].get<string>() == "hardware concurrency") {
+                    nb_threads = std::thread::hardware_concurrency();
+                } else {
+                    throw invalid_argument("hardware concurrency expected in nb threads");
+                }                
+                return make_unique<MinMaxNNUEPlayer>(j["microseconds"].get<uint64_t>(), 
+                                                 j["tt size"].get<size_t>(),
+                                                 j["nb moves at full depth"].get<size_t>(),
+                                                 j["late move reduction"].get<uint8_t>(),
+                                                 j["weights"],
                                                  nb_threads);
             }
         },

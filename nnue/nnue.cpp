@@ -8,10 +8,11 @@
 #include <iostream>
 #include <iomanip>
 
-// g++ -std=c++2a -O3 -I../game -I../misc ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
+/*
+// g++ -std=c++2a -O3 -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
 int main(int argc, char* argv[]) {
     using namespace std;
-    NNUE<4096, 64, 64, NNUE_BASIC> nnue;
+    NNUE<4096, 64, 64> nnue;
     nnue.load("nnue_parameters.txt");
     // Yolah yolah;
     // cout << yolah << '\n';
@@ -43,7 +44,12 @@ int main(int argc, char* argv[]) {
             Move m(sq1, sq2);
             nnue.play(yolah.current_player(), m);                        
             yolah.play(m);
+            yolah.undo(m);
+            nnue.undo(yolah.current_player(), m);
+            nnue.play(yolah.current_player(), m);                        
+            yolah.play(m);            
             //cout << yolah << '\n';            
         }
     }
 }
+*/

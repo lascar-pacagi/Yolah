@@ -57,10 +57,8 @@ static void duration0xffff(benchmark::State& state) {
 // BENCHMARK(duration0xf);
 // BENCHMARK(duration0xffff);
 
-template <size_t H1_SIZE, size_t H2_SIZE, size_t H3_SIZE, bool BASIC>
-static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE, BASIC>& nnue, size_t nb_games = 1000) {
-  zobrist::init();
-  magic::init();
+template <size_t H1_SIZE, size_t H2_SIZE, size_t H3_SIZE>
+static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE>& nnue, size_t nb_games = 1000) {
   float res = 0;
   PRNG prng(42);
   for (size_t i = 0; i < nb_games; i++) {
@@ -70,7 +68,7 @@ static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE, BASIC>& nnue, size_t nb
     while (!yolah.game_over()) {
         yolah.moves(moves);        
         Move m = moves[prng.rand<size_t>() % moves.size()];
-        const auto [black_proba, ignore, white_proba] = nnue.output_linear();
+        const auto [black_proba, ignore, white_proba] = nnue.output_softmax();
         res += black_proba - white_proba;
         nnue.play(yolah.current_player(), m);
         yolah.play(m);
@@ -79,13 +77,15 @@ static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE, BASIC>& nnue, size_t nb
   return res;
 }
 
-static void nnue_basic(benchmark::State& state) {
-  NNUE<4096, 64, 64, NNUE_BASIC> nnue;
+static void nnue(benchmark::State& state) {
+  zobrist::init();
+  magic::init();  
+  NNUE<4096, 64, 64> nnue;
   nnue.load("../../nnue/nnue_parameters.txt");
   float res = 0;
   benchmark::DoNotOptimize(res);
   for (auto _ : state) {    
-    res += nnue_helper(nnue, 1000);
+    res += nnue_helper(nnue, 1);
   }
 }
 
@@ -166,8 +166,8 @@ static void matmul_basic(benchmark::State& state) {
   }
 }
 
-//BENCHMARK(nnue_basic);
-BENCHMARK(matmul_eigen);
-BENCHMARK(matmul_basic);
+BENCHMARK(nnue);
+// BENCHMARK(matmul_eigen);
+// BENCHMARK(matmul_basic);
 
 BENCHMARK_MAIN();

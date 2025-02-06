@@ -3,8 +3,8 @@ add_library(player OBJECT
     MCTS_player.cpp MCTS_mem_player.cpp human_player.cpp
     heuristic.cpp basic_minmax_player.cpp transposition_table.cpp
     heuristic_weights_learner.cpp player.cpp
-    minmax_player.cpp
+    minmax_player.cpp minmax_nnue_player.cpp
 )
 target_include_directories(player PUBLIC .)
 
-include_directories(../misc ../game ../optimization)
+include_directories(../misc ../game ../optimization ../nnue ../eigen)
