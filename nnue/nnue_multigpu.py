@@ -118,7 +118,7 @@ class Net(nn.Module):
 
 NB_EPOCHS=1000
 MODEL_PATH="./"#"/mnt/"
-MODEL_NAME="nnue"
+MODEL_NAME="nnue_4096x64x64"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
 def ddp_setup(rank, world_size):

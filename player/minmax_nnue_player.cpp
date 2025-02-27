@@ -11,11 +11,9 @@ MinMaxNNUEPlayer::MinMaxNNUEPlayer(uint64_t microseconds, size_t tt_size_mb, siz
     : thinking_time(microseconds), table(tt_size_mb),
       nb_moves_at_full_depth(nb_moves_at_full_depth), late_move_reduction(late_move_reduction), 
       nnue_parameters_filename(nnue_parameters_filename),
-      nnues(static_cast<BS::concurrency_t>(nb_threads)),
+      accs(nb_threads),
       pool(static_cast<BS::concurrency_t>(nb_threads)) {
-        for (size_t i = 0; i < nnues.size(); i++) {
-            nnues[i].load(nnue_parameters_filename);
-        }
+        nnue.load(nnue_parameters_filename);
     }
 
 Move MinMaxNNUEPlayer::play(Yolah yolah) {
@@ -34,8 +32,8 @@ Move MinMaxNNUEPlayer::play(Yolah yolah) {
     table.new_search();
     std::vector<Search> results(pool.get_thread_count());
     for (size_t i = 0; i < results.size(); i++) {
-        results[i].nnue_index = i;
-        nnues[i].init(yolah);        
+        results[i].acc_index = i;
+        nnue.init(yolah, accs[i]);
     };
     BS::multi_future<void> futures = pool.submit_sequence<size_t>(0, pool.get_thread_count(), [&](size_t i) { 
         iterative_deepening(yolah, results[i]);
@@ -104,7 +102,7 @@ int16_t MinMaxNNUEPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_
         }
     }
     if (depth <= 0) {
-        const auto [black_proba, draw_proba, white_proba] = nnues[s.nnue_index].output_softmax();
+        const auto [black_proba, draw_proba, white_proba] = nnue.output_softmax(accs[s.acc_index]);
         float coeff = (yolah.current_player() == Yolah::BLACK ? 1 : -1); 
         int16_t v = (coeff * black_proba - coeff * white_proba) * heuristic::MAX_VALUE; 
         table.update(hash, v, BOUND_EXACT, 0);
@@ -119,18 +117,18 @@ int16_t MinMaxNNUEPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_
     for (size_t i = 0; i < moves.size(); i++) {        
         Move m = moves[i];
         if (i >= nb_moves_at_full_depth) {
-            nnues[s.nnue_index].play(yolah.current_player(), m);
+            nnue.play(yolah.current_player(), m, accs[s.acc_index]);
             yolah.play(m);            
             int16_t v = -negamax(yolah, s, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction);            
             yolah.undo(m);
-            nnues[s.nnue_index].undo(yolah.current_player(), m);
+            nnue.undo(yolah.current_player(), m, accs[s.acc_index]);
             if (v <= alpha) continue;
         }
-        nnues[s.nnue_index].play(yolah.current_player(), m);
+        nnue.play(yolah.current_player(), m, accs[s.acc_index]);
         yolah.play(m);
         int16_t v = -negamax(yolah, s, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
         yolah.undo(m);
-        nnues[s.nnue_index].undo(yolah.current_player(), m);
+        nnue.undo(yolah.current_player(), m, accs[s.acc_index]);
         if (v >= beta) {
             table.update(hash, v, BOUND_LOWER, depth, m);
             s.killer2[yolah.nb_plies()] = s.killer1[yolah.nb_plies()];
@@ -163,18 +161,18 @@ int16_t MinMaxNNUEPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
     for (size_t i = 0; i < moves.size(); i++) {     
         Move m = moves[i];
         if (i >= nb_moves_at_full_depth) {
-            nnues[s.nnue_index].play(yolah.current_player(), m);
+            nnue.play(yolah.current_player(), m, accs[s.acc_index]);
             yolah.play(m);
             int16_t v = -negamax(yolah, s, zobrist::update(hash, player, m), -beta, -alpha, depth - late_move_reduction);
             yolah.undo(m);
-            nnues[s.nnue_index].undo(yolah.current_player(), m);
+            nnue.undo(yolah.current_player(), m, accs[s.acc_index]);
             if (v <= alpha) continue;
         }
-        nnues[s.nnue_index].play(yolah.current_player(), m);
+        nnue.play(yolah.current_player(), m, accs[s.acc_index]);
         yolah.play(m);
         int16_t v = -negamax(yolah, s, zobrist::update(hash, player, m), -beta, -alpha, depth - 1);
         yolah.undo(m);
-        nnues[s.nnue_index].undo(yolah.current_player(), m);
+        nnue.undo(yolah.current_player(), m, accs[s.acc_index]);
         if (v > alpha) {
             alpha = v;
             res = m;

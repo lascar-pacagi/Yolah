@@ -58,19 +58,21 @@ static void duration0xffff(benchmark::State& state) {
 // BENCHMARK(duration0xffff);
 
 template <size_t H1_SIZE, size_t H2_SIZE, size_t H3_SIZE>
-static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE>& nnue, size_t nb_games = 1000) {
+static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE>& nnue, 
+                        typename NNUE<H1_SIZE, H2_SIZE, H3_SIZE>::Accumulator& acc, 
+                        size_t nb_games = 1000) {
   float res = 0;
   PRNG prng(42);
   for (size_t i = 0; i < nb_games; i++) {
     Yolah yolah;
-    nnue.init(yolah);
+    nnue.init(yolah, acc);
     Yolah::MoveList moves;
     while (!yolah.game_over()) {
         yolah.moves(moves);        
         Move m = moves[prng.rand<size_t>() % moves.size()];
-        const auto [black_proba, ignore, white_proba] = nnue.output_softmax();
+        const auto [black_proba, ignore, white_proba] = nnue.output_softmax(acc);
         res += black_proba - white_proba;
-        nnue.play(yolah.current_player(), m);
+        nnue.play(yolah.current_player(), m, acc);
         yolah.play(m);
     }
   }
@@ -81,11 +83,12 @@ static void nnue(benchmark::State& state) {
   zobrist::init();
   magic::init();  
   NNUE<4096, 64, 64> nnue;
+  auto acc = nnue.make_accumulator();
   nnue.load("../../nnue/nnue_parameters.txt");
   float res = 0;
   benchmark::DoNotOptimize(res);
   for (auto _ : state) {    
-    res += nnue_helper(nnue, 1);
+    res += nnue_helper(nnue, acc, 1000);
   }
 }
 

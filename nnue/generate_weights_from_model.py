@@ -24,11 +24,11 @@ if __name__ == "__main__":
     net = Net()
     net.to('cpu')
     state_dict = torch.load(LAST_MODEL, map_location=torch.device('cpu'))
-    net_dict = OrderedDict()
-    for k, v in state_dict.items():
-        name = k[7:]
-        net_dict[name] = v
-    net.load_state_dict(net_dict)
+    # net_dict = OrderedDict()
+    # for k, v in state_dict.items():
+    #     name = k[7:]
+    #     net_dict[name] = v
+    net.load_state_dict(state_dict)
     #net.load_state_dict(state_dict)
     save_model_parameters("nnue_parameters.txt", net)
-    torch.save(net_dict, "nnue.pt")
+    #torch.save(net_dict, "nnue_512x64x64.pt")

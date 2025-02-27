@@ -3,6 +3,7 @@
 using namespace std;
 using MatrixXf = Eigen::MatrixXf;
 using RowVectorXf = Eigen::RowVectorXf;
+using VectorXf = Eigen::VectorXf;
 
 int main() {
     MatrixXf m1{{1, 2, 3}, {10, 20, 30}};
@@ -13,4 +14,6 @@ int main() {
     cout << v * m1 << endl;
     v = v.array().max(0);
     cout << v.sum() << endl;
+    VectorXf v1(10);
+    cout << v1 << endl;
 }

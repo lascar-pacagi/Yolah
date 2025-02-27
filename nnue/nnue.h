@@ -12,6 +12,437 @@
 // black positions + white positions + empty positions + occupied positions + free positions + turn 
 constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
 constexpr size_t OUTPUT_SIZE = 3;
+/*
+constexpr int VECTOR_LANES = 8;
+constexpr int VECTOR_SIZE = 4 * VECTOR_LANES;
+typedef float vec __attribute__ (( vector_size(VECTOR_SIZE) ));
+
+template<int H1_SIZE, int H2_SIZE, int H3_SIZE>
+class NNUE {
+    int round_to_vector_size(int n) {
+        return (n + VECTOR_SIZE - 1) / VECTOR_SIZE * VECTOR_SIZE; 
+    }
+    vec* alloc(int n) {
+        vec* ptr = (vec*) std::aligned_alloc(VECTOR_SIZE, 4 * n);
+        memset(ptr, 0, 4 * n);
+        return ptr;
+    }
+    void kernel(float *a, vec *b, vec *c, int x, int y, int l, int r, int n) {
+        vec t[6][2]{}; // will be zero-filled and stored in ymm registers
+
+        for (int k = l; k < r; k++) {
+            for (int i = 0; i < 6; i++) {
+                // broadcast a[x + i][k] into a register
+                vec alpha = vec{} + a[(x + i) * n + k]; // converts to a broadcast
+                // multiply b[k][y:y+16] by it and update t[i][0] and t[i][1]
+                for (int j = 0; j < 2; j++) {
+                    t[i][j] += alpha * b[(k * n + y) / VECTOR_SIZE + j]; // converts to an fma
+                }                 
+            }
+        }
+        // write the results back to C
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 2; j++) {
+                c[((x + i) * n + y) / VECTOR_SIZE + j] += t[i][j];
+            }
+        }
+    }
+    void matmul(const float *_a, const float *_b, float *_c, int n) {
+        // to simplify the implementation, we pad the height and width
+        // so that they are divisible by 6 and 16 respectively
+        int nx = round_to_vector_size((n + 5) / 6 * 6);
+        int ny = round_to_vector_size((n + 15) / 16 * 16);
+        
+        for (int i = 0; i < n; i++) {
+            memcpy(&a[i * ny], &_a[i * n], 4 * n);
+            memcpy(&b[i * ny], &_b[i * n], 4 * n); // we don't need to transpose b this time
+        }
+
+        const int s3 = 64;  // how many columns of B to select
+        const int s2 = 120; // how many rows of A to select 
+        const int s1 = 240; // how many rows of B to select
+
+        for (int i3 = 0; i3 < ny; i3 += s3) {
+            // now we are working with b[:][i3:i3+s3]
+            for (int i2 = 0; i2 < nx; i2 += s2) {
+                // now we are working with a[i2:i2+s2][:]
+                for (int i1 = 0; i1 < ny; i1 += s1) {
+                    // now we are working with b[i1:i1+s1][i3:i3+s3]
+                    // and we need to update c[i2:i2+s2][i3:i3+s3] with [l:r] = [i1:i1+s1]
+                    for (int x = i2; x < std::min(i2 + s2, nx); x += 6) {
+                        for (int y = i3; y < std::min(i3 + s3, ny); y += 16) {
+                            kernel(a, (vec*) b, (vec*) c, x, y, i1, std::min(i1 + s1, n), ny);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < n; i++) {
+            memcpy(&_c[i * n], &c[i * ny], 4 * n);
+        }
+    }
+    struct Accumulator {
+        float* acc;
+        float* output;
+        Accumulator() {
+            acc = (float*)alloc(H1_SIZE);
+            output = (float*)alloc(std::max({H1_SIZE, H2_SIZE, H3_SIZE, OUTPUT_SIZE});
+        }
+        ~Accumulator() {
+            delete[] acc;
+            delete[] output;
+        }
+    };
+private:
+    float* turn_black;
+    float* turn_white;
+    float* input_to_h1;
+    float* h1_bias;    
+    float* h1_to_h2;
+    float* h2_bias;
+    float* h2_to_h3;
+    float* h3_bias;
+    float* h3_to_output;
+    float* output_bias;
+public:
+    NNUE() {
+        turn_black   = (float*)alloc(H1_SIZE);
+        turn_white   = (float*)alloc(H1_SIZE);
+        input_to_h1  = (float*)alloc(INPUT_SIZE * H1_SIZE); 
+        h1_bias      = (float*)alloc(H1_SIZE);
+        h1_to_h2     = (float*)alloc(H1_SIZE * H2_SIZE);
+        h2_bias      = (float*)alloc(H2_SIZE);
+        h2_to_h3     = (float*)alloc(H2_SIZE * H3_SIZE);
+        h3_bias      = (float*)alloc(H3_SIZE);
+        h3_to_output = (float*)alloc(H3_SIZE * OUTPUT_SIZE);
+        output_bias  = (float*)alloc(OUTPUT_SIZE);
+    }
+    ~NNUE() {
+        delete[] turn_black;
+        delete[] turn_white;
+        delete[] input_to_h1;
+        delete[] h1_bias;
+        delete[] h1_to_h2;
+        delete[] h2_bias;
+        delete[] h2_to_h3;
+        delete[] h3_bias;
+        delete[] h3_to_output;
+        delete[] output_bias;
+    }
+
+    Accumulator make_accumulator() {
+        return {};                
+    }
+
+    void load(const std::string& filename) {
+        std::ifstream ifs(filename, std::ifstream::in);
+        size_t n, m;
+        float v;
+        std::string type;
+        bool first = true;
+        for (auto& [N, M, weights, bias]: {
+                std::make_tuple(H1_SIZE, INPUT_SIZE, input_to_h1, h1_bias), 
+                std::make_tuple(H2_SIZE, H1_SIZE, h1_to_h2, h2_bias), 
+                std::make_tuple(H3_SIZE, H2_SIZE, h2_to_h3, h3_bias),
+                std::make_tuple(OUTPUT_SIZE, H3_SIZE, h3_to_output, output_bias)}) {
+            ifs >> type;
+            if (type != "W") {
+                throw "W expected";
+            }
+            if (!(ifs >> n >> m)) {
+                throw "matrix size expected";
+            }
+            if (n != N || m != M) {
+                throw "bad matrix dimension";
+            }
+            for (size_t i = 0; i < N; i++) {
+                for (size_t j = 0; j < M; j++) {
+                    ifs >> v;
+                    if (first) weights[j * N + i] =  v; 
+                    else weights[i * M + j] =  v;                    
+                }
+            }
+            ifs >> type;
+            if (type != "B") {
+                throw "B expected";
+            }
+            if (!(ifs >> n)) {
+                throw "bias size expected";
+            }
+            if (n != N) {
+                throw "bad bias dimension";
+            }
+            for (size_t i = 0; i < N; i++) {
+                ifs >> v;
+                bias[i] = v;
+            }
+            first = false;
+        }
+        constexpr size_t pos = 64 * 5;
+        for (size_t i = 0; i < 64; i++) {
+            for (size_t j = 0; j < H1_SIZE; j++) {
+                turn_white[j] += input_to_h1[(pos + i) * H1_SIZE + j];
+            }     
+        }    
+        for (size_t i = 0; i < H1_SIZE; i++) {
+            turn_black[i] = -turn_white[i];
+        }
+    }
+    std::tuple<uint64_t, uint64_t, uint64_t , uint64_t, uint64_t> encode_yolah(const Yolah& yolah) const {
+        // black positions + white positions + empty positions + occupied positions + free positions 
+        const uint64_t black = yolah.bitboard(Yolah::BLACK);
+        const uint64_t white = yolah.bitboard(Yolah::WHITE);
+        const uint64_t empty = yolah.empty_bitboard();
+        const uint64_t occupied = yolah.occupied_squares();
+        const uint64_t free = yolah.free_squares();
+        return {black, white, empty, occupied, free};
+    }
+    void init(const Yolah& yolah, Accumulator& a) {
+        a.acc = h1_bias;
+        const auto [black, white, empty, occupied, free] = encode_yolah(yolah);        
+        size_t delta = 0;
+        for (uint64_t bitboard : {black, white, empty, occupied, free}) {
+            while (bitboard) {
+                uint64_t pos = std::countr_zero(bitboard & -bitboard);
+                size_t offset = delta + 63 - pos;
+                //a.acc += input_to_h1.col(offset);
+                a.add(input_to_h1, offset);
+                bitboard &= bitboard - 1;
+            }
+            delta += 64;
+        }
+        if (yolah.current_player() == Yolah::WHITE) {
+            a.add += turn_white;  
+        }
+    }
+    std::tuple<float, float, float> output_linear(const Accumulator& a) {
+        VectorXf h1_output = a.acc.array().max(0);        
+        VectorXf h2_output = (h1_to_h2 * h1_output + h2_bias).array().max(0);
+        VectorXf h3_output = (h2_to_h3 * h2_output + h3_bias).array().max(0);
+        VectorXf output    = h3_to_output * h3_output + output_bias;
+        return {output(0), output(1), output(2)};
+    }
+    std::tuple<float, float, float> output_softmax(const Accumulator& a) {
+        VectorXf h1_output = a.acc.array().max(0);
+        VectorXf h2_output = (h1_to_h2 * h1_output + h2_bias).array().max(0);
+        VectorXf h3_output = (h2_to_h3 * h2_output + h3_bias).array().max(0);
+        VectorXf output    = (h3_to_output * h3_output + output_bias).array().exp();
+        auto sum  = output.sum();
+        output    /= sum;
+        return {output(0), output(1), output(2)};        
+    }
+    void play(uint8_t player, const Move& m, Accumulator& a) {
+        size_t from = 63 - m.from_sq();
+        size_t to = 63 - m.to_sq();
+        // black positions + white positions + empty positions + occupied positions + free positions
+        size_t pos = (player == Yolah::BLACK) ? 0 : 64;
+        const auto& turn = (player == Yolah::BLACK) ? turn_white : turn_black;        
+        size_t from_offset = pos + from;
+        size_t to_offset = pos + to;
+        size_t empty_offset = 128 + from;
+        size_t occupied_offset = 192 + to;
+        size_t free_offset = 256 + to;
+        a.acc += input_to_h1.col(to_offset) 
+                - input_to_h1.col(from_offset)
+                + input_to_h1.col(empty_offset)
+                + input_to_h1.col(occupied_offset)
+                - input_to_h1.col(free_offset)
+                + turn;
+    }
+    void undo(uint8_t player, const Move& m, Accumulator& a) {
+        size_t from = 63 - m.from_sq();
+        size_t to = 63 - m.to_sq();
+        // black positions + white positions + empty positions + occupied positions + free positions
+        size_t pos = (player == Yolah::BLACK) ? 0 : 64;
+        const auto& turn = (player == Yolah::BLACK) ? turn_white : turn_black;
+        size_t from_offset = pos + from;
+        size_t to_offset = pos + to;
+        size_t empty_offset = 128 + from;
+        size_t occupied_offset = 192 + to;
+        size_t free_offset = 256 + to;
+        a.acc += input_to_h1.col(from_offset)
+                - input_to_h1.col(to_offset)
+                - input_to_h1.col(empty_offset)
+                - input_to_h1.col(occupied_offset)
+                + input_to_h1.col(free_offset)
+                - turn;
+    }
+};
+*/
+using MatrixXf = Eigen::MatrixXf;
+using RowVectorXf = Eigen::RowVectorXf;
+using VectorXf = Eigen::VectorXf;
+//using MatrixX = Eigen::MatrixX<int>;
+//using VectorX = Eigen::VectorX<int>;
+
+template<size_t H1_SIZE, size_t H2_SIZE, size_t H3_SIZE>
+class NNUE {
+public:
+    struct Accumulator {
+        VectorXf acc;
+        Accumulator() : acc(H1_SIZE) {}
+    };
+private:
+    VectorXf turn_black;
+    VectorXf turn_white;
+    MatrixXf input_to_h1;
+    VectorXf h1_bias;
+    MatrixXf h1_to_h2;
+    VectorXf h2_bias;
+    MatrixXf h2_to_h3;
+    VectorXf h3_bias;
+    MatrixXf h3_to_output;
+    VectorXf output_bias;
+public:
+    NNUE() :
+        turn_black(H1_SIZE),
+        turn_white(H1_SIZE),
+        input_to_h1(H1_SIZE, INPUT_SIZE),
+        h1_bias(H1_SIZE),
+        h1_to_h2(H2_SIZE, H1_SIZE),
+        h2_bias(H2_SIZE),
+        h2_to_h3(H3_SIZE, H2_SIZE),
+        h3_bias(H3_SIZE),
+        h3_to_output(OUTPUT_SIZE, H3_SIZE),
+        output_bias(OUTPUT_SIZE) {}
+
+    Accumulator make_accumulator() {
+        return {};        
+    }
+
+    void load(const std::string& filename) {
+        std::ifstream ifs(filename, std::ifstream::in);
+        size_t n, m;
+        float v;
+        std::string type;
+        for (auto& [N, M, weights, bias]: {
+                std::make_tuple(H1_SIZE, INPUT_SIZE, input_to_h1.data(), h1_bias.data()), 
+                std::make_tuple(H2_SIZE, H1_SIZE, h1_to_h2.data(), h2_bias.data()), 
+                std::make_tuple(H3_SIZE, H2_SIZE, h2_to_h3.data(), h3_bias.data()),
+                std::make_tuple(OUTPUT_SIZE, H3_SIZE, h3_to_output.data(), output_bias.data())}) {
+            ifs >> type;
+            if (type != "W") {
+                throw "W expected";
+            }
+            if (!(ifs >> n >> m)) {
+                throw "matrix size expected";
+            }
+            if (n != N || m != M) {
+                throw "bad matrix dimension";
+            }
+            for (size_t i = 0; i < N; i++) {
+                for (size_t j = 0; j < M; j++) {
+                    ifs >> v;
+                    weights[j * N + i] =  v;                    
+                }
+            }
+            ifs >> type;
+            if (type != "B") {
+                throw "B expected";
+            }
+            if (!(ifs >> n)) {
+                throw "bias size expected";
+            }
+            if (n != N) {
+                throw "bad bias dimension";
+            }
+            for (size_t i = 0; i < N; i++) {
+                ifs >> v;
+                bias[i] = v;
+            }
+        }
+        turn_white.fill(0);
+        constexpr size_t pos = 64 * 5;
+        for (size_t i = 0; i < 64; i++) {
+            turn_white += input_to_h1.col(pos + i);                        
+        }    
+        turn_black = -turn_white;
+    }
+    std::tuple<uint64_t, uint64_t, uint64_t , uint64_t, uint64_t> encode_yolah(const Yolah& yolah) const {
+        // black positions + white positions + empty positions + occupied positions + free positions 
+        const uint64_t black = yolah.bitboard(Yolah::BLACK);
+        const uint64_t white = yolah.bitboard(Yolah::WHITE);
+        const uint64_t empty = yolah.empty_bitboard();
+        const uint64_t occupied = yolah.occupied_squares();
+        const uint64_t free = yolah.free_squares();
+        return {black, white, empty, occupied, free};
+    }
+    void init(const Yolah& yolah, Accumulator& a) {
+        a.acc = h1_bias;
+        const auto [black, white, empty, occupied, free] = encode_yolah(yolah);        
+        size_t delta = 0;
+        for (uint64_t bitboard : {black, white, empty, occupied, free}) {
+            while (bitboard) {
+                uint64_t pos = std::countr_zero(bitboard & -bitboard);
+                size_t offset = delta + 63 - pos;
+                a.acc += input_to_h1.col(offset);
+                bitboard &= bitboard - 1;
+            }
+            delta += 64;
+        }
+        if (yolah.current_player() == Yolah::WHITE) {
+            a.acc += turn_white;  
+        }
+    }
+    std::tuple<float, float, float> output_linear(const Accumulator& a) {
+        VectorXf h1_output = a.acc.array().max(0);        
+        VectorXf h2_output = (h1_to_h2 * h1_output + h2_bias).array().max(0);
+        VectorXf h3_output = (h2_to_h3 * h2_output + h3_bias).array().max(0);
+        VectorXf output    = h3_to_output * h3_output + output_bias;
+        return {output(0), output(1), output(2)};
+    }
+    std::tuple<float, float, float> output_softmax(const Accumulator& a) {
+        VectorXf h1_output = a.acc.array().max(0);
+        VectorXf h2_output = (h1_to_h2 * h1_output + h2_bias).array().max(0);
+        VectorXf h3_output = (h2_to_h3 * h2_output + h3_bias).array().max(0);
+        VectorXf output    = (h3_to_output * h3_output + output_bias).array().exp();
+        auto sum  = output.sum();
+        output    /= sum;
+        return {output(0), output(1), output(2)};        
+    }
+    void play(uint8_t player, const Move& m, Accumulator& a) {
+        size_t from = 63 - m.from_sq();
+        size_t to = 63 - m.to_sq();
+        // black positions + white positions + empty positions + occupied positions + free positions
+        size_t pos = (player == Yolah::BLACK) ? 0 : 64;
+        const auto& turn = (player == Yolah::BLACK) ? turn_white : turn_black;        
+        size_t from_offset = pos + from;
+        size_t to_offset = pos + to;
+        size_t empty_offset = 128 + from;
+        size_t occupied_offset = 192 + to;
+        size_t free_offset = 256 + to;
+        a.acc += input_to_h1.col(to_offset) 
+                - input_to_h1.col(from_offset)
+                + input_to_h1.col(empty_offset)
+                + input_to_h1.col(occupied_offset)
+                - input_to_h1.col(free_offset)
+                + turn;
+    }
+    void undo(uint8_t player, const Move& m, Accumulator& a) {
+        size_t from = 63 - m.from_sq();
+        size_t to = 63 - m.to_sq();
+        // black positions + white positions + empty positions + occupied positions + free positions
+        size_t pos = (player == Yolah::BLACK) ? 0 : 64;
+        const auto& turn = (player == Yolah::BLACK) ? turn_white : turn_black;
+        size_t from_offset = pos + from;
+        size_t to_offset = pos + to;
+        size_t empty_offset = 128 + from;
+        size_t occupied_offset = 192 + to;
+        size_t free_offset = 256 + to;
+        a.acc += input_to_h1.col(from_offset)
+                - input_to_h1.col(to_offset)
+                - input_to_h1.col(empty_offset)
+                - input_to_h1.col(occupied_offset)
+                + input_to_h1.col(free_offset)
+                - turn;
+    }
+};
+
+/*
+// black positions + white positions + empty positions + occupied positions + free positions + turn 
+constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
+constexpr size_t OUTPUT_SIZE = 3;
 
 using MatrixXf = Eigen::MatrixXf;
 using RowVectorXf = Eigen::RowVectorXf;
@@ -180,7 +611,7 @@ public:
                         - turn;
     }
 };
-
+*/
 /*
 constexpr bool NNUE_BASIC = true;
 constexpr bool NNUE_SIMD = !NNUE_BASIC;
