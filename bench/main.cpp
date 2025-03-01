@@ -8,6 +8,7 @@
 #include "magic.h"
 #include <tuple>
 #include "Eigen/Dense"
+#include "matmul.h"
 using namespace std;
 
 
@@ -169,8 +170,160 @@ static void matmul_basic(benchmark::State& state) {
   }
 }
 
-BENCHMARK(nnue);
+static void mm1(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul1(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mm2(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul2(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mm3(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul3(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mm4(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul4(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mm5(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul5(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mm6(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul6(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mm7(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul7(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mm8(benchmark::State& state) {
+  const int M = 1000;
+  const int INNER = 800;
+  const int N = 1000;
+  float* a = new float[M * INNER];
+  float* b = new float[INNER * N];
+  float* c = new float[M * N];
+  rinit(a, M * INNER);
+  rinit(b, INNER * N);
+  memset(c, 0, sizeof(float) * M * N);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matmul8(M, N, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+// BENCHMARK(nnue);
 // BENCHMARK(matmul_eigen);
 // BENCHMARK(matmul_basic);
+BENCHMARK(mm1);
+BENCHMARK(mm2);
+BENCHMARK(mm3);
+BENCHMARK(mm4);
+BENCHMARK(mm5);
+BENCHMARK(mm6);
+BENCHMARK(mm7);
+BENCHMARK(mm8);
 
 BENCHMARK_MAIN();
