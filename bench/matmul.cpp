@@ -343,13 +343,7 @@ void matmul8(int m, int n, int inner, const float* __restrict__ a, const float* 
 
 typedef float vec8 __attribute__ (( vector_size(8 * 4) ));
 
-void kernel4x4_9(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
-    /*
-        c( 0, 0 ), c( 0, 1 ), c( 0, 2 ), c( 0, 3 )  
-        c( 1, 0 ), c( 1, 1 ), c( 1, 2 ), c( 1, 3 )  
-        c( 2, 0 ), c( 2, 1 ), c( 2, 2 ), c( 2, 3 )  
-        c( 3, 0 ), c( 3, 1 ), c( 3, 2 ), c( 3, 3 )
-    */
+void kernel8x8_9(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
     vec8 c0 = vec8{} + 0;
     vec8 c1 = vec8{} + 0;
     vec8 c2 = vec8{} + 0;
@@ -358,7 +352,7 @@ void kernel4x4_9(int m, int n, int inner, const float* __restrict__ a, const flo
     vec8 c5 = vec8{} + 0;
     vec8 c6 = vec8{} + 0;
     vec8 c7 = vec8{} + 0;
-    
+
     const float* a0k_p = &a[0 * inner];
     const float* a1k_p = &a[1 * inner];
     const float* a2k_p = &a[2 * inner];
@@ -403,21 +397,417 @@ void kernel4x4_9(int m, int n, int inner, const float* __restrict__ a, const flo
 void matmul9(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
     for (int j = 0; j < n; j += 8) {
         for (int i = 0; i < m; i += 8) {
-            kernel4x4_9(m, n, inner, &a[i * inner], &b[j], &c[i * n + j]);
+            kernel8x8_9(m, n, inner, &a[i * inner], &b[j], &c[i * n + j]);
         }
     }
 }
 
-int main() {
-    const int M = 1000;
-    const int INNER = 800;
-    const int N = 1000;
-    float* a = new float[M * INNER];
-    float* b = new float[INNER * N];
-    float* c = new float[M * N];
-    rinit(a, M * INNER);
-    rinit(b, INNER * N);
-    memset(c, 0, sizeof(float) * M * N);
-    matmul9(M, N, INNER, a, b, c);
-    cout << c[0] << ' ' << c[M * N - 1] << endl;
+// void kernel7x8_10(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+//     vec8 c0 = vec8{} + 0;
+//     vec8 c1 = vec8{} + 0;
+//     vec8 c2 = vec8{} + 0;
+//     vec8 c3 = vec8{} + 0;
+//     vec8 c4 = vec8{} + 0;
+//     vec8 c5 = vec8{} + 0;
+//     vec8 c6 = vec8{} + 0;
+
+//     const float* a0k_p = &a[0 * inner];
+//     const float* a1k_p = &a[1 * inner];
+//     const float* a2k_p = &a[2 * inner];
+//     const float* a3k_p = &a[3 * inner];
+//     const float* a4k_p = &a[4 * inner];
+//     const float* a5k_p = &a[5 * inner];
+//     const float* a6k_p = &a[6 * inner];
+
+//     for (int k = 0; k < inner; k++) {
+//         vec8 a0k = vec8{} + *a0k_p++;        
+//         vec8 a1k = vec8{} + *a1k_p++;
+//         vec8 a2k = vec8{} + *a2k_p++;
+//         vec8 a3k = vec8{} + *a3k_p++;
+//         vec8 a4k = vec8{} + *a4k_p++;        
+//         vec8 a5k = vec8{} + *a5k_p++;
+//         vec8 a6k = vec8{} + *a6k_p++;
+
+//         vec8 bk = *((vec8*)&b[k * n + 0]);
+
+//         c0 += a0k * bk;
+//         c1 += a1k * bk;
+//         c2 += a2k * bk;
+//         c3 += a3k * bk;
+//         c4 += a4k * bk;
+//         c5 += a5k * bk;
+//         c6 += a6k * bk;
+
+//     }
+//     *((vec8*)&c[0 * n]) += c0;
+//     *((vec8*)&c[1 * n]) += c1;
+//     *((vec8*)&c[2 * n]) += c2;
+//     *((vec8*)&c[3 * n]) += c3;
+//     *((vec8*)&c[4 * n]) += c4;
+//     *((vec8*)&c[5 * n]) += c5;
+//     *((vec8*)&c[6 * n]) += c6;
+// }
+
+// void matmul10(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+//     for (int j = 0; j < n; j += 8) {
+//         for (int i = 0; i < m; i += 7) {
+//             kernel7x8_10(m, n, inner, &a[i * inner], &b[j], &c[i * n + j]);
+//         }
+//     }
+// }
+
+void kernel8x8_11(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    vec8 c0 = vec8{} + 0;
+    vec8 c1 = vec8{} + 0;
+    vec8 c2 = vec8{} + 0;
+    vec8 c3 = vec8{} + 0;
+    vec8 c4 = vec8{} + 0;
+    vec8 c5 = vec8{} + 0;
+    vec8 c6 = vec8{} + 0;
+    vec8 c7 = vec8{} + 0;
+
+    const float* a0k_p = &a[0 * inner];
+    const float* a1k_p = &a[1 * inner];
+    const float* a2k_p = &a[2 * inner];
+    const float* a3k_p = &a[3 * inner];
+    const float* a4k_p = &a[4 * inner];
+    const float* a5k_p = &a[5 * inner];
+    const float* a6k_p = &a[6 * inner];
+    const float* a7k_p = &a[7 * inner];
+
+    for (int k = 0; k < inner; k++) {
+        vec8 bk = *((vec8*)&b[k * n + 0]);
+        
+        vec8 a0k = vec8{} + *a0k_p++;        
+        vec8 a1k = vec8{} + *a1k_p++;
+        vec8 a2k = vec8{} + *a2k_p++;
+        vec8 a3k = vec8{} + *a3k_p++;
+        
+        c0 += a0k * bk;
+        c1 += a1k * bk;
+        c2 += a2k * bk;
+        c3 += a3k * bk;
+        
+        
+        vec8 a4k = vec8{} + *a4k_p++;        
+        vec8 a5k = vec8{} + *a5k_p++;
+        vec8 a6k = vec8{} + *a6k_p++;
+        vec8 a7k = vec8{} + *a7k_p++;
+        
+        c4 += a4k * bk;
+        c5 += a5k * bk;
+        c6 += a6k * bk;
+        c7 += a7k * bk;
+
+    }
+    *((vec8*)&c[0 * n]) += c0;
+    *((vec8*)&c[1 * n]) += c1;
+    *((vec8*)&c[2 * n]) += c2;
+    *((vec8*)&c[3 * n]) += c3;
+    *((vec8*)&c[4 * n]) += c4;
+    *((vec8*)&c[5 * n]) += c5;
+    *((vec8*)&c[6 * n]) += c6;
+    *((vec8*)&c[7 * n]) += c7;
 }
+
+void matmul11(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    for (int j = 0; j < n; j += 8) {
+        for (int i = 0; i < m; i += 8) {
+            kernel8x8_11(m, n, inner, &a[i * inner], &b[j], &c[i * n + j]);
+        }
+    }
+}
+
+constexpr int M_BLOCK = 256;
+constexpr int INNER_BLOCK = 128;
+
+void micro_kernel(int n, int inner_block, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    vec8 c0 = vec8{} + 0;
+    vec8 c1 = vec8{} + 0;
+    vec8 c2 = vec8{} + 0;
+    vec8 c3 = vec8{} + 0;
+    vec8 c4 = vec8{} + 0;
+    vec8 c5 = vec8{} + 0;
+    vec8 c6 = vec8{} + 0;
+    vec8 c7 = vec8{} + 0;
+
+    const float* a0k_p = &a[0 * INNER_BLOCK];
+    const float* a1k_p = &a[1 * INNER_BLOCK];
+    const float* a2k_p = &a[2 * INNER_BLOCK];
+    const float* a3k_p = &a[3 * INNER_BLOCK];
+    const float* a4k_p = &a[4 * INNER_BLOCK];
+    const float* a5k_p = &a[5 * INNER_BLOCK];
+    const float* a6k_p = &a[6 * INNER_BLOCK];
+    const float* a7k_p = &a[7 * INNER_BLOCK];
+
+    for (int k = 0; k < inner_block; k++) {
+        vec8 bk = *((vec8*)&b[k * n]);
+        
+        vec8 a0k = vec8{} + *a0k_p++;    
+        vec8 a1k = vec8{} + *a1k_p++;
+        vec8 a2k = vec8{} + *a2k_p++;
+        vec8 a3k = vec8{} + *a3k_p++;
+        
+        c0 += a0k * bk;
+        c1 += a1k * bk;
+        c2 += a2k * bk;
+        c3 += a3k * bk;
+        
+        
+        vec8 a4k = vec8{} + *a4k_p++;        
+        vec8 a5k = vec8{} + *a5k_p++;
+        vec8 a6k = vec8{} + *a6k_p++;
+        vec8 a7k = vec8{} + *a7k_p++;
+        
+        c4 += a4k * bk;
+        c5 += a5k * bk;
+        c6 += a6k * bk;
+        c7 += a7k * bk;
+    }
+    *((vec8*)&c[0 * n]) += c0;
+    *((vec8*)&c[1 * n]) += c1;
+    *((vec8*)&c[2 * n]) += c2;
+    *((vec8*)&c[3 * n]) += c3;
+    *((vec8*)&c[4 * n]) += c4;
+    *((vec8*)&c[5 * n]) += c5;
+    *((vec8*)&c[6 * n]) += c6;
+    *((vec8*)&c[7 * n]) += c7;
+}
+
+void pack_matrix_a(int inner, int inner_block, const float* __restrict__ a, float* __restrict__ packed_a) {    
+    for (int i = 0; i < 8; i++) {
+        const float* a_ptr = &a[i * inner];        
+        for (int j = 0; j < inner_block; j++) {
+            *(packed_a + j) = *(a_ptr + j);
+        }
+        packed_a += INNER_BLOCK;
+    }
+}
+
+void macro_kernel(int m_block, int n, int inner, int inner_block, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    alignas(32) float packed_a[M_BLOCK * INNER_BLOCK];
+    for (int j = 0; j < n; j += 8) {
+        for (int i = 0; i < m_block; i += 8) {
+            if (j == 0) {
+                pack_matrix_a(inner, inner_block, &a[i * inner], &packed_a[i * INNER_BLOCK]);
+            }
+            micro_kernel(n, inner_block, &packed_a[i * INNER_BLOCK], &b[j], &c[i * n + j]);
+        }
+    }
+}
+
+void matmul12(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    for (int k = 0; k < inner; k += INNER_BLOCK) {
+        int inner_block = min(inner - k, INNER_BLOCK);
+        for (int i = 0; i < m; i += M_BLOCK) {
+            int m_block = min(m - i, M_BLOCK);
+            macro_kernel(m_block, n, inner, inner_block, &a[i * inner + k], &b[k * n], &c[i * n]);
+        }
+    }
+}
+
+void micro_kernel13(int n, int inner_block, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    vec8 c0 = vec8{} + 0;
+    vec8 c1 = vec8{} + 0;
+    vec8 c2 = vec8{} + 0;
+    vec8 c3 = vec8{} + 0;
+    vec8 c4 = vec8{} + 0;
+    vec8 c5 = vec8{} + 0;
+    vec8 c6 = vec8{} + 0;
+    vec8 c7 = vec8{} + 0;
+
+    const float* a0k_p = &a[0 * INNER_BLOCK];
+    const float* a1k_p = &a[1 * INNER_BLOCK];
+    const float* a2k_p = &a[2 * INNER_BLOCK];
+    const float* a3k_p = &a[3 * INNER_BLOCK];
+    const float* a4k_p = &a[4 * INNER_BLOCK];
+    const float* a5k_p = &a[5 * INNER_BLOCK];
+    const float* a6k_p = &a[6 * INNER_BLOCK];
+    const float* a7k_p = &a[7 * INNER_BLOCK];
+
+    for (int k = 0; k < inner_block; k++) {
+        vec8 bk = *((vec8*)&b[k * n]);
+        
+        vec8 a0k = vec8{} + *a0k_p++;    
+        vec8 a1k = vec8{} + *a1k_p++;
+        vec8 a2k = vec8{} + *a2k_p++;
+        vec8 a3k = vec8{} + *a3k_p++;
+        
+        c0 += a0k * bk;
+        c1 += a1k * bk;
+        c2 += a2k * bk;
+        c3 += a3k * bk;
+        
+        
+        vec8 a4k = vec8{} + *a4k_p++;        
+        vec8 a5k = vec8{} + *a5k_p++;
+        vec8 a6k = vec8{} + *a6k_p++;
+        vec8 a7k = vec8{} + *a7k_p++;
+        
+        c4 += a4k * bk;
+        c5 += a5k * bk;
+        c6 += a6k * bk;
+        c7 += a7k * bk;
+    }
+    *((vec8*)&c[0 * n]) += c0;
+    *((vec8*)&c[1 * n]) += c1;
+    *((vec8*)&c[2 * n]) += c2;
+    *((vec8*)&c[3 * n]) += c3;
+    *((vec8*)&c[4 * n]) += c4;
+    *((vec8*)&c[5 * n]) += c5;
+    *((vec8*)&c[6 * n]) += c6;
+    *((vec8*)&c[7 * n]) += c7;
+}
+
+void pack_matrix_b(int n, int inner_block, const float* __restrict__ b, float* __restrict__ packed_b) {    
+    for (int i = 0; i < inner_block; i++) {
+        const float* b_ptr = &b[i * n];
+        for (int j = 0; j < 8; j++) {
+            *(packed_b + j) = *(b_ptr + j);
+        }
+        packed_b += 4096;
+    }
+}
+
+void macro_kernel13(int m_block, int n, int inner, int inner_block, bool first, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    alignas(32) float packed_a[M_BLOCK * INNER_BLOCK];
+    alignas(32) static float packed_b[INNER_BLOCK * 4096];
+    for (int j = 0; j < n; j += 8) {
+        if (first) {
+            pack_matrix_b(n, inner_block, &b[j], &packed_b[j]);
+        }
+        for (int i = 0; i < m_block; i += 8) {
+            if (j == 0) {
+                pack_matrix_a(inner, inner_block, &a[i * inner], &packed_a[i * INNER_BLOCK]);
+            }
+            micro_kernel13(n, inner_block, &packed_a[i * INNER_BLOCK], &packed_b[j], &c[i * n + j]);
+        }
+    }
+}
+
+void matmul13(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    for (int k = 0; k < inner; k += INNER_BLOCK) {
+        int inner_block = min(inner - k, INNER_BLOCK);
+        for (int i = 0; i < m; i += M_BLOCK) {
+            int m_block = min(m - i, M_BLOCK);
+            macro_kernel13(m_block, n, inner, inner_block, i == 0, &a[i * inner + k], &b[k * n], &c[i * n]);
+        }
+    }
+}
+
+constexpr int N_BLOCK = 512;
+
+void micro_kernel14(int n, int inner_block, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    vec8 c0 = vec8{} + 0;
+    vec8 c1 = vec8{} + 0;
+    vec8 c2 = vec8{} + 0;
+    vec8 c3 = vec8{} + 0;
+    vec8 c4 = vec8{} + 0;
+    vec8 c5 = vec8{} + 0;
+    vec8 c6 = vec8{} + 0;
+    vec8 c7 = vec8{} + 0;
+
+    const float* a0k_p = &a[0 * INNER_BLOCK];
+    const float* a1k_p = &a[1 * INNER_BLOCK];
+    const float* a2k_p = &a[2 * INNER_BLOCK];
+    const float* a3k_p = &a[3 * INNER_BLOCK];
+    const float* a4k_p = &a[4 * INNER_BLOCK];
+    const float* a5k_p = &a[5 * INNER_BLOCK];
+    const float* a6k_p = &a[6 * INNER_BLOCK];
+    const float* a7k_p = &a[7 * INNER_BLOCK];
+
+    for (int k = 0; k < inner_block; k++) {
+        vec8 bk = *((vec8*)&b[k * N_BLOCK]);
+        
+        vec8 a0k = vec8{} + *a0k_p++;    
+        vec8 a1k = vec8{} + *a1k_p++;
+        vec8 a2k = vec8{} + *a2k_p++;
+        vec8 a3k = vec8{} + *a3k_p++;
+        
+        c0 += a0k * bk;
+        c1 += a1k * bk;
+        c2 += a2k * bk;
+        c3 += a3k * bk;
+        
+        
+        vec8 a4k = vec8{} + *a4k_p++;        
+        vec8 a5k = vec8{} + *a5k_p++;
+        vec8 a6k = vec8{} + *a6k_p++;
+        vec8 a7k = vec8{} + *a7k_p++;
+        
+        c4 += a4k * bk;
+        c5 += a5k * bk;
+        c6 += a6k * bk;
+        c7 += a7k * bk;
+    }
+    *((vec8*)&c[0 * n]) += c0;
+    *((vec8*)&c[1 * n]) += c1;
+    *((vec8*)&c[2 * n]) += c2;
+    *((vec8*)&c[3 * n]) += c3;
+    *((vec8*)&c[4 * n]) += c4;
+    *((vec8*)&c[5 * n]) += c5;
+    *((vec8*)&c[6 * n]) += c6;
+    *((vec8*)&c[7 * n]) += c7;
+}
+
+void pack_matrix_a14(int inner, int inner_block, const float* __restrict__ a, float* __restrict__ packed_a) {    
+    for (int i = 0; i < 8; i++) {
+        const float* a_ptr = &a[i * inner];        
+        for (int j = 0; j < inner_block; j++) {
+            *(packed_a + j) = *(a_ptr + j);
+        }
+        packed_a += INNER_BLOCK;
+    }
+}
+
+void pack_matrix_b14(int n, int inner_block, const float* __restrict__ b, float* __restrict__ packed_b) {    
+    for (int i = 0; i < inner_block; i++) {
+        const float* b_ptr = &b[i * n];
+        for (int j = 0; j < 8; j++) {
+            *(packed_b + j) = *(b_ptr + j);
+        }
+        packed_b += N_BLOCK;
+    }
+}
+
+void macro_kernel14(int m_block, int n, int inner, int inner_block, bool first, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    alignas(32) float packed_a[M_BLOCK * INNER_BLOCK];
+    alignas(32) static float packed_b[INNER_BLOCK * N_BLOCK];
+    for (int j = 0; j < N_BLOCK; j += 8) {
+        if (first) {
+            pack_matrix_b14(n, inner_block, &b[j], &packed_b[j]);
+        }
+        for (int i = 0; i < m_block; i += 8) {
+            if (j == 0) {
+                pack_matrix_a14(inner, inner_block, &a[i * inner], &packed_a[i * INNER_BLOCK]);
+            }
+            micro_kernel14(n, inner_block, &packed_a[i * INNER_BLOCK], &packed_b[j], &c[i * n + j]);
+        }
+    }
+}
+
+void matmul14(int m, int n, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    for (int k = 0; k < inner; k += INNER_BLOCK) {
+        int inner_block = min(inner - k, INNER_BLOCK);
+        for (int j = 0; j < n; j += N_BLOCK) {
+            for (int i = 0; i < m; i += M_BLOCK) {
+                int m_block = min(m - i, M_BLOCK);
+                macro_kernel14(m_block, n, inner, inner_block, i == 0, &a[i * inner + k], &b[k * n + j], &c[i * n + j]);
+            }
+        }        
+    }
+}
+
+// int main() {
+//     const int M = 2048;
+//     const int INNER = 2048;
+//     const int N = 4096;
+//     float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//     float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//     float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//     rinit(a, M * INNER);
+//     rinit(b, INNER * N);
+//     memset(c, 0, sizeof(float) * M * N);
+//     matmul14(M, N, INNER, a, b, c);
+//     cout << c[0] << ' ' << c[M * N - 1] << endl;
+// }

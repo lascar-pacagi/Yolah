@@ -10,7 +10,7 @@ find_package(benchmark REQUIRED)
 
 include_directories(../misc ../game ../nnue ../vcl ../eigen)
 add_executable(Benchmarks main.cpp matmul.cpp ../game/game.cpp ../game/zobrist.cpp ../game/magic.cpp)
-target_compile_options(Benchmarks PRIVATE -Wall -O3 -march=native -ffast-math -funroll-loops)
+target_compile_options(Benchmarks PRIVATE -Wall -O3 -march=native -mavx2 -ffast-math -funroll-loops)
 
 target_include_directories(Benchmarks PRIVATE ${Boost_INCLUDE_DIR})
 target_link_libraries(Benchmarks PRIVATE ${Boost_LIBRARIES})
