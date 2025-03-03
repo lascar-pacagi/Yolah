@@ -9,8 +9,10 @@
 #include <tuple>
 #include "Eigen/Dense"
 #include "matmul.h"
-using namespace std;
+#include "matvec.h"
+#include "util.h"
 
+using namespace std;
 
 static void duration_helper(uint32_t mask, uint64_t n) {
     using namespace std::chrono;
@@ -170,146 +172,11 @@ static void matmul_basic(benchmark::State& state) {
   }
 }
 
-constexpr size_t M = 64;
-constexpr size_t INNER = 2048 * 2;
-constexpr size_t N = 64;
+// constexpr size_t M = 64;
+// constexpr size_t INNER = 2048 * 2;
+// constexpr size_t N = 8;
 
-static void mm1(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul1(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm2(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul2(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm3(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul3(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm4(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul4(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm5(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul5(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm6(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul6(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm7(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul7(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm8(benchmark::State& state) {
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul8(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-static void mm9(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
-  rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
-  //float res = 0;
-  //benchmark::DoNotOptimize(res);
-  for (auto _ : state) {
-    matmul9(M, N, INNER, a, b, c);
-    //res += c[0];
-  }
-}
-
-// static void mm10(benchmark::State& state) {  
+// static void mm1(benchmark::State& state) {
 //   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
 //   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
 //   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
@@ -319,67 +186,295 @@ static void mm9(benchmark::State& state) {
 //   //float res = 0;
 //   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
-//     matmul10(M, N, INNER, a, b, c);
+//     matmul1(M, N, INNER, a, b, c);
 //     //res += c[0];
 //   }
 // }
 
-static void mm11(benchmark::State& state) {  
+// static void mm2(benchmark::State& state) {
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul2(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm3(benchmark::State& state) {
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul3(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm4(benchmark::State& state) {
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul4(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm5(benchmark::State& state) {
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul5(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm6(benchmark::State& state) {
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul6(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm7(benchmark::State& state) {
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul7(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm8(benchmark::State& state) {
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul8(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm9(benchmark::State& state) {  
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul9(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// // static void mm10(benchmark::State& state) {  
+// //   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+// //   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+// //   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+// //   rinit(a, M * INNER);
+// //   rinit(b, INNER * N);
+// //   memset(c, 0, sizeof(float) * M * N);
+// //   //float res = 0;
+// //   //benchmark::DoNotOptimize(res);
+// //   for (auto _ : state) {
+// //     matmul10(M, N, INNER, a, b, c);
+// //     //res += c[0];
+// //   }
+// // }
+
+// static void mm11(benchmark::State& state) {  
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul11(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm12(benchmark::State& state) {  
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul12(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm13(benchmark::State& state) {  
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul13(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+// static void mm14(benchmark::State& state) {  
+//   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+//   float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
+//   float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+//   rinit(a, M * INNER);
+//   rinit(b, INNER * N);
+//   memset(c, 0, sizeof(float) * M * N);
+//   //float res = 0;
+//   //benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {
+//     matmul14(M, N, INNER, a, b, c);
+//     //res += c[0];
+//   }
+// }
+
+constexpr size_t M = 64;
+constexpr size_t INNER = 4096;
+
+static void mv1(benchmark::State& state) {  
   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
   //float res = 0;
   //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
-    matmul11(M, N, INNER, a, b, c);
+    matvec1(M, INNER, a, b, c);
     //res += c[0];
   }
 }
 
-static void mm12(benchmark::State& state) {  
+static void mv2(benchmark::State& state) {  
   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
   //float res = 0;
   //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
-    matmul12(M, N, INNER, a, b, c);
+    matvec2(M, INNER, a, b, c);
     //res += c[0];
   }
 }
 
-static void mm13(benchmark::State& state) {  
+static void mv3(benchmark::State& state) {  
   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
   //float res = 0;
   //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
-    matmul13(M, N, INNER, a, b, c);
+    matvec3(M, INNER, a, b, c);
     //res += c[0];
   }
 }
 
-static void mm14(benchmark::State& state) {  
+static void mv4(benchmark::State& state) {  
   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER * N);
-  float* c = (float*)std::aligned_alloc(32, 32 * M * N);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
-  rinit(b, INNER * N);
-  memset(c, 0, sizeof(float) * M * N);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
   //float res = 0;
   //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
-    matmul14(M, N, INNER, a, b, c);
+    matvec4(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mv5(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  rinit(a, M * INNER);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec5(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mv6(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  rinit(a, M * INNER);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec6(M, INNER, a, b, c);
     //res += c[0];
   }
 }
@@ -388,18 +483,24 @@ static void mm14(benchmark::State& state) {
 // BENCHMARK(matmul_eigen);
 // BENCHMARK(matmul_basic);
 //BENCHMARK(mm1);
-BENCHMARK(mm2);
+//BENCHMARK(mm2);
 // BENCHMARK(mm3);
 // BENCHMARK(mm4);
 // BENCHMARK(mm5);
 // BENCHMARK(mm6);
 // BENCHMARK(mm7);
 // BENCHMARK(mm8);
-BENCHMARK(mm9);
+//BENCHMARK(mm9);
 //BENCHMARK(mm10);
-BENCHMARK(mm11);
-BENCHMARK(mm12);
-BENCHMARK(mm13);
-BENCHMARK(mm14);
+//BENCHMARK(mm11);
+//BENCHMARK(mm12);
+//BENCHMARK(mm13);
+//BENCHMARK(mm14);
+BENCHMARK(mv1);
+BENCHMARK(mv2);
+BENCHMARK(mv3);
+BENCHMARK(mv4);
+BENCHMARK(mv5);
+BENCHMARK(mv6);
 
 BENCHMARK_MAIN();

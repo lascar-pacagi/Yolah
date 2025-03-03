@@ -1,6 +1,5 @@
 #pragma once
 
-void rinit(float* a, int n);
 void matmul1(int m, int n, int inner, const float* a, const float* b, float* c);
 void matmul2(int m, int n, int inner, const float* a, const float* b, float* c);
 //void kernel4x4_3(int m, int n, int inner, const float* a, const float* b, float* c);

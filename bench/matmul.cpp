@@ -1,14 +1,8 @@
 #include <bits/stdc++.h>
 #include "matmul.h"
-using namespace std;
+#include "util.h"
 
-void rinit(float* a, int n) {
-    std::default_random_engine g(42);
-    std::uniform_real_distribution<float> d;
-    for (int i = 0; i < n; i++) {
-        a[i] = d(g); 
-    }
-}
+using namespace std;
 
 
 // c += a * b
@@ -808,6 +802,6 @@ void matmul14(int m, int n, int inner, const float* __restrict__ a, const float*
 //     rinit(a, M * INNER);
 //     rinit(b, INNER * N);
 //     memset(c, 0, sizeof(float) * M * N);
-//     matmul14(M, N, INNER, a, b, c);
+//     matmul12(M, N, INNER, a, b, c);
 //     cout << c[0] << ' ' << c[M * N - 1] << endl;
 // }
