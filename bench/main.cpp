@@ -387,7 +387,7 @@ static void matmul_basic(benchmark::State& state) {
 // }
 
 constexpr size_t M = 64;
-constexpr size_t INNER = 4096;
+constexpr size_t INNER = 64;
 
 static void mv1(benchmark::State& state) {  
   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
@@ -479,6 +479,82 @@ static void mv6(benchmark::State& state) {
   }
 }
 
+static void mv7(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  rinit(a, M * INNER);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec7(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mv8(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  rinit(a, M * INNER);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec8(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mv9(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  rinit(a, M * INNER);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec9(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mv10(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  rinit(a, M * INNER);
+  rinit(b, INNER);
+  memset(c, 0, sizeof(float) * M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec10(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void mv3x64_1(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * 3 * 64);
+  float* b = (float*)std::aligned_alloc(32, 32 * 64);
+  float* c = (float*)std::aligned_alloc(32, 32 * 3);
+  rinit(a, 3 * 64);
+  rinit(b, 64);
+  memset(c, 0, sizeof(float) * 3);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec3x64_1(a, b, c);
+    //res += c[0];
+  }
+}
+
+
 // BENCHMARK(nnue);
 // BENCHMARK(matmul_eigen);
 // BENCHMARK(matmul_basic);
@@ -502,5 +578,10 @@ BENCHMARK(mv3);
 BENCHMARK(mv4);
 BENCHMARK(mv5);
 BENCHMARK(mv6);
+BENCHMARK(mv7);
+BENCHMARK(mv8);
+BENCHMARK(mv9);
+BENCHMARK(mv10);
+BENCHMARK(mv3x64_1);
 
 BENCHMARK_MAIN();
