@@ -385,7 +385,81 @@ void matvec3x64_1(const float* __restrict__ a, const float* __restrict__ b, floa
     }
 }
 
-// int main() {
+void matvec_int1(int m, int inner, const int8_t* __restrict__ a, const int8_t* __restrict__ b, int8_t* __restrict__ c) {
+    for (int i = 0; i < m; i++) {
+        int8_t sum = 0;
+        for (int j = 0; j < inner; j++) {
+            sum += a[i * inner + j] * b[j];
+        }
+        c[i] = sum;
+    }
+}
+
+typedef int8_t vec32 __attribute__ (( vector_size(32) ));
+
+void matvec_int2(int m, int inner, const int8_t* __restrict__ a, const int8_t* __restrict__ b, int8_t* __restrict__ c) {
+    for (int i = 0; i < m; i += 256) { 
+        vec32 sum[8]{};
+        for (int j = 0; j < inner; j++) {
+            vec32 bb = vec32{} + b[j];
+            const vec32* aa = (vec32*)&a[j * m + i];
+            for (int k = 0; k < 8; k++) {
+                sum[k] += aa[k] * bb;
+            }
+        }
+        for (int k = 0; k < 8; k++) {
+            *((vec32*)&c[i + k * 32]) = sum[k];
+        }
+    }
+}
+
+void addvec1(int n, float* a, const float* __restrict__ b) {
+    for (int i = 0; i < n; i++) {
+        a[i] += b[i];
+    }
+}
+
+void addvec2(int n, float* a, const float* __restrict__ b) {
+    vec8* aa = (vec8*)a;
+    const vec8* bb = (vec8*)b;
+    int m = n / 8;
+    for (int i = 0; i < m; i++) {
+        aa[i] += bb[i];
+    }
+}
+
+nnue::nnue() {
+    acc = (float*)std::aligned_alloc(32, 32 * (H1 + H2));
+    rinit(acc, H1 + H2);
+    h1_to_h2 = (float*)std::aligned_alloc(32, 32 * H1 * H2);
+    rinit(h1_to_h2, H1 * H2);
+    h2_to_h3 = (float*)std::aligned_alloc(32, 32 * H2 * H3);
+    rinit(h2_to_h3, H2 * H3);
+    h3_to_output = (float*)std::aligned_alloc(32, 32 * H3 * OUTPUT);
+    rinit(h3_to_output, H3 * OUTPUT);
+}
+
+nnue::~nnue() {    
+    delete[] acc;
+    delete[] h1_to_h2;
+    delete[] h2_to_h3;
+    delete[] h3_to_output;    
+}
+
+float nnue::output() {
+    matvec8(H2, H1, h1_to_h2, acc, acc + H1);
+    matvec8(H3, H2, h2_to_h3, acc + H1, acc);
+    matvec3x64_1(h3_to_output, acc, acc + H2);
+    const float* output = acc + H2;
+    float e1 = std::exp(output[0]);
+    float e2 = std::exp(output[1]);
+    float e3 = std::exp(output[2]);
+    float sum = e1 + e2 + e3;
+    float res = e1 / sum + e2 / sum + e3 / sum;
+    return res;
+}
+
+//int main() {
 //     // const size_t M = 8192;
 //     // const size_t INNER = 2048 * 4;
 //     // float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
@@ -404,12 +478,38 @@ void matvec3x64_1(const float* __restrict__ a, const float* __restrict__ b, floa
 //     // matvec10(M, INNER, a_t, b, c);
 //     // cout << c[0] << ' ' << c[M - 1] << endl;
 
-//     float* a = (float*)std::aligned_alloc(32, 32 * 3 * 64);
-//     float* b = (float*)std::aligned_alloc(32, 32 * 64);
-//     float* c = (float*)std::aligned_alloc(32, 32 * 3);
-//     rinit(a, 64 * 3);
-//     rinit(b, 64);
-//     memset(c, 0, sizeof(float) * M);
-//     matvec3x64_1(a, b, c);
-//     cout << c[0] << ' ' << c[1] << ' ' << c[2] << '\n';
+//     // float* a = (float*)std::aligned_alloc(32, 32 * 3 * 64);
+//     // float* b = (float*)std::aligned_alloc(32, 32 * 64);
+//     // float* c = (float*)std::aligned_alloc(32, 32 * 3);
+//     // rinit(a, 64 * 3);
+//     // rinit(b, 64);
+//     // memset(c, 0, sizeof(float) * M);
+//     // matvec3x64_1(a, b, c);
+//     // cout << c[0] << ' ' << c[1] << ' ' << c[2] << '\n';
+
+//     // const size_t N = 2048 * 2;
+//     // float* a = (float*)std::aligned_alloc(32, 32 * N);
+//     // float* b = (float*)std::aligned_alloc(32, 32 * N);
+//     // rinit(a, N);
+//     // rinit(b, N);
+//     // addvec2(N, a, b);
+//     // cout << a[0] << ' ' << a[N - 1] << '\n';
+//     nnue net;
+//     cout << net.output() << '\n';
+//     const size_t M = 8192;
+//     const size_t INNER = 2048 * 4;
+//     int8_t* a = (int8_t*)std::aligned_alloc(32, M * INNER);
+//     int8_t* a_t = (int8_t*)std::aligned_alloc(32, M * INNER);
+//     int8_t* b = (int8_t*)std::aligned_alloc(32, INNER);
+//     int8_t* c = (int8_t*)std::aligned_alloc(32, M);
+//     rinit_int8(a, M * INNER);
+//     rinit_int8(b, INNER);
+//     memset(c, 0, M);
+//     for (int i = 0; i < M; i++) {
+//         for (int j = 0; j < INNER; j++) {
+//             a_t[j * M + i] = a[i * INNER + j];
+//         }
+//     }
+//     matvec_int2(M, INNER, a_t, b, c);
+//     cout << (int)c[0] << ' ' << (int)c[M - 1] << '\n';
 // }

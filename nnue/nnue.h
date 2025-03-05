@@ -12,6 +12,11 @@
 // black positions + white positions + empty positions + occupied positions + free positions + turn 
 constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
 constexpr size_t OUTPUT_SIZE = 3;
+
+class NNUE {
+
+};
+
 /*
 constexpr int VECTOR_LANES = 8;
 constexpr int VECTOR_SIZE = 4 * VECTOR_LANES;
@@ -270,6 +275,7 @@ public:
     }
 };
 */
+/*
 using MatrixXf = Eigen::MatrixXf;
 using RowVectorXf = Eigen::RowVectorXf;
 using VectorXf = Eigen::VectorXf;
@@ -438,7 +444,7 @@ public:
                 - turn;
     }
 };
-
+*/
 /*
 // black positions + white positions + empty positions + occupied positions + free positions + turn 
 constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;

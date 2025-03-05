@@ -60,40 +60,40 @@ static void duration0xffff(benchmark::State& state) {
 // BENCHMARK(duration0xf);
 // BENCHMARK(duration0xffff);
 
-template <size_t H1_SIZE, size_t H2_SIZE, size_t H3_SIZE>
-static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE>& nnue, 
-                        typename NNUE<H1_SIZE, H2_SIZE, H3_SIZE>::Accumulator& acc, 
-                        size_t nb_games = 1000) {
-  float res = 0;
-  PRNG prng(42);
-  for (size_t i = 0; i < nb_games; i++) {
-    Yolah yolah;
-    nnue.init(yolah, acc);
-    Yolah::MoveList moves;
-    while (!yolah.game_over()) {
-        yolah.moves(moves);        
-        Move m = moves[prng.rand<size_t>() % moves.size()];
-        const auto [black_proba, ignore, white_proba] = nnue.output_softmax(acc);
-        res += black_proba - white_proba;
-        nnue.play(yolah.current_player(), m, acc);
-        yolah.play(m);
-    }
-  }
-  return res;
-}
+// template <size_t H1_SIZE, size_t H2_SIZE, size_t H3_SIZE>
+// static float nnue_helper(NNUE<H1_SIZE, H2_SIZE, H3_SIZE>& nnue, 
+//                         typename NNUE<H1_SIZE, H2_SIZE, H3_SIZE>::Accumulator& acc, 
+//                         size_t nb_games = 1000) {
+//   float res = 0;
+//   PRNG prng(42);
+//   for (size_t i = 0; i < nb_games; i++) {
+//     Yolah yolah;
+//     nnue.init(yolah, acc);
+//     Yolah::MoveList moves;
+//     while (!yolah.game_over()) {
+//         yolah.moves(moves);        
+//         Move m = moves[prng.rand<size_t>() % moves.size()];
+//         const auto [black_proba, ignore, white_proba] = nnue.output_softmax(acc);
+//         res += black_proba - white_proba;
+//         nnue.play(yolah.current_player(), m, acc);
+//         yolah.play(m);
+//     }
+//   }
+//   return res;
+// }
 
-static void nnue(benchmark::State& state) {
-  zobrist::init();
-  magic::init();  
-  NNUE<4096, 64, 64> nnue;
-  auto acc = nnue.make_accumulator();
-  nnue.load("../../nnue/nnue_parameters.txt");
-  float res = 0;
-  benchmark::DoNotOptimize(res);
-  for (auto _ : state) {    
-    res += nnue_helper(nnue, acc, 1000);
-  }
-}
+// static void nnue1(benchmark::State& state) {
+//   zobrist::init();
+//   magic::init();  
+//   NNUE<4096, 64, 64> nnue;
+//   auto acc = nnue.make_accumulator();
+//   nnue.load("../../nnue/nnue_parameters.txt");
+//   float res = 0;
+//   benchmark::DoNotOptimize(res);
+//   for (auto _ : state) {    
+//     res += nnue_helper(nnue, acc, 1000);
+//   }
+// }
 
 static void matmul_eigen(benchmark::State& state) {
   constexpr size_t N = 1000;
@@ -386,8 +386,8 @@ static void matmul_basic(benchmark::State& state) {
 //   }
 // }
 
-constexpr size_t M = 64;
-constexpr size_t INNER = 64;
+constexpr size_t M = 256;
+constexpr size_t INNER = 4096;
 
 static void mv1(benchmark::State& state) {  
   float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
@@ -554,8 +554,70 @@ static void mv3x64_1(benchmark::State& state) {
   }
 }
 
+static void mv_int1(benchmark::State& state) {  
+  int8_t* a = (int8_t*)std::aligned_alloc(32, M * INNER);
+  int8_t* b = (int8_t*)std::aligned_alloc(32, INNER);
+  int8_t* c = (int8_t*)std::aligned_alloc(32, M);
+  rinit_int8(a, M * INNER);
+  rinit_int8(b, INNER);
+  memset(c, 0, M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec_int1(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
 
-// BENCHMARK(nnue);
+static void mv_int2(benchmark::State& state) {  
+  int8_t* a = (int8_t*)std::aligned_alloc(32, M * INNER);
+  int8_t* b = (int8_t*)std::aligned_alloc(32, INNER);
+  int8_t* c = (int8_t*)std::aligned_alloc(32, M);
+  rinit_int8(a, M * INNER);
+  rinit_int8(b, INNER);
+  memset(c, 0, M);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    matvec_int2(M, INNER, a, b, c);
+    //res += c[0];
+  }
+}
+
+static void addvec1(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  rinit(a, INNER);
+  rinit(b, INNER);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    addvec1(INNER, a, b);
+    //res += c[0];
+  }
+}
+
+static void addvec2(benchmark::State& state) {  
+  float* a = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  rinit(a, INNER);
+  rinit(b, INNER);
+  //float res = 0;
+  //benchmark::DoNotOptimize(res);
+  for (auto _ : state) {
+    addvec2(INNER, a, b);
+    //res += c[0];
+  }
+}
+
+static void nnue2(benchmark::State& state) {  
+  nnue net;
+  for (auto _ : state) {
+    net.output();
+  }
+}
+
+// BENCHMARK(nnue1);
 // BENCHMARK(matmul_eigen);
 // BENCHMARK(matmul_basic);
 //BENCHMARK(mm1);
@@ -572,16 +634,21 @@ static void mv3x64_1(benchmark::State& state) {
 //BENCHMARK(mm12);
 //BENCHMARK(mm13);
 //BENCHMARK(mm14);
-BENCHMARK(mv1);
-BENCHMARK(mv2);
-BENCHMARK(mv3);
-BENCHMARK(mv4);
-BENCHMARK(mv5);
-BENCHMARK(mv6);
-BENCHMARK(mv7);
+// BENCHMARK(mv1);
+// BENCHMARK(mv2);
+// BENCHMARK(mv3);
+// BENCHMARK(mv4);
+// BENCHMARK(mv5);
+// BENCHMARK(mv6);
+// BENCHMARK(mv7);
 BENCHMARK(mv8);
-BENCHMARK(mv9);
-BENCHMARK(mv10);
-BENCHMARK(mv3x64_1);
+// BENCHMARK(mv9);
+// BENCHMARK(mv10);
+// BENCHMARK(mv3x64_1);
+// BENCHMARK(addvec1);
+// BENCHMARK(addvec2);
+BENCHMARK(nnue2);
+BENCHMARK(mv_int1);
+BENCHMARK(mv_int2);
 
 BENCHMARK_MAIN();
