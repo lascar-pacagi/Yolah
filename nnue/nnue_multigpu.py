@@ -129,18 +129,18 @@ def ddp_setup(rank, world_size):
 def dataloader_ddp(trainset, batch_size):
     sampler_train = DistributedSampler(trainset)
     train_loader = DataLoader(
-        trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train, num_workers=8
+        trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train, num_workers=0
     )
     return train_loader, sampler_train
 
 class TrainerDDP:
-    def __init__(self, gpu_id, model, train_loader, sampler_train, lr_step_size=40, save_every=10):
+    def __init__(self, gpu_id, model, train_loader, sampler_train, lr_step_size=20, save_every=5):
         self.gpu_id = gpu_id
         self.model = model.to(self.gpu_id)
         self.train_loader = train_loader
         self.sampler_train = sampler_train
         self.save_every = save_every
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.07, momentum=0.9, weight_decay=0)
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, lr_step_size)
         self.loss_fn = torch.nn.CrossEntropyLoss()
         torch.cuda.set_device(gpu_id)
@@ -197,4 +197,4 @@ def main(rank, world_size, batch_size):
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    mp.spawn(main, args=(world_size, 512), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 256), nprocs=world_size)

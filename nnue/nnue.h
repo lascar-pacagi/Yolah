@@ -13,8 +13,18 @@
 constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
 constexpr size_t OUTPUT_SIZE = 3;
 
-class NNUE {
-
+struct NNUE {  
+    static constexpr int H1 = 4096;
+    static constexpr int H2 = 64;
+    static constexpr int H3 = 64;
+    static constexpr int OUTPUT = 3;  
+    float* acc;
+    float* h1_to_h2;
+    float* h2_to_h3;
+    float* h3_to_output;
+    nnue();
+    float output();
+    ~nnue();
 };
 
 /*
