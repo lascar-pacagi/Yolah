@@ -386,13 +386,13 @@ static void matmul_basic(benchmark::State& state) {
 //   }
 // }
 
-constexpr size_t M = 256;
+constexpr size_t M = 64;
 constexpr size_t INNER = 4096;
 
 static void mv1(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -405,9 +405,9 @@ static void mv1(benchmark::State& state) {
 }
 
 static void mv2(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -420,9 +420,9 @@ static void mv2(benchmark::State& state) {
 }
 
 static void mv3(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -435,9 +435,9 @@ static void mv3(benchmark::State& state) {
 }
 
 static void mv4(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -450,9 +450,9 @@ static void mv4(benchmark::State& state) {
 }
 
 static void mv5(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -465,9 +465,9 @@ static void mv5(benchmark::State& state) {
 }
 
 static void mv6(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -480,9 +480,9 @@ static void mv6(benchmark::State& state) {
 }
 
 static void mv7(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -495,9 +495,9 @@ static void mv7(benchmark::State& state) {
 }
 
 static void mv8(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -510,9 +510,9 @@ static void mv8(benchmark::State& state) {
 }
 
 static void mv9(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -525,9 +525,9 @@ static void mv9(benchmark::State& state) {
 }
 
 static void mv10(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * M * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* c = (float*)std::aligned_alloc(32, 32 * M);
+  float* a = (float*)aligned_alloc(32, 32 * M * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
+  float* c = (float*)aligned_alloc(32, 32 * M);
   rinit(a, M * INNER);
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
@@ -540,9 +540,9 @@ static void mv10(benchmark::State& state) {
 }
 
 static void mv3x64_1(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * 3 * 64);
-  float* b = (float*)std::aligned_alloc(32, 32 * 64);
-  float* c = (float*)std::aligned_alloc(32, 32 * 3);
+  float* a = (float*)aligned_alloc(32, 32 * 3 * 64);
+  float* b = (float*)aligned_alloc(32, 32 * 64);
+  float* c = (float*)aligned_alloc(32, 32 * 3);
   rinit(a, 3 * 64);
   rinit(b, 64);
   memset(c, 0, sizeof(float) * 3);
@@ -555,9 +555,9 @@ static void mv3x64_1(benchmark::State& state) {
 }
 
 static void mv_int1(benchmark::State& state) {  
-  int8_t* a = (int8_t*)std::aligned_alloc(32, M * INNER);
-  int8_t* b = (int8_t*)std::aligned_alloc(32, INNER);
-  int8_t* c = (int8_t*)std::aligned_alloc(32, M);
+  int8_t* a = (int8_t*)aligned_alloc(32, M * INNER);
+  int8_t* b = (int8_t*)aligned_alloc(32, INNER);
+  int8_t* c = (int8_t*)aligned_alloc(32, M);
   rinit_int8(a, M * INNER);
   rinit_int8(b, INNER);
   memset(c, 0, M);
@@ -570,9 +570,9 @@ static void mv_int1(benchmark::State& state) {
 }
 
 static void mv_int2(benchmark::State& state) {  
-  int8_t* a = (int8_t*)std::aligned_alloc(32, M * INNER);
-  int8_t* b = (int8_t*)std::aligned_alloc(32, INNER);
-  int8_t* c = (int8_t*)std::aligned_alloc(32, M);
+  int8_t* a = (int8_t*)aligned_alloc(32, M * INNER);
+  int8_t* b = (int8_t*)aligned_alloc(32, INNER);
+  int8_t* c = (int8_t*)aligned_alloc(32, M);
   rinit_int8(a, M * INNER);
   rinit_int8(b, INNER);
   memset(c, 0, M);
@@ -585,8 +585,8 @@ static void mv_int2(benchmark::State& state) {
 }
 
 static void addvec1(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* a = (float*)aligned_alloc(32, 32 * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
   rinit(a, INNER);
   rinit(b, INNER);
   //float res = 0;
@@ -598,8 +598,8 @@ static void addvec1(benchmark::State& state) {
 }
 
 static void addvec2(benchmark::State& state) {  
-  float* a = (float*)std::aligned_alloc(32, 32 * INNER);
-  float* b = (float*)std::aligned_alloc(32, 32 * INNER);
+  float* a = (float*)aligned_alloc(32, 32 * INNER);
+  float* b = (float*)aligned_alloc(32, 32 * INNER);
   rinit(a, INNER);
   rinit(b, INNER);
   //float res = 0;
@@ -620,8 +620,8 @@ static void nnue2(benchmark::State& state) {
 // BENCHMARK(nnue1);
 // BENCHMARK(matmul_eigen);
 // BENCHMARK(matmul_basic);
-//BENCHMARK(mm1);
-//BENCHMARK(mm2);
+// BENCHMARK(mm1);
+// BENCHMARK(mm2);
 // BENCHMARK(mm3);
 // BENCHMARK(mm4);
 // BENCHMARK(mm5);
@@ -634,7 +634,7 @@ static void nnue2(benchmark::State& state) {
 //BENCHMARK(mm12);
 //BENCHMARK(mm13);
 //BENCHMARK(mm14);
-// BENCHMARK(mv1);
+BENCHMARK(mv1);
 // BENCHMARK(mv2);
 // BENCHMARK(mv3);
 // BENCHMARK(mv4);
@@ -647,8 +647,8 @@ BENCHMARK(mv8);
 // BENCHMARK(mv3x64_1);
 // BENCHMARK(addvec1);
 // BENCHMARK(addvec2);
-BENCHMARK(nnue2);
-BENCHMARK(mv_int1);
-BENCHMARK(mv_int2);
+// BENCHMARK(nnue2);
+// BENCHMARK(mv_int1);
+// BENCHMARK(mv_int2);
 
 BENCHMARK_MAIN();

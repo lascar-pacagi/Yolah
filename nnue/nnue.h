@@ -14,17 +14,30 @@ constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
 constexpr size_t OUTPUT_SIZE = 3;
 
 struct NNUE {  
-    static constexpr int H1 = 4096;
-    static constexpr int H2 = 64;
-    static constexpr int H3 = 64;
-    static constexpr int OUTPUT = 3;  
-    float* acc;
-    float* h1_to_h2;
-    float* h2_to_h3;
-    float* h3_to_output;
-    nnue();
-    float output();
-    ~nnue();
+    static constexpr int H1_SIZE = 4096;
+    static constexpr int H2_SIZE = 64;
+    static constexpr int H3_SIZE = 64;
+    struct Accumulator {
+        float* acc;
+        Accumulator() {
+            acc = (float*)aligned_alloc(32, 32 * (H1_SIZE + H2_SIZE));
+            memset(acc, 4 * (H1_SIZE + H2_SIZE), 0);
+        }
+        ~Accumulator() {
+            delete[] acc;
+        }
+    };    
+    float* weights_and_biases;    
+    NNUE();
+    void load(const std::string& filename);
+    Accumulator make_accumulator() {
+        return {};
+    }
+    void init(const Yolah& yolah, Accumulator& a);
+    void play(uint8_t player, const Move& m, Accumulator& a);
+    void undo(uint8_t player, const Move& m, Accumulator& a);
+    std::tuple<float, float, float> output(Accumulator& a);
+    ~NNUE();
 };
 
 /*

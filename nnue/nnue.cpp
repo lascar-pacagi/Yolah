@@ -10,6 +10,91 @@
 #include <iostream>
 #include <iomanip>
 #include <random>
+#include <stdlib.h>
+
+typedef float vec8 __attribute__ (( vector_size(8 * 4) ));
+
+static inline void matvec(int n, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {    
+    vec8 sum[8]{};
+    for (int i = 0; i < n; i++) {
+        vec8 bb = vec8{} + b[i];
+        const vec8* aa = (vec8*)&a[i * 64];
+        for (int k = 0; k < 8; k++) {
+            sum[k] += aa[k] * bb;
+        }
+    }
+    for (int k = 0; k < 8; k++) {
+        *((vec8*)&c[k * 8]) = sum[k];
+    }
+}
+
+static inline void matvec3x64(const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {
+    for (int i = 0; i < 3; i++) {
+        float sum = 0;
+        for (int j = 0; j < 64; j++) {
+            sum += a[i * 64 + j] * b[j];
+        }
+        c[i] = sum;
+    }
+}
+
+static inline void relu(int n, float* output) {
+    for (int i = 0; i < n; i++) {
+        output[i] = output[i] >= 0 ? output[i] : 0;
+    }
+}
+
+static inline void addvec(int n, const float* __restrict__ src, float* __restrict__ dst) {
+    for (int i = 0; i < n; i++) {
+        dst[i] += src[i];
+    }
+}
+
+NNUE::NNUE() {
+    constexpr int n = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE + H3_SIZE * OUTPUT_SIZE;
+    weights_and_biases = (float*)aligned_alloc(32, 32 * n);    
+}
+
+NNUE::~NNUE() {
+    delete[] weights_and_biases;
+}
+
+std::tuple<float, float, float> NNUE::output(Accumulator& a) {
+    constexpr int H2_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE;
+    constexpr int H1_TO_H2 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE;
+    constexpr int H3_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE;
+    constexpr int H2_TO_H3 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE;
+    constexpr int OUTPUT_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE;
+    constexpr int H3_TO_OUTPUT = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE;
+    for (int i = 0; i < H1_SIZE; i++) {
+        a.acc[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
+    }
+    matvec(H1_SIZE, weights_and_biases + H1_TO_H2, a.acc, a.acc + H1_SIZE);    
+    addvec(H2_SIZE, weights_and_biases + H2_BIAS, a.acc + H1_SIZE);
+    relu(H2_SIZE, a.acc + H1_SIZE);
+    
+    matvec(H2_SIZE, weights_and_biases + H2_TO_H3, a.acc + H1_SIZE, a.acc);
+    addvec(H3_SIZE, weights_and_biases + H3_BIAS, a.acc);
+    relu(H3_SIZE, a.acc);
+    
+    matvec3x64(weights_and_biases + H3_TO_OUTPUT, a.acc, a.acc + H3_SIZE);
+    addvec(OUTPUT_SIZE, weights_and_biases + OUTPUT_BIAS, a.acc + H3_SIZE);
+
+    const float* output = a.acc + H3_SIZE;
+    float e1 = std::exp(output[0]);
+    float e2 = std::exp(output[1]);
+    float e3 = std::exp(output[2]);
+    float sum = e1 + e2 + e3;
+    return { e1 / sum, e2 / sum, e3 / sum };
+}
+
+void NNUE::load(const std::string& filename) {
+    std::ifstream ifs(filename, std::ifstream::in);
+    size_t n, m;
+    float v;
+    std::string type;
+    
+}
 
 /*
 // g++ -std=c++2a -O3 -march=native -ffast-math -funroll-loops -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp

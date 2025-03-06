@@ -318,6 +318,20 @@ void matvec8(int m, int inner, const float* __restrict__ a, const float* __restr
     }
 }
 
+// void matvec8(int m, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {        
+//     vec8 sum[8]{};
+//     for (int j = 0; j < inner; j++) {
+//         vec8 bb = vec8{} + b[j];
+//         const vec8* aa = (vec8*)&a[j * m];
+//         for (int k = 0; k < 8; k++) {
+//             sum[k] += aa[k] * bb;
+//         }
+//     }
+//     for (int k = 0; k < 8; k++) {
+//         *((vec8*)&c[k * 8]) = sum[k];
+//     }    
+// }
+
 void matvec9(int m, int inner, const float* __restrict__ a, const float* __restrict__ b, float* __restrict__ c) {    
     for (int i = 0; i < m; i += 64) {        
         vec8 sum[8]{};
