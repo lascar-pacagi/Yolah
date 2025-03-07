@@ -59,28 +59,32 @@ NNUE::~NNUE() {
     delete[] weights_and_biases;
 }
 
-std::tuple<float, float, float> NNUE::output(Accumulator& a) {
-    constexpr int H2_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE;
-    constexpr int H1_TO_H2 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE;
-    constexpr int H3_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE;
-    constexpr int H2_TO_H3 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE;
-    constexpr int OUTPUT_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE;
-    constexpr int H3_TO_OUTPUT = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE;
+NNUE::Accumulator NNUE::make_accumulator() const {
+    Accumulator a;
     for (int i = 0; i < H1_SIZE; i++) {
-        a.acc[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
+        a.acc[i] = weights_and_biases[H1_BIAS + i];
     }
-    matvec(H1_SIZE, weights_and_biases + H1_TO_H2, a.acc, a.acc + H1_SIZE);    
-    addvec(H2_SIZE, weights_and_biases + H2_BIAS, a.acc + H1_SIZE);
-    relu(H2_SIZE, a.acc + H1_SIZE);
-    
-    matvec(H2_SIZE, weights_and_biases + H2_TO_H3, a.acc + H1_SIZE, a.acc);
-    addvec(H3_SIZE, weights_and_biases + H3_BIAS, a.acc);
-    relu(H3_SIZE, a.acc);
-    
-    matvec3x64(weights_and_biases + H3_TO_OUTPUT, a.acc, a.acc + H3_SIZE);
-    addvec(OUTPUT_SIZE, weights_and_biases + OUTPUT_BIAS, a.acc + H3_SIZE);
+    return a;
+}
 
-    const float* output = a.acc + H3_SIZE;
+std::tuple<float, float, float> NNUE::output(Accumulator& a) {    
+    thread_local float h1[H1_SIZE];
+    thread_local float h2[H2_SIZE];
+    thread_local float h3[H3_SIZE];
+    thread_local float output[OUTPUT_SIZE];
+    for (int i = 0; i < H1_SIZE; i++) {
+        h1[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
+    }
+    matvec(H1_SIZE, weights_and_biases + H1_TO_H2, h1, h2);    
+    addvec(H2_SIZE, weights_and_biases + H2_BIAS, h2);
+    relu(H2_SIZE, h2);
+    
+    matvec(H2_SIZE, weights_and_biases + H2_TO_H3, h2, h3);
+    addvec(H3_SIZE, weights_and_biases + H3_BIAS, h3);
+    relu(H3_SIZE, h3);
+    
+    matvec3x64(weights_and_biases + H3_TO_OUTPUT, h3, output);
+    addvec(OUTPUT_SIZE, weights_and_biases + OUTPUT_BIAS, output);
     float e1 = std::exp(output[0]);
     float e2 = std::exp(output[1]);
     float e3 = std::exp(output[2]);
@@ -88,12 +92,100 @@ std::tuple<float, float, float> NNUE::output(Accumulator& a) {
     return { e1 / sum, e2 / sum, e3 / sum };
 }
 
-void NNUE::load(const std::string& filename) {
-    std::ifstream ifs(filename, std::ifstream::in);
-    size_t n, m;
+static constexpr bool TRANSPOSE = true; 
+
+template<int M, int N, bool transpose = false>
+static void read_matrix(std::ifstream& ifs, float* weights) {
+    size_t m, n;
     float v;
     std::string type;
-    
+    ifs >> type;
+    if (type != "W") {
+        throw "W expected";
+    }
+    if (!(ifs >> m >> n)) {
+        throw "matrix size expected";
+    }
+    if (m != M || n != N) {
+        throw "bad matrix dimension";
+    }
+    for (size_t i = 0; i < M; i++) {
+        for (size_t j = 0; j < N; j++) {
+            ifs >> v;
+            if constexpr (transpose) weights[j * M + i] =  v; 
+            else weights[i * N + j] =  v;
+        }
+    }
+}
+
+template<int N>
+void read_bias(std::ifstream& ifs, float* weights) {
+    int n;
+    float v;
+    std::string type;
+    ifs >> type;
+    if (type != "B") {
+        throw "B expected";
+    }
+    if (!(ifs >> n)) {
+        throw "bias size expected";
+    }
+    if (n != N) {
+        throw "bad bias dimension";
+    }
+    for (size_t i = 0; i < N; i++) {
+        ifs >> v;
+        weights[i] = v;
+    }
+}
+
+void NNUE::load(const std::string& filename) {
+    std::ifstream ifs(filename, std::ifstream::in);
+    read_matrix<H1_SIZE, INPUT_SIZE, TRANSPOSE>(ifs, weights_and_biases + INPUT_TO_H1);
+    read_bias<H1_SIZE>(ifs, weights_and_biases + H1_BIAS);
+    read_matrix<H2_SIZE, H1_SIZE>(ifs, weights_and_biases + H1_TO_H2);
+    read_bias<H2_SIZE>(ifs, weights_and_biases + H2_BIAS);
+    read_matrix<H3_SIZE, H2_SIZE>(ifs, weights_and_biases + H2_TO_H3);
+    read_bias<H3_SIZE>(ifs, weights_and_biases + H3_BIAS);
+    read_matrix<OUTPUT_SIZE, H3_SIZE>(ifs, weights_and_biases + H3_TO_OUTPUT);
+    read_bias<OUTPUT_SIZE>(ifs, weights_and_biases + OUTPUT_BIAS);
+}
+
+static inline std::tuple<uint64_t, uint64_t, uint64_t , uint64_t, uint64_t> encode_yolah(const Yolah& yolah) {
+    // black positions + white positions + empty positions + occupied positions + free positions 
+    const uint64_t black = yolah.bitboard(Yolah::BLACK);
+    const uint64_t white = yolah.bitboard(Yolah::WHITE);
+    const uint64_t empty = yolah.empty_bitboard();
+    const uint64_t occupied = yolah.occupied_squares();
+    const uint64_t free = yolah.free_squares();
+    return { black, white, empty, occupied, free };
+}
+
+void NNUE::init(const Yolah& yolah, Accumulator& a) {
+    // a.acc = h1_bias;
+    // const auto [black, white, empty, occupied, free] = encode_yolah(yolah);        
+    // size_t delta = 0;
+    // for (uint64_t bitboard : {black, white, empty, occupied, free}) {
+    //     while (bitboard) {
+    //         uint64_t pos = std::countr_zero(bitboard & -bitboard);
+    //         size_t offset = delta + 63 - pos;
+    //         //a.acc += input_to_h1.col(offset);
+    //         a.add(input_to_h1, offset);
+    //         bitboard &= bitboard - 1;
+    //     }
+    //     delta += 64;
+    // }
+    // if (yolah.current_player() == Yolah::WHITE) {
+    //     a.add += turn_white;  
+    // }
+}
+
+void NNUE::play(uint8_t player, const Move& m, Accumulator& a) {
+
+}
+
+void NNUE::undo(uint8_t player, const Move& m, Accumulator& a) {
+
 }
 
 /*

@@ -17,11 +17,19 @@ struct NNUE {
     static constexpr int H1_SIZE = 4096;
     static constexpr int H2_SIZE = 64;
     static constexpr int H3_SIZE = 64;
+    static constexpr int H1_BIAS = 0;
+    static constexpr int INPUT_TO_H1 = H1_SIZE;
+    static constexpr int H2_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE;
+    static constexpr int H1_TO_H2 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE;
+    static constexpr int H3_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE;
+    static constexpr int H2_TO_H3 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE;
+    static constexpr int OUTPUT_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE;
+    static constexpr int H3_TO_OUTPUT = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE;
     struct Accumulator {
         float* acc;
         Accumulator() {
-            acc = (float*)aligned_alloc(32, 32 * (H1_SIZE + H2_SIZE));
-            memset(acc, 4 * (H1_SIZE + H2_SIZE), 0);
+            acc = (float*)aligned_alloc(32, 32 * H1_SIZE);
+            memset(acc, 4 * H1_SIZE, 0);
         }
         ~Accumulator() {
             delete[] acc;
@@ -30,9 +38,7 @@ struct NNUE {
     float* weights_and_biases;    
     NNUE();
     void load(const std::string& filename);
-    Accumulator make_accumulator() {
-        return {};
-    }
+    Accumulator make_accumulator() const;
     void init(const Yolah& yolah, Accumulator& a);
     void play(uint8_t player, const Move& m, Accumulator& a);
     void undo(uint8_t player, const Move& m, Accumulator& a);
