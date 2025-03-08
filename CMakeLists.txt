@@ -9,7 +9,7 @@ find_package(Threads REQUIRED)
 find_package(benchmark REQUIRED)
 
 add_executable(Yolah main.cpp)
-target_compile_options(Yolah PRIVATE -Wall -O3 -march=native -ffast-math -funroll-loops)
+target_compile_options(Yolah PRIVATE -Wall -O3 -march=native -mavx2 -ffast-math -funroll-loops)
 
 target_include_directories(Yolah PRIVATE ${Boost_INCLUDE_DIR})
 target_link_libraries(Yolah PRIVATE ${Boost_LIBRARIES})

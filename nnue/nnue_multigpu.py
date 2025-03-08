@@ -114,10 +114,10 @@ class Net(nn.Module):
         x = relu(x)
         x = self.fc3(x)
         x = relu(x)
-        return self.fc4(x)#softmax(self.fc4(x), dim=1)
+        return softmax(self.fc4(x), dim=1)#self.fc4(x)#
 
 NB_EPOCHS=1000
-MODEL_PATH="/mnt/"
+MODEL_PATH="./"#"/mnt/"
 MODEL_NAME="nnue_4096x64x64"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 

@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <random>
 #include <stdlib.h>
+#include <bit>
 
 typedef float vec8 __attribute__ (( vector_size(8 * 4) ));
 
@@ -51,7 +52,7 @@ static inline void addvec(int n, const float* __restrict__ src, float* __restric
 }
 
 NNUE::NNUE() {
-    constexpr int n = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE + H3_SIZE * OUTPUT_SIZE;
+    constexpr int n = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE + H3_SIZE * OUTPUT_SIZE;
     weights_and_biases = (float*)aligned_alloc(32, 32 * n);    
 }
 
@@ -96,7 +97,7 @@ static constexpr bool TRANSPOSE = true;
 
 template<int M, int N, bool transpose = false>
 static void read_matrix(std::ifstream& ifs, float* weights) {
-    size_t m, n;
+    int m, n;
     float v;
     std::string type;
     ifs >> type;
@@ -109,8 +110,8 @@ static void read_matrix(std::ifstream& ifs, float* weights) {
     if (m != M || n != N) {
         throw "bad matrix dimension";
     }
-    for (size_t i = 0; i < M; i++) {
-        for (size_t j = 0; j < N; j++) {
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
             ifs >> v;
             if constexpr (transpose) weights[j * M + i] =  v; 
             else weights[i * N + j] =  v;
@@ -133,7 +134,7 @@ void read_bias(std::ifstream& ifs, float* weights) {
     if (n != N) {
         throw "bad bias dimension";
     }
-    for (size_t i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) {
         ifs >> v;
         weights[i] = v;
     }
@@ -143,12 +144,21 @@ void NNUE::load(const std::string& filename) {
     std::ifstream ifs(filename, std::ifstream::in);
     read_matrix<H1_SIZE, INPUT_SIZE, TRANSPOSE>(ifs, weights_and_biases + INPUT_TO_H1);
     read_bias<H1_SIZE>(ifs, weights_and_biases + H1_BIAS);
-    read_matrix<H2_SIZE, H1_SIZE>(ifs, weights_and_biases + H1_TO_H2);
+    read_matrix<H2_SIZE, H1_SIZE, TRANSPOSE>(ifs, weights_and_biases + H1_TO_H2);
     read_bias<H2_SIZE>(ifs, weights_and_biases + H2_BIAS);
-    read_matrix<H3_SIZE, H2_SIZE>(ifs, weights_and_biases + H2_TO_H3);
+    read_matrix<H3_SIZE, H2_SIZE, TRANSPOSE>(ifs, weights_and_biases + H2_TO_H3);
     read_bias<H3_SIZE>(ifs, weights_and_biases + H3_BIAS);
     read_matrix<OUTPUT_SIZE, H3_SIZE>(ifs, weights_and_biases + H3_TO_OUTPUT);
     read_bias<OUTPUT_SIZE>(ifs, weights_and_biases + OUTPUT_BIAS);
+    constexpr int pos = 64 * 5;
+    float* turn_white = weights_and_biases + TURN_WHITE;
+    float* input_to_h1 = weights_and_biases + INPUT_TO_H1;
+    for (int i = 0; i < 64; i++) {
+        int row = (pos + i) * H1_SIZE;
+        for (int j = 0; j < H1_SIZE; j++) {
+            turn_white[j] += input_to_h1[row + j];
+        }
+    }
 }
 
 static inline std::tuple<uint64_t, uint64_t, uint64_t , uint64_t, uint64_t> encode_yolah(const Yolah& yolah) {
@@ -162,37 +172,101 @@ static inline std::tuple<uint64_t, uint64_t, uint64_t , uint64_t, uint64_t> enco
 }
 
 void NNUE::init(const Yolah& yolah, Accumulator& a) {
-    // a.acc = h1_bias;
-    // const auto [black, white, empty, occupied, free] = encode_yolah(yolah);        
-    // size_t delta = 0;
-    // for (uint64_t bitboard : {black, white, empty, occupied, free}) {
-    //     while (bitboard) {
-    //         uint64_t pos = std::countr_zero(bitboard & -bitboard);
-    //         size_t offset = delta + 63 - pos;
-    //         //a.acc += input_to_h1.col(offset);
-    //         a.add(input_to_h1, offset);
-    //         bitboard &= bitboard - 1;
-    //     }
-    //     delta += 64;
-    // }
-    // if (yolah.current_player() == Yolah::WHITE) {
-    //     a.add += turn_white;  
-    // }
+    float* h1_bias = weights_and_biases + H1_BIAS;
+    for (int i = 0; i < H1_SIZE; i++) {
+        a.acc[i] = h1_bias[i];
+    }
+    const auto [black, white, empty, occupied, free] = encode_yolah(yolah);        
+    float* turn_white = weights_and_biases + TURN_WHITE;
+    float* input_to_h1 = weights_and_biases + INPUT_TO_H1;
+    int delta = 0;
+    for (uint64_t bitboard : {black, white, empty, occupied, free}) {
+        while (bitboard) {
+            uint64_t pos = std::countr_zero(bitboard & -bitboard);
+            int row = (delta + 63 - pos) * H1_SIZE;
+            for (int j = 0; j < H1_SIZE; j++) {
+                a.acc[j] += input_to_h1[row + j];
+            }
+            bitboard &= bitboard - 1;
+        }
+        delta += 64;
+    }
+    if (yolah.current_player() == Yolah::WHITE) {
+        for (int i = 0; i < H1_SIZE; i++) {
+            a.acc[i] += turn_white[i];
+        }
+    }
 }
 
 void NNUE::play(uint8_t player, const Move& m, Accumulator& a) {
-
+    int from = 63 - m.from_sq();
+    int to = 63 - m.to_sq();
+    // black positions + white positions + empty positions + occupied positions + free positions
+    int pos = (player == Yolah::BLACK) ? 0 : 64;    
+    int from_offset = (pos + from) * H1_SIZE;
+    int to_offset = (pos + to) * H1_SIZE;
+    int empty_offset = (128 + from) * H1_SIZE;
+    int occupied_offset = (192 + to) * H1_SIZE;
+    int free_offset = (256 + to) * H1_SIZE;
+    float* input_to_h1 = weights_and_biases + INPUT_TO_H1;
+    float* turn_white = weights_and_biases + TURN_WHITE;
+    for (int j = 0; j < H1_SIZE; j++) {
+        float v1 = -input_to_h1[from_offset + j];
+        float v2 = input_to_h1[to_offset + j];
+        float v3 = input_to_h1[empty_offset + j];
+        float v4 = input_to_h1[occupied_offset + j];
+        float v5 = -input_to_h1[free_offset + j];
+        a.acc[j] += v1 + v2 + v3 + v4 + v5;
+    }
+    float* turn = weights_and_biases + TURN_WHITE;
+    if (player == Yolah::BLACK) {
+        for (int i = 0; i < H1_SIZE; i++) {
+            a.acc[i] += turn_white[i];
+        }
+    } else {
+        for (int i = 0; i < H1_SIZE; i++) {
+            a.acc[i] -= turn_white[i];
+        }
+    }
 }
 
 void NNUE::undo(uint8_t player, const Move& m, Accumulator& a) {
-
+    int from = 63 - m.from_sq();
+    int to = 63 - m.to_sq();
+    // black positions + white positions + empty positions + occupied positions + free positions
+    int pos = (player == Yolah::BLACK) ? 0 : 64;    
+    int from_offset = (pos + from) * H1_SIZE;
+    int to_offset = (pos + to) * H1_SIZE;
+    int empty_offset = (128 + from) * H1_SIZE;
+    int occupied_offset = (192 + to) * H1_SIZE;
+    int free_offset = (256 + to) * H1_SIZE;
+    float* input_to_h1 = weights_and_biases + INPUT_TO_H1;
+    float* turn_white = weights_and_biases + TURN_WHITE;
+    for (int j = 0; j < H1_SIZE; j++) {
+        float v1 = input_to_h1[from_offset + j];
+        float v2 = -input_to_h1[to_offset + j];
+        float v3 = -input_to_h1[empty_offset + j];
+        float v4 = -input_to_h1[occupied_offset + j];
+        float v5 = input_to_h1[free_offset + j];
+        a.acc[j] += v1 + v2 + v3 + v4 + v5;
+    }
+    float* turn = weights_and_biases + TURN_WHITE;
+    if (player == Yolah::BLACK) {
+        for (int i = 0; i < H1_SIZE; i++) {
+            a.acc[i] -= turn_white[i];
+        }
+    } else {
+        for (int i = 0; i < H1_SIZE; i++) {
+            a.acc[i] += turn_white[i];
+        }
+    }
 }
 
+// g++ -std=c++2a -O3 -march=native -mavx2 -ffast-math -funroll-loops -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
 /*
-// g++ -std=c++2a -O3 -march=native -ffast-math -funroll-loops -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
 int main(int argc, char* argv[]) {
     using namespace std;
-    NNUE<4096, 64, 64> nnue;
+    NNUE nnue;
     nnue.load("nnue_parameters.txt");
     auto acc = nnue.make_accumulator();
     // Yolah yolah;
@@ -211,8 +285,8 @@ int main(int argc, char* argv[]) {
         getline(ifs, line);
         if (line == "") continue;
         for (auto it = sregex_iterator(begin(line), end(line), re_moves); it != sregex_iterator(); ++it) {
-            //nnue.init(yolah);
-            const auto [black_proba, draw_proba, white_proba] = nnue.output_softmax(acc);
+            //nnue.init(yolah, acc);
+            const auto [black_proba, draw_proba, white_proba] = nnue.output(acc);
             cout << setprecision(17) << black_proba << '\n';
             cout << draw_proba << '\n';
             cout << white_proba << '\n';
@@ -234,7 +308,6 @@ int main(int argc, char* argv[]) {
     }
 }
 */
-
 /*
 int main() {
     magic::init();
