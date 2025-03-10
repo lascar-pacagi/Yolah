@@ -53,11 +53,11 @@ static inline void addvec(int n, const float* __restrict__ src, float* __restric
 
 NNUE::NNUE() {
     constexpr int n = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE + H3_SIZE * OUTPUT_SIZE;
-    weights_and_biases = (float*)aligned_alloc(32, 32 * n);    
+    weights_and_biases = (float*)aligned_alloc(32, 4 * 32 * (n + 31) / 32);    
 }
 
 NNUE::~NNUE() {
-    delete[] weights_and_biases;
+    free(weights_and_biases);
 }
 
 NNUE::Accumulator NNUE::make_accumulator() const {
@@ -69,10 +69,10 @@ NNUE::Accumulator NNUE::make_accumulator() const {
 }
 
 std::tuple<float, float, float> NNUE::output(Accumulator& a) {    
-    thread_local float h1[H1_SIZE];
-    thread_local float h2[H2_SIZE];
-    thread_local float h3[H3_SIZE];
-    thread_local float output[OUTPUT_SIZE];
+    float h1[H1_SIZE];
+    float h2[H2_SIZE];
+    float h3[H3_SIZE];
+    float output[OUTPUT_SIZE];
     for (int i = 0; i < H1_SIZE; i++) {
         h1[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
     }

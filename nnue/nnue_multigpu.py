@@ -51,15 +51,24 @@ class GameDataset(Dataset):
                 self.infos.append((filename, r, nb_positions))
         self.size = nb_positions
 
+    # @staticmethod
+    # def encode_yolah(yolah):
+    #     res = list(itertools.chain.from_iterable([
+    #                 bitboard64_to_list(yolah.black), 
+    #                 bitboard64_to_list(yolah.white), 
+    #                 bitboard64_to_list(yolah.empty),
+    #                 bitboard64_to_list(yolah.black | yolah.white | yolah.empty),
+    #                 bitboard64_to_list(bit_not(yolah.black | yolah.white | yolah.empty)),
+    #                 [yolah.nb_plies() & 1]*64]))
+    #     return torch.tensor(res, dtype=torch.float32)
+
     @staticmethod
     def encode_yolah(yolah):
         res = list(itertools.chain.from_iterable([
                     bitboard64_to_list(yolah.black), 
                     bitboard64_to_list(yolah.white), 
                     bitboard64_to_list(yolah.empty),
-                    bitboard64_to_list(yolah.black | yolah.white | yolah.empty),
-                    bitboard64_to_list(bit_not(yolah.black | yolah.white | yolah.empty)),
-                    [yolah.nb_plies() & 1]*64]))
+                    [1 if yolah.nb_plies() & 1 == 0 else 0]]))
         return torch.tensor(res, dtype=torch.float32)
 
     @staticmethod
@@ -97,10 +106,13 @@ class GameDataset(Dataset):
         return GameDataset.encode(moves[: r + idx - n]), self.outputs[lo]
 
 # black positions + white positions + empty positions + occupied positions + free positions + turn 
-INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
+#INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
+
+# black positions + white positions + empty positions + turn 
+INPUT_SIZE = 64 + 64 + 64 + 1
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=4096, l2_size=64, l3_size=64):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=32, l3_size=64):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -114,11 +126,11 @@ class Net(nn.Module):
         x = relu(x)
         x = self.fc3(x)
         x = relu(x)
-        return softmax(self.fc4(x), dim=1)#self.fc4(x)#
+        return self.fc4(x)#softmax(self.fc4(x), dim=1)#
 
 NB_EPOCHS=1000
 MODEL_PATH="./"#"/mnt/"
-MODEL_NAME="nnue_4096x64x64"
+MODEL_NAME="nnue_1024x32x64x3"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
 def ddp_setup(rank, world_size):
@@ -148,7 +160,7 @@ class TrainerDDP:
         self.model = DDP(self.model, device_ids=[self.gpu_id])
 
     def _save_checkpoint(self, epoch):
-        torch.save(self.model.module.state_dict(), f"{MODEL_PATH}{MODEL_NAME}{epoch}.pt")
+        torch.save(self.model.module.state_dict(), f"{MODEL_PATH}{MODEL_NAME}.{epoch}.pt")
 
     def _run_epoch(self, epoch):
         n = 0

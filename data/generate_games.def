@@ -1,0 +1,12 @@
+Bootstrap: library
+From: ubuntu:24.04
+
+%post
+    apt update
+    apt -y install build-essential g++ libtbb-dev libboost-all-dev libbenchmark-dev git cmake
+    git clone https://github.com/lascar-pacagi/Yolah.git
+    cd Yolah && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make
+
+%runscript
+    /Yolah/build/Yolah
+    

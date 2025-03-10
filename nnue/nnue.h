@@ -14,7 +14,7 @@ constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
 constexpr size_t OUTPUT_SIZE = 3;
 
 struct NNUE {  
-    static constexpr int H1_SIZE = 4096;
+    static constexpr int H1_SIZE = 512;
     static constexpr int H2_SIZE = 64;
     static constexpr int H3_SIZE = 64;
     static constexpr int TURN_WHITE = 0;
@@ -29,7 +29,7 @@ struct NNUE {
     struct Accumulator {
         float* acc;
         Accumulator() {
-            acc = (float*)aligned_alloc(32, 32 * H1_SIZE);
+            acc = (float*)aligned_alloc(32, 4 * H1_SIZE);
             memset(acc, 4 * H1_SIZE, 0);
         }
         ~Accumulator() {
