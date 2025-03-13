@@ -68,7 +68,7 @@ class GameDataset(Dataset):
                     bitboard64_to_list(yolah.black), 
                     bitboard64_to_list(yolah.white), 
                     bitboard64_to_list(yolah.empty),
-                    [1 if yolah.nb_plies() & 1 == 0 else 0]]))
+                    [yolah.nb_plies() & 1]]))
         return torch.tensor(res, dtype=torch.float32)
 
     @staticmethod
