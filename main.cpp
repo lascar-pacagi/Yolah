@@ -44,8 +44,10 @@ int main(int argc, char* argv[]) {
     // data::generate_games(cout, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 
     //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 6, 10000, 12);
 
-    data::generate_games2(cout, std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 
-                            std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 2, 50000, 20);
+    // data::generate_games2(cout, std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 
+    //                         std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 2, 50000, 20);
+
+    data::cut("/home/elucterio/tmp/data", "/home/elucterio/tmp/data/dst");
 
     // const std::filesystem::path data_dir("../data");
     // std::regex re_games("^games((?!.*symmetries.*))", std::regex_constants::ECMAScript|std::regex_constants::multiline);

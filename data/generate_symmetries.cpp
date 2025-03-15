@@ -1,6 +1,8 @@
 #include "generate_symmetries.h"
 #include <regex>
 #include <map>
+#include <filesystem>
+#include <fstream>
 
 namespace data {
     void generate_symmetries(std::istream& is, std::ostream& os) {
@@ -48,6 +50,43 @@ namespace data {
                 }                
             }
             os << "(" << black_score << '/' << white_score << ")\n";
+        }
+    }
+
+    void cut(const std::string& src_dir, const std::string& dst_dir, size_t nb_lines_per_file) {
+        const std::filesystem::path src(src_dir);
+        const std::filesystem::path dst(dst_dir);
+        std::regex re_games("^games((?!.*symmetries.*))", std::regex_constants::ECMAScript|std::regex_constants::multiline);
+        for (auto const& dir_entry : std::filesystem::directory_iterator(src_dir)) {
+            auto path = dir_entry.path();
+            if (!std::regex_search(path.filename().string(), re_games)) continue;      
+            std::cout << path << std::endl;
+            auto input = std::ifstream(path);
+            size_t count = 0;
+            while (input) {                
+                auto output = std::ofstream(dst_dir / path.filename().replace_extension("_" + std::to_string(count++) + ".txt"));
+                size_t i = 0;
+                while (input && i < nb_lines_per_file) {
+                    std::string line;
+                    std::getline(input, line);
+                    output << line << '\n';
+                    i++;
+                }
+            }            
+        }
+    }
+
+    void generate_symmetries(const std::string& src_dir, const std::string& dst_dir) {
+        const std::filesystem::path src(src_dir);
+        const std::filesystem::path dst(dst_dir);
+        std::regex re_games("^games((?!.*symmetries.*))", std::regex_constants::ECMAScript|std::regex_constants::multiline);
+        for (auto const& dir_entry : std::filesystem::directory_iterator(src_dir)) {
+            auto path = dir_entry.path();
+            if (!std::regex_search(path.filename().string(), re_games)) continue;      
+            std::cout << path << std::endl;
+            auto input = std::ifstream(path);
+            auto output = std::ofstream(dst_dir / path.filename().replace_extension("symmetries.txt"));
+            generate_symmetries(input, output);
         }
     }
 }
