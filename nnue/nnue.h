@@ -14,7 +14,7 @@ constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
 constexpr size_t OUTPUT_SIZE = 3;
 
 struct NNUE {  
-    static constexpr int H1_SIZE = 512;
+    static constexpr int H1_SIZE = 4096;
     static constexpr int H2_SIZE = 64;
     static constexpr int H3_SIZE = 64;
     static constexpr int TURN_WHITE = 0;
@@ -33,7 +33,7 @@ struct NNUE {
             memset(acc, 4 * H1_SIZE, 0);
         }
         ~Accumulator() {
-            delete[] acc;
+            free(acc);
         }
     };    
     float* weights_and_biases;
@@ -45,6 +45,11 @@ struct NNUE {
     void undo(uint8_t player, const Move& m, Accumulator& a);
     std::tuple<float, float, float> output(Accumulator& a);
     ~NNUE();
+    std::pair<float, float> minmax_weights() const;
+    std::pair<float, float> percentile_weights(float percentile) const;
+    void get_activations(Accumulator& acc, std::vector<float>& activations);
+    std::pair<float, float> minmax_activations(const std::string& filename);
+    std::pair<float, float> percentile_activations(const std::string& filename, float percentile);
 };
 
 /*

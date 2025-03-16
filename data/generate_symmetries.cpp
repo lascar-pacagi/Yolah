@@ -64,11 +64,12 @@ namespace data {
             auto input = std::ifstream(path);
             size_t count = 0;
             while (input) {                
-                auto output = std::ofstream(dst_dir / path.filename().replace_extension("_" + std::to_string(count++) + ".txt"));
+                auto output = std::ofstream(dst_dir / path.filename().replace_extension(std::to_string(count++) + ".txt"));
                 size_t i = 0;
                 while (input && i < nb_lines_per_file) {
                     std::string line;
                     std::getline(input, line);
+                    if (line == "") continue;
                     output << line << '\n';
                     i++;
                 }

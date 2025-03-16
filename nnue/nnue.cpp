@@ -12,6 +12,7 @@
 #include <random>
 #include <stdlib.h>
 #include <bit>
+#include <algorithm>
 
 typedef float vec8 __attribute__ (( vector_size(8 * 4) ));
 
@@ -262,12 +263,128 @@ void NNUE::undo(uint8_t player, const Move& m, Accumulator& a) {
     }
 }
 
+std::pair<float, float> NNUE::minmax_weights() const {
+    const float* matrix_begin = weights_and_biases + INPUT_TO_H1;
+    const auto [min1, max1] = std::minmax_element(matrix_begin, matrix_begin + INPUT_SIZE * H1_SIZE);
+    matrix_begin = weights_and_biases + H1_TO_H2;
+    const auto [min2, max2] = std::minmax_element(matrix_begin, matrix_begin + H1_SIZE * H2_SIZE);
+    matrix_begin = weights_and_biases + H2_TO_H3;
+    const auto [min3, max3] = std::minmax_element(matrix_begin, matrix_begin + H2_SIZE * H3_SIZE);
+    matrix_begin = weights_and_biases + H3_TO_OUTPUT;
+    const auto [min4, max4] = std::minmax_element(matrix_begin, matrix_begin + H3_SIZE * OUTPUT_SIZE);
+    return {
+        std::min({*min1, *min2, *min3, *min4}),
+        std::max({*max1, *max2, *max3, *max4})
+    };
+}
+
+std::pair<float, float> NNUE::percentile_weights(float percentile) const {
+    std::vector<float> weights;
+    const float* matrix_begin = weights_and_biases + INPUT_TO_H1;
+    std::copy(matrix_begin, matrix_begin + INPUT_SIZE * H1_SIZE, std::back_inserter(weights));
+    matrix_begin = weights_and_biases + H1_TO_H2;
+    std::copy(matrix_begin, matrix_begin + H1_SIZE * H2_SIZE, std::back_inserter(weights));
+    matrix_begin = weights_and_biases + H2_TO_H3;
+    std::copy(matrix_begin, matrix_begin + H2_SIZE * H3_SIZE, std::back_inserter(weights));
+    matrix_begin = weights_and_biases + H3_TO_OUTPUT;
+    std::copy(matrix_begin, matrix_begin + H3_SIZE * OUTPUT_SIZE, std::back_inserter(weights));
+    std::sort(begin(weights), end(weights));
+    int n = (weights.size() - weights.size() * percentile) / 2;
+    return { weights[n], weights[weights.size() - 1 - n] };
+}
+
+void NNUE::get_activations(Accumulator& a, std::vector<float>& activations) {
+    float h1[H1_SIZE];
+    float h2[H2_SIZE];
+    float h3[H3_SIZE];
+    float output[OUTPUT_SIZE];
+    for (int i = 0; i < H1_SIZE; i++) {
+        h1[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
+    }
+    std::copy(h1, h1 + H1_SIZE, std::back_inserter(activations));
+
+    matvec(H1_SIZE, weights_and_biases + H1_TO_H2, h1, h2);
+    addvec(H2_SIZE, weights_and_biases + H2_BIAS, h2);
+    std::copy(h2, h2 + H2_SIZE, std::back_inserter(activations));
+    relu(H2_SIZE, h2);
+    
+    matvec(H2_SIZE, weights_and_biases + H2_TO_H3, h2, h3);
+    addvec(H3_SIZE, weights_and_biases + H3_BIAS, h3);
+    std::copy(h3, h3 + H3_SIZE, std::back_inserter(activations));
+    relu(H3_SIZE, h3);
+    
+    matvec3x64(weights_and_biases + H3_TO_OUTPUT, h3, output);
+    std::copy(output, output + OUTPUT_SIZE, std::back_inserter(activations));
+    addvec(OUTPUT_SIZE, weights_and_biases + OUTPUT_BIAS, output);
+}
+
+std::pair<float, float> NNUE::minmax_activations(const std::string& filename) {
+    std::ifstream ifs(filename, std::ifstream::in);
+    std::regex re_moves(R"(((\w\d):(\w\d))+)", std::regex_constants::ECMAScript);
+    Accumulator acc = make_accumulator();
+    std::vector<float> activations;
+    while (ifs) {
+        Yolah yolah;
+        init(yolah, acc);
+        std::string line;
+        std::getline(ifs, line);
+        if (line == "") continue;
+        for (auto it = std::sregex_iterator(std::begin(line), std::end(line), re_moves); it != std::sregex_iterator(); ++it) {
+            get_activations(acc, activations);
+            std::smatch match = *it;
+            std::string match_str = match.str();
+            Square sq1 = make_square(match[2].str());
+            Square sq2 = make_square(match[3].str());
+            Move m(sq1, sq2);
+            play(yolah.current_player(), m, acc);
+            yolah.play(m);
+        }
+    }
+    const auto [min, max] = std::minmax_element(begin(activations), end(activations));
+    return { *min, *max };
+}
+
+std::pair<float, float> NNUE::percentile_activations(const std::string& filename, float percentile) {
+    std::ifstream ifs(filename, std::ifstream::in);
+    std::regex re_moves(R"(((\w\d):(\w\d))+)", std::regex_constants::ECMAScript);
+    Accumulator acc = make_accumulator();
+    std::vector<float> activations;
+    while (ifs) {
+        Yolah yolah;
+        init(yolah, acc);
+        std::string line;
+        std::getline(ifs, line);
+        if (line == "") continue;
+        for (auto it = std::sregex_iterator(std::begin(line), std::end(line), re_moves); it != std::sregex_iterator(); ++it) {
+            get_activations(acc, activations);
+            std::smatch match = *it;
+            std::string match_str = match.str();
+            Square sq1 = make_square(match[2].str());
+            Square sq2 = make_square(match[3].str());
+            Move m(sq1, sq2);
+            play(yolah.current_player(), m, acc);
+            yolah.play(m);
+        }
+    }
+    std::sort(begin(activations), end(activations));
+    int n = (activations.size() - activations.size() * percentile) / 2;
+    return { activations[n], activations[activations.size() - 1 - n] };
+}
+
 // g++ -std=c++2a -O3 -march=native -mavx2 -ffast-math -funroll-loops -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
-/*
 int main(int argc, char* argv[]) {
     using namespace std;
     NNUE nnue;
     nnue.load("nnue_parameters.txt");
+    const auto [min1, max1] = nnue.minmax_weights();
+    cout << min1 << ' ' << max1 << endl;
+    const auto [min2, max2] = nnue.percentile_weights(0.999);
+    cout << min2 << ' ' << max2 << endl;
+    const auto [min3, max3] = nnue.minmax_activations("./games.txt");
+    cout << min3 << ' ' << max3 << endl;
+    const auto [min4, max4] = nnue.percentile_activations("./games.txt", 0.999);
+    cout << min4 << ' ' << max4 << endl;
+    /*
     auto acc = nnue.make_accumulator();
     // Yolah yolah;
     // cout << yolah << '\n';
@@ -306,67 +423,5 @@ int main(int argc, char* argv[]) {
             //cout << yolah << '\n';            
         }
     }
-}
 */
-/*
-int main() {
-    magic::init();
-    zobrist::init();
-    NNUE<4096, 64, 64> nnue;
-    auto acc = nnue.make_accumulator();
-    float res = 0;
-    PRNG prng(42);
-    for (size_t i = 0; i < 10000; i++) {
-        Yolah yolah;
-        nnue.init(yolah, acc);
-        Yolah::MoveList moves;
-        while (!yolah.game_over()) {
-            yolah.moves(moves);        
-            Move m = moves[prng.rand<size_t>() % moves.size()];
-            const auto [black_proba, ignore, white_proba] = nnue.output_softmax(acc);
-            res += black_proba - white_proba;
-            nnue.play(yolah.current_player(), m, acc);
-            yolah.play(m);
-        }
-    }
-    std::cout << res << std::endl;
 }
-*/
-/*
-using type = float;
-
-void matmul(const type *a, const type *_b, type * __restrict__ c, size_t N) {
-    alignas(32) type *b = new type[N * N];
-    for (size_t i = 0; i < N; i++) {
-        for (size_t j = 0; j < N; j++) {
-            b[i * N + j] = _b[j * N + i];
-        }            
-    }        
-    for (size_t i = 0; i < N; i++) {
-        for (size_t j = 0; j < N; j++) {
-            for (size_t k = 0; k < N; k++) {
-                c[i * N + j] += a[i * N + k] * b[j * N + k];
-            }                
-        }            
-    }        
-}
-
-void rinit(type* a, size_t N) {
-    std::default_random_engine g(42);
-    std::uniform_real_distribution<type> d;
-    for (size_t i = 0; i < N; i++) {
-        a[i] = d(g); 
-    }
-}
-
-int main() {
-    constexpr size_t N = 2048;
-    alignas(32) type* a = new type[N * N];
-    alignas(32) type* b = new type[N * N];
-    alignas(32) type* c = new type[N * N];
-    rinit(a, N * N);
-    rinit(b, N * N);
-    matmul(a, b, c, N);
-    std::cout << c[0] << std::endl;
-}
-*/
