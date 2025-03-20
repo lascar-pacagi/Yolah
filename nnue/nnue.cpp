@@ -162,6 +162,40 @@ void NNUE::load(const std::string& filename) {
     }
 }
 
+template<int M, int N, bool transpose = false>
+static void save_matrix_quantized(std::ofstream& ofs, float* weights, float scale = 64) {
+    ofs << "W\n" << M << '\n' << N << '\n';
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            int w;
+            if constexpr (transpose) w = static_cast<int8_t>(scale * weights[j * M + i]); 
+            else w = static_cast<int8_t>(scale * weights[i * N + j]);
+            ofs << w << '\n';
+        }
+    }
+}
+
+template<int N>
+static void save_bias_quantized(std::ofstream& ofs, float* weights, float scale = 64) {
+    ofs << "B\n" << N << '\n';
+    for (int i = 0; i < N; i++) {
+        int w = static_cast<int8_t>(scale * weights[i]);
+        ofs << w << '\n';
+    }
+}
+
+void NNUE::save_quantized(const std::string& filename, float scale) {
+    std::ofstream ofs(filename, std::ofstream::out);
+    save_matrix_quantized<H1_SIZE, INPUT_SIZE, TRANSPOSE>(ofs, weights_and_biases + INPUT_TO_H1, scale);
+    save_bias_quantized<H1_SIZE>(ofs, weights_and_biases + H1_BIAS, scale);
+    save_matrix_quantized<H2_SIZE, H1_SIZE, TRANSPOSE>(ofs, weights_and_biases + H1_TO_H2, scale);
+    save_bias_quantized<H2_SIZE>(ofs, weights_and_biases + H2_BIAS, scale);
+    save_matrix_quantized<H3_SIZE, H2_SIZE, TRANSPOSE>(ofs, weights_and_biases + H2_TO_H3, scale);
+    save_bias_quantized<H3_SIZE>(ofs, weights_and_biases + H3_BIAS, scale);
+    save_matrix_quantized<OUTPUT_SIZE, H3_SIZE>(ofs, weights_and_biases + H3_TO_OUTPUT, scale);
+    save_bias_quantized<OUTPUT_SIZE>(ofs, weights_and_biases + OUTPUT_BIAS, scale);
+}
+
 static inline std::tuple<uint64_t, uint64_t, uint64_t , uint64_t, uint64_t> encode_yolah(const Yolah& yolah) {
     // black positions + white positions + empty positions + occupied positions + free positions 
     const uint64_t black = yolah.bitboard(Yolah::BLACK);
@@ -376,15 +410,15 @@ int main(int argc, char* argv[]) {
     using namespace std;
     NNUE nnue;
     nnue.load("nnue_parameters.txt");
-    const auto [min1, max1] = nnue.minmax_weights();
-    cout << min1 << ' ' << max1 << endl;
-    const auto [min2, max2] = nnue.percentile_weights(0.999);
-    cout << min2 << ' ' << max2 << endl;
-    const auto [min3, max3] = nnue.minmax_activations("./games.txt");
-    cout << min3 << ' ' << max3 << endl;
-    const auto [min4, max4] = nnue.percentile_activations("./games.txt", 0.999);
-    cout << min4 << ' ' << max4 << endl;
-    /*
+    nnue.save_quantized("nnue_q_parameters.txt", 128);
+    // const auto [min1, max1] = nnue.minmax_weights();
+    // cout << min1 << ' ' << max1 << endl;
+    // const auto [min2, max2] = nnue.percentile_weights(0.99);
+    // cout << min2 << ' ' << max2 << endl;
+    // const auto [min3, max3] = nnue.minmax_activations("./games.txt");
+    // cout << min3 << ' ' << max3 << endl;
+    // const auto [min4, max4] = nnue.percentile_activations("./games.txt", 0.99);
+    // cout << min4 << ' ' << max4 << endl;
     auto acc = nnue.make_accumulator();
     // Yolah yolah;
     // cout << yolah << '\n';
@@ -423,5 +457,4 @@ int main(int argc, char* argv[]) {
             //cout << yolah << '\n';            
         }
     }
-*/
 }

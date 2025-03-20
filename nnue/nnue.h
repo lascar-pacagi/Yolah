@@ -10,8 +10,8 @@
 #include "Eigen/Dense"
 
 // black positions + white positions + empty positions + occupied positions + free positions + turn 
-constexpr size_t INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
-constexpr size_t OUTPUT_SIZE = 3;
+constexpr int INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
+constexpr int OUTPUT_SIZE = 3;
 
 struct NNUE {  
     static constexpr int H1_SIZE = 4096;
@@ -50,6 +50,7 @@ struct NNUE {
     void get_activations(Accumulator& acc, std::vector<float>& activations);
     std::pair<float, float> minmax_activations(const std::string& filename);
     std::pair<float, float> percentile_activations(const std::string& filename, float percentile);
+    void save_quantized(const std::string& filename, float scale = 64);
 };
 
 /*
