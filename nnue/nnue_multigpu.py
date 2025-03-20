@@ -45,14 +45,11 @@ class GameDataset(Dataset):
                         black_score = int(black_score)
                         white_score = int(white_score)
                         if black_score == white_score: res = 1
-                        elif black_score > white_score:
-                            if yolah.current_player() == Yolah.BLACK_PLAYER: res = 0
-                            else: res = 2
-                        else:
-                            if yolah.current_player() == Yolah.WHITE_PLAYER: res = 0
-                            else: res = 2
-                        self.outputs.append(torch.tensor(res, dtype=torch.long))
-                #self.infos.append((filename, r, nb_positions))
+                        elif black_score > white_score: res = 0
+                        else: res = 2                       
+                        self.outputs.append(res)
+                        #self.outputs.append(torch.tensor(res, dtype=torch.long))
+                self.infos.append((filename, r, nb_positions))
         self.size = nb_positions
 
     # @staticmethod
@@ -80,12 +77,26 @@ class GameDataset(Dataset):
                         bitboard64_to_list(yolah.empty)]))
         return torch.tensor(res, dtype=torch.float32)
 
+    # @staticmethod
+    # def encode(moves):
+    #     yolah = Yolah()
+    #     for m in map(lambda m: Move.from_str(m), moves):
+    #         yolah.play(m)
+    #     return GameDataset.encode_yolah(yolah)
+
     @staticmethod
-    def encode(moves):
+    def encode(moves, res):
         yolah = Yolah()
         for m in map(lambda m: Move.from_str(m), moves):
             yolah.play(m)
-        return GameDataset.encode_yolah(yolah)
+        output = 1
+        if res == 0:
+            if yolah.current_player() == Yolah.BLACK_PLAYER: output = 0
+            else: output = 2
+        elif res == 2:
+            if yolah.current_player() == Yolah.WHITE_PLAYER: output = 0
+            else: output = 2
+        return GameDataset.encode_yolah(yolah), torch.tensor(output, dtype=torch.long)
 
     def get_infos(self):
         return self.infos
@@ -112,7 +123,7 @@ class GameDataset(Dataset):
         n = self.inputs[lo - 1][0] if lo > 0 else 0
         moves = self.inputs[lo][1]
         #print(n, moves, lo, r)
-        return GameDataset.encode(moves[: r + idx - n]), self.outputs[lo]
+        return GameDataset.encode(moves[: r + idx - n], self.outputs[lo])
 
 # black positions + white positions + empty positions + occupied positions + free positions + turn 
 #INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64
