@@ -64,6 +64,10 @@ inline uint64_t mul_hi64(uint64_t a, uint64_t b) {
     return aH * bH + (c2 >> 32) + (c3 >> 32);
 }
 
+constexpr uint32_t reduce(uint32_t x, uint32_t N) {
+    return ((uint64_t) x * (uint64_t) N) >> 32;
+}
+
 static constexpr bool DEBUG = false;
 
 void debug(auto&& print) {

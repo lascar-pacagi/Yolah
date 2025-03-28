@@ -76,21 +76,29 @@ std::tuple<float, float, float> NNUE_Q::output(Accumulator& a) {
     for (int i = 0; i < H1_SIZE; i++) {
         int32_t v = a.acc[i] >> SHIFT;
         h1[i] = v >= 0 ? v & 0x7F : 0;
+        std::cout << (int)h1[i] << " ";
     }
+    std::cout << '\n' << "#################\n";
     matvec(H1_SIZE, weights_and_biases + H1_TO_H2, h1, h2);    
     addvec(H2_SIZE, weights_and_biases + H2_BIAS, h2);
     for (int i = 0; i < H2_SIZE; i++) {
         h2[i] >>= SHIFT;
     }
     relu(H2_SIZE, h2, h2_8);
-    
+    for (int i = 0; i < H2_SIZE; i++) {
+        std::cout << (int)h2_8[i] << ' ';
+    }
+    std::cout << '\n' << "#################\n";
     matvec(H2_SIZE, weights_and_biases + H2_TO_H3, h2_8, h3);
     addvec(H3_SIZE, weights_and_biases + H3_BIAS, h3);
     for (int i = 0; i < H3_SIZE; i++) {
         h3[i] >>= SHIFT;
     }
     relu(H3_SIZE, h3, h3_8);
-    
+    for (int i = 0; i < H3_SIZE; i++) {
+        std::cout << (int)h3_8[i] << ' ';
+    }
+    std::cout << '\n' << "#################\n";
     matvec3x64(weights_and_biases + H3_TO_OUTPUT, h3_8, output);
     addvec(OUTPUT_SIZE, weights_and_biases + OUTPUT_BIAS, output);
     
@@ -185,7 +193,7 @@ static inline std::tuple<uint64_t, uint64_t, uint64_t , uint64_t, uint64_t> enco
 void NNUE_Q::init(const Yolah& yolah, Accumulator& a) {
     int8_t* h1_bias = weights_and_biases + H1_BIAS;
     for (int i = 0; i < H1_SIZE; i++) {
-        a.acc[i] = h1_bias[i];
+        a.acc[i] = h1_bias[i];       
     }
     const auto [black, white, empty, occupied, free] = encode_yolah(yolah);        
     int16_t* turn_white = (int16_t*)(weights_and_biases + TURN_WHITE);
@@ -207,6 +215,11 @@ void NNUE_Q::init(const Yolah& yolah, Accumulator& a) {
             a.acc[i] += turn_white[i];
         }
     }
+    for (int i = 0; i < H1_SIZE; i++) {
+        a.acc[i] *= 16;
+        std::cout << a.acc[i] << ' ';
+    }
+    std::cout << "\n---------------\n";
 }
 
 void NNUE_Q::play(uint8_t player, const Move& m, Accumulator& a) {
@@ -305,6 +318,7 @@ int main(int argc, char* argv[]) {
             Move m(sq1, sq2);
             //nnue.play(yolah.current_player(), m, acc);                        
             yolah.play(m);
+            return 0;
             // yolah.undo(m);
             // nnue.undo(yolah.current_player(), m, acc);
             // nnue.play(yolah.current_player(), m, acc);                        

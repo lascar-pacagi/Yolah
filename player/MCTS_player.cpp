@@ -41,7 +41,8 @@ uint32_t MCTSPlayer::Node::select() const {
     double log_N = std::log(N);
     // TO DO: SIMD
     auto nb_children = static_cast<uint32_t>(nodes.size());
-    uint32_t k = prng.rand<uint32_t>() % nodes.size();
+    //uint32_t k = prng.rand<uint32_t>() % nodes.size();
+    uint32_t k = reduce(prng.rand<uint32_t>(), nodes.size());
     uint32_t res = k;
     double best_value = std::numeric_limits<double>::lowest();
     for (uint32_t i = 0; i < nb_children; i++) {        
@@ -82,7 +83,8 @@ int32_t MCTSPlayer::playout(Yolah yolah) const {
     Yolah::MoveList moves;
     while (!yolah.game_over()) {
         yolah.moves(moves);        
-        Move m = moves[prng.rand<size_t>() % moves.size()];
+        //Move m = moves[prng.rand<size_t>() % moves.size()];
+        Move m = moves[reduce(prng.rand<uint32_t>(), moves.size())];
         yolah.play(m);
     }
     return game_value(yolah, player);
@@ -144,7 +146,8 @@ Move MCTSPlayer::play(Yolah yolah) {
         std::cout << "random " << root.nb_visits << "\n";
         root.expand(yolah);
     }
-    uint32_t k = prng.rand<uint32_t>() % root.nodes.size();
+    //uint32_t k = prng.rand<uint32_t>() % root.nodes.size();
+    uint32_t k = reduce(prng.rand<uint32_t>(), root.nodes.size());
     Move res = Move::none();
     uint32_t best_nb_visits = 0;
     for (uint32_t i = 0; i < nb_children; i++) {
@@ -158,8 +161,8 @@ Move MCTSPlayer::play(Yolah yolah) {
             k = 0;
         }
     }
-    //std::cout << root;
-    //std::cout << Node::NB_NODES << '\n';
+    std::cout << root;
+    std::cout << Node::NB_NODES << '\n';
     reset();    
     return res;
 }

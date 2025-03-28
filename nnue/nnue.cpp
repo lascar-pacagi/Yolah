@@ -76,17 +76,31 @@ std::tuple<float, float, float> NNUE::output(Accumulator& a) {
     float output[OUTPUT_SIZE];
     for (int i = 0; i < H1_SIZE; i++) {
         h1[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
+        //std::cout << std::setprecision(3) << h1[i] << ' ';
     }
+    //std::cout << '\n' << "#################\n";
     matvec(H1_SIZE, weights_and_biases + H1_TO_H2, h1, h2);    
     addvec(H2_SIZE, weights_and_biases + H2_BIAS, h2);
     relu(H2_SIZE, h2);
-    
+    // for (int i = 0; i < H2_SIZE; i++) {
+    //     std::cout << std::setprecision(3) << h2[i] << ' ';
+    // }
+    // std::cout << '\n' << "#################\n";
+
     matvec(H2_SIZE, weights_and_biases + H2_TO_H3, h2, h3);
     addvec(H3_SIZE, weights_and_biases + H3_BIAS, h3);
     relu(H3_SIZE, h3);
-    
+    // for (int i = 0; i < H3_SIZE; i++) {
+    //     std::cout << std::setprecision(3) << h3[i] << ' ';
+    // }
+    // std::cout << '\n' << "#################\n";
+
     matvec3x64(weights_and_biases + H3_TO_OUTPUT, h3, output);
     addvec(OUTPUT_SIZE, weights_and_biases + OUTPUT_BIAS, output);
+    // for (int i = 0; i < OUTPUT_SIZE; i++) {
+    //     std::cout << std::setprecision(3) << output[i] << ' ';
+    // }
+    // std::cout << '\n' << "#################\n";
     float e1 = std::exp(output[0]);
     float e2 = std::exp(output[1]);
     float e3 = std::exp(output[2]);
@@ -179,7 +193,7 @@ template<int N>
 static void save_bias_quantized(std::ofstream& ofs, float* weights, float scale = 64) {
     ofs << "B\n" << N << '\n';
     for (int i = 0; i < N; i++) {
-        int w = static_cast<int8_t>(scale * weights[i]);
+        int w = static_cast<int16_t>(scale * weights[i]);
         ofs << w << '\n';
     }
 }
@@ -210,7 +224,7 @@ void NNUE::init(const Yolah& yolah, Accumulator& a) {
     float* h1_bias = weights_and_biases + H1_BIAS;
     for (int i = 0; i < H1_SIZE; i++) {
         a.acc[i] = h1_bias[i];
-    }
+    }    
     const auto [black, white, empty, occupied, free] = encode_yolah(yolah);        
     float* turn_white = weights_and_biases + TURN_WHITE;
     float* input_to_h1 = weights_and_biases + INPUT_TO_H1;
@@ -231,6 +245,10 @@ void NNUE::init(const Yolah& yolah, Accumulator& a) {
             a.acc[i] += turn_white[i];
         }
     }
+    // for (int i = 0; i < H1_SIZE; i++) {
+    //     std::cout << a.acc[i] << ' ';
+    // }
+    // std::cout << "\n---------------\n";
 }
 
 void NNUE::play(uint8_t player, const Move& m, Accumulator& a) {
@@ -335,6 +353,7 @@ void NNUE::get_activations(Accumulator& a, std::vector<float>& activations) {
     for (int i = 0; i < H1_SIZE; i++) {
         h1[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
     }
+
     std::copy(h1, h1 + H1_SIZE, std::back_inserter(activations));
 
     matvec(H1_SIZE, weights_and_biases + H1_TO_H2, h1, h2);
@@ -406,11 +425,11 @@ std::pair<float, float> NNUE::percentile_activations(const std::string& filename
 }
 
 // g++ -std=c++2a -O3 -march=native -mavx2 -ffast-math -funroll-loops -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
-int main(int argc, char* argv[]) {
+/*int main(int argc, char* argv[]) {
     using namespace std;
     NNUE nnue;
     nnue.load("nnue_parameters.txt");
-    nnue.save_quantized("nnue_q_parameters.txt", 128);
+    nnue.save_quantized("nnue_q_parameters.txt", 64);
     // const auto [min1, max1] = nnue.minmax_weights();
     // cout << min1 << ' ' << max1 << endl;
     // const auto [min2, max2] = nnue.percentile_weights(0.99);
@@ -419,6 +438,7 @@ int main(int argc, char* argv[]) {
     // cout << min3 << ' ' << max3 << endl;
     // const auto [min4, max4] = nnue.percentile_activations("./games.txt", 0.99);
     // cout << min4 << ' ' << max4 << endl;
+    
     auto acc = nnue.make_accumulator();
     // Yolah yolah;
     // cout << yolah << '\n';
@@ -458,3 +478,4 @@ int main(int argc, char* argv[]) {
         }
     }
 }
+*/

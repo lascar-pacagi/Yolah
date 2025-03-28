@@ -19,7 +19,6 @@ static void duration_helper(uint32_t mask, uint64_t n) {
     const steady_clock::time_point start = steady_clock::now();
     duration<uint64_t, std::micro> mu;
     double res = 0;
-    benchmark::DoNotOptimize(res);
     for (size_t iter = 0; iter < n; iter++) {
         for (size_t i = 0; i < 10; i++) {
             res = res + sqrt(i);
@@ -100,7 +99,6 @@ static void matmul_eigen(benchmark::State& state) {
   auto m1 = Eigen::MatrixXf::Random(N, N);
   auto m2 = Eigen::MatrixXf::Random(N, N);
   Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> res(N, N);
-  benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     res += m1 * m2;
   }
@@ -166,7 +164,6 @@ static void matmul_basic(benchmark::State& state) {
   auto m1 = random_matrix<float>(N, N);
   auto m2 = random_matrix<float>(N, N);
   auto res = make_matrix<float>(N, N);
-  benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     res = res + m1 * m2;
   }
@@ -184,7 +181,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul1(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -199,7 +195,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul2(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -214,7 +209,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul3(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -229,7 +223,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul4(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -244,7 +237,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul5(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -259,7 +251,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul6(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -274,7 +265,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul7(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -289,7 +279,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul8(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -304,7 +293,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul9(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -319,7 +307,6 @@ static void matmul_basic(benchmark::State& state) {
 // //   rinit(b, INNER * N);
 // //   memset(c, 0, sizeof(float) * M * N);
 // //   //float res = 0;
-// //   //benchmark::DoNotOptimize(res);
 // //   for (auto _ : state) {
 // //     matmul10(M, N, INNER, a, b, c);
 // //     //res += c[0];
@@ -334,7 +321,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul11(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -349,7 +335,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul12(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -364,7 +349,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul13(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -379,7 +363,6 @@ static void matmul_basic(benchmark::State& state) {
 //   rinit(b, INNER * N);
 //   memset(c, 0, sizeof(float) * M * N);
 //   //float res = 0;
-//   //benchmark::DoNotOptimize(res);
 //   for (auto _ : state) {
 //     matmul14(M, N, INNER, a, b, c);
 //     //res += c[0];
@@ -397,7 +380,7 @@ static void mv1(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
+
   for (auto _ : state) {
     matvec1(M, INNER, a, b, c);
     //res += c[0];
@@ -412,7 +395,6 @@ static void mv2(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec2(M, INNER, a, b, c);
     //res += c[0];
@@ -427,7 +409,6 @@ static void mv3(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec3(M, INNER, a, b, c);
     //res += c[0];
@@ -442,7 +423,6 @@ static void mv4(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec4(M, INNER, a, b, c);
     //res += c[0];
@@ -457,7 +437,6 @@ static void mv5(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec5(M, INNER, a, b, c);
     //res += c[0];
@@ -472,7 +451,6 @@ static void mv6(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec6(M, INNER, a, b, c);
     //res += c[0];
@@ -487,7 +465,6 @@ static void mv7(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec7(M, INNER, a, b, c);
     //res += c[0];
@@ -502,7 +479,6 @@ static void mv8(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec8(M, INNER, a, b, c);
     //res += c[0];
@@ -517,7 +493,6 @@ static void mv9(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec9(M, INNER, a, b, c);
     //res += c[0];
@@ -532,7 +507,6 @@ static void mv10(benchmark::State& state) {
   rinit(b, INNER);
   memset(c, 0, sizeof(float) * M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec10(M, INNER, a, b, c);
     //res += c[0];
@@ -547,7 +521,6 @@ static void mv3x64_1(benchmark::State& state) {
   rinit(b, 64);
   memset(c, 0, sizeof(float) * 3);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec3x64_1(a, b, c);
     //res += c[0];
@@ -562,7 +535,6 @@ static void mv_int1(benchmark::State& state) {
   rinit_int8(b, INNER);
   memset(c, 0, M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec_int1(M, INNER, a, b, c);
     //res += c[0];
@@ -577,7 +549,6 @@ static void mv_int2(benchmark::State& state) {
   rinit_int8(b, INNER);
   memset(c, 0, M);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     matvec_int2(M, INNER, a, b, c);
     //res += c[0];
@@ -590,7 +561,6 @@ static void addvec1(benchmark::State& state) {
   rinit(a, INNER);
   rinit(b, INNER);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     addvec1(INNER, a, b);
     //res += c[0];
@@ -603,7 +573,6 @@ static void addvec2(benchmark::State& state) {
   rinit(a, INNER);
   rinit(b, INNER);
   //float res = 0;
-  //benchmark::DoNotOptimize(res);
   for (auto _ : state) {
     addvec2(INNER, a, b);
     //res += c[0];
@@ -614,6 +583,36 @@ static void nnue2(benchmark::State& state) {
   nnue net;
   for (auto _ : state) {
     net.output();
+  }
+}
+
+constexpr int NB_RANDOM_NUMBERS = 500;
+
+static void modulo1(benchmark::State& state) {
+  PRNG prng(42);
+  int n = prng.rand<uint16_t>() + 1;
+  uint32_t random_numbers[NB_RANDOM_NUMBERS];
+  for (int i = 0; i < NB_RANDOM_NUMBERS; i++) {
+    random_numbers[i] = prng.rand<uint32_t>();
+  }
+  for (auto _ : state) {
+    for (int i = 0; i < NB_RANDOM_NUMBERS; i++) {
+      benchmark::DoNotOptimize(random_numbers[i] % n);      
+    }    
+  }
+}
+
+static void modulo2(benchmark::State& state) {
+  PRNG prng(42);
+  int n = prng.rand<uint16_t>() + 1;
+  uint32_t random_numbers[NB_RANDOM_NUMBERS];
+  for (int i = 0; i < NB_RANDOM_NUMBERS; i++) {
+    random_numbers[i] = prng.rand<uint32_t>();
+  }
+  for (auto _ : state) {    
+    for (int i = 0; i < NB_RANDOM_NUMBERS; i++) {
+      benchmark::DoNotOptimize((random_numbers[i] * (uint64_t)n) >> 32);      
+    }
   }
 }
 
@@ -634,14 +633,14 @@ static void nnue2(benchmark::State& state) {
 //BENCHMARK(mm12);
 //BENCHMARK(mm13);
 //BENCHMARK(mm14);
-BENCHMARK(mv1);
+//BENCHMARK(mv1);
 // BENCHMARK(mv2);
 // BENCHMARK(mv3);
 // BENCHMARK(mv4);
 // BENCHMARK(mv5);
 // BENCHMARK(mv6);
 // BENCHMARK(mv7);
-BENCHMARK(mv8);
+//BENCHMARK(mv8);
 // BENCHMARK(mv9);
 // BENCHMARK(mv10);
 // BENCHMARK(mv3x64_1);
@@ -650,5 +649,7 @@ BENCHMARK(mv8);
 // BENCHMARK(nnue2);
 // BENCHMARK(mv_int1);
 // BENCHMARK(mv_int2);
+BENCHMARK(modulo1);
+BENCHMARK(modulo2);
 
 BENCHMARK_MAIN();
