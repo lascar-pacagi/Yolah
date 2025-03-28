@@ -59,7 +59,7 @@ namespace data {
         std::regex re_games("^games((?!.*symmetries.*))", std::regex_constants::ECMAScript|std::regex_constants::multiline);
         for (auto const& dir_entry : std::filesystem::directory_iterator(src_dir)) {
             auto path = dir_entry.path();
-            if (!std::regex_search(path.filename().string(), re_games)) continue;      
+            if (std::filesystem::is_directory(path) || !std::regex_search(path.filename().string(), re_games)) continue;      
             std::cout << path << std::endl;
             auto input = std::ifstream(path);
             size_t count = 0;
