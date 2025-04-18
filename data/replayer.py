@@ -8,7 +8,7 @@ from yolah import Yolah, Move, Cell
 sys.path.append("../python_binding/build")
 from yolah_bind import heuristic
 sys.path.append("../nnue")
-import nnue
+import nnue_multigpu as nnue
 from pathlib import Path
 import torch
 

@@ -1,0 +1,49 @@
+FACTOR = 8192
+First : 0.870315
+Second: 0.83644
+Third : 0.903448
+Error : 0.164325
+
+-----------------------
+FACTOR = 4096
+First : 0.998514
+Second: 0.997509
+Third : 0.998991
+Error : 0.00150858
+-----------------------
+
+FACTOR = 2048
+First : 0.997104
+Second: 0.995059
+Third : 0.997934
+Error : 0.00302223
+
+FACTOR = 1024
+First : 0.994206
+Second: 0.990199
+Third : 0.995891
+Error : 0.00609844
+
+FACTOR = 512
+First : 0.988459
+Second: 0.981036
+Third : 0.992189
+Error : 0.0119193
+
+FACTOR = 256
+First : 0.975427
+Second: 0.960662
+Third : 0.983525
+Error : 0.0247089
+
+FACTOR = 128
+First : 0.951964
+Second: 0.925916
+Third : 0.968028
+Error : 0.0488648
+
+FACTOR = 64
+First : 0.907445
+Second: 0.861821
+Third : 0.930752
+Error : 0.10298

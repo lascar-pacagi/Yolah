@@ -9,23 +9,34 @@
 #include <iomanip>
 #include "Eigen/Dense"
 
-// black positions + white positions + empty positions + occupied positions + free positions + turn 
-constexpr int INPUT_SIZE = 64 + 64 + 64 + 64 + 64 + 64;
-constexpr int OUTPUT_SIZE = 3;
-
 struct NNUE {  
-    static constexpr int H1_SIZE = 4096;
-    static constexpr int H2_SIZE = 64;
+    // black positions + white positions + empty positions + turn
+    static constexpr int INPUT_SIZE = 64 + 64 + 64 + 1;
+    static constexpr int OUTPUT_SIZE = 3;
+
+    // static constexpr int H1_SIZE = 1024;
+    // static constexpr int H2_SIZE = 128;
+    // static constexpr int H3_SIZE = 64;
+    // static constexpr int TURN_WHITE = 0;
+    // static constexpr int H1_BIAS = H1_SIZE;    
+    // static constexpr int INPUT_TO_H1 = 2 * H1_SIZE;
+    // static constexpr int H2_BIAS = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE;
+    // static constexpr int H1_TO_H2 = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE;
+    // static constexpr int H3_BIAS = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE;
+    // static constexpr int H2_TO_H3 = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE;
+    // static constexpr int OUTPUT_BIAS = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE;
+    // static constexpr int H3_TO_OUTPUT = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE;
+    static constexpr int H1_SIZE = 1024;
+    static constexpr int H2_SIZE = 128;
     static constexpr int H3_SIZE = 64;
-    static constexpr int TURN_WHITE = 0;
-    static constexpr int H1_BIAS = H1_SIZE;    
-    static constexpr int INPUT_TO_H1 = 2 * H1_SIZE;
-    static constexpr int H2_BIAS = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE;
-    static constexpr int H1_TO_H2 = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE;
-    static constexpr int H3_BIAS = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE;
-    static constexpr int H2_TO_H3 = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE;
-    static constexpr int OUTPUT_BIAS = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE;
-    static constexpr int H3_TO_OUTPUT = 2 * H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE;
+    static constexpr int H1_BIAS = 0;    
+    static constexpr int INPUT_TO_H1 = H1_SIZE;
+    static constexpr int H2_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE;
+    static constexpr int H1_TO_H2 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE;
+    static constexpr int H3_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE;
+    static constexpr int H2_TO_H3 = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE;
+    static constexpr int OUTPUT_BIAS = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE;
+    static constexpr int H3_TO_OUTPUT = H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE;
     struct Accumulator {
         float* acc;
         Accumulator() {
