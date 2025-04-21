@@ -29,7 +29,7 @@ struct NNUE_Q {
         int32_t* acc;
         Accumulator() {
             acc = (int32_t*)aligned_alloc(32, 4 * H1_SIZE);
-            memset(acc, H1_SIZE, 0);
+            memset(acc, 0, H1_SIZE);
         }
         ~Accumulator() {
             free(acc);

@@ -611,7 +611,7 @@ std::pair<float, float> NNUE::percentile_activations(const std::string& filename
 //     NNUE nnue;
 //     nnue.load("nnue_1024x128x64x3.20.txt");
 //     nnue.save_quantized("nnue_q_1024x128x64x3.20.txt", 4096);
-//     return 0;
+//     //return 0;
 //     // const auto [min1, max1] = nnue.minmax_weights();
 //     // cout << min1 << ' ' << max1 << endl;
 //     // const auto [min2, max2] = nnue.percentile_weights(0.99);

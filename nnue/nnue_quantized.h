@@ -22,13 +22,13 @@ struct NNUE_Quantized {
     alignas(32) int16_t h1_to_h2[H1_SIZE * H2_SIZE];
     alignas(32) int32_t h3_bias[H3_SIZE];
     alignas(32) int16_t h2_to_h3[H1_SIZE * H2_SIZE];
-    alignas(32) int32_t output_bias[OUTPUT_SIZE];
+    alignas(32) int32_t output_bias[OUTPUT_SIZE + 1]{};
     alignas(32) int16_t h3_to_output[H3_SIZE * OUTPUT_SIZE];
     struct Accumulator {
         int32_t* acc;
         Accumulator() {
             acc = (int32_t*)aligned_alloc(32, 4 * H1_SIZE);
-            memset(acc, H1_SIZE, 0);
+            memset(acc, 0, H1_SIZE);
         }
         ~Accumulator() {
             free(acc);

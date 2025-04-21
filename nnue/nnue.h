@@ -41,7 +41,7 @@ struct NNUE {
         float* acc;
         Accumulator() {
             acc = (float*)aligned_alloc(32, 4 * H1_SIZE);
-            memset(acc, 4 * H1_SIZE, 0);
+            memset(acc, 0, 4 * H1_SIZE);
         }
         ~Accumulator() {
             free(acc);
