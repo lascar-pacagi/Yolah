@@ -19,4 +19,4 @@ From: nvidia/cuda:12.6.2-cudnn-devel-ubuntu24.04
     
 %runscript
     cd /nnue
-    python3 nnue_multigpu2.py
+    python3 nnue_multigpu.py

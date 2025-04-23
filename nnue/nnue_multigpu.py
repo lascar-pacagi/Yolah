@@ -167,10 +167,10 @@ class Net(nn.Module):
         x = self.fc3(x)
         #x = relu(x)
         x = torch.clamp(x, min=0.0, max=1.0)
-        return softmax(self.fc4(x), dim=1)#self.fc4(x)#
+        return self.fc4(x)#softmax(self.fc4(x), dim=1)#
 
 NB_EPOCHS=1000
-MODEL_PATH="./"#"/mnt/"
+MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x128x64x3"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
@@ -182,18 +182,18 @@ def ddp_setup(rank, world_size):
 def dataloader_ddp(trainset, batch_size):
     sampler_train = DistributedSampler(trainset)
     train_loader = DataLoader(
-        trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train, num_workers=0
+        trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train, pin_memory=True, num_workers=0
     )
     return train_loader, sampler_train
 
 class TrainerDDP:
-    def __init__(self, gpu_id, model, train_loader, sampler_train, lr_step_size=10, save_every=10):
+    def __init__(self, gpu_id, model, train_loader, sampler_train, lr_step_size=15, save_every=5):
         self.gpu_id = gpu_id
         self.model = model.to(self.gpu_id)
         self.train_loader = train_loader
         self.sampler_train = sampler_train
         self.save_every = save_every
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.1, momentum=0.9, weight_decay=0)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0)
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, lr_step_size)
         self.loss_fn = torch.nn.CrossEntropyLoss()
         torch.cuda.set_device(gpu_id)
@@ -233,7 +233,7 @@ class TrainerDDP:
 
 def main(rank, world_size, batch_size):
     ddp_setup(rank, world_size)
-    dataset = GameDataset("../data")
+    dataset = GameDataset("../data/games")
     print(rank)
     if rank == 0:
         print(len(dataset), flush=True)
@@ -250,4 +250,4 @@ def main(rank, world_size, batch_size):
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    mp.spawn(main, args=(world_size, 512), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 1024), nprocs=world_size)

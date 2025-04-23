@@ -49,12 +49,47 @@ static inline void mm256_dpwssds_avx_epi32(__m256i& acc, __m256i a, __m256i b) {
     #endif
 }
 
-static inline void matvec_128(int n, const int16_t* __restrict__ a, const int16_t* __restrict__ b, int32_t* __restrict__ c, 
+// static inline void matvec_128(int n, const int16_t* __restrict__ a, const int16_t* __restrict__ b, int32_t* __restrict__ c, 
+//                                 const int32_t* __restrict__ bias) {
+//     constexpr int register_width = 256 / 16;    
+//     constexpr int m = 128;
+//     const int num_in_chunks = n / register_width;
+//     const int num_out_chunks = m / 4;
+
+//     for (int i = 0; i < num_out_chunks; ++i) {
+//         const int offset0 = (i * 4 + 0) * n;
+//         const int offset1 = (i * 4 + 1) * n;
+//         const int offset2 = (i * 4 + 2) * n;
+//         const int offset3 = (i * 4 + 3) * n;
+
+//         __m256i sum0 = _mm256_setzero_si256();
+//         __m256i sum1 = _mm256_setzero_si256();
+//         __m256i sum2 = _mm256_setzero_si256();
+//         __m256i sum3 = _mm256_setzero_si256();
+
+//         for (int j = 0; j < num_in_chunks; ++j) {
+//             const __m256i in = _mm256_load_si256((__m256i*)&b[j * register_width]);
+//             mm256_dpwssds_avx_epi32(sum0, in, _mm256_load_si256((__m256i*)&a[offset0 + j * register_width]));
+//             mm256_dpwssds_avx_epi32(sum1, in, _mm256_load_si256((__m256i*)&a[offset1 + j * register_width]));
+//             mm256_dpwssds_avx_epi32(sum2, in, _mm256_load_si256((__m256i*)&a[offset2 + j * register_width]));
+//             mm256_dpwssds_avx_epi32(sum3, in, _mm256_load_si256((__m256i*)&a[offset3 + j * register_width]));
+//         }
+//         const __m128i _bias = _mm_load_si128((__m128i*)&bias[i * 4]);
+//         __m128i outval = m256_haddx4(sum0, sum1, sum2, sum3, _bias);
+//         outval = _mm_srai_epi32(outval, SHIFT);
+//         _mm_store_si128((__m128i*)&c[i * 4], outval);
+//     }
+// }
+
+static inline void matvec_128(int n, const int16_t* __restrict__ a, const int16_t* __restrict__ b, int16_t* __restrict__ c, 
                                 const int32_t* __restrict__ bias) {
     constexpr int register_width = 256 / 16;    
     constexpr int m = 128;
     const int num_in_chunks = n / register_width;
     const int num_out_chunks = m / 4;
+
+    const __m128i zero    = _mm_setzero_si128();
+    const __m128i factor  = _mm_set1_epi32(FACTOR); 
 
     for (int i = 0; i < num_out_chunks; ++i) {
         const int offset0 = (i * 4 + 0) * n;
@@ -77,7 +112,10 @@ static inline void matvec_128(int n, const int16_t* __restrict__ a, const int16_
         const __m128i _bias = _mm_load_si128((__m128i*)&bias[i * 4]);
         __m128i outval = m256_haddx4(sum0, sum1, sum2, sum3, _bias);
         outval = _mm_srai_epi32(outval, SHIFT);
-        _mm_store_si128((__m128i*)&c[i * 4], outval);
+        outval = _mm_min_epi32(_mm_max_epi32(outval, zero), factor);
+        outval = _mm_packs_epi32(outval, zero);
+        _mm_storeu_si64(&c[i * 4], outval);
+        //_mm_store_si128((__m128i*)&c[i * 4], outval);
     }
 }
 
@@ -108,12 +146,15 @@ static inline void matvec_128(int n, const int16_t* __restrict__ a, const int16_
 //     }
 // }
 
-static inline void matvec_64(int n, const int16_t* __restrict__ a, const int16_t* __restrict__ b, int32_t* __restrict__ c,
+static inline void matvec_64(int n, const int16_t* __restrict__ a, const int16_t* __restrict__ b, int16_t* __restrict__ c,
                                 const int32_t* __restrict__ bias) {    
     constexpr int register_width = 256 / 16;    
     constexpr int m = 64;
     const int num_in_chunks = n / register_width;
     const int num_out_chunks = m / 4;
+
+    const __m128i zero    = _mm_setzero_si128();
+    const __m128i factor  = _mm_set1_epi32(FACTOR); 
 
     for (int i = 0; i < num_out_chunks; ++i) {
         const int offset0 = (i * 4 + 0) * n;
@@ -136,7 +177,10 @@ static inline void matvec_64(int n, const int16_t* __restrict__ a, const int16_t
         const __m128i _bias = _mm_load_si128((__m128i*)&bias[i * 4]);
         __m128i outval = m256_haddx4(sum0, sum1, sum2, sum3, _bias);
         outval = _mm_srai_epi32(outval, SHIFT);
-        _mm_store_si128((__m128i*)&c[i * 4], outval);
+        outval = _mm_min_epi32(_mm_max_epi32(outval, zero), factor);
+        outval = _mm_packs_epi32(outval, zero);
+        _mm_storeu_si64(&c[i * 4], outval);
+        //_mm_store_si128((__m128i*)&c[i * 4], outval);
     }
 }
 
@@ -178,6 +222,7 @@ static inline void matvec3x64(const int16_t* __restrict__ a, const int16_t* __re
     const __m128i _bias = _mm_load_si128((__m128i*)bias);
     __m128i outval = m256_haddx4(sum0, sum1, sum2, sum3, _bias);
     outval = _mm_srai_epi32(outval, SHIFT);
+
     _mm_store_si128((__m128i*)c, outval);
 }
 
@@ -234,14 +279,28 @@ NNUE_Quantized::Accumulator NNUE_Quantized::make_accumulator() const {
 }
 
 std::tuple<float, float, float> NNUE_Quantized::output(Accumulator& a) {        
-    alignas(32) int32_t h2[H2_SIZE];
-    alignas(32) int32_t h3[H3_SIZE];
+    //alignas(32) int32_t h2[H2_SIZE];
+    //alignas(32) int32_t h3[H3_SIZE];
     alignas(32) int32_t output[OUTPUT_SIZE + 1]{};
     alignas(32) int16_t h1[H1_SIZE];
     alignas(32) int16_t h2_16[H2_SIZE];
     alignas(32) int16_t h3_16[H3_SIZE];
+
+    // constexpr int register_width = 128 / 32;    
+    // const int num_chunks = H1_SIZE / register_width;
+
+    // const __m128i zero    = _mm_setzero_si128();
+    // const __m128i factor  = _mm_set1_epi32(FACTOR);
+
+    // for (int i = 0; i < num_chunks; i++) {
+    //     __m128i v = _mm_load_si128((__m128i*)&a.acc[i * register_width]);
+    //     v = _mm_min_epi32(_mm_max_epi32(v, zero), factor);
+    //     v = _mm_packs_epi32(v, zero);
+    //     _mm_storeu_si64(&h1[i * register_width], v);
+    // }
+
     for (int i = 0; i < H1_SIZE; i++) {
-        int32_t v = a.acc[i];
+        const int32_t v = a.acc[i];
         //std::cout << v << ' ';
         //std::cout << (float)(v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v)) / FACTOR << " ";
         //h1[i] = std::min(std::max(0, v), 127);
@@ -249,7 +308,7 @@ std::tuple<float, float, float> NNUE_Quantized::output(Accumulator& a) {
         //std::cout << (float)h1[i] / FACTOR << " ";
     }
     //std::cout << '\n' << "#################\n";
-    matvec_128(H1_SIZE, h1_to_h2, h1, h2, h2_bias);    
+    matvec_128(H1_SIZE, h1_to_h2, h1, h2_16, h2_bias);    
     // for (int i = 0; i < H2_SIZE; i++) {
     //     std::cout << (float)h2[i] / (FACTOR * FACTOR) << ' ';
     // }
@@ -263,17 +322,20 @@ std::tuple<float, float, float> NNUE_Quantized::output(Accumulator& a) {
     //     //std::cout << h2[i] << ' ';
     // }
     //std::cout << '\n' << "#################\n";
-    clamp(H2_SIZE, h2, h2_16);
+    //clamp(H2_SIZE, h2, h2_16);
+    // for (int i = 0; i < H2_SIZE; i++) {
+    //     h2_16[i] = h2[i];
+    // }
     // for (int i = 0; i < H2_SIZE; i++) {
     //     std::cout << (int)h2_8[i] / FACTOR << ' ';
     // }
     // std::cout << '\n' << "#################\n";
-    matvec_64(H2_SIZE, h2_to_h3, h2_16, h3, h3_bias);
+    matvec_64(H2_SIZE, h2_to_h3, h2_16, h3_16, h3_bias);
     // addvec(H3_SIZE, h3_bias, h3);
     // for (int i = 0; i < H3_SIZE; i++) {
     //     h3[i] >>= SHIFT;
     // }
-    clamp(H3_SIZE, h3, h3_16);
+    //clamp(H3_SIZE, h3, h3_16);
     // for (int i = 0; i < H3_SIZE; i++) {
     //     std::cout << (int)h3_8[i] << ' ';
     // }

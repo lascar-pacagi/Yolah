@@ -1,0 +1,9 @@
+500 games, 4r moves, 2s by move, 1 thread
+
+[ player 1 % of black victories ]: 1.5873
+[ player 2 % of black victories ]: 48.9087
+[ player 1 % of white victories ]: 0.198413
+[ player 2 % of white victories ]: 45.5357
+[          % of draws           ]: 3.76984
+[   player 1 % of victories     ]: 3.67063
+[   player 2 % of victories     ]: 96.3294

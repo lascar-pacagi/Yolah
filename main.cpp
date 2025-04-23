@@ -38,9 +38,9 @@ int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
 
-    test::play(Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))),
+    test::play(Player::create(nlohmann::json::parse(std::ifstream("../config/mcts_player.cfg"))),
                 Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))),
-                2, 100);
+                4, 500);
 
     // auto input = std::ifstream("../data/games_7r_1s_bis_d.txt");
     // auto output = std::ofstream("../data/games_7r_1s_bis_d_symmetries.txt");
