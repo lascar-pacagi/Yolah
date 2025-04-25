@@ -356,9 +356,9 @@ std::tuple<float, float, float> NNUE_Quantized::output(Accumulator& a) {
 
     // std::cout << '\n' << "#################\n";
 
-    float e1 = std::exp(output[0] / ((float)FACTOR * A));
-    float e2 = std::exp(output[1] / ((float)FACTOR * A));
-    float e3 = std::exp(output[2] / ((float)FACTOR * A));
+    float e1 = std::exp(output[0] / ((float)FACTOR));
+    float e2 = std::exp(output[1] / ((float)FACTOR));
+    float e3 = std::exp(output[2] / ((float)FACTOR));
     float sum = e1 + e2 + e3;
     return { e1 / sum, e2 / sum, e3 / sum };
 }
