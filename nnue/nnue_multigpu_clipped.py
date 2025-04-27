@@ -167,15 +167,16 @@ class Net(nn.Module):
         x = self.fc3(x)
         #x = relu(x)
         x = torch.clamp(x, min=0.0, max=1.0)
-        return self.fc4(x)#softmax(self.fc4(x), dim=1)#
+        return softmax(self.fc4(x), dim=1)#self.fc4(x)#
     
     def clip(self):
         for fc in [self.fc1, self.fc2, self.fc3, self.fc4]:
             fc.weight.data.clamp_(-127/64, 127/64)
+            fc.bias.data.clamp_(-127/64, 127/64)
             
 
 NB_EPOCHS=1000
-MODEL_PATH="/mnt/"
+MODEL_PATH="./"#"/mnt/"
 MODEL_NAME="nnue_3072x16x32x3"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 

@@ -1,5 +1,5 @@
 import sys
-from nnue_multigpu import Net, GameDataset, LAST_MODEL
+from nnue_multigpu_clipped import Net, GameDataset, LAST_MODEL
 import torch
 sys.path.append("../server")
 from yolah import Yolah

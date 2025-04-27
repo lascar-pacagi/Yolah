@@ -150,7 +150,7 @@ class GameDataset(Dataset):
 INPUT_SIZE = 64 + 64 + 64 + 1
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=128, l3_size=64):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=512, l2_size=64, l3_size=32):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -167,11 +167,11 @@ class Net(nn.Module):
         x = self.fc3(x)
         #x = relu(x)
         x = torch.clamp(x, min=0.0, max=1.0)
-        return self.fc4(x)#softmax(self.fc4(x), dim=1)#
+        return softmax(self.fc4(x), dim=1)#self.fc4(x)#
 
 NB_EPOCHS=1000
-MODEL_PATH="/mnt/"
-MODEL_NAME="nnue_1024x128x64x3"
+MODEL_PATH="./"#"/mnt/"
+MODEL_NAME="nnue_512x64x32x3"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
 def ddp_setup(rank, world_size):
