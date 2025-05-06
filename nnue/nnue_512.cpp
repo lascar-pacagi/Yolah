@@ -441,11 +441,12 @@ std::pair<float, float> NNUE_512::percentile_activations(const std::string& file
 }
 
 // g++ -std=c++2a -O3 -march=native -mavx2 -ffast-math -funroll-loops -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
+/*
 int main(int argc, char* argv[]) {
     using namespace std;
     NNUE_512 nnue;
-    nnue.load("nnue_512x64x32x3.txt");
-    nnue.save_quantized("nnue_q_512x64x32x3.txt", 4096);
+    nnue.load("nnue_512x64x32x3.20.txt");
+    nnue.save_quantized("nnue_q_512x64x32x3.20.txt", 4096);
     //return 0;
     // const auto [min1, max1] = nnue.minmax_weights();
     // cout << min1 << ' ' << max1 << endl;
@@ -495,3 +496,4 @@ int main(int argc, char* argv[]) {
         }
     }
 }
+*/

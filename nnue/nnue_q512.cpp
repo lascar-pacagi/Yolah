@@ -323,7 +323,7 @@ void NNUE_Q512::undo(uint8_t player, const Move& m, Accumulator& a) {
 //     using namespace std;
 //     NNUE_Q512 nnue;
 //     try {
-//         nnue.load("nnue_q_512x64x32x3.txt");
+//         nnue.load("nnue_q_512x64x32x3.20.txt");
 //     } catch (const char* e) {
 //         cout << e << endl;
 //         exit(EXIT_FAILURE);

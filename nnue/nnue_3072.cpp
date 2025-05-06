@@ -99,38 +99,30 @@ std::tuple<float, float, float> NNUE_3072::output(Accumulator& a) {
         //std::cout << a.acc[i] << ' ';
         h1[i] = a.acc[i] >= 0 ? a.acc[i] : 0;
         h1[i] = h1[i] >= 1 ? 1 : h1[i];
-        //std::cout << std::setprecision(3) << h1[i] << ' ';
+        std::cout << std::setprecision(3) << h1[i] << ' ';
     }
-    //std::cout << '\n' << "#################\n";
-    matvec_3072x16(weights_and_biases + H1_TO_H2, h1, h2);
-    // for (int i = 0; i < H2_SIZE; i++) {
-    //     std::cout << std::setprecision(3) << h2[i] << ' ';
-    // }
-    // std::cout << '\n' << "#################\n";   
+    std::cout << '\n' << "#################\n";
+    matvec_3072x16(weights_and_biases + H1_TO_H2, h1, h2);       
     addvec(H2_SIZE, weights_and_biases + H2_BIAS, h2);
-    // for (int i = 0; i < H2_SIZE; i++) {
-    //     std::cout << std::setprecision(3) << h2[i] << ' ';
-    // }
-    // std::cout << '\n' << "#################\n";
     clamp(H2_SIZE, h2);
-    // for (int i = 0; i < H2_SIZE; i++) {
-    //     std::cout << std::setprecision(3) << h2[i] << ' ';
-    // }
-    // std::cout << '\n' << "#################\n";
+    for (int i = 0; i < H2_SIZE; i++) {
+        std::cout << std::setprecision(3) << h2[i] << ' ';
+    }
+    std::cout << '\n' << "#################\n";
     matvec_16x32(weights_and_biases + H2_TO_H3, h2, h3);
     addvec(H3_SIZE, weights_and_biases + H3_BIAS, h3);
     clamp(H3_SIZE, h3);
-    // for (int i = 0; i < H3_SIZE; i++) {
-    //     std::cout << std::setprecision(3) << h3[i] << ' ';
-    // }
-    // std::cout << '\n' << "#################\n";
+    for (int i = 0; i < H3_SIZE; i++) {
+        std::cout << std::setprecision(3) << h3[i] << ' ';
+    }
+    std::cout << '\n' << "#################\n";
 
     matvec_3x32(weights_and_biases + H3_TO_OUTPUT, h3, output);
     addvec(OUTPUT_SIZE, weights_and_biases + OUTPUT_BIAS, output);
-    // for (int i = 0; i < OUTPUT_SIZE; i++) {
-    //     std::cout << std::setprecision(3) << output[i] << ' ';
-    // }
-    // std::cout << '\n' << "#################\n";
+    for (int i = 0; i < OUTPUT_SIZE; i++) {
+        std::cout << std::setprecision(3) << output[i] << ' ';
+    }
+    std::cout << '\n' << "#################\n";
     float e1 = std::exp(output[0]);
     float e2 = std::exp(output[1]);
     float e3 = std::exp(output[2]);
@@ -206,10 +198,10 @@ static void save_matrix_quantized(std::ofstream& ofs, float* weights, float scal
             int w;                                    
             if constexpr (transpose) w = static_cast<int32_t>(scale * weights[j * M + i]); 
             else w = static_cast<int32_t>(scale * weights[i * N + j]);
-            w = w <= -127 ? -127 : w;
-            w = w >= 127 ? 127 : w;
-            // w = w <= -32767 ? -32767 : w;
-            // w = w >= 32767 ? 32767 : w;
+            // w = w <= -clamp ? -clamp : w;
+            // w = w >= clamp ? clamp : w;
+            w = w <= -32767 ? -32767 : w;
+            w = w >= 32767 ? 32767 : w;
             ofs << w << '\n';
             //std::cout << w / scale << std::endl;
         }
@@ -219,13 +211,11 @@ static void save_matrix_quantized(std::ofstream& ofs, float* weights, float scal
 template<int N>
 static void save_bias_quantized(std::ofstream& ofs, float* weights, float scale = 64) {
     ofs << "B\n" << N << '\n';
-    //std::cout << "B" << std::endl;
     for (int i = 0; i < N; i++) {
         int w = static_cast<int32_t>(scale * weights[i]);
-        w = w <= -32767 ? -32767 : w;
-        w = w >= 32767 ? 32767 : w;
+        // w = w <= -clamp ? -clamp : w;
+        // w = w >= clamp ? clamp : w;
         ofs << w << '\n';
-        //std::cout << w / scale << std::endl;
     }
 }
 
@@ -240,6 +230,18 @@ void NNUE_3072::save_quantized(const std::string& filename, float scale) {
     save_matrix_quantized<OUTPUT_SIZE, H3_SIZE>(ofs, weights_and_biases + H3_TO_OUTPUT, scale);
     save_bias_quantized<OUTPUT_SIZE>(ofs, weights_and_biases + OUTPUT_BIAS, scale * scale);
 }
+
+// void NNUE_3072::save_quantized(const std::string& filename, float scale) {
+//     std::ofstream ofs(filename, std::ofstream::out);
+//     save_matrix_quantized<H1_SIZE, INPUT_SIZE, TRANSPOSE>(ofs, weights_and_biases + INPUT_TO_H1, 8192, 32767);
+//     save_bias_quantized<H1_SIZE>(ofs, weights_and_biases + H1_BIAS, 8192);
+//     save_matrix_quantized<H2_SIZE, H1_SIZE, TRANSPOSE>(ofs, weights_and_biases + H1_TO_H2, 8192, 32767);    
+//     save_bias_quantized<H2_SIZE>(ofs, weights_and_biases + H2_BIAS, 8192);
+//     save_matrix_quantized<H3_SIZE, H2_SIZE, TRANSPOSE>(ofs, weights_and_biases + H2_TO_H3, 256);
+//     save_bias_quantized<H3_SIZE>(ofs, weights_and_biases + H3_BIAS, 256);
+//     save_matrix_quantized<OUTPUT_SIZE, H3_SIZE>(ofs, weights_and_biases + H3_TO_OUTPUT, 256);
+//     save_bias_quantized<OUTPUT_SIZE>(ofs, weights_and_biases + OUTPUT_BIAS, 256);
+// }
 
 static inline std::tuple<uint64_t, uint64_t, uint64_t> encode_yolah(const Yolah& yolah) {
     // black positions + white positions + empty positions 
@@ -445,7 +447,7 @@ int main(int argc, char* argv[]) {
     using namespace std;
     NNUE_3072 nnue;
     nnue.load("nnue_3072x16x32x3.txt");
-    nnue.save_quantized("nnue_q_3072x16x32x3.txt", 64);
+    nnue.save_quantized("nnue_q_3072x16x32x3.txt", 4096);
     //return 0;
     // const auto [min1, max1] = nnue.minmax_weights();
     // cout << min1 << ' ' << max1 << endl;
@@ -477,7 +479,7 @@ int main(int argc, char* argv[]) {
             cout << setprecision(17) << black_proba << '\n';
             cout << draw_proba << '\n';
             cout << white_proba << '\n';
-            //return 0;
+            return 0;
             smatch match = *it;
             string match_str = match.str();
             //cout << match_str << '\n';

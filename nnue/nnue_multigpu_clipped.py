@@ -150,7 +150,7 @@ class GameDataset(Dataset):
 INPUT_SIZE = 64 + 64 + 64 + 1
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=3072, l2_size=16, l3_size=32):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=64, l3_size=32):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -174,10 +174,9 @@ class Net(nn.Module):
             fc.weight.data.clamp_(-127/64, 127/64)
             fc.bias.data.clamp_(-127/64, 127/64)
             
-
 NB_EPOCHS=1000
 MODEL_PATH="./"#"/mnt/"
-MODEL_NAME="nnue_3072x16x32x3"
+MODEL_NAME="nnue_1024x64x32x3.0"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
 def ddp_setup(rank, world_size):
@@ -213,8 +212,7 @@ class TrainerDDP:
         n = 0
         running_loss = 0
         accuracy = 0
-        for (X, y) in self.train_loader:
-            self.model.clip()
+        for (X, y) in self.train_loader:            
             n += len(X)
             X = X.to(self.gpu_id)
             y = y.to(self.gpu_id)
@@ -225,6 +223,7 @@ class TrainerDDP:
             self.optimizer.step()
             running_loss += loss.item()
             accuracy += sum(torch.argmax(logits, dim=1) == y).item()
+            self.model.clip()
         if self.gpu_id == 0:
             print('epoch {} loss: {} accuracy: {}'.format(epoch + 1, running_loss / n, accuracy / n), flush=True)
         self.lr_scheduler.step()
