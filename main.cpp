@@ -30,6 +30,7 @@
 #include <filesystem>
 #include <regex>
 #include "minmax_nnue_quantized_player.h"
+#include "tournament.h"
 
 namespace po = boost::program_options;
 using std::cout, std::endl, std::string;
@@ -38,9 +39,11 @@ int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
 
-    test::play(Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))),
-                Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))),
-                4, 500);
+    // test::play(Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))),
+    //             Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))),
+    //             2, 500);
+
+    test::tournament({"../config/random_player.cfg", "../config/mc_player.cfg", "../config/mcts_player.cfg", "../config/mm_player.cfg", "../config/mm_nnue_quantized_player.cfg"}, 4, 2000);
 
     // auto input = std::ifstream("../data/games_7r_1s_bis_d.txt");
     // auto output = std::ofstream("../data/games_7r_1s_bis_d_symmetries.txt");

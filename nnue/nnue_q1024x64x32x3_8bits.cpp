@@ -432,46 +432,46 @@ void NNUE_Q1024x64x32x3_8bits::undo(uint8_t player, const Move& m, Accumulator& 
     }
 }
 
-int main(int argc, char* argv[]) {
-    using namespace std;
-    NNUE_Q1024x64x32x3_8bits nnue;
-    try {
-        nnue.load("nnue_q_1024x64x32x3.0.txt");
-    } catch (const char* e) {
-        cout << e << endl;
-        exit(EXIT_FAILURE);
-    }    
-    auto acc = nnue.make_accumulator();
-    ifstream ifs(argv[1], std::ifstream::in);
-    regex re_moves(R"(((\w\d):(\w\d))+)", regex_constants::ECMAScript);
-    size_t i = 0;
-    while (ifs) {
-        Yolah yolah;
-        nnue.init(yolah, acc);
-        string line;
-        getline(ifs, line);
-        if (line == "") continue;
-        for (auto it = sregex_iterator(begin(line), end(line), re_moves); it != sregex_iterator(); ++it) {
-            //nnue.init(yolah, acc);
-            const auto [black_proba, draw_proba, white_proba] = nnue.output(acc);
-            cout << setprecision(17) << black_proba << '\n';
-            cout << draw_proba << '\n';
-            cout << white_proba << '\n';
-            //return 0;
-            smatch match = *it;
-            string match_str = match.str();
-            //cout << match_str << '\n';
-            Square sq1 = make_square(match[2].str());
-            Square sq2 = make_square(match[3].str());
-            //cout << sq1 << ':' << sq2 << '\n';
-            Move m(sq1, sq2);
-            nnue.play(yolah.current_player(), m, acc);                        
-            yolah.play(m);
-            // yolah.undo(m);
-            // nnue.undo(yolah.current_player(), m, acc);
-            // nnue.play(yolah.current_player(), m, acc);                        
-            // yolah.play(m);
-            //cout << yolah << '\n';            
-        }
-    }
-}
+// int main(int argc, char* argv[]) {
+//     using namespace std;
+//     NNUE_Q1024x64x32x3_8bits nnue;
+//     try {
+//         nnue.load("nnue_q_1024x64x32x3.15.txt");
+//     } catch (const char* e) {
+//         cout << e << endl;
+//         exit(EXIT_FAILURE);
+//     }
+//     auto acc = nnue.make_accumulator();
+//     ifstream ifs(argv[1], std::ifstream::in);
+//     regex re_moves(R"(((\w\d):(\w\d))+)", regex_constants::ECMAScript);
+//     size_t i = 0;
+//     while (ifs) {
+//         Yolah yolah;
+//         nnue.init(yolah, acc);
+//         string line;
+//         getline(ifs, line);
+//         if (line == "") continue;
+//         for (auto it = sregex_iterator(begin(line), end(line), re_moves); it != sregex_iterator(); ++it) {
+//             //nnue.init(yolah, acc);
+//             const auto [black_proba, draw_proba, white_proba] = nnue.output(acc);
+//             cout << setprecision(17) << black_proba << '\n';
+//             cout << draw_proba << '\n';
+//             cout << white_proba << '\n';
+//             //return 0;
+//             smatch match = *it;
+//             string match_str = match.str();
+//             //cout << match_str << '\n';
+//             Square sq1 = make_square(match[2].str());
+//             Square sq2 = make_square(match[3].str());
+//             //cout << sq1 << ':' << sq2 << '\n';
+//             Move m(sq1, sq2);
+//             nnue.play(yolah.current_player(), m, acc);                        
+//             yolah.play(m);
+//             // yolah.undo(m);
+//             // nnue.undo(yolah.current_player(), m, acc);
+//             // nnue.play(yolah.current_player(), m, acc);                        
+//             // yolah.play(m);
+//             //cout << yolah << '\n';            
+//         }
+//     }
+// }

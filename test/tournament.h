@@ -4,7 +4,7 @@
 #include <string>
 
 namespace test {
-    void tournament(const std::vector<std::string>& players, size_t nb_games);
+    void tournament(const std::vector<std::string>& players_configs, size_t nb_random_moves, size_t nb_games);
 }
 
 #endif

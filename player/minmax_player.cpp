@@ -61,7 +61,7 @@ Move MinMaxPlayer::play(Yolah yolah) {
     // cout << "tt load: " << table.load() << '\n';
     // print_pv(yolah, zobrist::hash(yolah), depth);
     // cout << '\n';
-    //cout << heuristic::eval(yolah.current_player(), yolah) << endl;
+    // cout << heuristic::eval(yolah.current_player(), yolah) << endl;
     return res;
 }
 

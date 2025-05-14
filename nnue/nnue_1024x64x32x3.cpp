@@ -204,8 +204,8 @@ static void save_matrix_quantized(std::ofstream& ofs, float* weights, float scal
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {
             int w;                                    
-            if constexpr (transpose) w = static_cast<int32_t>(scale * weights[j * M + i]); 
-            else w = static_cast<int32_t>(scale * weights[i * N + j]);
+            if constexpr (transpose) w = static_cast<int32_t>(std::round(scale * weights[j * M + i])); 
+            else w = static_cast<int32_t>(std::round(scale * weights[i * N + j]));
             // w = w <= -127 ? -127 : w;
             // w = w >= 127 ? 127 : w;
             w = w <= -32767 ? -32767 : w;
@@ -221,7 +221,7 @@ static void save_bias_quantized(std::ofstream& ofs, float* weights, float scale 
     ofs << "B\n" << N << '\n';
     //std::cout << "B" << std::endl;
     for (int i = 0; i < N; i++) {
-        int w = static_cast<int32_t>(scale * weights[i]);
+        int w = static_cast<int32_t>(std::round(scale * weights[i]));
         // w = w <= -32767 ? -32767 : w;
         // w = w >= 32767 ? 32767 : w;
         ofs << w << '\n';
@@ -445,8 +445,9 @@ std::pair<float, float> NNUE_1024x64x32x3::percentile_activations(const std::str
 int main(int argc, char* argv[]) {
     using namespace std;
     NNUE_1024x64x32x3 nnue;
-    nnue.load("nnue_1024x64x32x3.0.txt");
-    nnue.save_quantized("nnue_q_1024x64x32x3.0.txt", 64);
+    nnue.load("nnue_1024x64x32x3.15.txt");
+    //nnue.save_quantized("nnue_q_1024x64x32x3.0.txt", 64);
+    nnue.save_quantized("nnue_q_1024x64x32x3.15.txt", 64);
     //return 0;
     // const auto [min1, max1] = nnue.minmax_weights();
     // cout << min1 << ' ' << max1 << endl;
