@@ -436,7 +436,7 @@ void NNUE_Q1024x64x32x3_8bits::undo(uint8_t player, const Move& m, Accumulator& 
 //     using namespace std;
 //     NNUE_Q1024x64x32x3_8bits nnue;
 //     try {
-//         nnue.load("nnue_q_1024x64x32x3.15.txt");
+//         nnue.load("nnue_q_1024x64x32x3.25.txt");
 //     } catch (const char* e) {
 //         cout << e << endl;
 //         exit(EXIT_FAILURE);

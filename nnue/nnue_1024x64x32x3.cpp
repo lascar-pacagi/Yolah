@@ -442,58 +442,58 @@ std::pair<float, float> NNUE_1024x64x32x3::percentile_activations(const std::str
 
 // g++ -std=c++2a -O3 -march=native -mavx2 -ffast-math -funroll-loops -I../game -I../misc -I../eigen ../game/zobrist.cpp ../game/magic.cpp ../game/game.cpp nnue.cpp
 
-int main(int argc, char* argv[]) {
-    using namespace std;
-    NNUE_1024x64x32x3 nnue;
-    nnue.load("nnue_1024x64x32x3.15.txt");
-    //nnue.save_quantized("nnue_q_1024x64x32x3.0.txt", 64);
-    nnue.save_quantized("nnue_q_1024x64x32x3.15.txt", 64);
-    //return 0;
-    // const auto [min1, max1] = nnue.minmax_weights();
-    // cout << min1 << ' ' << max1 << endl;
-    // const auto [min2, max2] = nnue.percentile_weights(0.99);
-    // cout << min2 << ' ' << max2 << endl;
-    // const auto [min3, max3] = nnue.minmax_activations("../data/games/games_2r_1s_a.0.txt");
-    // cout << min3 << ' ' << max3 << endl;
-    // const auto [min4, max4] = nnue.percentile_activations("../data/games/games_2r_1s_a.0.txt", 0.99);
-    // cout << min4 << ' ' << max4 << endl;
-    auto acc = nnue.make_accumulator();
-    // Yolah yolah;
-    // cout << yolah << '\n';
-    // yolah.play(Move(make_square("a1"), make_square("a7")));
-    // cout << yolah << '\n';
-    // nnue.output_linear(yolah);
-    //nnue.write(cout);
-    ifstream ifs(argv[1], std::ifstream::in);
-    regex re_moves(R"(((\w\d):(\w\d))+)", regex_constants::ECMAScript);
-    size_t i = 0;
-    while (ifs) {
-        Yolah yolah;
-        nnue.init(yolah, acc);
-        string line; 
-        getline(ifs, line);
-        if (line == "") continue;
-        for (auto it = sregex_iterator(begin(line), end(line), re_moves); it != sregex_iterator(); ++it) {
-            //nnue.init(yolah, acc);
-            const auto [black_proba, draw_proba, white_proba] = nnue.output(acc);
-            cout << setprecision(17) << black_proba << '\n';
-            cout << draw_proba << '\n';
-            cout << white_proba << '\n';
-            //return 0;
-            smatch match = *it;
-            string match_str = match.str();
-            //cout << match_str << '\n';
-            Square sq1 = make_square(match[2].str());
-            Square sq2 = make_square(match[3].str());
-            //cout << sq1 << ':' << sq2 << '\n';
-            Move m(sq1, sq2);
-            nnue.play(yolah.current_player(), m, acc);
-            yolah.play(m);
-            // yolah.undo(m);
-            // nnue.undo(yolah.current_player(), m, acc);
-            // nnue.play(yolah.current_player(), m, acc);                        
-            // yolah.play(m);
-            //cout << yolah << '\n';            
-        }
-    }
-}
+// int main(int argc, char* argv[]) {
+//     using namespace std;
+//     NNUE_1024x64x32x3 nnue;
+//     nnue.load("nnue_1024x64x32x3.25.txt");
+//     //nnue.save_quantized("nnue_q_1024x64x32x3.0.txt", 64);
+//     nnue.save_quantized("nnue_q_1024x64x32x3.25.txt", 64);
+//     //return 0;
+//     // const auto [min1, max1] = nnue.minmax_weights();
+//     // cout << min1 << ' ' << max1 << endl;
+//     // const auto [min2, max2] = nnue.percentile_weights(0.99);
+//     // cout << min2 << ' ' << max2 << endl;
+//     // const auto [min3, max3] = nnue.minmax_activations("../data/games/games_2r_1s_a.0.txt");
+//     // cout << min3 << ' ' << max3 << endl;
+//     // const auto [min4, max4] = nnue.percentile_activations("../data/games/games_2r_1s_a.0.txt", 0.99);
+//     // cout << min4 << ' ' << max4 << endl;
+//     auto acc = nnue.make_accumulator();
+//     // Yolah yolah;
+//     // cout << yolah << '\n';
+//     // yolah.play(Move(make_square("a1"), make_square("a7")));
+//     // cout << yolah << '\n';
+//     // nnue.output_linear(yolah);
+//     //nnue.write(cout);
+//     ifstream ifs(argv[1], std::ifstream::in);
+//     regex re_moves(R"(((\w\d):(\w\d))+)", regex_constants::ECMAScript);
+//     size_t i = 0;
+//     while (ifs) {
+//         Yolah yolah;
+//         nnue.init(yolah, acc);
+//         string line; 
+//         getline(ifs, line);
+//         if (line == "") continue;
+//         for (auto it = sregex_iterator(begin(line), end(line), re_moves); it != sregex_iterator(); ++it) {
+//             //nnue.init(yolah, acc);
+//             const auto [black_proba, draw_proba, white_proba] = nnue.output(acc);
+//             cout << setprecision(17) << black_proba << '\n';
+//             cout << draw_proba << '\n';
+//             cout << white_proba << '\n';
+//             //return 0;
+//             smatch match = *it;
+//             string match_str = match.str();
+//             //cout << match_str << '\n';
+//             Square sq1 = make_square(match[2].str());
+//             Square sq2 = make_square(match[3].str());
+//             //cout << sq1 << ':' << sq2 << '\n';
+//             Move m(sq1, sq2);
+//             nnue.play(yolah.current_player(), m, acc);
+//             yolah.play(m);
+//             // yolah.undo(m);
+//             // nnue.undo(yolah.current_player(), m, acc);
+//             // nnue.play(yolah.current_player(), m, acc);                        
+//             // yolah.play(m);
+//             //cout << yolah << '\n';            
+//         }
+//     }
+// }
