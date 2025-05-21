@@ -29,11 +29,12 @@ namespace test {
         for (const string& cfg : players_configs) {
             players.push_back(Player::create(nlohmann::json::parse(ifstream(cfg))));
         }
+        std::mutex mutex;
         {
-            std::mutex mutex;          
+            vector<jthread> threads;        
             for (size_t p1 = 0; p1 < players.size(); p1++) {
                 for (size_t p2 = p1 + 1; p2 < players.size(); p2++) {
-                    jthread([&, p1, p2]{
+                    threads.emplace_back([&, p1, p2]{
                         double p1_black_victories = 0;
                         double p1_white_victories = 0;
                         double p2_black_victories = 0;

@@ -6,7 +6,6 @@
 #include <atomic>
 #include "BS_thread_pool.h"
 #include "nnue_quantized.h"
-#include "nnue_q1024x64x32x3_8bits.h"
 
 class MinMaxNNUE_QuantizedPlayer : public Player {
     const uint64_t thinking_time;
@@ -14,7 +13,7 @@ class MinMaxNNUE_QuantizedPlayer : public Player {
     size_t nb_moves_at_full_depth;
     uint8_t late_move_reduction;
     const std::string nnue_q_parameters_filename;
-    NNUE_Q1024x64x32x3_8bits nnue;
+    NNUE_Quantized nnue;
     BS::thread_pool pool;
     std::atomic_bool stop = false;
     
@@ -28,7 +27,7 @@ class MinMaxNNUE_QuantizedPlayer : public Player {
         size_t nb_nodes = 0;
         size_t nb_hits  = 0;
         size_t acc_index = 0;
-        NNUE_Q1024x64x32x3_8bits::Accumulator acc;
+        NNUE_Quantized::Accumulator acc;
     };
 
     int16_t negamax(Yolah& yolah, Search&, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth);
