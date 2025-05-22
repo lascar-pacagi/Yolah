@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
     //             Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))),
     //             2, 500);
 
-    test::tournament({"/Yolah/config/random_player.cfg", "/Yolah/config/mc_player.cfg", "/Yolah/config/mcts_player.cfg", "/Yolah/config/mm_player.cfg", "/Yolah/config/mm_nnue_quantized_player.cfg", "/Yolah/config/mm_nnue_player.cfg"}, 4, 500);
+    test::tournament({"/Yolah/config/mc_player.cfg", "/Yolah/config/mcts_player.cfg", "/Yolah/config/mm_player.cfg", "/Yolah/config/mm_nnue_quantized_player.cfg", "/Yolah/config/mm_nnue_player.cfg"}, 4, 1000);
     //test::tournament({"../config/random_player.cfg", "../config/mc_player.cfg", "../config/mcts_player.cfg", "../config/mm_player.cfg", "../config/mm_nnue_quantized_player.cfg", "../config/mm_nnue_player.cfg"}, 4, 2);
     // auto input = std::ifstream("../data/games_7r_1s_bis_d.txt");
     // auto output = std::ofstream("../data/games_7r_1s_bis_d_symmetries.txt");
