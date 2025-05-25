@@ -1,0 +1,110 @@
+player 1:
+minmax nnue quantized player (transposition table + late move reduction + killer + lazy SMP)
+player 2:
+minmax nnue player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 31.7
+[ player 2 % of black victories ]: 23.1
+[ player 1 % of white victories ]: 11.15
+[ player 2 % of white victories ]: 6.35
+[          % of draws           ]: 27.7
+[   player 1 % of victories     ]: 56.7
+[   player 2 % of victories     ]: 43.3
+player 1:
+monte carlo player
+player 2:
+mcts synchronized memory pool player
+[ player 1 % of black victories ]: 0.8
+[ player 2 % of black victories ]: 49.1
+[ player 1 % of white victories ]: 0.3
+[ player 2 % of white victories ]: 48.2
+[          % of draws           ]: 1.6
+[   player 1 % of victories     ]: 1.9
+[   player 2 % of victories     ]: 98.1
+player 1:
+minmax player (transposition table + late move reduction + killer + lazy SMP)
+player 2:
+minmax nnue quantized player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 10.5
+[ player 2 % of black victories ]: 43.7
+[ player 1 % of white victories ]: 1.9
+[ player 2 % of white victories ]: 31.2
+[          % of draws           ]: 12.7
+[   player 1 % of victories     ]: 18.75
+[   player 2 % of victories     ]: 81.25
+player 1:
+minmax player (transposition table + late move reduction + killer + lazy SMP)
+player 2:
+minmax nnue player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 11.2
+[ player 2 % of black victories ]: 42.9
+[ player 1 % of white victories ]: 2.95
+[ player 2 % of white victories ]: 29.5
+[          % of draws           ]: 13.45
+[   player 1 % of victories     ]: 20.875
+[   player 2 % of victories     ]: 79.125
+player 1:
+mcts synchronized memory pool player
+player 2:
+minmax player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 13.1
+[ player 2 % of black victories ]: 38.8
+[ player 1 % of white victories ]: 5.55
+[ player 2 % of white victories ]: 29.05
+[          % of draws           ]: 13.5
+[   player 1 % of victories     ]: 25.4
+[   player 2 % of victories     ]: 74.6
+player 1:
+mcts synchronized memory pool player
+player 2:
+minmax nnue player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 6.8
+[ player 2 % of black victories ]: 48.35
+[ player 1 % of white victories ]: 0.55
+[ player 2 % of white victories ]: 38.7
+[          % of draws           ]: 5.6
+[   player 1 % of victories     ]: 10.15
+[   player 2 % of victories     ]: 89.85
+player 1:
+mcts synchronized memory pool player
+player 2:
+minmax nnue quantized player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 4.85
+[ player 2 % of black victories ]: 48.6
+[ player 1 % of white victories ]: 0.4
+[ player 2 % of white victories ]: 40.55
+[          % of draws           ]: 5.6
+[   player 1 % of victories     ]: 8.05
+[   player 2 % of victories     ]: 91.95
+player 1:
+monte carlo player
+player 2:
+minmax nnue player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 1.05
+[ player 2 % of black victories ]: 49.95
+[ player 1 % of white victories ]: 0
+[ player 2 % of white victories ]: 48.25
+[          % of draws           ]: 0.75
+[   player 1 % of victories     ]: 1.425
+[   player 2 % of victories     ]: 98.575
+player 1:
+monte carlo player
+player 2:
+minmax nnue quantized player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 0.8
+[ player 2 % of black victories ]: 49.95
+[ player 1 % of white victories ]: 0
+[ player 2 % of white victories ]: 48.9
+[          % of draws           ]: 0.35
+[   player 1 % of victories     ]: 0.975
+[   player 2 % of victories     ]: 99.025
+player 1:
+monte carlo player
+player 2:
+minmax player (transposition table + late move reduction + killer + lazy SMP)
+[ player 1 % of black victories ]: 1.1
+[ player 2 % of black victories ]: 49.2
+[ player 1 % of white victories ]: 0.25
+[ player 2 % of white victories ]: 48.1
+[          % of draws           ]: 1.35
+[   player 1 % of victories     ]: 2.025
+[   player 2 % of victories     ]: 97.975
