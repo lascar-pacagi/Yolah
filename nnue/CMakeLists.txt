@@ -1,4 +1,4 @@
-add_library(nnue OBJECT nnue.cpp nnue_quantized.cpp)
+add_library(nnue OBJECT nnue.cpp nnue_quantized.cpp logic_net.cpp)
 
 target_compile_options(nnue PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops)
 
