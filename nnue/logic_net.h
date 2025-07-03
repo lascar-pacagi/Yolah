@@ -54,21 +54,26 @@ struct LogicNet {
         1, 1, 1, 1,
    };
    struct Layer {
-    alignas(64) std::array<uint16_t, 256> inputs1;
-    alignas(64) std::array<uint16_t, 256> inputs2;
-    alignas(64) std::array<uint8_t, 256> gates;
+    static constexpr int SIZE = 256;
+    alignas(64) std::array<uint16_t, SIZE> inputs1;
+    alignas(64) std::array<uint16_t, SIZE> inputs2;
+    alignas(64) std::array<uint8_t, SIZE> gates;
     Layer(std::mt19937_64&);
     Layer(uint8_t gate);
     Layer();
     void forward(const uint8_t* input_prev, uint8_t* __restrict__ output) const;
     std::array<int, 16> gates_count() const;
     friend std::ostream& operator<<(std::ostream&, const Layer&);
+    std::string to_json() const;
+    static Layer from_json(std::istream&);
    };
    std::vector<Layer> layers;
-   LogicNet(int nb_layers);
+   LogicNet(int nb_layers = 4);
    std::tuple<float, float, float> forward(const Yolah& yolah) const;
    std::array<int, 16> gates_count() const;
    friend std::ostream& operator<<(std::ostream&, const LogicNet&);
+   std::string to_json() const;
+   static LogicNet from_json(std::istream&);
 };
 
 #endif

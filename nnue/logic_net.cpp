@@ -108,6 +108,38 @@ std::ostream& operator<<(std::ostream& os, const LogicNet::Layer& l) {
     return os;
 }   
 
+static void to_json(json& j, const LogicNet::Layer& l) {
+    j = json{
+        {"inputs1", l.inputs1},
+        {"inputs2", l.inputs2},
+        {"gates",   l.gates}
+    };
+}
+
+static void from_json(const json& j, LogicNet::Layer& l) {
+    j.at("inputs1").get_to(l.inputs1);
+    j.at("inputs2").get_to(l.inputs2);
+    j.at("gates").get_to(l.gates);
+}
+
+static void to_json(json& j, const LogicNet& net) {
+    j = json{{"layers", net.layers}};
+}
+
+static void from_json(const json& j, LogicNet& net) {
+    j.at("layers").get_to(net.layers);
+}
+
+std::string LogicNet::Layer::to_json() const {
+    json j = *this;
+    return j.dump(4);
+}
+
+LogicNet::Layer LogicNet::Layer::from_json(std::istream& is) {
+    json j = json::parse(is);
+    return j.get<Layer>();
+}
+
 LogicNet::LogicNet(int nb_layers) {
     std::mt19937_64 mt(std::chrono::system_clock::now().time_since_epoch().count());
     for (int i = 0; i < nb_layers; i++) {
@@ -174,6 +206,27 @@ std::ostream& operator<<(std::ostream& os, const LogicNet& net) {
         os << "\n****LAYER " << i << ":\n" << net.layers[i] << '\n';
     }
     return os;
+}
+
+std::string LogicNet::to_json() const {
+    json j = *this;
+    return j.dump(4);
+}
+
+/*
+json j;
+    j["ply"]   = to_string(ply);
+    j["black"] = to_string(black);
+    j["white"] = to_string(white);
+    j["empty"] = to_string(empty);
+    j["black score"] = to_string(black_score);
+    j["white score"] = to_string(white_score);
+    return j.dump();
+*/
+
+LogicNet LogicNet::from_json(std::istream& is) {
+    json j = json::parse(is);
+    return j.get<LogicNet>();
 }
 
 void test1() {
@@ -281,31 +334,44 @@ void test3() {
     }        
 }
 
-int main() {
-    test1();
-    test2();
-    test3();
-    // LogicNet::Layer l(8);
-    // std::cout << l << '\n';
-    // alignas(64) uint8_t input_prev[512];
-    // std::memset(input_prev, 1, sizeof(input_prev));
-    // alignas(64) uint8_t output[256];    
-    // for (int i = 0; i < 1; i++) {
-    //     l.forward(input_prev, output);
-    // }    
-    // for (int i = 0; i < 256; i++) {
-    //     std::cout << "[#" << i << ' ' << (int)output[i] << ']'; 
-    // }
-    // std::cout << '\n';    
-    LogicNet net(5);
-    //    std::cout << net << '\n';
-    Yolah yolah;
-    float black = 0, draw = 0, white = 0;
-    for (int i = 0; i < 1; i++) {
-        const auto [b, d, w] = net.forward(yolah);
-        black += b;
-        draw += d;
-        white += w;
-    }
-    std::cout << black << ' ' << draw << ' ' << white << '\n';    
-}
+// int main() {
+//     test1();
+//     test2();
+//     test3();
+//     // std::vector<int> ones{ 4, 9, 12, 13, 18, 20, 22, 25, 26, 28, 29, 30, 35, 36, 39, 41, 43, 44, 45, 47, 50, 51, 52, 54, 55, 57, 58, 59, 60, 61, 62, 63 };
+//     // std::vector<int> zeroes{ 0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 14, 15, 16, 17, 19, 21, 23, 24, 27, 31, 32, 33, 34, 37, 38, 40, 42, 46, 48, 49, 53, 56 };
+//     // for (int i = 1; i < 5000; i++) {
+//     //     for (int x : ones) {
+            
+//     //     }
+//     //     for (int x : zeroes) {
+            
+//     //     }
+//     //     std::cout << "found: " << i << '\n';
+//     //     bad:;
+//     // }
+//     // LogicNet::Layer l(8);
+//     // std::cout << l << '\n';
+//     // alignas(64) uint8_t input_prev[512];
+//     // std::memset(input_prev, 1, sizeof(input_prev));
+//     // alignas(64) uint8_t output[256];    
+//     // for (int i = 0; i < 10000000; i++) {
+//     //     l.forward(input_prev, output);
+//     // }    
+//     // for (int i = 0; i < 256; i++) {
+//     //     std::cout << "[#" << i << ' ' << (int)output[i] << ']'; 
+//     // }
+//     // std::cout << '\n';    
+//     // LogicNet net(2);
+//     // std::cout << net << '\n';
+//     // std::cout << net.to_json() << '\n';
+//     // Yolah yolah;
+//     // float black = 0, draw = 0, white = 0;
+//     // for (int i = 0; i < 10000000; i++) {
+//     //     const auto [b, d, w] = net.forward(yolah);
+//     //     black += b;
+//     //     draw += d;
+//     //     white += w;
+//     // }
+//     // std::cout << black << ' ' << draw << ' ' << white << '\n';    
+// }
