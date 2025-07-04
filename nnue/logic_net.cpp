@@ -183,8 +183,8 @@ std::tuple<float, float, float> LogicNet::forward(const Yolah& yolah) const {
     int sum_white = 0;
     for (int i = 0; i < 80; i++) {
         sum_black += input_prev[idx][256 + i];
-        sum_draw  += input_prev[idx][256 + 64 + i];
-        sum_white += input_prev[idx][256 + 128 + i];
+        sum_draw  += input_prev[idx][256 + 80 + i];
+        sum_white += input_prev[idx][256 + 160 + i];
     }
     constexpr float DIV = 30;
     float b = std::exp(sum_black / DIV);
