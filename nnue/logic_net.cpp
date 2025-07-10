@@ -31,68 +31,6 @@ LogicNet::Layer::Layer() {
     gates.fill(0);
 }
 
-static void print__m256i(__m256i r) {
-    alignas(64) uint8_t v[32];
-    _mm256_store_si256((__m256i*)v, r);
-    std::cout << "print__m256i\n";
-    for (int i = 0; i < 32; i++) {
-        std::cout << "[#" << i << ' ' << (int)v[i] << ']';
-    } 
-    std::cout << '\n';
-}
-
-// void LogicNet::Layer::forward(const uint8_t* input_prev, uint8_t* __restrict__ output) const {
-//     alignas(64) uint8_t out_idx[32];
-//     // for (int i = 0; i < 512; i++) {
-//     //     std::cout << "[#" << i << ' ' << (int)input_prev[i] << ']';
-//     // }
-//     for (int i = 0; i < 256; i += 32) {
-//         __m256i g  = _mm256_load_si256((__m256i*)&gates[i]);
-//         //print__m256i(g);
-//         __m256i v1 = _mm256_set_epi8(
-//             input_prev[inputs1[i + 31]], input_prev[inputs1[i + 30]],
-//             input_prev[inputs1[i + 29]], input_prev[inputs1[i + 28]],
-//             input_prev[inputs1[i + 27]], input_prev[inputs1[i + 26]],
-//             input_prev[inputs1[i + 25]], input_prev[inputs1[i + 24]],
-//             input_prev[inputs1[i + 23]], input_prev[inputs1[i + 22]],
-//             input_prev[inputs1[i + 21]], input_prev[inputs1[i + 20]],
-//             input_prev[inputs1[i + 19]], input_prev[inputs1[i + 18]],
-//             input_prev[inputs1[i + 17]], input_prev[inputs1[i + 16]],
-//             input_prev[inputs1[i + 15]], input_prev[inputs1[i + 14]],
-//             input_prev[inputs1[i + 13]], input_prev[inputs1[i + 12]],
-//             input_prev[inputs1[i + 11]], input_prev[inputs1[i + 10]],
-//             input_prev[inputs1[i + 9]], input_prev[inputs1[i + 8]],
-//             input_prev[inputs1[i + 7]], input_prev[inputs1[i + 6]],
-//             input_prev[inputs1[i + 5]], input_prev[inputs1[i + 4]],
-//             input_prev[inputs1[i + 3]], input_prev[inputs1[i + 2]],
-//             input_prev[inputs1[i + 1]], input_prev[inputs1[i + 0]]
-//         );
-//         //print__m256i(v1);
-//         __m256i v2 = _mm256_set_epi8(
-//             input_prev[inputs2[i + 31]], input_prev[inputs2[i + 30]],
-//             input_prev[inputs2[i + 29]], input_prev[inputs2[i + 28]],
-//             input_prev[inputs2[i + 27]], input_prev[inputs2[i + 26]],
-//             input_prev[inputs2[i + 25]], input_prev[inputs2[i + 24]],
-//             input_prev[inputs2[i + 23]], input_prev[inputs2[i + 22]],
-//             input_prev[inputs2[i + 21]], input_prev[inputs2[i + 20]],
-//             input_prev[inputs2[i + 19]], input_prev[inputs2[i + 18]],
-//             input_prev[inputs2[i + 17]], input_prev[inputs2[i + 16]],
-//             input_prev[inputs2[i + 15]], input_prev[inputs2[i + 14]],
-//             input_prev[inputs2[i + 13]], input_prev[inputs2[i + 12]],
-//             input_prev[inputs2[i + 11]], input_prev[inputs2[i + 10]],
-//             input_prev[inputs2[i + 9]], input_prev[inputs2[i + 8]],
-//             input_prev[inputs2[i + 7]], input_prev[inputs2[i + 6]],
-//             input_prev[inputs2[i + 5]], input_prev[inputs2[i + 4]],
-//             input_prev[inputs2[i + 3]], input_prev[inputs2[i + 2]],
-//             input_prev[inputs2[i + 1]], input_prev[inputs2[i + 0]]
-//         );        
-//         _mm256_store_si256((__m256i*)out_idx, _mm256_adds_epu8(_mm256_slli_epi16(g, 2), _mm256_adds_epu8(_mm256_slli_epi16(v1, 1), v2)));
-//         for (int j = 0; j < 32; j++) {
-//             output[i + j] = gates_output[out_idx[j]];
-//         }
-//     }
-// }
-
 void LogicNet::Layer::forward(const uint8_t* input, const uint8_t* prev, uint8_t* __restrict__ output) const {
     for (int i = 0; i < 256; i++) {
         int i1 = inputs1[i];
@@ -189,19 +127,16 @@ std::tuple<float, float, float> LogicNet::forward(const Yolah& yolah) const {
         input[i + 128] = prev[i + 128] = empty >> i & 1ULL;
         input[i + 192] = prev[i + 192] = turn;
     }
+    initial_layers(input, prev);
     for (const auto& l : layers) {
         l.forward(input, prev, output);
         for (int i = 0; i < 256; i++) {
             prev[i] = output[i];
-        }   
+        }
     }
     int sum_black = 0;
     int sum_draw  = 0;
     int sum_white = 0;
-    // for (int i = 0; i < 256; i++) {
-    //     std::cout << (int)output[i] << ' ';
-    // }
-    // std::cout << std::endl;
     for (int i = 0; i < 85; i++) {
         sum_black += output[i];
         sum_draw  += output[85 + i];
@@ -214,80 +149,6 @@ std::tuple<float, float, float> LogicNet::forward(const Yolah& yolah) const {
     float s = b + d + w;
     return { b / s, d / s, w / s };
 }
-
-// std::tuple<float, float, float> LogicNet::forward_basic(const Yolah& yolah) const {
-//     alignas(64) uint8_t input_prev[2][512];
-//     uint64_t black = yolah.bitboard(Yolah::BLACK);
-//     uint64_t white = yolah.bitboard(Yolah::WHITE);
-//     uint64_t empty = yolah.empty_bitboard();
-//     uint8_t turn   = yolah.nb_plies() & 1;
-//     for (int i = 0; i < 64; i++) {
-//         input_prev[0][i + 256]       = input_prev[0][i]       = input_prev[1][i] = black >> i & 1ULL;
-//         input_prev[0][i + 256 + 64]  = input_prev[0][i + 64]  = input_prev[1][i + 64] = white >> i & 1ULL;
-//         input_prev[0][i + 256 + 128] = input_prev[0][i + 128] = input_prev[1][i + 128] = empty >> i & 1ULL;
-//         input_prev[0][i + 256 + 192] = input_prev[0][i + 192] = input_prev[1][i + 192] = turn;
-//     }
-//     int idx = 0;
-//     for (const auto& l : layers) {
-//         l.forward_basic(input_prev[idx], input_prev[idx] + 256, input_prev[1 - idx] + 256);
-//         idx = 1 - idx;
-//     }
-//     int sum_black = 0;
-//     int sum_draw  = 0;
-//     int sum_white = 0;
-//     // for (int i = 0; i < 256; i++) {
-//     //     std::cout << (int)input_prev[idx][256 + i] << ' ';
-//     // }
-//     // std::cout << std::endl;
-//     for (int i = 0; i < 85; i++) {
-//         sum_black += input_prev[idx][256 + i];
-//         sum_draw  += input_prev[idx][256 + 85 + i];
-//         sum_white += input_prev[idx][256 + 170 + i];
-//     }
-//     constexpr float DIV = 30;
-//     float b = std::exp(sum_black / DIV);
-//     float d = std::exp(sum_draw / DIV);
-//     float w = std::exp(sum_white / DIV);
-//     float s = b + d + w;
-//     return { b / s, d / s, w / s };
-// }
-
-// std::tuple<float, float, float> LogicNet::forward(const Yolah& yolah) const {
-//     alignas(64) uint8_t input_prev[2][512];
-//     uint64_t black = yolah.bitboard(Yolah::BLACK);
-//     uint64_t white = yolah.bitboard(Yolah::WHITE);
-//     uint64_t empty = yolah.empty_bitboard();
-//     uint8_t turn   = yolah.nb_plies() & 1;
-//     for (int i = 0; i < 64; i++) {
-//         input_prev[0][i + 256]       = input_prev[0][i]       = input_prev[1][i] = black >> i & 1ULL;
-//         input_prev[0][i + 256 + 64]  = input_prev[0][i + 64]  = input_prev[1][i + 64] = white >> i & 1ULL;
-//         input_prev[0][i + 256 + 128] = input_prev[0][i + 128] = input_prev[1][i + 128] = empty >> i & 1ULL;
-//         input_prev[0][i + 256 + 192] = input_prev[0][i + 192] = input_prev[1][i + 192] = turn;
-//     }
-//     int idx = 0;
-//     for (const auto& l : layers) {
-//         l.forward(input_prev[idx], input_prev[1 - idx] + 256);
-//         idx = 1 - idx;
-//     }
-//     int sum_black = 0;
-//     int sum_draw  = 0;
-//     int sum_white = 0;
-//     // for (int i = 0; i < 256; i++) {
-//     //     std::cout << (int)input_prev[idx][256 + i] << ' ';
-//     // }
-//     // std::cout << std::endl;
-//     for (int i = 0; i < 85; i++) {
-//         sum_black += input_prev[idx][256 + i];
-//         sum_draw  += input_prev[idx][256 + 85 + i];
-//         sum_white += input_prev[idx][256 + 170 + i];
-//     }
-//     constexpr float DIV = 30;
-//     float b = std::exp(sum_black / DIV);
-//     float d = std::exp(sum_draw / DIV);
-//     float w = std::exp(sum_white / DIV);
-//     float s = b + d + w;
-//     return { b / s, d / s, w / s };
-// }
 
 std::string LogicNet::gate_to_c_expression(std::string_view i1, const std::string_view i2, int gate) const {
     using namespace std;
@@ -398,142 +259,27 @@ std::string LogicNet::to_json() const {
     return j.dump(4);
 }
 
-/*
-json j;
-    j["ply"]   = to_string(ply);
-    j["black"] = to_string(black);
-    j["white"] = to_string(white);
-    j["empty"] = to_string(empty);
-    j["black score"] = to_string(black_score);
-    j["white score"] = to_string(white_score);
-    return j.dump();
-*/
-
 LogicNet LogicNet::from_json(std::istream& is) {
     json j = json::parse(is);
     return j.get<LogicNet>();
 }
 
-// void test1() {
-//     LogicNet::Layer l;
-//     alignas(64) uint8_t input_prev[512];
-//     alignas(64) uint8_t output[256];
-//     input_prev[0] = 0;
-//     input_prev[1] = 0;
-//     input_prev[2] = 0;
-//     input_prev[3] = 1;
-//     input_prev[4] = 1;
-//     input_prev[5] = 0;
-//     input_prev[6] = 1;
-//     input_prev[7] = 1;
-//     l.inputs1[0] = 0;
-//     l.inputs2[0] = 1;
-//     l.inputs1[1] = 2;
-//     l.inputs2[1] = 3;
-//     l.inputs1[2] = 4;
-//     l.inputs2[2] = 5;
-//     l.inputs1[3] = 6;
-//     l.inputs2[3] = 7;
-//     for (int i = 0; i < 16; i++) {
-//         l.gates[0] = i;
-//         l.gates[1] = i;
-//         l.gates[2] = i;
-//         l.gates[3] = i;
-//         l.forward(input_prev, output);
-//         for (int j = 0; j < 4; j++) {
-//             int expected = LogicNet::gates_output[i * 4 + j];
-//             if (output[j] != expected) {
-//                 std::cout << "test1 for gate " << i << " and input " << j << " expected " << expected << " got " << output[j] << '\n';
-//             }
-//         }
-//     }        
+// int main() {
+//     // std::ifstream ifs("model.txt");
+//     // LogicNet net = LogicNet::from_json(ifs);
+//     // std::cout << net << std::endl;
+//     // std::cout << net.c_expression_from_layer(3);
+//     LogicNet net(5);
+//     Yolah yolah;
+//     float black = 0, draw = 0, white = 0;
+//     for (int i = 0; i < 1000000; i++) {
+//         const auto [b, d, w] = net.forward(yolah);
+//         black += b;
+//         draw += d;
+//         white += w;
+//     }
+//     std::cout << black << ' ' << draw << ' ' << white << '\n';    
 // }
-
-// void test2() {
-//     LogicNet::Layer l;
-//     alignas(64) uint8_t input_prev[512];
-//     alignas(64) uint8_t output[256];
-//     input_prev[455] = 0;
-//     input_prev[456] = 0;
-//     input_prev[457] = 0;
-//     input_prev[458] = 1;
-//     input_prev[459] = 1;
-//     input_prev[460] = 0;
-//     input_prev[461] = 1;
-//     input_prev[462] = 1;
-//     l.inputs1[200] = 455;
-//     l.inputs2[200] = 456;
-//     l.inputs1[201] = 457;
-//     l.inputs2[201] = 458;
-//     l.inputs1[202] = 459;
-//     l.inputs2[202] = 460;
-//     l.inputs1[203] = 461;
-//     l.inputs2[203] = 462;
-//     for (int i = 0; i < 16; i++) {
-//         l.gates[200] = i;
-//         l.gates[201] = i;
-//         l.gates[202] = i;
-//         l.gates[203] = i;
-//         l.forward(input_prev, output);
-//         for (int j = 0; j < 4; j++) {
-//             int expected = LogicNet::gates_output[i * 4 + j];
-//             if (output[200 + j] != expected) {
-//                 std::cout << "test2 for gate " << i << " and input " << j << " expected " << expected << " got " << output[j] << '\n';
-//             }
-//         }
-//     }        
-// }
-
-// void test3() {
-//     LogicNet::Layer l;
-//     alignas(64) uint8_t input_prev[512];
-//     alignas(64) uint8_t output[256];
-//     input_prev[0] = 0;
-//     input_prev[256] = 0;
-//     input_prev[1] = 0;
-//     input_prev[257] = 1;
-//     input_prev[2] = 1;
-//     input_prev[258] = 0;
-//     input_prev[3] = 1;
-//     input_prev[259] = 1;
-//     l.inputs1[0] = 0;
-//     l.inputs2[0] = 256;
-//     l.inputs1[1] = 1;
-//     l.inputs2[1] = 257;
-//     l.inputs1[2] = 2;
-//     l.inputs2[2] = 258;
-//     l.inputs1[3] = 3;
-//     l.inputs2[3] = 259;
-//     for (int i = 0; i < 16; i++) {
-//         l.gates[0] = i;
-//         l.gates[1] = i;
-//         l.gates[2] = i;
-//         l.gates[3] = i;
-//         l.forward(input_prev, output);
-//         for (int j = 0; j < 4; j++) {
-//             int expected = LogicNet::gates_output[i * 4 + j];
-//             if (output[j] != expected) {
-//                 std::cout << "test3 for gate " << i << " and input " << j << " expected " << expected << " got " << output[j] << '\n';
-//             }
-//         }
-//     }        
-// }
-
-int main() {
-    std::ifstream ifs("model.txt");
-    LogicNet net = LogicNet::from_json(ifs);
-    //std::cout << net << std::endl;
-    std::cout << net.c_expression_from_layer(3);
-    // Yolah yolah;
-    // float black = 0, draw = 0, white = 0;
-    // for (int i = 0; i < 5000000; i++) {
-    //     const auto [b, d, w] = net.forward2(yolah);
-    //     black += b;
-    //     draw += d;
-    //     white += w;
-    // }
-    // std::cout << black << ' ' << draw << ' ' << white << '\n';    
-}
 
 void LogicNet::initial_layers(const uint8_t* input, uint8_t* __restrict__ output) {
     uint8_t x_0_0 = !input[97];
@@ -1090,10 +836,6 @@ std::tuple<float, float, float> LogicNet::forward2(const Yolah& yolah) {
         input[i + 192] = turn;
     } 
     initial_layers(input, output);
-    // for (int i = 0; i < 256; i++) {
-    //     std::cout << (int)output[i] << ' ';
-    // }
-    // std::cout << std::endl;
     int sum_black = 0;
     int sum_draw  = 0;
     int sum_white = 0;    
