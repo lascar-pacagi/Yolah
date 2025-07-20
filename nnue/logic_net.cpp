@@ -96,11 +96,17 @@ LogicNet::Layer LogicNet::Layer::from_json(std::istream& is) {
     return j.get<Layer>();
 }
 
-LogicNet::LogicNet(int nb_layers) {
-    std::mt19937_64 mt(std::chrono::system_clock::now().time_since_epoch().count());
-    for (int i = 0; i < nb_layers; i++) {
-        layers.emplace_back(mt);
-    }
+LogicNet::LogicNet(int nb_layers, int gate) {
+    if (gate == -1) {
+        std::mt19937_64 mt(std::chrono::system_clock::now().time_since_epoch().count());
+        for (int i = 0; i < nb_layers; i++) {
+            layers.emplace_back(mt);
+        }
+    } else {
+        for (int i = 0; i < nb_layers; i++) {
+            layers.emplace_back(gate);
+        }
+    }    
 }
 
 std::array<int, 16> LogicNet::gates_count() const {
@@ -127,7 +133,7 @@ std::tuple<float, float, float> LogicNet::forward(const Yolah& yolah) const {
         input[i + 128] = prev[i + 128] = empty >> i & 1ULL;
         input[i + 192] = prev[i + 192] = turn;
     }
-    initial_layers(input, prev);
+    //initial_layers(input, prev);
     for (const auto& l : layers) {
         l.forward(input, prev, output);
         for (int i = 0; i < 256; i++) {

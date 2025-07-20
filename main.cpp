@@ -76,10 +76,10 @@ int main(int argc, char* argv[]) {
         builder
         .set_population_size(1000)
         .set_nb_iterations(100000)
-        .set_network_depth(5)
+        .set_network_depth(50)
         .set_crossover_rate(0.4)
         .set_mutation_rate(0.01)
-        .set_selection_rate(0.02)
+        .set_selection_rate(0.04)
         .set_logic_net_checkpoint_path("/mnt/model.txt")
         .set_training_data_path("/Yolah/nnue/data/games_2r.txt")
         .build();

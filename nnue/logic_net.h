@@ -72,7 +72,7 @@ struct LogicNet {
     static Layer from_json(std::istream&);
    };
    std::vector<Layer> layers;
-   LogicNet(int nb_layers = 4);
+   LogicNet(int nb_layers = 4, int gate = -1);
    std::tuple<float, float, float> forward(const Yolah& yolah) const;
    std::string c_expression_from_layer(int layer) const;
    std::array<int, 16> gates_count() const;
