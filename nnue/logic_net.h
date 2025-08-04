@@ -58,14 +58,14 @@ struct LogicNet {
         1, 1, 1, 1,
    };
    struct Layer {
-    static constexpr int SIZE = 256;
+    static constexpr int SIZE = 2048;
     alignas(64) std::array<uint16_t, SIZE> inputs1;
     alignas(64) std::array<uint16_t, SIZE> inputs2;
     alignas(64) std::array<uint8_t, SIZE> gates;
     Layer(std::mt19937_64&);
     Layer(uint8_t gate);
     Layer();
-    void forward(const uint8_t* input, const uint8_t* prev, uint8_t* __restrict__ output) const;
+    void forward(const uint8_t* __restrict__ input, const uint8_t* __restrict__ prev, uint8_t* __restrict__ output) const;
     std::array<int, 16> gates_count() const;
     friend std::ostream& operator<<(std::ostream&, const Layer&);
     std::string to_json() const;
@@ -79,9 +79,8 @@ struct LogicNet {
    friend std::ostream& operator<<(std::ostream&, const LogicNet&);
    std::string to_json() const;
    static LogicNet from_json(std::istream&);
-   static std::tuple<float, float, float> forward2(const Yolah& yolay);
 private:
-    static void initial_layers(const uint8_t* input, uint8_t* __restrict__ output);
+    static void initial_layers(const uint8_t* __restrict__ input, uint8_t* __restrict__ output);
     std::string gate_to_c_expression(std::string_view i1, std::string_view i2, int gate) const;
 };
 

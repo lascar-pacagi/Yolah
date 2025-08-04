@@ -143,7 +143,10 @@ class Expression:
 
     def eval(self, inputs):
         raise NotImplementedError
-    
+
+    def to_c(self, memo):
+        raise NotImplementedError
+
     def __str__(self):
         return self.__repr__()
 
@@ -152,7 +155,7 @@ class Expression:
 
     @staticmethod
     def reset():
-        cache = {}
+        Expression.cache = {}
 
     @staticmethod
     def memo(e, inputs):
@@ -170,11 +173,24 @@ class EInput(Expression):
     def eval(self, inputs):
         return inputs[self.id]
 
+    def to_c(self, memo):
+        pass
+
     def __repr__(self):
         return f'I_{self.id}'
 
-class EFalse(Expression):
+class ENop(Expression):
     def __init__(self):
+        super().__init__()
+    
+    def eval(self, inputs):
+        return super.eval(inputs)
+    
+    def __repr__(self):
+        return 'NOP' 
+
+class EFalse(Expression):
+    def __init__(self, i1, i2):
         super().__init__()
     
     def eval(self, inputs):
@@ -196,6 +212,192 @@ class ENor(Expression):
 
     def __repr__(self):
         return f'({str(self.children[0])} nor {str(self.children[1])})'
+
+class ENotBImpliesA(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = v2 and not v1
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'~({str(self.children[1])} => {str(self.children[0])})'
+
+class ENotA(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1)
+
+    def eval(self, inputs):
+        v = Expression.memo(self.children[0], inputs)
+        res = not v
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'~{str(self.children[0])}'
+
+class ENotAImpliesB(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = v1 and not v2
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'~({str(self.children[0])} => {str(self.children[1])})'
+
+class ENotB(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i2)
+
+    def eval(self, inputs):
+        v = Expression.memo(self.children[0], inputs)
+        res = not v
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'~{str(self.children[0])}'
+
+class EXor(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = v1 != v2
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'({str(self.children[0])} xor {str(self.children[1])})'
+
+class ENand(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = not(v1 and v2)
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'({str(self.children[0])} nand {str(self.children[1])})'
+
+class EAnd(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = v1 and v2
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'({str(self.children[0])} and {str(self.children[1])})'
+
+class ENotXor(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = v1 == v2
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'~({str(self.children[0])} xor {str(self.children[1])})'
+
+class EB(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i2)
+
+    def eval(self, inputs):
+        res = Expression.memo(self.children[0], inputs)
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'{str(self.children[0])}'
+
+class EImplies(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = not v1 or v2
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'({str(self.children[0])} => {str(self.children[1])})'
+
+class EA(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1)
+
+    def eval(self, inputs):
+        res = Expression.memo(self.children[0], inputs)
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'{str(self.children[0])}'
+
+class EBImpliesA(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = not v2 or v1
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'({str(self.children[1])} => {str(self.children[0])})'
+
+class EOr(Expression):
+    def __init__(self, i1, i2):
+        super().__init__(i1, i2)
+
+    def eval(self, inputs):
+        v1 = Expression.memo(self.children[0], inputs)
+        v2 = Expression.memo(self.children[1], inputs)
+        res = v1 or v2
+        Expression.cache[self] = res
+        return res
+
+    def __repr__(self):
+        return f'({str(self.children[0])} or {str(self.children[1])})'
+
+class ETrue(Expression):
+    def __init__(self, i1, i2):
+        super().__init__()
+    
+    def eval(self, inputs):
+        return True
+
+    def __repr__(self):
+        return "T"
 
 def random_indices(n1, n2):
     return [random.randint(0, n1 - 1) for _ in range(2 * n2)]
@@ -233,9 +435,9 @@ class LogicNet:
                      self.variables.append(output)
                      output_vars.append(output)
                 previous_layer = output_vars
-            black = BitVec(f'black_{i}', 16)
-            draw  = BitVec(f'draw_{i}', 16)
-            white = BitVec(f'white_{i}', 16)
+            black = BitVec(f'black_{i}', 8)
+            draw  = BitVec(f'draw_{i}', 8)
+            white = BitVec(f'white_{i}', 8)
             self.variables += [black, draw, white]
             n = len(previous_layer) // 3
             self._add_output_constraint(previous_layer[0:n], black)
@@ -249,7 +451,7 @@ class LogicNet:
                 self.solver.add(white > black, white > draw)
 
     def _add_output_constraint(self, prev, output):
-        self.solver.add(output == Sum([If(v, BitVecVal(1, 16), BitVecVal(0, 16)) for v in prev]))
+        self.solver.add(output == Sum([If(v, BitVecVal(1, 8), BitVecVal(0, 8)) for v in prev]))
 
     def _gate_output(self, prev, i, j, k, i1, i2):
         in1 = prev[i1]
@@ -281,10 +483,48 @@ class LogicNet:
         return self.solver.model()
 
     def expression(self):
-        pass
-
+        model = self.solver.model()
+        gate_map = {
+            0: EFalse,
+            1: ENor,
+            2: ENotBImpliesA,
+            3: ENotA,
+            4: ENotAImpliesB,
+            5: ENotB,
+            6: EXor,
+            7: ENand,
+            8: EAnd,
+            9: ENotXor,
+            10: EB,
+            11: EImplies,
+            12: EA,
+            13: EBImpliesA,
+            14: EOr,
+            15: ETrue,
+        }
+        current = [EInput(i) for i in range(INPUT_SIZE)]
+        for i, indices in enumerate(self.input_indices):
+            previous = current
+            current = []
+            select_vars = self.selects[i]
+            for j, sel_var in enumerate(select_vars):
+                sel_val = model.eval(sel_var).as_long()
+                i1 = indices[2 * j]
+                i2 = indices[2 * j + 1]
+                expr1 = previous[i1]
+                expr2 = previous[i2]
+                gate_class = gate_map.get(sel_val)
+                current.append(gate_class(expr1, expr2))
+        return current
+    
     def c_expression(self):
-        pass
+        memo = {}
+        res = ''
+        for i, e in enumerate(self.expression()):
+            (var, c) = e.to_c(memo)
+            res += e + '\n'
+            res += f'output[{i}] = {var};\n'
+        return res
 
 data = GameData("data/data_test")
 net = LogicNet(data, [INPUT_SIZE, 1000, 10, 90])
