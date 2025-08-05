@@ -74,12 +74,12 @@ int main(int argc, char* argv[]) {
     LogicNetLearning::Builder builder;
     try {
         builder
-        .set_population_size(2000)
+        .set_population_size(1000)
         .set_nb_iterations(100000)
-        .set_network_depth(10)
+        .set_network_depth(20)
         .set_crossover_rate(0.4)
         .set_mutation_rate(0.1)
-        .set_selection_rate(0.04)
+        .set_selection_rate(0.02)
         // .set_logic_net_checkpoint_path("../nnue/model.txt")
         // .set_training_data_path("../nnue/data/data_test/games_2r.txt")
         .set_logic_net_checkpoint_path("/mnt/model.txt")

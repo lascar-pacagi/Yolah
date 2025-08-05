@@ -117,21 +117,22 @@ namespace {
     }
     float compute_fitness(const std::vector<Data>& training_data, const float coeff_black, const float coeff_draw, 
                             const float coeff_white, const LogicNet& net) {
-        float res = 0;
-        constexpr float epsilon = std::numeric_limits<float>::min();
-        for (const auto& [yolah, match_result] : training_data) {
-            float black_proba = 0, draw_proba = 0, white_proba = 0; 
-            if (match_result == 0) black_proba = 1;
-            else if (match_result == 1) draw_proba = 1;
-            else white_proba = 1;
-            const auto [b, d, w] = net.forward(yolah);
-            int prediction = 0;
-            if (d > b && d > w) prediction = 1;
-            if (w > b && w > d) prediction = 2;
-            res += prediction == match_result;
-            res += black_proba * std::log(b + epsilon) + draw_proba * std::log(d + epsilon) + white_proba * std::log(w + epsilon);
-        }
-        return res / training_data.size();
+        // float res = 0;
+        // constexpr float epsilon = std::numeric_limits<float>::min();
+        // for (const auto& [yolah, match_result] : training_data) {
+        //     float black_proba = 0, draw_proba = 0, white_proba = 0; 
+        //     if (match_result == 0) black_proba = 1;
+        //     else if (match_result == 1) draw_proba = 1;
+        //     else white_proba = 1;
+        //     const auto [b, d, w] = net.forward(yolah);
+        //     int prediction = 0;
+        //     if (d > b && d > w) prediction = 1;
+        //     if (w > b && w > d) prediction = 2;
+        //     res += prediction == match_result;
+        //     res += black_proba * std::log(b + epsilon) + draw_proba * std::log(d + epsilon) + white_proba * std::log(w + epsilon);
+        // }
+        // return res / training_data.size();
+        return accuracy(training_data, net);
     }
 }
 
