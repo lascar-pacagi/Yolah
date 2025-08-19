@@ -31,6 +31,7 @@
 #include <regex>
 #include "minmax_nnue_quantized_player.h"
 #include "tournament.h"
+#include <format>
 #include "logic_net_learning.h"
 
 namespace po = boost::program_options;
@@ -50,9 +51,19 @@ int main(int argc, char* argv[]) {
     // auto output = std::ofstream("../data/games_7r_1s_bis_d_symmetries.txt");
     //data::setify(input, output);
     //data::analyze_games(input, cout);
-    // data::generate_games(cout, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 
-    //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))), 6, 10000, 12);
-
+    //auto input = std::ifstream("../nnue/data/data_test/games.txt", std::ios::binary);
+    const auto now = std::chrono::system_clock::now();
+    const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
+    for (int i = 0; i < 20; i++) {
+        std::string filename = "/tmp/games_" + timestamp + "_" + std::to_string(i) + ".txt";
+        std::cout << filename << std::endl;
+        auto output = std::ofstream(filename, std::ios::binary);
+        data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
+                            Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
+                            {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 500, 12);
+    }    
+    // std::filesystem::path input("../nnue/data/data_test/games.txt"); 
+    // data::decode_games(input, cout);
     // data::generate_games2(cout, std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 
     //                         std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 2, 50000, 20);
 
@@ -70,7 +81,7 @@ int main(int argc, char* argv[]) {
     //     auto output = std::ofstream(path);
     //     data::generate_symmetries(input, output);
     // }
-
+/*
     LogicNetLearning::Builder builder;
     try {
         builder
@@ -88,7 +99,7 @@ int main(int argc, char* argv[]) {
     } catch (const char* e) {
         std::cout << e << '\n';
     }
-
+*/
     // po::options_description general("General options");
     // general.add_options()
     // ("help", "produce help message")

@@ -53,6 +53,11 @@ namespace data {
         }
     }
 
+    void generate_symmetries(std::ifstream& is, std::ostream& os) {
+        using namespace std;
+        
+    }
+
     void cut(const std::string& src_dir, const std::string& dst_dir, size_t nb_lines_per_file) {
         const std::filesystem::path src(src_dir);
         const std::filesystem::path dst(dst_dir);
