@@ -153,8 +153,7 @@ namespace data {
     void generate_games(std::ostream& os, std::unique_ptr<Player> black, std::unique_ptr<Player> white, const std::vector<int>& nb_random_moves, 
                         int nb_games, int nb_threads) 
     {
-        auto first_n_moves_random = [](Yolah& yolah, uint64_t seed, int n, std::vector<Move>& moves_history) {
-            PRNG prng(seed);
+        auto first_n_moves_random = [](Yolah& yolah, PRNG& prng, int n, std::vector<Move>& moves_history) {
             Yolah::MoveList moves;
             int i = 0;
             while (!yolah.game_over()) {                 
@@ -168,20 +167,21 @@ namespace data {
         {
             std::vector<std::jthread> threads;
             std::mutex mutex;
+
             for (int i = 0; i < nb_threads; i++) {
                 threads.emplace_back([&, i]{                    
                     const std::vector<json> configs{black->config(), white->config()};                                        
                     std::vector<Move> moves(Yolah::MAX_NB_MOVES);
                     std::vector<uint8_t> games(nb_games * nb_random_moves.size() * (2 * Yolah::MAX_NB_MOVES + 4));                             
                     uint64_t games_size = 0;
-                    uint64_t seed = i * 10000000000ULL;
+                    PRNG prng(i * 1000000000ULL + std::chrono::system_clock::now().time_since_epoch().count());
                     for (int j = 0; j < nb_games; j++) {
                         for (const int nb_random: nb_random_moves) {
                             auto black = Player::create(configs[0]);
                             auto white = Player::create(configs[1]);
                             Yolah yolah;
                             if (nb_random) {
-                                first_n_moves_random(yolah, seed, nb_random, moves);
+                                first_n_moves_random(yolah, prng, nb_random, moves);
                             }
                             int k = nb_random;
                             while (!yolah.game_over()) {
@@ -198,8 +198,7 @@ namespace data {
                             // }
                             // std::cout << '(' << black_score << ',' << white_score << ")\n";
                             encode_game(moves, k, nb_random, black_score, white_score, &games.data()[games_size]);
-                            games_size += 2 * k + 4;
-                            seed++;
+                            games_size += 2 * k + 4;                            
                         }
                     }
                     {

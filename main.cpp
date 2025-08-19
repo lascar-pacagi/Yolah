@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
                             Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
                             {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 500, 12);
     }    
-    // std::filesystem::path input("../nnue/data/data_test/games.txt"); 
+    // std::filesystem::path input("../nnue/data/data_test/games_2025_08_19_21_22_06.452337704_0.txt"); 
     // data::decode_games(input, cout);
     // data::generate_games2(cout, std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 
     //                         std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 2, 50000, 20);
