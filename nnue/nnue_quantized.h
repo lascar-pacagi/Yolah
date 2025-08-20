@@ -28,7 +28,7 @@ struct NNUE_Quantized {
         int16_t* acc;
         Accumulator() {
             acc = (int16_t*)aligned_alloc(64, 2 * H1_SIZE);
-            memset(acc, 0, H1_SIZE);
+            memset(acc, 0, 2 * H1_SIZE);
         }
         ~Accumulator() {
             free(acc);

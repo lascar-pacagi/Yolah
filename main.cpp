@@ -56,11 +56,15 @@ int main(int argc, char* argv[]) {
     const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
     for (int i = 0; i < 20; i++) {
         std::string filename = "/tmp/games_" + timestamp + "_" + std::to_string(i) + ".txt";
+        //std::string filename = "../nnue/data/data_test/games_" + timestamp + "_" + std::to_string(i) + ".txt";
         std::cout << filename << std::endl;
         auto output = std::ofstream(filename, std::ios::binary);
         data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
                             Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
-                            {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 500, 12);
+                            {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 500, 14);
+        // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
+        //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
+        //                     {2, 3, 4, 5, 10, 11, 16, 17}, 20, 4);
     }    
     // std::filesystem::path input("../nnue/data/data_test/games_2025_08_19_21_22_06.452337704_0.txt"); 
     // data::decode_games(input, cout);
