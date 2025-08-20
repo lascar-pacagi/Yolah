@@ -167,12 +167,11 @@ namespace data {
         {
             std::vector<std::jthread> threads;
             std::mutex mutex;
-
             for (int i = 0; i < nb_threads; i++) {
                 threads.emplace_back([&, i]{                    
                     const std::vector<json> configs{black->config(), white->config()};                                        
                     std::vector<Move> moves(Yolah::MAX_NB_MOVES);
-                    std::vector<uint8_t> games(nb_games * nb_random_moves.size() * (2 * Yolah::MAX_NB_MOVES + 4));                             
+                    std::vector<uint8_t> games(nb_games * nb_random_moves.size() * (2 * 120 + 4));                             
                     uint64_t games_size = 0;
                     PRNG prng(i * 1000000000ULL + std::chrono::system_clock::now().time_since_epoch().count());
                     for (int j = 0; j < nb_games; j++) {
