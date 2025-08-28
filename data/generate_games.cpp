@@ -212,7 +212,6 @@ namespace data {
                         std::lock_guard lock(mutex);
                         std::cout << games_size << std::endl;
                         os.write(reinterpret_cast<const char*>(games.data()), games_size);
-                        os.flush();          
                     }
                 });
             }
