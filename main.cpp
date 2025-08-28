@@ -54,14 +54,14 @@ int main(int argc, char* argv[]) {
     //auto input = std::ifstream("../nnue/data/data_test/games.txt", std::ios::binary);
     const auto now = std::chrono::system_clock::now();
     const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 5; i++) {
         std::string filename = "/tmp/games_" + timestamp + "_" + std::to_string(i) + ".txt";
         //std::string filename = "../nnue/data/data_test/games_" + timestamp + "_" + std::to_string(i) + ".txt";
         std::cout << filename << std::endl;
-        auto output = std::ofstream(filename, std::ios::binary);
+        std::ofstream output(filename, std::ios::binary);
         data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
                             Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
-                            {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 250, 14);
+                            {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 1, 14);
         // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
         //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
         //                     {2, 3, 4, 5, 10, 11, 16, 17}, 20, 4);
