@@ -10,6 +10,9 @@
 #include "monte_carlo_player.h"
 #include "minmax_nnue_player.h"
 #include "minmax_nnue_quantized_player.h"
+#ifdef ENABLE_CUDA
+#include "alphazero_player.h"
+#endif
 #include <stdexcept>
 
 using std::unique_ptr, std::string, std::make_unique, std::invalid_argument;
@@ -255,6 +258,14 @@ unique_ptr<Player> Player::create(const json& j) {
                                                  nb_threads);
             }
         },
+#ifdef ENABLE_CUDA
+        {
+            "AlphaZeroPlayer",
+            [](const json& j) {
+                return make_unique<AlphaZeroPlayer>(j);
+            }
+        },
+#endif
     };
     return m.at(j["name"].get<string>())(j);
 }

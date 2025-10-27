@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.20.0)
-project(Yolah CXX)
+
+# Enable CUDA support (optional - only if CUDA is available)
+option(ENABLE_CUDA "Enable CUDA support for AlphaZero" OFF)
+
+if(ENABLE_CUDA)
+    project(Yolah CXX CUDA)
+    enable_language(CUDA)
+else()
+    project(Yolah CXX)
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -35,3 +45,9 @@ add_subdirectory(data)
 target_link_libraries(Yolah PRIVATE data)
 add_subdirectory(nnue)
 target_link_libraries(Yolah PRIVATE nnue)
+
+# AlphaZero (only if CUDA is enabled)
+if(ENABLE_CUDA)
+    add_subdirectory(alphazero)
+    target_link_libraries(Yolah PRIVATE alphazero)
+endif()

@@ -52,22 +52,22 @@ int main(int argc, char* argv[]) {
     //data::setify(input, output);
     //data::analyze_games(input, cout);
     //auto input = std::ifstream("../nnue/data/data_test/games.txt", std::ios::binary);
-    const auto now = std::chrono::system_clock::now();
-    const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
-    for (int i = 0; i < 3; i++) {
-        std::string filename = "/mnt/games_" + timestamp + "_" + std::to_string(i) + ".txt";
-        //std::string filename = "../nnue/data/data_test/games_" + timestamp + "_" + std::to_string(i) + ".txt";
-        std::cout << filename << std::endl;
-        std::ofstream output(filename, std::ios::binary);
-        data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
-                            Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
-                            {0, 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31}, 300, 14);
-        // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
-        //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
-        //                     {2, 3, 4, 5, 10, 11, 16, 17}, 20, 4);
-    }    
-    // std::filesystem::path input("../nnue/data/data_test/games_2025_08_19_21_22_06.452337704_0.txt"); 
-    // data::decode_games(input, cout);
+    // const auto now = std::chrono::system_clock::now();
+    // const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
+    // for (int i = 0; i < 3; i++) {
+    //     std::string filename = "/mnt/games_" + timestamp + "_" + std::to_string(i) + ".txt";
+    //     //std::string filename = "../nnue/data/data_test/games_" + timestamp + "_" + std::to_string(i) + ".txt";
+    //     std::cout << filename << std::endl;
+    //     std::ofstream output(filename, std::ios::binary);
+    //     data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
+    //                         Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
+    //                         {0, 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31}, 300, 14);
+    //     // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
+    //     //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
+    //     //                     {2, 3, 4, 5, 10, 11, 16, 17}, 20, 4);
+    // }    
+    std::filesystem::path input("../data/games/games_2025_08_31_22_09_02.335269145_0.txt"); 
+    data::decode_games(input, cout);
     // data::generate_games2(cout, std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 
     //                         std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 2, 50000, 20);
 
