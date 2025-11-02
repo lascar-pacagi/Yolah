@@ -12,9 +12,47 @@ import re
 from torch.utils.data import Dataset, DataLoader, random_split
 import glob
 import sys
-sys.path.append("../server")
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+sys.path.append("/server")
 from yolah import Yolah, Move, Square
 import itertools
+
+torch.set_float32_matmul_precision('high')
+
+def preprocess_dataset_to_memmap(games_dir, output_prefix):
+    """
+    Convert GameDataset to memory-mapped files for efficient multi-worker loading.
+    Run this once to preprocess your data.
+
+    Args:
+        games_dir: Directory containing game files
+        output_prefix: Path prefix for output memmap files (e.g., "data/dataset")
+    """
+    print(f"Loading dataset from {games_dir}...")
+    dataset = GameDataset(games_dir)
+    total = len(dataset)
+
+    print(f"Creating memory-mapped arrays for {total} samples...")
+
+    # Create memory-mapped arrays
+    inputs_mmap = np.memmap(f'{output_prefix}_inputs.npy', dtype=np.uint8,
+                            mode='w+', shape=(total, INPUT_SIZE))
+    outputs_mmap = np.memmap(f'{output_prefix}_outputs.npy', dtype=np.uint8,
+                             mode='w+', shape=(total,))
+
+    # Fill memory-mapped arrays
+    for i in tqdm(range(total), desc="Preprocessing dataset"):
+        inputs_mmap[i] = dataset.inputs[i]
+        outputs_mmap[i] = dataset.outputs[i]
+
+    # Flush to disk
+    inputs_mmap.flush()
+    outputs_mmap.flush()
+
+    print(f"Dataset preprocessing complete!")
+    print(f"  Inputs:  {inputs_mmap.nbytes / (1024**2):.2f} MB")
+    print(f"  Outputs: {outputs_mmap.nbytes / (1024**2):.2f} MB")
+    print(f"  Total:   {(inputs_mmap.nbytes + outputs_mmap.nbytes) / (1024**2):.2f} MB")
 
 def bit_not(n, numbits=64):
     return (1 << numbits) - 1 - n
@@ -24,101 +62,201 @@ def bitboard64_to_list(n):
     return [0]*(64 - len(b)) + b
 
 class GameDataset(Dataset):
-    def __init__(self, games_dir):
+    def __init__(self, games_dir, max_workers=15, use_processes=True):
         self.inputs = []
         self.outputs = []
-        self.size = 0
-        for filename in glob.glob(games_dir + "/games*"):
-            print(filename)            
-            with open(filename, 'rb') as f:
-                data = f.read()
-                print(len(data))
-                counter = 1
-                while data:
-                    if counter % 1000 == 0: 
-                        print(counter)
-                    counter += 1
-                    #if counter == 3000: break
-                    #print(len(data))
-                    nb_moves = int(data[0])
-                    d = data[:nb_moves * 2 + 4]
-                    nb_random_moves = int(d[1])
-                    #print(nb_moves, ' ', nb_random_moves)
-                    if nb_random_moves >= nb_moves: continue
-                    black_score = int(d[-2])
-                    white_score = int(d[-1])
-                    #print(black_score, ' ', white_score)
-                    res = 0
-                    if black_score == white_score: res = 1
-                    if white_score > black_score: res = 2
-                    res = torch.tensor(res, dtype=torch.uint8)
-                    yolah = Yolah()
-                    for sq1, sq2 in zip(d[2:2+2*nb_random_moves:2], data[3:2+2*nb_random_moves:2]):
-                        m = Move(Square(int(sq1)), Square(int(sq2)))
-                        yolah.play(m)
-                    # print(yolah)
-                    # print(self.encode_yolah(yolah))
-                    # print(res)
-                    # input()
-                    self.inputs.append(self.encode_yolah(yolah))
-                    self.outputs.append(res)
-                    self.size += 1
-                    for sq1, sq2 in zip(d[2+2*nb_random_moves:2+2*nb_moves:2], d[3+2*nb_random_moves:2+2*nb_moves:2]):
-                        m = Move(Square(int(sq1)), Square(int(sq2)))
-                        yolah.play(m)
-                        self.inputs.append(self.encode_yolah(yolah))
-                        self.outputs.append(res)
-                        self.size += 1
-                        # print(yolah)
-                        # print(self.encode_yolah(yolah))
-                        # print(res)
-                        # input()
-                    data = data[2+2*nb_moves+2:]
-                print(sys.getsizeof(self.inputs) / (1024 * 1024))
+        
+        # Get all game files
+        files = glob.glob(games_dir + "/games*")
+
+        # Choose executor based on preference
+        executor_class = ProcessPoolExecutor if use_processes else ThreadPoolExecutor
+
+        # Use executor to load files in parallel
+        with executor_class(max_workers=max_workers) as executor:
+            # Submit each file for processing
+            futures = [executor.submit(self._process_file, filename) for filename in files]
+
+            # Collect results as they complete
+            for future in futures:
+                file_inputs, file_outputs = future.result()
+                self.inputs.extend(file_inputs)
+                self.outputs.extend(file_outputs)                
+
+        mem = self.get_memory_usage()
+        print(f"Inputs:  {mem['inputs_mb']:.2f} MB")
+        print(f"Outputs: {mem['outputs_mb']:.2f} MB")
+        print(f"Total:   {mem['total_mb']:.2f} MB")
+        
+
+    def _process_file(self, filename):
+        """Process a single file and return (inputs, outputs)"""
+        inputs = []
+        outputs = []
+
+        print(filename)
+        with open(filename, 'rb') as f:
+            data = f.read()
+            print(len(data))
+            counter = 1
+            while data:
+                if counter % 1000 == 0:
+                    print(counter)
+                counter += 1
+
+                nb_moves = int(data[0])
+                d = data[:nb_moves * 2 + 4]
+                nb_random_moves = int(d[1])
+
+                if nb_random_moves >= nb_moves:
+                    data = data[2 + 2*nb_moves + 2:]
+                    continue
+
+                black_score = int(d[-2])
+                white_score = int(d[-1])
+                res = 0
+                if black_score == white_score:
+                    res = 1
+                if white_score > black_score:
+                    res = 2
+                res = int(res)  # Keep as Python int, not tensor
+
+                yolah = Yolah()
+                for sq1, sq2 in zip(d[2:2+2*nb_random_moves:2], data[3:2+2*nb_random_moves:2]):
+                    m = Move(Square(int(sq1)), Square(int(sq2)))
+                    yolah.play(m)
+
+                inputs.append(self.encode_yolah(yolah))  # Returns numpy array
+                outputs.append(res)
+
+                for sq1, sq2 in zip(d[2+2*nb_random_moves:2+2*nb_moves:2], d[3+2*nb_random_moves:2+2*nb_moves:2]):
+                    m = Move(Square(int(sq1)), Square(int(sq2)))
+                    yolah.play(m)
+                    inputs.append(self.encode_yolah(yolah))  # Returns numpy array
+                    outputs.append(res)
+
+                data = data[2 + 2*nb_moves + 2:]
+
+        #print(sys.getsizeof(inputs) / (1024 * 1024))
+        return inputs, outputs
 
     @staticmethod
     def encode_yolah(yolah):
         black_list = bitboard64_to_list(yolah.black)
         white_list = bitboard64_to_list(yolah.white)
         one_hot = np.array(list(itertools.chain.from_iterable([
-                        black_list, 
-                        white_list, 
-                        bitboard64_to_list(yolah.empty),                    
-                        [Yolah.WHITE_PLAYER if yolah.nb_plies() & 1 else Yolah.BLACK_PLAYER]])))
-        indices = np.nonzero(one_hot)[0]
-        return torch.tensor(indices, dtype=torch.uint8)
+                        black_list,
+                        white_list,
+                        bitboard64_to_list(yolah.empty),
+                        [Yolah.WHITE_PLAYER if yolah.nb_plies() & 1 else Yolah.BLACK_PLAYER]])), dtype=np.uint8)
+        return one_hot
     
     def __len__(self):
-        return self.size
+        return len(self.outputs)
 
     def __getitem__(self, idx):
         return (self.inputs[idx], self.outputs[idx])
 
-# black positions + white positions + empty positions + turn 
+    def get_memory_usage(self):
+        """Returns memory usage in bytes and MB"""
+        # Calculate inputs memory (numpy arrays)
+        inputs_bytes = self.inputs[0].nbytes * len(self.inputs)
+        # for arr in self.inputs:
+        #     inputs_bytes += arr.nbytes  # NumPy array memory size
+
+        # Calculate outputs memory (Python ints)
+        outputs_bytes = sys.getsizeof(self.outputs[0]) * len(self.outputs)
+        # for val in self.outputs:
+        #     outputs_bytes += sys.getsizeof(val)  # Python int object size
+
+        total_bytes = inputs_bytes + outputs_bytes
+
+        return {
+            'inputs_mb': inputs_bytes / (1024**2),
+            'outputs_mb': outputs_bytes / (1024**2),
+            'total_mb': total_bytes / (1024**2),
+            'inputs_bytes': inputs_bytes,
+            'outputs_bytes': outputs_bytes,
+            'total_bytes': total_bytes
+        }
+
+# black positions + white positions + empty positions + turn
 INPUT_SIZE = 64 + 64 + 64 + 1
 
-def custom_collate(batch, vocab_size=INPUT_SIZE):
+class GameDatasetMemmap(Dataset):
     """
-    Convert batch of sparse indices to dense one-hot tensors.
-    Each sample is a tuple of (sparse_indices, target).
+    Memory-mapped dataset that efficiently shares data across multiple worker processes.
+    All workers access the same on-disk data without copying it to each process.
+
+    This is ideal for distributed training where you want to avoid RAM duplication
+    across worker processes.
     """
-    inputs, targets = zip(*batch)
-    batch_size = len(inputs)
-    device = inputs[0].device
+    def __init__(self, data_prefix):
+        """
+        Args:
+            data_prefix: Path prefix for memmap files (e.g., "data/dataset")
+                        Will look for "{data_prefix}_inputs.npy" and "{data_prefix}_outputs.npy"
+        """
+        inputs_path = f'{data_prefix}_inputs.npy'
+        outputs_path = f'{data_prefix}_outputs.npy'
 
-    # Create dense tensor for the batch
-    dense = torch.zeros(batch_size, vocab_size, dtype=torch.float32, device=device)
+        if not os.path.exists(inputs_path) or not os.path.exists(outputs_path):
+            raise FileNotFoundError(
+                f"Memory-mapped files not found. Please run preprocessing first:\n"
+                f"  from nnue_multigpu3 import preprocess_dataset_to_memmap\n"
+                f"  preprocess_dataset_to_memmap('data', 'data/dataset')"
+            )
 
-    # Fill in the active features for each sample in the batch
-    for i, sparse_indices in enumerate(inputs):
-        # Convert uint8 to long for indexing
-        indices = sparse_indices.long()
-        dense[i, indices] = 1.0
+        # Calculate number of samples from file size
+        file_size_bytes = os.path.getsize(inputs_path)
+        # Each sample is INPUT_SIZE bytes (uint8 = 1 byte per element)
+        num_samples = file_size_bytes // INPUT_SIZE
 
-    return dense, torch.stack(targets)
+        # Open as read-only memory-mapped arrays
+        # This is shared across all processes without duplication
+        self.inputs = np.memmap(inputs_path, dtype=np.uint8, mode='r', shape=(num_samples, INPUT_SIZE))
+        self.outputs = np.memmap(outputs_path, dtype=np.uint8, mode='r')
+
+        print(f"Loaded memory-mapped dataset from {data_prefix}")
+        print(f"  Total samples: {len(self)}")
+        print(f"  Inputs shape:  {self.inputs.shape}")
+        print(f"  Outputs shape: {self.outputs.shape}")
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __getitem__(self, idx):
+        """
+        Get a single sample. Memory-map handles efficient access for concurrent reads.
+        """
+        # Direct access - no copy needed since we only read (no data race)
+        input_data = self.inputs[idx]
+        output_data = self.outputs[idx]
+
+        return torch.from_numpy(input_data.astype(np.float32)), torch.tensor(output_data, dtype=torch.long)
+
+# def custom_collate(batch, vocab_size=INPUT_SIZE):
+#     """
+#     Convert batch of sparse indices to dense one-hot tensors.
+#     Each sample is a tuple of (sparse_indices, target).
+#     """
+#     inputs, targets = zip(*batch)
+#     batch_size = len(inputs)
+#     device = inputs[0].device
+
+#     # Create dense tensor for the batch
+#     dense = torch.zeros(batch_size, vocab_size, dtype=torch.float32, device=device, pin_memory=True)
+
+#     # Fill in the active features for each sample in the batch
+#     for i, sparse_indices in enumerate(inputs):
+#         # Convert uint8 to long for indexing
+#         indices = sparse_indices.long()
+#         dense[i, indices] = 1.0
+
+#     return dense, torch.stack(targets)
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=2048, l2_size=128, l3_size=64):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=64, l3_size=32):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -134,10 +272,10 @@ class Net(nn.Module):
         x = torch.clamp(x, min=0.0, max=1.0)
         return self.fc4(x)#softmax(self.fc4(x), dim=1)#
 
-NB_EPOCHS=5
+NB_EPOCHS=300
 #MODEL_PATH="/mnt/"
-MODEL_PATH="./"
-MODEL_NAME="nnue_2048x128x64x3_2"
+MODEL_PATH="/mnt/"
+MODEL_NAME="nnue_1024x64x32x3_2"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
 def ddp_setup(rank, world_size):
@@ -148,16 +286,26 @@ def ddp_setup(rank, world_size):
 def dataloader_ddp(trainset, valset, batch_size):
     sampler_train = DistributedSampler(trainset)
     sampler_val = DistributedSampler(valset, shuffle=False)
+    # train_loader = DataLoader(
+    #     trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train,
+    #     num_workers=2, pin_memory=True, prefetch_factor=2, persistent_workers=False#, collate_fn=custom_collate
+    # )
+    # val_loader = DataLoader(
+    #     valset, batch_size=batch_size, shuffle=False, sampler=sampler_val,
+    #     num_workers=2, pin_memory=True, prefetch_factor=2, persistent_workers=False#, collate_fn=custom_collate
+    # )
     train_loader = DataLoader(
-        trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train, num_workers=0, pin_memory=True, collate_fn=custom_collate
+        trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train,
+        num_workers=0, pin_memory=True#, collate_fn=custom_collate
     )
     val_loader = DataLoader(
-        valset, batch_size=batch_size, shuffle=False, sampler=sampler_val, num_workers=0, pin_memory=True, collate_fn=custom_collate
+        valset, batch_size=batch_size, shuffle=False, sampler=sampler_val,
+        num_workers=0, pin_memory=True#, collate_fn=custom_collate
     )
     return train_loader, sampler_train, val_loader, sampler_val
 
 class TrainerDDP:
-    def __init__(self, gpu_id, model, train_loader, sampler_train, val_loader, sampler_val, save_every=1):
+    def __init__(self, gpu_id, model, train_loader, sampler_train, val_loader, sampler_val, save_every=10):
         self.gpu_id = gpu_id
         self.model = model.to(self.gpu_id)
         self.train_loader = train_loader
@@ -170,8 +318,10 @@ class TrainerDDP:
         torch.cuda.set_device(gpu_id)
         torch.cuda.empty_cache()
         self.model = DDP(self.model, device_ids=[self.gpu_id])
-        self.model = torch.compile(self.model, mode="max-autotune")
-
+        self.model = torch.compile(self.model)
+        # Create CUDA stream for asynchronous data transfer
+        self.stream = torch.cuda.Stream(device=gpu_id)
+        
     def _save_checkpoint(self, epoch):
         torch.save(self.model.module.state_dict(), f"{MODEL_PATH}{MODEL_NAME}.{epoch}.pt")
 
@@ -181,10 +331,18 @@ class TrainerDDP:
         accuracy = 0
         for (X, y) in self.train_loader:
             n += len(X)
-            X = X.to(self.gpu_id)
+            # X = X.to(self.gpu_id)
+            # y = y.to(self.gpu_id)
+            # Use CUDA stream for asynchronous data transfer
+            with torch.cuda.stream(self.stream):
+                X = X.to(self.gpu_id, non_blocking=True)
+                y = y.to(self.gpu_id, non_blocking=True)
+            # Ensure transfer is complete before computation
+            torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
+
             self.optimizer.zero_grad()
             logits = self.model(X)
-            y = y.to(self.gpu_id, dtype=torch.long)
+            #y = y.to(self.gpu_id, dtype=torch.long)
             loss = self.loss_fn(logits, y)
             loss.backward()
             self.optimizer.step()
@@ -201,9 +359,17 @@ class TrainerDDP:
         with torch.no_grad():
             for (X, y) in self.val_loader:
                 n += len(X)
-                X = X.to(self.gpu_id)
+                # X = X.to(self.gpu_id)
+                # y = y.to(self.gpu_id)
+                # Use CUDA stream for asynchronous data transfer
+                with torch.cuda.stream(self.stream):
+                    X = X.to(self.gpu_id, non_blocking=True)
+                    y = y.to(self.gpu_id, non_blocking=True)
+                # # Ensure transfer is complete before computation
+                torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
+
                 logits = self.model(X)
-                y = y.to(self.gpu_id, dtype=torch.long)
+                #y = y.to(self.gpu_id, dtype=torch.long)
                 loss = self.loss_fn(logits, y)
                 val_loss += loss.item()
                 val_accuracy += sum(torch.argmax(logits, dim=1) == y).item()
@@ -221,9 +387,8 @@ class TrainerDDP:
                 self._save_checkpoint(epoch)
         self._save_checkpoint(nb_epochs - 1)
 
-def main(rank, world_size, batch_size):
+def main(rank, world_size, batch_size, dataset):
     ddp_setup(rank, world_size)
-    dataset = GameDataset("data")
     print(rank)
     if rank == 0:
         print(len(dataset), flush=True)
@@ -247,7 +412,29 @@ def main(rank, world_size, batch_size):
     destroy_process_group()
 
 if __name__ == "__main__":
+    print(torch.cuda.is_available())
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    mp.spawn(main, args=(world_size, 2048), nprocs=world_size)
-    #data = GameDataset("data")
+
+    # Dataset configuration
+    DATA_PREFIX = "/mnt/"  # Path prefix for memory-mapped files
+
+    # Check if preprocessing is needed
+    if not (os.path.exists(f'{DATA_PREFIX}_inputs.npy') and os.path.exists(f'{DATA_PREFIX}_outputs.npy')):
+        print("Memory-mapped dataset not found. Running preprocessing...", flush=True)
+        print("This will create:", flush=True)
+        print(f"  - {DATA_PREFIX}_inputs.npy", flush=True)
+        print(f"  - {DATA_PREFIX}_outputs.npy", flush=True)
+        preprocess_dataset_to_memmap("/nnue/data/", DATA_PREFIX)
+        print("Preprocessing complete!", flush=True)
+    else:
+        print("Using existing memory-mapped dataset", flush=True)
+
+    # Load dataset from memory-mapped files
+    print("Loading memory-mapped dataset...", flush=True)
+    dataset = GameDatasetMemmap(DATA_PREFIX)
+    print("Dataset loaded successfully!", flush=True)
+
+    # Spawn workers with the shared dataset
+    # Workers will access the same memory-mapped files without duplication
+    mp.spawn(main, args=(world_size, 16384, dataset), nprocs=world_size)

@@ -3,20 +3,21 @@ From: nvidia/cuda:12.6.2-cudnn-devel-ubuntu24.04
 
 %files
     ../server /
-    ../nnue /
-    ../data /    
+    ../nnue /    
 
 %post
     DEBIAN_FRONTEND=noninteractive apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         python3 \
+        python3-dev \
         python3-pip \
         python3-tk \
         python3-setuptools \
-        build-essential git
+        build-essential \
+        git
     rm -rf /var/lib/apt/lists/*
-    pip3 install --break-system-packages torch numpy matplotlib glob2 tqdm
+    pip3 install --break-system-packages torch numpy matplotlib tqdm
     
 %runscript
     cd /nnue
-    python3 nnue_multigpu_clipped.py
+    python3 nnue_multigpu3.py
