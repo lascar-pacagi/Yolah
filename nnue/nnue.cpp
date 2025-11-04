@@ -345,8 +345,8 @@ void NNUE::undo(uint8_t player, const Move& m, Accumulator& a) {
 // int main(int argc, char* argv[]) {
 //     using namespace std;
 //     NNUE nnue;
-//     nnue.load("nnue.txt");
-//     nnue.save_quantized("nnue_quantized.txt", 64);
+//     nnue.load("nnue_1024x64x32x3_2.txt");
+//     nnue.save_quantized("nnue_quantized_2.txt", 64);
 //     auto acc = nnue.make_accumulator();
 //     ifstream ifs(argv[1], std::ifstream::in);
 //     regex re_moves(R"(((\w\d):(\w\d))+)", regex_constants::ECMAScript);

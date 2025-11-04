@@ -1,4 +1,4 @@
-from nnue_multigpu_clipped import Net, LAST_MODEL
+from nnue_multigpu3 import Net, LAST_MODEL
 import torch
 from collections import OrderedDict
 
@@ -30,5 +30,5 @@ if __name__ == "__main__":
     #     net_dict[name] = v
     #net.load_state_dict(net_dict)
     net.load_state_dict(state_dict)
-    save_model_parameters("nnue_1024x64x32x3.25.txt", net)
+    save_model_parameters("nnue_1024x64x32x3_2.txt", net)
     #torch.save(net_dict, "nnue_512x64x64.pt")

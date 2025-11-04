@@ -66,8 +66,8 @@ int main(int argc, char* argv[]) {
     //     //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
     //     //                     {2, 3, 4, 5, 10, 11, 16, 17}, 20, 4);
     // }    
-    std::filesystem::path input("../data/games/games_2025_08_31_22_09_02.335269145_0.txt"); 
-    data::decode_games(input, cout);
+    // std::filesystem::path input("../data/games/games_2025_08_31_22_09_02.335269145_0.txt"); 
+    // data::decode_games(input, cout);
     // data::generate_games2(cout, std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 
     //                         std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 2, 50000, 20);
 
@@ -85,6 +85,7 @@ int main(int argc, char* argv[]) {
     //     auto output = std::ofstream(path);
     //     data::generate_symmetries(input, output);
     // }
+    data::generate_symmetries("/home/elucterio/Yolah/nnue/data", "/home/elucterio/Yolah/nnue/data");
 /*
     LogicNetLearning::Builder builder;
     try {

@@ -3,6 +3,7 @@
 #include <map>
 #include <filesystem>
 #include <fstream>
+#include "generate_games.h"
 
 namespace data {
     void generate_symmetries(std::istream& is, std::ostream& os) {
@@ -53,11 +54,6 @@ namespace data {
         }
     }
 
-    void generate_symmetries(std::ifstream& is, std::ostream& os) {
-        using namespace std;
-        
-    }
-
     void cut(const std::string& src_dir, const std::string& dst_dir, size_t nb_lines_per_file) {
         const std::filesystem::path src(src_dir);
         const std::filesystem::path dst(dst_dir);
@@ -93,6 +89,61 @@ namespace data {
             auto input = std::ifstream(path);
             auto output = std::ofstream(dst_dir / path.filename().replace_extension("symmetries.txt"));
             generate_symmetries(input, output);
+        }
+    }
+
+    void generate_symmetries2(const std::filesystem::path& input_file, const std::filesystem::path& output_file) {
+        using namespace std;
+        map<uint8_t, uint8_t> diag1{{7,7},{15,6},{6,15},{23,5},{5,23},{31,4},{4,31},{39,3},{3,39},{47,2},{2,47},{55,1},{1,55},{63,0},{0,63},{14,14},{22,13},{13,22},{30,12},{12,30},{38,11},{11,38},{46,10},{10,46},{54,9},{9,54},{62,8},{8,62},{21,21},{29,20},{20,29},{37,19},{19,37},{45,18},{18,45},{53,17},{17,53},{61,16},{16,61},{28,28},{36,27},{27,36},{44,26},{26,44},{52,25},{25,52},{60,24},{24,60},{35,35},{43,34},{34,43},{51,33},{33,51},{59,32},{32,59},{42,42},{50,41},{41,50},{58,40},{40,58},{49,49},{57,48},{48,57},{56,56},};
+        map<uint8_t, uint8_t> diag2{{0,0},{8,1},{1,8},{16,2},{2,16},{24,3},{3,24},{32,4},{4,32},{40,5},{5,40},{48,6},{6,48},{56,7},{7,56},{9,9},{17,10},{10,17},{25,11},{11,25},{33,12},{12,33},{41,13},{13,41},{49,14},{14,49},{57,15},{15,57},{18,18},{26,19},{19,26},{34,20},{20,34},{42,21},{21,42},{50,22},{22,50},{58,23},{23,58},{27,27},{35,28},{28,35},{43,29},{29,43},{51,30},{30,51},{59,31},{31,59},{36,36},{44,37},{37,44},{52,38},{38,52},{60,39},{39,60},{45,45},{53,46},{46,53},{61,47},{47,61},{54,54},{62,55},{55,62},{63,63},};
+        map<uint8_t, uint8_t> central{{2,61},{59,4},{56,7},{18,45},{40,23},{4,59},{37,26},{1,62},{50,13},{42,21},{26,37},{23,40},{54,9},{36,27},{38,25},{45,18},{47,16},{10,53},{16,47},{57,6},{53,10},{58,5},{6,57},{30,33},{25,38},{44,19},{34,29},{8,55},{24,39},{14,49},{48,15},{7,56},{19,44},{20,43},{39,24},{13,50},{62,1},{52,11},{9,54},{49,14},{21,42},{41,22},{27,36},{46,17},{55,8},{5,58},{11,52},{12,51},{29,34},{31,32},{0,63},{32,31},{17,46},{51,12},{22,41},{63,0},{43,20},{61,2},{3,60},{28,35},{35,28},{33,30},{60,3},{15,48},};
+        auto size = filesystem::file_size(input_file);
+        vector<uint8_t> encoding(size);
+        ifstream ifs(input_file, ios::binary);
+        ifs.read(reinterpret_cast<char*>(encoding.data()), size);
+        stringbuf buffer;
+        ostream os(&buffer);
+        vector<Move> moves;
+        int n = 0;
+        while (n < size) {
+            moves.clear();
+            int nb_moves, nb_random_moves, black_score, white_score;
+            data::decode_game(encoding.data() + n, moves, nb_moves, nb_random_moves, black_score, white_score);
+            uint8_t header[2] = {static_cast<uint8_t>(nb_moves), static_cast<uint8_t>(nb_random_moves)};
+            os.write(reinterpret_cast<const char*>(header), 2);
+            for (int i = 0; i < nb_moves; i++) {
+                uint8_t move[2] = {diag1[moves[i].from_sq()], diag1[moves[i].to_sq()]};
+                os.write(reinterpret_cast<const char*>(move), 2);
+            }
+            uint8_t scores[2] = {static_cast<uint8_t>(black_score), static_cast<uint8_t>(white_score)};
+            os.write(reinterpret_cast<const char*>(scores), 2);
+            os.write(reinterpret_cast<const char*>(header), 2);
+            for (int i = 0; i < nb_moves; i++) {
+                uint8_t move[2] = {diag2[moves[i].from_sq()], diag2[moves[i].to_sq()]};
+                os.write(reinterpret_cast<const char*>(move), 2);
+            }
+            os.write(reinterpret_cast<const char*>(scores), 2);
+            os.write(reinterpret_cast<const char*>(header), 2);
+            for (int i = 0; i < nb_moves; i++) {
+                uint8_t move[2] = {central[moves[i].from_sq()], central[moves[i].to_sq()]};
+                os.write(reinterpret_cast<const char*>(move), 2);
+            }
+            os.write(reinterpret_cast<const char*>(scores), 2);
+            n += 2 + 2 * nb_moves + 2;
+        }
+        ofstream ofs(output_file, ios::binary);
+        ofs << buffer.str();
+    }
+
+    void generate_symmetries2(const std::string& src_dir, const std::string& dst_dir) {
+        const std::filesystem::path src(src_dir);
+        const std::filesystem::path dst(dst_dir);
+        std::regex re_games("^games((?!.*symmetries.*))", std::regex_constants::ECMAScript|std::regex_constants::multiline);
+        for (auto const& dir_entry : std::filesystem::directory_iterator(src_dir)) {
+            auto path = dir_entry.path();
+            if (!std::regex_search(path.filename().string(), re_games)) continue;      
+            std::cout << path << std::endl;
+            generate_symmetries2(path, dst_dir / path.filename().replace_extension("symmetries.txt"));
         }
     }
 }

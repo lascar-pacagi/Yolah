@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import glob
 import sys
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-sys.path.append("/server")
+sys.path.append("../server")
 from yolah import Yolah, Move, Square
 import itertools
 
@@ -273,8 +273,8 @@ class Net(nn.Module):
         return self.fc4(x)#softmax(self.fc4(x), dim=1)#
 
 NB_EPOCHS=300
+MODEL_PATH="./"
 #MODEL_PATH="/mnt/"
-MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 
