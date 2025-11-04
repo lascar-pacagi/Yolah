@@ -85,7 +85,7 @@ int main(int argc, char* argv[]) {
     //     auto output = std::ofstream(path);
     //     data::generate_symmetries(input, output);
     // }
-    data::generate_symmetries("/home/elucterio/Yolah/nnue/data", "/home/elucterio/Yolah/nnue/data");
+    data::generate_symmetries2("../data/games", "../nnue/data");
 /*
     LogicNetLearning::Builder builder;
     try {
