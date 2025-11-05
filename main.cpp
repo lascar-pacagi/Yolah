@@ -52,8 +52,8 @@ int main(int argc, char* argv[]) {
     //data::setify(input, output);
     //data::analyze_games(input, cout);
     //auto input = std::ifstream("../nnue/data/data_test/games.txt", std::ios::binary);
-    // const auto now = std::chrono::system_clock::now();
-    // const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
+    const auto now = std::chrono::system_clock::now();
+    const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
     for (int i = 0; i < 4; i++) {
         std::string filename = "/mnt/games_" + timestamp + "_" + std::to_string(i) + ".txt";
         //std::string filename = "../nnue/data/data_test/games_" + timestamp + "_" + std::to_string(i) + ".txt";
