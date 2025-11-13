@@ -105,26 +105,46 @@ namespace data {
         ostream os(&buffer);
         vector<Move> moves(Yolah::MAX_NB_MOVES);
         size_t n = 0;
+        uint8_t move[2];
+        uint8_t pass[2] = { static_cast<uint8_t>(Move::none().from_sq()), static_cast<uint8_t>(Move::none().to_sq()) };
         while (n < size) {            
             int nb_moves, nb_random_moves, black_score, white_score;
             data::decode_game(encoding.data() + n, moves, nb_moves, nb_random_moves, black_score, white_score);             
             uint8_t header[2] = {static_cast<uint8_t>(nb_moves), static_cast<uint8_t>(nb_random_moves)};
             os.write(reinterpret_cast<const char*>(header), 2);
             for (int i = 0; i < nb_moves; i++) {
-                uint8_t move[2] = {diag1[moves[i].from_sq()], diag1[moves[i].to_sq()]};
+                if (moves[i] == Move::none()) {
+                    move[0] = pass[0];
+                    move[1] = pass[1];
+                } else {
+                    move[0] = diag1[moves[i].from_sq()];
+                    move[1] = diag1[moves[i].to_sq()];
+                }
                 os.write(reinterpret_cast<const char*>(move), 2);
             }
             uint8_t scores[2] = {static_cast<uint8_t>(black_score), static_cast<uint8_t>(white_score)};
             os.write(reinterpret_cast<const char*>(scores), 2);
             os.write(reinterpret_cast<const char*>(header), 2);
             for (int i = 0; i < nb_moves; i++) {
-                uint8_t move[2] = {diag2[moves[i].from_sq()], diag2[moves[i].to_sq()]};
+                if (moves[i] == Move::none()) {
+                    move[0] = pass[0];
+                    move[1] = pass[1];
+                } else {
+                    move[0] = diag2[moves[i].from_sq()];
+                    move[1] = diag2[moves[i].to_sq()];
+                }
                 os.write(reinterpret_cast<const char*>(move), 2);
             }
             os.write(reinterpret_cast<const char*>(scores), 2);
             os.write(reinterpret_cast<const char*>(header), 2);
             for (int i = 0; i < nb_moves; i++) {
-                uint8_t move[2] = {central[moves[i].from_sq()], central[moves[i].to_sq()]};
+                if (moves[i] == Move::none()) {
+                    move[0] = pass[0];
+                    move[1] = pass[1];
+                } else {
+                    move[0] = central[moves[i].from_sq()];
+                    move[1] = central[moves[i].to_sq()];
+                }
                 os.write(reinterpret_cast<const char*>(move), 2);
             }
             os.write(reinterpret_cast<const char*>(scores), 2);

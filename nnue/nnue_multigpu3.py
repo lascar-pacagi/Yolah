@@ -108,7 +108,7 @@ class GameDataset(Dataset):
                 d = data[:nb_moves * 2 + 4]
                 nb_random_moves = int(d[1])
 
-                if nb_random_moves >= nb_moves:
+                if nb_random_moves == nb_moves:
                     data = data[2 + 2*nb_moves + 2:]
                     continue
 
@@ -272,7 +272,7 @@ class Net(nn.Module):
         x = torch.clamp(x, min=0.0, max=1.0)
         return self.fc4(x)#softmax(self.fc4(x), dim=1)#
 
-NB_EPOCHS=300
+NB_EPOCHS=200
 #MODEL_PATH="./"
 MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
@@ -437,4 +437,4 @@ if __name__ == "__main__":
 
     # Spawn workers with the shared dataset
     # Workers will access the same memory-mapped files without duplication
-    mp.spawn(main, args=(world_size, 16384, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 16384 * 2, dataset), nprocs=world_size)
