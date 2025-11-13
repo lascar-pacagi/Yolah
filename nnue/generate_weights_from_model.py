@@ -1,4 +1,4 @@
-from nnue_multigpu3 import Net, LAST_MODEL
+from nnue_multigpu5 import Net, LAST_MODEL
 import torch
 from collections import OrderedDict
 
