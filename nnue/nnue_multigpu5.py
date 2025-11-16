@@ -5,6 +5,7 @@ import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
+from torch.nn.functional import softmax
 import os
 import sys
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -152,9 +153,9 @@ class Net(nn.Module):
         x = torch.clamp(x, min=0.0, max=1.0)
         return self.fc4(x)#softmax(self.fc4(x), dim=1)#
 
-NB_EPOCHS=200
-MODEL_PATH="./"
-#MODEL_PATH="/mnt/"
+NB_EPOCHS=100
+#MODEL_PATH="./"
+MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
@@ -186,7 +187,7 @@ def dataloader_ddp(trainset, valset, batch_size):
     return train_loader, sampler_train, val_loader, sampler_val
 
 class TrainerDDP:
-    def __init__(self, gpu_id, model, train_loader, sampler_train, val_loader, sampler_val, save_every=10):
+    def __init__(self, gpu_id, model, train_loader, sampler_train, val_loader, sampler_val, save_every=5):
         self.gpu_id = gpu_id
         self.model = model.to(self.gpu_id)
         self.train_loader = train_loader
@@ -196,6 +197,8 @@ class TrainerDDP:
         self.save_every = save_every
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, weight_decay=0)
         self.loss_fn = torch.nn.CrossEntropyLoss()
+        # Learning rate scheduler: exponential decay
+        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.99)
         torch.cuda.set_device(gpu_id)
         torch.cuda.empty_cache()
         self.model = DDP(self.model, device_ids=[self.gpu_id])
@@ -229,8 +232,11 @@ class TrainerDDP:
             self.optimizer.step()
             running_loss += loss.item()
             accuracy += sum(torch.argmax(logits, dim=1) == y).item()
+        # Step the scheduler after each epoch
+        self.scheduler.step()
         if self.gpu_id == 0:
-            print('epoch {} train loss: {} train accuracy: {}'.format(epoch + 1, running_loss / n, accuracy / n), flush=True)
+            current_lr = self.optimizer.param_groups[0]['lr']
+            print('epoch {} train loss: {} train accuracy: {} lr: {:.6f}'.format(epoch + 1, running_loss / n, accuracy / n, current_lr), flush=True)
 
     def _validate(self, epoch):
         self.model.eval()
@@ -297,4 +303,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = GameDataset(GAME_DIR)    
-    mp.spawn(main, args=(world_size, 16384 * 4, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 512 * 2, dataset), nprocs=world_size)
