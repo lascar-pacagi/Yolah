@@ -1,0 +1,372 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Modular Book Structure - Yolah Game AI Engine
+%
+% This template uses separate chapter files for better organization
+% and collaboration. Ideal for large books with multiple authors.
+%
+% USAGE:
+% 1. Create chapter files in chapters/ directory
+% 2. Include them using \include{chapters/XX_name}
+% 3. Compile: make pdf (or pdflatex --shell-escape book_modular.tex)
+%
+% STRUCTURE:
+% book_modular.tex          <- This file (main document)
+% chapters/
+%   01_introduction.tex
+%   02_game_engine.tex
+%   03_algorithms.tex
+%   ...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[12pt,a4paper,twoside,openright]{book}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PACKAGES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Encoding and Language
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+% Page Layout
+\usepackage[
+    top=1in,
+    bottom=1in,
+    left=1.25in,
+    right=1in,
+    headheight=15pt
+]{geometry}
+
+% Math
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+
+% Graphics and Colors
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+
+% Code Listings
+\usepackage{minted}
+\usemintedstyle{friendly}
+\setminted{
+    breaklines,
+    fontsize=\small,
+    frame=lines,
+    framesep=2mm,
+    baselinestretch=1.2,
+    tabsize=4
+}
+
+% Define code background color
+\definecolor{codebg}{RGB}{248,248,248}
+
+% Algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Bibliography
+\usepackage[
+    backend=biber,
+    style=numeric,
+    sorting=none,
+    maxbibnames=99
+]{biblatex}
+\addbibresource{references.bib}
+
+% Hyperlinks
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    citecolor=green!50!black,
+    urlcolor=blue!50!black,
+    bookmarksdepth=3,
+    pdfstartview=FitH
+}
+
+% Headers and Footers
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\leftmark}
+\fancyhead[RO]{\rightmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Other Useful Packages
+\usepackage{float}              % Better float control
+\usepackage{caption}            % Better captions
+\usepackage{subcaption}         % Subfigures
+\usepackage{enumitem}           % Better lists
+\usepackage{footnote}           % Better footnotes
+\usepackage{csquotes}           % Quotations
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CUSTOM COLORS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\definecolor{boxborder}{RGB}{52,101,164}
+\definecolor{boxbg}{RGB}{232,241,250}
+\definecolor{algoborder}{RGB}{46,125,50}
+\definecolor{algobg}{RGB}{232,245,233}
+\definecolor{resultborder}{RGB}{183,28,28}
+\definecolor{resultbg}{RGB}{255,235,238}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CUSTOM ENVIRONMENTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Important Box
+\usepackage{tcolorbox}
+\tcbuselibrary{most}
+
+\newtcolorbox{importantbox}{
+    colback=boxbg,
+    colframe=boxborder,
+    fonttitle=\bfseries,
+    title=Important,
+    boxrule=1.5pt,
+    arc=3pt
+}
+
+% Algorithm Box
+\newtcolorbox{algorithmbox}{
+    colback=algobg,
+    colframe=algoborder,
+    fonttitle=\bfseries,
+    title=Algorithm,
+    boxrule=1.5pt,
+    arc=3pt
+}
+
+% Result Box
+\newtcolorbox{resultbox}{
+    colback=resultbg,
+    colframe=resultborder,
+    fonttitle=\bfseries,
+    title=Key Result,
+    boxrule=1.5pt,
+    arc=3pt
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT INFORMATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{
+    \Huge\textbf{Yolah Game AI Engine} \\
+    \vspace{0.5cm}
+    \Large Building Intelligent Game-Playing Agents \\
+    \vspace{0.5cm}
+    \large From Classical Algorithms to Neural Networks
+}
+
+\author{
+    \Large Your Name \\
+    \vspace{0.3cm}
+    \normalsize Your Affiliation
+}
+
+\date{\today}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BEGIN DOCUMENT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FRONT MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\frontmatter
+
+% Title Page
+\maketitle
+
+% Copyright Page
+\thispagestyle{empty}
+\vspace*{\fill}
+\begin{center}
+\textcopyright{} \the\year{} Your Name \\
+All rights reserved.
+\end{center}
+\vspace*{\fill}
+\clearpage
+
+% Dedication (Optional)
+\thispagestyle{empty}
+\vspace*{\fill}
+\begin{center}
+\textit{To those who taught me to think several moves ahead.}
+\end{center}
+\vspace*{\fill}
+\clearpage
+
+% Table of Contents
+\tableofcontents
+
+% List of Figures
+\listoffigures
+
+% List of Tables
+\listoftables
+
+% Preface (Optional)
+\chapter{Preface}
+
+This book explores the fascinating world of game-playing artificial intelligence through the lens of the Yolah game engine. From classical search algorithms to modern neural network approaches, we'll build a complete understanding of how computers can master complex games.
+
+Throughout this journey, you'll discover:
+\begin{itemize}
+    \item How game-playing AI has evolved over decades
+    \item Classical algorithms like Minimax and Alpha-Beta pruning
+    \item Monte Carlo Tree Search and its applications
+    \item Neural network evaluation functions
+    \item Self-play training methodologies
+    \item Performance optimization techniques
+\end{itemize}
+
+The code examples and algorithms presented here are based on real implementations in the Yolah engine, providing practical insights into building production-quality game AI.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MAIN MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\mainmatter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INCLUDE CHAPTERS
+%
+% Each chapter is in a separate file in the chapters/ directory
+% Use \include for chapters (adds page breaks)
+% Use \input for smaller sections (no page breaks)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Part I: Foundations
+\part{Foundations}
+
+\include{chapters/01_introduction}
+% \include{chapters/02_game_rules}
+% \include{chapters/03_game_engine}
+% \include{chapters/04_data_structures}
+
+% Part II: Classical Algorithms
+\part{Classical Game-Playing Algorithms}
+
+% \include{chapters/05_minimax}
+% \include{chapters/06_alphabeta}
+% \include{chapters/07_move_ordering}
+% \include{chapters/08_transposition_tables}
+% \include{chapters/09_iterative_deepening}
+
+% Part III: Monte Carlo Methods
+\part{Monte Carlo Tree Search}
+
+% \include{chapters/10_mcts_basics}
+% \include{chapters/11_uct}
+% \include{chapters/12_mcts_enhancements}
+
+% Part IV: Neural Networks
+\part{Neural Network Approaches}
+
+% \include{chapters/13_neural_evaluation}
+% \include{chapters/14_network_architectures}
+% \include{chapters/15_training_data}
+% \include{chapters/16_supervised_learning}
+
+% Part V: Reinforcement Learning
+\part{Self-Play and Reinforcement Learning}
+
+% \include{chapters/17_selfplay}
+% \include{chapters/18_policy_gradients}
+% \include{chapters/19_alphazero_approach}
+
+% Part VI: Advanced Topics
+\part{Advanced Topics and Optimization}
+
+% \include{chapters/20_parallel_search}
+% \include{chapters/21_opening_books}
+% \include{chapters/22_endgame_databases}
+% \include{chapters/23_performance_tuning}
+
+% Part VII: Results and Analysis
+\part{Experimental Results}
+
+% \include{chapters/24_benchmarks}
+% \include{chapters/25_tournament_results}
+% \include{chapters/26_analysis}
+
+% Conclusion
+% \include{chapters/27_conclusion}
+% \include{chapters/28_future_work}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BACK MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\backmatter
+
+% Appendices
+\appendix
+
+% \include{chapters/appendix_a_installation}
+% \include{chapters/appendix_b_code_reference}
+% \include{chapters/appendix_c_mathematical_proofs}
+
+% Bibliography
+\printbibliography[heading=bibintoc]
+
+% Index (if using)
+% \printindex
+
+\end{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NOTES FOR AUTHORS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Creating a new chapter:
+% 1. Create file: chapters/XX_chapter_name.tex
+% 2. Start with: \chapter{Chapter Title}
+% 3. Add sections, subsections, content
+% 4. Uncomment the \include line above
+%
+% Example chapter structure:
+%   \chapter{My Chapter}
+%   \label{ch:mychapter}
+%
+%   \section{Introduction}
+%   Content...
+%
+%   \section{Main Content}
+%   \subsection{Subsection}
+%   More content...
+%
+% Benefits of modular approach:
+% - Easier collaboration (different people work on different chapters)
+% - Better organization (each chapter is self-contained)
+% - Faster compilation (can compile individual chapters)
+% - Easier to reorder chapters
+% - Better version control (smaller diffs)
+%
+% Compilation tips:
+% - Full build: pdflatex --shell-escape book_modular.tex
+% - Quick build: use \includeonly{chapters/05_minimax} to compile only one chapter
+% - Use Makefile for automated builds
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

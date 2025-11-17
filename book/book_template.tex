@@ -1,0 +1,657 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Complete Book Template - Yolah Game AI Engine
+%
+% A comprehensive single-file template for writing a technical book
+% This template includes all necessary packages, custom environments,
+% and example content to get you started quickly.
+%
+% USAGE:
+% 1. Copy this file: cp book_template.tex book.tex
+% 2. Edit book.tex with your content
+% 3. Compile: make pdf (or pdflatex --shell-escape book.tex)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[12pt,a4paper,twoside,openright]{book}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PACKAGES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Encoding and Language
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+% Page Layout
+\usepackage[
+    top=1in,
+    bottom=1in,
+    left=1.25in,
+    right=1in,
+    headheight=15pt
+]{geometry}
+
+% Math
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+
+% Graphics and Colors
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+
+% Code Listings
+\usepackage{minted}
+\usemintedstyle{friendly}
+\setminted{
+    breaklines,
+    fontsize=\small,
+    frame=lines,
+    framesep=2mm,
+    baselinestretch=1.2,
+    tabsize=4
+}
+
+% Define code background color
+\definecolor{codebg}{RGB}{248,248,248}
+
+% Algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Bibliography
+\usepackage[
+    backend=biber,
+    style=numeric,
+    sorting=none,
+    maxbibnames=99
+]{biblatex}
+\addbibresource{references.bib}
+
+% Hyperlinks
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    citecolor=green!50!black,
+    urlcolor=blue!50!black,
+    bookmarksdepth=3,
+    pdfstartview=FitH
+}
+
+% Headers and Footers
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\leftmark}
+\fancyhead[RO]{\rightmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Other Useful Packages
+\usepackage{float}              % Better float control
+\usepackage{caption}            % Better captions
+\usepackage{subcaption}         % Subfigures
+\usepackage{enumitem}           % Better lists
+\usepackage{footnote}           % Better footnotes
+\usepackage{csquotes}           % Quotations
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CUSTOM COLORS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\definecolor{boxborder}{RGB}{52,101,164}
+\definecolor{boxbg}{RGB}{232,241,250}
+\definecolor{algoborder}{RGB}{46,125,50}
+\definecolor{algobg}{RGB}{232,245,233}
+\definecolor{resultborder}{RGB}{183,28,28}
+\definecolor{resultbg}{RGB}{255,235,238}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CUSTOM ENVIRONMENTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Important Box
+\usepackage{tcolorbox}
+\tcbuselibrary{most}
+
+\newtcolorbox{importantbox}{
+    colback=boxbg,
+    colframe=boxborder,
+    fonttitle=\bfseries,
+    title=Important,
+    boxrule=1.5pt,
+    arc=3pt
+}
+
+% Algorithm Box
+\newtcolorbox{algorithmbox}{
+    colback=algobg,
+    colframe=algoborder,
+    fonttitle=\bfseries,
+    title=Algorithm,
+    boxrule=1.5pt,
+    arc=3pt
+}
+
+% Result Box
+\newtcolorbox{resultbox}{
+    colback=resultbg,
+    colframe=resultborder,
+    fonttitle=\bfseries,
+    title=Key Result,
+    boxrule=1.5pt,
+    arc=3pt
+}
+
+\usepackage{fontawesome}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT INFORMATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{
+    \Huge\textbf{Yolah Board Game} \\
+    \vspace{0.5cm}
+    \Large Building a Two-Player Perfect-Information Game with AI Players\\ 
+}
+
+\author{
+    \Large Pascal Garcia \\
+    % \vspace{0.3cm}
+    % \normalsize INSA Rennes
+}
+
+\date{\today}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BEGIN DOCUMENT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FRONT MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\frontmatter
+
+% Title Page
+\maketitle
+
+\thispagestyle{empty}
+\vspace*{\fill}
+% \begin{center}
+% \reflectbox{\copyright} \the\year{} Pascal Garcia
+% \end{center}
+\begin{center}
+    \includegraphics[width=10cm]{logo.png}
+\end{center}
+\vspace*{\fill}
+\clearpage
+
+
+% Copyright Page
+\thispagestyle{empty}
+\vspace*{\fill}
+% \begin{center}
+% \reflectbox{\copyright} \the\year{} Pascal Garcia
+% \end{center}
+\begin{center}
+{\ttfamily\Huge\textcolor{black}{C'est en forgeant qu'on devient forgeron}}
+\end{center}
+\vspace*{\fill}
+\clearpage
+
+% Dedication (Optional)
+\thispagestyle{empty}
+\vspace*{\fill}
+\begin{center}
+\textit{À Sarah, Hugo et C\'elya \textcolor{red}{\faHeart}}
+\end{center}
+\vspace*{\fill}
+\clearpage
+
+% Table of Contents
+\tableofcontents
+
+% List of Figures
+\listoffigures
+
+% List of Tables
+\listoftables
+
+% Preface (Optional)
+\chapter{Preface}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MAIN MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\mainmatter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CHAPTER 1: INTRODUCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{The Yolah Game}
+
+\begin{importantbox}
+TO DO
+\end{importantbox}
+
+\subsection{Game Rules}
+
+% \subsection{Why Yolah for AI Research?}
+
+% Yolah provides several advantages as a platform for AI development:
+
+% \begin{itemize}
+%     \item \textbf{Moderate complexity}: Complex enough to be interesting, simple enough to be tractable
+%     \item \textbf{Clear evaluation}: Position quality can be measured objectively
+%     \item \textbf{Strategic depth}: Multiple viable strategies and playing styles
+%     \item \textbf{Computational feasibility}: Playable with various AI techniques
+% \end{itemize}
+
+% \section{Overview of Game AI}
+
+% Game-playing has been a cornerstone of artificial intelligence research since the field's inception. From early checkers programs to modern systems that master Go and Chess, game AI has driven innovation in search, learning, and decision-making.
+
+% \subsection{Historical Context}
+
+% The evolution of game AI can be traced through several key milestones:
+
+% \begin{table}[H]
+% \centering
+% \begin{tabular}{lp{8cm}}
+% \toprule
+% \textbf{Year} & \textbf{Achievement} \\
+% \midrule
+% 1950s & Early checkers programs \\
+% 1970s & Chess programs reach amateur level \\
+% 1997 & Deep Blue defeats world champion Garry Kasparov \\
+% 2016 & AlphaGo defeats world champion Lee Sedol \\
+% 2017 & AlphaZero masters Chess, Go, and Shogi through self-play \\
+% \bottomrule
+% \end{tabular}
+% \caption{Key milestones in game-playing AI}
+% \label{tab:milestones}
+% \end{table}
+
+% \subsection{Categories of Game AI Techniques}
+
+% Game AI techniques can be broadly categorized as:
+
+% \begin{description}
+%     \item[Search-based methods] Use game tree exploration (Minimax, Alpha-Beta)
+%     \item[Sampling methods] Use Monte Carlo simulations (MCTS)
+%     \item[Learning-based methods] Use neural networks and reinforcement learning
+%     \item[Hybrid approaches] Combine multiple techniques for optimal performance
+% \end{description}
+
+% \section{Book Structure}
+
+% This book is organized into three main parts:
+
+% \textbf{Part I: Foundations} covers the basic game engine, data structures, and move generation.
+
+% \textbf{Part II: Classical Algorithms} explores traditional search-based AI techniques.
+
+% \textbf{Part III: Modern Approaches} delves into neural networks and learning methods.
+
+% Each chapter builds upon previous concepts, with complete code examples and performance analysis.
+
+\chapter{Game Engine}
+\label{ch:engine}
+
+% \section{Core Data Structures}
+
+% The foundation of any game engine lies in its data structures. For Yolah, we need efficient representations for:
+
+% \begin{itemize}
+%     \item Board state
+%     \item Move history
+%     \item Player positions
+%     \item Game metadata
+% \end{itemize}
+
+% \subsection{Board Representation}
+
+% Here's our basic board representation in Python:
+
+% \begin{listing}[H]
+% \begin{minted}[linenos, bgcolor=codebg]{python}
+% class Board:
+%     """Represents the Yolah game board state."""
+
+%     def __init__(self, size=8):
+%         self.size = size
+%         self.grid = [[None for _ in range(size)]
+%                      for _ in range(size)]
+%         self.current_player = 1
+%         self.move_count = 0
+
+%     def make_move(self, move):
+%         """Apply a move to the board."""
+%         row, col = move.position
+%         self.grid[row][col] = self.current_player
+%         self.current_player = -self.current_player
+%         self.move_count += 1
+
+%     def is_valid_move(self, move):
+%         """Check if a move is legal."""
+%         row, col = move.position
+%         if not (0 <= row < self.size and 0 <= col < self.size):
+%             return False
+%         return self.grid[row][col] is None
+% \end{minted}
+% \caption{Basic board representation in Yolah}
+% \label{code:board}
+% \end{listing}
+
+% \begin{importantbox}
+% Efficient board representation is critical for performance. Every AI algorithm will access board state thousands or millions of times during search.
+% \end{importantbox}
+
+% \section{Move Generation}
+
+% Move generation is the process of finding all legal moves from a given position. This is a critical component that affects both correctness and performance.
+
+% \subsection{Algorithm}
+
+% The move generation algorithm follows this structure:
+
+% \begin{algorithmbox}
+% \begin{algorithmic}[1]
+% \Procedure{GenerateMoves}{$board$}
+%     \State $moves \gets []$
+%     \For{each position $(row, col)$ on $board$}
+%         \If{position is empty}
+%             \State $move \gets \textsc{CreateMove}(row, col)$
+%             \If{$move$ is legal}
+%                 \State $moves.\textsc{append}(move)$
+%             \EndIf
+%         \EndIf
+%     \EndFor
+%     \State \Return $moves$
+% \EndProcedure
+% \end{algorithmic}
+% \end{algorithmbox}
+
+% \section{Performance Considerations}
+
+% When building a game engine, performance is paramount. Consider these key metrics:
+
+% \begin{table}[H]
+% \centering
+% \begin{tabular}{lcc}
+% \toprule
+% \textbf{Operation} & \textbf{Target Time} & \textbf{Frequency} \\
+% \midrule
+% Move generation & $< 1$ ms & Every node \\
+% Make/unmake move & $< 0.1$ ms & Every node \\
+% Position evaluation & $< 5$ ms & Leaf nodes \\
+% Legal move check & $< 0.01$ ms & Very frequent \\
+% \bottomrule
+% \end{tabular}
+% \caption{Performance targets for engine operations}
+% \label{tab:performance}
+% \end{table}
+
+% \begin{resultbox}
+% Our optimized engine achieves over 100,000 nodes per second on modern hardware, enabling deep search within reasonable time constraints.
+% \end{resultbox}
+
+
+\chapter{AI Players}
+\label{ch:ai}
+
+% \section{Introduction to Minimax}
+
+% The Minimax algorithm is the foundation of game-playing AI. It assumes both players play optimally and searches the game tree to find the best move.
+
+% \subsection{Basic Concept}
+
+% The algorithm alternates between:
+% \begin{itemize}
+%     \item \textbf{Maximizing} player tries to maximize score
+%     \item \textbf{Minimizing} player tries to minimize score
+% \end{itemize}
+
+% This creates a mathematical framework for two-player zero-sum games.
+
+% \section{Implementation}
+
+% Here's a complete Minimax implementation:
+
+% \begin{listing}[H]
+% \begin{minted}[linenos, bgcolor=codebg]{python}
+% def minimax(board, depth, maximizing_player):
+%     """
+%     Standard Minimax algorithm implementation.
+
+%     Args:
+%         board: Current game state
+%         depth: Remaining search depth
+%         maximizing_player: True if maximizing, False if minimizing
+
+%     Returns:
+%         Best evaluation score for this position
+%     """
+%     # Base case: terminal position or depth limit
+%     if depth == 0 or board.is_game_over():
+%         return evaluate(board)
+
+%     if maximizing_player:
+%         max_eval = float('-inf')
+%         for move in board.generate_moves():
+%             board.make_move(move)
+%             eval = minimax(board, depth - 1, False)
+%             board.undo_move()
+%             max_eval = max(max_eval, eval)
+%         return max_eval
+%     else:
+%         min_eval = float('inf')
+%         for move in board.generate_moves():
+%             board.make_move(move)
+%             eval = minimax(board, depth - 1, True)
+%             board.undo_move()
+%             min_eval = min(min_eval, eval)
+%         return min_eval
+% \end{minted}
+% \caption{Minimax algorithm implementation}
+% \label{code:minimax}
+% \end{listing}
+
+% \section{Complexity Analysis}
+
+% The time complexity of Minimax is:
+
+% \begin{equation}
+%     T(d) = O(b^d)
+%     \label{eq:minimax_complexity}
+% \end{equation}
+
+% where $b$ is the branching factor and $d$ is the search depth.
+
+% For Yolah with an average branching factor of 30:
+% \begin{align}
+%     \text{Nodes at depth 1} &= 30 \\
+%     \text{Nodes at depth 2} &= 30^2 = 900 \\
+%     \text{Nodes at depth 4} &= 30^4 = 810,000 \\
+%     \text{Nodes at depth 6} &= 30^6 = 729,000,000
+% \end{align}
+
+% \begin{importantbox}
+% The exponential growth of nodes makes deep search impractical without optimization techniques like Alpha-Beta pruning.
+% \end{importantbox}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % EXAMPLE FIGURE
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \section{Visualizing Minimax}
+
+% Figure~\ref{fig:minimax_tree} shows how Minimax explores the game tree.
+
+% \begin{figure}[H]
+% \centering
+% \begin{tikzpicture}[
+%     level distance=1.5cm,
+%     level 1/.style={sibling distance=4cm},
+%     level 2/.style={sibling distance=2cm},
+%     every node/.style={circle, draw, minimum size=0.8cm}
+% ]
+% \node {Max}
+%     child {node {Min}
+%         child {node {5}}
+%         child {node {3}}
+%     }
+%     child {node {Min}
+%         child {node {7}}
+%         child {node {2}}
+%     }
+%     child {node {Min}
+%         child {node {4}}
+%         child {node {6}}
+%     };
+% \end{tikzpicture}
+% \caption{Minimax game tree example. The maximizing player chooses the move leading to the highest value.}
+% \label{fig:minimax_tree}
+% \end{figure}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % ADDITIONAL CHAPTERS
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \chapter{Alpha-Beta Pruning}
+% \label{ch:alphabeta}
+
+% Alpha-Beta pruning dramatically improves Minimax by eliminating branches that cannot affect the final decision.
+
+% \section{The Pruning Principle}
+
+% Your content here...
+
+\chapter{Monte Carlo Player}
+\label{ch:monte_carlo}
+
+% MCTS revolutionized game AI by using random simulations instead of exhaustive search.
+
+% \section{UCB1 Formula}
+
+% The Upper Confidence Bound formula balances exploration and exploitation:
+
+% \begin{equation}
+%     UCB1 = \frac{w_i}{n_i} + c\sqrt{\frac{\ln N}{n_i}}
+%     \label{eq:ucb1}
+% \end{equation}
+
+% where:
+% \begin{itemize}
+%     \item $w_i$ = wins for node $i$
+%     \item $n_i$ = visits to node $i$
+%     \item $N$ = total visits to parent
+%     \item $c$ = exploration constant
+% \end{itemize}
+
+% Continue with more chapters...
+
+\chapter{MCTS Player}
+\label{ch:mcts}
+
+% Your content here...
+
+\chapter{Minmax Player}
+\label{ch:minmax}
+
+% Your content here...
+
+\chapter{Minmax with Neural Network Player}
+\label{ch:nnue}
+
+% Your content here...
+
+\chapter{AI Tournament}
+\label{ch:tournament}
+
+% Your content here...
+
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+% This book has taken you on a journey from classical game-playing algorithms to modern neural network approaches. The Yolah engine demonstrates that combining multiple techniques yields the best results.
+
+% \section{Key Takeaways}
+
+% \begin{enumerate}
+%     \item Classical algorithms remain relevant and effective
+%     \item Neural networks provide powerful evaluation functions
+%     \item Hybrid approaches leverage the strengths of multiple methods
+%     \item Performance optimization is critical for practical systems
+% \end{enumerate}
+
+% \section{Future Directions}
+
+% Promising areas for future research include:
+% \begin{itemize}
+%     \item More efficient neural architectures
+%     \item Better exploration strategies
+%     \item Transfer learning across game domains
+%     \item Real-time learning and adaptation
+% \end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BACK MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\backmatter
+
+% Appendix
+\appendix
+
+% \chapter{Installation Guide}
+% \label{app:installation}
+
+% \section{Requirements}
+
+% To run the Yolah engine, you need:
+% \begin{itemize}
+%     \item Python 3.8 or higher
+%     \item NumPy
+%     \item TensorFlow or PyTorch
+%     \item Additional dependencies listed in requirements.txt
+% \end{itemize}
+
+% \section{Setup Instructions}
+
+% \begin{minted}[bgcolor=codebg]{bash}
+% git clone https://github.com/yourusername/yolah.git
+% cd yolah
+% pip install -r requirements.txt
+% python setup.py install
+% \end{minted}
+
+% Bibliography
+\printbibliography[heading=bibintoc]
+
+% Index (if needed)
+% \printindex
+
+\end{document}

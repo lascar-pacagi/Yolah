@@ -1,0 +1,13 @@
+\babel@toc {english}{}\relax 
+\contentsline {chapter}{Preface}{xi}{chapter*.4}%
+\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}The Yolah Game}{1}{section.1.1}%
+\contentsline {subsection}{\numberline {1.1.1}Game Rules}{1}{subsection.1.1.1}%
+\contentsline {chapter}{\numberline {2}Game Engine}{3}{chapter.2}%
+\contentsline {chapter}{\numberline {3}AI Players}{5}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{7}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{9}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{11}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{13}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{15}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{17}{chapter.9}%
