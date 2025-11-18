@@ -41,13 +41,13 @@
   >
 ]>
 <requests version="1.0">
-  <internal package="biblatex" priority="9" active="1">
+  <internal package="biblatex" priority="9" active="0">
     <generic>latex</generic>
     <provides type="dynamic">
-      <file>book_template.bcf</file>
+      <file>book.bcf</file>
     </provides>
     <requires type="dynamic">
-      <file>book_template.bbl</file>
+      <file>book.bbl</file>
     </requires>
     <requires type="static">
       <file>blx-dm.def</file>
@@ -60,23 +60,23 @@
       <file>english.lbx</file>
     </requires>
   </internal>
-  <external package="biblatex" priority="5" active="1">
+  <external package="biblatex" priority="5" active="0">
     <generic>biber</generic>
     <cmdline>
       <binary>biber</binary>
-      <infile>book_template</infile>
+      <infile>book</infile>
     </cmdline>
     <input>
-      <file>book_template.bcf</file>
+      <file>book.bcf</file>
     </input>
     <output>
-      <file>book_template.bbl</file>
+      <file>book.bbl</file>
     </output>
     <provides type="dynamic">
-      <file>book_template.bbl</file>
+      <file>book.bbl</file>
     </provides>
     <requires type="dynamic">
-      <file>book_template.bcf</file>
+      <file>book.bcf</file>
     </requires>
     <requires type="editable">
       <file>references.bib</file>

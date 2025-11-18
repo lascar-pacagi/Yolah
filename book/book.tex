@@ -156,6 +156,7 @@
     arc=3pt
 }
 
+\usepackage{wasysym}
 \usepackage{fontawesome}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -234,7 +235,7 @@
 \listoftables
 
 % Preface (Optional)
-\chapter{Preface}
+%\chapter{Preface}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -252,11 +253,130 @@
 
 \section{The Yolah Game}
 
+% J'ai créé le jeu Yolah dans le but d'illustrer des techniques efficaces d'implémentation de jeux de plateaux
+% et d'intelligences artificielles pour mes étudiants. Je me suis inspiré du jeu des pingouins dont vous pouvez voir la boîte dans la figure \ref{fig:pingouins} (je le conseille \smiley)
+
+I created the Yolah game to illustrate effective techniques for implementing board games
+and artificial intelligences for my students. I was inspired by the penguin game, whose box you can see in Figure~\ref{fig:pingouins} (I highly recommend it \smiley)
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.4\textwidth]{pingouins.png}
+\caption{The Pingouins game box}
+% \caption{La boîte du jeu des pingouins}
+\label{fig:pingouins}
+\end{figure}
+
 \begin{importantbox}
-TO DO
+% J'ai fait au mieux de mes connaissances actuelles (\emph{ars longa, vita brevis}) pour implémenter mon jeu et les IA associées. Mais comme tout bon scientifique, il faudra regarder mon travail avec un oeil critique.
+I have done my best with my current knowledge (\emph{ars longa, vita brevis}) to implement my game and the associated AIs. But like any good scientist, you should look at my work with a critical eye.
+% J'ai écrit le livre en français (plus facile pour moi) et j'ai demandé à un assistant (Claude) de le traduire pour moi.
+I wrote the book in French (easier for me) and asked an AI assistant (Claude~\cite{anthropic2025claude}) to translate it for me.
 \end{importantbox}
 
+% Je vais maintenant décrire les règles du jeu, puis j'expliquerai pourquoi j'ai choisi ces règles, je donnerai un exemple de partie entre deux IA et je présenterai la suite du livre.
+I will now describe the rules of the game, then I will explain why I chose these rules, I will give an example of a game between two AIs and then I will present the rest of the book.
+
 \subsection{Game Rules}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{yolah_initial_configuration.png}
+\caption{The initial configuration of the Yolah game}
+% \caption{La configuration initiale du jeu Yolah}
+\label{fig:yolah_initial_configuration}
+\end{figure}
+
+% Le plateau du jeu Yolah est représenté dans la figure \ref{fig:yolah_initial_configuration}.
+% On peut y voir quatre pions noirs et quatre pions blancs placés de manière symétrique. Les noirs commencent en choisissant une de leurs pièces parmi
+% les quatre. Une pièce ne pourra jamais disparaître du plateau car Yolah est un jeu sans possibilité de captures. Une pièce se déplace dans les huit directions
+% aussi loin qu'elle le souhaite tant qu'elle n'est pas bloquée par une autre pièce ou un trou (notion que nous allons bientôt aborder). Par exemple, si les noirs
+% choisissent de déplacer leur pièce qui se situe en {\ttfamily d5}, les cases où elle peut atterrir sont indiquées par de petites croix noires dans la figure \ref{fig:yolah_moves1}.
+
+The Yolah game board is shown in Figure~\ref{fig:yolah_initial_configuration}.
+You can see four black pieces and four white pieces placed symmetrically. Black starts by choosing one of their four pieces.
+A piece can never disappear from the board because Yolah is a game without captures. A piece moves in all eight directions
+as far as it wishes as long as it is not blocked by another piece or a hole (a concept we will soon discuss). For example, if black
+chooses to move their piece located at {\ttfamily d5}, the squares where it can land are indicated by small black crosses in Figure~\ref{fig:yolah_moves1}.\\
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.67\textwidth]{yolah_moves1.pdf}
+\caption{Possible moves (small black crosses) for the black piece identified by a smiley (square {\ttfamily d5})}
+% \caption{Mouvements possibles (petites croix noires) pour le pion noir identifié par un smiley (case {\ttfamily d5})}
+\label{fig:yolah_moves1}
+\end{figure}
+
+% Maintenant, si le pion noir en {\ttfamily d5} se déplace en {\ttfamily b7}, ce que nous noterons par {\ttfamily d5:b7}, nous obtenons la configuration représentée dans la figure \ref{fig:yolah_moves2}. On peut remarquer que la case de départ du pion noir disparaît et devient un trou~! Cette case (ce trou) devient inaccessible et infranchissable pour le reste de la partie~! Ceci va créer des opportunités pour bloquer l'adversaire et essayer de créer des zones où l'adversaire ne pourra pas aller.
+
+Now, if the black piece at {\ttfamily d5} moves to {\ttfamily b7}, which we will denote as {\ttfamily d5:b7}, we get the configuration shown in Figure~\ref{fig:yolah_moves2}. Notice that the starting square of the black piece disappears and becomes a hole! This square (this hole) becomes inaccessible and impassable for the rest of the game! This will create opportunities to block the opponent and try to create areas where the opponent cannot go.\\
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{yolah_moves2.png}
+\caption{Black just moved from {\ttfamily d5} to {\ttfamily b7}. The starting square {\ttfamily d5} becomes inaccessible and impassable for the rest of the game}
+% \caption{Noir vient de se déplacer de {\ttfamily d5} en {\ttfamily b7}. La case de départ {\ttfamily d5} devient inaccessible et infranchissable pour le reste de la partie}
+\label{fig:yolah_moves2}
+\end{figure}
+
+% Un déplacement rapporte un point au joueur qui vient de se déplacer. Par exemple, dans la configuration de la figure \ref{fig:yolah_moves2}, le joueur noir a un point et le joueur blanc qui ne s'est pas encore déplacé a zéro point. Le but du jeu est assez simple à résumer~: il faut se déplacer plus longtemps que son adversaire~!
+
+A move earns one point for the player who just moved. For example, in the configuration of Figure~\ref{fig:yolah_moves2}, the black player has one point and the white player who has not yet moved has zero points. The goal of the game is quite simple to summarize: you must move longer than your opponent!\\
+
+% Maintenant c'est au tour des blancs de jouer. Ils doivent décider du pion blanc qu'ils vont bouger. Supposons que ce soit le pion en {\ttfamily e5}.
+% Les déplacements possibles de ce pion blanc sont indiqués dans la figure \ref{fig:yolah_moves3}. Si blanc décide d'effectuer le coup {\ttfamily e5:f5}, on se retrouve dans la configuration de la figure \ref{fig:yolah_moves4} et le score est d'un point partout (chaque joueur a joué un coup).
+
+Now it is white's turn to play. They must decide which white piece they will move. Suppose it is the piece at {\ttfamily e5}.
+The possible moves for this white piece are shown in Figure~\ref{fig:yolah_moves3}. If white decides to make the move {\ttfamily e5:f5}, we end up in the configuration of Figure~\ref{fig:yolah_moves4} and the score is one point each (each player has played one move).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.67\textwidth]{yolah_moves3.pdf}
+\caption{Possible moves (small white crosses) for the white piece identified by a smiley (square {\ttfamily e5})}
+% \caption{Mouvements possibles (petites croix blanches) pour le pion blanc identifié par un smiley (case {\ttfamily e5})}
+\label{fig:yolah_moves3}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{yolah_moves4.png}
+\caption{White just moved from {\ttfamily e5} to {\ttfamily f5}. The starting square {\ttfamily e5} becomes inaccessible and impassable for the rest of the game. The score is one point each (each player has moved once)}
+% \caption{Blanc vient de se déplacer de {\ttfamily e5} en {\ttfamily f5}. La case de départ {\ttfamily e5} devient inaccessible et infranchissable pour le reste de la partie. Le score est d'un point partout (chaque joueur s'est déplacé une fois)}
+\label{fig:yolah_moves4}
+\end{figure}
+
+% Pour résumer, les règles du jeu Yolah sont les suivantes~:
+
+To summarize, the rules of Yolah are as follows:
+\begin{itemize}
+% \item Le jeu est un jeu à deux joueurs (les noirs et les blancs) au tour par tour.
+\item The game is a two-player game (black and white) played in turns.
+% \item Chaque joueur dispose de quatre pions.
+\item Each player has four pieces.
+% \item À son tour, le joueur choisit un des pions qui peut encore bouger, si aucun pion ne peut bouger il passe son tour (on indiquera par le coup {\ttfamily a1:a1} le fait de passer son tour).
+\item On their turn, the player chooses one of the pieces that can still move; if no piece can move, they pass their turn (we will denote passing the turn by the move {\ttfamily a1:a1}).
+% \item Il doit déplacer le pion choisi dans une des huit directions, d'autant de cases qu'il le souhaite, mais il ne doit pas atterrir ou être bloqué par un pion ou un trou.
+\item They must move the chosen piece in one of the eight directions, as many squares as desired, but must not land on or be blocked by a piece or a hole.
+% \item Après le déplacement du pion choisi, la case de départ du coup devient un trou et on ne peut plus alors la franchir ou se poser dessus.
+\item After moving the chosen piece, the starting square of the move becomes a hole and can no longer be crossed or landed on.
+% \item Après chaque déplacement le joueur gagne un point.
+\item After each move, the player earns one point.
+% \item La partie se termine lorsque les deux joueurs ne peuvent plus se déplacer.
+\item The game ends when both players can no longer move.
+% \item Le joueur qui a le plus de points gagne la partie.
+\item The player with the most points wins the game.
+% \item Si les deux joueurs ont le même nombre de points, la partie est déclarée nulle.
+\item If both players have the same number of points, the game is declared a draw.
+\end{itemize}
+
+% \subsection{Caractéristiques intéressantes de Yolah pour développer des IA}
+\subsection{Interesting Characteristics of Yolah for Developing AIs}
+
+% \subsection{Exemple de partie}
+\subsection{Game Example}
+
+% \subsection{La suite}
+\subsection{What's Next}
 
 % \subsection{Why Yolah for AI Research?}
 

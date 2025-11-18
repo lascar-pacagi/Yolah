@@ -1,9 +1,9 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  18 NOV 2025 10:54
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  18 NOV 2025 16:08
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
-**book_template.tex
-(./book_template.tex
+**book.tex
+(./book.tex
 LaTeX2e <2021-11-15> patch level 1
 L3 programming layer <2022-01-21>
 (/usr/share/texlive/texmf-dist/tex/latex/base/book.cls
@@ -681,11 +681,10 @@ Package: etexcmds 2019/12/15 v1.7 Avoid name clashes with e-TeX commands (HO)
 (/usr/share/texlive/texmf-dist/tex/generic/iftex/ifluatex.sty
 Package: ifluatex 2019/10/25 v1.5 ifluatex legacy package. Use iftex instead.
 )
-runsystem(uname -s > "book_template.w18")...executed.
+runsystem(uname -s > "book.w18")...executed.
 
-
-(./book_template.w18)
-runsystem(rm -- "book_template.w18")...executed.
+ (./book.w18)
+runsystem(rm -- "book.w18")...executed.
 
 )
 (/usr/share/texlive/texmf-dist/tex/generic/xstring/xstring.sty
@@ -719,7 +718,7 @@ Package: float 2001/11/08 v1.3d Float enhancements (AL)
 \@float@every@listing=\toks48
 \c@listing=\count339
 )
-runsystem(mkdir -p _minted-book_template)...executed.
+runsystem(mkdir -p _minted-book)...executed.
 
 
 (/usr/share/texlive/texmf-dist/tex/latex/algorithms/algorithm.sty
@@ -1306,16 +1305,16 @@ Package: ifxetex 2019/10/25 v0.7 ifxetex legacy package. Use iftex instead.
 .tex)
 (/usr/share/texlive/texmf-dist/tex/latex/fontawesome/fontawesomesymbols-pdftex.
 tex))
-runsystem(which pygmentize && touch book_template.aex)...executed.
+runsystem(which pygmentize && touch book.aex)...executed.
 
-runsystem(rm book_template.aex)...executed.
+runsystem(rm book.aex)...executed.
 
 Package csquotes Info: Checking for multilingual support...
 Package csquotes Info: ... found 'babel' package.
 Package csquotes Info: Adjusting default style.
 Package csquotes Info: Redefining alias 'default' -> 'english'.
- (./book_template.aux)
-\openout1 = `book_template.aux'.
+ (./book.aux)
+\openout1 = `book.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 184.
 LaTeX Font Info:    ... okay on input line 184.
@@ -1401,12 +1400,11 @@ File: english.lbx 2022/02/02 v3.17 biblatex localization (PK/MW)
 Package biblatex Info: Input encoding 'utf8' detected.
 Package biblatex Info: Automatic encoding selection.
 (biblatex)             Assuming data encoding 'utf8'.
-\openout6 = `book_template.bcf'.
+\openout6 = `book.bcf'.
 
 Package biblatex Info: Trying to load bibliographic data...
-Package biblatex Info: ... file 'book_template.bbl' not found.
-
-No file book_template.bbl.
+Package biblatex Info: ... file 'book.bbl' found.
+ (./book.bbl)
 Package biblatex Info: Reference section=0 on input line 184.
 Package biblatex Info: Reference segment=0 on input line 184.
 Package hyperref Info: Link coloring ON on input line 184.
@@ -1425,9 +1423,9 @@ LaTeX Info: Redefining \ref on input line 184.
 LaTeX Info: Redefining \pageref on input line 184.
 LaTeX Info: Redefining \nameref on input line 184.
 
-(./book_template.out) (./book_template.out)
+(./book.out) (./book.out)
 \@outlinefile=\write7
-\openout7 = `book_template.out'.
+\openout7 = `book.out'.
 
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: listings package is loaded.
@@ -1455,7 +1453,7 @@ File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
 
 
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}]
-<figures//logo.png, id=107, 307.0672pt x 134.1813pt>
+<figures//logo.png, id=111, 307.0672pt x 134.1813pt>
 File: figures//logo.png Graphic file (type png)
 <use figures//logo.png>
 Package pdftex.def Info: figures//logo.png  used on input line 201.
@@ -1481,123 +1479,169 @@ LaTeX Font Warning: Font shape `U/fontawesometwo/m/it' undefined
 
 [4
 
-] (./book_template.toc)
+] (./book.toc)
 \tf@toc=\write8
-\openout8 = `book_template.toc'.
+\openout8 = `book.toc'.
 
  [5
 
 
 ] [6
 
-] (./book_template.lof)
+] (./book.lof)
 \tf@lof=\write9
-\openout9 = `book_template.lof'.
+\openout9 = `book.lof'.
 
  [7] [8
 
-]
-(./book_template.lot)
+] (./book.lot)
 \tf@lot=\write10
-\openout10 = `book_template.lot'.
+\openout10 = `book.lot'.
 
  [9] [10
 
 ]
 Chapter 1.
-<figures//pingouins.png, id=172, 699.61375pt x 718.685pt>
+<figures//pingouins.png, id=194, 699.61375pt x 718.685pt>
 File: figures//pingouins.png Graphic file (type png)
 <use figures//pingouins.png>
 Package pdftex.def Info: figures//pingouins.png  used on input line 264.
 (pdftex.def)             Requested size: 173.95749pt x 178.69481pt.
+<figures//yolah_initial_configuration.png, id=196, 883.3pt x 883.3pt>
+File: figures//yolah_initial_configuration.png Graphic file (type png)
+<use figures//yolah_initial_configuration.png>
+Package pdftex.def Info: figures//yolah_initial_configuration.png  used on inpu
+t line 284.
+(pdftex.def)             Requested size: 304.42894pt x 304.42883pt.
 
-LaTeX Warning: Citation 'anthropic2025claude' on page 1 undefined on input line
- 274.
-
-
-Underfull \vbox (badness 2608) has occurred while \output is active []
+Underfull \vbox (badness 4832) has occurred while \output is active []
 
  [1
 
- <./figures//pingouins.png>] [2]
-Chapter 2.
-[3
+ <./figures//pingouins.png>]
+Underfull \hbox (badness 10000) in paragraph at lines 296--301
 
-] [4
+ []
+
+
+
+pdfTeX warning: pdflatex (file ./figures//yolah_moves1.pdf): PDF inclusion: fou
+nd PDF version <1.6>, but at most version <1.5> allowed
+<figures//yolah_moves1.pdf, id=206, 597.6786pt x 597.6786pt>
+File: figures//yolah_moves1.pdf Graphic file (type pdf)
+<use figures//yolah_moves1.pdf>
+Package pdftex.def Info: figures//yolah_moves1.pdf  used on input line 304.
+(pdftex.def)             Requested size: 291.38246pt x 291.38766pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [2 <./figures//yolah_initial_configuration.png (PNG copy)>]
+Underfull \hbox (badness 10000) in paragraph at lines 312--313
+
+ []
+
+<figures//yolah_moves2.png, id=213, 883.3pt x 883.3pt>
+File: figures//yolah_moves2.png Graphic file (type png)
+<use figures//yolah_moves2.png>
+Package pdftex.def Info: figures//yolah_moves2.png  used on input line 316.
+(pdftex.def)             Requested size: 260.94289pt x 260.93515pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [3 <./figures//yolah_moves1.pdf>]
+Underfull \hbox (badness 10000) in paragraph at lines 324--325
+
+ []
+
+
+
+pdfTeX warning: pdflatex (file ./figures//yolah_moves3.pdf): PDF inclusion: fou
+nd PDF version <1.6>, but at most version <1.5> allowed
+<figures//yolah_moves3.pdf, id=226, 597.6786pt x 597.6786pt>
+File: figures//yolah_moves3.pdf Graphic file (type pdf)
+<use figures//yolah_moves3.pdf>
+Package pdftex.def Info: figures//yolah_moves3.pdf  used on input line 334.
+(pdftex.def)             Requested size: 291.38246pt x 291.38766pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [4 <./figures//yolah_moves2.png (PNG copy)>]
+<figures//yolah_moves4.png, id=231, 883.3pt x 883.3pt>
+File: figures//yolah_moves4.png Graphic file (type png)
+<use figures//yolah_moves4.png>
+Package pdftex.def Info: figures//yolah_moves4.png  used on input line 342.
+(pdftex.def)             Requested size: 260.94289pt x 260.93515pt.
+ [5 <./figures//yolah_moves3.pdf> <./figures//yolah_moves4.png (PNG copy)>] [6]
+
+Chapter 2.
+[7
+
+] [8
 
 ]
 Chapter 3.
-[5] [6
-
-]
-Chapter 4.
-[7] [8
-
-]
-Chapter 5.
 [9] [10
 
 ]
-Chapter 6.
+Chapter 4.
 [11] [12
 
 ]
-Chapter 7.
+Chapter 5.
 [13] [14
 
 ]
-Chapter 8.
+Chapter 6.
 [15] [16
 
 ]
-Chapter 9.
+Chapter 7.
 [17] [18
 
 ]
+Chapter 8.
+[19] [20
 
-LaTeX Warning: Empty bibliography on input line 682.
+]
+Chapter 9.
+[21] [22
 
-(./book_template.aux)
+] [23
+
+] (./book.aux)
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
-
-LaTeX Warning: There were undefined references.
-
-Package rerunfilecheck Info: File `book_template.out' has not changed.
-(rerunfilecheck)             Checksum: D0186B8A150AAC2D660CD89E8537515F;1921.
-
-Package biblatex Warning: Please (re)run Biber on the file:
-(biblatex)                book_template
-(biblatex)                and rerun LaTeX afterwards.
-
-Package logreq Info: Writing requests to 'book_template.run.xml'.
-\openout1 = `book_template.run.xml'.
+Package rerunfilecheck Info: File `book.out' has not changed.
+(rerunfilecheck)             Checksum: 1059A9D05399315DA727F5A44271440C;2028.
+Package logreq Info: Writing requests to 'book.run.xml'.
+\openout1 = `book.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 44692 strings out of 478287
- 885356 string characters out of 5849289
- 1657215 words of memory out of 5000000
- 62149 multiletter control sequences out of 15000+600000
- 486390 words of font info for 76 fonts, out of 8000000 for 9000
+ 44785 strings out of 478287
+ 887374 string characters out of 5849289
+ 1658883 words of memory out of 5000000
+ 62223 multiletter control sequences out of 15000+600000
+ 486727 words of font info for 77 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 84i,11n,82p,746b,1833s stack positions out of 5000i,500n,10000p,200000b,80000s
-{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc}{/usr/share/texliv
-e/texmf-dist/fonts/enc/dvips/fontawesome/fontawesometwo.enc}</usr/share/texlive
-/texmf-dist/fonts/type1/public/fontawesome/FontAwesome.pfb></usr/share/texmf/fo
-nts/type1/public/cm-super/sfbx1200.pfb></usr/share/texmf/fonts/type1/public/cm-
-super/sfbx1440.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb><
-/usr/share/texmf/fonts/type1/public/cm-super/sfbx2488.pfb></usr/share/texmf/fon
-ts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-s
-uper/sfrm1440.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1728.pfb></
-usr/share/texmf/fonts/type1/public/cm-super/sfti1200.pfb></usr/share/texmf/font
-s/type1/public/cm-super/sftt2488.pfb></usr/share/texlive/texmf-dist/fonts/type1
-/public/wasy-type1/wasy10.pfb>
-Output written on book_template.pdf (28 pages, 1498707 bytes).
+ 84i,11n,82p,737b,1833s stack positions out of 5000i,500n,10000p,200000b,80000s
+{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}{/usr/share/texmf
+/fonts/enc/dvips/cm-super/cm-super-t1.enc}{/usr/share/texlive/texmf-dist/fonts/
+enc/dvips/fontawesome/fontawesometwo.enc}</usr/share/texlive/texmf-dist/fonts/t
+ype1/public/fontawesome/FontAwesome.pfb></usr/share/texmf/fonts/type1/public/cm
+-super/sfbx1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1440.pfb>
+</usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fo
+nts/type1/public/cm-super/sfbx2488.pfb></usr/share/texmf/fonts/type1/public/cm-
+super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1440.pfb><
+/usr/share/texmf/fonts/type1/public/cm-super/sfrm1728.pfb></usr/share/texmf/fon
+ts/type1/public/cm-super/sfti1200.pfb></usr/share/texmf/fonts/type1/public/cm-s
+uper/sftt1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt2488.pfb></
+usr/share/texlive/texmf-dist/fonts/type1/public/wasy-type1/wasy10.pfb>
+Output written on book.pdf (33 pages, 1635153 bytes).
 PDF statistics:
- 315 PDF objects out of 1000 (max. 8388607)
- 233 compressed objects within 3 object streams
- 47 named destinations out of 1000 (max. 500000)
- 279 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 389 PDF objects out of 1000 (max. 8388607)
+ 292 compressed objects within 3 object streams
+ 59 named destinations out of 1000 (max. 500000)
+ 312 words of extra memory for PDF output out of 10000 (max. 10000000)
 
