@@ -151,11 +151,11 @@ class Net(nn.Module):
         x = torch.clamp(x, min=0.0, max=1.0)
         x = self.fc3(x)
         x = torch.clamp(x, min=0.0, max=1.0)
-        return self.fc4(x)#softmax(self.fc4(x), dim=1)#
+        return softmax(self.fc4(x), dim=1)#self.fc4(x)
 
 NB_EPOCHS=100
-#MODEL_PATH="./"
-MODEL_PATH="/mnt/"
+MODEL_PATH="./"
+#MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
