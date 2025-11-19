@@ -2,13 +2,13 @@
 \addvspace {10\p@ }
 \contentsline {figure}{\numberline {1.1}{\ignorespaces The Pingouins game box\relax }}{1}{figure.caption.4}%
 \contentsline {figure}{\numberline {1.2}{\ignorespaces The initial configuration of the Yolah game\relax }}{2}{figure.caption.5}%
-\contentsline {figure}{\numberline {1.3}{\ignorespaces Possible moves (small black crosses) for the black piece identified by a smiley (square {\ttfamily d5})\relax }}{3}{figure.caption.6}%
+\contentsline {figure}{\numberline {1.3}{\ignorespaces Possible moves (small black crosses) for the black piece located on square {\ttfamily d5}\relax }}{3}{figure.caption.6}%
 \contentsline {figure}{\numberline {1.4}{\ignorespaces Black just moved from {\ttfamily d5} to {\ttfamily b7}. The starting square {\ttfamily d5} becomes inaccessible and impassable for the rest of the game\relax }}{3}{figure.caption.7}%
-\contentsline {figure}{\numberline {1.5}{\ignorespaces Possible moves (small white crosses) for the white piece identified by a smiley (square {\ttfamily e5})\relax }}{4}{figure.caption.8}%
+\contentsline {figure}{\numberline {1.5}{\ignorespaces Possible moves (small white crosses) for the white piece located on square {\ttfamily e5}\relax }}{4}{figure.caption.8}%
 \contentsline {figure}{\numberline {1.6}{\ignorespaces White just moved from {\ttfamily e5} to {\ttfamily f5}. The starting square {\ttfamily e5} becomes inaccessible and impassable for the rest of the game. The score is one point each (each player has moved once)\relax }}{4}{figure.caption.9}%
-\contentsline {figure}{\numberline {1.7}{\ignorespaces Game example between two AIs - moves 1 to 19\relax }}{6}{figure.caption.10}%
-\contentsline {figure}{\numberline {1.8}{\ignorespaces Game example between two AIs - moves 20 to 39\relax }}{7}{figure.caption.11}%
-\contentsline {figure}{\numberline {1.9}{\ignorespaces Game example between two AIs - moves 40 to 56. White wins 32 to 24\relax }}{8}{figure.caption.12}%
+\contentsline {figure}{\numberline {1.7}{\ignorespaces Game example between two AIs - moves 1 to 19\relax }}{7}{figure.caption.10}%
+\contentsline {figure}{\numberline {1.8}{\ignorespaces Game example between two AIs - moves 20 to 39\relax }}{8}{figure.caption.11}%
+\contentsline {figure}{\numberline {1.9}{\ignorespaces Game example between two AIs - moves 40 to 56. White wins 32 to 24\relax }}{9}{figure.caption.12}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

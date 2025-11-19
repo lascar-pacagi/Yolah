@@ -260,7 +260,7 @@
 % et d'intelligences artificielles pour mes étudiants. Je me suis inspiré du jeu des pingouins dont vous pouvez voir la boîte dans la figure \ref{fig:pingouins} (je le conseille \smiley)
 
 I created the Yolah game to illustrate effective techniques for implementing board games
-and artificial intelligences for my students. I was inspired by the penguin game, whose box you can see in Figure~\ref{fig:pingouins} (I highly recommend it \smiley)
+and artificial intelligences for my students. I was inspired by the Pingouins game, whose box you can see in Figure~\ref{fig:pingouins} (I highly recommend it \smiley)
 
 \begin{figure}[htpb]
 \centering
@@ -305,8 +305,8 @@ chooses to move their piece located at {\ttfamily d5}, the squares where it can 
 \begin{figure}[htpb]
 \centering
 \includegraphics[width=0.67\textwidth]{yolah_moves1.pdf}
-\caption{Possible moves (small black crosses) for the black piece identified by a smiley (square {\ttfamily d5})}
-% \caption{Mouvements possibles (petites croix noires) pour le pion noir identifié par un smiley (case {\ttfamily d5})}
+% \caption{Mouvements possibles (petites croix noires) pour le pion noir situé sur la case {\ttfamily d5})}
+\caption{Possible moves (small black crosses) for the black piece located on square {\ttfamily d5}}
 \label{fig:yolah_moves1}
 \end{figure}
 
@@ -335,8 +335,8 @@ The possible moves for this white piece are shown in Figure~\ref{fig:yolah_moves
 \begin{figure}[htpb]
 \centering
 \includegraphics[width=0.67\textwidth]{yolah_moves3.pdf}
-\caption{Possible moves (small white crosses) for the white piece identified by a smiley (square {\ttfamily e5})}
-% \caption{Mouvements possibles (petites croix blanches) pour le pion blanc identifié par un smiley (case {\ttfamily e5})}
+% \caption{Mouvements possibles (petites croix blanches) pour le pion blanc situé sur la case {\ttfamily e5})}
+\caption{Possible moves (small white crosses) for the white piece located on square {\ttfamily e5}}
 \label{fig:yolah_moves3}
 \end{figure}
 
@@ -375,7 +375,13 @@ To summarize, the rules of Yolah are as follows:
 % \subsection{Caractéristiques intéressantes de Yolah pour développer des IA}
 \subsection{Interesting Characteristics of Yolah for Developing AIs}
 
+% J'ai choisi les règles précédentes pour Yolah, d'une part parce que j'aimais bien la dynamique du jeu des Pingouins, mais aussi parce qu'il n'y a pas de cycle dans le jeu, il n'y a donc pas besoin de règles spéciales pour éviter qu'une partie ne se termine pas. Le nombre de coups à disposition de chacun des joueurs est assez important au début (mais raisonnable) \footnote{56 coups possibles pour le joueur noir en début de partie.}, mais il va diminuer petit à petit avec l'apparition des trous \footnote{Le nombre de coups possibles ne diminue pas forcément après chaque coup, il existe des configurations où le joueur a plus de 56 coups à sa disposition.}. Cela permet aux IA de pouvoir regarder un nombre assez important de coups à l'avance.
 
+I chose the above rules for Yolah, on the one hand because I liked the dynamics of the Penguin game, but also because there are no cycles in the game, so there is no need for special rules to prevent a game from never ending. The number of moves available to each player is quite large at the beginning (but reasonable)\footnote{56 possible moves for the black player at the start of the game.}, but it will decrease little by little with the appearance of holes\footnote{The number of possible moves does not necessarily decrease after each move; there are configurations where the player has more than 56 available moves.}. This allows the AIs to look ahead a fairly large number of moves.\\
+
+% Je voulais aussi pouvoir réutiliser des concepts utilisés pour l'implémentation efficace du jeu d'échecs, et la taille du plateau et le déplacement des pions (même façon de se déplacer qu'une Dame aux échecs) me permettent de faire cela.
+
+I also wanted to be able to reuse concepts used for the efficient implementation of chess, and the size of the board and the movement of the pieces (same way of moving as a Queen in chess) allow me to do that.
 
 % \subsection{Exemple de partie}
 \subsection{Game Example}
@@ -879,6 +885,23 @@ The game is won by the white player 32 to 24, which is a very good score because
 
 % \subsection{La suite}
 \subsection{What's Next}
+
+% Dans le prochain chapitre, nous allons étudier l'implémentation du jeu Yolah, cette implémentation se veut efficace car il sera important pour les IA de pouvoir jouer beaucoup de parties à la seconde~; leur niveau de jeu va en dépendre.
+
+In the next chapter, we will study the implementation of the Yolah game. This implementation is designed to be efficient because it will be important for the AIs to be able to play many games per second; their level of play will depend on it.\\
+
+% Le chapitre \ref{ch:ai} décrit l'interface commune de nos différentes IA, le chapitre \ref{ch:monte_carlo} présente une IA très simple basée sur une recherche Monte-Carlo. L'IA suivante, décrite au chapitre \ref{fig:mcts}, est une évolution de la précédente et permettra, contrairement à l'IA Monte-Carlo, de développer un arbre de jeu. Notons que ces deux IA ne nécessiteront pas d'heuristiques apportées par l'humain et n'ont besoin que des règles du jeu. Le chapitre \ref{ch:minmax} présente une IA basée sur une recherche arborescente minmax avec des heuristiques fournies par l'humain. L'heuristique utilisée par l'IA est une combinaison linéaire des heuristiques fournies par l'humain~; les pondérations de chacune des heuristiques dans cette combinaison linéaire sont apprises grâce à un algorithme génétique. Notre dernière, et plus forte IA, est présentée au chapitre \ref{ch:nnue}. Un réseau de neurones est utilisé à la place des heuristiques. Ce réseau de neurones est entraîné sur un ensemble de parties jouées par l'IA précédente.
+
+Chapter~\ref{ch:ai} describes the common interface for our different AIs. Chapter~\ref{ch:monte_carlo} presents a very simple AI based on Monte Carlo search. The next AI, described in Chapter~\ref{fig:mcts}, is an evolution of the previous one and will allow, unlike the Monte Carlo AI, the development of a game tree. Note that these two AIs will not require heuristics provided by humans and only need the rules of the game. Chapter~\ref{ch:minmax} presents an AI based on minimax tree search with heuristics provided by humans. The heuristic used by the AI is a linear combination of the heuristics provided by humans; the weights of each heuristic in this linear combination are learned using a genetic algorithm. Our last and strongest AI is presented in Chapter~\ref{ch:nnue}. A neural network is used instead of heuristics. This neural network is trained on a set of games played by the previous AI.\\
+
+% Le chapitre \ref{ch:tournament} évalue alors toutes ces IA, en les faisant se rencontrer dans un tournoi. Nous conclurons ensuite et proposerons différentes directions pour créer d'autres joueurs artificiels.
+
+Chapter~\ref{ch:tournament} then evaluates all these AIs by having them compete in a tournament. We will then conclude and propose different directions for creating other artificial players.\\
+
+% Bonne lecture~!
+
+Happy reading!
+
 
 % \subsection{Why Yolah for AI Research?}
 
