@@ -1,15 +1,15 @@
 [0] Config.pm:307> INFO - This is Biber 2.17
 [0] Config.pm:310> INFO - Logfile is 'book.blg'
-[63] biber:340> INFO - === Tue Nov 18, 2025, 16:08:28
-[76] Biber.pm:418> INFO - Reading 'book.bcf'
-[132] Biber.pm:972> INFO - Found 1 citekeys in bib section 0
-[142] Biber.pm:4383> INFO - Processing section 0
-[150] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
-[152] bibtex.pm:1713> INFO - LaTeX decoding ...
-[183] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
-[214] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
-[214] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
-[214] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
-[214] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
-[215] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
-[216] bbl.pm:757> INFO - Output to book.bbl
+[60] biber:340> INFO - === Wed Nov 19, 2025, 12:44:54
+[71] Biber.pm:418> INFO - Reading 'book.bcf'
+[127] Biber.pm:972> INFO - Found 1 citekeys in bib section 0
+[137] Biber.pm:4383> INFO - Processing section 0
+[145] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
+[147] bibtex.pm:1713> INFO - LaTeX decoding ...
+[177] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
+[208] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
+[208] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[208] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
+[208] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
+[209] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
+[210] bbl.pm:757> INFO - Output to book.bbl

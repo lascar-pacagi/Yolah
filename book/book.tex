@@ -262,7 +262,7 @@
 I created the Yolah game to illustrate effective techniques for implementing board games
 and artificial intelligences for my students. I was inspired by the penguin game, whose box you can see in Figure~\ref{fig:pingouins} (I highly recommend it \smiley)
 
-\begin{figure}[H]
+\begin{figure}[htpb]
 \centering
 \includegraphics[width=0.4\textwidth]{pingouins.png}
 \caption{The Pingouins game box}
@@ -282,7 +282,7 @@ I will now describe the rules of the game, then I will explain why I chose these
 
 \subsection{Game Rules}
 
-\begin{figure}[H]
+\begin{figure}[htpb]
 \centering
 \includegraphics[width=0.7\textwidth]{yolah_initial_configuration.png}
 \caption{The initial configuration of the Yolah game}
@@ -302,7 +302,7 @@ A piece can never disappear from the board because Yolah is a game without captu
 as far as it wishes as long as it is not blocked by another piece or a hole (a concept we will soon discuss). For example, if black
 chooses to move their piece located at {\ttfamily d5}, the squares where it can land are indicated by small black crosses in Figure~\ref{fig:yolah_moves1}.\\
 
-\begin{figure}[H]
+\begin{figure}[htpb]
 \centering
 \includegraphics[width=0.67\textwidth]{yolah_moves1.pdf}
 \caption{Possible moves (small black crosses) for the black piece identified by a smiley (square {\ttfamily d5})}
@@ -314,7 +314,7 @@ chooses to move their piece located at {\ttfamily d5}, the squares where it can 
 
 Now, if the black piece at {\ttfamily d5} moves to {\ttfamily b7}, which we will denote as {\ttfamily d5:b7}, we get the configuration shown in Figure~\ref{fig:yolah_moves2}. Notice that the starting square of the black piece disappears and becomes a hole! This square (this hole) becomes inaccessible and impassable for the rest of the game! This will create opportunities to block the opponent and try to create areas where the opponent cannot go.\\
 
-\begin{figure}[H]
+\begin{figure}[htpb]
 \centering
 \includegraphics[width=0.6\textwidth]{yolah_moves2.png}
 \caption{Black just moved from {\ttfamily d5} to {\ttfamily b7}. The starting square {\ttfamily d5} becomes inaccessible and impassable for the rest of the game}
@@ -332,7 +332,7 @@ A move earns one point for the player who just moved. For example, in the config
 Now it is white's turn to play. They must decide which white piece they will move. Suppose it is the piece at {\ttfamily e5}.
 The possible moves for this white piece are shown in Figure~\ref{fig:yolah_moves3}. If white decides to make the move {\ttfamily e5:f5}, we end up in the configuration of Figure~\ref{fig:yolah_moves4} and the score is one point each (each player has played one move).
 
-\begin{figure}[H]
+\begin{figure}[htpb]
 \centering
 \includegraphics[width=0.67\textwidth]{yolah_moves3.pdf}
 \caption{Possible moves (small white crosses) for the white piece identified by a smiley (square {\ttfamily e5})}
@@ -340,7 +340,7 @@ The possible moves for this white piece are shown in Figure~\ref{fig:yolah_moves
 \label{fig:yolah_moves3}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htpb]
 \centering
 \includegraphics[width=0.6\textwidth]{yolah_moves4.png}
 \caption{White just moved from {\ttfamily e5} to {\ttfamily f5}. The starting square {\ttfamily e5} becomes inaccessible and impassable for the rest of the game. The score is one point each (each player has moved once)}
@@ -357,7 +357,7 @@ To summarize, the rules of Yolah are as follows:
 % \item Chaque joueur dispose de quatre pions.
 \item Each player has four pieces.
 % \item À son tour, le joueur choisit un des pions qui peut encore bouger, si aucun pion ne peut bouger il passe son tour (on indiquera par le coup {\ttfamily a1:a1} le fait de passer son tour).
-\item On their turn, the player chooses one of the pieces that can still move; if no piece can move, they pass their turn (we will denote passing the turn by the move {\ttfamily a1:a1}).
+\item On their turn, the player chooses one of the pieces that can still move; if no piece can move, they pass their turn (we will denote by the move {\ttfamily a1:a1} to skip one's turn).
 % \item Il doit déplacer le pion choisi dans une des huit directions, d'autant de cases qu'il le souhaite, mais il ne doit pas atterrir ou être bloqué par un pion ou un trou.
 \item They must move the chosen piece in one of the eight directions, as many squares as desired, but must not land on or be blocked by a piece or a hole.
 % \item Après le déplacement du pion choisi, la case de départ du coup devient un trou et on ne peut plus alors la franchir ou se poser dessus.
@@ -380,9 +380,502 @@ To summarize, the rules of Yolah are as follows:
 % \subsection{Exemple de partie}
 \subsection{Game Example}
 
-Pour avoir une idée du déroulement d'une partie du jeu Yolah, nous allons faire jouer deux intelligences artificielles entre elles. La première IA sera basée sur la recherche arborescente Monte-Carlo et la deuxième sera basée sur le MinMax avec réseau neuronal. Nous étudierons ces deux IA dans la suite du livre. La seconde IA est plus forte et vous allez voir sa stratégie d'isolement en action~!\\
+% Pour avoir une idée du déroulement d'une partie du jeu Yolah, nous allons faire jouer deux intelligences artificielles entre elles. La première IA sera basée sur la recherche arborescente Monte-Carlo et la deuxième sera basée sur le MinMax avec réseau neuronal. Nous étudierons ces deux IA dans la suite du livre. La seconde IA est plus forte et vous allez voir sa stratégie d'isolement de zones en action~!
 
-Le déroulement de la partie est représenté dans les figures \ref{fig:game_example1}.
+To get an idea of how a Yolah game unfolds, we will have two artificial intelligences play against each other. The first AI will be based on Monte Carlo Tree Search and the second will be based on Minimax with a neural network. We will study both of these AIs later in the book. The second AI is stronger and you will see its zone isolation strategy in action!\\
+
+% Le déroulement de la partie est décrit dans les figures \ref{fig:game_example_opening}, \ref{fig:game_example_middle} et \ref{fig:game_example_end}.
+
+The progression of the game is described in Figures~\ref{fig:game_example_opening}, \ref{fig:game_example_middle} and \ref{fig:game_example_end}.\\
+
+% L'IA des blancs estime qu'elle est gagnante à partir du coup 10 (voir figure \ref{fig:game_example_move10}). On peut voir au coup 30 (voir figure \ref{fig:game_example_move30}) qu'elle a réussi à isoler une zone où les noirs ne pourront plus accéder. Au coup 32 (voir figure \ref{fig:game_example_move32}) elle sort un de ses pions de la zone qu'elle a isolée car l'autre pion pourra collecter tous les points de celle-ci. Il est plus utile d'utiliser l'autre pion pour glaner des points autre part. Notons qu'à partir du coup 47 (voir à partir de la figure \ref{fig:game_example_move47}) les noirs n'ont plus aucun coup disponible et doivent donc passer leur tour.
+
+The white AI estimates that it is winning starting from move 10 (see Figure~\ref{fig:game_example_move10}). We can see at move 30 (see Figure~\ref{fig:game_example_move30}) that it has successfully isolated a zone where black can no longer access. At move 32 (see Figure~\ref{fig:game_example_move32}) it moves one of its pieces out of the isolated zone because the other piece will be able to collect all the points from that zone. It is more useful to use the other piece to gather points elsewhere. Note that starting from move 47 (see Figure~\ref{fig:game_example_move47} onward), black has no more available moves and must therefore pass their turn.\\
+
+% La partie est gagnée par le joueur blanc 32 à 24, ce qui est un très bon score car le jeu Yolah me semble être à l'avantage des noirs.
+
+The game is won by the white player 32 to 24, which is a very good score because the Yolah game seems to me to favor black.
+
+\begin{figure}[htpb] %H
+\centering
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{board.png}
+    % \caption{Position initiale}
+    \caption{Initial position}
+    \label{fig:game_example_init}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move1.png}
+    % \caption{Coup 1 (Noir)}
+    \caption{Move 1 (Black)}
+    \label{fig:game_example_move1}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move2.png}
+    % \caption{Coup 2 (Blanc)}
+    \caption{Move 2 (White)}
+    \label{fig:game_example_move2}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move3.png}
+    % \caption{Coup 3 (Noir)}
+    \caption{Move 3 (Black)}
+    \label{fig:game_example_move3}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move4.png}
+    % \caption{Coup 4 (Blanc)}
+    \caption{Move 4 (White)}
+    \label{fig:game_example_move4}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move5.png}
+    % \caption{Coup 5 (Noir)}
+    \caption{Move 5 (Black)}
+    \label{fig:game_example_move5}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move6.png}
+    % \caption{Coup 6 (Blanc)}
+    \caption{Move 6 (White)}
+    \label{fig:game_example_move6}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move7.png}
+    % \caption{Coup 7 (Noir)}
+    \caption{Move 7 (Black)}
+    \label{fig:game_example_move7}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move8.png}
+    % \caption{Coup 8 (Blanc)}
+    \caption{Move 8 (White)}
+    \label{fig:game_example_move8}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move9.png}
+    % \caption{Coup 9 (Noir)}
+    \caption{Move 9 (Black)}
+    \label{fig:game_example_move9}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move10.png}
+    % \caption{Coup 10 (Blanc)}
+    \caption{Move 10 (White)}
+    \label{fig:game_example_move10}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move11.png}
+    % \caption{Coup 11 (Noir)}
+    \caption{Move 11 (Black)}
+    \label{fig:game_example_move11}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move12.png}
+    % \caption{Coup 12 (Blanc)}
+    \caption{Move 12 (White)}
+    \label{fig:game_example_move12}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move13.png}
+    % \caption{Coup 13 (Noir)}
+    \caption{Move 13 (Black)}
+    \label{fig:game_example_move13}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move14.png}
+    % \caption{Coup 14 (Blanc)}
+    \caption{Move 14 (White)}
+    \label{fig:game_example_move14}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move15.png}
+    % \caption{Coup 15 (Noir)}
+    \caption{Move 15 (Black)}
+    \label{fig:game_example_move15}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move16.png}
+    % \caption{Coup 16 (Blanc)}
+    \caption{Move 16 (White)}
+    \label{fig:game_example_move16}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move17.png}
+    % \caption{Coup 17 (Noir)}
+    \caption{Move 17 (Black)}
+    \label{fig:game_example_move17}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move18.png}
+    % \caption{Coup 18 (Blanc)}
+    \caption{Move 18 (White)}
+    \label{fig:game_example_move18}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move19.png}
+    % \caption{Coup 19 (Noir)}
+    \caption{Move 19 (Black)}
+    \label{fig:game_example_move19}
+\end{subfigure}
+
+% \caption{Example de partie entre deux IA - coups 1 à 19}
+\caption{Game example between two AIs - moves 1 to 19}
+\label{fig:game_example_opening}
+\end{figure}
+
+\begin{figure}[htpb]
+\centering
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move20.png}
+    % \caption{Coup 20 (Blanc)}
+    \caption{Move 20 (White)}
+    \label{fig:game_example_move20}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move21.png}
+    % \caption{Coup 21 (Noir)}
+    \caption{Move 21 (Black)}
+    \label{fig:game_example_move21}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move22.png}
+    % \caption{Coup 22 (Blanc)}
+    \caption{Move 22 (White)}
+    \label{fig:game_example_move22}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move23.png}
+    % \caption{Coup 23 (Noir)}
+    \caption{Move 23 (Black)}
+    \label{fig:game_example_move23}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move24.png}
+    % \caption{Coup 24 (Blanc)}
+    \caption{Move 24 (White)}
+    \label{fig:game_example_move24}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move25.png}
+    % \caption{Coup 25 (Noir)}
+    \caption{Move 25 (Black)}
+    \label{fig:game_example_move25}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move26.png}
+    % \caption{Coup 26 (Blanc)}
+    \caption{Move 26 (White)}
+    \label{fig:game_example_move26}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move27.png}
+    % \caption{Coup 27 (Noir)}
+    \caption{Move 27 (Black)}
+    \label{fig:game_example_move27}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move28.png}
+    % \caption{Coup 28 (Blanc)}
+    \caption{Move 28 (White)}
+    \label{fig:game_example_move28}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move29.png}
+    % \caption{Coup 29 (Noir)}
+    \caption{Move 29 (Black)}
+    \label{fig:game_example_move29}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move30.png}
+    % \caption{Coup 30 (Blanc)}
+    \caption{Move 30 (White)}
+    \label{fig:game_example_move30}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move31.png}
+    % \caption{Coup 31 (Noir)}
+    \caption{Move 31 (Black)}
+    \label{fig:game_example_move31}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move32.png}
+    % \caption{Coup 32 (Blanc)}
+    \caption{Move 32 (White)}
+    \label{fig:game_example_move32}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move33.png}
+    % \caption{Coup 33 (Noir)}
+    \caption{Move 33 (Black)}
+    \label{fig:game_example_move33}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move34.png}
+    % \caption{Coup 34 (Blanc)}
+    \caption{Move 34 (White)}
+    \label{fig:game_example_move34}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move35.png}
+    % \caption{Coup 35 (Noir)}
+    \caption{Move 35 (Black)}
+    \label{fig:game_example_move35}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move36.png}
+    % \caption{Coup 36 (Blanc)}
+    \caption{Move 36 (White)}
+    \label{fig:game_example_move36}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move37.png}
+    % \caption{Coup 37 (Noir)}
+    \caption{Move 37 (Black)}
+    \label{fig:game_example_move37}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move38.png}
+    % \caption{Coup 38 (Blanc)}
+    \caption{Move 38 (White)}
+    \label{fig:game_example_move38}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move39.png}
+    % \caption{Coup 39 (Noir)}
+    \caption{Move 39 (Black)}
+    \label{fig:game_example_move39}
+\end{subfigure}\\
+
+% \caption{Example de partie entre deux IA - coups 20 à 39}
+\caption{Game example between two AIs - moves 20 to 39}
+\label{fig:game_example_middle}
+\end{figure}
+
+
+\begin{figure}[htpb]
+\centering
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move40.png}
+    % \caption{Coup 40 (Blanc)}
+    \caption{Move 40 (White)}
+    \label{fig:game_example_move40}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move41.png}
+    % \caption{Coup 41 (Noir)}
+    \caption{Move 41 (Black)}
+    \label{fig:game_example_move41}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move42.png}
+    % \caption{Coup 42 (Blanc)}
+    \caption{Move 42 (White)}
+    \label{fig:game_example_move42}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move43.png}
+    % \caption{Coup 43 (Noir)}
+    \caption{Move 43 (Black)}
+    \label{fig:game_example_move43}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move44.png}
+    % \caption{Coup 44 (Blanc)}
+    \caption{Move 44 (White)}
+    \label{fig:game_example_move44}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move45.png}
+    % \caption{Coup 45 (Noir)}
+    \caption{Move 45 (Black)}
+    \label{fig:game_example_move45}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move46.png}
+    % \caption{Coup 46 (Blanc)}
+    \caption{Move 46 (White)}
+    \label{fig:game_example_move46}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move47.png}
+    % \caption{Coup 47 (Noir)}
+    \caption{Move 47 (Black)}
+    \label{fig:game_example_move47}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move48.png}
+    % \caption{Coup 48 (Blanc)}
+    \caption{Move 48 (White)}
+    \label{fig:game_example_move48}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move49.png}
+    % \caption{Coup 49 (Blanc)}
+    \caption{Move 49 (White)}
+    \label{fig:game_example_move49}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move50.png}
+    % \caption{Coup 50 (Blanc)}
+    \caption{Move 50 (White)}
+    \label{fig:game_example_move50}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move51.png}
+    % \caption{Coup 51 (Blanc)}
+    \caption{Move 51 (White)}
+    \label{fig:game_example_move51}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move52.png}
+    % \caption{Coup 52 (Blanc)}
+    \caption{Move 52 (White)}
+    \label{fig:game_example_move52}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move53.png}
+    % \caption{Coup 53 (Blanc)}
+    \caption{Move 53 (White)}
+    \label{fig:game_example_move53}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move54.png}
+    % \caption{Coup 54 (Blanc)}
+    \caption{Move 54 (White)}
+    \label{fig:game_example_move54}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move55.png}
+    % \caption{Coup 55 (Blanc)}
+    \caption{Move 55 (White)}
+    \label{fig:game_example_move55}
+\end{subfigure}\\
+
+\begin{subfigure}[b]{0.24\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{yolah_game_example_move56.png}
+    % \caption{Coup 56 (Blanc)}
+    \caption{Move 56 (White)}
+    \label{fig:game_example_move56}
+\end{subfigure}
+\hfill
+
+% \caption{Example de partie entre deux IA - coups 39 à 56. Blanc gagne 32 à 24}
+\caption{Game example between two AIs - moves 40 to 56. White wins 32 to 24}
+\label{fig:game_example_end}
+\end{figure}
 
 % \subsection{La suite}
 \subsection{What's Next}

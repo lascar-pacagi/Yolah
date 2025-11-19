@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  18 NOV 2025 16:08
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  19 NOV 2025 12:44
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -1095,7 +1095,7 @@ Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 2
 )
 \Hy@SectionHShift=\skip94
 )
-Package hyperref Info: Option `colorlinks' set `true' on input line 92.
+Package hyperref Info: Option `colorlinks' set `true' on input line 95.
 
 (/usr/share/texlive/texmf-dist/tex/latex/fancyhdr/fancyhdr.sty
 Package: fancyhdr 2021/01/28 v4.0.1 Extensive control of page headers and foote
@@ -1316,24 +1316,24 @@ Package csquotes Info: Redefining alias 'default' -> 'english'.
  (./book.aux)
 \openout1 = `book.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 184.
-LaTeX Font Info:    ... okay on input line 184.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 187.
+LaTeX Font Info:    ... okay on input line 187.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -1405,9 +1405,9 @@ Package biblatex Info: Automatic encoding selection.
 Package biblatex Info: Trying to load bibliographic data...
 Package biblatex Info: ... file 'book.bbl' found.
  (./book.bbl)
-Package biblatex Info: Reference section=0 on input line 184.
-Package biblatex Info: Reference segment=0 on input line 184.
-Package hyperref Info: Link coloring ON on input line 184.
+Package biblatex Info: Reference section=0 on input line 187.
+Package biblatex Info: Reference segment=0 on input line 187.
+Package hyperref Info: Link coloring ON on input line 187.
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
 
@@ -1419,9 +1419,9 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
 \c@section@level=\count519
 )
-LaTeX Info: Redefining \ref on input line 184.
-LaTeX Info: Redefining \pageref on input line 184.
-LaTeX Info: Redefining \nameref on input line 184.
+LaTeX Info: Redefining \ref on input line 187.
+LaTeX Info: Redefining \pageref on input line 187.
+LaTeX Info: Redefining \nameref on input line 187.
 
 (./book.out) (./book.out)
 \@outlinefile=\write7
@@ -1431,20 +1431,20 @@ Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count520
-LaTeX Font Info:    Trying to load font information for U+msa on input line 194
+LaTeX Font Info:    Trying to load font information for U+msa on input line 197
 .
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 194
+LaTeX Font Info:    Trying to load font information for U+msb on input line 197
 .
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 LaTeX Font Info:    Trying to load font information for U+wasy on input line 19
-4.
+7.
 
 (/usr/share/texlive/texmf-dist/tex/latex/wasysym/uwasy.fd
 File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
@@ -1456,11 +1456,11 @@ File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
 <figures//logo.png, id=111, 307.0672pt x 134.1813pt>
 File: figures//logo.png Graphic file (type png)
 <use figures//logo.png>
-Package pdftex.def Info: figures//logo.png  used on input line 201.
+Package pdftex.def Info: figures//logo.png  used on input line 204.
 (pdftex.def)             Requested size: 284.52756pt x 124.33278pt.
  [2 <./figures//logo.png>]
 LaTeX Font Info:    Trying to load font information for T1+cmtt on input line 2
-14.
+17.
 
 (/usr/share/texlive/texmf-dist/tex/latex/base/t1cmtt.fd
 File: t1cmtt.fd 2019/12/16 v2.5j Standard LaTeX font definitions
@@ -1468,14 +1468,14 @@ File: t1cmtt.fd 2019/12/16 v2.5j Standard LaTeX font definitions
 
 ]
 LaTeX Font Info:    Trying to load font information for U+fontawesometwo on inp
-ut line 223.
+ut line 226.
 
 (/usr/share/texlive/texmf-dist/tex/latex/fontawesome/ufontawesometwo.fd
 File: ufontawesometwo.fd 2016/05/22 Font definitions for U/fontawesometwo.
 )
 
 LaTeX Font Warning: Font shape `U/fontawesometwo/m/it' undefined
-(Font)              using `U/fontawesometwo/m/n' instead on input line 223.
+(Font)              using `U/fontawesometwo/m/n' instead on input line 226.
 
 [4
 
@@ -1502,54 +1502,45 @@ LaTeX Font Warning: Font shape `U/fontawesometwo/m/it' undefined
 
 ]
 Chapter 1.
-<figures//pingouins.png, id=194, 699.61375pt x 718.685pt>
+<figures//pingouins.png, id=200, 699.61375pt x 718.685pt>
 File: figures//pingouins.png Graphic file (type png)
 <use figures//pingouins.png>
-Package pdftex.def Info: figures//pingouins.png  used on input line 264.
+Package pdftex.def Info: figures//pingouins.png  used on input line 267.
 (pdftex.def)             Requested size: 173.95749pt x 178.69481pt.
-<figures//yolah_initial_configuration.png, id=196, 883.3pt x 883.3pt>
+<figures//yolah_initial_configuration.png, id=202, 883.3pt x 883.3pt>
 File: figures//yolah_initial_configuration.png Graphic file (type png)
 <use figures//yolah_initial_configuration.png>
 Package pdftex.def Info: figures//yolah_initial_configuration.png  used on inpu
-t line 284.
+t line 287.
 (pdftex.def)             Requested size: 304.42894pt x 304.42883pt.
 
-Underfull \vbox (badness 4832) has occurred while \output is active []
-
- [1
-
- <./figures//pingouins.png>]
-Underfull \hbox (badness 10000) in paragraph at lines 296--301
+Underfull \hbox (badness 10000) in paragraph at lines 299--304
 
  []
 
+[1
 
+ <./figures//pingouins.png>]
 
 pdfTeX warning: pdflatex (file ./figures//yolah_moves1.pdf): PDF inclusion: fou
 nd PDF version <1.6>, but at most version <1.5> allowed
-<figures//yolah_moves1.pdf, id=206, 597.6786pt x 597.6786pt>
+<figures//yolah_moves1.pdf, id=213, 597.6786pt x 597.6786pt>
 File: figures//yolah_moves1.pdf Graphic file (type pdf)
 <use figures//yolah_moves1.pdf>
-Package pdftex.def Info: figures//yolah_moves1.pdf  used on input line 304.
+Package pdftex.def Info: figures//yolah_moves1.pdf  used on input line 307.
 (pdftex.def)             Requested size: 291.38246pt x 291.38766pt.
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [2 <./figures//yolah_initial_configuration.png (PNG copy)>]
-Underfull \hbox (badness 10000) in paragraph at lines 312--313
+Underfull \hbox (badness 10000) in paragraph at lines 315--316
 
  []
 
-<figures//yolah_moves2.png, id=213, 883.3pt x 883.3pt>
+<figures//yolah_moves2.png, id=215, 883.3pt x 883.3pt>
 File: figures//yolah_moves2.png Graphic file (type png)
 <use figures//yolah_moves2.png>
-Package pdftex.def Info: figures//yolah_moves2.png  used on input line 316.
+Package pdftex.def Info: figures//yolah_moves2.png  used on input line 319.
 (pdftex.def)             Requested size: 260.94289pt x 260.93515pt.
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [3 <./figures//yolah_moves1.pdf>]
-Underfull \hbox (badness 10000) in paragraph at lines 324--325
+Underfull \hbox (badness 10000) in paragraph at lines 327--328
 
  []
 
@@ -1557,91 +1548,483 @@ Underfull \hbox (badness 10000) in paragraph at lines 324--325
 
 pdfTeX warning: pdflatex (file ./figures//yolah_moves3.pdf): PDF inclusion: fou
 nd PDF version <1.6>, but at most version <1.5> allowed
-<figures//yolah_moves3.pdf, id=226, 597.6786pt x 597.6786pt>
+<figures//yolah_moves3.pdf, id=219, 597.6786pt x 597.6786pt>
 File: figures//yolah_moves3.pdf Graphic file (type pdf)
 <use figures//yolah_moves3.pdf>
-Package pdftex.def Info: figures//yolah_moves3.pdf  used on input line 334.
+Package pdftex.def Info: figures//yolah_moves3.pdf  used on input line 337.
 (pdftex.def)             Requested size: 291.38246pt x 291.38766pt.
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [4 <./figures//yolah_moves2.png (PNG copy)>]
-<figures//yolah_moves4.png, id=231, 883.3pt x 883.3pt>
+<figures//yolah_moves4.png, id=220, 883.3pt x 883.3pt>
 File: figures//yolah_moves4.png Graphic file (type png)
 <use figures//yolah_moves4.png>
-Package pdftex.def Info: figures//yolah_moves4.png  used on input line 342.
+Package pdftex.def Info: figures//yolah_moves4.png  used on input line 345.
 (pdftex.def)             Requested size: 260.94289pt x 260.93515pt.
- [5 <./figures//yolah_moves3.pdf> <./figures//yolah_moves4.png (PNG copy)>] [6]
+[2 <./figures//yolah_initial_configuration.png (PNG copy)>] [3 <./figures//yola
+h_moves1.pdf> <./figures//yolah_moves2.png (PNG copy)>] [4 <./figures//yolah_mo
+ves3.pdf> <./figures//yolah_moves4.png (PNG copy)>]
+Underfull \hbox (badness 10000) in paragraph at lines 385--386
 
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 389--390
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 393--394
+
+ []
+
+<figures//board.png, id=250, 883.3pt x 883.3pt>
+File: figures//board.png Graphic file (type png)
+<use figures//board.png>
+Package pdftex.def Info: figures//board.png  used on input line 403.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move1.png, id=251, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move1.png Graphic file (type png)
+<use figures//yolah_game_example_move1.png>
+Package pdftex.def Info: figures//yolah_game_example_move1.png  used on input l
+ine 411.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move2.png, id=252, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move2.png Graphic file (type png)
+<use figures//yolah_game_example_move2.png>
+Package pdftex.def Info: figures//yolah_game_example_move2.png  used on input l
+ine 419.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move3.png, id=253, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move3.png Graphic file (type png)
+<use figures//yolah_game_example_move3.png>
+Package pdftex.def Info: figures//yolah_game_example_move3.png  used on input l
+ine 427.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move4.png, id=254, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move4.png Graphic file (type png)
+<use figures//yolah_game_example_move4.png>
+Package pdftex.def Info: figures//yolah_game_example_move4.png  used on input l
+ine 435.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move5.png, id=255, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move5.png Graphic file (type png)
+<use figures//yolah_game_example_move5.png>
+Package pdftex.def Info: figures//yolah_game_example_move5.png  used on input l
+ine 443.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move6.png, id=256, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move6.png Graphic file (type png)
+<use figures//yolah_game_example_move6.png>
+Package pdftex.def Info: figures//yolah_game_example_move6.png  used on input l
+ine 451.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move7.png, id=257, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move7.png Graphic file (type png)
+<use figures//yolah_game_example_move7.png>
+Package pdftex.def Info: figures//yolah_game_example_move7.png  used on input l
+ine 459.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move8.png, id=258, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move8.png Graphic file (type png)
+<use figures//yolah_game_example_move8.png>
+Package pdftex.def Info: figures//yolah_game_example_move8.png  used on input l
+ine 467.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move9.png, id=259, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move9.png Graphic file (type png)
+<use figures//yolah_game_example_move9.png>
+Package pdftex.def Info: figures//yolah_game_example_move9.png  used on input l
+ine 475.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move10.png, id=260, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move10.png Graphic file (type png)
+<use figures//yolah_game_example_move10.png>
+Package pdftex.def Info: figures//yolah_game_example_move10.png  used on input 
+line 483.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move11.png, id=261, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move11.png Graphic file (type png)
+<use figures//yolah_game_example_move11.png>
+Package pdftex.def Info: figures//yolah_game_example_move11.png  used on input 
+line 491.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move12.png, id=262, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move12.png Graphic file (type png)
+<use figures//yolah_game_example_move12.png>
+Package pdftex.def Info: figures//yolah_game_example_move12.png  used on input 
+line 499.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move13.png, id=263, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move13.png Graphic file (type png)
+<use figures//yolah_game_example_move13.png>
+Package pdftex.def Info: figures//yolah_game_example_move13.png  used on input 
+line 507.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move14.png, id=264, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move14.png Graphic file (type png)
+<use figures//yolah_game_example_move14.png>
+Package pdftex.def Info: figures//yolah_game_example_move14.png  used on input 
+line 515.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move15.png, id=265, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move15.png Graphic file (type png)
+<use figures//yolah_game_example_move15.png>
+Package pdftex.def Info: figures//yolah_game_example_move15.png  used on input 
+line 523.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move16.png, id=266, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move16.png Graphic file (type png)
+<use figures//yolah_game_example_move16.png>
+Package pdftex.def Info: figures//yolah_game_example_move16.png  used on input 
+line 531.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move17.png, id=267, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move17.png Graphic file (type png)
+<use figures//yolah_game_example_move17.png>
+Package pdftex.def Info: figures//yolah_game_example_move17.png  used on input 
+line 539.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move18.png, id=268, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move18.png Graphic file (type png)
+<use figures//yolah_game_example_move18.png>
+Package pdftex.def Info: figures//yolah_game_example_move18.png  used on input 
+line 547.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move19.png, id=269, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move19.png Graphic file (type png)
+<use figures//yolah_game_example_move19.png>
+Package pdftex.def Info: figures//yolah_game_example_move19.png  used on input 
+line 555.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move20.png, id=270, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move20.png Graphic file (type png)
+<use figures//yolah_game_example_move20.png>
+Package pdftex.def Info: figures//yolah_game_example_move20.png  used on input 
+line 571.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move21.png, id=271, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move21.png Graphic file (type png)
+<use figures//yolah_game_example_move21.png>
+Package pdftex.def Info: figures//yolah_game_example_move21.png  used on input 
+line 579.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move22.png, id=272, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move22.png Graphic file (type png)
+<use figures//yolah_game_example_move22.png>
+Package pdftex.def Info: figures//yolah_game_example_move22.png  used on input 
+line 587.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move23.png, id=273, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move23.png Graphic file (type png)
+<use figures//yolah_game_example_move23.png>
+Package pdftex.def Info: figures//yolah_game_example_move23.png  used on input 
+line 595.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move24.png, id=274, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move24.png Graphic file (type png)
+<use figures//yolah_game_example_move24.png>
+Package pdftex.def Info: figures//yolah_game_example_move24.png  used on input 
+line 603.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move25.png, id=275, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move25.png Graphic file (type png)
+<use figures//yolah_game_example_move25.png>
+Package pdftex.def Info: figures//yolah_game_example_move25.png  used on input 
+line 611.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move26.png, id=276, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move26.png Graphic file (type png)
+<use figures//yolah_game_example_move26.png>
+Package pdftex.def Info: figures//yolah_game_example_move26.png  used on input 
+line 619.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move27.png, id=277, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move27.png Graphic file (type png)
+<use figures//yolah_game_example_move27.png>
+Package pdftex.def Info: figures//yolah_game_example_move27.png  used on input 
+line 627.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move28.png, id=278, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move28.png Graphic file (type png)
+<use figures//yolah_game_example_move28.png>
+Package pdftex.def Info: figures//yolah_game_example_move28.png  used on input 
+line 635.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move29.png, id=279, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move29.png Graphic file (type png)
+<use figures//yolah_game_example_move29.png>
+Package pdftex.def Info: figures//yolah_game_example_move29.png  used on input 
+line 643.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move30.png, id=280, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move30.png Graphic file (type png)
+<use figures//yolah_game_example_move30.png>
+Package pdftex.def Info: figures//yolah_game_example_move30.png  used on input 
+line 651.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move31.png, id=281, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move31.png Graphic file (type png)
+<use figures//yolah_game_example_move31.png>
+Package pdftex.def Info: figures//yolah_game_example_move31.png  used on input 
+line 659.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move32.png, id=282, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move32.png Graphic file (type png)
+<use figures//yolah_game_example_move32.png>
+Package pdftex.def Info: figures//yolah_game_example_move32.png  used on input 
+line 667.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move33.png, id=283, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move33.png Graphic file (type png)
+<use figures//yolah_game_example_move33.png>
+Package pdftex.def Info: figures//yolah_game_example_move33.png  used on input 
+line 675.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move34.png, id=284, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move34.png Graphic file (type png)
+<use figures//yolah_game_example_move34.png>
+Package pdftex.def Info: figures//yolah_game_example_move34.png  used on input 
+line 683.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move35.png, id=285, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move35.png Graphic file (type png)
+<use figures//yolah_game_example_move35.png>
+Package pdftex.def Info: figures//yolah_game_example_move35.png  used on input 
+line 691.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move36.png, id=286, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move36.png Graphic file (type png)
+<use figures//yolah_game_example_move36.png>
+Package pdftex.def Info: figures//yolah_game_example_move36.png  used on input 
+line 699.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move37.png, id=287, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move37.png Graphic file (type png)
+<use figures//yolah_game_example_move37.png>
+Package pdftex.def Info: figures//yolah_game_example_move37.png  used on input 
+line 707.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move38.png, id=288, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move38.png Graphic file (type png)
+<use figures//yolah_game_example_move38.png>
+Package pdftex.def Info: figures//yolah_game_example_move38.png  used on input 
+line 715.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move39.png, id=289, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move39.png Graphic file (type png)
+<use figures//yolah_game_example_move39.png>
+Package pdftex.def Info: figures//yolah_game_example_move39.png  used on input 
+line 723.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move40.png, id=290, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move40.png Graphic file (type png)
+<use figures//yolah_game_example_move40.png>
+Package pdftex.def Info: figures//yolah_game_example_move40.png  used on input 
+line 740.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move41.png, id=291, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move41.png Graphic file (type png)
+<use figures//yolah_game_example_move41.png>
+Package pdftex.def Info: figures//yolah_game_example_move41.png  used on input 
+line 748.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move42.png, id=292, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move42.png Graphic file (type png)
+<use figures//yolah_game_example_move42.png>
+Package pdftex.def Info: figures//yolah_game_example_move42.png  used on input 
+line 756.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move43.png, id=293, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move43.png Graphic file (type png)
+<use figures//yolah_game_example_move43.png>
+Package pdftex.def Info: figures//yolah_game_example_move43.png  used on input 
+line 764.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move44.png, id=294, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move44.png Graphic file (type png)
+<use figures//yolah_game_example_move44.png>
+Package pdftex.def Info: figures//yolah_game_example_move44.png  used on input 
+line 772.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move45.png, id=295, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move45.png Graphic file (type png)
+<use figures//yolah_game_example_move45.png>
+Package pdftex.def Info: figures//yolah_game_example_move45.png  used on input 
+line 780.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move46.png, id=296, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move46.png Graphic file (type png)
+<use figures//yolah_game_example_move46.png>
+Package pdftex.def Info: figures//yolah_game_example_move46.png  used on input 
+line 788.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move47.png, id=297, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move47.png Graphic file (type png)
+<use figures//yolah_game_example_move47.png>
+Package pdftex.def Info: figures//yolah_game_example_move47.png  used on input 
+line 796.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move48.png, id=298, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move48.png Graphic file (type png)
+<use figures//yolah_game_example_move48.png>
+Package pdftex.def Info: figures//yolah_game_example_move48.png  used on input 
+line 804.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move49.png, id=299, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move49.png Graphic file (type png)
+<use figures//yolah_game_example_move49.png>
+Package pdftex.def Info: figures//yolah_game_example_move49.png  used on input 
+line 812.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move50.png, id=300, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move50.png Graphic file (type png)
+<use figures//yolah_game_example_move50.png>
+Package pdftex.def Info: figures//yolah_game_example_move50.png  used on input 
+line 820.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move51.png, id=301, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move51.png Graphic file (type png)
+<use figures//yolah_game_example_move51.png>
+Package pdftex.def Info: figures//yolah_game_example_move51.png  used on input 
+line 828.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move52.png, id=302, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move52.png Graphic file (type png)
+<use figures//yolah_game_example_move52.png>
+Package pdftex.def Info: figures//yolah_game_example_move52.png  used on input 
+line 836.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move53.png, id=303, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move53.png Graphic file (type png)
+<use figures//yolah_game_example_move53.png>
+Package pdftex.def Info: figures//yolah_game_example_move53.png  used on input 
+line 844.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move54.png, id=304, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move54.png Graphic file (type png)
+<use figures//yolah_game_example_move54.png>
+Package pdftex.def Info: figures//yolah_game_example_move54.png  used on input 
+line 852.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move55.png, id=305, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move55.png Graphic file (type png)
+<use figures//yolah_game_example_move55.png>
+Package pdftex.def Info: figures//yolah_game_example_move55.png  used on input 
+line 860.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+<figures//yolah_game_example_move56.png, id=306, 883.3pt x 883.3pt>
+File: figures//yolah_game_example_move56.png Graphic file (type png)
+<use figures//yolah_game_example_move56.png>
+Package pdftex.def Info: figures//yolah_game_example_move56.png  used on input 
+line 868.
+(pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
+[5] [6 <./figures//board.png (PNG copy)> <./figures//yolah_game_example_move1.p
+ng (PNG copy)> <./figures//yolah_game_example_move2.png (PNG copy)> <./figures/
+/yolah_game_example_move3.png (PNG copy)> <./figures//yolah_game_example_move4.
+png (PNG copy)> <./figures//yolah_game_example_move5.png (PNG copy)> <./figures
+//yolah_game_example_move6.png (PNG copy)> <./figures//yolah_game_example_move7
+.png (PNG copy)> <./figures//yolah_game_example_move8.png (PNG copy)> <./figure
+s//yolah_game_example_move9.png (PNG copy)> <./figures//yolah_game_example_move
+10.png (PNG copy)> <./figures//yolah_game_example_move11.png (PNG copy)> <./fig
+ures//yolah_game_example_move12.png (PNG copy)> <./figures//yolah_game_example_
+move13.png (PNG copy)> <./figures//yolah_game_example_move14.png (PNG copy)> <.
+/figures//yolah_game_example_move15.png (PNG copy)> <./figures//yolah_game_exam
+ple_move16.png (PNG copy)> <./figures//yolah_game_example_move17.png (PNG copy)
+> <./figures//yolah_game_example_move18.png (PNG copy)> <./figures//yolah_game_
+example_move19.png (PNG copy)>] [7 <./figures//yolah_game_example_move20.png (P
+NG copy)> <./figures//yolah_game_example_move21.png (PNG copy)> <./figures//yol
+ah_game_example_move22.png (PNG copy)> <./figures//yolah_game_example_move23.pn
+g (PNG copy)> <./figures//yolah_game_example_move24.png (PNG copy)> <./figures/
+/yolah_game_example_move25.png (PNG copy)> <./figures//yolah_game_example_move2
+6.png (PNG copy)> <./figures//yolah_game_example_move27.png (PNG copy)> <./figu
+res//yolah_game_example_move28.png (PNG copy)> <./figures//yolah_game_example_m
+ove29.png (PNG copy)> <./figures//yolah_game_example_move30.png (PNG copy)> <./
+figures//yolah_game_example_move31.png (PNG copy)> <./figures//yolah_game_examp
+le_move32.png (PNG copy)> <./figures//yolah_game_example_move33.png (PNG copy)>
+ <./figures//yolah_game_example_move34.png (PNG copy)> <./figures//yolah_game_e
+xample_move35.png (PNG copy)> <./figures//yolah_game_example_move36.png (PNG co
+py)> <./figures//yolah_game_example_move37.png (PNG copy)> <./figures//yolah_ga
+me_example_move38.png (PNG copy)> <./figures//yolah_game_example_move39.png (PN
+G copy)>] [8 <./figures//yolah_game_example_move40.png (PNG copy)> <./figures//
+yolah_game_example_move41.png (PNG copy)> <./figures//yolah_game_example_move42
+.png (PNG copy)> <./figures//yolah_game_example_move43.png (PNG copy)> <./figur
+es//yolah_game_example_move44.png (PNG copy)> <./figures//yolah_game_example_mo
+ve45.png (PNG copy)> <./figures//yolah_game_example_move46.png (PNG copy)> <./f
+igures//yolah_game_example_move47.png (PNG copy)> <./figures//yolah_game_exampl
+e_move48.png (PNG copy)> <./figures//yolah_game_example_move49.png (PNG copy)> 
+<./figures//yolah_game_example_move50.png (PNG copy)> <./figures//yolah_game_ex
+ample_move51.png (PNG copy)> <./figures//yolah_game_example_move52.png (PNG cop
+y)> <./figures//yolah_game_example_move53.png (PNG copy)> <./figures//yolah_gam
+e_example_move54.png (PNG copy)> <./figures//yolah_game_example_move55.png (PNG
+ copy)> <./figures//yolah_game_example_move56.png (PNG copy)>]
 Chapter 2.
-[7
+[9
 
-] [8
+] [10
 
 ]
 Chapter 3.
-[9] [10
-
-]
-Chapter 4.
 [11] [12
 
 ]
-Chapter 5.
+Chapter 4.
 [13] [14
 
 ]
-Chapter 6.
+Chapter 5.
 [15] [16
 
 ]
-Chapter 7.
+Chapter 6.
 [17] [18
 
 ]
-Chapter 8.
+Chapter 7.
 [19] [20
 
 ]
-Chapter 9.
+Chapter 8.
 [21] [22
 
-] [23
+]
+Chapter 9.
+[23] [24
+
+] [25
 
 ] (./book.aux)
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
 Package rerunfilecheck Info: File `book.out' has not changed.
-(rerunfilecheck)             Checksum: 1059A9D05399315DA727F5A44271440C;2028.
+(rerunfilecheck)             Checksum: A94B0D79587BC1FED44B4BCD1460E9B9;2028.
 Package logreq Info: Writing requests to 'book.run.xml'.
 \openout1 = `book.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 44785 strings out of 478287
- 887374 string characters out of 5849289
- 1658883 words of memory out of 5000000
- 62223 multiletter control sequences out of 15000+600000
- 486727 words of font info for 77 fonts, out of 8000000 for 9000
+ 45371 strings out of 478287
+ 909246 string characters out of 5849289
+ 1687654 words of memory out of 5000000
+ 62746 multiletter control sequences out of 15000+600000
+ 487496 words of font info for 78 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  84i,11n,82p,737b,1833s stack positions out of 5000i,500n,10000p,200000b,80000s
-{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}{/usr/share/texmf
-/fonts/enc/dvips/cm-super/cm-super-t1.enc}{/usr/share/texlive/texmf-dist/fonts/
+{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc}{/usr/share/texmf/
+fonts/enc/dvips/cm-super/cm-super-ts1.enc}{/usr/share/texlive/texmf-dist/fonts/
 enc/dvips/fontawesome/fontawesometwo.enc}</usr/share/texlive/texmf-dist/fonts/t
 ype1/public/fontawesome/FontAwesome.pfb></usr/share/texmf/fonts/type1/public/cm
 -super/sfbx1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1440.pfb>
 </usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fo
 nts/type1/public/cm-super/sfbx2488.pfb></usr/share/texmf/fonts/type1/public/cm-
-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1440.pfb><
-/usr/share/texmf/fonts/type1/public/cm-super/sfrm1728.pfb></usr/share/texmf/fon
-ts/type1/public/cm-super/sfti1200.pfb></usr/share/texmf/fonts/type1/public/cm-s
-uper/sftt1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt2488.pfb></
-usr/share/texlive/texmf-dist/fonts/type1/public/wasy-type1/wasy10.pfb>
-Output written on book.pdf (33 pages, 1635153 bytes).
+super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1200.pfb><
+/usr/share/texmf/fonts/type1/public/cm-super/sfrm1440.pfb></usr/share/texmf/fon
+ts/type1/public/cm-super/sfrm1728.pfb></usr/share/texmf/fonts/type1/public/cm-s
+uper/sfti1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1200.pfb></
+usr/share/texmf/fonts/type1/public/cm-super/sftt2488.pfb></usr/share/texlive/te
+xmf-dist/fonts/type1/public/wasy-type1/wasy10.pfb>
+Output written on book.pdf (35 pages, 2459248 bytes).
 PDF statistics:
- 389 PDF objects out of 1000 (max. 8388607)
- 292 compressed objects within 3 object streams
- 59 named destinations out of 1000 (max. 500000)
- 312 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 474 PDF objects out of 1000 (max. 8388607)
+ 315 compressed objects within 4 object streams
+ 64 named destinations out of 1000 (max. 500000)
+ 597 words of extra memory for PDF output out of 10000 (max. 10000000)
 
