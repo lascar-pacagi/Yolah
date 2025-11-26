@@ -151,11 +151,16 @@ class Net(nn.Module):
         x = torch.clamp(x, min=0.0, max=1.0)
         x = self.fc3(x)
         x = torch.clamp(x, min=0.0, max=1.0)
-        return softmax(self.fc4(x), dim=1)#self.fc4(x)
+        return self.fc4(x)#softmax(self.fc4(x), dim=1)#self.fc4(x)
+    
+    def clip(self):
+        for fc in [self.fc1, self.fc2, self.fc3, self.fc4]:
+            fc.weight.data.clamp_(-127/64, 127/64)
+            fc.bias.data.clamp_(-127/64, 127/64)
 
-NB_EPOCHS=100
-MODEL_PATH="./"
-#MODEL_PATH="/mnt/"
+NB_EPOCHS=50
+#MODEL_PATH="./"
+MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
@@ -232,6 +237,7 @@ class TrainerDDP:
             self.optimizer.step()
             running_loss += loss.item()
             accuracy += sum(torch.argmax(logits, dim=1) == y).item()
+            self.model.module.clip()
         # Step the scheduler after each epoch
         self.scheduler.step()
         if self.gpu_id == 0:
@@ -302,5 +308,5 @@ if __name__ == "__main__":
     print(torch.cuda.is_available())
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    dataset = GameDataset(GAME_DIR)    
+    dataset = GameDataset(GAME_DIR)
     mp.spawn(main, args=(world_size, 512 * 2, dataset), nprocs=world_size)

@@ -103,13 +103,13 @@ namespace data {
         ifs.read(reinterpret_cast<char*>(encoding.data()), size);
         stringbuf buffer;
         ostream os(&buffer);
-        vector<Move> moves(Yolah::MAX_NB_MOVES);
+        vector<Move> moves(Yolah::MAX_NB_PLIES);
         size_t n = 0;
         uint8_t move[2];
         uint8_t pass[2] = { static_cast<uint8_t>(Move::none().from_sq()), static_cast<uint8_t>(Move::none().to_sq()) };
         while (n < size) {            
             int nb_moves, nb_random_moves, black_score, white_score;
-            data::decode_game(encoding.data() + n, moves, nb_moves, nb_random_moves, black_score, white_score);             
+            decode_game(encoding.data() + n, moves, nb_moves, nb_random_moves, black_score, white_score);             
             uint8_t header[2] = {static_cast<uint8_t>(nb_moves), static_cast<uint8_t>(nb_random_moves)};
             os.write(reinterpret_cast<const char*>(header), 2);
             for (int i = 0; i < nb_moves; i++) {

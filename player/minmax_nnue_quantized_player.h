@@ -16,14 +16,13 @@ class MinMaxNNUE_QuantizedPlayer : public Player {
     NNUE_Quantized nnue;
     BS::thread_pool pool;
     std::atomic_bool stop = false;
-    
-    static constexpr size_t NB_PLIES = 128;
+
     struct Search {
         uint8_t depth   = 0;
         int16_t value   = 0;
-        Move move       = Move::none();    
-        Move killer1[NB_PLIES]{};
-        Move killer2[NB_PLIES]{};
+        Move move       = Move::none();
+        Move killer1[Yolah::MAX_NB_PLIES]{};
+        Move killer2[Yolah::MAX_NB_PLIES]{};
         size_t nb_nodes = 0;
         size_t nb_hits  = 0;
         size_t acc_index = 0;

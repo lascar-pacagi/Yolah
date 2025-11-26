@@ -1,5 +1,4 @@
 #include "compare_nnue_and_nnue_quantized.h"
-#include "nnue_q6.h"
 #include <fstream>
 #include <string>
 #include <regex>

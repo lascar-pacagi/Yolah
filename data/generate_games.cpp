@@ -169,12 +169,11 @@ namespace data {
             std::vector<std::jthread> threads;
             std::mutex mutex;
             for (int i = 0; i < nb_threads; i++) {
-                threads.emplace_back([&, i]{                    
-                    const std::vector<json> configs{black->config(), white->config()};  
-                    constexpr int MAX_NB_PLIES = 120;                 
-                    std::vector<Move> moves(MAX_NB_PLIES);
-                    std::vector<uint8_t> games(nb_games * nb_random_moves.size() * (2 * MAX_NB_PLIES + 4));
-                    std::cout << nb_games * nb_random_moves.size() * (2 * MAX_NB_PLIES + 4) << std::endl;                             
+                threads.emplace_back([&, i]{
+                    const std::vector<json> configs{black->config(), white->config()};
+                    std::vector<Move> moves(Yolah::MAX_NB_PLIES);
+                    std::vector<uint8_t> games(nb_games * nb_random_moves.size() * (2 * Yolah::MAX_NB_PLIES + 4));
+                    std::cout << nb_games * nb_random_moves.size() * (2 * Yolah::MAX_NB_PLIES + 4) << std::endl;                             
                     uint64_t games_size = 0;
                     PRNG prng(i * 1000000000ULL + std::chrono::system_clock::now().time_since_epoch().count());
                     for (int j = 0; j < nb_games; j++) {
@@ -188,16 +187,16 @@ namespace data {
                             }
                             while (!yolah.game_over()) {
                                 Move m = (yolah.current_player() == Yolah::BLACK ? black : white)->play(yolah);
-                                if (k >= MAX_NB_PLIES) {
+                                if (k >= Yolah::MAX_NB_PLIES) {
                                     std::cout << "problem" << std::endl;
                                     break;
                                 }
                                 moves[k++] = m;
                                 yolah.play(m);
-                            }             
+                            }
                             black->game_over(yolah);
                             white->game_over(yolah);
-                            if (k >= MAX_NB_PLIES) continue;                                           
+                            if (k >= Yolah::MAX_NB_PLIES) continue;                                           
                             const auto [black_score, white_score] = yolah.score();
                             //std::cout << k << ' ' << nb_random << ' ';
                             // for (int i = 0; i < k; i++) {

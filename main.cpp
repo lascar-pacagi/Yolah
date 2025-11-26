@@ -33,6 +33,7 @@
 #include "tournament.h"
 #include <format>
 #include "logic_net_learning.h"
+#include "compare_models.h"
 
 namespace po = boost::program_options;
 using std::cout, std::endl, std::string;
@@ -89,6 +90,7 @@ int main(int argc, char* argv[]) {
     //     data::generate_symmetries(input, output);
     // }
     data::generate_symmetries2("../data/games", "../nnue/data");
+    //data::analyze_games2("../nnue/data", cout);
 /*
     LogicNetLearning::Builder builder;
     try {
@@ -108,6 +110,8 @@ int main(int argc, char* argv[]) {
         std::cout << e << '\n';
     }
 */
+    //compare_models("../nnue/nnue_quantized.txt", "../nnue/nnue_quantized2.txt", "../nnue/data", cout);
+
     //data::decode_games("../data/games/games_2025_08_31_22_09_02.335269145_0.txt", cout);
     // po::options_description general("General options");
     // general.add_options()
