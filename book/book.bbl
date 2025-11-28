@@ -40,6 +40,32 @@
       \field{title}{Claude Sonnet 4.5}
       \field{year}{2025}
     \endentry
+    \entry{cppreference}{online}{}
+      \name{author}{1}{}{%
+        {{hash=ccb2e96d41753ca525a50baa0f70c147}{%
+           family={{cppreference.com}},
+           familyi={c\bibinitperiod}}}%
+      }
+      \strng{namehash}{ccb2e96d41753ca525a50baa0f70c147}
+      \strng{fullhash}{ccb2e96d41753ca525a50baa0f70c147}
+      \strng{bibnamehash}{ccb2e96d41753ca525a50baa0f70c147}
+      \strng{authorbibnamehash}{ccb2e96d41753ca525a50baa0f70c147}
+      \strng{authornamehash}{ccb2e96d41753ca525a50baa0f70c147}
+      \strng{authorfullhash}{ccb2e96d41753ca525a50baa0f70c147}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{note}{Accessed: 2025-01-28}
+      \field{title}{C++ Reference}
+      \field{year}{2025}
+      \verb{urlraw}
+      \verb https://en.cppreference.com/
+      \endverb
+      \verb{url}
+      \verb https://en.cppreference.com/
+      \endverb
+    \endentry
   \enddatalist
 \endrefsection
 \endinput

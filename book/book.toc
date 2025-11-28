@@ -13,4 +13,4 @@
 \contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{21}{chapter.7}%
 \contentsline {chapter}{\numberline {8}AI Tournament}{23}{chapter.8}%
 \contentsline {chapter}{\numberline {9}Conclusion}{25}{chapter.9}%
-\contentsline {chapter}{Bibliography}{27}{appendix*.13}%
+\contentsline {chapter}{Bibliography}{27}{appendix*.15}%

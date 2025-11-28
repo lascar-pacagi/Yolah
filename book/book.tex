@@ -161,6 +161,7 @@
 
 \usepackage{wasysym}
 \usepackage{fontawesome}
+\usepackage{hhline}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DOCUMENT INFORMATION
@@ -400,7 +401,7 @@ The white AI estimates that it is winning starting from move 10 (see Figure~\ref
 
 % La partie est gagnée par le joueur blanc 32 à 24, ce qui est un très bon score car le jeu Yolah me semble être à l'avantage des noirs.
 
-The game is won by the white player 32 to 24, which is a very good score because the Yolah game seems to me to favor black.
+The game is won by the white player 32 to 24, which is a very good score because the Yolah game seems to favor black.
 
 \begin{figure}[htpb] %H
 \centering
@@ -886,9 +887,9 @@ The game is won by the white player 32 to 24, which is a very good score because
 % \subsection{La suite}
 \subsection{What's Next}
 
-% Dans le prochain chapitre, nous allons étudier l'implémentation du jeu Yolah, cette implémentation se veut efficace car il sera important pour les IA de pouvoir jouer beaucoup de parties à la seconde~; leur niveau de jeu va en dépendre.
+% Dans le prochain chapitre, nous allons étudier l'implémentation du jeu Yolah en C++ \cite{cppreference}, cette implémentation se veut efficace car il sera important pour les IA de pouvoir jouer beaucoup de parties à la seconde~; leur niveau de jeu va en dépendre.
 
-In the next chapter, we will study the implementation of the Yolah game. This implementation is designed to be efficient because it will be important for the AIs to be able to play many games per second; their level of play will depend on it.\\
+In the next chapter, we will study the implementation of the Yolah game in \cite{cppreference}. This implementation is designed to be efficient because it will be important for the AIs to be able to play many games per second; their level of play will depend on it.\\
 
 % Le chapitre \ref{ch:ai} décrit l'interface commune de nos différentes IA, le chapitre \ref{ch:monte_carlo} présente une IA très simple basée sur une recherche Monte-Carlo. L'IA suivante, décrite au chapitre \ref{fig:mcts}, est une évolution de la précédente et permettra, contrairement à l'IA Monte-Carlo, de développer un arbre de jeu. Notons que ces deux IA ne nécessiteront pas d'heuristiques apportées par l'humain et n'ont besoin que des règles du jeu. Le chapitre \ref{ch:minmax} présente une IA basée sur une recherche arborescente minmax avec des heuristiques fournies par l'humain. L'heuristique utilisée par l'IA est une combinaison linéaire des heuristiques fournies par l'humain~; les pondérations de chacune des heuristiques dans cette combinaison linéaire sont apprises grâce à un algorithme génétique. Notre dernière, et plus forte IA, est présentée au chapitre \ref{ch:nnue}. Un réseau de neurones est utilisé à la place des heuristiques. Ce réseau de neurones est entraîné sur un ensemble de parties jouées par l'IA précédente.
 
@@ -964,6 +965,152 @@ Happy reading!
 
 \chapter{Game Engine}
 \label{ch:engine}
+
+Nous allons implémenter la gestion du jeu en C++ en essayant de créer une implémentation efficace pour pouvoir réaliser un maximum de parties à la seconde, ce qui sera important pour avoir des IA de bons niveaux. Nous testerons notre implémentation en générant un maximum de parties aléatoires en un temps donné à la fin de ce chapitre.\\
+
+Nous allons représenter la position des noirs, des blancs et des cases détruites par des des entiers non signés sur $64$ bits~: \mintinline{c++}{uint64_t}. Nous appelerons bitboard ces entiers. Nous prenons des \mintinline{c++}{uint64_t} car le plateau de Yolah contient $64$ cases, nous avons donc un bit par case. La table \ref{tab:bitboard_indices} donne la position de chaque cases du plateau dans le bitboard.\\
+
+\begin{table}[H]
+\centering
+\caption{Positions de chaque cases du plateau dans le bitboard}
+\label{tab:bitboard_indices}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+8 & bit$_{56}$ & bit$_{57}$ & bit$_{58}$ & bit$_{59}$ & bit$_{60}$ & bit$_{61}$ & bit$_{62}$ & bit$_{63}$ \\ \hline
+7 & bit$_{48}$ & bit$_{49}$ & bit$_{50}$ & bit$_{51}$ & bit$_{52}$ & bit$_{53}$ & bit$_{54}$ & bit$_{55}$ \\ \hline
+6 & bit$_{40}$ & bit$_{41}$ & bit$_{42}$ & bit$_{43}$ & bit$_{44}$ & bit$_{45}$ & bit$_{46}$ & bit$_{47}$ \\ \hline
+5 & bit$_{32}$ & bit$_{33}$ & bit$_{34}$ & bit$_{35}$ & bit$_{36}$ & bit$_{37}$ & bit$_{38}$ & bit$_{39}$ \\ \hline
+4 & bit$_{24}$ & bit$_{25}$ & bit$_{26}$ & bit$_{27}$ & bit$_{28}$ & bit$_{29}$ & bit$_{30}$ & bit$_{31}$ \\ \hline
+3 & bit$_{16}$ & bit$_{17}$ & bit$_{18}$ & bit$_{19}$ & bit$_{20}$ & bit$_{21}$ & bit$_{22}$ & bit$_{23}$ \\ \hline
+2 & bit$_{8}$ & bit$_{9}$ & bit$_{10}$ & bit$_{11}$ & bit$_{12}$ & bit$_{13}$ & bit$_{14}$ & bit$_{15}$ \\ \hline
+1 & bit$_{0}$ & bit$_{1}$ & bit$_{2}$ & bit$_{3}$ & bit$_{4}$ & bit$_{5}$ & bit$_{6}$ & bit$_{7}$ \\ \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+% \begin{table}[H]
+% \centering
+% \caption{Yolah board (showing: black)}
+% \label{tab:yolah_black}
+% \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+% \hline
+% 8 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ \\ \hline
+% 7 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+% 6 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+% 5 & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+% 4 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+% 3 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+% 2 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+% 1 & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+% \multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+% \cline{2-9}
+% \end{tabular}
+% \end{table}
+
+% \noindent
+% Bitboard binary representations:
+% \begin{itemize}
+% \item Black: \texttt{1000000000000000000000000000100000010000000000000000000000000001}
+% \item White: \texttt{0000000100000000000000000001000000001000000000000000000010000000}
+% \item Empty: \texttt{0000000000000000000000000000000000000000000000000000000000000000}
+% \end{itemize}
+
+\begin{figure}[htpb]
+\centering
+\includegraphics[width=0.5\textwidth]{yolah_game_example_move21.png}
+\caption{Configuration du plateau de jeu correspondant au coup 21 de la partie donnée en example dans le chapitre précédent (figure \ref{fig:game_example_move21})}
+\label{fig:yolah_game_engine1}
+\end{figure}
+
+
+Prenons comme exemple le plateau représentée dans la figure \ref{fig:yolah_game_engine1}. Les positions des pièces noires sur le plateau~:\\
+
+
+seront représentées par le bitboard suivant~:\\
+
+
+
+% \begin{listing}[H]
+% \begin{minted}[linenos, bgcolor=codebg]{c++}
+% class Yolah {
+%     uint64_t black = BLACK_INITIAL_POSITION;
+%     uint64_t white = WHITE_INITIAL_POSITION;
+%     uint64_t empty = 0;
+%     uint16_t black_score = 0;
+%     uint16_t white_score = 0;
+%     uint16_t ply = 0;
+
+% public:
+%     static constexpr uint16_t MAX_NB_MOVES = 75;
+%     static constexpr int MAX_NB_PLIES = 120;
+%     class MoveList {
+%       Move moveList[MAX_NB_MOVES], *last;
+%     public:
+%       explicit MoveList() : last(moveList) {}
+%       const Move* begin() const { return moveList; }
+%       const Move* end() const { return last; }
+%       Move* begin() { return moveList; }
+%       Move* end() { return last; }
+%       size_t size() const { return last - moveList; }
+%       const Move& operator[](size_t i) const { return moveList[i]; }
+%       Move& operator[](size_t i) { return moveList[i]; }
+%       Move* data() { return moveList; }
+%       friend class Yolah;
+%     };
+%     static constexpr uint8_t BLACK = 0;
+%     static constexpr uint8_t WHITE = 1;
+%     static constexpr uint8_t EMPTY = 2;
+%     static constexpr uint8_t FREE  = 3;
+%     constexpr std::pair<uint16_t, uint16_t> score() const {
+%       return { black_score, white_score };
+%     }
+%     constexpr int16_t score(uint8_t player) const {
+%       return (black_score - white_score) * ((player == WHITE) * -1 + (player == BLACK)); 
+%     }
+%     constexpr uint8_t current_player() const {
+%       return uint8_t(ply & 1);
+%     }
+%     static constexpr uint8_t other_player(uint8_t player) {
+%       return 1 - player;
+%     }
+%     uint8_t get(Square) const;
+%     uint8_t get(File f, Rank r) const;
+%     bool game_over() const;
+%     void play(Move m);
+%     void undo(Move m);
+%     void moves(uint8_t player, MoveList& moves) const;
+%     void moves(MoveList& moves) const;
+%     void moves(uint64_t bb, MoveList& moves) const;
+%     bool valid(Move m) const;
+%     constexpr uint64_t free_squares() const {
+%       return FULL & ~occupied_squares();
+%     }
+%     constexpr uint64_t occupied_squares() const {
+%       return black | white | empty;
+%     }
+%     constexpr uint64_t bitboard(uint8_t player) const {
+%       return player == BLACK ? black : white;
+%     }
+%     constexpr uint16_t nb_plies() const {
+%       return ply;
+%     }
+%     constexpr uint64_t empty_bitboard() const {
+%       return empty;
+%     }
+%     constexpr bool contact(Move m) const {
+%       return around(square_bb(m.to_sq())) & (black | white) & ~square_bb(m.from_sq());
+%     }
+%     std::string to_json() const;
+%     static Yolah from_json(std::istream& is);
+%     static Yolah from_json(const std::string&);
+%     friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
+% };
+% \end{minted}
+% \caption{to do}
+% \label{code:board}
+% \end{listing}
+
 
 % \section{Core Data Structures}
 
