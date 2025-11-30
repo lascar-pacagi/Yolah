@@ -158,6 +158,45 @@ def print_board_utf8(yolah, show='all'):
     print(f"\nLegend: {CHAR_BLACK} = Black  {CHAR_WHITE} = White  {CHAR_EMPTY} = Empty  {CHAR_VACANT} = Vacant")
 
 
+def print_single_bitboard_latex(bitboard, name=""):
+    """
+    Generate LaTeX code showing a single bitboard as a grid with 1s and 0s.
+
+    Args:
+        bitboard: 64-bit integer representing the bitboard
+        name: Name of the bitboard (e.g., "Noir", "Blanc")
+    """
+    print("\\begin{table}[H]")
+    print("\\centering")
+    print("\\begin{tabular}{|c|c|c|c|c|c|c|c|c|}")
+    print("\\hline")
+
+    # Print board from rank 8 to rank 1 (top to bottom)
+    for i in range(7, -1, -1):
+        # Print rank label
+        print(f"{RANKS[i]}", end='')
+
+        for j in range(8):
+            # Calculate bit index for this square
+            bit_index = square_to_index(i, j)
+            # Get bit value (1 or 0)
+            bit_value = (bitboard >> bit_index) & 1
+            print(f" & {bit_value}", end='')
+
+        print(" \\\\ \\hline")
+
+    # Print file labels with vertical line on left cell
+    print("\\multicolumn{1}{c|}{} & " + " & ".join(FILES) + " \\\\")
+    print("\\cline{2-9}")
+    print("\\end{tabular}")
+    print("\\end{table}")
+
+    # Print binary representation
+    print()
+    print("\\noindent")
+    print(f"Représentation binaire: \\texttt{{{bitboard:064b}}}")
+
+
 def print_bitboard_indices_latex(caption='', label=''):
     """
     Generate LaTeX code showing bitboard bit indices for each square.
@@ -200,7 +239,7 @@ def print_board_latex(yolah, show='all', caption='', label=''):
 
     Args:
         yolah: Yolah game instance
-        show: What to display - 'all', 'black', 'white', 'empty', or 'vacant'
+        show: What to display - 'all', 'black', 'white', 'empty', 'vacant', or comma-separated list like 'black,white'
         caption: Optional caption for the table
         label: Optional label for referencing
     """
@@ -215,6 +254,9 @@ def print_board_latex(yolah, show='all', caption='', label=''):
     print("\\begin{tabular}{|c|c|c|c|c|c|c|c|c|}")
     print("\\hline")
 
+    # Parse show parameter - can be comma-separated list
+    show_list = [s.strip() for s in show.split(',')]
+
     # Print board from rank 8 to rank 1 (top to bottom)
     for i in range(Yolah.DIM - 1, -1, -1):
         # Print rank label
@@ -224,7 +266,8 @@ def print_board_latex(yolah, show='all', caption='', label=''):
             cell = grid[i][j]
 
             # Determine what character to display based on filter
-            char = ' '
+            char = '$\\cdot$'  # Default to vacant
+
             if show == 'all':
                 if cell == Cell.BLACK:
                     char = '$\\bullet$'
@@ -234,26 +277,32 @@ def print_board_latex(yolah, show='all', caption='', label=''):
                     char = '$\\times$'
                 else:  # Vacant
                     char = '$\\cdot$'
-            elif show == 'black':
-                if cell == Cell.BLACK:
+            elif len(show_list) > 1:
+                # Multiple filters specified
+                if 'black' in show_list and cell == Cell.BLACK:
                     char = '$\\bullet$'
-                else:
-                    char = '$\\cdot$'
-            elif show == 'white':
-                if cell == Cell.WHITE:
+                elif 'white' in show_list and cell == Cell.WHITE:
                     char = '$\\circ$'
-                else:
-                    char = '$\\cdot$'
-            elif show == 'empty':
-                if cell == Cell.EMPTY:
+                elif 'empty' in show_list and cell == Cell.EMPTY:
                     char = '$\\times$'
-                else:
+                elif 'vacant' in show_list and cell == Cell.NONE:
                     char = '$\\cdot$'
-            elif show == 'vacant':
-                if cell == Cell.NONE:
-                    char = '$\\cdot$'
-                else:
-                    char = ' '
+            else:
+                # Single filter
+                if show == 'black':
+                    if cell == Cell.BLACK:
+                        char = '$\\bullet$'
+                elif show == 'white':
+                    if cell == Cell.WHITE:
+                        char = '$\\circ$'
+                elif show == 'empty':
+                    if cell == Cell.EMPTY:
+                        char = '$\\times$'
+                elif show == 'vacant':
+                    if cell == Cell.NONE:
+                        char = '$\\cdot$'
+                    else:
+                        char = ' '
 
             print(f" & {char}", end='')
 
@@ -266,15 +315,35 @@ def print_board_latex(yolah, show='all', caption='', label=''):
     print("\\end{tabular}")
     print("\\end{table}")
 
-    # Print bitboard binary representations
+    # Print bitboard representations
     print()
     print("\\noindent")
-    print("Bitboard binary representations:")
+    print("Représentations binaires des bitboards:")
     print("\\begin{itemize}")
     print(f"\\item Black: \\texttt{{{yolah.black:064b}}}")
     print(f"\\item White: \\texttt{{{yolah.white:064b}}}")
     print(f"\\item Empty: \\texttt{{{yolah.empty:064b}}}")
     print("\\end{itemize}")
+
+    # Print individual bitboards for black and white
+    print()
+    print("\\noindent")
+    print("Bitboard des pièces noires:")
+    print()
+    print_single_bitboard_latex(yolah.black, "Noir")
+
+    print()
+    print("\\noindent")
+    print("Bitboard des pièces blanches:")
+    print()
+    print_single_bitboard_latex(yolah.white, "Blanc")
+
+    # Print combined bitboard (black | white)
+    print()
+    print("\\noindent")
+    print("Bitboard des pièces (noir | blanc):")
+    print()
+    print_single_bitboard_latex(yolah.black | yolah.white, "Noir | Blanc")
 
 
 def print_bitboard_latex(yolah, show='all', caption='', label=''):
@@ -631,8 +700,7 @@ Examples:
     parser.add_argument('--moves', type=str, default=None,
                        help='Space-separated moves in format "a1:b1 b1:b5 ..."')
     parser.add_argument('--show', type=str, default='all',
-                       choices=['all', 'black', 'white', 'empty', 'vacant'],
-                       help='What to display: all, black, white, empty, or vacant (default: all)')
+                       help='What to display: all, black, white, empty, vacant, or comma-separated (e.g., black,white) (default: all)')
     parser.add_argument('--array', action='store_true',
                        help='Show detailed array representation with indices and square names')
     parser.add_argument('--compact', action='store_true',

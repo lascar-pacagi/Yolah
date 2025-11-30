@@ -1,0 +1,16 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{BLACK\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{+w}{ }\PYG{o}{=}
+\PYG{l+m+mb}{0b10000000\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}00001000\PYGZsq{}00010000\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}00000001}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{WHITE\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{+w}{ }\PYG{o}{=}
+\PYG{l+m+mb}{0b00000001\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}00010000\PYGZsq{}00001000\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}10000000}\PYG{p}{;}
+\PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{Yolah}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{BLACK\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{WHITE\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{k}{public}\PYG{o}{:}
+\PYG{+w}{    }\PYG{c+c1}{// ...}
+\PYG{p}{\PYGZcb{};}
+\end{Verbatim}

@@ -1,0 +1,26 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{File}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{FILE\PYGZus{}A}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}B}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}C}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}D}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}E}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}F}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}G}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}H}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{FILE\PYGZus{}NB}
+\PYG{p}{\PYGZcb{};}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Rank}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{RANK\PYGZus{}1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}8}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{RANK\PYGZus{}NB}
+\PYG{p}{\PYGZcb{};}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mh}{0x0101010101010101}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileBBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileCBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileDBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{3}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileEBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{4}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileFBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{5}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileGBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileHBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mh}{0xFF}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank2BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank3BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank4BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{3}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank5BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{4}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank6BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{5}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank7BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank8BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{);}
+\end{Verbatim}
