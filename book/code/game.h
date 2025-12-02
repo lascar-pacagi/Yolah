@@ -34,7 +34,7 @@ public:
     };
     static constexpr uint8_t BLACK = 0;
     static constexpr uint8_t WHITE = 1;
-    static constexpr uint8_t EMPTY = 2;
+    static constexpr uint8_t HOLE  = 2;
     static constexpr uint8_t FREE  = 3;
     constexpr std::pair<uint16_t, uint16_t> score() const;
     constexpr int16_t score(uint8_t player) const;

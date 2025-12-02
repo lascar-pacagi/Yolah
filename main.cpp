@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
     if (vm.count("version")) {
-        cout << "Yolah 0.1 by Pascal Garcia\n";
+        cout << "Yolah 1.0 by Pascal Garcia\n";
         return EXIT_SUCCESS;
     }
     if (vm.count("player")) {

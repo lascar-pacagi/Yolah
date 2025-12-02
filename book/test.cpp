@@ -9,11 +9,11 @@ constexpr uint64_t WHITE_INITIAL_POSITION =
 
 class Yolah {    
     uint64_t black = BLACK_INITIAL_POSITION;
-    uint16_t black_score = 0;    
     uint64_t white = WHITE_INITIAL_POSITION;
-    uint16_t white_score = 0;
     uint64_t holes = 0;
-    uint16_t ply = 0;    
+    uint8_t black_score = 0;    
+    uint8_t white_score = 0;    
+    uint8_t ply = 0;
 public:
 };
 

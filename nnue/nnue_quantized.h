@@ -34,6 +34,10 @@ struct NNUE_Quantized {
             free(acc);
         }
     };
+    NNUE_Quantized() = default;
+    NNUE_Quantized(const std::string& nnue_parameters_filename) {
+        load(nnue_parameters_filename);
+    }
     void load(const std::string& filename);
     Accumulator make_accumulator() const;
     void init(const Yolah& yolah, Accumulator& a);

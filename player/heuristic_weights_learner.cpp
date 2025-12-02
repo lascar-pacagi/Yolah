@@ -58,7 +58,7 @@ namespace heuristic {
                 return yolah.score(Yolah::BLACK);
             };
             double res = 0;                                        
-            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(300000, 1);
+            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer<>>(300000, 1);
             auto update = [&](uint64_t seed, size_t nb_random) {
                 constexpr double W1 = 1e5;
                 constexpr double W2 = 1;
@@ -114,7 +114,7 @@ namespace heuristic {
             };
             double res = 0;        
             auto me = factory(w);
-            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer>(1000000, 1);
+            std::unique_ptr<Player> opponent = std::make_unique<MCTSMemPlayer<>>(1000000, 1);
             auto update = [&](const auto& me, const auto& opponent) {
                 constexpr double W1 = 1e5;
                 constexpr double W2 = 1;

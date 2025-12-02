@@ -10,6 +10,7 @@
 #include "monte_carlo_player.h"
 #include "minmax_nnue_player.h"
 #include "minmax_nnue_quantized_player.h"
+#include "MCTS_mem_nn_player.h"
 #ifdef ENABLE_CUDA
 #include "alphazero_player.h"
 #endif
@@ -54,7 +55,7 @@ unique_ptr<Player> Player::create(const json& j) {
                 if (!j["microseconds"].is_number()) {
                     throw invalid_argument("number expected for microseconds");
                 }
-                return make_unique<MCTSMemPlayer>(j["microseconds"].get<uint64_t>(), nb_threads);
+                return make_unique<MCTSMemPlayer<>>(j["microseconds"].get<uint64_t>(), nb_threads);
             }
         },
         {
@@ -77,7 +78,33 @@ unique_ptr<Player> Player::create(const json& j) {
                 if (!j["microseconds"].is_number()) {
                     throw invalid_argument("number expected for microseconds");
                 }
-                return make_unique<MCTSPlayer>(j["microseconds"].get<uint64_t>(), nb_threads);
+                return make_unique<MCTSPlayer<>>(j["microseconds"].get<uint64_t>(), nb_threads);
+            }
+        },
+        {
+            "MCTSMemNNPlayer",
+            [](const json& j) {
+                if (!j.contains("nb threads")) {
+                    throw invalid_argument("nb threads key expected");
+                }
+                if (!j.contains("microseconds")) {
+                    throw invalid_argument("microseconds key expected");
+                }
+                if (!j.contains("weights")) {
+                    throw invalid_argument("weights key expected");
+                }
+                size_t nb_threads;
+                if (j["nb threads"].is_number()) {
+                    nb_threads = j["nb threads"].get<size_t>();
+                } else if (j["nb threads"].get<string>() == "hardware concurrency") {
+                    nb_threads = std::thread::hardware_concurrency();
+                } else {
+                    throw invalid_argument("hardware concurrency expected in nb threads");
+                }
+                if (!j["microseconds"].is_number()) {
+                    throw invalid_argument("number expected for microseconds");
+                }
+                return make_unique<MCTSMemNNPlayer>(j["microseconds"].get<uint64_t>(), j["weights"], nb_threads);
             }
         },
         {

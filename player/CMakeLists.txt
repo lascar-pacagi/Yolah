@@ -1,6 +1,6 @@
 set(PLAYER_SOURCES
     random_player.cpp monte_carlo_player.cpp client_player.cpp
-    MCTS_player.cpp MCTS_mem_player.cpp human_player.cpp
+    MCTS_mem_nn_player.cpp human_player.cpp
     heuristic.cpp basic_minmax_player.cpp transposition_table.cpp
     heuristic_weights_learner.cpp player.cpp
     minmax_player.cpp minmax_player2.cpp minmax_nnue_player.cpp minmax_nnue_quantized_player.cpp
