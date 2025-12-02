@@ -240,8 +240,9 @@ class TransformerNet(nn.Module):
 
 
 NB_EPOCHS=50
+#MODEL_PATH="./"
 MODEL_PATH="/mnt/"
-MODEL_NAME="transformer_d256_h8_l8"
+MODEL_NAME="transformer_d512_h8_l8"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
 
@@ -364,7 +365,7 @@ def main(rank, world_size, batch_size, dataset):
         d_model=512,            # embedding dimension
         nhead=8,                # attention heads
         num_layers=8,           # transformer layers
-        dim_feedforward=1024,    # FFN dimension
+        dim_feedforward=1024,   # FFN dimension
         dropout=0.1
     )
 
