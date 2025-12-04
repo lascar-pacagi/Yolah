@@ -1,0 +1,5 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{board}\PYG{p}{)}
+\end{Verbatim}

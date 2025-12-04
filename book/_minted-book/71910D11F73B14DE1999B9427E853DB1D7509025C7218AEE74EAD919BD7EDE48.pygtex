@@ -3,7 +3,7 @@
 \PYG{c+cp}{\PYGZsh{}define TYPES\PYGZus{}H }
 \PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}cstdint\PYGZgt{}}
 \PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}bit\PYGZgt{}}
-\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Square}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Square}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H1}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H2}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H3}\PYG{p}{,}
@@ -16,7 +16,7 @@
 \PYG{+w}{    }\PYG{n}{SQUARE\PYGZus{}ZERO}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{SQUARE\PYGZus{}NB}\PYG{+w}{   }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{64}
 \PYG{p}{\PYGZcb{};}
-\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Direction}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Direction}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{NORTH}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{EAST}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{SOUTH}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{NORTH}\PYG{p}{,}
@@ -26,11 +26,11 @@
 \PYG{+w}{    }\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{WEST}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{NORTH\PYGZus{}WEST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{NORTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{WEST}
 \PYG{p}{\PYGZcb{};}
-\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{File}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{File}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{FILE\PYGZus{}A}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}B}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}C}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}D}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}E}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}F}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}G}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}H}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{FILE\PYGZus{}NB}
 \PYG{p}{\PYGZcb{};}
-\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Rank}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Rank}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{RANK\PYGZus{}1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}8}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{RANK\PYGZus{}NB}
 \PYG{p}{\PYGZcb{};}

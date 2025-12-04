@@ -13,12 +13,12 @@
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{BLACK\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{WHITE\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{empty}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{k}{public}\PYG{o}{:}
-\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{MAX\PYGZus{}NB\PYGZus{}MOVES}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{75}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{MAX\PYGZus{}NB\PYGZus{}PLIES}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{120}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{MAX\PYGZus{}NB\PYGZus{}MOVES}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{75}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{MAX\PYGZus{}NB\PYGZus{}PLIES}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{120}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{MoveList}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{      }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{moveList}\PYG{p}{[}\PYG{n}{MAX\PYGZus{}NB\PYGZus{}MOVES}\PYG{p}{],}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{last}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{public}\PYG{o}{:}
@@ -35,10 +35,10 @@
 \PYG{+w}{    }\PYG{p}{\PYGZcb{};}
 \PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{WHITE}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{EMPTY}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{HOLE}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FREE}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{3}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{pair}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint16\PYGZus{}t}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{score}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{int16\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{score}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{pair}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{score}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{int8\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{score}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{current\PYGZus{}player}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{other\PYGZus{}player}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{);}
 \PYG{+w}{    }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{get}\PYG{p}{(}\PYG{n}{Square}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{p}{;}
@@ -62,23 +62,18 @@
 \PYG{n}{std}\PYG{o}{::}\PYG{n}{ostream}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{p}{(}\PYG{n}{std}\PYG{o}{::}\PYG{n}{ostream}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{os}\PYG{p}{,}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{);}
 \PYG{k+kt}{bool}\PYG{+w}{ }\PYG{n+nf}{Yolah::game\PYGZus{}over}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{possible}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{empty}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{black}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{white}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k}{return}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}
-\PYG{+w}{        }\PYG{p}{(}\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{     }
+\PYG{+w}{    }
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{around\PYGZus{}black}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{        }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{        }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{black}\PYG{p}{);}
+\PYG{+w}{     }
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{around\PYGZus{}white}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{        }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{        }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{white}\PYG{p}{);}
+
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{around\PYGZus{}players}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{around\PYGZus{}black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{around\PYGZus{}white}\PYG{p}{;}
+
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{around\PYGZus{}players}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{    }
 \PYG{p}{\PYGZcb{}}
 \PYG{c+cp}{\PYGZsh{}endif}
 \end{Verbatim}

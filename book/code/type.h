@@ -2,7 +2,7 @@
 #define TYPES_H 
 #include <cstdint>
 #include <bit>
-enum Square : int {
+enum Square : int8_t {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
     SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2,
     SQ_A3, SQ_B3, SQ_C3, SQ_D3, SQ_E3, SQ_F3, SQ_G3, SQ_H3,
@@ -15,7 +15,7 @@ enum Square : int {
     SQUARE_ZERO = 0,
     SQUARE_NB   = 64
 };
-enum Direction : int {
+enum Direction : int8_t {
     NORTH = 8,
     EAST  = 1,
     SOUTH = -NORTH,
@@ -25,11 +25,11 @@ enum Direction : int {
     SOUTH_WEST = SOUTH + WEST,
     NORTH_WEST = NORTH + WEST
 };
-enum File : int {
+enum File : uint8_t {
     FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H,
     FILE_NB
 };
-enum Rank : int {
+enum Rank : uint8_t {
     RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8,
     RANK_NB
 };

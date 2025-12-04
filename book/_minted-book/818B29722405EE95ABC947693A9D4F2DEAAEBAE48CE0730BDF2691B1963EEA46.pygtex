@@ -1,5 +1,5 @@
 \begin{Verbatim}[commandchars=\\\{\}]
-\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Direction}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Direction}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{NORTH}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{EAST}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{SOUTH}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{NORTH}\PYG{p}{,}

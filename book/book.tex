@@ -976,7 +976,7 @@ Nous allons implémenter la gestion du jeu en C++ en essayant de créer une impl
 
 \section{Structure de données}
 
-Nous allons représenter la position des noirs, des blancs et des cases détruites par des des entiers non signés sur $64$ bits~: \mintinline{c++}{uint64_t}. Nous appelerons bitboard ces entiers. Nous prenons des \mintinline{c++}{uint64_t} car le plateau de Yolah contient $64$ cases, nous avons donc un bit par case. La table \ref{tab:bitboard_indices} donne la position de chaque cases du plateau dans le bitboard.\\
+Nous allons représenter la position des noirs, des blancs et des cases détruites par des des entiers non signés sur $64$ bits~: \mintinline{c++}{uint64_t}. Nous appelerons bitboard ces entiers. Nous prenons des \mintinline{c++}{uint64_t} car le plateau de Yolah contient $64$ cases, nous avons donc un bit par case. La table \ref{tab:bitboard_indices} donne la position de chaque cases du plateau dans le bitboard. Cette information est représentée dans le code par l'énumération du listing \ref{lst:squares} \footnote{Par défaut, l'énumeration commence à la valeur 0, donc \mintinline{c++}{SQ_A1} vaut 0, \mintinline{c++}{SQ_A1} vaut 1, \ldots}.\\
 
 \begin{table}[htpb]
 \centering
@@ -996,6 +996,26 @@ Nous allons représenter la position des noirs, des blancs et des cases détruit
 \cline{2-9}
 \end{tabular}
 \end{table}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+enum Square : int8_t {
+    SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
+    SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2,
+    SQ_A3, SQ_B3, SQ_C3, SQ_D3, SQ_E3, SQ_F3, SQ_G3, SQ_H3,
+    SQ_A4, SQ_B4, SQ_C4, SQ_D4, SQ_E4, SQ_F4, SQ_G4, SQ_H4,
+    SQ_A5, SQ_B5, SQ_C5, SQ_D5, SQ_E5, SQ_F5, SQ_G5, SQ_H5,
+    SQ_A6, SQ_B6, SQ_C6, SQ_D6, SQ_E6, SQ_F6, SQ_G6, SQ_H6,
+    SQ_A7, SQ_B7, SQ_C7, SQ_D7, SQ_E7, SQ_F7, SQ_G7, SQ_H7,
+    SQ_A8, SQ_B8, SQ_C8, SQ_D8, SQ_E8, SQ_F8, SQ_G8, SQ_H8,
+    SQ_NONE,
+    SQUARE_ZERO = 0,
+    SQUARE_NB   = 64
+};
+\end{minted}
+\captionof{listing}{Les cases du plateau de jeu}
+\label{lst:squares}
+\end{mdframed}
 
 
 \begin{figure}[htpb]
@@ -1077,12 +1097,11 @@ Prenons comme exemple le plateau représenté dans la figure \ref{fig:yolah_game
 \end{itemize}
 
 
-Les bitboards vont nous permettre une manipulation efficace du plateau, en utilisant des opérations bits à bits, et peu de place mémoire pour représenter celui-ci.\\
+Les bitboards vont nous permettre une manipulation efficace du plateau, en utilisant des opérations bits à bits, et nécessiterons peu de place mémoire pour représenter celui-ci.\\
 
 Nous représentons le plateau de jeu par la classe \mintinline{c++}{Yolah} dont un extrait est donné dans le listing \ref{lst:yolah_class_attributes}.
 
-\begin{mdframed}[frametitle={Listing~: Les attributs de la classe Yolah représentant le plateau de jeu},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:yolah_class_attributes}
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
 constexpr uint64_t BLACK_INITIAL_POSITION =
 0b10000000'00000000'00000000'00001000'00010000'00000000'00000000'00000001;
@@ -1092,13 +1111,15 @@ class Yolah {
     uint64_t black = BLACK_INITIAL_POSITION;
     uint64_t white = WHITE_INITIAL_POSITION;
     uint64_t holes = 0;
-    uint16_t black_score = 0;
-    uint16_t white_score = 0;
-    uint16_t ply = 0;
+    uint8_t black_score = 0;
+    uint8_t white_score = 0;
+    uint8_t ply = 0;
 public:
     // ...
 };
 \end{minted}
+\captionof{listing}{Les attributs de la classe Yolah représentant le plateau de jeu}
+\label{lst:yolah_class_attributes}
 \end{mdframed}
 
 Les attributs de la classe \mintinline{c++}{Yolah} sont~:\\
@@ -1116,11 +1137,11 @@ Un objet de type \mintinline{c++}{Yolah} prendra en mémoire \mintinline{c++}{sy
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
 class Yolah {
     uint64_t black = BLACK_INITIAL_POSITION;
-    uint16_t black_score = 0;    
+    uint8_t black_score = 0;    
     uint64_t white = WHITE_INITIAL_POSITION;
-    uint16_t white_score = 0;
+    uint8_t white_score = 0;
     uint64_t holes = 0;
-    uint16_t ply = 0;
+    uint8_t ply = 0;
 public:
     // ...
 };
@@ -1159,10 +1180,29 @@ Nous allons continuer d'utiliser des opérations bits-à-bits dans la suite de c
 
 \section{Test de fin de partie}
 
-\begin{mdframed}[frametitle={Listing~: Directions},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:directions}
+Pour tester la fin de partie nous allons avoir besoin de quelques énumerations et constantes (listings \ref{lst:directions} et \ref{lst:files_and_ranks}) et de la function \mintinline{c++}{shift} (listing \ref{lst:shift}). La constante \mintinline{c++}{NORTH} de l'énumeration \mintinline{c++}{Direction} (listing \ref{lst:directions}) est égale à $8$. Pourquoi avoir choisi cette valeur~? Reprenons ci-dessous, voir la table \ref{tab:bitboard_indices2}, la table vu au chapitre précédent représentant la position de chaque bit d'un bitboard dans le plateau. On peut voir que si l'on ajoute $8$ au numéro de bit contenu dans une des cases, on obtient le numéro de bit de la case au nord ce cette dernière (sauf si l'on sort du plateau de jeu). Il en va de même pour les autres valeurs des constantes de l'énumération \mintinline{c++}{Direction} (listing \ref{lst:directions}). 
+\begin{table}[htpb]
+\centering
+\caption{Positions de chaque cases du plateau dans le bitboard. Remarquons que pour une case qui ne se trouve pas dans la rangée 8, bit$_{i+8}$ est le bit correspondant à la case au nord de la case du bit$_i$}
+\label{tab:bitboard_indices2}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+8 & bit$_{56}$ & bit$_{57}$ & bit$_{58}$ & bit$_{59}$ & bit$_{60}$ & bit$_{61}$ & bit$_{62}$ & bit$_{63}$ \\ \hline
+7 & bit$_{48}$ & bit$_{49}$ & bit$_{50}$ & bit$_{51}$ & bit$_{52}$ & bit$_{53}$ & bit$_{54}$ & bit$_{55}$ \\ \hline
+6 & bit$_{40}$ & bit$_{41}$ & bit$_{42}$ & bit$_{43}$ & bit$_{44}$ & bit$_{45}$ & bit$_{46}$ & bit$_{47}$ \\ \hline
+5 & bit$_{32}$ & bit$_{33}$ & bit$_{34}$ & bit$_{35}$ & bit$_{36}$ & bit$_{37}$ & bit$_{38}$ & bit$_{39}$ \\ \hline
+4 & bit$_{24}$ & bit$_{25}$ & bit$_{26}$ & bit$_{27}$ & bit$_{28}$ & bit$_{29}$ & bit$_{30}$ & bit$_{31}$ \\ \hline
+3 & bit$_{16}$ & bit$_{17}$ & bit$_{18}$ & bit$_{19}$ & bit$_{20}$ & bit$_{21}$ & bit$_{22}$ & bit$_{23}$ \\ \hline
+2 & bit$_{8}$ & bit$_{9}$ & bit$_{10}$ & bit$_{11}$ & bit$_{12}$ & bit$_{13}$ & bit$_{14}$ & bit$_{15}$ \\ \hline
+1 & bit$_{0}$ & bit$_{1}$ & bit$_{2}$ & bit$_{3}$ & bit$_{4}$ & bit$_{5}$ & bit$_{6}$ & bit$_{7}$ \\ \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
-enum Direction : int {
+enum Direction : int8_t {
     NORTH = 8,
     EAST  = 1,
     SOUTH = -NORTH,
@@ -1173,104 +1213,232 @@ enum Direction : int {
     NORTH_WEST = NORTH + WEST
 };
 \end{minted}
+\captionof{listing}{Directions}
+\label{lst:directions}
 \end{mdframed}
 
-\begin{mdframed}[frametitle={Listing~: Colonnes et rangées},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:files_and_ranks}
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
-enum File : int {
+template<Direction D>
+constexpr uint64_t shift(uint64_t b) {
+    if constexpr (D == NORTH)
+        return b << NORTH;
+    else if constexpr (D == SOUTH)      
+        return b >> -SOUTH;
+    else if constexpr (D == EAST)       
+        return (b & ~FileHBB) << EAST;
+    else if constexpr (D == WEST)       
+        return (b & ~FileABB) >> -WEST;
+    else if constexpr (D == NORTH_EAST) 
+        return (b & ~FileHBB) << NORTH_EAST;
+    else if constexpr (D == NORTH_WEST) 
+        return (b & ~FileABB) << NORTH_WEST;
+    else if constexpr (D == SOUTH_EAST) 
+        return (b & ~FileHBB) >> -SOUTH_EAST;
+    else if constexpr (D == SOUTH_WEST) 
+        return (b & ~FileABB) >> -SOUTH_WEST;
+    else return 0;
+}
+\end{minted}
+\captionof{listing}{Décalage selon une direction}
+\label{lst:shift}
+\end{mdframed}
+
+
+La fonction \mintinline{c++}{shift(uint64_t b)} donnée dans le listing \ref{lst:shift} nous permet de décaler tous les bits à 1 du bitboard en paramètre dans la direction \mintinline{c++}{D}. Soit,
+\begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
+black == 1000000000000000000000000000100000100000000000000000000000000001
+\end{minted}
+le bitboard représenté dans la table \ref{tab:shift_north_before}. Pour décaler les pièces noires d'une case vers le nord, on effectue~: \mintinline{c++}{shift<NORTH>(black)}. On obtient alors le bitboard
+  \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
+1000000000000000000000000000100000100000000000000000000000000001
+\end{minted}
+représenté dans la table \ref{tab:shift_north_after}. Notons que la pièce en {\ttfamily h8} n'est plus sur le plateau.\\
+
+\begin{table}[H]
+\centering
+\begin{minipage}{0.45\textwidth}
+\centering
+\caption{Plateau de jeu avant d'effectuer \mintinline{c++}{shift<NORTH>}}
+\label{tab:shift_north_before}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+8 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ \\ \hline
+7 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+6 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+4 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ \\ \hline
+3 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+2 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+1 & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+\centering
+\caption{Plateau de jeu après avoir effectuer \mintinline{c++}{shift<NORTH>}}
+\label{tab:shift_north_after}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+8 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+7 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+6 & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ \\ \hline
+4 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+3 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+2 & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+1 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{minipage}
+\end{table}
+
+On peut ainsi facilement obtenir toutes les cases directement au contact des pièces d'un plateau donné \mintinline{c++}{board}, en effectuant l'opération suivante~:\\ 
+
+\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+shift<NORTH>(board) | shift<SOUTH>(board) | shift<EAST>(board) | 
+shift<WEST>(board) | shift<NORTH_EAST>(board) | shift<NORTH_WEST>(board) |
+shift<SOUTH_EAST>(board) | shift<SOUTH_WEST>(board)
+\end{minted}
+
+Pour le plateau de la table \ref{tab:before_all_shift} on obtient les positions représentées par des étoiles dans la table \ref{tab:after_all_shift}.\\
+
+\begin{table}[H]
+\centering
+\begin{minipage}{0.45\textwidth}
+\centering
+\caption{Plateau de jeu}
+\label{tab:before_all_shift}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+8 & $\circ$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ \\ \hline
+7 & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+6 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\circ$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+4 & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\times$ & $\bullet$ & $\cdot$ & $\cdot$ \\ \hline
+3 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+2 & $\cdot$ & $\cdot$ & $\cdot$ & $\circ$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+1 & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\circ$ \\ \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+\centering
+\caption{Positions autour des pièces}
+\label{tab:after_all_shift}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+8 & $\ast$ & $\ast$ & $\ast$ & $\cdot$ & $\cdot$ & $\cdot$ & $\ast$ & $\cdot$ \\ \hline
+7 & $\ast$ & $\ast$ & $\ast$ & $\cdot$ & $\cdot$ & $\cdot$ & $\ast$ & $\ast$ \\ \hline
+6 & $\ast$ & $\ast$ & $\ast$ & $\ast$ & $\cdot$ & $\ast$ & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\cdot$ & $\cdot$ & $\ast$ & $\ast$ & $\ast$ & $\ast$ & $\cdot$ \\ \hline
+4 & $\cdot$ & $\cdot$ & $\cdot$ & $\ast$ & $\ast$ & $\ast$ & $\ast$ & $\cdot$ \\ \hline
+3 & $\cdot$ & $\cdot$ & $\ast$ & $\ast$ & $\ast$ & $\ast$ & $\ast$ & $\cdot$ \\ \hline
+2 & $\ast$ & $\ast$ & $\ast$ & $\cdot$ & $\ast$ & $\cdot$ & $\ast$ & $\ast$ \\ \hline
+1 & $\cdot$ & $\ast$ & $\ast$ & $\ast$ & $\ast$ & $\cdot$ & $\ast$ & $\cdot$ \\ \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{minipage}
+\end{table}
+
+
+Dans le code de la fonction \mintinline{c++}{shift} (listing \ref{lst:shift}) on peut voir l'utilisation des constantes \mintinline{c++}{FileHBB} et \mintinline{c++}{FileABB} ({\ttfamily BB} pour bitboard). Ces constantes vont nous permettre de masquer certains bits qui se retrouveraient après décalage dans une position incorrecte. Par exemple, si nous décalons dans la direction \mintinline{c++}{EAST} le bitboard représenté dans la table \ref{tab:before_all_shift}, le pion blanc en {\ttfamily h1} se retrouverait en {\ttfamily a2}. Pour éviter cela, avant le décalage, on élimine les éléments de la colonne {\ttfamily h} pour qu'ils ne se retrouvent pas dans la colonne {\ttfamily a} (ligne 8 du listing \ref{lst:shift}). Les constantes \mintinline{c++}{FileABB} et \mintinline{c++}{FileHBB} ainsi que les énumerations pour les rangées et colonnes sont définies dans le listing \ref{lst:files_and_ranks}.    
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+enum File : uint8_t {
     FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H,
     FILE_NB
 };
-enum Rank : int {
+enum Rank : uint8_t {
     RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8,
     RANK_NB
 };
 constexpr uint64_t FileABB = 0x0101010101010101;
-constexpr uint64_t FileBBB = FileABB << 1;
-constexpr uint64_t FileCBB = FileABB << 2;
-constexpr uint64_t FileDBB = FileABB << 3;
-constexpr uint64_t FileEBB = FileABB << 4;
-constexpr uint64_t FileFBB = FileABB << 5;
-constexpr uint64_t FileGBB = FileABB << 6;
+//   0x0101010101010101
+//== 0b0000000100000001000000010000000100000001000000010000000100000001  
+//            a8      a7      a6      a5      a4      a3      a2      a1 
+
 constexpr uint64_t FileHBB = FileABB << 7;
-constexpr uint64_t Rank1BB = 0xFF;
-constexpr uint64_t Rank2BB = Rank1BB << (8 * 1);
-constexpr uint64_t Rank3BB = Rank1BB << (8 * 2);
-constexpr uint64_t Rank4BB = Rank1BB << (8 * 3);
-constexpr uint64_t Rank5BB = Rank1BB << (8 * 4);
-constexpr uint64_t Rank6BB = Rank1BB << (8 * 5);
-constexpr uint64_t Rank7BB = Rank1BB << (8 * 6);
-constexpr uint64_t Rank8BB = Rank1BB << (8 * 7);
+//   0x1010101010101010
+//== 0b1000000010000000100000001000000010000000100000001000000010000000  
+//     h8      h7      h6      h5      h4      h3      h2      h1 
 \end{minted}
+\captionof{listing}{Colonnes et rangées}
+\label{lst:files_and_ranks}
 \end{mdframed}
 
+La fonction qui teste la fin de partie s'appelle \mintinline{c++}{game_over} et elle est décrite dans le listing \ref{lst:game_over}. Son implémentation est assez simple,
 
-\begin{mdframed}[frametitle={Listing~: Décalage selon une direction},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:shift}
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
-template<Direction D>
-constexpr uint64_t shift(uint64_t b) {
-    if constexpr (D == NORTH)           return b << 8;
-    else if constexpr (D == SOUTH)      return b >> 8;
-    else if constexpr (D == EAST)       return (b & ~FileHBB) << 1;
-    else if constexpr (D == WEST)       return (b & ~FileABB) >> 1;
-    else if constexpr (D == NORTH_EAST) return (b & ~FileHBB) << 9;
-    else if constexpr (D == NORTH_WEST) return (b & ~FileABB) << 7;
-    else if constexpr (D == SOUTH_EAST) return (b & ~FileHBB) >> 7;
-    else if constexpr (D == SOUTH_WEST) return (b & ~FileABB) >> 9;
-    else return 0;
-}
-\end{minted}
-\end{mdframed}
+\begin{itemize}
 
+\item À la ligne 2, on récupère dans \mintinline{c++}{possible} le bitboard où il y a des $1$ dans les positions libres.
 
-\begin{mdframed}[frametitle={Listing~: Test de fin de partie},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:game_over}
+\item Les lignes 4 à 7 permettent de créer le bitboard \mintinline{c++}{around_black} qui contient des $1$ aux positions autour de chacun des pièces noires.
+
+\item Les lignes 9 à 12 font de même pour les pièces blanches.
+
+\item À la ligne 14, on récupère dans le bitboard \mintinline{c++}{around_players} les positions (à $1$ dans le bitboard) des cases autour des deux joueurs.
+
+\item Enfin, à la ligne 16, on teste s'il n'existe aucune position libre à côté d'un des joueurs. En effet, le et bit-à-bit ne gardera un $1$ dans un bit du résultat, que si et seulement s'il y a un $1$ à cette position dans le bitboard
+\mintinline{c++}{possible} et dans le bitboard \mintinline{c++}{around_players}. Donc que la case correspondante est libre et accessible par le joueur. Si le résultat de \mintinline{c++}{around_players & possible} vaut $0$, cela veut dire qu'aucune position n'est à la fois à côté d'un des joueurs et libre.
+
+\end{itemize}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
 bool Yolah::game_over() const {
-    uint64_t possible = ~empty & ~black & ~white;
-    return
-        (shift<NORTH>(black) & possible) == 0 &&
-        (shift<SOUTH>(black) & possible) == 0 &&
-        (shift<EAST>(black) & possible) == 0 &&
-        (shift<WEST>(black) & possible) == 0 &&
-        (shift<NORTH_EAST>(black) & possible) == 0 &&
-        (shift<NORTH_WEST>(black) & possible) == 0 &&
-        (shift<SOUTH_EAST>(black) & possible) == 0 &&
-        (shift<SOUTH_WEST>(black) & possible) == 0 &&
-        (shift<NORTH>(white) & possible) == 0 &&
-        (shift<SOUTH>(white) & possible) == 0 &&
-        (shift<EAST>(white) & possible) == 0 &&
-        (shift<WEST>(white) & possible) == 0 &&
-        (shift<NORTH_EAST>(white) & possible) == 0 &&
-        (shift<NORTH_WEST>(white) & possible) == 0 &&
-        (shift<SOUTH_EAST>(white) & possible) == 0 &&
-        (shift<SOUTH_WEST>(white) & possible) == 0;     
+    uint64_t possible = ~holes & ~black & ~white;
+    
+    uint64_t around_black = shift<NORTH>(black) | shift<SOUTH>(black) | 
+        shift<EAST>(black) | shift<WEST>(black) | 
+        shift<NORTH_EAST>(black) | shift<NORTH_WEST>(black) | 
+        shift<SOUTH_EAST>(black) | shift<SOUTH_WEST>(black);
+     
+    uint64_t around_white = shift<NORTH>(white) | shift<SOUTH>(white) | 
+        shift<EAST>(white) | shift<WEST>(white) | 
+        shift<NORTH_EAST>(white) | shift<NORTH_WEST>(white) | 
+        shift<SOUTH_EAST>(white) | shift<SOUTH_WEST>(white);
+
+    uint64_t around_players = around_black | around_white;
+    
+    return (around_players & possible) == 0;
 }
 \end{minted}
+\captionof{listing}{Test de fin de partie}
+\label{lst:game_over}
 \end{mdframed}
 
+Maintenant que nous savons tester la fin d'une partie, nous allons étudier comment générer efficacement les coups possibles dans une position donnée.
 
 \section{Génération des mouvements possibles pour les pièces}
 
 \section{Code du plateau de jeu}
 
-\begin{mdframed}[frametitle={Listing~: Squares, files, ranks and directions},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:type_h}
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/type.h}
+\captionof{listing}{Squares, files, ranks and directions}
+\label{lst:type_h}
 \end{mdframed}
 
 
-\begin{mdframed}[frametitle={Listing~: implémentation d'un coup},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:move_h}
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/move.h}
+\captionof{listing}{implémentation d'un coup}
+\label{lst:move_h}
 \end{mdframed}
 
 
-\begin{mdframed}[frametitle={Listing~: implémentation du plateau},frametitlerule=false,skipabove=\baselineskip,hidealllines=true]
-\label{lst:game_h}
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/game.h}
+\captionof{listing}{implémentation du plateau}
+\label{lst:game_h}
 \end{mdframed}
 
 \section{Test avec des parties aléatoires}

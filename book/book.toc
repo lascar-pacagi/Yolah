@@ -7,16 +7,16 @@
 \contentsline {subsection}{\numberline {1.1.4}What's Next}{6}{subsection.1.1.4}%
 \contentsline {chapter}{\numberline {2}Game Engine}{11}{chapter.2}%
 \contentsline {section}{\numberline {2.1}Structure de données}{11}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Test de fin de partie}{15}{section.2.2}%
-\contentsline {section}{\numberline {2.3}Génération des mouvements possibles pour les pièces}{17}{section.2.3}%
-\contentsline {section}{\numberline {2.4}Code du plateau de jeu}{17}{section.2.4}%
-\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{23}{section.2.5}%
-\contentsline {section}{\numberline {2.6}La suite}{23}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{25}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{27}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{29}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{31}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{33}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{35}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{37}{chapter.9}%
-\contentsline {chapter}{Bibliography}{39}{appendix*.19}%
+\contentsline {section}{\numberline {2.2}Test de fin de partie}{16}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Génération des mouvements possibles pour les pièces}{20}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Code du plateau de jeu}{20}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{25}{section.2.5}%
+\contentsline {section}{\numberline {2.6}La suite}{25}{section.2.6}%
+\contentsline {chapter}{\numberline {3}AI Players}{27}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{29}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{31}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{33}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{35}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{37}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{39}{chapter.9}%
+\contentsline {chapter}{Bibliography}{41}{appendix*.22}%

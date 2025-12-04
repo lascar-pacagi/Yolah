@@ -1,0 +1,73 @@
+        mov     rax, rsi
+        mov     rcx, rsi
+        push    rbp
+        movabs  r11, 9187201950435737471        
+        sal     rax, 8
+        shr     rcx, 8
+        push    rbx
+        mov     rbp, rsi
+        or      rax, rcx
+        mov     rcx, rdi
+        movabs  rbx, -72340172838076674
+        movabs  r10, -72340172838076928
+        sal     rcx, 8
+        shr     rbp, 9
+        movabs  r9, 9187201950435737344
+        movabs  r8, 71775015237779198
+        or      rax, rcx
+        mov     rcx, rdi
+        shr     rcx, 8
+        or      rax, rcx
+        lea     rcx, [rsi+rsi]
+        and     rcx, rbx
+        or      rax, rcx
+        mov     rcx, rsi
+        shr     rcx
+        and     rcx, r11
+        or      rax, rcx
+        mov     rcx, rsi
+        sal     rcx, 9
+        and     rcx, r10
+        or      rax, rcx
+        mov     rcx, rsi
+        sal     rcx, 7
+        and     rcx, r9
+        or      rax, rcx
+        mov     rcx, rsi
+        shr     rcx, 7
+        and     rcx, r8
+        or      rax, rcx
+        movabs  rcx, 35887507618889599
+        and     rbp, rcx
+        or      rax, rbp
+        lea     rbp, [rdi+rdi]
+        and     rbx, rbp
+        or      rax, rbx
+        mov     rbx, rdi
+        shr     rbx
+        and     r11, rbx
+        pop     rbx
+        pop     rbp
+        or      rax, r11
+        mov     r11, rdi
+        sal     r11, 9
+        and     r10, r11
+        or      rax, r10
+        mov     r10, rdi
+        sal     r10, 7
+        and     r9, r10
+        or      rax, r9
+        mov     r9, rdi
+        shr     r9, 7
+        and     r8, r9
+        or      rax, r8
+        mov     r8, rdi
+        or      rdi, rsi
+        shr     r8, 9
+        or      rdi, rdx
+        and     rcx, r8
+        not     rdi
+        or      rax, rcx
+        test    rdi, rax
+        sete    al
+        ret

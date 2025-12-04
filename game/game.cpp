@@ -25,6 +25,7 @@ uint8_t Yolah::get(File f, Rank r) const {
 }
 
 bool Yolah::game_over() const {
+    /*
     uint64_t possible = ~empty & ~black & ~white;
     return
         (shift<NORTH>(black) & possible) == 0 &&
@@ -42,7 +43,20 @@ bool Yolah::game_over() const {
         (shift<NORTH_EAST>(white) & possible) == 0 &&
         (shift<NORTH_WEST>(white) & possible) == 0 &&
         (shift<SOUTH_EAST>(white) & possible) == 0 &&
-        (shift<SOUTH_WEST>(white) & possible) == 0;     
+        (shift<SOUTH_WEST>(white) & possible) == 0;   
+    */
+    uint64_t possible = ~empty & ~black & ~white;
+    uint64_t around_black = shift<NORTH>(black) | shift<SOUTH>(black) | shift<EAST>(black) |
+    shift<WEST>(black) | shift<NORTH_EAST>(black) | shift<NORTH_WEST>(black) |
+    shift<SOUTH_EAST>(black) | shift<SOUTH_WEST>(black);
+     
+    uint64_t around_white = shift<NORTH>(white) | shift<SOUTH>(white) | shift<EAST>(white) |
+    shift<WEST>(white) | shift<NORTH_EAST>(white) | shift<NORTH_WEST>(white) |
+    shift<SOUTH_EAST>(white) | shift<SOUTH_WEST>(white);
+
+    uint64_t around = around_black | around_white;
+
+    return (around & possible) == 0;
 }
 
 bool Yolah::valid(Move m) const {

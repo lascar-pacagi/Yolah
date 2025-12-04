@@ -12,12 +12,12 @@ class Yolah {
     uint64_t black = BLACK_INITIAL_POSITION;
     uint64_t white = WHITE_INITIAL_POSITION;
     uint64_t empty = 0;
-    uint16_t black_score = 0;
-    uint16_t white_score = 0;
-    uint16_t ply = 0;
+    uint8_t black_score = 0;
+    uint8_t white_score = 0;
+    uint8_t ply = 0;
 public:
-    static constexpr uint16_t MAX_NB_MOVES = 75;
-    static constexpr int MAX_NB_PLIES = 120;
+    static constexpr uint8_t MAX_NB_MOVES = 75;
+    static constexpr uint8_t MAX_NB_PLIES = 120;
     class MoveList {
       Move moveList[MAX_NB_MOVES], *last;
     public:
@@ -36,8 +36,8 @@ public:
     static constexpr uint8_t WHITE = 1;
     static constexpr uint8_t HOLE  = 2;
     static constexpr uint8_t FREE  = 3;
-    constexpr std::pair<uint16_t, uint16_t> score() const;
-    constexpr int16_t score(uint8_t player) const;
+    constexpr std::pair<uint8_t, uint8_t> score() const;
+    constexpr int8_t score(uint8_t player) const;
     constexpr uint8_t current_player() const;
     static constexpr uint8_t other_player(uint8_t player);
     uint8_t get(Square) const;
@@ -61,22 +61,17 @@ public:
 std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
 bool Yolah::game_over() const {
     uint64_t possible = ~empty & ~black & ~white;
-    return
-        (shift<NORTH>(black) & possible) == 0 &&
-        (shift<SOUTH>(black) & possible) == 0 &&
-        (shift<EAST>(black) & possible) == 0 &&
-        (shift<WEST>(black) & possible) == 0 &&
-        (shift<NORTH_EAST>(black) & possible) == 0 &&
-        (shift<NORTH_WEST>(black) & possible) == 0 &&
-        (shift<SOUTH_EAST>(black) & possible) == 0 &&
-        (shift<SOUTH_WEST>(black) & possible) == 0 &&
-        (shift<NORTH>(white) & possible) == 0 &&
-        (shift<SOUTH>(white) & possible) == 0 &&
-        (shift<EAST>(white) & possible) == 0 &&
-        (shift<WEST>(white) & possible) == 0 &&
-        (shift<NORTH_EAST>(white) & possible) == 0 &&
-        (shift<NORTH_WEST>(white) & possible) == 0 &&
-        (shift<SOUTH_EAST>(white) & possible) == 0 &&
-        (shift<SOUTH_WEST>(white) & possible) == 0;     
+    
+    uint64_t around_black = shift<NORTH>(black) | shift<SOUTH>(black) | shift<EAST>(black) |
+        shift<WEST>(black) | shift<NORTH_EAST>(black) | shift<NORTH_WEST>(black) |
+        shift<SOUTH_EAST>(black) | shift<SOUTH_WEST>(black);
+     
+    uint64_t around_white = shift<NORTH>(white) | shift<SOUTH>(white) | shift<EAST>(white) |
+        shift<WEST>(white) | shift<NORTH_EAST>(white) | shift<NORTH_WEST>(white) |
+        shift<SOUTH_EAST>(white) | shift<SOUTH_WEST>(white);
+
+    uint64_t around_players = around_black | around_white;
+
+    return (around_players & possible) == 0;    
 }
 #endif

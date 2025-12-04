@@ -13,6 +13,18 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable Link-Time Optimization (LTO/IPO)
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_output)
+
+if(ipo_supported)
+    message(STATUS "LTO/IPO is supported and enabled")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+else()
+    message(WARNING "LTO/IPO is not supported: ${ipo_output}")
+endif()
+
 find_package(OpenMP)
 find_package(Boost 1.71 COMPONENTS program_options REQUIRED)
 find_package(TBB REQUIRED)
@@ -20,7 +32,8 @@ find_package(Threads REQUIRED)
 find_package(benchmark REQUIRED)
 
 add_executable(Yolah main.cpp)
-target_compile_options(Yolah PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_compile_options(Yolah PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp -flto=auto)
+target_link_options(Yolah PRIVATE -flto=auto)
 
 if(OpenMP_CXX_FOUND)
     target_link_libraries(Yolah PRIVATE OpenMP::OpenMP_CXX)
