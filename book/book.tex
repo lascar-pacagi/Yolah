@@ -1150,7 +1150,7 @@ public:
 car avec cette implémentation, nous aurions eu \mintinline{c++}{syzeof(Yolah) == 48} octets.\\
 
 La représentation en bitboard permet d'obtenir efficacement des informations sur le jeu. Par exemple pour voir les cases occupées par les pièces noires et les pièces blanches, il suffit d'effectuer~: \mintinline{c++}{black | white}. Pour les positions des tables \ref{tab:black_positions_game_example_move21} et \ref{tab:white_positions_game_example_move21}, on obtiendrait en une seule opération très efficace \footnote{Vous pouvez trouver des informations sur la latence et le débit des instructions pour plusieurs processeurs via le lien suivant~: \url{https://agner.org/optimize/instruction_tables.pdf}} les positions des pièces noires et blanches de la table \ref{tab:black_white_positions_game_example_move21}. En notation binaire, on obtient~:\\
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
 black | white
 == 0000001010000000000000010000000000100000000000000000000000000000 |
    0000000000100000000001000000000000000000000000000010100000000000
@@ -1245,7 +1245,7 @@ constexpr uint64_t shift(uint64_t b) {
 \end{mdframed}
 
 
-La fonction \mintinline{c++}{shift(uint64_t b)} donnée dans le listing \ref{lst:shift} nous permet de décaler tous les bits à 1 du bitboard en paramètre dans la direction \mintinline{c++}{D}. Soit,
+La fonction \mintinline{c++}{shift(uint64_t b)} donnée dans le listing \ref{lst:shift} nous permet de décaler tous les bits à 1 du bitboard en paramètre dans la direction \mintinline{c++}{D} \footnote{Grâce aux \mintinline{c++}{if constexpr}, lorsque l'on effectuera \mintinline{c++}{shift<NORTH>(b)} par exemple, le compilateur transformera le code en~: \mintinline{c++}{return b << NORTH;}.}. Soit,
 \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
 black == 1000000000000000000000000000100000100000000000000000000000000001
 \end{minted}
@@ -1296,7 +1296,7 @@ représenté dans la table \ref{tab:shift_north_after}. Notons que la pièce en 
 \end{minipage}
 \end{table}
 
-On peut ainsi facilement obtenir toutes les cases directement au contact des pièces d'un plateau donné \mintinline{c++}{board}, en effectuant l'opération suivante~:\\ 
+On peut ainsi facilement obtenir toutes les cases directement au contact des pièces d'un plateau donné \mintinline{c++}{board}, en effectuant l'opération suivante~:
 
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
 shift<NORTH>(board) | shift<SOUTH>(board) | shift<EAST>(board) | 
@@ -1425,7 +1425,7 @@ La génération des coups possibles va utiliser une technique appelée les \emph
 
 Supposons que nous devions trouver la position du seul bit à $1$ dans un entier long non-signé (\mintinline{c++}{uint64_t}). Par exemple, si nous appelons \mintinline{c++}{position} la fonction permettant de calculer cette position, nous obtenons les résultats suivants~:
 
-\begin{minted}[breaklines,fontsize=\small]{cpp}
+\begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
     position(1)          == 0
     position(0b1000)     == 3
     position(0b10000000) == 7
@@ -1434,7 +1434,7 @@ Supposons que nous devions trouver la position du seul bit à $1$ dans un entier
 
 Notons que les processeurs possèdent des instructions permettant de calculer efficacement cette fonction \footnote{\mintinline{asm}{tzcnt} sous Intel.}, et le compilateur {\ttfamily gcc} permet de calculer efficacement cette position avec la fonction \mintinline{c++}{__builtin_ctzll(unsigned long long x)} \footnote{Returns the number of trailing 0-bits in x, starting at the least significant bit position. If x is 0, the result is undefined.}, par exemple,
 
-\begin{minted}[breaklines,fontsize=\small]{cpp}
+\begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
     position(0b1000) == __builtin_ctzll(0b1000)
 \end{minted}
 
@@ -1451,7 +1451,30 @@ int position(uint64_t x) {
 }
 \end{minted}
 
-La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau \footnote{Nous mesurerons à la fin de cette section le gain apporté par le hachage parfait par rapport à l'utilisation d'une table de hachage classique.}
+La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau \footnote{Nous mesurerons à la fin de cette section le gain apporté par le hachage parfait par rapport à l'utilisation d'une table de hachage classique.}. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande, par exemple la valeur \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$~!). L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des $63$ valeurs\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}, que nous allons appeler clés, dans la plage $[0, 2^6 - 1 = 63]$ \footnote{Nous allons voir pourquoi $2^6 - 1$ et pas seulement $62$.}.
+De plus on veut qu'il n'y ait aucune collision, d'où le nom de hachage parfait. S'il y a des collisions des positions seraient erronées. Par exemple, si les clés \mintinline{c++}{0b100} et \mintinline{c++}{0b1000000} étaient transformées en l'indice $42$, on devrait mettre dans \mintinline{c++}{table[42]} la valeur $2$ ou $6$, mais on ne peut pas stocker plus d'une valeur au même emplacement.\\
+
+La fonction de hachage parfait va avoir la forme suivante~:
+
+\begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
+constexpr uint64_t MAGIC = //...
+constexpr int K = 6;
+int perfect_hashing(uint64_t key) {
+    return key * MAGIC >> (64 - K);
+}
+\end{minted}
+
+Dans cette fonction,
+
+\begin{itemize}
+
+\item À la ligne 2, la constante \mintinline{c++}{K} donne le nombre de bits pour notre index. Ici avec \mintinline{c++}{K == 6}, cela nous donne un maximum de $2^K = 2^6 = 64$ valeurs possibles dans la table.
+
+\item À la ligne 4, on peut voir la formule pour calculer l'index dans la table selon la clé \mintinline{c++}{uint64_t key} donnée en paramètre. On multiplie la clé par la constante \mintinline{c++}{MAGIC} et ensuite on décale vers la droite pour ne garder que les \mintinline{c++}{K} bits de poids forts du résultat. Cette opération est très peu coûteuse, mais comment trouver cette constante magique~?\\
+
+\end{itemize}
+
+
 
 
 \subsection{Magic bitboard pour les mouvements des pièces}

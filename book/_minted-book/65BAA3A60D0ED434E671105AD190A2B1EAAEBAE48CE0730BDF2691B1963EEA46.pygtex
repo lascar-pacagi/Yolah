@@ -1,0 +1,7 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{MAGIC}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{c+c1}{//...}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{K}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{;}
+\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n+nf}{perfect\PYGZus{}hashing}\PYG{p}{(}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{key}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{key}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{MAGIC}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{64}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{K}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}
