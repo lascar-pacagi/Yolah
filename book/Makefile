@@ -260,6 +260,29 @@ help:
 	@echo "$(YELLOW)Note: Default target is 'pdf'$(NO_COLOR)"
 
 #########################################################################
+# BENCHMARK TARGETS
+#########################################################################
+
+.PHONY: bench bench-clean bench-run
+
+# Compile the benchmark
+bench: magic_bench.cpp
+	@echo "$(BLUE)Compiling magic_bench...$(NO_COLOR)"
+	@g++ -std=c++23 -O3 -march=native -Wall -Wextra magic_bench.cpp -o magic_bench -lbenchmark -lpthread
+	@echo "$(GREEN)Benchmark compiled: magic_bench$(NO_COLOR)"
+
+# Run the benchmark
+bench-run: bench
+	@echo "$(BLUE)Running benchmark...$(NO_COLOR)"
+	@./magic_bench
+
+# Clean benchmark executable
+bench-clean:
+	@echo "$(YELLOW)Cleaning benchmark executable...$(NO_COLOR)"
+	@rm -f magic_bench
+	@echo "$(GREEN)Benchmark clean complete$(NO_COLOR)"
+
+#########################################################################
 # DEPENDENCIES
 #########################################################################
 

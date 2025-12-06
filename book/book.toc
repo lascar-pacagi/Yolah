@@ -9,9 +9,11 @@
 \contentsline {section}{\numberline {2.1}Structure de données}{11}{section.2.1}%
 \contentsline {section}{\numberline {2.2}Test de fin de partie}{16}{section.2.2}%
 \contentsline {section}{\numberline {2.3}Génération des mouvements possibles pour les pièces}{20}{section.2.3}%
-\contentsline {section}{\numberline {2.4}Code du plateau de jeu}{20}{section.2.4}%
-\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{25}{section.2.5}%
-\contentsline {section}{\numberline {2.6}La suite}{25}{section.2.6}%
+\contentsline {subsection}{\numberline {2.3.1}Hachage parfait}{20}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Magic bitboard pour les mouvements des pièces}{21}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}Code complet commenté du plateau de jeu}{21}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{26}{section.2.5}%
+\contentsline {section}{\numberline {2.6}La suite}{26}{section.2.6}%
 \contentsline {chapter}{\numberline {3}AI Players}{27}{chapter.3}%
 \contentsline {chapter}{\numberline {4}Monte Carlo Player}{29}{chapter.4}%
 \contentsline {chapter}{\numberline {5}MCTS Player}{31}{chapter.5}%

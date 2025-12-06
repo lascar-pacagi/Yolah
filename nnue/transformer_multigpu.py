@@ -242,7 +242,7 @@ class TransformerNet(nn.Module):
 NB_EPOCHS=50
 #MODEL_PATH="./"
 MODEL_PATH="/mnt/"
-MODEL_NAME="transformer_d512_h8_l8"
+MODEL_NAME="transformer_d512_h8_l16"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
 
@@ -364,7 +364,7 @@ def main(rank, world_size, batch_size, dataset):
         vocab_size=258,         # 64 squares * 4 states + 2 turn states
         d_model=512,            # embedding dimension
         nhead=8,                # attention heads
-        num_layers=8,           # transformer layers
+        num_layers=16,          # transformer layers
         dim_feedforward=1024,   # FFN dimension
         dropout=0.1
     )
@@ -388,4 +388,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = GameDataset(GAME_DIR)
-    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 512 * 2, dataset), nprocs=world_size)

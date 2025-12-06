@@ -1,0 +1,6 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{+w}{    }\PYG{n}{position}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{          }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}
+\PYG{+w}{    }\PYG{n}{position}\PYG{p}{(}\PYG{l+m+mb}{0b1000}\PYG{p}{)}\PYG{+w}{     }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{3}
+\PYG{+w}{    }\PYG{n}{position}\PYG{p}{(}\PYG{l+m+mb}{0b10000000}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{7}
+\PYG{+w}{    }\PYG{n}{position}\PYG{p}{(}\PYG{l+m+mh}{0x8000000000000000}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{63}
+\end{Verbatim}

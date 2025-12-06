@@ -1392,7 +1392,7 @@ La fonction qui teste la fin de partie s'appelle \mintinline{c++}{game_over} et 
 \end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 bool Yolah::game_over() const {
     uint64_t possible = ~holes & ~black & ~white;
     
@@ -1419,7 +1419,44 @@ Maintenant que nous savons tester la fin d'une partie, nous allons étudier comm
 
 \section{Génération des mouvements possibles pour les pièces}
 
-\section{Code du plateau de jeu}
+La génération des coups possibles va utiliser une technique appelée les \emph{magic bitboard}. Pour comprendre cette technique je vais tout d'abord la présenter sur un exemple simple. Je me suis inspiré de l'article \url{http://pradu.us/old/Nov27_2008/Buzz/research/magic/Bitboards.pdf} pour cet exemple.
+
+\subsection{Hachage parfait}
+
+Supposons que nous devions trouver la position du seul bit à $1$ dans un entier long non-signé (\mintinline{c++}{uint64_t}). Par exemple, si nous appelons \mintinline{c++}{position} la fonction permettant de calculer cette position, nous obtenons les résultats suivants~:
+
+\begin{minted}[breaklines,fontsize=\small]{cpp}
+    position(1)          == 0
+    position(0b1000)     == 3
+    position(0b10000000) == 7
+    position(0x8000000000000000) == 63
+\end{minted}
+
+Notons que les processeurs possèdent des instructions permettant de calculer efficacement cette fonction \footnote{\mintinline{asm}{tzcnt} sous Intel.}, et le compilateur {\ttfamily gcc} permet de calculer efficacement cette position avec la fonction \mintinline{c++}{__builtin_ctzll(unsigned long long x)} \footnote{Returns the number of trailing 0-bits in x, starting at the least significant bit position. If x is 0, the result is undefined.}, par exemple,
+
+\begin{minted}[breaklines,fontsize=\small]{cpp}
+    position(0b1000) == __builtin_ctzll(0b1000)
+\end{minted}
+
+Mais nous allons coder cette fonction \mintinline{c++}{position} en utilisant un hachage parfait afin d'illustrer cette technique, qui nous servira pour la génération des coups possibles par la suite.\\
+
+En utilisant une table de hachage classique, nous pouvons tout d'abord remplir celle-ci avec les 63 valeurs et simplement consulter cette table par la suite, comme dans le code suivant~:
+
+\begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
+unordered_map<uint64_t, uint8_t> table {
+    {1, 0}, {0b10, 1}, {0b100, 2}, {0b1000, 3}, //...
+}
+int position(uint64_t x) {
+    return table[x];
+}
+\end{minted}
+
+La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau \footnote{Nous mesurerons à la fin de cette section le gain apporté par le hachage parfait par rapport à l'utilisation d'une table de hachage classique.}
+
+
+\subsection{Magic bitboard pour les mouvements des pièces}
+
+\section{Code complet commenté du plateau de jeu}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/type.h}
