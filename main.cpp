@@ -55,21 +55,21 @@ int main(int argc, char* argv[]) {
     //auto input = std::ifstream("../nnue/data/data_test/games.txt", std::ios::binary);
     // const auto now = std::chrono::system_clock::now();
     // const std::string timestamp = std::format("{:%Y_%m_%d_%H_%M_%S}", now);
-    // for (int i = 0; i < 4; i++) {
-    //     std::string filename = "/mnt/games_" + timestamp + "_" + std::to_string(i) + ".txt";
+    for (int i = 0; i < 4; i++) {
+        std::string filename = "/mnt/games_" + timestamp + "_" + std::to_string(i) + ".txt";
         //std::string filename = "../nnue/data/data_test/games_" + timestamp + "_" + std::to_string(i) + ".txt";
-        // std::cout << filename << std::endl;
-        // std::ofstream output(filename, std::ios::binary);
+        std::cout << filename << std::endl;
+        std::ofstream output(filename, std::ios::binary);
         // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
         //                     Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
         //                     {0, 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31}, 300, 14);
-        // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
-        //                     Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
-        //                     {0, 1, 2, 3, 4, 5}, 300, 14);
+        data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
+                            Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
+                            {0, 1, 2, 3, 4, 5}, 300, 14);
         // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
         //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
         //                     {2, 3, 4, 5, 10, 11, 16, 17}, 20, 4);
-    //}    
+    }    
     // std::filesystem::path input("../data/games/games_2025_08_31_22_09_02.335269145_0.txt"); 
     // data::decode_games(input, cout);
     // data::generate_games2(cout, std::make_unique<MinMaxPlayer>(1000000, 100, 2, 3, 7), 
@@ -113,54 +113,54 @@ int main(int argc, char* argv[]) {
     //compare_models("../nnue/nnue_quantized.txt", "../nnue/nnue_quantized2.txt", "../nnue/data", cout);
 
     //data::decode_games("../data/games/games_2025_08_31_22_09_02.335269145_0.txt", cout);
-    po::options_description general("General options");
-    general.add_options()
-    ("help", "produce help message")
-    ("version", "output the version number");
+    // po::options_description general("General options");
+    // general.add_options()
+    // ("help", "produce help message")
+    // ("version", "output the version number");
     
-    po::options_description client("Client options");
-    client.add_options()
-    ("server,s", po::value<string>()->default_value("127.0.0.1"), "server ip adress")
-    ("port,p", po::value<uint16_t>()->default_value(8001), "server port")
-    ("key,k", po::value<string>(), "join key, if not present create a new game and get the join and watch keys by the server")
-    ("player", po::value<string>(), "configuration file for player");
+    // po::options_description client("Client options");
+    // client.add_options()
+    // ("server,s", po::value<string>()->default_value("127.0.0.1"), "server ip adress")
+    // ("port,p", po::value<uint16_t>()->default_value(8001), "server port")
+    // ("key,k", po::value<string>(), "join key, if not present create a new game and get the join and watch keys by the server")
+    // ("player", po::value<string>(), "configuration file for player");
     
-    po::options_description evaluate("Evaluate AI options");
-    evaluate.add_options()
-    ("player1,1", po::value<string>(), "configuration file for first AI player")
-    ("player2,2", po::value<string>(), "configuration file for second AI player")
-    ("nb-random-moves,r", po::value<size_t>()->default_value(0), "number of random moves at the beginning of the game")
-    ("nb-games,n", po::value<size_t>()->default_value(100), "number of games for the evaluation");
+    // po::options_description evaluate("Evaluate AI options");
+    // evaluate.add_options()
+    // ("player1,1", po::value<string>(), "configuration file for first AI player")
+    // ("player2,2", po::value<string>(), "configuration file for second AI player")
+    // ("nb-random-moves,r", po::value<size_t>()->default_value(0), "number of random moves at the beginning of the game")
+    // ("nb-games,n", po::value<size_t>()->default_value(100), "number of games for the evaluation");
 
-    po::options_description all("Allowed options");
-    all.add(general).add(client).add(evaluate);
+    // po::options_description all("Allowed options");
+    // all.add(general).add(client).add(evaluate);
     
-    po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, all), vm);
-    po::notify(vm);
-    if (vm.count("help")) {
-        cout << all << "\n";
-        return EXIT_SUCCESS;
-    }
-    if (vm.count("version")) {
-        cout << "Yolah 1.0 by Pascal Garcia\n";
-        return EXIT_SUCCESS;
-    }
-    if (vm.count("player")) {
-        std::ifstream f(vm["player"].as<string>());
-        nlohmann::json j = nlohmann::json::parse(f);    
-        cout << j << '\n';
-        ClientPlayer player(Player::create(j),
-                            WebsocketClientSync::create(vm["server"].as<string>(), vm["port"].as<uint16_t>()));
-        player.run(vm.count("key") ? std::optional<string>(vm["key"].as<string>()) : std::nullopt);
-    } else if (vm.count("player1") && vm.count("player2")) {
-        test::play(Player::create(nlohmann::json::parse(std::ifstream(vm["player1"].as<string>()))),
-                   Player::create(nlohmann::json::parse(std::ifstream(vm["player2"].as<string>()))),
-                   vm["nb-random-moves"].as<size_t>(),
-                   vm["nb-games"].as<size_t>());
-    } else {
-        cout << "wrong mix of options\n";
-        return EXIT_FAILURE;
-    }
+    // po::variables_map vm;
+    // po::store(po::parse_command_line(argc, argv, all), vm);
+    // po::notify(vm);
+    // if (vm.count("help")) {
+    //     cout << all << "\n";
+    //     return EXIT_SUCCESS;
+    // }
+    // if (vm.count("version")) {
+    //     cout << "Yolah 1.0 by Pascal Garcia\n";
+    //     return EXIT_SUCCESS;
+    // }
+    // if (vm.count("player")) {
+    //     std::ifstream f(vm["player"].as<string>());
+    //     nlohmann::json j = nlohmann::json::parse(f);    
+    //     cout << j << '\n';
+    //     ClientPlayer player(Player::create(j),
+    //                         WebsocketClientSync::create(vm["server"].as<string>(), vm["port"].as<uint16_t>()));
+    //     player.run(vm.count("key") ? std::optional<string>(vm["key"].as<string>()) : std::nullopt);
+    // } else if (vm.count("player1") && vm.count("player2")) {
+    //     test::play(Player::create(nlohmann::json::parse(std::ifstream(vm["player1"].as<string>()))),
+    //                Player::create(nlohmann::json::parse(std::ifstream(vm["player2"].as<string>()))),
+    //                vm["nb-random-moves"].as<size_t>(),
+    //                vm["nb-games"].as<size_t>());
+    // } else {
+    //     cout << "wrong mix of options\n";
+    //     return EXIT_FAILURE;
+    // }
     return EXIT_SUCCESS;
 }
