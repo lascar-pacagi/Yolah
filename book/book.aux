@@ -20,6 +20,13 @@
 \gdef\HyperFirstAtBeginDocument#1{#1}
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
+\providecommand\@newglossary[4]{}
+\@newglossary{main}{glg}{gls}{glo}
+\@newglossary{acronym}{alg}{acr}{acn}
+\providecommand\@glsorder[1]{}
+\providecommand\@istfilename[1]{}
+\@istfilename{book.ist}
+\@glsorder{word}
 \babel@aux{english}{}
 \abx@aux@cite{0}{anthropic2025claude}
 \abx@aux@segm{0}{0}{anthropic2025claude}
@@ -167,6 +174,8 @@
 \newlabel{sub@fig:game_example_move56}{{q}{9}{Move 56 (White)\relax }{figure.caption.12}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {1.9}{\ignorespaces Game example between two AIs - moves 40 to 56. White wins 32 to 24\relax }}{9}{figure.caption.12}\protected@file@percent }
 \newlabel{fig:game_example_end}{{1.9}{9}{Game example between two AIs - moves 40 to 56. White wins 32 to 24\relax }{figure.caption.12}{}}
+\abx@aux@cite{0}{stockfish2025}
+\abx@aux@segm{0}{0}{stockfish2025}
 \@writefile{toc}{\contentsline {chapter}{\numberline {2}Game Engine}{11}{chapter.2}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
@@ -215,57 +224,70 @@
 \newlabel{lst:files_and_ranks}{{5}{19}{Colonnes et rangées\relax }{listing.5}{}}
 \zref@newlabel{mdf@pagelabel-9}{\default{2.2}\page{19}\abspage{29}\mdf@pagevalue{19}}
 \@writefile{lol}{\contentsline {listing}{\numberline {6}{\ignorespaces Test de fin de partie\relax }}{19}{listing.6}\protected@file@percent }
-\zref@newlabel{mdf@pagelabel-10}{\default{2.2}\page{20}\abspage{30}\mdf@pagevalue{20}}
-\newlabel{lst:game_over}{{6}{20}{Test de fin de partie\relax }{listing.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.3}Génération des mouvements possibles pour les pièces}{20}{section.2.3}\protected@file@percent }
+\newlabel{lst:game_over}{{6}{19}{Test de fin de partie\relax }{listing.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Génération des mouvements possibles pour les pièces}{19}{section.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}Hachage parfait}{20}{subsection.2.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}Magic bitboard pour les mouvements des pièces}{21}{subsection.2.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.4}Code complet commenté du plateau de jeu}{21}{section.2.4}\protected@file@percent }
-\zref@newlabel{mdf@pagelabel-11}{\default{2.4}\page{21}\abspage{31}\mdf@pagevalue{21}}
-\zref@newlabel{mdf@pagelabel-12}{\default{2.4}\page{22}\abspage{32}\mdf@pagevalue{22}}
-\zref@newlabel{mdf@pagelabel-13}{\default{2.4}\page{23}\abspage{33}\mdf@pagevalue{23}}
-\zref@newlabel{mdf@pagelabel-14}{\default{2.4}\page{24}\abspage{34}\mdf@pagevalue{24}}
-\@writefile{lol}{\contentsline {listing}{\numberline {7}{\ignorespaces Squares, files, ranks and directions\relax }}{24}{listing.7}\protected@file@percent }
-\newlabel{lst:type_h}{{7}{24}{Squares, files, ranks and directions\relax }{listing.7}{}}
-\zref@newlabel{mdf@pagelabel-15}{\default{2.4}\page{24}\abspage{34}\mdf@pagevalue{24}}
-\zref@newlabel{mdf@pagelabel-16}{\default{2.4}\page{25}\abspage{35}\mdf@pagevalue{25}}
-\@writefile{lol}{\contentsline {listing}{\numberline {8}{\ignorespaces implémentation d'un coup\relax }}{25}{listing.8}\protected@file@percent }
-\newlabel{lst:move_h}{{8}{25}{implémentation d'un coup\relax }{listing.8}{}}
-\zref@newlabel{mdf@pagelabel-17}{\default{2.4}\page{25}\abspage{35}\mdf@pagevalue{25}}
-\zref@newlabel{mdf@pagelabel-18}{\default{2.4}\page{26}\abspage{36}\mdf@pagevalue{26}}
-\zref@newlabel{mdf@pagelabel-19}{\default{2.4}\page{27}\abspage{37}\mdf@pagevalue{27}}
-\@writefile{lol}{\contentsline {listing}{\numberline {9}{\ignorespaces implémentation du plateau\relax }}{27}{listing.9}\protected@file@percent }
-\newlabel{lst:game_h}{{9}{27}{implémentation du plateau\relax }{listing.9}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{27}{section.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.6}La suite}{27}{section.2.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}AI Players}{29}{chapter.3}\protected@file@percent }
+\abx@aux@cite{0}{stockfish2025}
+\abx@aux@segm{0}{0}{stockfish2025}
+\zref@newlabel{mdf@pagelabel-10}{\default{2.3.1}\page{21}\abspage{31}\mdf@pagevalue{21}}
+\zref@newlabel{mdf@pagelabel-11}{\default{2.3.1}\page{22}\abspage{32}\mdf@pagevalue{22}}
+\@writefile{lol}{\contentsline {listing}{\numberline {7}{\ignorespaces Recherche aléatoire de la constante \mintinline {c++}{MAGIC}\relax }}{22}{listing.7}\protected@file@percent }
+\newlabel{lst:random_magic}{{7}{22}{Recherche aléatoire de la constante \mintinline {c++}{MAGIC}\relax }{listing.7}{}}
+\abx@aux@cite{0}{kroening2016decision}
+\abx@aux@segm{0}{0}{kroening2016decision}
+\abx@aux@cite{0}{biere2021handbook}
+\abx@aux@segm{0}{0}{biere2021handbook}
+\zref@newlabel{mdf@pagelabel-12}{\default{2.3.1}\page{24}\abspage{34}\mdf@pagevalue{24}}
+\zref@newlabel{mdf@pagelabel-13}{\default{2.3.1}\page{25}\abspage{35}\mdf@pagevalue{25}}
+\@writefile{lol}{\contentsline {listing}{\numberline {8}{\ignorespaces Recherche avec un solveur \gls {smt} de la constante \mintinline {c++}{MAGIC}\relax }}{25}{listing.8}\protected@file@percent }
+\newlabel{lst:z3_magic}{{8}{25}{Recherche avec un solveur \gls {smt} de la constante \mintinline {c++}{MAGIC}\relax }{listing.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}Magic bitboard pour les mouvements des pièces}{25}{subsection.2.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Code complet commenté du plateau de jeu}{25}{section.2.4}\protected@file@percent }
+\zref@newlabel{mdf@pagelabel-14}{\default{2.4}\page{25}\abspage{35}\mdf@pagevalue{25}}
+\zref@newlabel{mdf@pagelabel-15}{\default{2.4}\page{26}\abspage{36}\mdf@pagevalue{26}}
+\zref@newlabel{mdf@pagelabel-16}{\default{2.4}\page{27}\abspage{37}\mdf@pagevalue{27}}
+\@writefile{lol}{\contentsline {listing}{\numberline {9}{\ignorespaces Squares, files, ranks and directions\relax }}{27}{listing.9}\protected@file@percent }
+\newlabel{lst:type_h}{{9}{27}{Squares, files, ranks and directions\relax }{listing.9}{}}
+\zref@newlabel{mdf@pagelabel-17}{\default{2.4}\page{27}\abspage{37}\mdf@pagevalue{27}}
+\zref@newlabel{mdf@pagelabel-18}{\default{2.4}\page{28}\abspage{38}\mdf@pagevalue{28}}
+\@writefile{lol}{\contentsline {listing}{\numberline {10}{\ignorespaces implémentation d'un coup\relax }}{28}{listing.10}\protected@file@percent }
+\newlabel{lst:move_h}{{10}{28}{implémentation d'un coup\relax }{listing.10}{}}
+\zref@newlabel{mdf@pagelabel-19}{\default{2.4}\page{28}\abspage{38}\mdf@pagevalue{28}}
+\zref@newlabel{mdf@pagelabel-20}{\default{2.4}\page{29}\abspage{39}\mdf@pagevalue{29}}
+\zref@newlabel{mdf@pagelabel-21}{\default{2.4}\page{30}\abspage{40}\mdf@pagevalue{30}}
+\@writefile{lol}{\contentsline {listing}{\numberline {11}{\ignorespaces implémentation du plateau\relax }}{30}{listing.11}\protected@file@percent }
+\newlabel{lst:game_h}{{11}{30}{implémentation du plateau\relax }{listing.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{30}{section.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}La suite}{30}{section.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}AI Players}{31}{chapter.3}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:ai}{{3}{29}{AI Players}{chapter.3}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {4}Monte Carlo Player}{31}{chapter.4}\protected@file@percent }
+\newlabel{ch:ai}{{3}{31}{AI Players}{chapter.3}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}Monte Carlo Player}{33}{chapter.4}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:monte_carlo}{{4}{31}{Monte Carlo Player}{chapter.4}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {5}MCTS Player}{33}{chapter.5}\protected@file@percent }
+\newlabel{ch:monte_carlo}{{4}{33}{Monte Carlo Player}{chapter.4}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}MCTS Player}{35}{chapter.5}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:mcts}{{5}{33}{MCTS Player}{chapter.5}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {6}Minmax Player}{35}{chapter.6}\protected@file@percent }
+\newlabel{ch:mcts}{{5}{35}{MCTS Player}{chapter.5}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {6}Minmax Player}{37}{chapter.6}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:minmax}{{6}{35}{Minmax Player}{chapter.6}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{37}{chapter.7}\protected@file@percent }
+\newlabel{ch:minmax}{{6}{37}{Minmax Player}{chapter.6}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{39}{chapter.7}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:nnue}{{7}{37}{Minmax with Neural Network Player}{chapter.7}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {8}AI Tournament}{39}{chapter.8}\protected@file@percent }
+\newlabel{ch:nnue}{{7}{39}{Minmax with Neural Network Player}{chapter.7}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {8}AI Tournament}{41}{chapter.8}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:tournament}{{8}{39}{AI Tournament}{chapter.8}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {9}Conclusion}{41}{chapter.9}\protected@file@percent }
+\newlabel{ch:tournament}{{8}{41}{AI Tournament}{chapter.8}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {9}Conclusion}{43}{chapter.9}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:conclusion}{{9}{41}{Conclusion}{chapter.9}{}}
+\newlabel{ch:conclusion}{{9}{43}{Conclusion}{chapter.9}{}}
+\@writefile{toc}{\contentsline {chapter}{Acronymes}{45}{section*.22}\protected@file@percent }
 \gdef\minted@oldcachelist{,
   friendly.pygstyle,
   A559A65D3B5842B1C45A868FE3224AF593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
@@ -325,12 +347,12 @@
   F67DEE350673374900099C15197679EAEAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
   C2F963FC52A5B5BB893F9D3FC9EC907693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   8D014A8B61C251BC6CF9FD8E33EC606C93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  7A12BDDF0E919CA54EFED1FCC06E609793C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  03C2832044F450D994559FBF8FDD2D1E93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   0A9E645A0337A2A9D892B89FB01B070F93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   8D014A8B61C251BC6CF9FD8E33EC606C93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   0A9E645A0337A2A9D892B89FB01B070F93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   26A340799A676D7348169F17EB28111B93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  CB910DDC6D474927CBDF7070FCC277B6EAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
+  A7B3DD2F2BB71066E8F06ACD2F13B533EAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
   9B838E9A7F6C74380D0396E67BAFC7D393C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   1D42B7567C7945155CA173262C4D578293C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   E414941207CD2B86A9A8667E059A0B6AEAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
@@ -350,11 +372,50 @@
   594DE985C5C30A9E297152248F70716193C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  2F385A1632DFE6F80A1144B037513129EAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  9B838E9A7F6C74380D0396E67BAFC7D393C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  CF982747DF48E674E432668C9A0D87A993C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  7EE582357C6BCE08A5AA66F813CE5E8D93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  BFD7464C15E2B86526FE5094642703C693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  F14CC067547814E2D87EB28C6912900E93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  BFD7464C15E2B86526FE5094642703C693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  BFD7464C15E2B86526FE5094642703C693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  CAF7E7BF96A799F0547469CB698BFB6893C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  4F024808F6411B76351886074AEE5A1393C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  304D82C0867E556F1B5E676E0D11F52093C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  FD8D946C55C81C05FD4AB5732543838793C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  CAF7E7BF96A799F0547469CB698BFB6893C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  91E454EBA04C1ACA45D1EF5D17C6528593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  CAF7E7BF96A799F0547469CB698BFB6893C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  B2A5DBF2011601BE9AB6E5E38C807318EAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
+  EE1DFC0B670C480741AB5D1A196612FE93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  70E419B304BE945509ED9FAD58593577EAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
+  CF982747DF48E674E432668C9A0D87A993C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  BFD7464C15E2B86526FE5094642703C693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  BFD7464C15E2B86526FE5094642703C693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  8DEF3AAB38DFC007D12F666B2179AD170A3767F64192739B9886B13895A28D92.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  AC0F03136EEAE5FCFF734368F371962EEAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
   71910D11F73B14DE1999B9427E853DB1D7509025C7218AEE74EAD919BD7EDE48.pygtex,
   F35B81406F7BB52DA72366E8E214FF2D932FC75BC45705035B6A3A714B155ECF.pygtex,
-  52451424B5C70CBC9CB106029961C39CACFF3D034B26E3FA3FAD560B61377743.pygtex}
-\@writefile{toc}{\contentsline {chapter}{Bibliography}{43}{appendix*.22}\protected@file@percent }
-\abx@aux@read@bbl@mdfivesum{8DE16ACEA95E7F391E976873BB865160}
+  FAE0F0E20B53646AFE7AC9D46A23DED2ACFF3D034B26E3FA3FAD560B61377743.pygtex}
+\@writefile{toc}{\contentsline {chapter}{Bibliography}{47}{appendix*.24}\protected@file@percent }
+\abx@aux@read@bbl@mdfivesum{16D085CFF7EE7522FDEF9F5CA0F133F0}
 \abx@aux@defaultrefcontext{0}{anthropic2025claude}{none/global//global/global}
 \abx@aux@defaultrefcontext{0}{cppreference}{none/global//global/global}
-\gdef \@abspage@last{53}
+\abx@aux@defaultrefcontext{0}{stockfish2025}{none/global//global/global}
+\abx@aux@defaultrefcontext{0}{kroening2016decision}{none/global//global/global}
+\abx@aux@defaultrefcontext{0}{biere2021handbook}{none/global//global/global}
+\gdef \@abspage@last{57}

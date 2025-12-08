@@ -1,0 +1,34 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kn}{from} \PYG{n+nn}{z3} \PYG{k+kn}{import} \PYG{o}{*}
+
+\PYG{n}{positions} \PYG{o}{=} \PYG{p}{\PYGZob{}\PYGZcb{}}
+\PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{64}\PYG{p}{):}
+    \PYG{n}{positions}\PYG{p}{[}\PYG{l+m+mi}{1} \PYG{o}{\PYGZlt{}\PYGZlt{}} \PYG{n}{i}\PYG{p}{]} \PYG{o}{=} \PYG{n}{i}
+
+\PYG{n}{solver} \PYG{o}{=} \PYG{n}{Solver}\PYG{p}{()}
+\PYG{n}{MAGIC}  \PYG{o}{=} \PYG{n}{BitVec}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}magic\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{64}\PYG{p}{)}
+\PYG{n}{K} \PYG{o}{=} \PYG{l+m+mi}{6}
+\PYG{n}{bitboards} \PYG{o}{=} \PYG{n+nb}{list}\PYG{p}{(}\PYG{n}{positions}\PYG{o}{.}\PYG{n}{keys}\PYG{p}{())}
+
+\PYG{k}{def} \PYG{n+nf}{index}\PYG{p}{(}\PYG{n}{magic}\PYG{p}{,} \PYG{n}{k}\PYG{p}{,} \PYG{n}{bitboard}\PYG{p}{):}
+    \PYG{k}{return} \PYG{n}{magic} \PYG{o}{*} \PYG{n}{bitboard} \PYG{o}{\PYGZgt{}\PYGZgt{}} \PYG{p}{(}\PYG{l+m+mi}{64} \PYG{o}{\PYGZhy{}} \PYG{n}{k}\PYG{p}{)}
+
+\PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{64}\PYG{p}{):}
+    \PYG{n}{index1} \PYG{o}{=} \PYG{n}{index}\PYG{p}{(}\PYG{n}{MAGIC}\PYG{p}{,} \PYG{n}{K}\PYG{p}{,} \PYG{n}{bitboards}\PYG{p}{[}\PYG{n}{i}\PYG{p}{])}
+    \PYG{k}{for} \PYG{n}{j} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{i} \PYG{o}{+} \PYG{l+m+mi}{1}\PYG{p}{,} \PYG{l+m+mi}{64}\PYG{p}{):}
+        \PYG{n}{index2} \PYG{o}{=} \PYG{n}{index}\PYG{p}{(}\PYG{n}{MAGIC}\PYG{p}{,} \PYG{n}{K}\PYG{p}{,} \PYG{n}{bitboards}\PYG{p}{[}\PYG{n}{j}\PYG{p}{])}
+        \PYG{n}{solver}\PYG{o}{.}\PYG{n}{add}\PYG{p}{(}\PYG{n}{index1} \PYG{o}{!=} \PYG{n}{index2}\PYG{p}{)}
+
+\PYG{k}{if} \PYG{n}{solver}\PYG{o}{.}\PYG{n}{check}\PYG{p}{()} \PYG{o}{==} \PYG{n}{sat}\PYG{p}{:}
+    \PYG{n}{model} \PYG{o}{=} \PYG{n}{solver}\PYG{o}{.}\PYG{n}{model}\PYG{p}{()}
+    \PYG{n}{m} \PYG{o}{=} \PYG{n}{model}\PYG{p}{[}\PYG{n}{MAGIC}\PYG{p}{]}\PYG{o}{.}\PYG{n}{as\PYGZus{}long}\PYG{p}{()}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+sa}{f}\PYG{l+s+s1}{\PYGZsq{}found magic for K = }\PYG{l+s+si}{\PYGZob{}}\PYG{n}{K}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s1}{: }\PYG{l+s+si}{\PYGZob{}}\PYG{n}{m}\PYG{l+s+si}{:}\PYG{l+s+s1}{\PYGZsh{}x}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+    \PYG{n}{size} \PYG{o}{=} \PYG{l+m+mi}{1} \PYG{o}{\PYGZlt{}\PYGZlt{}} \PYG{n}{K}
+    \PYG{n}{table} \PYG{o}{=} \PYG{p}{[}\PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{1}\PYG{p}{]} \PYG{o}{*} \PYG{n}{size}
+    \PYG{k}{for} \PYG{n}{bitboard}\PYG{p}{,} \PYG{n}{pos} \PYG{o+ow}{in} \PYG{n}{positions}\PYG{o}{.}\PYG{n}{items}\PYG{p}{():}
+        \PYG{n}{table}\PYG{p}{[}\PYG{n}{index}\PYG{p}{(}\PYG{n}{m}\PYG{p}{,} \PYG{n}{K}\PYG{p}{,} \PYG{n}{bitboard}\PYG{p}{)} \PYG{o}{\PYGZam{}} \PYG{n}{size} \PYG{o}{\PYGZhy{}} \PYG{l+m+mi}{1}\PYG{p}{]} \PYG{o}{=} \PYG{n}{pos}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+sa}{f}\PYG{l+s+s1}{\PYGZsq{}constexpr uint8\PYGZus{}t bitscan[}\PYG{l+s+si}{\PYGZob{}}\PYG{n}{size}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s1}{] = }\PYG{l+s+se}{\PYGZob{}\PYGZob{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+    \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{size}\PYG{p}{):}
+        \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+sa}{f}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+si}{\PYGZob{}}\PYG{n}{table}\PYG{p}{[}\PYG{n}{i}\PYG{p}{]}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s1}{,\PYGZsq{}}\PYG{p}{,} \PYG{n}{end}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}\PYGZsq{}}\PYG{p}{)}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s+s1}{\PYGZcb{};\PYGZsq{}}\PYG{p}{)}
+\end{Verbatim}

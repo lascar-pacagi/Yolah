@@ -2346,8 +2346,15 @@
   <bcf:section number="0">
     <bcf:citekey order="1">anthropic2025claude</bcf:citekey>
     <bcf:citekey order="2">cppreference</bcf:citekey>
-    <bcf:citekey order="3">anthropic2025claude</bcf:citekey>
-    <bcf:citekey order="4">cppreference</bcf:citekey>
+    <bcf:citekey order="3">stockfish2025</bcf:citekey>
+    <bcf:citekey order="4">stockfish2025</bcf:citekey>
+    <bcf:citekey order="5">kroening2016decision</bcf:citekey>
+    <bcf:citekey order="6">biere2021handbook</bcf:citekey>
+    <bcf:citekey order="7">anthropic2025claude</bcf:citekey>
+    <bcf:citekey order="8">cppreference</bcf:citekey>
+    <bcf:citekey order="9">stockfish2025</bcf:citekey>
+    <bcf:citekey order="10">kroening2016decision</bcf:citekey>
+    <bcf:citekey order="11">biere2021handbook</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="none">

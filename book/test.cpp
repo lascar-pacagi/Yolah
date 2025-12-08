@@ -55,22 +55,22 @@ using ll = uint64_t;
 
 int main() {
     random_device rd;
-    mt19937_64 mt(rd());
+    mt19937 mt(rd());
     uniform_int_distribution<ll> d;
-    unordered_map<ll, int> bitscan;
+    unordered_map<uint64_t, int> positions;
     for (int i = 0; i < 64; i++) {
-        bitscan[1ULL << i] = i;
+        positions[1ULL << i] = i;
     }
-    constexpr int k = 6;
-    auto index = [](ll magic, int k, ll bitboard) {
+    constexpr int K = 7;
+    auto index = [](uint64_t magic, int k, ll bitboard) {
         return bitboard * magic >> (64 - k);
     };
     while (true) {
-        ll magic = d(mt);
+        ll MAGIC = d(mt);
         bool found = true;
-        set<ll> seen;
-        for (const auto [bitboard, n] : bitscan) {
-            ll i = index(magic, k, bitboard);
+        set<uint64_t> seen;
+        for (const auto [bitboard, pos] : positions) {
+            int64_t i = index(MAGIC, K, bitboard);
             if (seen.contains(i)) {
                 found = false;
                 break;
@@ -78,10 +78,10 @@ int main() {
             seen.insert(i);
         }
         if (found) {
-            cout << format("found magic for k = {}: {:x}\n", k, magic);
-            vector<int> table(1 << k);
-            for (const auto [bitboard, n] : bitscan) {
-                table[index(magic, k, bitboard)] = n;
+            cout << format("found magic for K = {}: {:x}\n", K, MAGIC);
+            vector<int> table(1 << K);
+            for (const auto [bitboard, pos] : positions) {
+                table[index(MAGIC, K, bitboard)] = pos;
             }
             cout << "uint8_t bitscan[64] = {";
             for (int i = 0; i < 64; i++) {

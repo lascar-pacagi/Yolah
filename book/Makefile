@@ -24,6 +24,7 @@ MAIN_PDF = $(MAIN).pdf
 LATEX = pdflatex
 LATEX_FLAGS = --shell-escape -interaction=nonstopmode -halt-on-error
 BIBER = biber
+MAKEGLOSSARIES = makeglossaries
 
 # Python for figure generation
 PYTHON = python3
@@ -60,11 +61,12 @@ RED=\033[0;31m
 # Default target
 all: pdf
 
-# Full build with bibliography
+# Full build with bibliography and glossary
 pdf: figures
-	@echo "$(BLUE)Building $(MAIN_PDF) with bibliography...$(NO_COLOR)"
+	@echo "$(BLUE)Building $(MAIN_PDF) with bibliography and glossary...$(NO_COLOR)"
 	@$(LATEX) $(LATEX_FLAGS) $(MAIN_TEX)
 	@$(BIBER) $(MAIN)
+	@$(MAKEGLOSSARIES) $(MAIN)
 	@$(LATEX) $(LATEX_FLAGS) $(MAIN_TEX)
 	@$(LATEX) $(LATEX_FLAGS) $(MAIN_TEX)
 	@echo "$(GREEN)Build complete: $(MAIN_PDF)$(NO_COLOR)"
@@ -85,6 +87,7 @@ clean:
 	@echo "$(YELLOW)Cleaning build artifacts...$(NO_COLOR)"
 	@rm -f *.aux *.log *.out *.toc *.bbl *.blg *.bcf *.run.xml
 	@rm -f *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz
+	@rm -f *.glo *.gls *.glg *.acn *.acr *.alg *.ist
 	@rm -rf _minted-*
 	@rm -f chapters/*.aux
 	@echo "$(GREEN)Clean complete$(NO_COLOR)"
@@ -177,9 +180,10 @@ MODULAR_TEX = $(MODULAR_MAIN).tex
 MODULAR_PDF = $(MODULAR_MAIN).pdf
 
 modular: figures
-	@echo "$(BLUE)Building $(MODULAR_PDF) with bibliography...$(NO_COLOR)"
+	@echo "$(BLUE)Building $(MODULAR_PDF) with bibliography and glossary...$(NO_COLOR)"
 	@$(LATEX) $(LATEX_FLAGS) $(MODULAR_TEX)
 	@$(BIBER) $(MODULAR_MAIN)
+	@$(MAKEGLOSSARIES) $(MODULAR_MAIN)
 	@$(LATEX) $(LATEX_FLAGS) $(MODULAR_TEX)
 	@$(LATEX) $(LATEX_FLAGS) $(MODULAR_TEX)
 	@echo "$(GREEN)Modular build complete: $(MODULAR_PDF)$(NO_COLOR)"
@@ -208,6 +212,7 @@ install-deps:
 	sudo apt-get update
 	sudo apt-get install -y texlive-full texlive-latex-extra biber python3-pygments
 	@echo "$(GREEN)Dependencies installed$(NO_COLOR)"
+	@echo "$(YELLOW)Note: makeglossaries is included in texlive-full$(NO_COLOR)"
 
 # Show last 50 lines of log file
 show-log:

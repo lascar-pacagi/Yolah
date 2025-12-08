@@ -61,17 +61,10 @@ public:
 std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
 bool Yolah::game_over() const {
     uint64_t possible = ~empty & ~black & ~white;
-    
-    uint64_t around_black = shift<NORTH>(black) | shift<SOUTH>(black) | shift<EAST>(black) |
-        shift<WEST>(black) | shift<NORTH_EAST>(black) | shift<NORTH_WEST>(black) |
-        shift<SOUTH_EAST>(black) | shift<SOUTH_WEST>(black);
-     
-    uint64_t around_white = shift<NORTH>(white) | shift<SOUTH>(white) | shift<EAST>(white) |
-        shift<WEST>(white) | shift<NORTH_EAST>(white) | shift<NORTH_WEST>(white) |
-        shift<SOUTH_EAST>(white) | shift<SOUTH_WEST>(white);
-
-    uint64_t around_players = around_black | around_white;
-
+    uint64_t players  = black | white;
+    uint64_t around_players = shift<NORTH>(players) | shift<SOUTH>(players) | shift<EAST>(players) |
+        shift<WEST>(players) | shift<NORTH_EAST>(players) | shift<NORTH_WEST>(players) |
+        shift<SOUTH_EAST>(players) | shift<SOUTH_WEST>(players);
     return (around_players & possible) == 0;    
 }
 #endif

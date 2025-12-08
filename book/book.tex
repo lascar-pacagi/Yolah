@@ -84,6 +84,10 @@
 ]{biblatex}
 \addbibresource{references.bib}
 
+% Glossary
+\usepackage[acronym,toc]{glossaries}
+\makeglossaries
+
 % Hyperlinks
 \usepackage{hyperref}
 \hypersetup{
@@ -181,6 +185,27 @@
 }
 
 \date{\today}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GLOSSARY ENTRIES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Acronyms
+\newacronym{smt}{SMT}{Satisfiability Modulo Theories}
+\newacronym{ai}{AI}{Artificial Intelligence}
+\newacronym{cpu}{CPU}{Central Processing Unit}
+\newacronym{gpu}{GPU}{Graphics Processing Unit}
+
+% Terms
+\newglossaryentry{bitboard}{
+    name=bitboard,
+    description={A data structure using bit arrays to represent game board positions, where each bit corresponds to a square on the board}
+}
+
+\newglossaryentry{magicbitboard}{
+    name=magic bitboard,
+    description={A perfect hashing technique using multiplication and bit shifting to efficiently map occupied squares to move lookup tables}
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % BEGIN DOCUMENT
@@ -972,7 +997,8 @@ Happy reading!
 \chapter{Game Engine}
 \label{ch:engine}
 
-Nous allons implémenter la gestion du jeu en C++ en essayant de créer une implémentation efficace pour pouvoir réaliser un maximum de parties à la seconde, ce qui sera important pour obtenir des IA de bons niveaux. Nous testerons notre implémentation en générant un maximum de parties aléatoires en un temps donné à la fin de ce chapitre.\\
+Nous allons implémenter la gestion du jeu en C++ en essayant de créer une implémentation efficace pour pouvoir réaliser un maximum de parties à la seconde, ce qui sera important pour obtenir des IA de bons niveaux. Nous testerons notre implémentation en générant un maximum de parties aléatoires en un temps donné à la fin de ce chapitre.
+Nous allons nous inspirer de l'excellent moteur de jeu d'échecs Stockfish \cite{stockfish2025} pour les structures de données de Yolah.
 
 \section{Structure de données}
 
@@ -1380,13 +1406,11 @@ La fonction qui teste la fin de partie s'appelle \mintinline{c++}{game_over} et 
 
 \item À la ligne 2, on récupère dans \mintinline{c++}{possible} le bitboard où il y a des $1$ dans les positions libres.
 
-\item Les lignes 4 à 7 permettent de créer le bitboard \mintinline{c++}{around_black} qui contient des $1$ aux positions autour de chacun des pièces noires.
+\item À la ligne 3, on crée le bitboard \mintinline{c++}{players} qui contient des $1$ dans les positions occupées par l'un des joueurs.
 
-\item Les lignes 9 à 12 font de même pour les pièces blanches.
+\item Les lignes 4 à 8 permettent de créer le bitboard \mintinline{c++}{around_players} qui contient des $1$ aux positions autour de chacune des pièces des joueurs.
 
-\item À la ligne 14, on récupère dans le bitboard \mintinline{c++}{around_players} les positions (à $1$ dans le bitboard) des cases autour des deux joueurs.
-
-\item Enfin, à la ligne 16, on teste s'il n'existe aucune position libre à côté d'un des joueurs. En effet, le et bit-à-bit ne gardera un $1$ dans un bit du résultat, que si et seulement s'il y a un $1$ à cette position dans le bitboard
+\item Enfin, à la ligne 8, on teste s'il n'existe aucune position libre à côté d'un des joueurs. En effet, le et bit-à-bit ne gardera un $1$ dans un bit du résultat, que si et seulement s'il y a un $1$ à cette position dans le bitboard
 \mintinline{c++}{possible} et dans le bitboard \mintinline{c++}{around_players}. Donc que la case correspondante est libre et accessible par le joueur. Si le résultat de \mintinline{c++}{around_players & possible} vaut $0$, cela veut dire qu'aucune position n'est à la fois à côté d'un des joueurs et libre.
 
 \end{itemize}
@@ -1394,21 +1418,14 @@ La fonction qui teste la fin de partie s'appelle \mintinline{c++}{game_over} et 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 bool Yolah::game_over() const {
-    uint64_t possible = ~holes & ~black & ~white;
-    
-    uint64_t around_black = shift<NORTH>(black) | shift<SOUTH>(black) | 
-        shift<EAST>(black) | shift<WEST>(black) | 
-        shift<NORTH_EAST>(black) | shift<NORTH_WEST>(black) | 
-        shift<SOUTH_EAST>(black) | shift<SOUTH_WEST>(black);
-     
-    uint64_t around_white = shift<NORTH>(white) | shift<SOUTH>(white) | 
-        shift<EAST>(white) | shift<WEST>(white) | 
-        shift<NORTH_EAST>(white) | shift<NORTH_WEST>(white) | 
-        shift<SOUTH_EAST>(white) | shift<SOUTH_WEST>(white);
-
-    uint64_t around_players = around_black | around_white;
-    
-    return (around_players & possible) == 0;
+    uint64_t possible = ~empty & ~black & ~white;
+    uint64_t players  = black | white;
+    uint64_t around_players = shift<NORTH>(players) | 
+        shift<SOUTH>(players) | shift<EAST>(players) | 
+        shift<WEST>(players) | shift<NORTH_EAST>(players) | 
+        shift<NORTH_WEST>(players) | shift<SOUTH_EAST>(players) | 
+        shift<SOUTH_WEST>(players);
+    return (around_players & possible) == 0;    
 }
 \end{minted}
 \captionof{listing}{Test de fin de partie}
@@ -1440,7 +1457,7 @@ Notons que les processeurs possèdent des instructions permettant de calculer ef
 
 Mais nous allons coder cette fonction \mintinline{c++}{position} en utilisant un hachage parfait afin d'illustrer cette technique, qui nous servira pour la génération des coups possibles par la suite.\\
 
-En utilisant une table de hachage classique, nous pouvons tout d'abord remplir celle-ci avec les 63 valeurs et simplement consulter cette table par la suite, comme dans le code suivant~:
+En utilisant une table de hachage classique, nous pouvons tout d'abord remplir celle-ci avec les 64 valeurs et simplement consulter cette table par la suite, comme dans le code suivant~:
 
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 unordered_map<uint64_t, uint8_t> table {
@@ -1451,7 +1468,7 @@ int position(uint64_t x) {
 }
 \end{minted}
 
-La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau \footnote{Nous mesurerons à la fin de cette section le gain apporté par le hachage parfait par rapport à l'utilisation d'une table de hachage classique.}. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande, par exemple la valeur \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$~!). L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des $63$ valeurs\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}, que nous allons appeler clés, dans la plage $[0, 2^6 - 1 = 63]$ \footnote{Nous allons voir pourquoi $2^6 - 1$ et pas seulement $62$.}.
+La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau \footnote{Nous mesurerons à la fin de cette section le gain apporté par le hachage parfait par rapport à l'utilisation d'une table de hachage classique.}. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande, par exemple la valeur \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$~!). L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des $64$ valeurs\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}, que nous allons appeler clés, dans la plage $[0, 2^6 - 1 = 63]$.
 De plus on veut qu'il n'y ait aucune collision, d'où le nom de hachage parfait. S'il y a des collisions des positions seraient erronées. Par exemple, si les clés \mintinline{c++}{0b100} et \mintinline{c++}{0b1000000} étaient transformées en l'indice $42$, on devrait mettre dans \mintinline{c++}{table[42]} la valeur $2$ ou $6$, mais on ne peut pas stocker plus d'une valeur au même emplacement.\\
 
 La fonction de hachage parfait va avoir la forme suivante~:
@@ -1474,8 +1491,160 @@ Dans cette fonction,
 
 \end{itemize}
 
+Une méthode simple pour essayer de trouver la constante \mintinline{c++}{MAGIC} est de la générer au hasard jusqu'à trouver une valeur qui ne crée aucune collision~! Ce genre d'approche est utilisée dans Stockfish \cite{stockfish2025} pour générer les magic bitboard. Le listing \ref{lst:random_magic} montre cette approche.
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
+#include <bits/stdc++.h>
+
+using namespace std;
+
+int main() {
+    random_device rd;
+    mt19937_64 mt(rd());
+    uniform_int_distribution<uint64_t> d;
+    unordered_map<uint64_t, int> positions;
+    for (int i = 0; i < 64; i++) {
+        positions[1ULL << i] = i;
+    }
+    constexpr int K = 7;
+    auto index = [](uint64_t magic, int k, uint64_t bitboard) {
+        return bitboard * magic >> (64 - k);
+    };
+    while (true) {
+        uint64_t MAGIC = d(mt);
+        bool found = true;
+        set<uint64_t> seen;
+        for (const auto [bitboard, pos] : positions) {
+            int64_t i = index(MAGIC, K, bitboard);
+            if (seen.contains(i)) {
+                found = false;
+                break;
+            }
+            seen.insert(i);
+        }
+        if (found) {
+            cout << format("found magic for K = {}: {:#x}\n", K, MAGIC);
+            int size = 1 << K;
+            vector<int> table(size, -1);
+            for (const auto [bitboard, pos] : positions) {
+                table[index(MAGIC, K, bitboard)] = pos;
+            }
+            cout << format("uint8_t positions[{}] = {{", size);
+            for (int i = 0; i < size; i++) {
+                cout << table[i] << ',';
+            }
+            cout << "};\n";
+            break;
+        }
+    }
+}
+\end{minted}
+\captionof{listing}{Recherche aléatoire de la constante \mintinline{c++}{MAGIC}}
+\label{lst:random_magic}
+\end{mdframed}
+
+\begin{itemize}
+
+\item Aux lignes 6 à 8, nous mettons en place un générateur aléatoire pour générer aléatoirement des \mintinline{c++}{uint64_t}.
+
+\item À la ligne 9, la table de correspondance \mintinline{c++}{positions} va associer à un entier long ne contenant qu'un seul bit à $1$, la position de ce dernier. Cette table est initialisée aux lignes 10 à 12.
+
+\item À la ligne 13, la constante \mintinline{c++}{K} est le nombre de bits de notre clé obtenue par hachage parfait. Il faut que \mintinline{c++}{K} permettent de représenter toutes les valeurs que l'on doit couvrir. Par exemple, ici nous avons $64$ valeurs possibles, car nous avons $64$ positions possibles pour le bit à $1$ dans un entier long sur $64$ bits. Avec \mintinline{c++}{K == 7}, on peut couvrir $2^7$, soit $128$ valeurs différentes. Notons que c'est plus que les $64$ valeurs dont nous avons besoin et que \mintinline{c++}{K == 6} suffirait (\mintinline{c++}{K == 5} serait trop petit). Mais en essayant de trouver la constante \mintinline{c++}{MAGIC} au hasard pour \mintinline{c++}{K == 6}, ce programme ne trouvait pas en un temps raisonnable \frownie{} (nous verrons après une autre façon de faire pour réussir pour \mintinline{c++}{K == 6} \smiley).
+
+\item Aux lignes 14 à 16, la fonction \mintinline{c++}{index} calcule l'index de clé \mintinline{c++}{bitboard} (ce bitboard contient un seul bit à $1$) en utilisant la formule pour notre hachage parfait.
+
+\item La boucle \mintinline{c++}{while}, lignes 17 à 43, va boucler jusqu'à trouver la constante \mintinline{c++}{MAGIC} qui permet de réaliser un hachage parfait (du coup cette boucle peut être infinie).
+
+\item À la ligne 18, on crée la valeur \mintinline{c++}{MAGIC} au hasard.
+
+\item Le \mintinline{c++}{set<uint64_t>} de la ligne 20 va nous permettre de mémoriser les index (obtenues grâce à la fonction \mintinline{c++}{index}) que nous avons déjà utilisés pour vérifier que nous n'avons pas de collisions.
+
+\item Aux lignes 21 à 28, la boucle \mintinline{c++}{for} va tester tous les bitboards, trouver l'index de chacun d'entre eux grâce au hachage (fonction \mintinline{c++}{index}) et vérifier que nous n'avons pas de collision (ligne 23) avec les index obtenus pour les bitboard précédents.
+
+\item Enfin, aux lignes 29 à 42, si nous avons trouvé une constante \mintinline{c++}{MAGIC} qui permet de créer le hachage parfait, nous affichons celle-ci puis nous affichons un tableau en \emph{C++} qui contient la position du bit à $1$ pour chacun des bitboard. La sortie de ce programme, pour une exécution donnée, est donnée ci-dessous. 
+
+\begin{minted}[breaklines,fontsize=\small]{cpp}
+found magic for K = 7: 0x65e4d4ee86638416
+uint8_t positions[128] = {
+    63, -1, 54, -1, 49, 55, 33, -1, 50, -1, -1, 56, 34, -1, 43, -1,
+    51, -1, -1, 11, -1, -1, 57,  3, 39, 35, 14, -1, 44, 22, -1, -1,
+    52, 31, -1, -1, -1, -1, 12, 20, -1, 18, -1, -1, 58, -1, -1,  4,
+    60, 40,  0, 36, -1, 15, -1, -1, 45, -1, 27, 23,  6, -1, -1, -1,
+    62, 53, 48, 32, -1, -1, -1, 42, -1, 10, -1,  2, 38, 13, 21, -1,
+    30, -1, -1, 19, 17, -1, -1, -1, 59, -1, -1, -1, -1, 26,  5, -1,
+    61, 47, -1, 41,  9,  1, 37, -1, 29, -1, 16, -1, -1, -1, 25, -1,
+    46, -1,  8, -1, 28, -1, -1, 24, -1,  7, -1, -1, -1, -1, -1, -1
+};
+
+\end{minted}
 
 
+Pour obtenir la position du bit à $1$ pour le bitboard \mintinline{c++}{0b1000} par exemple, il faut donc consulter la valeur suivante~:
+
+\begin{minted}[breaklines,fontsize=\small]{cpp}
+   positions[0b1000 * 0x65e4d4ee86638416 >> (64 - 7)]
+== positions[0x2f26a774331c20b0 >> 57]
+== positions[0x17]
+== positions[23]
+== 3
+\end{minted}
+
+On remarque qu'il y a des places vacantes dans le tableau \mintinline{c++}{positions}, celles contenant la valeur $-1$, donc on a perdu de la place. Nous n'aurions gaspillé aucune place si nous avions trouvé une constante 
+\mintinline{c++}{MAGIC} pour \mintinline{c++}{K == 6}. Mais est-ce possible~?
+
+\end{itemize}
+
+Pour répondre à cette question nous allons procéder d'une autre manière. Nous ne voulons pas, bien entendu, balayer les $2^{64}$ ($9, 223, 372, 036, 854, 775, 808$) valeurs possibles puis à chaque fois tester si la valeur permet le hachage parfait. Nous allons utiliser un solveur \gls{smt} qui va nous permettre de fixer des contraintes avant de balayer tout l'espace de recherche. Le fait de fixer tout d'abord des contraintes va permettre d'élaguer l'espace de recherche. Notons que nous n'avons pas la garantie que la recherche soit rapide, mais pour ce problème, l'obtention d'une constante \mintinline{c++}{MAGIC} pour \mintinline{c++}{K == 6} sera très rapide. Si vous êtes intéressé par le fonctionnement d'un solveur \gls{smt} vous pouvez consulter \cite{kroening2016decision} et \cite{biere2021handbook}. 
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{python}
+from z3 import *
+
+positions = {}
+for i in range(64):
+    positions[1 << i] = i
+
+solver = Solver()
+MAGIC  = BitVec('magic', 64)
+K = 6
+bitboards = list(positions.keys())
+
+def index(magic, k, bitboard):
+    return magic * bitboard >> (64 - k)
+
+for i in range(64):
+    index1 = index(MAGIC, K, bitboards[i])
+    for j in range(i + 1, 64):
+        index2 = index(MAGIC, K, bitboards[j])
+        solver.add(index1 != index2)
+
+if solver.check() == sat:
+    model = solver.model()
+    m = model[MAGIC].as_long()
+    print(f'found magic for K = {K}: {m:#x}')
+    size = 1 << K
+    table = [-1] * size
+    for bitboard, pos in positions.items():
+        table[index(m, K, bitboard) & size - 1] = pos
+    print(f'constexpr uint8_t bitscan[{size}] = {{')
+    for i in range(size):
+        print(f'{table[i]},', end='')
+    print('\n};')
+\end{minted}
+\captionof{listing}{Recherche avec un solveur \gls{smt} de la constante \mintinline{c++}{MAGIC}}
+\label{lst:z3_magic}
+\end{mdframed}
+
+\begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
+found magic for K = 6: 0x2643c51ab9dfa5b
+constexpr uint8_t positions[64] = {
+    0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
+   12, 26, 53,  5, 24, 33, 56, 35, 61,  8, 30, 58, 37, 42, 17, 46,
+   63, 13, 21, 27, 10, 54,  6, 40, 25, 52, 32, 34, 60, 57, 36, 45,
+   62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
+};
+\end{minted}
 
 \subsection{Magic bitboard pour les mouvements des pièces}
 
@@ -1914,6 +2083,10 @@ Dans cette fonction,
 % pip install -r requirements.txt
 % python setup.py install
 % \end{minted}
+
+% Glossary
+\printglossary[type=\acronymtype,title=Acronymes]
+\printglossary[title=Glossaire]
 
 % Bibliography
 \printbibliography[heading=bibintoc]

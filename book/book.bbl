@@ -66,6 +66,107 @@
       \verb https://en.cppreference.com/
       \endverb
     \endentry
+    \entry{stockfish2025}{misc}{}
+      \name{author}{1}{}{%
+        {{hash=725cf7cb7a8a50ab616e2129c7cb2d1a}{%
+           family={{Stockfish Team}},
+           familyi={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{725cf7cb7a8a50ab616e2129c7cb2d1a}
+      \strng{fullhash}{725cf7cb7a8a50ab616e2129c7cb2d1a}
+      \strng{bibnamehash}{725cf7cb7a8a50ab616e2129c7cb2d1a}
+      \strng{authorbibnamehash}{725cf7cb7a8a50ab616e2129c7cb2d1a}
+      \strng{authornamehash}{725cf7cb7a8a50ab616e2129c7cb2d1a}
+      \strng{authorfullhash}{725cf7cb7a8a50ab616e2129c7cb2d1a}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://stockfishchess.org/}}
+      \field{note}{Accessed: 2025-01-28}
+      \field{title}{Stockfish: Open Source Chess Engine}
+      \field{year}{2025}
+    \endentry
+    \entry{kroening2016decision}{book}{}
+      \name{author}{2}{}{%
+        {{hash=b4aa934119a9d2ed6e4c21b1a7f20424}{%
+           family={Kroening},
+           familyi={K\bibinitperiod},
+           given={Daniel},
+           giveni={D\bibinitperiod}}}%
+        {{hash=3c5e8fdfc45ad491037623e3912c70f0}{%
+           family={Strichman},
+           familyi={S\bibinitperiod},
+           given={Ofer},
+           giveni={O\bibinitperiod}}}%
+      }
+      \list{location}{1}{%
+        {Berlin Heidelberg}%
+      }
+      \list{publisher}{1}{%
+        {Springer-Verlag}%
+      }
+      \strng{namehash}{7988d1e5af104ac7bcd2b83558e40308}
+      \strng{fullhash}{7988d1e5af104ac7bcd2b83558e40308}
+      \strng{bibnamehash}{7988d1e5af104ac7bcd2b83558e40308}
+      \strng{authorbibnamehash}{7988d1e5af104ac7bcd2b83558e40308}
+      \strng{authornamehash}{7988d1e5af104ac7bcd2b83558e40308}
+      \strng{authorfullhash}{7988d1e5af104ac7bcd2b83558e40308}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{edition}{2nd}
+      \field{isbn}{978-3-662-50496-3}
+      \field{series}{Texts in Theoretical Computer Science. An EATCS Series}
+      \field{title}{Decision Procedures: An Algorithmic Point of View}
+      \field{year}{2016}
+    \endentry
+    \entry{biere2021handbook}{book}{}
+      \name{editor}{4}{}{%
+        {{hash=22081d00e30965a89f413e528510617e}{%
+           family={Biere},
+           familyi={B\bibinitperiod},
+           given={Armin},
+           giveni={A\bibinitperiod}}}%
+        {{hash=adbf24c301850e2a04b396044f205f4d}{%
+           family={Heule},
+           familyi={H\bibinitperiod},
+           given={Marijn},
+           giveni={M\bibinitperiod}}}%
+        {{hash=9110f8aed04ba11abf11338d3fa9e672}{%
+           family={Maaren},
+           familyi={M\bibinitperiod},
+           given={Hans},
+           giveni={H\bibinitperiod},
+           prefix={van},
+           prefixi={v\bibinitperiod}}}%
+        {{hash=0083caa546c0b2a86576a95dbef046a9}{%
+           family={Walsh},
+           familyi={W\bibinitperiod},
+           given={Toby},
+           giveni={T\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {IOS Press}%
+      }
+      \strng{namehash}{bc3be1691d20d567b9af500e799dfef0}
+      \strng{fullhash}{60fef90d3c5cb633c07f7a5f833c667a}
+      \strng{bibnamehash}{60fef90d3c5cb633c07f7a5f833c667a}
+      \strng{editorbibnamehash}{60fef90d3c5cb633c07f7a5f833c667a}
+      \strng{editornamehash}{bc3be1691d20d567b9af500e799dfef0}
+      \strng{editorfullhash}{60fef90d3c5cb633c07f7a5f833c667a}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{labelnamesource}{editor}
+      \field{labeltitlesource}{title}
+      \field{edition}{2nd}
+      \field{isbn}{978-1-64368-160-3}
+      \field{series}{Frontiers in Artificial Intelligence and Applications}
+      \field{title}{Handbook of Satisfiability}
+      \field{volume}{336}
+      \field{year}{2021}
+    \endentry
   \enddatalist
 \endrefsection
 \endinput

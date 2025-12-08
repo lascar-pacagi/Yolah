@@ -45,6 +45,7 @@ bool Yolah::game_over() const {
         (shift<SOUTH_EAST>(white) & possible) == 0 &&
         (shift<SOUTH_WEST>(white) & possible) == 0;   
     */
+/*
     uint64_t possible = ~empty & ~black & ~white;
     uint64_t around_black = shift<NORTH>(black) | shift<SOUTH>(black) | shift<EAST>(black) |
     shift<WEST>(black) | shift<NORTH_EAST>(black) | shift<NORTH_WEST>(black) |
@@ -57,6 +58,13 @@ bool Yolah::game_over() const {
     uint64_t around = around_black | around_white;
 
     return (around & possible) == 0;
+*/
+    uint64_t possible = ~empty & ~black & ~white;
+    uint64_t players  = black | white;
+    uint64_t around_players = shift<NORTH>(players) | shift<SOUTH>(players) | shift<EAST>(players) |
+        shift<WEST>(players) | shift<NORTH_EAST>(players) | shift<NORTH_WEST>(players) |
+        shift<SOUTH_EAST>(players) | shift<SOUTH_WEST>(players);
+    return (around_players & possible) == 0;
 }
 
 bool Yolah::valid(Move m) const {
