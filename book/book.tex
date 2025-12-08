@@ -195,6 +195,7 @@
 \newacronym{ai}{AI}{Artificial Intelligence}
 \newacronym{cpu}{CPU}{Central Processing Unit}
 \newacronym{gpu}{GPU}{Graphics Processing Unit}
+\newacronym{z3}{Z3}{Z3 Theorem Prover - An efficient SMT solver developed by Microsoft Research}
 
 % Terms
 \newglossaryentry{bitboard}{
@@ -1595,7 +1596,9 @@ On remarque qu'il y a des places vacantes dans le tableau \mintinline{c++}{posit
 
 \end{itemize}
 
-Pour répondre à cette question nous allons procéder d'une autre manière. Nous ne voulons pas, bien entendu, balayer les $2^{64}$ ($9, 223, 372, 036, 854, 775, 808$) valeurs possibles puis à chaque fois tester si la valeur permet le hachage parfait. Nous allons utiliser un solveur \gls{smt} qui va nous permettre de fixer des contraintes avant de balayer tout l'espace de recherche. Le fait de fixer tout d'abord des contraintes va permettre d'élaguer l'espace de recherche. Notons que nous n'avons pas la garantie que la recherche soit rapide, mais pour ce problème, l'obtention d'une constante \mintinline{c++}{MAGIC} pour \mintinline{c++}{K == 6} sera très rapide. Si vous êtes intéressé par le fonctionnement d'un solveur \gls{smt} vous pouvez consulter \cite{kroening2016decision} et \cite{biere2021handbook}. 
+Pour répondre à cette question nous allons procéder d'une autre manière. Nous ne voulons pas, bien entendu, balayer les $2^{64}$ ($9, 223, 372, 036, 854, 775, 808$) valeurs possibles puis à chaque fois tester si la valeur permet le hachage parfait. Nous allons utiliser un solveur \gls{smt} qui va nous permettre de fixer des contraintes avant de balayer tout l'espace de recherche. Le fait de fixer tout d'abord des contraintes va permettre d'élaguer l'espace de recherche. Notons que nous n'avons pas la garantie que la recherche soit rapide, mais pour ce problème, l'obtention d'une constante \mintinline{c++}{MAGIC} pour \mintinline{c++}{K == 6} sera très rapide. Si vous êtes intéressé par le fonctionnement d'un solveur \gls{smt} vous pouvez consulter \cite{kroening2016decision} et \cite{biere2021handbook}.\\
+
+Le code du listing \ref{lst:z3_magic} décrit l'approche utilisant le solveur \gls{z3} \cite{moura2008z3}.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{python}
@@ -1627,7 +1630,7 @@ if solver.check() == sat:
     table = [-1] * size
     for bitboard, pos in positions.items():
         table[index(m, K, bitboard) & size - 1] = pos
-    print(f'constexpr uint8_t bitscan[{size}] = {{')
+    print(f'constexpr uint8_t positions[{size}] = {{')
     for i in range(size):
         print(f'{table[i]},', end='')
     print('\n};')
@@ -1636,7 +1639,44 @@ if solver.check() == sat:
 \label{lst:z3_magic}
 \end{mdframed}
 
-\begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
+\begin{itemize}
+
+\item Les lignes 3 à 5 permettent de faire correspondre à un bitboard donné ne contenant qu'un bit à $1$, la position correspondante de ce bit. On utilise pour ce faire le dictionnaire \mintinline{python}{positions} (ligne 3).
+
+\item À la ligne 7, on instantie le solveur \gls{z3}.
+
+\item À la ligne 8, on déclare que la constante \mintinline{python}{MAGIC} est du type \mintinline{python}{z3.BitVec} qui est un type proposé par le solveur \gls{z3} qui permet de représenter des vecteurs de bits, ici nous utilisons un vecteur de $64$ bits.
+
+\item La fonction \mintinline{python}{index} définie aux lignes 12 et 13 permet de calculer le hachage en fonction de la constante \mintinline{python}{MAGIC} et de \mintinline{python}{K}.
+
+\item Aux lignes 15 à 19 on donne au solver les contraintes que les valeurs hachées par la fonction \mintinline{python}{index} de deux bitboards différents ne doivent pas se retrouver au même emplacement. Cette contrainte permet d'assurer que le hachage est parfait.
+
+\item À la ligne 21 on execute le solveur et il nous indique par la valeur \mintinline{python}{sat} s'il a trouvé une valeur pour \mintinline{python}{MAGIC} qui satisfait les contraintes. Notons que si le solveur répond \mintinline{python}{unsat} à la place de \mintinline{python}{sat}, cela veut dire qu'il n'existe aucun entier sur $64$ bits qui permette le hachage parfait. Même si l'espace de recherche est très grand, sur ma machine, l'obtention d'une solution se fait en moins d'une seconde~!
+
+\item Les lignes 22 à 32 permettent d'afficher sur la sortie standard la valeur \mintinline{python}{MAGIC} ainsi que le tableau \emph{C++} des valeurs obtenues. Ce tableau est donné ci-dessous. Notons qu'en \emph{Python} il était important d'effectuer 
+l'opération \mintinline{python}{index(m, K, bitboard) & size - 1} à la ligne 28 car les nombres entiers ont une précision arbitraire et par exemple nous avons
+
+\begin{minted}[breaklines,fontsize=\small]{python}
+   0x2643c51ab9dfa5b * 0x8000000000000000 >> 58
+== 0x4c878a3573bf4b60
+
+   (0x2643c51ab9dfa5b * 0x8000000000000000 >> 58) & size - 1
+== 0x4c878a3573bf4b60 & 0b111111
+== 32
+\end{minted}
+
+En \emph{C++} nous aurions
+
+\begin{minted}[breaklines,fontsize=\small]{cpp}
+   0x2643c51ab9dfa5b * 0x8000000000000000 >> 58
+== 32
+\end{minted}
+
+Remarquons que nous n'avons pas le même problème à la ligne 18 car \mintinline{python}{MAGIC} est de type \mintinline{python}{BitVec(64)}.\\
+
+\end{itemize}
+
+\begin{minted}[breaklines,fontsize=\small]{cpp}
 found magic for K = 6: 0x2643c51ab9dfa5b
 constexpr uint8_t positions[64] = {
     0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
@@ -1646,7 +1686,11 @@ constexpr uint8_t positions[64] = {
 };
 \end{minted}
 
+Maintenant que nous avons vu sur un exemple simple comment marche la technique des magic bitboard (ou hachage parfait), nous allons pouvoir étudier la génération des mouvements possibles des pièces en utilisant cette technique. 
+
 \subsection{Magic bitboard pour les mouvements des pièces}
+
+\subsection{Jouer et annuler un coup}
 
 \section{Code complet commenté du plateau de jeu}
 
@@ -1671,6 +1715,7 @@ constexpr uint8_t positions[64] = {
 \end{mdframed}
 
 \section{Test avec des parties aléatoires}
+
 
 \section{La suite}
 

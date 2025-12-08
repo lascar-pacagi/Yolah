@@ -1,0 +1,8 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+   \PYG{l+m+mh}{0x2643c51ab9dfa5b} \PYG{o}{*} \PYG{l+m+mh}{0x8000000000000000} \PYG{o}{\PYGZgt{}\PYGZgt{}} \PYG{l+m+mi}{58}
+\PYG{o}{==} \PYG{l+m+mh}{0x4c878a3573bf4b60}
+
+   \PYG{p}{(}\PYG{l+m+mh}{0x2643c51ab9dfa5b} \PYG{o}{*} \PYG{l+m+mh}{0x8000000000000000} \PYG{o}{\PYGZgt{}\PYGZgt{}} \PYG{l+m+mi}{58}\PYG{p}{)} \PYG{o}{\PYGZam{}} \PYG{n}{size} \PYG{o}{\PYGZhy{}} \PYG{l+m+mi}{1}
+\PYG{o}{==} \PYG{l+m+mh}{0x4c878a3573bf4b60} \PYG{o}{\PYGZam{}} \PYG{l+m+mb}{0b111111}
+\PYG{o}{==} \PYG{l+m+mi}{32}
+\end{Verbatim}

@@ -27,7 +27,7 @@
     \PYG{n}{table} \PYG{o}{=} \PYG{p}{[}\PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{1}\PYG{p}{]} \PYG{o}{*} \PYG{n}{size}
     \PYG{k}{for} \PYG{n}{bitboard}\PYG{p}{,} \PYG{n}{pos} \PYG{o+ow}{in} \PYG{n}{positions}\PYG{o}{.}\PYG{n}{items}\PYG{p}{():}
         \PYG{n}{table}\PYG{p}{[}\PYG{n}{index}\PYG{p}{(}\PYG{n}{m}\PYG{p}{,} \PYG{n}{K}\PYG{p}{,} \PYG{n}{bitboard}\PYG{p}{)} \PYG{o}{\PYGZam{}} \PYG{n}{size} \PYG{o}{\PYGZhy{}} \PYG{l+m+mi}{1}\PYG{p}{]} \PYG{o}{=} \PYG{n}{pos}
-    \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+sa}{f}\PYG{l+s+s1}{\PYGZsq{}constexpr uint8\PYGZus{}t bitscan[}\PYG{l+s+si}{\PYGZob{}}\PYG{n}{size}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s1}{] = }\PYG{l+s+se}{\PYGZob{}\PYGZob{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+sa}{f}\PYG{l+s+s1}{\PYGZsq{}constexpr uint8\PYGZus{}t positions[}\PYG{l+s+si}{\PYGZob{}}\PYG{n}{size}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s1}{] = }\PYG{l+s+se}{\PYGZob{}\PYGZob{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
     \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{size}\PYG{p}{):}
         \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+sa}{f}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+si}{\PYGZob{}}\PYG{n}{table}\PYG{p}{[}\PYG{n}{i}\PYG{p}{]}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s1}{,\PYGZsq{}}\PYG{p}{,} \PYG{n}{end}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}\PYGZsq{}}\PYG{p}{)}
     \PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s+s1}{\PYGZcb{};\PYGZsq{}}\PYG{p}{)}

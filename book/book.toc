@@ -10,16 +10,16 @@
 \contentsline {section}{\numberline {2.2}Test de fin de partie}{15}{section.2.2}%
 \contentsline {section}{\numberline {2.3}Génération des mouvements possibles pour les pièces}{19}{section.2.3}%
 \contentsline {subsection}{\numberline {2.3.1}Hachage parfait}{20}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {2.3.2}Magic bitboard pour les mouvements des pièces}{25}{subsection.2.3.2}%
-\contentsline {section}{\numberline {2.4}Code complet commenté du plateau de jeu}{25}{section.2.4}%
-\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{30}{section.2.5}%
-\contentsline {section}{\numberline {2.6}La suite}{30}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{31}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{33}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{35}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{37}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{39}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{41}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{43}{chapter.9}%
-\contentsline {chapter}{Acronymes}{45}{section*.22}%
-\contentsline {chapter}{Bibliography}{47}{appendix*.24}%
+\contentsline {subsection}{\numberline {2.3.2}Magic bitboard pour les mouvements des pièces}{26}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}Code complet commenté du plateau de jeu}{26}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Test avec des parties aléatoires}{31}{section.2.5}%
+\contentsline {section}{\numberline {2.6}La suite}{31}{section.2.6}%
+\contentsline {chapter}{\numberline {3}AI Players}{33}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{35}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{37}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{39}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{41}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{43}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{45}{chapter.9}%
+\contentsline {chapter}{Acronymes}{47}{section*.22}%
+\contentsline {chapter}{Bibliography}{49}{appendix*.24}%

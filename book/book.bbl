@@ -167,6 +167,45 @@
       \field{volume}{336}
       \field{year}{2021}
     \endentry
+    \entry{moura2008z3}{inproceedings}{}
+      \name{author}{2}{}{%
+        {{hash=04ffe79f369bf9f16e299fcf4f98e780}{%
+           family={Moura},
+           familyi={M\bibinitperiod},
+           given={Leonardo},
+           giveni={L\bibinitperiod},
+           prefix={de},
+           prefixi={d\bibinitperiod}}}%
+        {{hash=99b7b42f13980bae3d14cd2bbc329658}{%
+           family={Bj{ø}rner},
+           familyi={B\bibinitperiod},
+           given={Nikolaj},
+           giveni={N\bibinitperiod}}}%
+      }
+      \list{location}{1}{%
+        {Berlin, Heidelberg}%
+      }
+      \list{publisher}{1}{%
+        {Springer}%
+      }
+      \strng{namehash}{8ed841e87e50b9624f9ae19c1fa525cc}
+      \strng{fullhash}{8ed841e87e50b9624f9ae19c1fa525cc}
+      \strng{bibnamehash}{8ed841e87e50b9624f9ae19c1fa525cc}
+      \strng{authorbibnamehash}{8ed841e87e50b9624f9ae19c1fa525cc}
+      \strng{authornamehash}{8ed841e87e50b9624f9ae19c1fa525cc}
+      \strng{authorfullhash}{8ed841e87e50b9624f9ae19c1fa525cc}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Tools and Algorithms for the Construction and Analysis of Systems (TACAS)}
+      \field{series}{Lecture Notes in Computer Science}
+      \field{title}{Z3: An Efficient SMT Solver}
+      \field{volume}{4963}
+      \field{year}{2008}
+      \field{pages}{337\bibrangedash 340}
+      \range{pages}{4}
+    \endentry
   \enddatalist
 \endrefsection
 \endinput
