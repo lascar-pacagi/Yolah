@@ -63,8 +63,8 @@ int main(int argc, char* argv[]) {
         // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
         //                     Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
         //                     {0, 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31}, 300, 14);
-        data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
-                            Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_nnue_quantized_player.cfg"))), 
+        data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_player.cfg"))), 
+                            Player::create(nlohmann::json::parse(std::ifstream("/Yolah/config/mm_player.cfg"))), 
                             {0, 1, 2, 3, 4, 5}, 300, 14);
         // data::generate_games(output, Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
         //                     Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))), 
