@@ -1,16 +1,16 @@
 \babel@toc {english}{}\relax 
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {2.1}{\ignorespaces Positions de chaque cases du plateau dans le bitboard\relax }}{11}{table.caption.13}%
-\contentsline {table}{\numberline {2.2}{\ignorespaces Positions des pièces noires\relax }}{13}{table.caption.15}%
-\contentsline {table}{\numberline {2.3}{\ignorespaces Positions des pièces blanches\relax }}{13}{table.caption.16}%
-\contentsline {table}{\numberline {2.4}{\ignorespaces Positions des cases détruites (les trous)\relax }}{13}{table.caption.17}%
-\contentsline {table}{\numberline {2.5}{\ignorespaces Positions des pièces noires et blanches que l'on obtient en faisant~: \mintinline {c++}{black | white}\relax }}{15}{table.caption.18}%
-\contentsline {table}{\numberline {2.6}{\ignorespaces Positions de chaque cases du plateau dans le bitboard. Remarquons que pour une case qui ne se trouve pas dans la rangée 8, bit$_{i+8}$ est le bit correspondant à la case au nord de la case du bit$_i$\relax }}{16}{table.caption.19}%
-\contentsline {table}{\numberline {2.7}{\ignorespaces Plateau de jeu avant d'effectuer \mintinline {c++}{shift<NORTH>}\relax }}{17}{table.caption.20}%
-\contentsline {table}{\numberline {2.8}{\ignorespaces Plateau de jeu après avoir effectuer \mintinline {c++}{shift<NORTH>}\relax }}{17}{table.caption.20}%
-\contentsline {table}{\numberline {2.9}{\ignorespaces Plateau de jeu\relax }}{18}{table.caption.21}%
-\contentsline {table}{\numberline {2.10}{\ignorespaces Positions autour des pièces\relax }}{18}{table.caption.21}%
+\contentsline {table}{\numberline {2.1}{\ignorespaces Position of each board square in the bitboard\relax }}{11}{table.caption.13}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Black piece positions\relax }}{13}{table.caption.15}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces White piece positions\relax }}{13}{table.caption.16}%
+\contentsline {table}{\numberline {2.4}{\ignorespaces Destroyed square positions (holes)\relax }}{13}{table.caption.17}%
+\contentsline {table}{\numberline {2.5}{\ignorespaces Black and white piece positions obtained by computing: \mintinline {c++}{black | white}\relax }}{15}{table.caption.18}%
+\contentsline {table}{\numberline {2.6}{\ignorespaces Position of each board square in the bitboard. Note that for a square not in rank 8, bit$_{i+8}$ corresponds to the square north of bit$_i$\relax }}{16}{table.caption.19}%
+\contentsline {table}{\numberline {2.7}{\ignorespaces Game board before applying \mintinline {c++}{shift<NORTH>}\relax }}{17}{table.caption.20}%
+\contentsline {table}{\numberline {2.8}{\ignorespaces Game board after applying \mintinline {c++}{shift<NORTH>}\relax }}{17}{table.caption.20}%
+\contentsline {table}{\numberline {2.9}{\ignorespaces Game board\relax }}{18}{table.caption.21}%
+\contentsline {table}{\numberline {2.10}{\ignorespaces Positions around the pieces\relax }}{18}{table.caption.21}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

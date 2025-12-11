@@ -1,5 +1,4 @@
 #include <benchmark/benchmark.h>
-#include <random>
 #include <unordered_map>
 #include <vector>
 
@@ -13,67 +12,48 @@ std::vector<ll> generate_isolated_bits() {
     return samples;
 }
 
-static void BM_MagicBitscan_IsolatedBits(benchmark::State& state) {
+static void BM_magic_positions(benchmark::State& state) {
     constexpr ll MAGIC = 0x2643c51ab9dfa5b;
     constexpr int K = 6;
-    constexpr uint8_t bitscan[64] = {
+    constexpr uint8_t positions[64] = {
         0,1,2,14,3,22,28,15,11,4,23,55,7,29,41,16,12,26,53,5,24,33,56,35,61,8,30,58,37,42,17,46,63,13,21,27,10,54,6,40,25,52,32,34,60,57,36,45,62,20,9,39,51,31,59,44,19,38,50,43,18,49,48,47,
     };
     auto samples = generate_isolated_bits();
-    constexpr int LOOKUPS_PER_ITER = 100;
     size_t idx = 0;
-    //int sum = 0;
     for (auto _ : state) {
-        int sum = 0;
-        //for (int i = 0; i < LOOKUPS_PER_ITER; i++) {
-            ll bitboard = samples[idx++ & 63];
-            //sum += bitscan[bitboard * MAGIC >> (64 - K)];
-        //}
-        benchmark::DoNotOptimize(bitscan[bitboard * MAGIC >> (64 - K)]);
+        ll bitboard = samples[idx++ & 63];
+        benchmark::DoNotOptimize(positions[bitboard * MAGIC >> (64 - K)]);
     }
-    state.SetItemsProcessed(state.iterations() * LOOKUPS_PER_ITER);
+    state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_MagicBitscan_IsolatedBits);
+BENCHMARK(BM_magic_positions);
 
-static void BM_UnorderedMap_IsolatedBits(benchmark::State& state) {
+static void BM_unordered_map_positions(benchmark::State& state) {
     std::unordered_map<ll, uint8_t> map;
     for (uint8_t i = 0; i < 64; i++) {
         map[1ULL << i] = i;
     }
     auto samples = generate_isolated_bits();
-    constexpr int LOOKUPS_PER_ITER = 100;
     size_t idx = 0;
-    //int sum = 0;
     for (auto _ : state) {
-        //int sum = 0;
-        //for (int i = 0; i < LOOKUPS_PER_ITER; i++) {
-            ll bitboard = samples[idx++ & 63];
-            //sum += map[bitboard];
-        //}
+        ll bitboard = samples[idx++ & 63];
         benchmark::DoNotOptimize(map[bitboard]);
     }
 
-    state.SetItemsProcessed(state.iterations() * LOOKUPS_PER_ITER);
+    state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_UnorderedMap_IsolatedBits);
+BENCHMARK(BM_unordered_map_positions);
 
-static void BM_BuiltinCTZ_IsolatedBits(benchmark::State& state) {
+static void BM_builtin_ctz_positions(benchmark::State& state) {
     auto samples = generate_isolated_bits();
-    constexpr int LOOKUPS_PER_ITER = 100;
     size_t idx = 0;
-    //int sum = 0;
     for (auto _ : state) {
-        //int sum = 0;
-        //for (int i = 0; i < LOOKUPS_PER_ITER; i++) {
-            ll bitboard = samples[idx++ & 63];
-            //sum += __builtin_ctzll(bitboard);
-        //}
+        ll bitboard = samples[idx++ & 63];
         benchmark::DoNotOptimize(__builtin_ctzll(bitboard));
     }
-
-    state.SetItemsProcessed(state.iterations() * LOOKUPS_PER_ITER);
+    state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_BuiltinCTZ_IsolatedBits);
+BENCHMARK(BM_builtin_ctz_positions);
 
 BENCHMARK_MAIN();
 

@@ -2,8 +2,8 @@
 \begin{theglossary}\glossaryheader
 \glsgroupheading{S}\relax \glsresetentrylist %
 \glossentry{smt}{\glossaryentrynumbers{\relax 
-		\setentrycounter[]{page}\glsnumberformat{24\delimN 25}}}\glsgroupskip
+		\setentrycounter[]{page}\glsnumberformat{23\delimN 24}}}\glsgroupskip
 \glsgroupheading{Z}\relax \glsresetentrylist %
 \glossentry{z3}{\glossaryentrynumbers{\relax 
-		\setentrycounter[]{page}\glsnumberformat{24\delimN 25}}}%
+		\setentrycounter[]{page}\glsnumberformat{23\delimN 24}}}%
 \end{theglossary}\glossarypostamble

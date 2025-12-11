@@ -1,0 +1,19 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{File}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{FILE\PYGZus{}A}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}B}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}C}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}D}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}E}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}F}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}G}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}H}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{FILE\PYGZus{}NB}
+\PYG{p}{\PYGZcb{};}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Rank}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{RANK\PYGZus{}1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}8}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{RANK\PYGZus{}NB}
+\PYG{p}{\PYGZcb{};}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mh}{0x0101010101010101}\PYG{p}{;}
+\PYG{c+c1}{//   0x0101010101010101}
+\PYG{c+c1}{//== 0b0000000100000001000000010000000100000001000000010000000100000001}
+\PYG{c+c1}{//            a8      a7      a6      a5      a4      a3      a2      a1}
+
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileHBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{;}
+\PYG{c+c1}{//   0x8080808080808080}
+\PYG{c+c1}{//== 0b1000000010000000100000001000000010000000100000001000000010000000}
+\PYG{c+c1}{//     h8      h7      h6      h5      h4      h3      h2      h1}
+\end{Verbatim}

@@ -2351,12 +2351,14 @@
     <bcf:citekey order="5">kroening2016decision</bcf:citekey>
     <bcf:citekey order="6">biere2021handbook</bcf:citekey>
     <bcf:citekey order="7">moura2008z3</bcf:citekey>
-    <bcf:citekey order="8">anthropic2025claude</bcf:citekey>
-    <bcf:citekey order="9">cppreference</bcf:citekey>
-    <bcf:citekey order="10">stockfish2025</bcf:citekey>
-    <bcf:citekey order="11">kroening2016decision</bcf:citekey>
-    <bcf:citekey order="12">biere2021handbook</bcf:citekey>
-    <bcf:citekey order="13">moura2008z3</bcf:citekey>
+    <bcf:citekey order="8">googlebenchmark2025</bcf:citekey>
+    <bcf:citekey order="9">anthropic2025claude</bcf:citekey>
+    <bcf:citekey order="10">cppreference</bcf:citekey>
+    <bcf:citekey order="11">stockfish2025</bcf:citekey>
+    <bcf:citekey order="12">kroening2016decision</bcf:citekey>
+    <bcf:citekey order="13">biere2021handbook</bcf:citekey>
+    <bcf:citekey order="14">moura2008z3</bcf:citekey>
+    <bcf:citekey order="15">googlebenchmark2025</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="none">

@@ -206,6 +206,27 @@
       \field{pages}{337\bibrangedash 340}
       \range{pages}{4}
     \endentry
+    \entry{googlebenchmark2025}{misc}{}
+      \name{author}{1}{}{%
+        {{hash=8b36e9207c24c76e6719268e49201d94}{%
+           family={{Google}},
+           familyi={G\bibinitperiod}}}%
+      }
+      \strng{namehash}{8b36e9207c24c76e6719268e49201d94}
+      \strng{fullhash}{8b36e9207c24c76e6719268e49201d94}
+      \strng{bibnamehash}{8b36e9207c24c76e6719268e49201d94}
+      \strng{authorbibnamehash}{8b36e9207c24c76e6719268e49201d94}
+      \strng{authornamehash}{8b36e9207c24c76e6719268e49201d94}
+      \strng{authorfullhash}{8b36e9207c24c76e6719268e49201d94}
+      \field{sortinit}{8}
+      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://github.com/google/benchmark}}
+      \field{note}{C++ microbenchmarking library}
+      \field{title}{Google Benchmark: A microbenchmark support library}
+      \field{year}{2025}
+    \endentry
   \enddatalist
 \endrefsection
 \endinput

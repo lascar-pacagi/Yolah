@@ -1,0 +1,12 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+Run on (12 X 4400 MHz CPU s)
+CPU Caches: L1 Data 32 KiB (x6), L1 Instruction 32 KiB (x6),
+            L2 Unified 256 KiB (x6), L3 Unified 12288 KiB (x1)
+Load Average: 0.62, 1.33, 2.92
+
+Benchmark                      Time        CPU    Iterations  Throughput
+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}
+BM\PYGZus{}magic\PYGZus{}positions          0.542 ns   0.542 ns   1000000000  1.85 G/s
+BM\PYGZus{}unordered\PYGZus{}map\PYGZus{}positions   30.2 ns    30.2 ns     23361655  33.1 M/s
+BM\PYGZus{}builtin\PYGZus{}ctz\PYGZus{}positions    0.480 ns   0.480 ns   1000000000  2.08 G/s
+\end{Verbatim}

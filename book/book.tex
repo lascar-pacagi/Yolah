@@ -195,7 +195,7 @@
 \newacronym{ai}{AI}{Artificial Intelligence}
 \newacronym{cpu}{CPU}{Central Processing Unit}
 \newacronym{gpu}{GPU}{Graphics Processing Unit}
-\newacronym{z3}{Z3}{Z3 Theorem Prover - An efficient SMT solver developed by Microsoft Research}
+\newacronym{z3}{Z3}{Z3 Theorem Prover}
 
 % Terms
 \newglossaryentry{bitboard}{
@@ -205,7 +205,7 @@
 
 \newglossaryentry{magicbitboard}{
     name=magic bitboard,
-    description={A perfect hashing technique using multiplication and bit shifting to efficiently map occupied squares to move lookup tables}
+    description={A technique using specially chosen multiplication constants (magic numbers) and bit shifting to create a minimal perfect hash for efficiently mapping occupied squares to move lookup tables}
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -998,16 +998,20 @@ Happy reading!
 \chapter{Game Engine}
 \label{ch:engine}
 
-Nous allons implémenter la gestion du jeu en C++ en essayant de créer une implémentation efficace pour pouvoir réaliser un maximum de parties à la seconde, ce qui sera important pour obtenir des IA de bons niveaux. Nous testerons notre implémentation en générant un maximum de parties aléatoires en un temps donné à la fin de ce chapitre.
-Nous allons nous inspirer de l'excellent moteur de jeu d'échecs Stockfish \cite{stockfish2025} pour les structures de données de Yolah.
+% Nous allons implémenter la gestion du jeu en C++ en essayant de créer une implémentation efficace pour pouvoir réaliser un maximum de parties à la seconde, ce qui sera important pour obtenir des IA de bons niveaux. Nous testerons notre implémentation en générant un maximum de parties aléatoires en un temps donné à la fin de ce chapitre.
+% Nous allons nous inspirer de l'excellent moteur de jeu d'échecs Stockfish pour les structures de données de Yolah.
+We will implement game management in C++, striving to create an efficient implementation capable of running as many games per second as possible—this will be crucial for developing high-level AIs. We will test our implementation by generating as many random games as possible within a given time at the end of this chapter.
+We will draw inspiration from the excellent Stockfish chess engine \cite{stockfish2025} for Yolah's data structures.
 
-\section{Structure de données}
+\section{Data Structures}
 
-Nous allons représenter la position des noirs, des blancs et des cases détruites par des des entiers non signés sur $64$ bits~: \mintinline{c++}{uint64_t}. Nous appelerons bitboard ces entiers. Nous prenons des \mintinline{c++}{uint64_t} car le plateau de Yolah contient $64$ cases, nous avons donc un bit par case. La table \ref{tab:bitboard_indices} donne la position de chaque cases du plateau dans le bitboard. Cette information est représentée dans le code par l'énumération du listing \ref{lst:squares} \footnote{Par défaut, l'énumeration commence à la valeur 0, donc \mintinline{c++}{SQ_A1} vaut 0, \mintinline{c++}{SQ_A1} vaut 1, \ldots}.\\
+% Nous allons représenter la position des noirs, des blancs et des cases détruites par des des entiers non signés sur 64 bits : uint64_t. Nous appelerons bitboard ces entiers. Nous prenons des uint64_t car le plateau de Yolah contient 64 cases, nous avons donc un bit par case. La table donne la position de chaque cases du plateau dans le bitboard. Cette information est représentée dans le code par l'énumération du listing.
+We will represent the positions of black pieces, white pieces, and destroyed squares using $64$-bit unsigned integers: \mintinline{c++}{uint64_t}. We call these integers bitboards. We use \mintinline{c++}{uint64_t} because the Yolah board contains $64$ squares, giving us one bit per square. Table \ref{tab:bitboard_indices} shows the position of each board square in the bitboard. This information is represented in code by the enumeration in Listing \ref{lst:squares}\footnote{By default, the enumeration starts at value 0, so \mintinline{c++}{SQ_A1} equals 0, \mintinline{c++}{SQ_B1} equals 1, \ldots}.\\
 
 \begin{table}[htpb]
 \centering
-\caption{Positions de chaque cases du plateau dans le bitboard}
+% \caption{Positions de chaque cases du plateau dans le bitboard}
+\caption{Position of each board square in the bitboard}
 \label{tab:bitboard_indices}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1040,7 +1044,8 @@ enum Square : int8_t {
     SQUARE_NB   = 64
 };
 \end{minted}
-\captionof{listing}{Les cases du plateau de jeu}
+% \captionof{listing}{Les cases du plateau de jeu}
+\captionof{listing}{Board squares}
 \label{lst:squares}
 \end{mdframed}
 
@@ -1048,18 +1053,22 @@ enum Square : int8_t {
 \begin{figure}[htpb]
 \centering
 \includegraphics[width=0.5\textwidth]{yolah_game_example_move21.png}
-\caption{Configuration du plateau de jeu correspondant au coup 21 de la partie donnée en example dans le chapitre précédent (figure \ref{fig:game_example_move21})}
+% \caption{Configuration du plateau de jeu correspondant au coup 21 de la partie donnée en example dans le chapitre précédent (figure \ref{fig:game_example_move21})}
+\caption{Board configuration corresponding to move 21 of the game given as an example in the previous chapter (Figure \ref{fig:game_example_move21})}
 \label{fig:yolah_game_engine1}
 \end{figure}
 
-Prenons comme exemple le plateau représenté dans la figure \ref{fig:yolah_game_engine1}.\\
+% Prenons comme exemple le plateau représenté dans la figure.
+Let us take as an example the board shown in Figure \ref{fig:yolah_game_engine1}.\\
 \begin{itemize}
-\item Les positions des pièces noires sur le plateau (table \ref{tab:black_positions_game_example_move21}) sont représentées par le bitboard~:
+% \item Les positions des pièces noires sur le plateau sont représentées par le bitboard :
+\item The positions of black pieces on the board (Table \ref{tab:black_positions_game_example_move21}) are represented by the bitboard:
 \mintinline{c++}{0b0000001010000000000000010000000000100000000000000000000000000000}.\\
 
 \begin{table}[htpb]
 \centering
-\caption{Positions des pièces noires}
+% \caption{Positions des pièces noires}
+\caption{Black piece positions}
 \label{tab:black_positions_game_example_move21}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1077,12 +1086,14 @@ Prenons comme exemple le plateau représenté dans la figure \ref{fig:yolah_game
 \end{table}
 
 
-\item Les positions des pièces blanches sur le plateau (table \ref{tab:white_positions_game_example_move21}) sont représentées par le bitboard~: 
+% \item Les positions des pièces blanches sur le plateau sont représentées par le bitboard :
+\item The positions of white pieces on the board (Table \ref{tab:white_positions_game_example_move21}) are represented by the bitboard:
 \mintinline{c++}{0b0000000000100000000001000000000000000000000000000010100000000000}.\\
 
 \begin{table}[htpb]
 \centering
-\caption{Positions des pièces blanches}
+% \caption{Positions des pièces blanches}
+\caption{White piece positions}
 \label{tab:white_positions_game_example_move21}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1099,12 +1110,14 @@ Prenons comme exemple le plateau représenté dans la figure \ref{fig:yolah_game
 \end{tabular}
 \end{table}
 
-\item Les positions des trous (table \ref{tab:empty_positions_game_example_move21}) sont représentées par le bitboard~:\\
+% \item Les positions des trous sont représentées par le bitboard :
+\item The positions of holes (Table \ref{tab:empty_positions_game_example_move21}) are represented by the bitboard:\\
 \mintinline{c++}{0b1001000100000000001110001111100001011000001000010000001111000001}.\\
 
 \begin{table}[htpb]
 \centering
-\caption{Positions des cases détruites (les trous)}
+% \caption{Positions des cases détruites (les trous)}
+\caption{Destroyed square positions (holes)}
 \label{tab:empty_positions_game_example_move21}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1124,9 +1137,11 @@ Prenons comme exemple le plateau représenté dans la figure \ref{fig:yolah_game
 \end{itemize}
 
 
-Les bitboards vont nous permettre une manipulation efficace du plateau, en utilisant des opérations bits à bits, et nécessiterons peu de place mémoire pour représenter celui-ci.\\
+% Les bitboards vont nous permettre une manipulation efficace du plateau, en utilisant des opérations bits à bits, et nécessiterons peu de place mémoire pour représenter celui-ci.
+Bitboards allow us to efficiently manipulate the board using bitwise operations while requiring minimal memory to represent it.\\
 
-Nous représentons le plateau de jeu par la classe \mintinline{c++}{Yolah} dont un extrait est donné dans le listing \ref{lst:yolah_class_attributes}.
+% Nous représentons le plateau de jeu par la classe Yolah dont un extrait est donné dans le listing.
+We represent the game board with the \mintinline{c++}{Yolah} class, an excerpt of which is given in Listing \ref{lst:yolah_class_attributes}.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
@@ -1145,21 +1160,30 @@ public:
     // ...
 };
 \end{minted}
-\captionof{listing}{Les attributs de la classe Yolah représentant le plateau de jeu}
+% \captionof{listing}{Les attributs de la classe Yolah représentant le plateau de jeu}
+\captionof{listing}{Attributes of the Yolah class representing the game board}
 \label{lst:yolah_class_attributes}
 \end{mdframed}
 
-Les attributs de la classe \mintinline{c++}{Yolah} sont~:\\
+% Les attributs de la classe Yolah sont :
+The attributes of the \mintinline{c++}{Yolah} class are:\\
 \begin{itemize}
-\item Ligne 6, \mintinline{c++}{black}~: le bitboard pour les pièces noires.
-\item Ligne 7, \mintinline{c++}{white}~: le bitboard pour les pièces blanches.
-\item Ligne 8, \mintinline{c++}{holes}~: le bitboard pour les trous (les cases détruites).
-\item Ligne 9, \mintinline{c++}{black_score}~: le score, ou le nombre de déplacements, du joueur noir.
-\item Ligne 10, \mintinline{c++}{white_score}~: le score, ou le nombre de déplacements, du joueur blanc.
-\item Ligne 11, \mintinline{c++}{ply}~: le nombre de coups joués par les deux joueurs depuis le début de la partie.\\
+% \item Ligne 6, black : le bitboard pour les pièces noires.
+\item Line 6, \mintinline{c++}{black}: the bitboard for black pieces.
+% \item Ligne 7, white : le bitboard pour les pièces blanches.
+\item Line 7, \mintinline{c++}{white}: the bitboard for white pieces.
+% \item Ligne 8, holes : le bitboard pour les trous (les cases détruites).
+\item Line 8, \mintinline{c++}{holes}: the bitboard for holes (destroyed squares).
+% \item Ligne 9, black_score : le score, ou le nombre de déplacements, du joueur noir.
+\item Line 9, \mintinline{c++}{black_score}: the score, or number of moves, of the black player.
+% \item Ligne 10, white_score : le score, ou le nombre de déplacements, du joueur blanc.
+\item Line 10, \mintinline{c++}{white_score}: the score, or number of moves, of the white player.
+% \item Ligne 11, ply : le nombre de coups joués par les deux joueurs depuis le début de la partie.
+\item Line 11, \mintinline{c++}{ply}: the number of moves played by both players since the start of the game.\\
 \end{itemize}
 
-Un objet de type \mintinline{c++}{Yolah} prendra en mémoire \mintinline{c++}{syzeof(Yolah) == 32} octets. Notons qu'avec le padding \footnote{\url{https://en.wikipedia.org/wiki/Data_structure_alignment}}, il n'aurait pas été judicieux d'écrire, par exemple,
+% Un objet de type Yolah prendra en mémoire sizeof(Yolah) == 32 octets. Notons qu'avec le padding, il n'aurait pas été judicieux d'écrire, par exemple,
+A \mintinline{c++}{Yolah} object will occupy \mintinline{c++}{sizeof(Yolah) == 32} bytes in memory. Note that due to padding\footnote{\url{https://en.wikipedia.org/wiki/Data_structure_alignment}}, it would not have been wise to write, for example,
 
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
 class Yolah {
@@ -1174,9 +1198,11 @@ public:
 };
 \end{minted}
 
-car avec cette implémentation, nous aurions eu \mintinline{c++}{syzeof(Yolah) == 48} octets.\\
+% car avec cette implémentation, nous aurions eu sizeof(Yolah) == 48 octets.
+because with this implementation, we would have \mintinline{c++}{sizeof(Yolah) == 48} bytes.\\
 
-La représentation en bitboard permet d'obtenir efficacement des informations sur le jeu. Par exemple pour voir les cases occupées par les pièces noires et les pièces blanches, il suffit d'effectuer~: \mintinline{c++}{black | white}. Pour les positions des tables \ref{tab:black_positions_game_example_move21} et \ref{tab:white_positions_game_example_move21}, on obtiendrait en une seule opération très efficace \footnote{Vous pouvez trouver des informations sur la latence et le débit des instructions pour plusieurs processeurs via le lien suivant~: \url{https://agner.org/optimize/instruction_tables.pdf}} les positions des pièces noires et blanches de la table \ref{tab:black_white_positions_game_example_move21}. En notation binaire, on obtient~:\\
+% La représentation en bitboard permet d'obtenir efficacement des informations sur le jeu. Par exemple pour voir les cases occupées par les pièces noires et les pièces blanches, il suffit d'effectuer : black | white. Pour les positions des tables, on obtiendrait en une seule opération très efficace les positions des pièces noires et blanches. En notation binaire, on obtient :
+The bitboard representation allows for efficiently obtaining game information. For example, to see the squares occupied by black and white pieces, simply perform: \mintinline{c++}{black | white}. For the positions in Tables \ref{tab:black_positions_game_example_move21} and \ref{tab:white_positions_game_example_move21}, we would obtain in a single highly efficient operation\footnote{You can find information on instruction latency and throughput for various processors at: \url{https://agner.org/optimize/instruction_tables.pdf}} the black and white piece positions shown in Table \ref{tab:black_white_positions_game_example_move21}. In binary notation, we get:\\
 \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
 black | white
 == 0000001010000000000000010000000000100000000000000000000000000000 |
@@ -1186,7 +1212,8 @@ black | white
 
 \begin{table}[H]
 \centering
-\caption{Positions des pièces noires et blanches que l'on obtient en faisant~: \mintinline{c++}{black | white}}
+% \caption{Positions des pièces noires et blanches que l'on obtient en faisant : black | white}
+\caption{Black and white piece positions obtained by computing: \mintinline{c++}{black | white}}
 \label{tab:black_white_positions_game_example_move21}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1203,14 +1230,17 @@ black | white
 \end{tabular}
 \end{table}
 
-Nous allons continuer d'utiliser des opérations bits-à-bits dans la suite de ce chapitre, pour tester notamment la fin d'une partie et la génération des coups possibles. 
+% Nous allons continuer d'utiliser des opérations bits-à-bits dans la suite de ce chapitre, pour tester notamment la fin d'une partie et la génération des coups possibles.
+We will continue using bitwise operations throughout this chapter, particularly for testing game over conditions and generating possible moves.
 
-\section{Test de fin de partie}
+\section{Game Over Test}
 
-Pour tester la fin de partie nous allons avoir besoin de quelques énumerations et constantes (listings \ref{lst:directions} et \ref{lst:files_and_ranks}) et de la function \mintinline{c++}{shift} (listing \ref{lst:shift}). La constante \mintinline{c++}{NORTH} de l'énumeration \mintinline{c++}{Direction} (listing \ref{lst:directions}) est égale à $8$. Pourquoi avoir choisi cette valeur~? Reprenons ci-dessous, voir la table \ref{tab:bitboard_indices2}, la table vu au chapitre précédent représentant la position de chaque bit d'un bitboard dans le plateau. On peut voir que si l'on ajoute $8$ au numéro de bit contenu dans une des cases, on obtient le numéro de bit de la case au nord ce cette dernière (sauf si l'on sort du plateau de jeu). Il en va de même pour les autres valeurs des constantes de l'énumération \mintinline{c++}{Direction} (listing \ref{lst:directions}). 
+% Pour tester la fin de partie nous allons avoir besoin de quelques énumérations et constantes et de la fonction shift. La constante NORTH de l'énumération Direction est égale à 8. Pourquoi avoir choisi cette valeur ? Reprenons ci-dessous la table vue au chapitre précédent représentant la position de chaque bit d'un bitboard dans le plateau. On peut voir que si l'on ajoute 8 au numéro de bit contenu dans une des cases, on obtient le numéro de bit de la case au nord de cette dernière (sauf si l'on sort du plateau de jeu). Il en va de même pour les autres valeurs des constantes de l'énumération Direction.
+To test for game over, we will need some enumerations and constants (Listings \ref{lst:directions} and \ref{lst:files_and_ranks}) and the \mintinline{c++}{shift} function (Listing \ref{lst:shift}). The \mintinline{c++}{NORTH} constant in the \mintinline{c++}{Direction} enumeration (Listing \ref{lst:directions}) equals $8$. Why this value? Let us revisit below, see Table \ref{tab:bitboard_indices2}, the table from the previous chapter showing the position of each bit in a bitboard on the board. We can see that adding $8$ to the bit number in any square gives us the bit number of the square to the north (unless we exit the board). The same applies to the other constant values in the \mintinline{c++}{Direction} enumeration (Listing \ref{lst:directions}). 
 \begin{table}[htpb]
 \centering
-\caption{Positions de chaque cases du plateau dans le bitboard. Remarquons que pour une case qui ne se trouve pas dans la rangée 8, bit$_{i+8}$ est le bit correspondant à la case au nord de la case du bit$_i$}
+% \caption{Positions de chaque cases du plateau dans le bitboard. Remarquons que pour une case qui ne se trouve pas dans la rangée 8, bit$_{i+8}$ est le bit correspondant à la case au nord de la case du bit$_i$}
+\caption{Position of each board square in the bitboard. Note that for a square not in rank 8, bit$_{i+8}$ corresponds to the square north of bit$_i$}
 \label{tab:bitboard_indices2}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1267,26 +1297,30 @@ constexpr uint64_t shift(uint64_t b) {
     else return 0;
 }
 \end{minted}
-\captionof{listing}{Décalage selon une direction}
+% \captionof{listing}{Décalage selon une direction}
+\captionof{listing}{Shift by direction}
 \label{lst:shift}
 \end{mdframed}
 
 
-La fonction \mintinline{c++}{shift(uint64_t b)} donnée dans le listing \ref{lst:shift} nous permet de décaler tous les bits à 1 du bitboard en paramètre dans la direction \mintinline{c++}{D} \footnote{Grâce aux \mintinline{c++}{if constexpr}, lorsque l'on effectuera \mintinline{c++}{shift<NORTH>(b)} par exemple, le compilateur transformera le code en~: \mintinline{c++}{return b << NORTH;}.}. Soit,
+% La fonction shift(uint64_t b) donnée dans le listing nous permet de décaler tous les bits à 1 du bitboard en paramètre dans la direction D. Grâce aux if constexpr, lorsque l'on effectuera shift<NORTH>(b) par exemple, le compilateur transformera le code en : return b << NORTH;.
+The \mintinline{c++}{shift(uint64_t b)} function given in Listing \ref{lst:shift} shifts all 1-bits in the bitboard parameter in direction \mintinline{c++}{D}\footnote{Thanks to \mintinline{c++}{if constexpr}, when we call \mintinline{c++}{shift<NORTH>(b)} for example, the compiler will transform the code to: \mintinline{c++}{return b << NORTH;}.}. Given
 \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
 black == 1000000000000000000000000000100000100000000000000000000000000001
 \end{minted}
-le bitboard représenté dans la table \ref{tab:shift_north_before}. Pour décaler les pièces noires d'une case vers le nord, on effectue~: \mintinline{c++}{shift<NORTH>(black)}. On obtient alors le bitboard
+% le bitboard représenté dans la table. Pour décaler les pièces noires d'une case vers le nord, on effectue : shift<NORTH>(black). On obtient alors le bitboard représenté dans la table. Notons que la pièce en h8 n'est plus sur le plateau.
+the bitboard shown in Table \ref{tab:shift_north_before}. To shift the black pieces one square north, we perform: \mintinline{c++}{shift<NORTH>(black)}. We then get the bitboard
   \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
 1000000000000000000000000000100000100000000000000000000000000001
 \end{minted}
-représenté dans la table \ref{tab:shift_north_after}. Notons que la pièce en {\ttfamily h8} n'est plus sur le plateau.\\
+shown in Table \ref{tab:shift_north_after}. Note that the piece on {\ttfamily h8} is no longer on the board.\\
 
 \begin{table}[H]
 \centering
 \begin{minipage}{0.45\textwidth}
 \centering
-\caption{Plateau de jeu avant d'effectuer \mintinline{c++}{shift<NORTH>}}
+% \caption{Plateau de jeu avant d'effectuer shift<NORTH>}
+\caption{Game board before applying \mintinline{c++}{shift<NORTH>}}
 \label{tab:shift_north_before}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1305,7 +1339,8 @@ représenté dans la table \ref{tab:shift_north_after}. Notons que la pièce en 
 \hfill
 \begin{minipage}{0.45\textwidth}
 \centering
-\caption{Plateau de jeu après avoir effectuer \mintinline{c++}{shift<NORTH>}}
+% \caption{Plateau de jeu après avoir effectué shift<NORTH>}
+\caption{Game board after applying \mintinline{c++}{shift<NORTH>}}
 \label{tab:shift_north_after}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1323,7 +1358,8 @@ représenté dans la table \ref{tab:shift_north_after}. Notons que la pièce en 
 \end{minipage}
 \end{table}
 
-On peut ainsi facilement obtenir toutes les cases directement au contact des pièces d'un plateau donné \mintinline{c++}{board}, en effectuant l'opération suivante~:
+% On peut ainsi facilement obtenir toutes les cases directement au contact des pièces d'un plateau donné board, en effectuant l'opération suivante :
+We can thus easily obtain all squares directly adjacent to the pieces on a given \mintinline{c++}{board} by performing the following operation:
 
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
 shift<NORTH>(board) | shift<SOUTH>(board) | shift<EAST>(board) | 
@@ -1331,13 +1367,15 @@ shift<WEST>(board) | shift<NORTH_EAST>(board) | shift<NORTH_WEST>(board) |
 shift<SOUTH_EAST>(board) | shift<SOUTH_WEST>(board)
 \end{minted}
 
-Pour le plateau de la table \ref{tab:before_all_shift} on obtient les positions représentées par des étoiles dans la table \ref{tab:after_all_shift}.\\
+% Pour le plateau de la table on obtient les positions représentées par des étoiles dans la table.
+For the board in Table \ref{tab:before_all_shift}, we get the positions represented by stars in Table \ref{tab:after_all_shift}.\\
 
 \begin{table}[H]
 \centering
 \begin{minipage}{0.45\textwidth}
 \centering
-\caption{Plateau de jeu}
+% \caption{Plateau de jeu}
+\caption{Game board}
 \label{tab:before_all_shift}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1356,7 +1394,8 @@ Pour le plateau de la table \ref{tab:before_all_shift} on obtient les positions 
 \hfill
 \begin{minipage}{0.45\textwidth}
 \centering
-\caption{Positions autour des pièces}
+% \caption{Positions autour des pièces}
+\caption{Positions around the pieces}
 \label{tab:after_all_shift}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
@@ -1375,7 +1414,8 @@ Pour le plateau de la table \ref{tab:before_all_shift} on obtient les positions 
 \end{table}
 
 
-Dans le code de la fonction \mintinline{c++}{shift} (listing \ref{lst:shift}) on peut voir l'utilisation des constantes \mintinline{c++}{FileHBB} et \mintinline{c++}{FileABB} ({\ttfamily BB} pour bitboard). Ces constantes vont nous permettre de masquer certains bits qui se retrouveraient après décalage dans une position incorrecte. Par exemple, si nous décalons dans la direction \mintinline{c++}{EAST} le bitboard représenté dans la table \ref{tab:before_all_shift}, le pion blanc en {\ttfamily h1} se retrouverait en {\ttfamily a2}. Pour éviter cela, avant le décalage, on élimine les éléments de la colonne {\ttfamily h} pour qu'ils ne se retrouvent pas dans la colonne {\ttfamily a} (ligne 8 du listing \ref{lst:shift}). Les constantes \mintinline{c++}{FileABB} et \mintinline{c++}{FileHBB} ainsi que les énumerations pour les rangées et colonnes sont définies dans le listing \ref{lst:files_and_ranks}.    
+% Dans le code de la fonction shift on peut voir l'utilisation des constantes FileHBB et FileABB (BB pour bitboard). Ces constantes vont nous permettre de masquer certains bits qui se retrouveraient après décalage dans une position incorrecte. Par exemple, si nous décalons dans la direction EAST le bitboard représenté dans la table, le pion blanc en h1 se retrouverait en a2. Pour éviter cela, avant le décalage, on élimine les éléments de la colonne h pour qu'ils ne se retrouvent pas dans la colonne a. Les constantes FileABB et FileHBB ainsi que les énumérations pour les rangées et colonnes sont définies dans le listing.
+In the \mintinline{c++}{shift} function code (Listing \ref{lst:shift}), we can see the use of constants \mintinline{c++}{FileHBB} and \mintinline{c++}{FileABB} ({\ttfamily BB} for bitboard). These constants allow us to mask certain bits that would end up in incorrect positions after shifting. For example, if we shift the bitboard shown in Table \ref{tab:before_all_shift} in the \mintinline{c++}{EAST} direction, the white pawn on {\ttfamily h1} would end up on {\ttfamily a2}. To avoid this, before shifting, we eliminate elements from column {\ttfamily h} so they don't end up in column {\ttfamily a} (line 8 of Listing \ref{lst:shift}). The constants \mintinline{c++}{FileABB} and \mintinline{c++}{FileHBB} along with the rank and file enumerations are defined in Listing \ref{lst:files_and_ranks}.    
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
@@ -1393,33 +1433,38 @@ constexpr uint64_t FileABB = 0x0101010101010101;
 //            a8      a7      a6      a5      a4      a3      a2      a1 
 
 constexpr uint64_t FileHBB = FileABB << 7;
-//   0x1010101010101010
-//== 0b1000000010000000100000001000000010000000100000001000000010000000  
+//   0x8080808080808080
+//== 0b1000000010000000100000001000000010000000100000001000000010000000
 //     h8      h7      h6      h5      h4      h3      h2      h1 
 \end{minted}
-\captionof{listing}{Colonnes et rangées}
+% \captionof{listing}{Colonnes et rangées}
+\captionof{listing}{Files and ranks}
 \label{lst:files_and_ranks}
 \end{mdframed}
 
-La fonction qui teste la fin de partie s'appelle \mintinline{c++}{game_over} et elle est décrite dans le listing \ref{lst:game_over}. Son implémentation est assez simple,
+% La fonction qui teste la fin de partie s'appelle game_over et elle est décrite dans le listing. Son implémentation est assez simple,
+The function that tests for game over is called \mintinline{c++}{game_over} and is described in Listing \ref{lst:game_over}. Its implementation is straightforward:
 
 \begin{itemize}
 
-\item À la ligne 2, on récupère dans \mintinline{c++}{possible} le bitboard où il y a des $1$ dans les positions libres.
+% \item À la ligne 2, on récupère dans possible le bitboard où il y a des 1 dans les positions libres.
+\item On line 2, we retrieve in \mintinline{c++}{possible} the bitboard with $1$s in free positions.
 
-\item À la ligne 3, on crée le bitboard \mintinline{c++}{players} qui contient des $1$ dans les positions occupées par l'un des joueurs.
+% \item À la ligne 3, on crée le bitboard players qui contient des 1 dans les positions occupées par l'un des joueurs.
+\item On line 3, we create the \mintinline{c++}{players} bitboard containing $1$s in positions occupied by either player.
 
-\item Les lignes 4 à 8 permettent de créer le bitboard \mintinline{c++}{around_players} qui contient des $1$ aux positions autour de chacune des pièces des joueurs.
+% \item Les lignes 4 à 8 permettent de créer le bitboard around_players qui contient des 1 aux positions autour de chacune des pièces des joueurs.
+\item Lines 4 to 8 create the \mintinline{c++}{around_players} bitboard containing $1$s at positions around each player's pieces.
 
-\item Enfin, à la ligne 8, on teste s'il n'existe aucune position libre à côté d'un des joueurs. En effet, le et bit-à-bit ne gardera un $1$ dans un bit du résultat, que si et seulement s'il y a un $1$ à cette position dans le bitboard
-\mintinline{c++}{possible} et dans le bitboard \mintinline{c++}{around_players}. Donc que la case correspondante est libre et accessible par le joueur. Si le résultat de \mintinline{c++}{around_players & possible} vaut $0$, cela veut dire qu'aucune position n'est à la fois à côté d'un des joueurs et libre.
+% \item Enfin, à la ligne 8, on teste s'il n'existe aucune position libre à côté d'un des joueurs. En effet, le et bit-à-bit ne gardera un 1 dans un bit du résultat, que si et seulement s'il y a un 1 à cette position dans le bitboard possible et dans le bitboard around_players. Donc que la case correspondante est libre et accessible par le joueur. Si le résultat de around_players \& possible vaut 0, cela veut dire qu'aucune position n'est à la fois à côté d'un des joueurs et libre.
+\item Finally, on line 9, we test whether no free position exists adjacent to either player. The bitwise AND will keep a $1$ in a result bit if and only if there is a $1$ at that position in both the \mintinline{c++}{possible} and \mintinline{c++}{around_players} bitboards—meaning the corresponding square is both free and accessible by a player. If \mintinline{c++}{around_players & possible} equals $0$, it means no position is both adjacent to a player and free.
 
 \end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 bool Yolah::game_over() const {
-    uint64_t possible = ~empty & ~black & ~white;
+    uint64_t possible = ~holes & ~black & ~white;
     uint64_t players  = black | white;
     uint64_t around_players = shift<NORTH>(players) | 
         shift<SOUTH>(players) | shift<EAST>(players) | 
@@ -1429,19 +1474,23 @@ bool Yolah::game_over() const {
     return (around_players & possible) == 0;    
 }
 \end{minted}
-\captionof{listing}{Test de fin de partie}
+% \captionof{listing}{Test de fin de partie}
+\captionof{listing}{Game over test}
 \label{lst:game_over}
 \end{mdframed}
 
-Maintenant que nous savons tester la fin d'une partie, nous allons étudier comment générer efficacement les coups possibles dans une position donnée.
+% Maintenant que nous savons tester la fin d'une partie, nous allons étudier comment générer efficacement les coups possibles dans une position donnée.
+Now that we know how to test for game over, we will study how to efficiently generate possible moves in a given position.
 
-\section{Génération des mouvements possibles pour les pièces}
+\section{Generating Possible Piece Moves}
 
-La génération des coups possibles va utiliser une technique appelée les \emph{magic bitboard}. Pour comprendre cette technique je vais tout d'abord la présenter sur un exemple simple. Je me suis inspiré de l'article \url{http://pradu.us/old/Nov27_2008/Buzz/research/magic/Bitboards.pdf} pour cet exemple.
+% La génération des coups possibles va utiliser une technique appelée les magic bitboard. Pour comprendre cette technique je vais tout d'abord présenter sur un exemple simple le hachage parfait magique. Je me suis inspiré de l'article pour cet exemple.
+Move generation will use a technique called \emph{magic bitboards}. To understand this technique, I will first present magic perfect hashing through a simple example. I drew inspiration from the article \url{http://pradu.us/old/Nov27_2008/Buzz/research/magic/Bitboards.pdf} for this example.
 
-\subsection{Hachage parfait}
+\subsection{Magic Perfect Hashing Function}
 
-Supposons que nous devions trouver la position du seul bit à $1$ dans un entier long non-signé (\mintinline{c++}{uint64_t}). Par exemple, si nous appelons \mintinline{c++}{position} la fonction permettant de calculer cette position, nous obtenons les résultats suivants~:
+% Supposons que nous devions trouver la position du seul bit à 1 dans un entier long non-signé (uint64_t). Par exemple, si nous appelons position la fonction permettant de calculer cette position, nous obtenons les résultats suivants :
+Suppose we need to find the position of the only 1-bit in an unsigned long integer (\mintinline{c++}{uint64_t}). For example, if we call \mintinline{c++}{position} the function that calculates this position, we get the following results:
 
 \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
     position(1)          == 0
@@ -1450,15 +1499,15 @@ Supposons que nous devions trouver la position du seul bit à $1$ dans un entier
     position(0x8000000000000000) == 63
 \end{minted}
 
-Notons que les processeurs possèdent des instructions permettant de calculer efficacement cette fonction \footnote{\mintinline{asm}{tzcnt} sous Intel.}, et le compilateur {\ttfamily gcc} permet de calculer efficacement cette position avec la fonction \mintinline{c++}{__builtin_ctzll(unsigned long long x)} \footnote{Returns the number of trailing 0-bits in x, starting at the least significant bit position. If x is 0, the result is undefined.}, par exemple,
+% Notons que les processeurs possèdent des instructions permettant de calculer efficacement cette fonction, et le compilateur gcc permet de calculer efficacement cette position avec la fonction __builtin_ctzll(unsigned long long x), par exemple,
+Note that processors have instructions to efficiently compute this function\footnote{\mintinline{asm}{tzcnt} on Intel.}, and the {\ttfamily gcc} compiler allows efficient calculation of this position with the function\\ \mintinline{c++}{__builtin_ctzll(unsigned long long x)}\footnote{Returns the number of trailing 0-bits in x, starting at the least significant bit position. If x is 0, the result is undefined.}, for example,
 
 \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
     position(0b1000) == __builtin_ctzll(0b1000)
 \end{minted}
 
-Mais nous allons coder cette fonction \mintinline{c++}{position} en utilisant un hachage parfait afin d'illustrer cette technique, qui nous servira pour la génération des coups possibles par la suite.\\
-
-En utilisant une table de hachage classique, nous pouvons tout d'abord remplir celle-ci avec les 64 valeurs et simplement consulter cette table par la suite, comme dans le code suivant~:
+% Mais nous allons coder cette fonction position en utilisant une fonction magique de hachage parfait. Cette fonction nous servira pour la génération des coups possibles par la suite. En utilisant une table de hachage classique, nous pouvons tout d'abord remplir celle-ci avec les 64 valeurs et simplement consulter cette table par la suite, comme dans le code suivant :
+However, we will code this \mintinline{c++}{position} function using a magic perfect hashing function. This function will be useful for move generation later. Using a standard hash table, we could first fill it with 64 values and then simply look up this table, as in the following code:
 
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 unordered_map<uint64_t, uint8_t> table {
@@ -1469,30 +1518,37 @@ int position(uint64_t x) {
 }
 \end{minted}
 
-La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau \footnote{Nous mesurerons à la fin de cette section le gain apporté par le hachage parfait par rapport à l'utilisation d'une table de hachage classique.}. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande, par exemple la valeur \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$~!). L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des $64$ valeurs\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}, que nous allons appeler clés, dans la plage $[0, 2^6 - 1 = 63]$.
-De plus on veut qu'il n'y ait aucune collision, d'où le nom de hachage parfait. S'il y a des collisions des positions seraient erronées. Par exemple, si les clés \mintinline{c++}{0b100} et \mintinline{c++}{0b1000000} étaient transformées en l'indice $42$, on devrait mettre dans \mintinline{c++}{table[42]} la valeur $2$ ou $6$, mais on ne peut pas stocker plus d'une valeur au même emplacement.\\
+% La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande. L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des 64 valeurs, que nous allons appeler clés, dans la plage [0, 63].
+Looking up values in this hash table is far more costly than indexing a simple array\footnote{We will measure the performance gain from magic perfect hashing compared to using a standard hash table at the end of this section.}. However, we cannot directly use an array because the indexing values span too large a range—for example, the value \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$!). The idea is to find an efficient hash function that transforms each of the $64$ values\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}—which we call bitboards—into the range $[0, 2^6 - 1 = 63]$.
+% De plus on veut qu'il n'y ait aucune collision, on parle alors d'un hachage parfait. S'il y a des collisions des positions seraient erronées. Par exemple, si les clés 0b100 et 0b1000000 étaient transformées en l'indice 42, on devrait mettre dans table[42] la valeur 2 ou 6, mais on ne peut pas stocker plus d'une valeur au même emplacement.
+Moreover, we want no collisions—this is called perfect hashing. If there were collisions, positions would be incorrect. For example, if keys \mintinline{c++}{0b100} and \mintinline{c++}{0b1000000} were both transformed to index $42$, we would need to store value $2$ or $6$ in \mintinline{c++}{table[42]}, but we cannot store more than one value at the same location.\\
 
-La fonction de hachage parfait va avoir la forme suivante~:
+% La fonction de hachage parfait magique va avoir la forme suivante :
+The magic perfect hashing function will have the following form:
 
 \begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 constexpr uint64_t MAGIC = //...
 constexpr int K = 6;
-int perfect_hashing(uint64_t key) {
-    return key * MAGIC >> (64 - K);
+int magic_perfect_hashing(uint64_t bitboard) {
+    return bitboard * MAGIC >> (64 - K);
 }
 \end{minted}
 
-Dans cette fonction,
+% Dans cette fonction,
+In this function:
 
 \begin{itemize}
 
-\item À la ligne 2, la constante \mintinline{c++}{K} donne le nombre de bits pour notre index. Ici avec \mintinline{c++}{K == 6}, cela nous donne un maximum de $2^K = 2^6 = 64$ valeurs possibles dans la table.
+% \item À la ligne 2, la constante K donne le nombre de bits pour notre index. Ici avec K == 6, cela nous donne un maximum de 2^K = 2^6 = 64 valeurs possibles dans la table.
+\item On line 2, the constant \mintinline{c++}{K} gives the number of bits for our index. Here with \mintinline{c++}{K == 6}, this gives us a maximum of $2^K = 2^6 = 64$ possible values in the table.
 
-\item À la ligne 4, on peut voir la formule pour calculer l'index dans la table selon la clé \mintinline{c++}{uint64_t key} donnée en paramètre. On multiplie la clé par la constante \mintinline{c++}{MAGIC} et ensuite on décale vers la droite pour ne garder que les \mintinline{c++}{K} bits de poids forts du résultat. Cette opération est très peu coûteuse, mais comment trouver cette constante magique~?\\
+% \item À la ligne 4, on peut voir la formule pour calculer l'index dans la table selon la clé uint64_t key donnée en paramètre. On multiplie la clé par la constante MAGIC et ensuite on décale vers la droite pour ne garder que les K bits de poids forts du résultat. Cette opération est très peu coûteuse, mais comment trouver cette constante magique ?
+\item On line 4, we see the formula for calculating the table index from the \mintinline{c++}{uint64_t key} parameter. We multiply the key by the \mintinline{c++}{MAGIC} constant and then right-shift to keep only the \mintinline{c++}{K} most significant bits of the result. This operation is very inexpensive, but how do we find this magic constant?\\
 
 \end{itemize}
 
-Une méthode simple pour essayer de trouver la constante \mintinline{c++}{MAGIC} est de la générer au hasard jusqu'à trouver une valeur qui ne crée aucune collision~! Ce genre d'approche est utilisée dans Stockfish \cite{stockfish2025} pour générer les magic bitboard. Le listing \ref{lst:random_magic} montre cette approche.
+% Une méthode simple pour essayer de trouver la constante MAGIC est de la générer au hasard jusqu'à trouver une valeur qui ne crée aucune collision ! Ce genre d'approche est utilisée dans Stockfish pour générer les magic bitboard. Le listing montre cette approche.
+A simple method to find the \mintinline{c++}{MAGIC} constant is to generate it randomly until we find a value that produces no collisions! This approach is used in Stockfish \cite{stockfish2025} to generate magic bitboards. Listing \ref{lst:random_magic} shows this approach.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
@@ -1541,29 +1597,39 @@ int main() {
     }
 }
 \end{minted}
-\captionof{listing}{Recherche aléatoire de la constante \mintinline{c++}{MAGIC}}
+% \captionof{listing}{Recherche aléatoire de la constante MAGIC}
+\captionof{listing}{Random search for the \mintinline{c++}{MAGIC} constant}
 \label{lst:random_magic}
 \end{mdframed}
 
 \begin{itemize}
 
-\item Aux lignes 6 à 8, nous mettons en place un générateur aléatoire pour générer aléatoirement des \mintinline{c++}{uint64_t}.
+% \item Aux lignes 6 à 8, nous mettons en place un générateur aléatoire pour générer aléatoirement des uint64_t.
+\item On lines 6 to 8, we set up a random generator to randomly generate \mintinline{c++}{uint64_t} values.
 
-\item À la ligne 9, la table de correspondance \mintinline{c++}{positions} va associer à un entier long ne contenant qu'un seul bit à $1$, la position de ce dernier. Cette table est initialisée aux lignes 10 à 12.
+% \item À la ligne 9, la table de correspondance positions va associer à un entier long ne contenant qu'un seul bit à 1, la position de ce dernier. Cette table est initialisée aux lignes 10 à 12.
+\item On line 9, the lookup table \mintinline{c++}{positions} associates each long integer containing only one 1-bit with its position. This table is initialized on lines 10 to 12.
 
-\item À la ligne 13, la constante \mintinline{c++}{K} est le nombre de bits de notre clé obtenue par hachage parfait. Il faut que \mintinline{c++}{K} permettent de représenter toutes les valeurs que l'on doit couvrir. Par exemple, ici nous avons $64$ valeurs possibles, car nous avons $64$ positions possibles pour le bit à $1$ dans un entier long sur $64$ bits. Avec \mintinline{c++}{K == 7}, on peut couvrir $2^7$, soit $128$ valeurs différentes. Notons que c'est plus que les $64$ valeurs dont nous avons besoin et que \mintinline{c++}{K == 6} suffirait (\mintinline{c++}{K == 5} serait trop petit). Mais en essayant de trouver la constante \mintinline{c++}{MAGIC} au hasard pour \mintinline{c++}{K == 6}, ce programme ne trouvait pas en un temps raisonnable \frownie{} (nous verrons après une autre façon de faire pour réussir pour \mintinline{c++}{K == 6} \smiley).
+% \item À la ligne 13, la constante K est le nombre de bits de notre clé obtenue par hachage parfait magique. Il faut que K permette de représenter toutes les valeurs que l'on doit couvrir. Par exemple, ici nous avons 64 valeurs possibles, car nous avons 64 positions possibles pour le bit à 1 dans un entier long sur 64 bits. Avec K == 7, on peut couvrir 2^7, soit 128 valeurs différentes. Notons que c'est plus que les 64 valeurs dont nous avons besoin et que K == 6 suffirait (K == 5 serait trop petit). Mais en essayant de trouver la constante MAGIC au hasard pour K == 6, ce programme ne trouvait pas en un temps raisonnable (nous verrons après une autre façon de faire pour réussir pour K == 6).
+\item On line 13, the constant \mintinline{c++}{K} is the number of bits in our key obtained by magic perfect hashing. \mintinline{c++}{K} must be large enough to represent all values we need to cover. For example, here we have $64$ possible values since we have $64$ possible positions for the 1-bit in a $64$-bit long integer. With \mintinline{c++}{K == 7}, we can cover $2^7 = 128$ different values. Note that this is more than the $64$ values we need, and \mintinline{c++}{K == 6} would suffice (\mintinline{c++}{K == 5} would be too small). However, when trying to find the \mintinline{c++}{MAGIC} constant randomly for \mintinline{c++}{K == 6}, this program could not find one in reasonable time \frownie{} (we will see another approach to succeed with \mintinline{c++}{K == 6} \smiley).
 
-\item Aux lignes 14 à 16, la fonction \mintinline{c++}{index} calcule l'index de clé \mintinline{c++}{bitboard} (ce bitboard contient un seul bit à $1$) en utilisant la formule pour notre hachage parfait.
+% \item Aux lignes 14 à 16, la fonction index calcule l'index de clé bitboard (ce bitboard contient un seul bit à 1) en utilisant la formule pour notre hachage parfait magique.
+\item On lines 14 to 16, the \mintinline{c++}{index} function calculates the index for key \mintinline{c++}{bitboard} (this bitboard contains only one 1-bit) using the magic perfect hashing formula.
 
-\item La boucle \mintinline{c++}{while}, lignes 17 à 43, va boucler jusqu'à trouver la constante \mintinline{c++}{MAGIC} qui permet de réaliser un hachage parfait (du coup cette boucle peut être infinie).
+% \item La boucle while, lignes 17 à 43, va boucler jusqu'à trouver la constante MAGIC qui permet de réaliser un hachage parfait magique (du coup cette boucle peut être infinie).
+\item The \mintinline{c++}{while} loop, lines 17 to 43, loops until it finds a \mintinline{c++}{MAGIC} constant that achieves magic perfect hashing (this loop could potentially run forever).
 
-\item À la ligne 18, on crée la valeur \mintinline{c++}{MAGIC} au hasard.
+% \item À la ligne 18, on crée la valeur MAGIC au hasard.
+\item On line 18, we create the \mintinline{c++}{MAGIC} value randomly.
 
-\item Le \mintinline{c++}{set<uint64_t>} de la ligne 20 va nous permettre de mémoriser les index (obtenues grâce à la fonction \mintinline{c++}{index}) que nous avons déjà utilisés pour vérifier que nous n'avons pas de collisions.
+% \item Le set<uint64_t> de la ligne 20 va nous permettre de mémoriser les index (obtenues grâce à la fonction index) que nous avons déjà utilisés pour vérifier que nous n'avons pas de collisions.
+\item The \mintinline{c++}{set<uint64_t>} on line 20 allows us to remember the indices (obtained via the \mintinline{c++}{index} function) we have already used, to verify we have no collisions.
 
-\item Aux lignes 21 à 28, la boucle \mintinline{c++}{for} va tester tous les bitboards, trouver l'index de chacun d'entre eux grâce au hachage (fonction \mintinline{c++}{index}) et vérifier que nous n'avons pas de collision (ligne 23) avec les index obtenus pour les bitboard précédents.
+% \item Aux lignes 21 à 28, la boucle for va tester tous les bitboards, trouver l'index de chacun d'entre eux grâce au hachage (fonction index) et vérifier que nous n'avons pas de collision (ligne 23) avec les index obtenus pour les bitboard précédents.
+\item On lines 21 to 28, the \mintinline{c++}{for} loop tests all bitboards, finds the index for each using the hash (\mintinline{c++}{index} function), and verifies there are no collisions (line 23) with indices obtained for previous bitboards.
 
-\item Enfin, aux lignes 29 à 42, si nous avons trouvé une constante \mintinline{c++}{MAGIC} qui permet de créer le hachage parfait, nous affichons celle-ci puis nous affichons un tableau en \emph{C++} qui contient la position du bit à $1$ pour chacun des bitboard. La sortie de ce programme, pour une exécution donnée, est donnée ci-dessous. 
+% \item Enfin, aux lignes 29 à 42, si nous avons trouvé une constante MAGIC qui permet de créer le hachage parfait magique, nous affichons celle-ci puis nous affichons un tableau en C++ qui contient la position du bit à 1 pour chacun des bitboard. La sortie de ce programme, pour une exécution donnée, est donnée ci-dessous.
+\item Finally, on lines 29 to 42, if we found a \mintinline{c++}{MAGIC} constant that creates magic perfect hashing, we display it and then display a \emph{C++} array containing the position of the 1-bit for each bitboard. The output of this program for a given execution is shown below. 
 
 \begin{minted}[breaklines,fontsize=\small]{cpp}
 found magic for K = 7: 0x65e4d4ee86638416
@@ -1577,11 +1643,10 @@ uint8_t positions[128] = {
     61, 47, -1, 41,  9,  1, 37, -1, 29, -1, 16, -1, -1, -1, 25, -1,
     46, -1,  8, -1, 28, -1, -1, 24, -1,  7, -1, -1, -1, -1, -1, -1
 };
-
 \end{minted}
 
-
-Pour obtenir la position du bit à $1$ pour le bitboard \mintinline{c++}{0b1000} par exemple, il faut donc consulter la valeur suivante~:
+% Pour obtenir la position du bit à 1 pour le bitboard 0b1000 par exemple, il faut donc consulter la valeur suivante :
+To get the position of the 1-bit for bitboard \mintinline{c++}{0b1000} for example, we need to look up the following value:
 
 \begin{minted}[breaklines,fontsize=\small]{cpp}
    positions[0b1000 * 0x65e4d4ee86638416 >> (64 - 7)]
@@ -1591,14 +1656,16 @@ Pour obtenir la position du bit à $1$ pour le bitboard \mintinline{c++}{0b1000}
 == 3
 \end{minted}
 
-On remarque qu'il y a des places vacantes dans le tableau \mintinline{c++}{positions}, celles contenant la valeur $-1$, donc on a perdu de la place. Nous n'aurions gaspillé aucune place si nous avions trouvé une constante 
-\mintinline{c++}{MAGIC} pour \mintinline{c++}{K == 6}. Mais est-ce possible~?
+% On remarque qu'il y a des places vacantes dans le tableau positions, celles contenant la valeur -1, donc on a perdu de la place. Nous n'aurions gaspillé aucune place si nous avions trouvé une constante MAGIC pour K == 6. Mais est-ce possible ?
+Notice that there are vacant slots in the \mintinline{c++}{positions} array—those containing $-1$—so we wasted space. We would not have wasted any space if we had found a \mintinline{c++}{MAGIC} constant for \mintinline{c++}{K == 6}. But is this possible?
 
 \end{itemize}
 
-Pour répondre à cette question nous allons procéder d'une autre manière. Nous ne voulons pas, bien entendu, balayer les $2^{64}$ ($9, 223, 372, 036, 854, 775, 808$) valeurs possibles puis à chaque fois tester si la valeur permet le hachage parfait. Nous allons utiliser un solveur \gls{smt} qui va nous permettre de fixer des contraintes avant de balayer tout l'espace de recherche. Le fait de fixer tout d'abord des contraintes va permettre d'élaguer l'espace de recherche. Notons que nous n'avons pas la garantie que la recherche soit rapide, mais pour ce problème, l'obtention d'une constante \mintinline{c++}{MAGIC} pour \mintinline{c++}{K == 6} sera très rapide. Si vous êtes intéressé par le fonctionnement d'un solveur \gls{smt} vous pouvez consulter \cite{kroening2016decision} et \cite{biere2021handbook}.\\
+% Pour répondre à cette question nous allons procéder d'une autre manière. Nous ne voulons pas, bien entendu, balayer les 2^64 valeurs possibles puis à chaque fois tester si la valeur permet le hachage parfait magique. Nous allons utiliser un solveur SMT qui va nous permettre de fixer des contraintes avant de balayer tout l'espace de recherche. Le fait de fixer tout d'abord des contraintes va permettre d'élaguer l'espace de recherche. Notons que nous n'avons pas la garantie que la recherche soit rapide, mais pour ce problème, l'obtention d'une constante MAGIC pour K == 6 sera très rapide. Si vous êtes intéressé par le fonctionnement d'un solveur SMT vous pouvez consulter les références.
+To answer this question, we will proceed differently. Obviously, we do not want to scan through all $2^{64}$ ($9, 223, 372, 036, 854, 775, 808$) possible values and test each one for magic perfect hashing. We will use an \gls{smt} solver that allows us to set constraints before searching the entire space. Setting constraints first will prune the search space. Note that we have no guarantee the search will be fast, but for this problem, finding a \mintinline{c++}{MAGIC} constant for \mintinline{c++}{K == 6} will be very quick. If you are interested in how an \gls{smt} solver works, you can consult \cite{kroening2016decision} and \cite{biere2021handbook}.\\
 
-Le code du listing \ref{lst:z3_magic} décrit l'approche utilisant le solveur \gls{z3} \cite{moura2008z3}.
+% Le code du listing décrit l'approche utilisant le solveur Z3.
+The code in Listing \ref{lst:z3_magic} describes the approach using the \gls{z3} solver \cite{moura2008z3}.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{python}
@@ -1635,46 +1702,33 @@ if solver.check() == sat:
         print(f'{table[i]},', end='')
     print('\n};')
 \end{minted}
-\captionof{listing}{Recherche avec un solveur \gls{smt} de la constante \mintinline{c++}{MAGIC}}
+% \captionof{listing}{Recherche avec un solveur SMT de la constante MAGIC}
+\captionof{listing}{Searching for the \mintinline{c++}{MAGIC} constant with an \gls{smt} solver}
 \label{lst:z3_magic}
 \end{mdframed}
 
 \begin{itemize}
 
-\item Les lignes 3 à 5 permettent de faire correspondre à un bitboard donné ne contenant qu'un bit à $1$, la position correspondante de ce bit. On utilise pour ce faire le dictionnaire \mintinline{python}{positions} (ligne 3).
+% \item Les lignes 3 à 5 permettent de faire correspondre à un bitboard donné ne contenant qu'un bit à 1, la position correspondante de ce bit. On utilise pour ce faire le dictionnaire positions (ligne 3).
+\item Lines 3 to 5 associate each bitboard containing only one 1-bit with the corresponding position of that bit. We use the \mintinline{python}{positions} dictionary (line 3) for this.
 
-\item À la ligne 7, on instantie le solveur \gls{z3}.
+% \item À la ligne 7, on instantie le solveur Z3.
+\item On line 7, we instantiate the \gls{z3} solver.
 
-\item À la ligne 8, on déclare que la constante \mintinline{python}{MAGIC} est du type \mintinline{python}{z3.BitVec} qui est un type proposé par le solveur \gls{z3} qui permet de représenter des vecteurs de bits, ici nous utilisons un vecteur de $64$ bits.
+% \item À la ligne 8, on déclare que la constante MAGIC est du type z3.BitVec qui est un type proposé par le solveur Z3 qui permet de représenter des vecteurs de bits, ici nous utilisons un vecteur de 64 bits.
+\item On line 8, we declare that the \mintinline{python}{MAGIC} constant is of type \mintinline{python}{z3.BitVec}, a type provided by the \gls{z3} solver for representing bit vectors—here we use a $64$-bit vector.
 
-\item La fonction \mintinline{python}{index} définie aux lignes 12 et 13 permet de calculer le hachage en fonction de la constante \mintinline{python}{MAGIC} et de \mintinline{python}{K}.
+% \item La fonction index définie aux lignes 12 et 13 permet de calculer le hachage en fonction de la constante MAGIC et de K.
+\item The \mintinline{python}{index} function defined on lines 12 and 13 calculates the hash based on the \mintinline{python}{MAGIC} constant and \mintinline{python}{K}.
 
-\item Aux lignes 15 à 19 on donne au solver les contraintes que les valeurs hachées par la fonction \mintinline{python}{index} de deux bitboards différents ne doivent pas se retrouver au même emplacement. Cette contrainte permet d'assurer que le hachage est parfait.
+% \item Aux lignes 15 à 19 on donne au solver les contraintes que les valeurs hachées par la fonction index de deux bitboards différents ne doivent pas se retrouver au même emplacement. Cette contrainte permet d'assurer que le hachage est parfait.
+\item On lines 15 to 19, we give the solver the constraints that hashed values from the \mintinline{python}{index} function for two different bitboards must not map to the same location. This constraint ensures perfect hashing.
 
-\item À la ligne 21 on execute le solveur et il nous indique par la valeur \mintinline{python}{sat} s'il a trouvé une valeur pour \mintinline{python}{MAGIC} qui satisfait les contraintes. Notons que si le solveur répond \mintinline{python}{unsat} à la place de \mintinline{python}{sat}, cela veut dire qu'il n'existe aucun entier sur $64$ bits qui permette le hachage parfait. Même si l'espace de recherche est très grand, sur ma machine, l'obtention d'une solution se fait en moins d'une seconde~!
+% \item À la ligne 21 on execute le solveur et il nous indique par la valeur sat s'il a trouvé une valeur pour MAGIC qui satisfait les contraintes. Notons que si le solveur répond unsat à la place de sat, cela veut dire qu'il n'existe aucun entier sur 64 bits qui permette le hachage parfait. Même si l'espace de recherche est très grand, sur ma machine, l'obtention d'une solution se fait en moins d'une seconde !
+\item On line 21, we run the solver, which returns \mintinline{python}{sat} if it found a \mintinline{python}{MAGIC} value satisfying the constraints. Note that if the solver returns \mintinline{python}{unsat} instead of \mintinline{python}{sat}, it means no $64$-bit integer allows perfect hashing. Even though the search space is very large, on my machine, finding a solution takes less than a second!
 
-\item Les lignes 22 à 32 permettent d'afficher sur la sortie standard la valeur \mintinline{python}{MAGIC} ainsi que le tableau \emph{C++} des valeurs obtenues. Ce tableau est donné ci-dessous. Notons qu'en \emph{Python} il était important d'effectuer 
-l'opération \mintinline{python}{index(m, K, bitboard) & size - 1} à la ligne 28 car les nombres entiers ont une précision arbitraire et par exemple nous avons
-
-\begin{minted}[breaklines,fontsize=\small]{python}
-   0x2643c51ab9dfa5b * 0x8000000000000000 >> 58
-== 0x4c878a3573bf4b60
-
-   (0x2643c51ab9dfa5b * 0x8000000000000000 >> 58) & size - 1
-== 0x4c878a3573bf4b60 & 0b111111
-== 32
-\end{minted}
-
-En \emph{C++} nous aurions
-
-\begin{minted}[breaklines,fontsize=\small]{cpp}
-   0x2643c51ab9dfa5b * 0x8000000000000000 >> 58
-== 32
-\end{minted}
-
-Remarquons que nous n'avons pas le même problème à la ligne 18 car \mintinline{python}{MAGIC} est de type \mintinline{python}{BitVec(64)}.\\
-
-\end{itemize}
+% \item Les lignes 22 à 32 permettent d'afficher sur la sortie standard la valeur MAGIC ainsi que le tableau C++ des valeurs obtenues. Ce tableau est donné ci-dessous.
+\item Lines 22 to 32 print to standard output the \mintinline{python}{MAGIC} value and the \emph{C++} array of obtained values. This array is shown below. 
 
 \begin{minted}[breaklines,fontsize=\small]{cpp}
 found magic for K = 6: 0x2643c51ab9dfa5b
@@ -1686,13 +1740,125 @@ constexpr uint8_t positions[64] = {
 };
 \end{minted}
 
-Maintenant que nous avons vu sur un exemple simple comment marche la technique des magic bitboard (ou hachage parfait), nous allons pouvoir étudier la génération des mouvements possibles des pièces en utilisant cette technique. 
 
-\subsection{Magic bitboard pour les mouvements des pièces}
+% Notons qu'en Python il était important d'effectuer l'opération index(m, K, bitboard) & size - 1 à la ligne 28 car les nombres entiers ont une précision arbitraire et par exemple nous avons
+Note that in \emph{Python} it was important to perform the operation \mintinline{python}{index(m, K, bitboard) & size - 1} on line 28 because Python integers have arbitrary precision. For example, we have:
 
-\subsection{Jouer et annuler un coup}
+\begin{minted}[breaklines,fontsize=\small]{python}
+   0x2643c51ab9dfa5b * 0x8000000000000000 >> 58
+== 0x4c878a3573bf4b60
 
-\section{Code complet commenté du plateau de jeu}
+   (0x2643c51ab9dfa5b * 0x8000000000000000 >> 58) & size - 1
+== 0x4c878a3573bf4b60 & 0b111111
+== 32
+\end{minted}
+
+% En C++ nous aurions
+In \emph{C++} we would have:
+
+\begin{minted}[breaklines,fontsize=\small]{cpp}
+   0x2643c51ab9dfa5b * 0x8000000000000000 >> 58
+== 32
+\end{minted}
+
+% Remarquons que nous n'avons pas le même problème à la ligne 18 car MAGIC est de type BitVec(64).
+Note that we don't have the same problem on line 18 because \mintinline{python}{MAGIC} is of type \mintinline{python}{BitVec(64)}.\\
+
+\end{itemize}
+
+% Pour tester l'efficacité de notre technique de hachage parfait magique, nous allons mettre en place le micro-benchmark donné dans le listing. Nous utilisons la librairie google benchmark pour effectuer ces mesures. Le résultat de l'exécution de ce benchmark est donné dans la figure. La fonction BM_magic_positions utilisant le hachage parfait magique est bien plus rapide que la fonction BM_unordered_map_positions utilisant une table de hachage classique. Bien entendu, la fonction BM_builtin_ctz_positions utilisant une instruction dédiée est la plus efficace (mais ne sera d'aucune utilité pour la génération des coups possibles).
+To test the efficiency of our magic perfect hashing technique, we set up the micro-benchmark shown in Listing \ref{lst:compare_hashmap_magic}. We use the \emph{Google Benchmark} library for these measurements \cite{googlebenchmark2025}. The benchmark execution results are shown in Listing \ref{lst:result_compare_hashmap_magic}. The \mintinline{c++}{BM_magic_positions} function using magic perfect hashing is much faster than the \mintinline{c++}{BM_unordered_map_positions} function using a standard hash table. Of course, the \mintinline{c++}{BM_builtin_ctz_positions} function using a dedicated instruction is the most efficient (but will be of no use for move generation).\\
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
+#include <benchmark/benchmark.h>
+#include <unordered_map>
+#include <vector>
+
+std::vector<uint64_t> generate_isolated_bits() {
+    std::vector<uint64_t> samples;
+    for (int i = 0; i < 64; i++) {
+        samples.push_back(1ULL << i);
+    }
+    return samples;
+}
+static void BM_magic_positions(benchmark::State& state) {
+    constexpr uint64_t MAGIC = 0x2643c51ab9dfa5b;
+    constexpr int K = 6;
+    constexpr uint8_t positions[64] = {
+         0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
+        12, 26, 53,  5, 24, 33, 56, 35, 61,  8, 30, 58, 37, 42, 17, 46,
+        63, 13, 21, 27, 10, 54,  6, 40, 25, 52, 32, 34, 60, 57, 36, 45,
+        62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
+    };
+    auto samples = generate_isolated_bits();
+    size_t idx = 0;
+    for (auto _ : state) {
+     uint64_t bitboard = samples[idx++ & 63];
+     benchmark::DoNotOptimize(positions[bitboard * MAGIC >> (64 - K)]);
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_magic_positions);
+static void BM_unordered_map_positions(benchmark::State& state) {
+    std::unordered_map<uint64_t, uint8_t> map;
+    for (uint8_t i = 0; i < 64; i++) {
+        map[1ULL << i] = i;
+    }
+    auto samples = generate_isolated_bits();
+    size_t idx = 0;
+    for (auto _ : state) {
+        uint64_t bitboard = samples[idx++ & 63];
+        benchmark::DoNotOptimize(map[bitboard]);
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_unordered_map_positions);
+static void BM_builtin_ctz_positions(benchmark::State& state) {
+    auto samples = generate_isolated_bits();
+    size_t idx = 0;
+    for (auto _ : state) {
+        uint64_t bitboard = samples[idx++ & 63];
+        benchmark::DoNotOptimize(__builtin_ctzll(bitboard));
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_builtin_ctz_positions);
+BENCHMARK_MAIN();
+\end{minted}
+% \captionof{listing}{Micro-benchmark pour comparer les temps d'exécution du hachage parfait magique, d'une table de hachage classique et de l'instruction machine dédiée.}
+\captionof{listing}{Micro-benchmark comparing execution times of magic perfect hashing, a standard hash table, and a dedicated machine instruction.}
+\label{lst:compare_hashmap_magic}
+\end{mdframed} 
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\footnotesize]{text}
+Run on (12 X 4400 MHz CPU s)
+CPU Caches: L1 Data 32 KiB (x6), L1 Instruction 32 KiB (x6),
+            L2 Unified 256 KiB (x6), L3 Unified 12288 KiB (x1)
+Load Average: 0.62, 1.33, 2.92
+
+Benchmark                      Time        CPU    Iterations  Throughput
+--------------------------------------------------------------------------
+BM_magic_positions          0.542 ns   0.542 ns   1000000000  1.85 G/s
+BM_unordered_map_positions   30.2 ns    30.2 ns     23361655  33.1 M/s
+BM_builtin_ctz_positions    0.480 ns   0.480 ns   1000000000  2.08 G/s
+\end{minted}
+% \captionof{listing}{Résultats de l'exécution du micro-benchmark du listing}
+\captionof{listing}{Micro-benchmark execution results from Listing \ref{lst:compare_hashmap_magic}}
+\label{lst:result_compare_hashmap_magic}
+\end{mdframed}
+
+% Maintenant que nous avons vu sur un exemple simple comment marche la technique du hachage parfait magique, nous allons pouvoir étudier la génération des mouvements possibles des pièces en utilisant cette technique.
+Now that we have seen how the magic perfect hashing technique works through a simple example, we can study generating possible piece moves using this technique.
+
+\subsection{Magic Bitboards for Piece Moves}
+
+
+
+\subsection{Making and Unmaking Moves}
+
+\section{Complete Commented Game Board Code}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/type.h}
@@ -1703,21 +1869,23 @@ Maintenant que nous avons vu sur un exemple simple comment marche la technique d
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/move.h}
-\captionof{listing}{implémentation d'un coup}
+% \captionof{listing}{implémentation d'un coup}
+\captionof{listing}{Move implementation}
 \label{lst:move_h}
 \end{mdframed}
 
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/game.h}
-\captionof{listing}{implémentation du plateau}
+% \captionof{listing}{implémentation du plateau}
+\captionof{listing}{Board implementation}
 \label{lst:game_h}
 \end{mdframed}
 
-\section{Test avec des parties aléatoires}
+\section{Testing with Random Games}
 
 
-\section{La suite}
+\section{What's Next}
 
 
 % \begin{listing}[H]
