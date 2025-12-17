@@ -54,6 +54,7 @@
 \usepackage{array}
 \usepackage{multirow}
 \usepackage{longtable}
+\usepackage{colortbl}
 
 % Code Listings
 \usepackage{minted}
@@ -251,7 +252,10 @@
 \thispagestyle{empty}
 \vspace*{\fill}
 \begin{center}
-\textit{À Sarah, Hugo et C\'elya \textcolor{red}{\faHeart}}
+\textit{À Sar\textbf{ah}, Hug\textbf{o} et C\'e\textbf{ly}a \textcolor{red}{\faHeart}}\\
+\textit{\textbf{ah o ly}}\\
+\textit{\textbf{yolah}}\\
+\textit{\textbf{Yolah}}
 \end{center}
 \vspace*{\fill}
 \clearpage
@@ -1144,7 +1148,7 @@ Bitboards allow us to efficiently manipulate the board using bitwise operations 
 We represent the game board with the \mintinline{c++}{Yolah} class, an excerpt of which is given in Listing \ref{lst:yolah_class_attributes}.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 constexpr uint64_t BLACK_INITIAL_POSITION =
 0b10000000'00000000'00000000'00001000'00010000'00000000'00000000'00000001;
 constexpr uint64_t WHITE_INITIAL_POSITION =
@@ -1275,7 +1279,7 @@ enum Direction : int8_t {
 \end{mdframed}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 template<Direction D>
 constexpr uint64_t shift(uint64_t b) {
     if constexpr (D == NORTH)
@@ -1521,11 +1525,11 @@ int position(uint64_t x) {
 % La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande. L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des 64 valeurs, que nous allons appeler clés, dans la plage [0, 63].
 Looking up values in this hash table is far more costly than indexing a simple array\footnote{We will measure the performance gain from magic perfect hashing compared to using a standard hash table at the end of this section.}. However, we cannot directly use an array because the indexing values span too large a range—for example, the value \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$!). The idea is to find an efficient hash function that transforms each of the $64$ values\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}—which we call bitboards—into the range $[0, 2^6 - 1 = 63]$.
 % De plus on veut qu'il n'y ait aucune collision, on parle alors d'un hachage parfait. S'il y a des collisions des positions seraient erronées. Par exemple, si les clés 0b100 et 0b1000000 étaient transformées en l'indice 42, on devrait mettre dans table[42] la valeur 2 ou 6, mais on ne peut pas stocker plus d'une valeur au même emplacement.
-Moreover, we want no collisions—this is called perfect hashing. If there were collisions, positions would be incorrect. For example, if keys \mintinline{c++}{0b100} and \mintinline{c++}{0b1000000} were both transformed to index $42$, we would need to store value $2$ or $6$ in \mintinline{c++}{table[42]}, but we cannot store more than one value at the same location.\\
-
+Moreover, we want no collisions—this is called perfect hashing. If there were collisions, positions would be incorrect. For example, if keys \mintinline{c++}{0b100} and \mintinline{c++}{0b1000000} were both transformed to index $42$, we would need to store value $2$ and $6$ in \mintinline{c++}{table[42]}, but we cannot store more than one value at the same location.\\
 % La fonction de hachage parfait magique va avoir la forme suivante :
-The magic perfect hashing function will have the following form:
+The magic perfect hashing function will have the following form (listing \ref{lst:magic_perfect_hashing}):
 
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 constexpr uint64_t MAGIC = //...
 constexpr int K = 6;
@@ -1533,6 +1537,9 @@ int magic_perfect_hashing(uint64_t bitboard) {
     return bitboard * MAGIC >> (64 - K);
 }
 \end{minted}
+\captionof{listing}{Magic bitboard perfect hashing}
+\label{lst:magic_perfect_hashing}
+\end{mdframed}
 
 % Dans cette fonction,
 In this function:
@@ -1854,9 +1861,122 @@ Now that we have seen how the magic perfect hashing technique works through a si
 
 \subsection{Magic Bitboards for Piece Moves}
 
+Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case donnée, donner la liste des coups possibles pour cette configuration de jeu. Par exemple, pour le plateau de la figure \ref{fig:move23_position} dont les coups possibles pour la pièce en {\ttfamily d3} sont représentées par des étoiles dans la table \ref{tab:move23_d3_moves}, on voudrait très efficacement pouvoir obtenir le bitboard de la table \ref{tab:bb_move23_d3_moves} indiquant les différents coups possibles.\\
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.45\textwidth]{yolah_game_example_move23_no_arrow.png}
+% \caption{Position du plateau après le coup 23}
+\caption{Board position example (after move 23 in figure \ref{fig:fig:game_example_middle})}
+\label{fig:move23_position}
+\end{figure}
+
+
+\begin{table}[H]
+\centering
+\caption{Possible moves for white piece at d3}
+\label{tab:move23_d3_moves}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+8 & $\times$ & $\bullet$ & $\cdot$ & $\cdot$ & $\times$ & $\cdot$ & $\cdot$ & $\times$ \\ \hline
+7 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\circ$ & $\cdot$ & $\bullet$ \\ \hline
+6 & $\bullet$ & $\cdot$ & $\circ$ & $\times$ & $\times$ & $\times$ & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\cdot$ & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ \\ \hline
+4 & $\cdot$ & $\cdot$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\times$ & $\times$ & $\times$ & $\cdot$ \\ \hline
+3 & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\circ$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\cdot$ & $\cdot$ \\ \hline
+2 & $\times$ & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\circ$ & $\cdot$ & $\bullet$ \\ \hline
+1 & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\cdot$ & $\cdot$ & $\cdot$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\times$ \\ \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Bitboard of possible moves for white piece at d3}
+\label{tab:bb_move23_d3_moves}
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
+\hline
+8 & \begin{tabular}{@{}c@{}}{\tiny 56}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 57}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 58}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 59}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 60}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 61}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 62}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 63}\\[1pt]0\end{tabular} \\[5pt] \hline
+7 & \begin{tabular}{@{}c@{}}{\tiny 48}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 49}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 50}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 51}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 52}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 53}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 54}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 55}\\[1pt]0\end{tabular} \\[5pt] \hline
+6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
+5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
+4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]\textbf{1}\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
+2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
+1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Mask for horizontal, vertical and diagonal moves from d3}
+\label{tab:mask_for_d3}
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
+\hline
+8 & \begin{tabular}{@{}c@{}}{\tiny 56}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 57}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 58}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 59}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 60}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 61}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 62}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 63}\\[1pt]0\end{tabular} \\[5pt] \hline
+7 & \begin{tabular}{@{}c@{}}{\tiny 48}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 49}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 50}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 51}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 52}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 53}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 54}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 55}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
+5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
+4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]\textbf{1}\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
+1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Board bitboard}
+\label{tab:board_move23}
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
+\hline
+8 & \begin{tabular}{@{}c@{}}{\tiny 56}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 57}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 58}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 59}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 60}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 61}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 62}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 63}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+7 & \begin{tabular}{@{}c@{}}{\tiny 48}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 49}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 50}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 51}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 52}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 53}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 54}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 55}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
+5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
+2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Occupancies bitboard (\mintinline{c++}{mask & board}) for d3}
+\label{tab:occupancies_d3_move23}
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
+\hline
+8 & \begin{tabular}{@{}c@{}}{\tiny 56}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 57}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 58}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 59}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 60}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 61}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 62}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 63}\\[1pt]0\end{tabular} \\[5pt] \hline
+7 & \begin{tabular}{@{}c@{}}{\tiny 48}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 49}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 50}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 51}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 52}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 53}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 54}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 55}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
+5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
+4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]0\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
+2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
+1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+Prenons comme exemple la case {\ttfamily d3}. Nous avons tout d'abord besoin d'un masque qui va nous permettre d'isoler les cases du plateau atteignables par la pièce en {\ttfamily d3}. Ce masque est représenté dans la table \ref{tab:mask_for_d3}. Soit \mintinline{c++}{mask} le masque de la table \ref{tab:mask_for_d3} et \mintinline{c++}{board} le bitboard de la table \ref{tab:board_move23} représentant le plateau de jeu de la figure \ref{fig:move23_position}. On obtient le bitboard \mintinline{c++}{occupancies}, donnant les obstacles sur les trajectoires possibles de la pièce en {\ttfamily d3} en faisant~: \mintinline{c++}{occupancies = mask & board}. Ce bitboard est donné dans la table \ref{tab:occupancies_d3_move23}. Il y a un $1$ pour chaque case contenant une pièce ou un trou. Ce qu'il nous faut, c'est de pouvoir indexer une table, appelons la \mintinline{c++}{uint64_t MOVES_D3[]}, grâce au bitboard \mintinline{c++}{occupancies}, pour obtenir le bitboard des coups possibles à partir de la case {\ttfamily d3}. Ce bitboard est représenté dans la table \ref{tab:bb_move23_d3_moves}. Il ne nous restera plus qu'à parcourir chacun des bits à $1$ dans ce bitboard pour connaitre les cases où l'on peut se rendre et créer le coup correspondant. Pour obtenir l'index dans \mintinline{c++}{MOVES_D3}, on va utiliser la technique des magic bitboard que nous avons décrite dans la section précédente. Pour la case {\ttfamily d3}, il va nous falloir trouver une valeur \mintinline{c++}{K} et une valeur \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}) pour pouvoir obtenir le bitboard des coups possibles en faisant~: \mintinline{c++}{MOVES_D3[occupancies * MAGIC >> (64 - K)]}.
 
 \subsection{Making and Unmaking Moves}
+
+
+\section{Testing with Random Games}
+
+
+\section{What's Next}
+
 
 \section{Complete Commented Game Board Code}
 
@@ -1881,11 +2001,6 @@ Now that we have seen how the magic perfect hashing technique works through a si
 \captionof{listing}{Board implementation}
 \label{lst:game_h}
 \end{mdframed}
-
-\section{Testing with Random Games}
-
-
-\section{What's Next}
 
 
 % \begin{listing}[H]

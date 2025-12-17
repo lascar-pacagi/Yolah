@@ -11,6 +11,11 @@
 \contentsline {table}{\numberline {2.8}{\ignorespaces Game board after applying \mintinline {c++}{shift<NORTH>}\relax }}{17}{table.caption.20}%
 \contentsline {table}{\numberline {2.9}{\ignorespaces Game board\relax }}{18}{table.caption.21}%
 \contentsline {table}{\numberline {2.10}{\ignorespaces Positions around the pieces\relax }}{18}{table.caption.21}%
+\contentsline {table}{\numberline {2.11}{\ignorespaces Possible moves for white piece at d3\relax }}{28}{table.caption.23}%
+\contentsline {table}{\numberline {2.12}{\ignorespaces Bitboard of possible moves for white piece at d3\relax }}{29}{table.caption.24}%
+\contentsline {table}{\numberline {2.13}{\ignorespaces Mask for horizontal, vertical and diagonal moves from d3\relax }}{29}{table.caption.25}%
+\contentsline {table}{\numberline {2.14}{\ignorespaces Board bitboard\relax }}{30}{table.caption.26}%
+\contentsline {table}{\numberline {2.15}{\ignorespaces Occupancies bitboard (\mintinline {c++}{mask & board}) for d3\relax }}{30}{table.caption.27}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
