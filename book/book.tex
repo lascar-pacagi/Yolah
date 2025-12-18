@@ -252,10 +252,10 @@
 \thispagestyle{empty}
 \vspace*{\fill}
 \begin{center}
-\textit{À Sar\textbf{ah}, Hug\textbf{o} et C\'e\textbf{ly}a \textcolor{red}{\faHeart}}\\
-\textit{\textbf{ah o ly}}\\
+\textit{À Sar\textbf{ah}, \textbf{H}ug\textbf{o} et C\'e\textbf{ly}a \textcolor{red}{\faHeart}}\\
+\textit{\textbf{ahholy}}\\
+\textit{\textbf{aholy}}\\
 \textit{\textbf{yolah}}\\
-\textit{\textbf{Yolah}}
 \end{center}
 \vspace*{\fill}
 \clearpage
@@ -1048,6 +1048,7 @@ enum Square : int8_t {
     SQUARE_NB   = 64
 };
 \end{minted}
+\vspace{-0.5em}
 % \captionof{listing}{Les cases du plateau de jeu}
 \captionof{listing}{Board squares}
 \label{lst:squares}
@@ -1125,14 +1126,14 @@ Let us take as an example the board shown in Figure \ref{fig:yolah_game_engine1}
 \label{tab:empty_positions_game_example_move21}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
-8 & $\times$ & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\cdot$ & $\cdot$ & $\times$ \\ \hline
+8 & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
 7 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
-6 & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\times$ & $\times$ & $\cdot$ & $\cdot$ \\ \hline
-5 & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ \\ \hline
-4 & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\times$ & $\cdot$ & $\times$ & $\cdot$ \\ \hline
-3 & $\times$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\cdot$ & $\cdot$ \\ \hline
-2 & $\times$ & $\times$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
-1 & $\times$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\times$ \\ \hline
+6 & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
+4 & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ \\ \hline
+3 & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ \\ \hline
+2 & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+1 & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
 \multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
 \cline{2-9}
 \end{tabular}
@@ -1164,6 +1165,7 @@ public:
     // ...
 };
 \end{minted}
+\vspace{-0.5em}
 % \captionof{listing}{Les attributs de la classe Yolah représentant le plateau de jeu}
 \captionof{listing}{Attributes of the Yolah class representing the game board}
 \label{lst:yolah_class_attributes}
@@ -1386,8 +1388,8 @@ For the board in Table \ref{tab:before_all_shift}, we get the positions represen
 8 & $\circ$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\bullet$ \\ \hline
 7 & $\cdot$ & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
 6 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
-5 & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\circ$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
-4 & $\cdot$ & $\cdot$ & $\cdot$ & $\times$ & $\times$ & $\bullet$ & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & $\circ$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
+4 & $\cdot$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\bullet$ & $\cdot$ & $\cdot$ \\ \hline
 3 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
 2 & $\cdot$ & $\cdot$ & $\cdot$ & $\circ$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\ \hline
 1 & $\bullet$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\circ$ \\ \hline
@@ -1537,6 +1539,7 @@ int magic_perfect_hashing(uint64_t bitboard) {
     return bitboard * MAGIC >> (64 - K);
 }
 \end{minted}
+\vspace{-0.5em}
 \captionof{listing}{Magic bitboard perfect hashing}
 \label{lst:magic_perfect_hashing}
 \end{mdframed}
@@ -1863,37 +1866,37 @@ Now that we have seen how the magic perfect hashing technique works through a si
 
 Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case donnée, donner la liste des coups possibles pour cette configuration de jeu. Par exemple, pour le plateau de la figure \ref{fig:move23_position} dont les coups possibles pour la pièce en {\ttfamily d3} sont représentées par des étoiles dans la table \ref{tab:move23_d3_moves}, on voudrait très efficacement pouvoir obtenir le bitboard de la table \ref{tab:bb_move23_d3_moves} indiquant les différents coups possibles.\\
 
-\begin{figure}[H]
+\begin{figure}[htpb]
 \centering
 \includegraphics[width=0.45\textwidth]{yolah_game_example_move23_no_arrow.png}
 % \caption{Position du plateau après le coup 23}
-\caption{Board position example (after move 23 in figure \ref{fig:fig:game_example_middle})}
+\caption{Board position example (after move 23 in figure \ref{fig:game_example_middle})}
 \label{fig:move23_position}
 \end{figure}
 
 
-\begin{table}[H]
+\begin{table}[htpb]
 \centering
 \caption{Possible moves for white piece at d3}
 \label{tab:move23_d3_moves}
 \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
-8 & $\times$ & $\bullet$ & $\cdot$ & $\cdot$ & $\times$ & $\cdot$ & $\cdot$ & $\times$ \\ \hline
+8 & \raisebox{-0.3ex}{$\blacksquare$} & $\bullet$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
 7 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\circ$ & $\cdot$ & $\bullet$ \\ \hline
-6 & $\bullet$ & $\cdot$ & $\circ$ & $\times$ & $\times$ & $\times$ & $\cdot$ & $\cdot$ \\ \hline
-5 & $\cdot$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\cdot$ & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ \\ \hline
-4 & $\cdot$ & $\cdot$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\times$ & $\times$ & $\times$ & $\cdot$ \\ \hline
-3 & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\circ$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\cdot$ & $\cdot$ \\ \hline
-2 & $\times$ & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\circ$ & $\cdot$ & $\bullet$ \\ \hline
-1 & $\times$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\cdot$ & $\cdot$ & $\cdot$ & $\textcolor{red}{\boldsymbol{\ast}}$ & $\times$ & $\times$ \\ \hline
+6 & $\bullet$ & $\cdot$ & $\circ$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ \\ \hline
+5 & $\cdot$ & $\boldsymbol{\ast}$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
+4 & $\cdot$ & $\cdot$ & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ \\ \hline
+3 & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & $\boldsymbol{\ast}$ & $\circ$ & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ \\ \hline
+2 & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & $\circ$ & $\cdot$ & $\bullet$ \\ \hline
+1 & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & $\cdot$ & $\cdot$ & $\cdot$ & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
 \multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
 \cline{2-9}
 \end{tabular}
 \end{table}
 
-\begin{table}[H]
+\begin{table}[htpb]
 \centering
-\caption{Bitboard of possible moves for white piece at d3}
+\caption{Bitboard of possible moves for the piece at d3 (see table \ref{tab:move23_d3_moves})}
 \label{tab:bb_move23_d3_moves}
 \begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
 \hline
@@ -1910,9 +1913,9 @@ Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case
 \end{tabular}
 \end{table}
 
-\begin{table}[H]
+\begin{table}[htpb]
 \centering
-\caption{Mask for horizontal, vertical and diagonal moves from d3}
+\caption{Masque pour les cases atteignables par la pièce en d3 sans considérer les éventuels obstacles}
 \label{tab:mask_for_d3}
 \begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
 \hline
@@ -1921,7 +1924,7 @@ Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case
 6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
 5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
 4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
-3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]\textbf{1}\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]\textbf{1}\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{0}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]\textbf{1}\end{tabular} \\[5pt] \hline
 2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
 1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
 \multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
@@ -1929,7 +1932,7 @@ Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case
 \end{tabular}
 \end{table}
 
-\begin{table}[H]
+\begin{table}[htpb]
 \centering
 \caption{Board bitboard}
 \label{tab:board_move23}
@@ -1948,7 +1951,7 @@ Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case
 \end{tabular}
 \end{table}
 
-\begin{table}[H]
+\begin{table}[htpb]
 \centering
 \caption{Occupancies bitboard (\mintinline{c++}{mask & board}) for d3}
 \label{tab:occupancies_d3_move23}
@@ -1959,7 +1962,7 @@ Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case
 6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
 5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
 4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
-3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]0\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]0\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{0}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
 2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
 1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
 \multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
@@ -1967,7 +1970,202 @@ Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case
 \end{tabular}
 \end{table}
 
-Prenons comme exemple la case {\ttfamily d3}. Nous avons tout d'abord besoin d'un masque qui va nous permettre d'isoler les cases du plateau atteignables par la pièce en {\ttfamily d3}. Ce masque est représenté dans la table \ref{tab:mask_for_d3}. Soit \mintinline{c++}{mask} le masque de la table \ref{tab:mask_for_d3} et \mintinline{c++}{board} le bitboard de la table \ref{tab:board_move23} représentant le plateau de jeu de la figure \ref{fig:move23_position}. On obtient le bitboard \mintinline{c++}{occupancies}, donnant les obstacles sur les trajectoires possibles de la pièce en {\ttfamily d3} en faisant~: \mintinline{c++}{occupancies = mask & board}. Ce bitboard est donné dans la table \ref{tab:occupancies_d3_move23}. Il y a un $1$ pour chaque case contenant une pièce ou un trou. Ce qu'il nous faut, c'est de pouvoir indexer une table, appelons la \mintinline{c++}{uint64_t MOVES_D3[]}, grâce au bitboard \mintinline{c++}{occupancies}, pour obtenir le bitboard des coups possibles à partir de la case {\ttfamily d3}. Ce bitboard est représenté dans la table \ref{tab:bb_move23_d3_moves}. Il ne nous restera plus qu'à parcourir chacun des bits à $1$ dans ce bitboard pour connaitre les cases où l'on peut se rendre et créer le coup correspondant. Pour obtenir l'index dans \mintinline{c++}{MOVES_D3}, on va utiliser la technique des magic bitboard que nous avons décrite dans la section précédente. Pour la case {\ttfamily d3}, il va nous falloir trouver une valeur \mintinline{c++}{K} et une valeur \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}) pour pouvoir obtenir le bitboard des coups possibles en faisant~: \mintinline{c++}{MOVES_D3[occupancies * MAGIC >> (64 - K)]}.
+Prenons comme exemple la case {\ttfamily d3}. Nous avons tout d'abord besoin d'un masque qui va nous permettre d'isoler les cases du plateau atteignables par la pièce en {\ttfamily d3} sans prendre en considération les obstacles. Ce masque est représenté dans la table \ref{tab:mask_for_d3}. Soit \mintinline{c++}{mask} le masque de la table \ref{tab:mask_for_d3} et \mintinline{c++}{board} le bitboard de la table \ref{tab:board_move23} représentant le plateau de jeu de la figure \ref{fig:move23_position}. On obtient le bitboard \mintinline{c++}{occupancies}, donnant les obstacles sur les trajectoires possibles de la pièce en {\ttfamily d3} en faisant~: \mintinline{c++}{occupancies = mask & board}. Ce bitboard est donné dans la table \ref{tab:occupancies_d3_move23}. Il y a un $1$ pour chaque case contenant une pièce ou un trou. Ce qu'il nous faut, c'est de pouvoir indexer une table, appelons la \mintinline{c++}{uint64_t MOVES_D3[]}, grâce au bitboard \mintinline{c++}{occupancies}, pour obtenir le bitboard des coups possibles à partir de la case {\ttfamily d3}. Ce bitboard est représenté dans la table \ref{tab:bb_move23_d3_moves}. Il ne nous restera plus qu'à parcourir chacun des bits à $1$ dans ce bitboard pour connaitre les cases où l'on peut se rendre et créer le coup correspondant. Pour obtenir l'index dans \mintinline{c++}{MOVES_D3}, on va utiliser la technique des magic bitboard que nous avons décrite dans la section précédente. Pour la case {\ttfamily d3}, il va nous falloir trouver une valeur \mintinline{c++}{K} et une valeur \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}) pour pouvoir obtenir le bitboard des coups possibles en faisant~: \mintinline{c++}{MOVES_D3[occupancies * MAGIC >> (64 - K)]}.\\
+
+Pour trouver une constante \mintinline{c++}{MAGIC} pour la case {\ttfamily d3}, nous allons avoir besoin d'énumérer tous les placements d'obstacles possibles sur les cases où peut se rendre la pièce en {\ttfamily d3}. Cela veut dire que l'on doit énumérer tous les sous-ensembles de $1$ du bitboard de la table \ref{tab:mask_for_d3}. Huit sous-ensembles de cette énumération sont présentés dans la figure \ref{fig:subsets_for_d3}. Il y a $25$ cases sur la trajectoire de la pièce en {\ttfamily d3} (voir la table \ref{tab:mask_for_d3}), cela veut dire qu'il y a $2^{25} = 33,554,432$ sous-ensembles à énumérer~!
+Nous voudrions réduire ce nombre de configurations des obstacles possibles sur la trajectoire de la pièce. En effet, comme nous le verrons lorsque nous détaillerons le code pour déterminer la valeur de la constante \mintinline{c++}{MAGIC}, la place mémoire pour stocker les coups possibles pour une case donnée va dépendre de ce nombre de configurations.\\
+
+\begin{figure}[htpb]
+\centering
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.3cm}|}}
+\hline
+{\scriptsize 8} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 7} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 6} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 5} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 4} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 3} & \tiny 0 & \tiny 0 & \tiny 0 & \cellcolor{lightgray}\tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 2} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+\multicolumn{1}{c|}{} & \scriptsize a & \scriptsize b & \scriptsize c & \scriptsize d & \scriptsize e & \scriptsize f & \scriptsize g & \scriptsize h \\
+\cline{2-9}
+\end{tabular}
+\caption{Empty (0 bits)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.3cm}|}}
+\hline
+{\scriptsize 8} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 7} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 6} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 5} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 4} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 3} & \tiny 0 & \tiny 0 & \tiny 0 & \cellcolor{lightgray}\tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 2} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+\multicolumn{1}{c|}{} & \scriptsize a & \scriptsize b & \scriptsize c & \scriptsize d & \scriptsize e & \scriptsize f & \scriptsize g & \scriptsize h \\
+\cline{2-9}
+\end{tabular}
+\caption{1 bit set}
+\end{subfigure}
+
+\vspace{0.8cm}
+
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.3cm}|}}
+\hline
+{\scriptsize 8} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 7} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 6} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 5} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 4} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 3} & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \cellcolor{lightgray}\tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 2} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+\multicolumn{1}{c|}{} & \scriptsize a & \scriptsize b & \scriptsize c & \scriptsize d & \scriptsize e & \scriptsize f & \scriptsize g & \scriptsize h \\
+\cline{2-9}
+\end{tabular}
+\caption{2 bits set}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.3cm}|}}
+\hline
+{\scriptsize 8} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 7} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 6} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 5} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 4} & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 3} & \tiny 0 & \tiny 0 & \tiny 0 & \cellcolor{lightgray}\tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 2} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+\multicolumn{1}{c|}{} & \scriptsize a & \scriptsize b & \scriptsize c & \scriptsize d & \scriptsize e & \scriptsize f & \scriptsize g & \scriptsize h \\
+\cline{2-9}
+\end{tabular}
+\caption{3 bits set}
+\end{subfigure}
+
+\vspace{0.8cm}
+
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.3cm}|}}
+\hline
+{\scriptsize 8} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 7} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} \\[2pt] \hline
+{\scriptsize 6} & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 \\[2pt] \hline
+{\scriptsize 5} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 4} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 3} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \cellcolor{lightgray}\tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} \\[2pt] \hline
+{\scriptsize 2} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 1} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+\multicolumn{1}{c|}{} & \scriptsize a & \scriptsize b & \scriptsize c & \scriptsize d & \scriptsize e & \scriptsize f & \scriptsize g & \scriptsize h \\
+\cline{2-9}
+\end{tabular}
+\caption{9 bits set}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.3cm}|}}
+\hline
+{\scriptsize 8} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 7} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 & \tiny\textbf{1} \\[2pt] \hline
+{\scriptsize 6} & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny 0 \\[2pt] \hline
+{\scriptsize 5} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 4} & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny\textbf{1} & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 3} & \tiny\textbf{1} & \tiny\textbf{1} & \tiny\textbf{1} & \cellcolor{lightgray}\tiny 0 & \tiny\textbf{1} & \tiny\textbf{1} & \tiny\textbf{1} & \tiny\textbf{1} \\[2pt] \hline
+{\scriptsize 2} & \tiny 0 & \tiny 0 & \tiny\textbf{1} & \tiny\textbf{1} & \tiny\textbf{1} & \tiny 0 & \tiny 0 & \tiny 0 \\[2pt] \hline
+{\scriptsize 1} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny\textbf{1} & \tiny 0 & \tiny 0 \\[2pt] \hline
+\multicolumn{1}{c|}{} & \scriptsize a & \scriptsize b & \scriptsize c & \scriptsize d & \scriptsize e & \scriptsize f & \scriptsize g & \scriptsize h \\
+\cline{2-9}
+\end{tabular}
+\caption{18 bits set (full)}
+\end{subfigure}
+
+\caption{Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones}
+\label{fig:subsets_for_d3}
+\end{figure}
+ 
+Pour réduire ce nombre de configurations, nous allons ne pas considérer les cases sur les bords du plateau pour enlever les bits à $1$ sur les bords du plateau du masque de la table \ref{tab:mask_for_d3}. On obtient le bitboard de la table \ref{tab:mask_for_d3_without_edge}. Il nous manquera l'information sur le bord, mais on supposera que s'il est possible de jouer en {\ttfamily d7} par exemple, il sera aussi possible de jouer en {\ttfamily d8}. Bien sûr il se peut qu'il y ait un obstacle en {\ttfamily d8}, mais on pourra facilement éliminer ce coup impossible comme nous le verrons dans la suite de ce chapitre. Avec cette réduction, il nous reste $2^{17} = 131072$ sous-ensembles à énumérer. C'est bien mieux, mais nous allons pouvoir encore réduire ce nombre.\\
+
+\begin{table}[htpb]
+\centering
+\caption{Masque pour les cases atteignables pour la pièce en {\ttfamily d3} en excluant les bords du plateau}
+\label{tab:mask_for_d3_without_edge}
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
+\hline
+8 & \begin{tabular}{@{}c@{}}{\tiny 56}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 57}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 58}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 59}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 60}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 61}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 62}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 63}\\[1pt]0\end{tabular} \\[5pt] \hline
+7 & \begin{tabular}{@{}c@{}}{\tiny 48}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 49}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 50}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 51}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 52}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 53}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 54}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 55}\\[1pt]0\end{tabular} \\[5pt] \hline
+6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
+5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
+4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]\textbf{1}\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{0}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
+2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
+1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\end{table}
+
+En effet, on peut scinder les mouvements d'une pièce en mouvements diagonaux et orthogonaux. Nous obtiendrons deux tableaux~: \mintinline{c++}{MOVES_D3_DIAG} et \mintinline{c++}{MOVES_D3_ORTHO}. Nous aurons à consulter deux tableaux au lieu d'un seul, pour obtenir les coups possibles en {\ttfamily d3} (ou n'importe quelle autre case), mais nous allons gagner beaucoup de place mémoire. Nous verrons comment combiner les valeurs de ces deux tableaux plus loin dans ce chapitre. Au lieu du masque de la table \ref{tab:mask_for_d3_without_edge}, nous aurons maintenant les deux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
+Pour le masque orthogonal de la figure \ref{fig:orthogonal_mask_d3}, on a $2^{10} = 1024$ sous-ensembles et pour le masque diagonal de la figure \ref{fig:diagonal_mask_d3}, on a $2^{7} = 128$ sous-ensembles, on passe donc de $2^{17} = 131072$ à $2^{10} + 2^{7} = 1152$ configurations à considérer pour les obstacles pour la pièce en {\ttfamily d3}~!\\
+
+\begin{figure}[htpb]
+\centering
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
+\hline
+8 & \begin{tabular}{@{}c@{}}{\tiny 56}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 57}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 58}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 59}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 60}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 61}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 62}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 63}\\[1pt]0\end{tabular} \\[5pt] \hline
+7 & \begin{tabular}{@{}c@{}}{\tiny 48}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 49}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 50}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 51}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 52}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 53}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 54}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 55}\\[1pt]0\end{tabular} \\[5pt] \hline
+6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
+5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
+4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]\textbf{1}\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{0}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
+2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
+1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\caption{Orthogonal mask}
+\label{fig:orthogonal_mask_d3}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.45\textwidth}
+\centering
+\begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
+\hline
+8 & \begin{tabular}{@{}c@{}}{\tiny 56}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 57}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 58}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 59}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 60}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 61}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 62}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 63}\\[1pt]0\end{tabular} \\[5pt] \hline
+7 & \begin{tabular}{@{}c@{}}{\tiny 48}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 49}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 50}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 51}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 52}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 53}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 54}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 55}\\[1pt]0\end{tabular} \\[5pt] \hline
+6 & \begin{tabular}{@{}c@{}}{\tiny 40}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 41}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 42}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 43}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 44}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 45}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 46}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 47}\\[1pt]0\end{tabular} \\[5pt] \hline
+5 & \begin{tabular}{@{}c@{}}{\tiny 32}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 33}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 34}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 35}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 36}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 37}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 38}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 39}\\[1pt]0\end{tabular} \\[5pt] \hline
+4 & \begin{tabular}{@{}c@{}}{\tiny 24}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 25}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 26}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 27}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 28}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 29}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 30}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 31}\\[1pt]0\end{tabular} \\[5pt] \hline
+3 & \begin{tabular}{@{}c@{}}{\tiny 16}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 17}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 18}\\[1pt]0\end{tabular} & \cellcolor{lightgray}\begin{tabular}{@{}c@{}}{\tiny 19}\\[1pt]\textbf{0}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 20}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 21}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 22}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 23}\\[1pt]0\end{tabular} \\[5pt] \hline
+2 & \begin{tabular}{@{}c@{}}{\tiny 8}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 9}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 10}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 11}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 12}\\[1pt]\textbf{1}\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 13}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 14}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 15}\\[1pt]0\end{tabular} \\[5pt] \hline
+1 & \begin{tabular}{@{}c@{}}{\tiny 0}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 1}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 2}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 3}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 4}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 5}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 6}\\[1pt]0\end{tabular} & \begin{tabular}{@{}c@{}}{\tiny 7}\\[1pt]0\end{tabular} \\[5pt] \hline
+\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
+\cline{2-9}
+\end{tabular}
+\caption{Diagonal mask}
+\label{fig:diagonal_mask_d3}
+\end{subfigure}
+
+\caption{Diagonal and orthogonal masks for d3 without edge squares}
+\label{fig:diagonal_orthogonal_masks_d3}
+\end{figure}
+
+Nous pouvons maintenant étudier comment trouver les constantes \mintinline{c++}{MAGIC} et \mintinline{c++}{K} pour les coups diagonaux et orthogonaux de chacune des cases du plateau. Le code est donné dans le listing \ref{lst:find_magic}\footnote{J'ai essayé d'utiliser le solveur \gls{z3} pour obtenir ces constantes mais sans succés}.
+
+
+
+
 
 \subsection{Making and Unmaking Moves}
 

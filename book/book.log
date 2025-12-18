@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  17 DEC 2025 20:11
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  18 DEC 2025 18:33
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -1766,12 +1766,7 @@ LaTeX Font Warning: Font shape `U/fontawesometwo/m/it' undefined
 
 ] [6
 
-] (./book.lof
-
-LaTeX Warning: Reference `fig:fig:game_example_middle' on page vii undefined on
- input line 14.
-
-)
+] (./book.lof)
 \tf@lof=\write12
 \openout12 = `book.lof'.
 
@@ -1780,7 +1775,8 @@ LaTeX Warning: Reference `fig:fig:game_example_middle' on page vii undefined on
 ] (./book.lot
 \openout5 = `book.pyg'.
 
- (./_minted-book/friendly.pygstyle)
+
+(./_minted-book/friendly.pygstyle)
 (./_minted-book/A559A65D3B5842B1C45A868FE3224AF593C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
 \openout5 = `book.pyg'.
@@ -1805,12 +1801,12 @@ A.pygtex))
 
 ]
 Chapter 1.
-<figures//pingouins.png, id=289, 699.61375pt x 718.685pt>
+<figures//pingouins.png, id=301, 699.61375pt x 718.685pt>
 File: figures//pingouins.png Graphic file (type png)
 <use figures//pingouins.png>
 Package pdftex.def Info: figures//pingouins.png  used on input line 299.
 (pdftex.def)             Requested size: 173.95749pt x 178.69481pt.
-<figures//yolah_initial_configuration.png, id=291, 883.3pt x 883.3pt>
+<figures//yolah_initial_configuration.png, id=303, 883.3pt x 883.3pt>
 File: figures//yolah_initial_configuration.png Graphic file (type png)
 <use figures//yolah_initial_configuration.png>
 Package pdftex.def Info: figures//yolah_initial_configuration.png  used on inpu
@@ -1827,7 +1823,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 331--336
 
 pdfTeX warning: pdflatex (file ./figures//yolah_moves1.pdf): PDF inclusion: fou
 nd PDF version <1.6>, but at most version <1.5> allowed
-<figures//yolah_moves1.pdf, id=302, 597.6786pt x 597.6786pt>
+<figures//yolah_moves1.pdf, id=314, 597.6786pt x 597.6786pt>
 File: figures//yolah_moves1.pdf Graphic file (type pdf)
 <use figures//yolah_moves1.pdf>
 Package pdftex.def Info: figures//yolah_moves1.pdf  used on input line 339.
@@ -1837,7 +1833,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 347--348
 
  []
 
-<figures//yolah_moves2.png, id=304, 883.3pt x 883.3pt>
+<figures//yolah_moves2.png, id=316, 883.3pt x 883.3pt>
 File: figures//yolah_moves2.png Graphic file (type png)
 <use figures//yolah_moves2.png>
 Package pdftex.def Info: figures//yolah_moves2.png  used on input line 351.
@@ -1851,12 +1847,12 @@ Underfull \hbox (badness 10000) in paragraph at lines 359--360
 
 pdfTeX warning: pdflatex (file ./figures//yolah_moves3.pdf): PDF inclusion: fou
 nd PDF version <1.6>, but at most version <1.5> allowed
-<figures//yolah_moves3.pdf, id=308, 597.6786pt x 597.6786pt>
+<figures//yolah_moves3.pdf, id=320, 597.6786pt x 597.6786pt>
 File: figures//yolah_moves3.pdf Graphic file (type pdf)
 <use figures//yolah_moves3.pdf>
 Package pdftex.def Info: figures//yolah_moves3.pdf  used on input line 369.
 (pdftex.def)             Requested size: 291.38246pt x 291.38766pt.
-<figures//yolah_moves4.png, id=309, 883.3pt x 883.3pt>
+<figures//yolah_moves4.png, id=321, 883.3pt x 883.3pt>
 File: figures//yolah_moves4.png Graphic file (type png)
 <use figures//yolah_moves4.png>
 Package pdftex.def Info: figures//yolah_moves4.png  used on input line 377.
@@ -1884,342 +1880,342 @@ Underfull \hbox (badness 10000) in paragraph at lines 431--432
  []
 
 [5]
-<figures//board.png, id=351, 883.3pt x 883.3pt>
+<figures//board.png, id=363, 883.3pt x 883.3pt>
 File: figures//board.png Graphic file (type png)
 <use figures//board.png>
 Package pdftex.def Info: figures//board.png  used on input line 446.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move1.png, id=352, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move1.png, id=364, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move1.png Graphic file (type png)
 <use figures//yolah_game_example_move1.png>
 Package pdftex.def Info: figures//yolah_game_example_move1.png  used on input l
 ine 454.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move2.png, id=353, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move2.png, id=365, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move2.png Graphic file (type png)
 <use figures//yolah_game_example_move2.png>
 Package pdftex.def Info: figures//yolah_game_example_move2.png  used on input l
 ine 462.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move3.png, id=354, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move3.png, id=366, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move3.png Graphic file (type png)
 <use figures//yolah_game_example_move3.png>
 Package pdftex.def Info: figures//yolah_game_example_move3.png  used on input l
 ine 470.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move4.png, id=355, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move4.png, id=367, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move4.png Graphic file (type png)
 <use figures//yolah_game_example_move4.png>
 Package pdftex.def Info: figures//yolah_game_example_move4.png  used on input l
 ine 478.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move5.png, id=356, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move5.png, id=368, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move5.png Graphic file (type png)
 <use figures//yolah_game_example_move5.png>
 Package pdftex.def Info: figures//yolah_game_example_move5.png  used on input l
 ine 486.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move6.png, id=357, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move6.png, id=369, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move6.png Graphic file (type png)
 <use figures//yolah_game_example_move6.png>
 Package pdftex.def Info: figures//yolah_game_example_move6.png  used on input l
 ine 494.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move7.png, id=358, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move7.png, id=370, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move7.png Graphic file (type png)
 <use figures//yolah_game_example_move7.png>
 Package pdftex.def Info: figures//yolah_game_example_move7.png  used on input l
 ine 502.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move8.png, id=359, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move8.png, id=371, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move8.png Graphic file (type png)
 <use figures//yolah_game_example_move8.png>
 Package pdftex.def Info: figures//yolah_game_example_move8.png  used on input l
 ine 510.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move9.png, id=360, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move9.png, id=372, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move9.png Graphic file (type png)
 <use figures//yolah_game_example_move9.png>
 Package pdftex.def Info: figures//yolah_game_example_move9.png  used on input l
 ine 518.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move10.png, id=361, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move10.png, id=373, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move10.png Graphic file (type png)
 <use figures//yolah_game_example_move10.png>
 Package pdftex.def Info: figures//yolah_game_example_move10.png  used on input 
 line 526.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move11.png, id=362, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move11.png, id=374, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move11.png Graphic file (type png)
 <use figures//yolah_game_example_move11.png>
 Package pdftex.def Info: figures//yolah_game_example_move11.png  used on input 
 line 534.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move12.png, id=363, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move12.png, id=375, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move12.png Graphic file (type png)
 <use figures//yolah_game_example_move12.png>
 Package pdftex.def Info: figures//yolah_game_example_move12.png  used on input 
 line 542.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move13.png, id=364, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move13.png, id=376, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move13.png Graphic file (type png)
 <use figures//yolah_game_example_move13.png>
 Package pdftex.def Info: figures//yolah_game_example_move13.png  used on input 
 line 550.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move14.png, id=365, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move14.png, id=377, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move14.png Graphic file (type png)
 <use figures//yolah_game_example_move14.png>
 Package pdftex.def Info: figures//yolah_game_example_move14.png  used on input 
 line 558.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move15.png, id=366, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move15.png, id=378, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move15.png Graphic file (type png)
 <use figures//yolah_game_example_move15.png>
 Package pdftex.def Info: figures//yolah_game_example_move15.png  used on input 
 line 566.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move16.png, id=367, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move16.png, id=379, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move16.png Graphic file (type png)
 <use figures//yolah_game_example_move16.png>
 Package pdftex.def Info: figures//yolah_game_example_move16.png  used on input 
 line 574.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move17.png, id=368, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move17.png, id=380, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move17.png Graphic file (type png)
 <use figures//yolah_game_example_move17.png>
 Package pdftex.def Info: figures//yolah_game_example_move17.png  used on input 
 line 582.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move18.png, id=369, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move18.png, id=381, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move18.png Graphic file (type png)
 <use figures//yolah_game_example_move18.png>
 Package pdftex.def Info: figures//yolah_game_example_move18.png  used on input 
 line 590.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move19.png, id=370, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move19.png, id=382, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move19.png Graphic file (type png)
 <use figures//yolah_game_example_move19.png>
 Package pdftex.def Info: figures//yolah_game_example_move19.png  used on input 
 line 598.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move20.png, id=371, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move20.png, id=383, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move20.png Graphic file (type png)
 <use figures//yolah_game_example_move20.png>
 Package pdftex.def Info: figures//yolah_game_example_move20.png  used on input 
 line 614.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move21.png, id=372, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move21.png, id=384, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move21.png Graphic file (type png)
 <use figures//yolah_game_example_move21.png>
 Package pdftex.def Info: figures//yolah_game_example_move21.png  used on input 
 line 622.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move22.png, id=373, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move22.png, id=385, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move22.png Graphic file (type png)
 <use figures//yolah_game_example_move22.png>
 Package pdftex.def Info: figures//yolah_game_example_move22.png  used on input 
 line 630.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<yolah_game_example_move23.png, id=374, 883.3pt x 883.3pt>
+<yolah_game_example_move23.png, id=386, 883.3pt x 883.3pt>
 File: yolah_game_example_move23.png Graphic file (type png)
 <use yolah_game_example_move23.png>
 Package pdftex.def Info: yolah_game_example_move23.png  used on input line 638.
 
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move24.png, id=375, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move24.png, id=387, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move24.png Graphic file (type png)
 <use figures//yolah_game_example_move24.png>
 Package pdftex.def Info: figures//yolah_game_example_move24.png  used on input 
 line 646.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move25.png, id=376, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move25.png, id=388, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move25.png Graphic file (type png)
 <use figures//yolah_game_example_move25.png>
 Package pdftex.def Info: figures//yolah_game_example_move25.png  used on input 
 line 654.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move26.png, id=377, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move26.png, id=389, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move26.png Graphic file (type png)
 <use figures//yolah_game_example_move26.png>
 Package pdftex.def Info: figures//yolah_game_example_move26.png  used on input 
 line 662.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move27.png, id=378, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move27.png, id=390, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move27.png Graphic file (type png)
 <use figures//yolah_game_example_move27.png>
 Package pdftex.def Info: figures//yolah_game_example_move27.png  used on input 
 line 670.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move28.png, id=379, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move28.png, id=391, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move28.png Graphic file (type png)
 <use figures//yolah_game_example_move28.png>
 Package pdftex.def Info: figures//yolah_game_example_move28.png  used on input 
 line 678.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move29.png, id=380, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move29.png, id=392, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move29.png Graphic file (type png)
 <use figures//yolah_game_example_move29.png>
 Package pdftex.def Info: figures//yolah_game_example_move29.png  used on input 
 line 686.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move30.png, id=381, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move30.png, id=393, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move30.png Graphic file (type png)
 <use figures//yolah_game_example_move30.png>
 Package pdftex.def Info: figures//yolah_game_example_move30.png  used on input 
 line 694.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move31.png, id=382, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move31.png, id=394, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move31.png Graphic file (type png)
 <use figures//yolah_game_example_move31.png>
 Package pdftex.def Info: figures//yolah_game_example_move31.png  used on input 
 line 702.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move32.png, id=383, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move32.png, id=395, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move32.png Graphic file (type png)
 <use figures//yolah_game_example_move32.png>
 Package pdftex.def Info: figures//yolah_game_example_move32.png  used on input 
 line 710.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move33.png, id=384, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move33.png, id=396, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move33.png Graphic file (type png)
 <use figures//yolah_game_example_move33.png>
 Package pdftex.def Info: figures//yolah_game_example_move33.png  used on input 
 line 718.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move34.png, id=385, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move34.png, id=397, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move34.png Graphic file (type png)
 <use figures//yolah_game_example_move34.png>
 Package pdftex.def Info: figures//yolah_game_example_move34.png  used on input 
 line 726.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move35.png, id=386, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move35.png, id=398, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move35.png Graphic file (type png)
 <use figures//yolah_game_example_move35.png>
 Package pdftex.def Info: figures//yolah_game_example_move35.png  used on input 
 line 734.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move36.png, id=387, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move36.png, id=399, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move36.png Graphic file (type png)
 <use figures//yolah_game_example_move36.png>
 Package pdftex.def Info: figures//yolah_game_example_move36.png  used on input 
 line 742.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move37.png, id=388, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move37.png, id=400, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move37.png Graphic file (type png)
 <use figures//yolah_game_example_move37.png>
 Package pdftex.def Info: figures//yolah_game_example_move37.png  used on input 
 line 750.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move38.png, id=389, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move38.png, id=401, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move38.png Graphic file (type png)
 <use figures//yolah_game_example_move38.png>
 Package pdftex.def Info: figures//yolah_game_example_move38.png  used on input 
 line 758.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move39.png, id=390, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move39.png, id=402, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move39.png Graphic file (type png)
 <use figures//yolah_game_example_move39.png>
 Package pdftex.def Info: figures//yolah_game_example_move39.png  used on input 
 line 766.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move40.png, id=391, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move40.png, id=403, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move40.png Graphic file (type png)
 <use figures//yolah_game_example_move40.png>
 Package pdftex.def Info: figures//yolah_game_example_move40.png  used on input 
 line 783.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move41.png, id=392, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move41.png, id=404, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move41.png Graphic file (type png)
 <use figures//yolah_game_example_move41.png>
 Package pdftex.def Info: figures//yolah_game_example_move41.png  used on input 
 line 791.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move42.png, id=393, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move42.png, id=405, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move42.png Graphic file (type png)
 <use figures//yolah_game_example_move42.png>
 Package pdftex.def Info: figures//yolah_game_example_move42.png  used on input 
 line 799.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move43.png, id=394, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move43.png, id=406, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move43.png Graphic file (type png)
 <use figures//yolah_game_example_move43.png>
 Package pdftex.def Info: figures//yolah_game_example_move43.png  used on input 
 line 807.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move44.png, id=395, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move44.png, id=407, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move44.png Graphic file (type png)
 <use figures//yolah_game_example_move44.png>
 Package pdftex.def Info: figures//yolah_game_example_move44.png  used on input 
 line 815.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move45.png, id=396, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move45.png, id=408, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move45.png Graphic file (type png)
 <use figures//yolah_game_example_move45.png>
 Package pdftex.def Info: figures//yolah_game_example_move45.png  used on input 
 line 823.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move46.png, id=397, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move46.png, id=409, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move46.png Graphic file (type png)
 <use figures//yolah_game_example_move46.png>
 Package pdftex.def Info: figures//yolah_game_example_move46.png  used on input 
 line 831.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move47.png, id=398, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move47.png, id=410, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move47.png Graphic file (type png)
 <use figures//yolah_game_example_move47.png>
 Package pdftex.def Info: figures//yolah_game_example_move47.png  used on input 
 line 839.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move48.png, id=399, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move48.png, id=411, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move48.png Graphic file (type png)
 <use figures//yolah_game_example_move48.png>
 Package pdftex.def Info: figures//yolah_game_example_move48.png  used on input 
 line 847.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move49.png, id=400, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move49.png, id=412, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move49.png Graphic file (type png)
 <use figures//yolah_game_example_move49.png>
 Package pdftex.def Info: figures//yolah_game_example_move49.png  used on input 
 line 855.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move50.png, id=401, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move50.png, id=413, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move50.png Graphic file (type png)
 <use figures//yolah_game_example_move50.png>
 Package pdftex.def Info: figures//yolah_game_example_move50.png  used on input 
 line 863.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move51.png, id=402, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move51.png, id=414, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move51.png Graphic file (type png)
 <use figures//yolah_game_example_move51.png>
 Package pdftex.def Info: figures//yolah_game_example_move51.png  used on input 
 line 871.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move52.png, id=403, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move52.png, id=415, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move52.png Graphic file (type png)
 <use figures//yolah_game_example_move52.png>
 Package pdftex.def Info: figures//yolah_game_example_move52.png  used on input 
 line 879.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move53.png, id=404, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move53.png, id=416, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move53.png Graphic file (type png)
 <use figures//yolah_game_example_move53.png>
 Package pdftex.def Info: figures//yolah_game_example_move53.png  used on input 
 line 887.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move54.png, id=405, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move54.png, id=417, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move54.png Graphic file (type png)
 <use figures//yolah_game_example_move54.png>
 Package pdftex.def Info: figures//yolah_game_example_move54.png  used on input 
 line 895.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move55.png, id=406, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move55.png, id=418, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move55.png Graphic file (type png)
 <use figures//yolah_game_example_move55.png>
 Package pdftex.def Info: figures//yolah_game_example_move55.png  used on input 
 line 903.
 (pdftex.def)             Requested size: 104.37848pt x 104.37405pt.
-<figures//yolah_game_example_move56.png, id=407, 883.3pt x 883.3pt>
+<figures//yolah_game_example_move56.png, id=419, 883.3pt x 883.3pt>
 File: figures//yolah_game_example_move56.png Graphic file (type png)
 <use figures//yolah_game_example_move56.png>
 Package pdftex.def Info: figures//yolah_game_example_move56.png  used on input 
@@ -2323,19 +2319,19 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1052.
+(caption)                particular \caption on input line 1053.
 See the caption package documentation for explanation.
 
 Package hyperref Info: bookmark level for unknown listing defaults to 0 on inpu
-t line 1052.
+t line 1053.
 [11]
 File: figures//yolah_game_example_move21.png Graphic file (type png)
 <use figures//yolah_game_example_move21.png>
 Package pdftex.def Info: figures//yolah_game_example_move21.png  used on input 
-line 1059.
+line 1060.
 (pdftex.def)             Requested size: 217.4502pt x 217.44147pt.
 
-Underfull \hbox (badness 10000) in paragraph at lines 1066--1069
+Underfull \hbox (badness 10000) in paragraph at lines 1067--1070
 
  []
 
@@ -2344,13 +2340,13 @@ Underfull \hbox (badness 10000) in paragraph at lines 1066--1069
 
 (./_minted-book/CA861083A6BFB64C848F67456AB3703293C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Overfull \hbox (8.7154pt too wide) in paragraph at lines 1069--1071
+Overfull \hbox (8.7154pt too wide) in paragraph at lines 1070--1072
 \T1/cmr/m/n/12 board: []\T1/cmtt/m/n/10.95 0b0000001010000000000000010000000000
 100000000000000000000000000000[]\T1/cmr/m/n/12 . 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1069--1071
+Underfull \hbox (badness 10000) in paragraph at lines 1070--1072
 
  []
 
@@ -2359,13 +2355,13 @@ Underfull \hbox (badness 10000) in paragraph at lines 1069--1071
 
 (./_minted-book/AE13B5670CB16CFB85CED30B2412C87893C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Overfull \hbox (8.7154pt too wide) in paragraph at lines 1094--1096
+Overfull \hbox (8.7154pt too wide) in paragraph at lines 1095--1097
 \T1/cmr/m/n/12 board: []\T1/cmtt/m/n/10.95 0b0000000000100000000001000000000000
 000000000000000010100000000000[]\T1/cmr/m/n/12 . 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1094--1096
+Underfull \hbox (badness 10000) in paragraph at lines 1095--1097
 
  []
 
@@ -2374,12 +2370,12 @@ Underfull \hbox (badness 10000) in paragraph at lines 1094--1096
 
 (./_minted-book/8BE87D1AEC2BF36CA7D4202D14E9AB7793C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1118--1120
+Underfull \hbox (badness 10000) in paragraph at lines 1119--1121
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1145--1146
+Underfull \hbox (badness 10000) in paragraph at lines 1146--1147
 
  []
 
@@ -2389,10 +2385,10 @@ Underfull \hbox (badness 10000) in paragraph at lines 1145--1146
 
 (./_minted-book/E1734B8EC56BEA3F9AB003A3CB324D7F93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Package mdframed Info: mdframed works in twoside mode on input line 1150.
+Package mdframed Info: mdframed works in twoside mode on input line 1151.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1150.
+(mdframed)              on input line 1151.
 \openout4 = `book.pyg'.
 
 
@@ -2423,7 +2419,7 @@ mtt/m/n/10.95 00010000\TS1/cmtt/m/n/10.95 '\T1/cmtt/m/n/10.95 00001000\TS1/cmtt
 )
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1168.
+(caption)                particular \caption on input line 1170.
 See the caption package documentation for explanation.
 
 \openout5 = `book.pyg'.
@@ -2431,7 +2427,7 @@ See the caption package documentation for explanation.
 
 (./_minted-book/E1734B8EC56BEA3F9AB003A3CB324D7F93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1173--1176
+Underfull \hbox (badness 10000) in paragraph at lines 1175--1178
 
  []
 
@@ -2465,7 +2461,7 @@ A.pygtex)
 
 (./_minted-book/5E5859C72F4C1142181A8CC267AAB1A093C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1186--1187
+Underfull \hbox (badness 10000) in paragraph at lines 1188--1189
 
  []
 
@@ -2489,7 +2485,7 @@ A.pygtex)
 
 (./_minted-book/4E2E8F074CE7FDB34B2DD8993DBE8D9593C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1206--1207
+Underfull \hbox (badness 10000) in paragraph at lines 1208--1209
 
  []
 
@@ -2503,7 +2499,7 @@ A.pygtex)
 
 (./_minted-book/C7E74EFBCBB23A1460FD7EEF9D6C7BC5EAAEBAE48CE0730BDF2691B1963EEA4
 6.pygtex
-Underfull \hbox (badness 10000) in paragraph at lines 1209--1
+Underfull \hbox (badness 10000) in paragraph at lines 1211--1
 
  []
 
@@ -2538,10 +2534,10 @@ A.pygtex)
 
 (./_minted-book/E4EDBC12F4DC8146656716D63208A51C93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex) [15]
-Package mdframed Info: mdframed works in twoside mode on input line 1264.
+Package mdframed Info: mdframed works in twoside mode on input line 1266.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1264.
+(mdframed)              on input line 1266.
 \openout4 = `book.pyg'.
 
 
@@ -2549,13 +2545,13 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1277.
+(caption)                particular \caption on input line 1279.
 See the caption package documentation for explanation.
 
-Package mdframed Info: mdframed works in twoside mode on input line 1281.
+Package mdframed Info: mdframed works in twoside mode on input line 1283.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1281.
+(mdframed)              on input line 1283.
 \openout4 = `book.pyg'.
 
 
@@ -2563,7 +2559,7 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1305.
+(caption)                particular \caption on input line 1307.
 See the caption package documentation for explanation.
 
 [16]
@@ -2607,7 +2603,7 @@ A.pygtex)
 
 (./_minted-book/278F590D4DB2E06ED5D00A9475065C67EAAEBAE48CE0730BDF2691B1963EEA4
 6.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1320--1321
+Underfull \hbox (badness 10000) in paragraph at lines 1322--1323
 
  []
 
@@ -2641,12 +2637,12 @@ A.pygtex)
 
 (./_minted-book/C893491EA8CF2234CA80A4ACF6BD7F21EAAEBAE48CE0730BDF2691B1963EEA4
 6.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1375--1376
+Underfull \hbox (badness 10000) in paragraph at lines 1377--1378
 
  []
 
 
-Underfull \hbox (badness 2261) in paragraph at lines 1402--1402
+Underfull \hbox (badness 2261) in paragraph at lines 1404--1404
 []\T1/cmr/m/n/12 Table 2.10: |Po-si-tions around the
  []
 
@@ -2681,10 +2677,10 @@ A.pygtex)
 
 (./_minted-book/8E591F0542A7B8F15E84D668E67536A793C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Package mdframed Info: mdframed works in twoside mode on input line 1424.
+Package mdframed Info: mdframed works in twoside mode on input line 1426.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1424.
+(mdframed)              on input line 1426.
 \openout4 = `book.pyg'.
 
 
@@ -2692,7 +2688,7 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1445.
+(caption)                particular \caption on input line 1447.
 See the caption package documentation for explanation.
 
 \openout5 = `book.pyg'.
@@ -2730,10 +2726,10 @@ A.pygtex)
 
 (./_minted-book/26A340799A676D7348169F17EB28111B93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Package mdframed Info: mdframed works in twoside mode on input line 1468.
+Package mdframed Info: mdframed works in twoside mode on input line 1470.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1468.
+(mdframed)              on input line 1470.
 \openout4 = `book.pyg'.
 
 
@@ -2741,11 +2737,11 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1482.
+(caption)                particular \caption on input line 1484.
 See the caption package documentation for explanation.
 
 
-Overfull \hbox (7.59988pt too wide) in paragraph at lines 1492--1493
+Overfull \hbox (7.59988pt too wide) in paragraph at lines 1494--1495
 \T1/cmr/m/n/12 spi-ra-tion from the ar-ti-cle [][]$\T1/cmtt/m/n/12 http : / / p
 radu . us / old / Nov27 _ 2008 / Buzz / research / magic /
  []
@@ -2815,7 +2811,7 @@ A.pygtex)
 
 (./_minted-book/924B40A00052A352EF19A41E0360911A93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Overfull \hbox (16.97191pt too wide) in paragraph at lines 1526--1531
+Overfull \hbox (16.97191pt too wide) in paragraph at lines 1528--1533
 \T1/cmr/m/n/12 large a range^^Vfor ex-am-ple, the value []\T1/cmtt/m/n/10.95 0x
 8000000000000000[] \T1/cmr/m/n/12 ($\OT1/cmr/m/n/12 9\OML/cmm/m/it/12 ; \OT1/cm
 r/m/n/12 223\OML/cmm/m/it/12 ; \OT1/cmr/m/n/12 372\OML/cmm/m/it/12 ; \OT1/cmr/m
@@ -2823,10 +2819,10 @@ r/m/n/12 223\OML/cmm/m/it/12 ; \OT1/cmr/m/n/12 372\OML/cmm/m/it/12 ; \OT1/cmr/m
 12 775\OML/cmm/m/it/12 ; \OT1/cmr/m/n/12 808$\T1/cmr/m/n/12 !).
  []
 
-Package mdframed Info: mdframed works in twoside mode on input line 1532.
+Package mdframed Info: mdframed works in twoside mode on input line 1534.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1532.
+(mdframed)              on input line 1534.
 \openout4 = `book.pyg'.
 
 
@@ -2834,7 +2830,7 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1540.
+(caption)                particular \caption on input line 1543.
 See the caption package documentation for explanation.
 
 [20]
@@ -2863,7 +2859,7 @@ A.pygtex)
 
 (./_minted-book/46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1553--1554
+Underfull \hbox (badness 10000) in paragraph at lines 1556--1557
 
  []
 
@@ -2872,10 +2868,10 @@ Underfull \hbox (badness 10000) in paragraph at lines 1553--1554
 
 (./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Package mdframed Info: mdframed works in twoside mode on input line 1560.
+Package mdframed Info: mdframed works in twoside mode on input line 1563.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1560.
+(mdframed)              on input line 1563.
 \openout4 = `book.pyg'.
 
 
@@ -2883,7 +2879,7 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1608.
+(caption)                particular \caption on input line 1611.
 See the caption package documentation for explanation.
 
 \openout5 = `book.pyg'.
@@ -3036,14 +3032,14 @@ A.pygtex)
 
 (./_minted-book/BFD7464C15E2B86526FE5094642703C693C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1672--1673
+Underfull \hbox (badness 10000) in paragraph at lines 1675--1676
 
  []
 
-Package mdframed Info: mdframed works in twoside mode on input line 1677.
+Package mdframed Info: mdframed works in twoside mode on input line 1680.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1677.
+(mdframed)              on input line 1680.
 \openout4 = `book.pyg'.
 
 
@@ -3051,7 +3047,7 @@ Package mdframed Info: mdframed detected package amsthm
 2.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1713.
+(caption)                particular \caption on input line 1716.
 See the caption package documentation for explanation.
 
 \openout5 = `book.pyg'.
@@ -3154,7 +3150,7 @@ A.pygtex) [23]
 
 (./_minted-book/34A458A792CF27F26F2B59B26D4525970A3767F64192739B9886B13895A28D9
 2.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1772--1773
+Underfull \hbox (badness 10000) in paragraph at lines 1775--1776
 
  []
 
@@ -3173,15 +3169,15 @@ A.pygtex)
 
 (./_minted-book/6B40AE9A13671339D4E96621EF66600E93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Underfull \hbox (badness 10000) in paragraph at lines 1777--1778
+Underfull \hbox (badness 10000) in paragraph at lines 1780--1781
 
  []
 
 [25]
-Package mdframed Info: mdframed works in twoside mode on input line 1779.
+Package mdframed Info: mdframed works in twoside mode on input line 1782.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1779.
+(mdframed)              on input line 1782.
 \openout4 = `book.pyg'.
 
 
@@ -3189,14 +3185,14 @@ Package mdframed Info: mdframed detected package amsthm
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1837.
+(caption)                particular \caption on input line 1840.
 See the caption package documentation for explanation.
 
 [26]
-Package mdframed Info: mdframed works in twoside mode on input line 1841.
+Package mdframed Info: mdframed works in twoside mode on input line 1844.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1841.
+(mdframed)              on input line 1844.
 \openout4 = `book.pyg'.
 
 
@@ -3204,11 +3200,11 @@ Package mdframed Info: mdframed detected package amsthm
 0.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1855.
+(caption)                particular \caption on input line 1858.
 See the caption package documentation for explanation.
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1864--1865
+Underfull \hbox (badness 10000) in paragraph at lines 1867--1868
 
  []
 
@@ -3216,36 +3212,21 @@ Underfull \hbox (badness 10000) in paragraph at lines 1864--1865
 Underfull \vbox (badness 5288) has occurred while \output is active []
 
  [27]
-<yolah_game_example_move23_no_arrow.png, id=597, 883.3pt x 883.3pt>
+<yolah_game_example_move23_no_arrow.png, id=609, 883.3pt x 883.3pt>
 File: yolah_game_example_move23_no_arrow.png Graphic file (type png)
 <use yolah_game_example_move23_no_arrow.png>
 Package pdftex.def Info: yolah_game_example_move23_no_arrow.png  used on input 
-line 1868.
+line 1871.
 (pdftex.def)             Requested size: 195.70384pt x 195.70135pt.
 
 
-LaTeX Warning: Reference `fig:fig:game_example_middle' on page 28 undefined on 
-input line 1870.
-
-
-LaTeX Warning: Reference `fig:fig:game_example_middle' on page 28 undefined on 
-input line 1870.
-
-
 LaTeX Font Warning: Font shape `U/wasy/b/n' in size <8> not available
-(Font)              Font shape `U/wasy/m/n' tried instead on input line 1884.
+(Font)              Font shape `U/wasy/m/n' tried instead on input line 1887.
 
 
 LaTeX Font Warning: Font shape `U/wasy/b/n' in size <6> not available
-(Font)              Font shape `U/wasy/m/n' tried instead on input line 1884.
+(Font)              Font shape `U/wasy/m/n' tried instead on input line 1887.
 
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [28 <./yolah_game_example_move23_no_arrow.png (PNG copy)>]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [29]
 \openout5 = `book.pyg'.
 
 
@@ -3305,11 +3286,84 @@ A.pygtex)
 
 
 (./_minted-book/7DFF6926E1C687213E555EBD24BCF13793C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex) [30]
-Package mdframed Info: mdframed works in twoside mode on input line 1983.
+A.pygtex)
+Underfull \hbox (badness 10000) in paragraph at lines 1973--1974
+
+ []
+
+[28 <./yolah_game_example_move23_no_arrow.png (PNG copy)>] [29] [30]
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+Overfull \hbox (11.11316pt too wide) in paragraph at lines 1975--1977
+[]\T1/cmr/m/n/12 Pour trou-ver une con-stante \T1/cmtt/m/n/10.95 MAGIC \T1/cmr/
+m/n/12 pour la case \T1/cmtt/m/n/12 d3\T1/cmr/m/n/12 , nous al-lons avoir be-so
+in d'énumérer
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 1975--1977
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 2096--2097
+
+ []
+
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/F0F2D5DC3162D2A6661883A704D3C58C93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/EAA020F0D27D6B5375320250D961420993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+Underfull \hbox (badness 10000) in paragraph at lines 2117--2119
+
+ []
+
+
+Underfull \vbox (badness 1527) has occurred while \output is active []
+
+ [31]
+[32]
+Overfull \hbox (35.98058pt too wide) in paragraph at lines 2124--2137
+ [][] 
+ []
+
+
+Overfull \hbox (35.98058pt too wide) in paragraph at lines 2143--2156
+ [][] 
+ []
+
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+LaTeX Warning: Reference `lst:find_magic' on page 33 undefined on input line 21
+64.
+
+Package mdframed Info: mdframed works in twoside mode on input line 2181.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1983.
+(mdframed)              on input line 2181.
 
 (./_minted-book/71910D11F73B14DE1999B9427E853DB1D7509025C7218AEE74EAD919BD7EDE4
 8.pygtex
@@ -3333,83 +3387,85 @@ mtt/m/n/10.95 00010000\TS1/cmtt/m/n/10.95 '\T1/cmtt/m/n/10.95 00001000\TS1/cmtt
 )
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1985.
+(caption)                particular \caption on input line 2183.
 See the caption package documentation for explanation.
 
-[31] [32]
-Package mdframed Info: mdframed works in twoside mode on input line 1990.
+[33]
+Package mdframed Info: Not enough space on this page on input line 2185.
+ [34] [35]
+Package mdframed Info: mdframed works in twoside mode on input line 2188.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1990.
+(mdframed)              on input line 2188.
 
 (./_minted-book/F35B81406F7BB52DA72366E8E214FF2D932FC75BC45705035B6A3A714B155EC
 F.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 1993.
+(caption)                particular \caption on input line 2191.
 See the caption package documentation for explanation.
 
-[33]
-Package mdframed Info: mdframed works in twoside mode on input line 1998.
+[36]
+Package mdframed Info: mdframed works in twoside mode on input line 2196.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 1998.
+(mdframed)              on input line 2196.
 
 (./_minted-book/FAE0F0E20B53646AFE7AC9D46A23DED2ACFF3D034B26E3FA3FAD560B6137774
 3.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 2001.
+(caption)                particular \caption on input line 2199.
 See the caption package documentation for explanation.
 
-[34] [35] [36]
+[37] [38] [39] [40
+
+]
 Chapter 3.
-[37
-
-] [38
-
-]
-Chapter 4.
-[39] [40
-
-]
-Chapter 5.
 [41] [42
 
 ]
-Chapter 6.
+Chapter 4.
 [43] [44
 
 ]
-Chapter 7.
+Chapter 5.
 [45] [46
 
 ]
-Chapter 8.
+Chapter 6.
 [47] [48
 
 ]
-Chapter 9.
+Chapter 7.
 [49] [50
 
-] (./book.acr) (./book.gls) [51
-
-
-] [52
+]
+Chapter 8.
+[51] [52
 
 ]
-Overfull \hbox (4.54851pt too wide) in paragraph at lines 2420--2420
+Chapter 9.
+[53] [54
+
+] (./book.acr) (./book.gls) [55
+
+
+] [56
+
+]
+Overfull \hbox (4.54851pt too wide) in paragraph at lines 2618--2618
 []\T1/cmr/m/n/12 Stockfish Team. \T1/cmr/m/it/12 Stock-fish: Open Source Chess 
 En-gine\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 https : / / stockfishchess .
  []
 
 
-Overfull \hbox (1.26596pt too wide) in paragraph at lines 2420--2420
+Overfull \hbox (1.26596pt too wide) in paragraph at lines 2618--2618
 []\T1/cmr/m/n/12 Google. \T1/cmr/m/it/12 Google Bench-mark: A mi-crobench-mark 
 sup-port li-brary\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 https : / / github .
  []
 
-[53] (./book.aux)
+[57] (./book.aux)
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
@@ -3417,7 +3473,7 @@ LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 LaTeX Warning: There were undefined references.
 
 Package rerunfilecheck Info: File `book.out' has not changed.
-(rerunfilecheck)             Checksum: 8DE32DBD43BCA8C743A7CF6591093022;3787.
+(rerunfilecheck)             Checksum: 492DD68E7C2B7FF9E413EFC4A17709E4;3787.
 runsystem(rm book.pyg)...executed.
 
 Package logreq Info: Writing requests to 'book.run.xml'.
@@ -3425,13 +3481,13 @@ Package logreq Info: Writing requests to 'book.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 53749 strings out of 478287
- 1123440 string characters out of 5849289
- 1961739 words of memory out of 5000000
- 70444 multiletter control sequences out of 15000+600000
- 497338 words of font info for 103 fonts, out of 8000000 for 9000
+ 53785 strings out of 478287
+ 1125390 string characters out of 5849289
+ 1982811 words of memory out of 5000000
+ 70457 multiletter control sequences out of 15000+600000
+ 498119 words of font info for 104 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 91i,19n,117p,1999b,2309s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 91i,21n,117p,2042b,2309s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc}{/usr/share/texmf/
 fonts/enc/dvips/cm-super/cm-super-ts1.enc}{/usr/share/texlive/texmf-dist/fonts/
 enc/dvips/fontawesome/fontawesometwo.enc}</usr/share/texlive/texmf-dist/fonts/t
@@ -3443,26 +3499,28 @@ s/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cm
 r12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb>
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/
 share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/share/t
-exmf/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/texmf/fonts/type1/pub
-lic/cm-super/sfbx1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx144
-0.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/te
-xmf/fonts/type1/public/cm-super/sfbx2488.pfb></usr/share/texmf/fonts/type1/publ
-ic/cm-super/sfcc1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfit1095
-.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0600.pfb></usr/share/tex
-mf/fonts/type1/public/cm-super/sfrm0700.pfb></usr/share/texmf/fonts/type1/publi
-c/cm-super/sfrm0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.
-pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texm
-f/fonts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public
-/cm-super/sfrm1440.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1728.p
-fb></usr/share/texmf/fonts/type1/public/cm-super/sfti1200.pfb></usr/share/texmf
-/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/type1/public/
-cm-super/sftt1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1200.pf
-b></usr/share/texmf/fonts/type1/public/cm-super/sftt2488.pfb></usr/share/texliv
-e/texmf-dist/fonts/type1/public/wasy-type1/wasy10.pfb>
-Output written on book.pdf (63 pages, 2860396 bytes).
+exlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/share/te
+xmf/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/texmf/fonts/type1/publ
+ic/cm-super/sfbx0600.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200
+.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1440.pfb></usr/share/tex
+mf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/publi
+c/cm-super/sfbx2488.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfcc1200.
+pfb></usr/share/texmf/fonts/type1/public/cm-super/sfit1095.pfb></usr/share/texm
+f/fonts/type1/public/cm-super/sfrm0600.pfb></usr/share/texmf/fonts/type1/public
+/cm-super/sfrm0700.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0800.p
+fb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf
+/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/
+cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1440.pf
+b></usr/share/texmf/fonts/type1/public/cm-super/sfrm1728.pfb></usr/share/texmf/
+fonts/type1/public/cm-super/sfti1200.pfb></usr/share/texmf/fonts/type1/public/c
+m-super/sftt1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb
+></usr/share/texmf/fonts/type1/public/cm-super/sftt1200.pfb></usr/share/texmf/f
+onts/type1/public/cm-super/sftt2488.pfb></usr/share/texlive/texmf-dist/fonts/ty
+pe1/public/wasy-type1/wasy10.pfb>
+Output written on book.pdf (67 pages, 2905208 bytes).
 PDF statistics:
- 896 PDF objects out of 1000 (max. 8388607)
- 668 compressed objects within 7 object streams
- 148 named destinations out of 1000 (max. 500000)
+ 951 PDF objects out of 1000 (max. 8388607)
+ 712 compressed objects within 8 object streams
+ 156 named destinations out of 1000 (max. 500000)
  682 words of extra memory for PDF output out of 10000 (max. 10000000)
 
