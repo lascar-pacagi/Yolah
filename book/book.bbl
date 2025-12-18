@@ -87,6 +87,29 @@
       \field{title}{Stockfish: Open Source Chess Engine}
       \field{year}{2025}
     \endentry
+    \entry{kannan2008magicbitboards}{misc}{}
+      \name{author}{1}{}{%
+        {{hash=261fa6ebfcdda2921715f1dc69a96455}{%
+           family={Kannan},
+           familyi={K\bibinitperiod},
+           given={Pradyumna},
+           giveni={P\bibinitperiod}}}%
+      }
+      \strng{namehash}{261fa6ebfcdda2921715f1dc69a96455}
+      \strng{fullhash}{261fa6ebfcdda2921715f1dc69a96455}
+      \strng{bibnamehash}{261fa6ebfcdda2921715f1dc69a96455}
+      \strng{authorbibnamehash}{261fa6ebfcdda2921715f1dc69a96455}
+      \strng{authornamehash}{261fa6ebfcdda2921715f1dc69a96455}
+      \strng{authorfullhash}{261fa6ebfcdda2921715f1dc69a96455}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{http://pradu.us/old/Nov27_2008/Buzz/research/magic/Bitboards.pdf}}
+      \field{note}{Accessed: 2025-01-28}
+      \field{title}{Magic Move-Bitboard Generation in Computer Chess}
+      \field{year}{2008}
+    \endentry
     \entry{kroening2016decision}{book}{}
       \name{author}{2}{}{%
         {{hash=b4aa934119a9d2ed6e4c21b1a7f20424}{%
@@ -112,8 +135,8 @@
       \strng{authorbibnamehash}{7988d1e5af104ac7bcd2b83558e40308}
       \strng{authornamehash}{7988d1e5af104ac7bcd2b83558e40308}
       \strng{authorfullhash}{7988d1e5af104ac7bcd2b83558e40308}
-      \field{sortinit}{5}
-      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{edition}{2nd}
@@ -156,8 +179,8 @@
       \strng{editorbibnamehash}{60fef90d3c5cb633c07f7a5f833c667a}
       \strng{editornamehash}{bc3be1691d20d567b9af500e799dfef0}
       \strng{editorfullhash}{60fef90d3c5cb633c07f7a5f833c667a}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
       \field{labelnamesource}{editor}
       \field{labeltitlesource}{title}
       \field{edition}{2nd}
@@ -194,8 +217,8 @@
       \strng{authorbibnamehash}{8ed841e87e50b9624f9ae19c1fa525cc}
       \strng{authornamehash}{8ed841e87e50b9624f9ae19c1fa525cc}
       \strng{authorfullhash}{8ed841e87e50b9624f9ae19c1fa525cc}
-      \field{sortinit}{7}
-      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{sortinit}{8}
+      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{booktitle}{Tools and Algorithms for the Construction and Analysis of Systems (TACAS)}
@@ -218,8 +241,8 @@
       \strng{authorbibnamehash}{8b36e9207c24c76e6719268e49201d94}
       \strng{authornamehash}{8b36e9207c24c76e6719268e49201d94}
       \strng{authorfullhash}{8b36e9207c24c76e6719268e49201d94}
-      \field{sortinit}{8}
-      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
+      \field{sortinit}{9}
+      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{howpublished}{\url{https://github.com/google/benchmark}}
