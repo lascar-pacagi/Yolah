@@ -2205,7 +2205,7 @@ enum MoveType {
     DIAGONAL
 };
 
-uint64_t sliding_moves(MoveType mt, Square sq, uint64_t occupied) {
+uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied) {
     uint64_t  moves    = 0;
     Direction h_dir[4] = {NORTH, SOUTH, EAST, WEST};
     Direction d_dir[4] = {NORTH_EAST,SOUTH_EAST,SOUTH_WEST,NORTH_WEST};
@@ -2227,7 +2227,7 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
     using namespace std;
     uint64_t edges = ((Rank1BB | Rank8BB) & ~rank_bb(sq)) | 
                         ((FileABB | FileHBB) & ~file_bb(sq));
-    uint64_t moves_bb = sliding_moves(mt, sq, 0) & ~edges;
+    uint64_t moves_bb = reachable_squares(mt, sq, 0) & ~edges;
     vector<uint64_t> occupancies;
     vector<uint64_t> possible_moves;
     uint64_t b = 0;
@@ -2288,6 +2288,16 @@ int main() {
 \label{lst:find_magic}
 \end{mdframed} 
 
+Dans le listing \ref{lst:find_magic},
+
+\begin{itemize}
+
+\item À la ligne 39, la fonction \mintinline{c++}{uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied)} va nous permettre de créer le masque des cases accessibles à partir de la case \mintinline{c++}{sq} et pour le type de mouvement \mintinline{c++}{mt}, qui sera soit horizontal (\mintinline{c++}{HORIZONTAL} à la ligne 35), soit diagonal (\mintinline{c++}{DIAGONAL} à la ligne 36). Le masque créé sera similaire aux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
+\begin{itemize}
+\item TO DO
+\end{itemize}
+
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{shell}
@@ -2381,154 +2391,6 @@ uint64_t D_MAGIC[64] = {
 
 \section{Complete Commented Game Board Code}
 
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/type.h}
-\captionof{listing}{Squares, files, ranks and directions}
-\label{lst:type_h}
-\end{mdframed}
-
-
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/move.h}
-% \captionof{listing}{implémentation d'un coup}
-\captionof{listing}{Move implementation}
-\label{lst:move_h}
-\end{mdframed}
-
-
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\inputminted[linenos,breaklines,fontsize=\small]{cpp}{code/game.h}
-% \captionof{listing}{implémentation du plateau}
-\captionof{listing}{Board implementation}
-\label{lst:game_h}
-\end{mdframed}
-
-
-% \begin{listing}[H]
-% \begin{minted}[linenos, bgcolor=codebg]{c++}
-% class Yolah {
-%     uint64_t black = BLACK_INITIAL_POSITION;
-%     uint64_t white = WHITE_INITIAL_POSITION;
-%     uint64_t empty = 0;
-%     uint16_t black_score = 0;
-%     uint16_t white_score = 0;
-%     uint16_t ply = 0;
-
-% public:
-%     static constexpr uint16_t MAX_NB_MOVES = 75;
-%     static constexpr int MAX_NB_PLIES = 120;
-%     class MoveList {
-%       Move moveList[MAX_NB_MOVES], *last;
-%     public:
-%       explicit MoveList() : last(moveList) {}
-%       const Move* begin() const { return moveList; }
-%       const Move* end() const { return last; }
-%       Move* begin() { return moveList; }
-%       Move* end() { return last; }
-%       size_t size() const { return last - moveList; }
-%       const Move& operator[](size_t i) const { return moveList[i]; }
-%       Move& operator[](size_t i) { return moveList[i]; }
-%       Move* data() { return moveList; }
-%       friend class Yolah;
-%     };
-%     static constexpr uint8_t BLACK = 0;
-%     static constexpr uint8_t WHITE = 1;
-%     static constexpr uint8_t EMPTY = 2;
-%     static constexpr uint8_t FREE  = 3;
-%     constexpr std::pair<uint16_t, uint16_t> score() const {
-%       return { black_score, white_score };
-%     }
-%     constexpr int16_t score(uint8_t player) const {
-%       return (black_score - white_score) * ((player == WHITE) * -1 + (player == BLACK)); 
-%     }
-%     constexpr uint8_t current_player() const {
-%       return uint8_t(ply & 1);
-%     }
-%     static constexpr uint8_t other_player(uint8_t player) {
-%       return 1 - player;
-%     }
-%     uint8_t get(Square) const;
-%     uint8_t get(File f, Rank r) const;
-%     bool game_over() const;
-%     void play(Move m);
-%     void undo(Move m);
-%     void moves(uint8_t player, MoveList& moves) const;
-%     void moves(MoveList& moves) const;
-%     void moves(uint64_t bb, MoveList& moves) const;
-%     bool valid(Move m) const;
-%     constexpr uint64_t free_squares() const {
-%       return FULL & ~occupied_squares();
-%     }
-%     constexpr uint64_t occupied_squares() const {
-%       return black | white | empty;
-%     }
-%     constexpr uint64_t bitboard(uint8_t player) const {
-%       return player == BLACK ? black : white;
-%     }
-%     constexpr uint16_t nb_plies() const {
-%       return ply;
-%     }
-%     constexpr uint64_t empty_bitboard() const {
-%       return empty;
-%     }
-%     constexpr bool contact(Move m) const {
-%       return around(square_bb(m.to_sq())) & (black | white) & ~square_bb(m.from_sq());
-%     }
-%     std::string to_json() const;
-%     static Yolah from_json(std::istream& is);
-%     static Yolah from_json(const std::string&);
-%     friend std::ostream& operator<<(std::ostream& os, const Yolah& yolah);
-% };
-% \end{minted}
-% \caption{to do}
-% \label{code:board}
-% \end{listing}
-
-
-% \section{Core Data Structures}
-
-% The foundation of any game engine lies in its data structures. For Yolah, we need efficient representations for:
-
-% \begin{itemize}
-%     \item Board state
-%     \item Move history
-%     \item Player positions
-%     \item Game metadata
-% \end{itemize}
-
-% \subsection{Board Representation}
-
-% Here's our basic board representation in Python:
-
-% \begin{listing}[H]
-% \begin{minted}[linenos, bgcolor=codebg]{python}
-% class Board:
-%     """Represents the Yolah game board state."""
-
-%     def __init__(self, size=8):
-%         self.size = size
-%         self.grid = [[None for _ in range(size)]
-%                      for _ in range(size)]
-%         self.current_player = 1
-%         self.move_count = 0
-
-%     def make_move(self, move):
-%         """Apply a move to the board."""
-%         row, col = move.position
-%         self.grid[row][col] = self.current_player
-%         self.current_player = -self.current_player
-%         self.move_count += 1
-
-%     def is_valid_move(self, move):
-%         """Check if a move is legal."""
-%         row, col = move.position
-%         if not (0 <= row < self.size and 0 <= col < self.size):
-%             return False
-%         return self.grid[row][col] is None
-% \end{minted}
-% \caption{Basic board representation in Yolah}
-% \label{code:board}
-% \end{listing}
 
 % \begin{importantbox}
 % Efficient board representation is critical for performance. Every AI algorithm will access board state thousands or millions of times during search.

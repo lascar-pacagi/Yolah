@@ -15,12 +15,12 @@
 \contentsline {section}{\numberline {2.4}Testing with Random Games}{38}{section.2.4}%
 \contentsline {section}{\numberline {2.5}What's Next}{38}{section.2.5}%
 \contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{38}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{45}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{47}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{49}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{51}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{53}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{55}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{57}{chapter.9}%
-\contentsline {chapter}{Acronymes}{59}{section*.31}%
-\contentsline {chapter}{Bibliography}{61}{appendix*.33}%
+\contentsline {chapter}{\numberline {3}AI Players}{39}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{41}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{43}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{45}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{47}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{49}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{51}{chapter.9}%
+\contentsline {chapter}{Acronymes}{53}{section*.31}%
+\contentsline {chapter}{Bibliography}{55}{appendix*.33}%

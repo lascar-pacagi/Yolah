@@ -37,7 +37,7 @@
 \PYG{+w}{    }\PYG{n}{DIAGONAL}
 \PYG{p}{\PYGZcb{};}
 
-\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{sliding\PYGZus{}moves}\PYG{p}{(}\PYG{n}{MoveType}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{reachable\PYGZus{}squares}\PYG{p}{(}\PYG{n}{MoveType}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{  }\PYG{n}{moves}\PYG{+w}{    }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{h\PYGZus{}dir}\PYG{p}{[}\PYG{l+m+mi}{4}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{NORTH}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{EAST}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{WEST}\PYG{p}{\PYGZcb{};}
 \PYG{+w}{    }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{d\PYGZus{}dir}\PYG{p}{[}\PYG{l+m+mi}{4}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{p}{,}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{p}{\PYGZcb{};}
@@ -59,7 +59,7 @@
 \PYG{+w}{    }\PYG{k}{using}\PYG{+w}{ }\PYG{k}{namespace}\PYG{+w}{ }\PYG{n+nn}{std}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{edges}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Rank8BB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{rank\PYGZus{}bb}\PYG{p}{(}\PYG{n}{sq}\PYG{p}{))}\PYG{+w}{ }\PYG{o}{|}
 \PYG{+w}{                        }\PYG{p}{((}\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{FileHBB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{file\PYGZus{}bb}\PYG{p}{(}\PYG{n}{sq}\PYG{p}{));}
-\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{sliding\PYGZus{}moves}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{edges}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{reachable\PYGZus{}squares}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{edges}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{occupancies}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
