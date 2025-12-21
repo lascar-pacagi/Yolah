@@ -130,7 +130,7 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
     int size = 0;
     do {
         occupancies.push_back(b);
-        possible_moves.push_back(sliding_moves(HORIZONTAL, sq, b));
+        possible_moves.push_back(sliding_moves(mt, sq, b));
         size++;
         b = (b - moves_bb) & moves_bb;
     } while (b);

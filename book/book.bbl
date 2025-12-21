@@ -250,6 +250,32 @@
       \field{title}{Google Benchmark: A microbenchmark support library}
       \field{year}{2025}
     \endentry
+    \entry{warren2012hackersdelight}{book}{}
+      \name{author}{1}{}{%
+        {{hash=44ee368708f0639e431dd3df73272fdf}{%
+           family={Warren},
+           familyi={W\bibinitperiod},
+           given={Henry\bibnamedelima S.},
+           giveni={H\bibinitperiod\bibinitdelim S\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {Addison-Wesley Professional}%
+      }
+      \strng{namehash}{44ee368708f0639e431dd3df73272fdf}
+      \strng{fullhash}{44ee368708f0639e431dd3df73272fdf}
+      \strng{bibnamehash}{44ee368708f0639e431dd3df73272fdf}
+      \strng{authorbibnamehash}{44ee368708f0639e431dd3df73272fdf}
+      \strng{authornamehash}{44ee368708f0639e431dd3df73272fdf}
+      \strng{authorfullhash}{44ee368708f0639e431dd3df73272fdf}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{edition}{2nd}
+      \field{isbn}{978-0321842688}
+      \field{title}{Hacker's Delight}
+      \field{year}{2012}
+    \endentry
   \enddatalist
 \endrefsection
 \endinput

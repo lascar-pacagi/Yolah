@@ -66,7 +66,7 @@
 \PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{size}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{do}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{n}{occupancies}\PYG{p}{.}\PYG{n}{push\PYGZus{}back}\PYG{p}{(}\PYG{n}{b}\PYG{p}{);}
-\PYG{+w}{        }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{.}\PYG{n}{push\PYGZus{}back}\PYG{p}{(}\PYG{n}{sliding\PYGZus{}moves}\PYG{p}{(}\PYG{n}{HORIZONTAL}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{b}\PYG{p}{));}
+\PYG{+w}{        }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{.}\PYG{n}{push\PYGZus{}back}\PYG{p}{(}\PYG{n}{sliding\PYGZus{}moves}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{b}\PYG{p}{));}
 \PYG{+w}{        }\PYG{n}{size}\PYG{o}{++}\PYG{p}{;}
 \PYG{+w}{        }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{;}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{p}{);}
