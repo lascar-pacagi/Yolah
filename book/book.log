@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  22 DEC 2025 00:30
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  22 DEC 2025 13:03
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -3353,12 +3353,40 @@ Package mdframed Info: mdframed detected package amsthm
 \openout4 = `book.pyg'.
 
 
-(./_minted-book/092D39CA166AF973CA6EF1F25F31C149EAAEBAE48CE0730BDF2691B1963EEA4
+(./_minted-book/32F6A778CC7CF532E5361EC7A6AF2A97EAAEBAE48CE0730BDF2691B1963EEA4
 6.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
 (caption)                particular \caption on input line 2288.
 See the caption package documentation for explanation.
+
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+LaTeX Warning: Reference `lst:lst:magic_perfect_hashing' on page 33 undefined o
+n input line 2288.
+
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+LaTeX Warning: Reference `lst:lst:magic_perfect_hashing' on page 33 undefined o
+n input line 2288.
 
 [33] [34] [35]
 \openout5 = `book.pyg'.
@@ -3514,7 +3542,7 @@ A.pygtex)
 
 
 (./_minted-book/4E648BE5D383FB0E311CF4F69D76EEDA93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
+A.pygtex) [37]
 \openout5 = `book.pyg'.
 
 
@@ -3529,7 +3557,7 @@ A.pygtex)
 
 
 (./_minted-book/0E4625058BEECBB56D4BACA2898C408A93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex) [37]
+A.pygtex)
 Overfull \hbox (25.83388pt too wide) in paragraph at lines 2368--2381
  [][] 
  []
@@ -3553,7 +3581,7 @@ A.pygtex)
 
 
 (./_minted-book/723FCE75E7812FC833A2BB84DA97011993C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
+A.pygtex [38])
 \openout5 = `book.pyg'.
 
 
@@ -3584,11 +3612,155 @@ Overfull \hbox (6.19067pt too wide) in paragraph at lines 2424--2425
 -ra-tion d'obstacles
  []
 
-[38]
-Package mdframed Info: mdframed works in twoside mode on input line 2433.
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/4E648BE5D383FB0E311CF4F69D76EEDA93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/CCC87E7257869AD33A6A0BD9E28A4AE493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/522CA0BBE691CD240B1D80441F7DD50E93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/4483370FB420A8DA6CBFFBB60E772C7E93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/CCC87E7257869AD33A6A0BD9E28A4AE493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/D749B99237CF8FCA85C08948723CD9D093C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/436E2671A1B5A98944375A19C9E2D37793C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+Overfull \hbox (7.34418pt too wide) in paragraph at lines 2434--2435
+\T1/cmr/m/n/12 pos-si-bles pour un in-dice donné. Il se peut que deux con-fig-u
+-ra-tions d'obstacles
+ []
+
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/522CA0BBE691CD240B1D80441F7DD50E93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/CCC87E7257869AD33A6A0BD9E28A4AE493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/905414F91A70E0F5694EAA7059B081E593C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/CCC87E7257869AD33A6A0BD9E28A4AE493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/CAF7E7BF96A799F0547469CB698BFB6893C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/E579C71E52547256B87CDC45FD5F475193C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/D749B99237CF8FCA85C08948723CD9D093C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/B6E7F4684FAE52DB1C9E33687B697D3893C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/A7EB73459745D0C743749087A95AB3B493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/B6E7F4684FAE52DB1C9E33687B697D3893C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/FF4E22C6ECC05B7EFC7E1024B3EF5BC593C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/A7EB73459745D0C743749087A95AB3B493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/D269E1352875113AA1D33AA91C6EA54B93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex) [39]
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/7C897C2167F77748644493434066AE0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/CCC87E7257869AD33A6A0BD9E28A4AE493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+Package mdframed Info: mdframed works in twoside mode on input line 2456.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 2433.
+(mdframed)              on input line 2456.
 \openout4 = `book.pyg'.
 
 
@@ -3596,18 +3768,14 @@ Package mdframed Info: mdframed detected package amsthm
 0.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 2509.
+(caption)                particular \caption on input line 2532.
 See the caption package documentation for explanation.
 
-[39]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [40]
-[41] [42
-
-]
+[40] [41] [42]
 Chapter 3.
-[43] [44
+[43
+
+] [44
 
 ]
 Chapter 4.
@@ -3639,19 +3807,19 @@ Chapter 9.
 ] [58
 
 ]
-Overfull \hbox (4.54851pt too wide) in paragraph at lines 2815--2815
+Overfull \hbox (4.54851pt too wide) in paragraph at lines 2839--2839
 []\T1/cmr/m/n/12 Stockfish Team. \T1/cmr/m/it/12 Stock-fish: Open Source Chess 
 En-gine\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 https : / / stockfishchess .
  []
 
 
-Overfull \hbox (1.5946pt too wide) in paragraph at lines 2815--2815
+Overfull \hbox (1.5946pt too wide) in paragraph at lines 2839--2839
 []\T1/cmr/m/n/12 Pradyumna Kan-nan. \T1/cmr/m/it/12 Magic Move-Bitboard Gen-er-
 a-tion in Com-puter Chess\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 http :
  []
 
 
-Overfull \hbox (1.26596pt too wide) in paragraph at lines 2815--2815
+Overfull \hbox (1.26596pt too wide) in paragraph at lines 2839--2839
 []\T1/cmr/m/n/12 Google. \T1/cmr/m/it/12 Google Bench-mark: A mi-crobench-mark 
 sup-port li-brary\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 https : / / github .
  []
@@ -3672,10 +3840,10 @@ Package logreq Info: Writing requests to 'book.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 53980 strings out of 478287
- 1139578 string characters out of 5849289
- 1993487 words of memory out of 5000000
- 70545 multiletter control sequences out of 15000+600000
+ 54087 strings out of 478287
+ 1148371 string characters out of 5849289
+ 1996049 words of memory out of 5000000
+ 70577 multiletter control sequences out of 15000+600000
  501042 words of font info for 112 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  91i,21n,117p,2042b,2309s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -3708,10 +3876,10 @@ r/sfti1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr
 ype1/public/cm-super/sftt1200.pfb></usr/share/texmf/fonts/type1/public/cm-super
 /sftt2488.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/wasy-type1/wasy
 10.pfb>
-Output written on book.pdf (69 pages, 2936525 bytes).
+Output written on book.pdf (69 pages, 2943810 bytes).
 PDF statistics:
- 986 PDF objects out of 1000 (max. 8388607)
- 745 compressed objects within 8 object streams
- 164 named destinations out of 1000 (max. 500000)
+ 992 PDF objects out of 1000 (max. 8388607)
+ 750 compressed objects within 8 object streams
+ 165 named destinations out of 1000 (max. 500000)
  682 words of extra memory for PDF output out of 10000 (max. 10000000)
 

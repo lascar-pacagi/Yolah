@@ -11,10 +11,10 @@
 \contentsline {section}{\numberline {2.3}Generating Possible Piece Moves}{19}{section.2.3}%
 \contentsline {subsection}{\numberline {2.3.1}Magic Perfect Hashing Function}{19}{subsection.2.3.1}%
 \contentsline {subsection}{\numberline {2.3.2}Magic Bitboards for Piece Moves}{28}{subsection.2.3.2}%
-\contentsline {subsection}{\numberline {2.3.3}Making and Unmaking Moves}{41}{subsection.2.3.3}%
-\contentsline {section}{\numberline {2.4}Testing with Random Games}{41}{section.2.4}%
-\contentsline {section}{\numberline {2.5}What's Next}{41}{section.2.5}%
-\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{41}{section.2.6}%
+\contentsline {subsection}{\numberline {2.3.3}Making and Unmaking Moves}{42}{subsection.2.3.3}%
+\contentsline {section}{\numberline {2.4}Testing with Random Games}{42}{section.2.4}%
+\contentsline {section}{\numberline {2.5}What's Next}{42}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{42}{section.2.6}%
 \contentsline {chapter}{\numberline {3}AI Players}{43}{chapter.3}%
 \contentsline {chapter}{\numberline {4}Monte Carlo Player}{45}{chapter.4}%
 \contentsline {chapter}{\numberline {5}MCTS Player}{47}{chapter.5}%

@@ -2244,9 +2244,9 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
     random_device rd;
     mt19937_64 twister(rd());
     uniform_int_distribution<uint64_t> d;
-    vector<int> seen(1 << k);
+    vector<uint32_t> seen(1 << k);
     vector<uint64_t> moves(1 << k);                    
-    for (int cnt = 0;; cnt++) {
+    for (uint32_t cnt = 0;; cnt++) {
         uint64_t magic = d(twister) & d(twister) & d(twister);
         bool found = true;                    
         for (size_t j = 0; j < occupancies.size(); j++) {
@@ -2285,7 +2285,7 @@ int main() {
     }
 }
 \end{minted}
-\captionof{listing}{}
+\captionof{listing}{Programme permettant de trouver les constantes \mintinline{c++}{K} et \mintinline{c++}{MAGIC} du listing \ref{lst:magic_perfect_hashing}}
 \label{lst:find_magic}
 \end{mdframed} 
 
@@ -2425,7 +2425,30 @@ b = (0b1011 - 0b1011) & 0b1011; // b == 0
 
 \end{itemize}
 
+\item À la ligne 72, on compte le nombre de bits à $1$ dans le bitboard \mintinline{c++}{moves_bb}, ce qui revient à compter le nombre de sous-ensembles de configurations d'obstacles. Nous fixons \mintinline{c++}{k} à cette valeur, ce qui veut dire que pour la case \mintinline{c++}{sq} et le type de mouvement \mintinline{c++}{mt}, la place occupée par notre table de hachage parfait sera de $2^k$\footnote{C'est la façon de faire dans le logiciel Stockfish\cite{stockfish2025}.}. Notons que certaines configurations d'obstacles produisent les mêmes coups possibles, il est donc peut-être possible d'obtenir une valeur de \mintinline{c++}{k} plus petite. Mais cette façon de faire permet de trouver les différentes constantes \mintinline{c++}{MAGIC} très rapidement et la place mémoire consommée est relativement faible ($105$Kio en tout).
+
+\item Aux lignes 74 à 76, on met en place le générateur aléatoire qui va nous permettre de créer les constantes \mintinline{c++}{MAGIC}.
+
+\item À la ligne 77, le tableau \mintinline{c++}{seen} va nous permettre de mémoriser les indices, obtenues par la formule de la ligne 84, que l'on a déjà rencontrés.
+
+\item À la ligne 78, le tableau \mintinline{c++}{moves} va nous permettre de mémoriser les coups possibles pour un indice donné. Il se peut que deux configurations d'obstacles différentes donnent lieu aux mêmes coups possibles, ce tableau nous permettra de ne pas considérer comme des collisions ces deux configurations différentes menant au même indice, mais ayant les mêmes coups possibles.
+
+\item La boucle de la ligne 79 à 96 va rechercher la constante \mintinline{c++}{MAGIC} permettant de créer le hachage parfait pour la case \mintinline{c++}{sq} et la valeur \mintinline{c++}{k}. Notons que cette boucle est potentiellement infinie. Nous informons le compilateur, à la ligne 97, que cette partie du code ne sera jamais atteinte grâce à la fonction \mintinline{c++}{std::unreachable}.
+
+\item À la ligne 80, on génère un candidat \mintinline{c++}{MAGIC}. On génère trois nombres aléatoires et on fait un ET bit-à-bit entre eux pour obtenir un nombre aléatoire avec moins de bits à $1$. Cette astuce est très importante car sans celle-ci nous n'arrivions pas à trouver un en temps raisonnable les constantes \mintinline{c++}{MAGIC}~!
+
+\item Aux lignes 82 à 92, on vérifie qu'il n'y a pas de collisions pour la constante considérée. Si c'est le cas, on retourne la valeur \mintinline{c++}{k} et la constante magique trouvée.
+
+\begin{itemize}
+\item À la ligne 84, pour une configuration d'obstacles donnée, on calcule son indice \mintinline{c++}{index} grâce à la fonction de hachage parfait \mintinline{c++}{magic * occ >> (64 - k)}.
+
+\item À la ligne 85, on test s'il y a une collision. On utilise une petite astuce classique pour ne pas avoir à réinitialiser \mintinline{c++}{seen} à zéro à chaque fois que l'on va tester un nouveau candidat \mintinline{c++}{magic}. La variable \mintinline{c++}{cnt} nous permet de savoir si la valeur contenue dans seen pour la case index est une valeur mise à jour pour un ancien candidat \mintinline{c++}{magic} ou est pour le candidat actuel. En effet, si \mintinline{c++}{seen[index]} est inférieur à \mintinline{c++}{cnt}, la valeur n'est plus d'actualité. Maintenant, la partie \mintinline{c++}{moves[index] != possible_moves[j]} nous permet d'ignorer une collision qui produit les mêmes coups possibles. 
+
 \end{itemize}
+
+\end{itemize}
+
+\item Aux lignes 100 à 116, le \mintinline{c++}{main} va produire et afficher sur la sortie standard toutes les valeurs de \mintinline{c++}{k} et toutes les constantes \mintinline{c++}{MAGIC} pour chacune des cases du plateau et pour les deux types de mouvement. Ces constantes vont nous servir bientôt pour initialiser la table de tous les coups possibles pour chacune des configurations d'obstacles. On peut voir une sortie possible dans le listing \ref{lst:find_magic_exec}.
 
 \end{itemize}
 
@@ -2506,9 +2529,10 @@ uint64_t D_MAGIC[64] = {
     0x4000182008c20048,   0x112088105020200,
 };
 \end{minted}
-\captionof{listing}{}
+\captionof{listing}{Exemple de la sortie pour une exécution du programme du listing \ref{lst:find_magic}}
 \label{lst:find_magic_exec}
 \end{mdframed} 
+
 
 
 

@@ -2354,15 +2354,16 @@
     <bcf:citekey order="8">moura2008z3</bcf:citekey>
     <bcf:citekey order="9">googlebenchmark2025</bcf:citekey>
     <bcf:citekey order="10">warren2012hackersdelight</bcf:citekey>
-    <bcf:citekey order="11">anthropic2025claude</bcf:citekey>
-    <bcf:citekey order="12">cppreference</bcf:citekey>
-    <bcf:citekey order="13">stockfish2025</bcf:citekey>
-    <bcf:citekey order="14">kannan2008magicbitboards</bcf:citekey>
-    <bcf:citekey order="15">kroening2016decision</bcf:citekey>
-    <bcf:citekey order="16">biere2021handbook</bcf:citekey>
-    <bcf:citekey order="17">moura2008z3</bcf:citekey>
-    <bcf:citekey order="18">googlebenchmark2025</bcf:citekey>
-    <bcf:citekey order="19">warren2012hackersdelight</bcf:citekey>
+    <bcf:citekey order="11">stockfish2025</bcf:citekey>
+    <bcf:citekey order="12">anthropic2025claude</bcf:citekey>
+    <bcf:citekey order="13">cppreference</bcf:citekey>
+    <bcf:citekey order="14">stockfish2025</bcf:citekey>
+    <bcf:citekey order="15">kannan2008magicbitboards</bcf:citekey>
+    <bcf:citekey order="16">kroening2016decision</bcf:citekey>
+    <bcf:citekey order="17">biere2021handbook</bcf:citekey>
+    <bcf:citekey order="18">moura2008z3</bcf:citekey>
+    <bcf:citekey order="19">googlebenchmark2025</bcf:citekey>
+    <bcf:citekey order="20">warren2012hackersdelight</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="none">

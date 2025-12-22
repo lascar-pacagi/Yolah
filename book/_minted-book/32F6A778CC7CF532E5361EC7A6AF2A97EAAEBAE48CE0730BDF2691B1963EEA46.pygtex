@@ -75,9 +75,9 @@
 \PYG{+w}{    }\PYG{n}{random\PYGZus{}device}\PYG{+w}{ }\PYG{n}{rd}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{mt19937\PYGZus{}64}\PYG{+w}{ }\PYG{n+nf}{twister}\PYG{p}{(}\PYG{n}{rd}\PYG{p}{());}
 \PYG{+w}{    }\PYG{n}{uniform\PYGZus{}int\PYGZus{}distribution}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{;}
-\PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{int}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{seen}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{k}\PYG{p}{);}
+\PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{seen}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{k}\PYG{p}{);}
 \PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{k}\PYG{p}{);}
-\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{cnt}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;;}\PYG{+w}{ }\PYG{n}{cnt}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{cnt}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;;}\PYG{+w}{ }\PYG{n}{cnt}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{magic}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{(}\PYG{n}{twister}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{(}\PYG{n}{twister}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{(}\PYG{n}{twister}\PYG{p}{);}
 \PYG{+w}{        }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{n}{found}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n+nb}{true}\PYG{p}{;}
 \PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{n}{occupancies}\PYG{p}{.}\PYG{n}{size}\PYG{p}{();}\PYG{+w}{ }\PYG{n}{j}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
