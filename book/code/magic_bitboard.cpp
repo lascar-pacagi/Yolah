@@ -3,7 +3,7 @@
 #include "../../game/types.h"
 
 enum MoveType {
-    HORIZONTAL,
+    ORTHOGONAL,
     DIAGONAL,
 };
 
@@ -17,7 +17,7 @@ uint64_t sliding_moves(MoveType mt, Square sq, uint64_t occupied) {
     uint64_t  moves                    = 0;
     Direction horizontal_directions[4] = {NORTH, SOUTH, EAST, WEST};
     Direction diagonal_directions[4]   = {NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST};
-    for (Direction d : (mt == HORIZONTAL ? horizontal_directions : diagonal_directions)) {
+    for (Direction d : (mt == ORTHOGONAL ? horizontal_directions : diagonal_directions)) {
         Square s = sq;
         while (true) {            
             Square to = s + d;
@@ -31,16 +31,16 @@ uint64_t sliding_moves(MoveType mt, Square sq, uint64_t occupied) {
     return moves;
 }
 
-void magic_for_square(Square sq) {    
+void magic_for_square(Square sq, MoveType mt) {
     using namespace std;
-    uint64_t moves_bb = sliding_moves(HORIZONTAL, sq, 0);
+    uint64_t moves_bb = sliding_moves(mt, sq, 0);
     std::vector<uint64_t> occupancies;
     std::vector<uint64_t> possible_moves;
     uint64_t b = 0;
     int size = 0;
     do {
         occupancies.push_back(b);
-        possible_moves.push_back(sliding_moves(HORIZONTAL, sq, b));
+        possible_moves.push_back(sliding_moves(mt, sq, b));
         size++;
         b = (b - moves_bb) & moves_bb;
     } while (b);
@@ -80,5 +80,5 @@ void magic_for_square(Square sq) {
 }
 
 int main() {
-    magic_for_square(SQ_A1);
+    magic_for_square(SQ_A1, ORTHOGONAL);
 }

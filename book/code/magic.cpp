@@ -1,6 +1,4 @@
 #include <bits/stdc++.h>
-#include <random>
-#include <format>
 
 enum Square : int {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
@@ -98,15 +96,15 @@ int manhattan_distance(Square sq1, Square sq2) {
 }
 
 enum MoveType {
-    HORIZONTAL,
+    ORTHOGONAL,
     DIAGONAL,
 };
 
 uint64_t sliding_moves(MoveType mt, Square sq, uint64_t occupied) {
     uint64_t  moves                    = 0;
-    Direction horizontal_directions[4] = {NORTH, SOUTH, EAST, WEST};
+    Direction orthogonal_directions[4] = {NORTH, SOUTH, EAST, WEST};
     Direction diagonal_directions[4]   = {NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST};
-    for (Direction d : (mt == HORIZONTAL ? horizontal_directions : diagonal_directions)) {
+    for (Direction d : (mt == ORTHOGONAL ? orthogonal_directions : diagonal_directions)) {
         Square s = sq;
         while (true) {            
             Square to = s + d;
@@ -163,10 +161,10 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
 
 int main() {
     using namespace std;
-    for (MoveType mt : {HORIZONTAL, DIAGONAL}) {
+    for (MoveType mt : {ORTHOGONAL, DIAGONAL}) {
         stringstream ss_k, ss_magic;
-        ss_k << format("int {}_K[64] = {{", mt == HORIZONTAL ? "H" : "D");
-        ss_magic << format("uint64_t {}_MAGIC[64] = {{", mt == HORIZONTAL ? "H" : "D");
+        ss_k << format("int {}_K[64] = {{", mt == ORTHOGONAL ? "O" : "D");
+        ss_magic << format("uint64_t {}_MAGIC[64] = {{", mt == ORTHOGONAL ? "O" : "D");
         for (int sq = SQ_A1; sq <= SQ_H8; sq++) {
             const auto [k, magic] = magic_for_square(mt, Square(sq));
             ss_k << dec << k << ',';

@@ -112,6 +112,7 @@
 % Other Useful Packages
 \usepackage{float}              % Better float control
 \usepackage{caption}            % Better captions
+\captionsetup[listing]{skip=2pt} % Reduce space between listing and caption
 \usepackage{subcaption}         % Subfigures
 \usepackage{enumitem}           % Better lists
 \usepackage{footnote}           % Better footnotes
@@ -2202,15 +2203,15 @@ int manhattan_distance(Square sq1, Square sq2) {
 }
 
 enum MoveType {
-    HORIZONTAL,
+    ORTHOGONAL,
     DIAGONAL
 };
 
 uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied) {
     uint64_t  moves    = 0;
-    Direction h_dir[4] = {NORTH, SOUTH, EAST, WEST};
+    Direction o_dir[4] = {NORTH, SOUTH, EAST, WEST};
     Direction d_dir[4] = {NORTH_EAST,SOUTH_EAST,SOUTH_WEST,NORTH_WEST};
-    for (Direction d : (mt == HORIZONTAL ? h_dir : d_dir)) {
+    for (Direction d : (mt == ORTHOGONAL ? o_dir : d_dir)) {
         Square s = sq;
         while (true) {            
             Square to = s + d;
@@ -2269,12 +2270,12 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
 
 int main() {
     using namespace std;
-    for (MoveType mt : {HORIZONTAL, DIAGONAL}) {
+    for (MoveType mt : {ORTHOGONAL, DIAGONAL}) {
         stringstream ss_k, ss_magic;
-        ss_k << format("int {}_K[64] = {{", 
-                        mt == HORIZONTAL ? "H" : "D");
-        ss_magic << format("uint64_t {}_MAGIC[64] = {{", 
-                            mt == HORIZONTAL ? "H" : "D");
+        ss_k << format("int {}_K[64] = {{",
+                        mt == ORTHOGONAL ? "H" : "D");
+        ss_magic << format("uint64_t {}_MAGIC[64] = {{",
+                            mt == ORTHOGONAL ? "H" : "D");
         for (int sq = SQ_A1; sq <= SQ_H8; sq++) {
             const auto [k, magic] = magic_for_square(mt, Square(sq));
             ss_k << dec << k << ',';
@@ -2293,7 +2294,7 @@ Dans le listing \ref{lst:find_magic},
 
 \begin{itemize}
 
-\item À la ligne 39, la fonction \mintinline{c++}{uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied)} va nous permettre de créer le masque des cases accessibles à partir de la case \mintinline{c++}{sq} et pour le type de mouvement \mintinline{c++}{mt}, qui sera soit horizontal (\mintinline{c++}{HORIZONTAL} à la ligne 35), soit diagonal (\mintinline{c++}{DIAGONAL} à la ligne 36). Le masque créé sera similaire aux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
+\item À la ligne 39, la fonction \mintinline{c++}{uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied)} va nous permettre de créer le masque des cases accessibles à partir de la case \mintinline{c++}{sq} et pour le type de mouvement \mintinline{c++}{mt}, qui sera soit orthogonal (\mintinline{c++}{ORTHOGONAL} à la ligne 35), soit diagonal (\mintinline{c++}{DIAGONAL} à la ligne 36). Le masque créé sera similaire aux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
 \begin{itemize}
 \item Aux lignes 43 à 53, nous parcourons tour à tour une des directions selon le type de mouvement, en partant de la case de départ (\mintinline{c++}{sq})jusqu'à rencontrer un obstacle.
 \item À la ligne on test si on ne sort pas du plateau ou si on ne fait pas le tour, par exemple, si l'on se trouve dans la case \mintinline{c++}{SQ_A8} et que la direction est \mintinline{c++}{EAST}, \mintinline{c++}{SQ_H8 + EAST == SQ_B1}, le test avec la distance de Manhattan va nous permettre de d'exclure ce genre de cas (voir à la ligne 28 la définition de la distance de Manhattan et le listing \ref{lst:files_and_ranks} pour les définitions de \mintinline{c++}{File} et \mintinline{c++}{Rank}).
@@ -2303,7 +2304,7 @@ Dans le listing \ref{lst:find_magic},
 \item À la ligne 51, on ajoute la case d'où l'on vient comme coup possible.
 \end{itemize}
 
-\item À la ligne 57, la fonction \mintinline{c++}{pair<int, uint64_t> magic_for_square(MoveType mt, Square sq)} va renvoyer une paire dont le premier élément sera la valeur de \mintinline{c++}{K}, et le deuxième élément sera la constante \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}), pour le type de mouvement \mintinline{c++}{mt} (\mintinline{c++}{HORIZONTAL} ou \mintinline{c++}{DIAGONAL}) et la case \mintinline{c++}{sq}.
+\item À la ligne 57, la fonction \mintinline{c++}{pair<int, uint64_t> magic_for_square(MoveType mt, Square sq)} va renvoyer une paire dont le premier élément sera la valeur de \mintinline{c++}{K}, et le deuxième élément sera la constante \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}), pour le type de mouvement \mintinline{c++}{mt} (\mintinline{c++}{ORTHOGONAL} ou \mintinline{c++}{DIAGONAL}) et la case \mintinline{c++}{sq}.
 \begin{itemize}
 \item Aux lignes 59 à 60, on crée un masque qui va couvrir les bords du plateaux mais en faisant attention de ne pas exclure des cases qui doivent rester accessibles par la pièce. Par exemple, si \mintinline{c++}{sq == SQ_A1}, on obtient le bitboard de la figure \ref{fig:edges_mask_a1} et si \mintinline{c++}{sq == SQ_C2}, on obtient celui de la figure \ref{fig:edges_mask_c2}.
 
@@ -2455,7 +2456,7 @@ b = (0b1011 - 0b1011) & 0b1011; // b == 0
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{shell}
-int H_K[64] = {
+int O_K[64] = {
     12, 11, 11, 11, 11, 11, 11, 12,
     11, 10, 10, 10, 10, 10, 10, 11,
     11, 10, 10, 10, 10, 10, 10, 11,
@@ -2465,7 +2466,7 @@ int H_K[64] = {
     11, 10, 10, 10, 10, 10, 10, 11,
     12, 11, 11, 11, 11, 11, 11, 12,
 };
-uint64_t H_MAGIC[64] = {
+uint64_t O_MAGIC[64] = {
     0x80011040002082,     0x40022002100040,     0x1880200081181000,
     0x2080240800100080,   0x8080024400800800,   0x4100080400024100,
     0xc080028001000a00,   0x80146043000080,
@@ -2533,8 +2534,139 @@ uint64_t D_MAGIC[64] = {
 \label{lst:find_magic_exec}
 \end{mdframed} 
 
+Maintenant que nous détenons les constantes \mintinline{c++}{MAGIC}, nous allons pouvoir initialiser grâce à elles des tableaux, décrits dans le listing \ref{lst:magic_tables}, qui vont stocker les informations nécessaires nous permettant de générer les coups possibles à partir d'une case donnée et d'une configuration d'obstacles.
+\begin{itemize}
+\item À la ligne 1, le tableau \mintinline{c++}{orthogonalTable} contiendra les bitboards des coups possibles pour tous les coups orthogonaux, pour toutes les cases et toutes les configurations d'obstacles. La valeur $102400$ pour la taille de ce tableau s'obtient en faisant
+\begin{minted}[breaklines,fontsize=\small]{c++}
+size_t size = 0;
+for (int i = 0; i < 64; i++) {
+    size += 1 << O_K[i];
+}
+\end{minted}
+\item À la ligne 2, le tableau \mintinline{c++}{diagonalTable} fera de même mais pour les coups diagonaux.
+\item À la ligne 3, le tableau \mintinline{c++}{orthogonalMagics} va définir pour chaque case du plateau les différentes informations nous permettant d'appliquer le hachage parfait et retrouver les coups possibles dans le tableau \mintinline{c++}{orthogonalTable}. Nous allons décrire juste après la structure \mintinline{c++}{Magic} présentée dans le listing \ref{lst:magic_struct}.
+\item À la ligne 4, le tableau \mintinline{c++}{diagonalMagics} fera de même pour les coups diagonaux.
+\end{itemize}
 
 
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+uint64_t orthogonalTable[102400];
+uint64_t diagonalTable[5248];
+Magic orthogonalMagics[SQUARE_NB];
+Magic diagonalMagics[SQUARE_NB];
+\end{minted}
+\captionof{listing}{Les tableaux nous permettant de générer les coups possibles à partir d'une case donnée et d'une configuration d'obstacles}
+\label{lst:magic_tables}
+\end{mdframed}
+
+Le listing \ref{lst:magic_struct} décrit la structure permettant de stocker les informations permettant d'appliquer le hachage parfait pour une case donnée.
+\begin{itemize}
+\item À la ligne 2, l'attribut \mintinline{c++}{mask} est le bitboard permettant d'isoler la partie du plateau qui contient les cases concernées par le déplacement de la pièce pour la case et le type de déplacement considérés. Ce masque correspond à la variable \mintinline{c++}{moves_bb} à la ligne 61 du listing \ref{lst:find_magic}.
+
+\item À la ligne 3, l'attribut \mintinline{c++}{magic} est la constante \mintinline{c++}{MAGIC} que l'on a trouvé pour la case et le déplacement considérés. Ce attribut prendra la valeur d'une des constantes des tables \mintinline{c++}{O_MAGIC} ou \mintinline{c++}{D_MAGIC} du listing \ref{lst:find_magic_exec}.
+
+\item À la ligne 4, l'attribut \mintinline{c++}{moves} est un pointeur sur la partie de la table \mintinline{c++}{orthogonalTable} ou \mintinline{c++}{diagonalTable}, selon le type de déplacement, qui contiendra les coups possibles pour la case considérée.
+
+\item À la ligne 5, l'attribut \mintinline{c++}{shift} est le déplacement \mintinline{c++}{(64 - K)} dans la formule du listing \ref{lst:magic_perfect_hashing}.
+
+\item Aux lignes 7 à 9, la fonction \mintinline{c++}{uint32_t index(uint64_t occupied) const}, calcule la position dans \mintinline{c++}{moves} où trouver le bitboard des coups possibles. On retrouve la formule du listing \ref{lst:magic_perfect_hashing} avec le masque appliquée aux obstacles pour ne considérer que ceux dans la trajectoire de la pièce.
+
+\end{itemize}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+struct Magic {
+    uint64_t  mask;
+    uint64_t  magic;
+    uint64_t* moves;
+    uint32_t  shift;
+
+    uint32_t index(uint64_t occupied) const {
+        return uint32_t( ((occupied & mask) * magic) >> shift );
+    }
+};
+\end{minted}
+\captionof{listing}{Structure de donnée nous permettant de stocker les informations utiles pour trouver les coups possibles pour une case et une configuration d'obstacles données}
+\label{lst:magic_struct}
+\end{mdframed} 
+
+La fonction \mintinline{c++}{uint64_t moves_bb(Square sq, uint64_t occupied)} du listing \ref{lst:possible_moves} va se servir des tables du listing \ref{lst:magic_tables} pour calculer le bitboard des coups possibles, orthogonaux et diagonaux, pour la case \mintinline{c++}{sq} et la configuration d'obstacles \mintinline{c++}{occupied}. C'est cette fonction qui sera utilisée pour la génération des coups dans la partie \ref{subsection:making_and_unmaking_moves}. Pour ce faire,
+
+\begin{itemize}
+\item À la ligne 2, on calcule l'index \mintinline{c++}{idx_omoves}, grâce au hachage parfait, en utilisant la structure \mintinline{c++}{Magic} pour la case \mintinline{c++}{sq} et les coups orthogonaux.
+
+\item À la ligne 3, on calcule l'index \mintinline{c++}{idx_dmoves}, grâce au hachage parfait, en utilisant la structure \mintinline{c++}{Magic} pour la case \mintinline{c++}{sq} et les coups diagonaux.
+
+\item Aux lignes 4 et 5, on peut récupérer le bitboard des coups possibles orthogonaux (ligne 4) et faire l'union de ceux-ci avec les coups diagonaux en combinant ce bitboard par un OU bit-à-bit avec celui des coups possibles diagonaux (ligne 5). On obtient ainsi le bitboard de tous les coups possibles pour la pièce en \mintinline{c++}{sq} en prenant en considération tous les obstacles du bitboard \mintinline{c++}{occupied}.
+
+\end{itemize}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+uint64_t moves_bb(Square sq, uint64_t occupied) {
+    uint32_t idx_omoves = orthogonalMagics[sq].index(occupied);
+    uint32_t idx_dmoves = diagonalMagics[sq].index(occupied);
+    return orthogonalMagics[sq].moves[idx_omoves] | 
+            diagonalMagics[sq].moves[idx_dmoves];
+}
+\end{minted}
+\captionof{listing}{La fonction \mintinline{c++}{moves_bb} utilisent les éléments des listings \ref{lst:magic_tables} et \ref{lst:magic_struct} pour calculer efficacement le bitboard des coups possibles pour une case et une configuration d'obstacles données}
+\label{lst:possible_moves}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+void init() {
+    init_magics(ORTHOGONAL, orthogonalTable, orthogonalMagics);
+    init_magics(DIAGONAL, diagonalTable, diagonalMagics);
+}
+\end{minted}
+\captionof{listing}{}
+\label{lst:magic_init}
+\end{mdframed}
+
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+Square& operator++(Square& d) { return d = Square(int(d) + 1); }
+
+void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
+    static constexpr uint64_t O_MAGIC[64] = { 0x80011040002082, // ...
+    static constexpr uint64_t D_MAGIC[64] = { 0x811100100408200,// ...
+    using namespace std;
+    int32_t size = 0;
+    vector<uint64_t> occupancies;
+    vector<uint64_t> possible_moves;
+    for (Square sq = SQ_A1; sq <= SQ_H8; ++sq) {
+        occupancies.clear();
+        possible_moves.clear();
+        Magic& m = magics[sq];
+        uint64_t edges = ((Rank1BB | Rank8BB) & ~rank_bb(sq)) | 
+                            ((FileABB | FileHBB) & ~file_bb(sq));
+        uint64_t moves_bb = sliding_moves(mt, sq, 0) & ~edges;
+        m.mask = moves_bb;
+        m.shift = 64 - popcount(m.mask);
+        m.magic = (mt == ORTHOGONAL ? O_MAGIC : D_MAGIC)[sq];        
+        m.moves = sq == SQ_A1 ? table : magics[sq - 1].moves + size;
+        size = 0;
+        uint64_t b = 0;
+        do {
+            occupancies.push_back(b);
+            possible_moves.push_back(sliding_moves(mt, sq, b));
+            b = (b - moves_bb) & moves_bb;
+            size++;
+        } while (b);
+        for (int32_t j = 0; j < size; j++) {
+            int32_t index = m.index(occupancies[j]);
+            m.moves[index] = possible_moves[j];
+        }
+    }
+}
+\end{minted}
+\captionof{listing}{}
+\label{lst:find_magics}
+\end{mdframed} 
 
 \subsection{Making and Unmaking Moves}
 \label{subsection:making_and_unmaking_moves}

@@ -1,0 +1,8 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{idx\PYGZus{}omoves}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{index}\PYG{p}{(}\PYG{n}{occupied}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{idx\PYGZus{}dmoves}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{diagonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{index}\PYG{p}{(}\PYG{n}{occupied}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{moves}\PYG{p}{[}\PYG{n}{idx\PYGZus{}omoves}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{            }\PYG{n}{diagonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{moves}\PYG{p}{[}\PYG{n}{idx\PYGZus{}dmoves}\PYG{p}{];}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

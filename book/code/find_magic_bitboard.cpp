@@ -7,7 +7,7 @@
 #include <format>
 
 enum MoveType {
-    HORIZONTAL,
+    ORTHOGONAL,
     DIAGONAL,
 };
 
@@ -21,7 +21,7 @@ uint64_t sliding_moves(MoveType mt, Square sq, uint64_t occupied) {
     uint64_t  moves                    = 0;
     Direction horizontal_directions[4] = {NORTH, SOUTH, EAST, WEST};
     Direction diagonal_directions[4]   = {NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST};
-    for (Direction d : (mt == HORIZONTAL ? horizontal_directions : diagonal_directions)) {
+    for (Direction d : (mt == ORTHOGONAL ? horizontal_directions : diagonal_directions)) {
         Square s = sq;
         while (true) {            
             Square to = s + d;
@@ -46,7 +46,7 @@ uint64_t sliding_moves(MoveType mt, Square sq, uint64_t occupied) {
 //     set<uint64_t> moves;
 //     do {
 //         occupancies.push_back(b);
-//         possible_moves.push_back(sliding_moves(HORIZONTAL, sq, b));
+//         possible_moves.push_back(sliding_moves(ORTHOGONAL, sq, b));
 //         moves.insert(possible_moves.back());
 //         size++;
 //         b = (b - moves_bb) & moves_bb;
@@ -113,7 +113,7 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq, size_t nb_iter
     set<uint64_t> moves;
     do {
         occupancies.push_back(b);
-        possible_moves.push_back(sliding_moves(HORIZONTAL, sq, b));
+        possible_moves.push_back(sliding_moves(mt, sq, b));
         moves.insert(possible_moves.back());
         size++;
         b = (b - moves_bb) & moves_bb;
@@ -155,10 +155,11 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq, size_t nb_iter
 
 int main() {
     using namespace std;
-    for (MoveType mt : {HORIZONTAL, DIAGONAL}) {
+    std::array<MoveType, 2> move_types = {ORTHOGONAL, DIAGONAL};
+    for (MoveType mt : move_types) {
         for (int sq = SQ_A1; sq <= SQ_H8; sq++) {
             const auto [k, magic] = magic_for_square(mt, Square(sq), 100000000);
             cout << format("MoveType: {} Square: {} K: {} Magic: {}\n", int(mt), int(sq), k, magic);
-        }        
-    }    
+        }
+    }
 }

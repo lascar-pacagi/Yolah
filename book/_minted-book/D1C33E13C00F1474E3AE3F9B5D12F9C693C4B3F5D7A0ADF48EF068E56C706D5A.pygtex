@@ -1,0 +1,6 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{orthogonalTable}\PYG{p}{[}\PYG{l+m+mi}{102400}\PYG{p}{];}
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{diagonalTable}\PYG{p}{[}\PYG{l+m+mi}{5248}\PYG{p}{];}
+\PYG{n}{Magic}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{[}\PYG{n}{SQUARE\PYGZus{}NB}\PYG{p}{];}
+\PYG{n}{Magic}\PYG{+w}{ }\PYG{n}{diagonalMagics}\PYG{p}{[}\PYG{n}{SQUARE\PYGZus{}NB}\PYG{p}{];}
+\end{Verbatim}
