@@ -1492,7 +1492,8 @@ Now that we know how to test for game over, we will study how to efficiently gen
 \section{Generating Possible Piece Moves}
 
 % La génération des coups possibles va utiliser une technique appelée les magic bitboard. Pour comprendre cette technique je vais tout d'abord présenter sur un exemple simple le hachage parfait magique. Je me suis inspiré de l'article pour cet exemple.
-Move generation will use a technique called \emph{magic bitboards}. To understand this technique, I will first present magic perfect hashing through a simple example. I drew inspiration from \cite{kannan2008magicbitboards} for this example.
+Move generation will use a technique called \emph{magic bitboards}, which is a perfect hash function that maps blocker occupancy patterns to unique lookup table indices without collisions % (nous allons voir tout cela en détail dans la suite de ce chapitre)
+(we will see all this in detail later in this chapter). To understand this technique, I will first present perfect hashing through a simple example. Throughout this chapter, I will use the terms \emph{perfect hashing} and \emph{magic bitboards} interchangeably, as they refer to the same technique in this context. I drew inspiration from \cite{kannan2008magicbitboards} for this example.
 
 \subsection{Magic Perfect Hashing Function}
 
@@ -1865,7 +1866,8 @@ Now that we have seen how the magic perfect hashing technique works through a si
 
 \subsection{Magic Bitboards for Piece Moves}
 
-Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case donnée, donner la liste des coups possibles pour cette configuration de jeu. Par exemple, pour le plateau de la figure \ref{fig:move23_position} dont les coups possibles pour la pièce en {\ttfamily d3} sont représentées par des étoiles dans la table \ref{tab:move23_d3_moves}, on voudrait très efficacement pouvoir obtenir le bitboard de la table \ref{tab:bb_move23_d3_moves} indiquant les différents coups possibles.\\
+% Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case donnée, donner la liste des coups possibles pour cette configuration de jeu. Par exemple, pour le plateau de la figure \ref{fig:move23_position} dont les coups possibles pour la pièce en {\ttfamily d3} sont représentées par des étoiles dans la table \ref{tab:move23_d3_moves}, on voudrait très efficacement pouvoir obtenir le bitboard de la table \ref{tab:bb_move23_d3_moves} indiquant les différents coups possibles.
+For each board configuration, we want to be able to provide, for a given square, the list of possible moves for that game configuration. For example, for the board in figure \ref{fig:move23_position} where the possible moves for the piece at {\ttfamily d3} are represented by stars in table \ref{tab:move23_d3_moves}, we would like to very efficiently obtain the bitboard shown in table \ref{tab:bb_move23_d3_moves} indicating the different possible moves.\\
 
 \begin{figure}[htpb]
 \centering
@@ -1971,10 +1973,14 @@ Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case
 \end{tabular}
 \end{table}
 
-Prenons comme exemple la case {\ttfamily d3}. Nous avons tout d'abord besoin d'un masque qui va nous permettre d'isoler les cases du plateau atteignables par la pièce en {\ttfamily d3} sans prendre en considération les obstacles. Ce masque est représenté dans la table \ref{tab:mask_for_d3}. Soit \mintinline{c++}{mask} le masque de la table \ref{tab:mask_for_d3} et \mintinline{c++}{board} le bitboard de la table \ref{tab:board_move23} représentant le plateau de jeu de la figure \ref{fig:move23_position}. On obtient le bitboard \mintinline{c++}{occupancies}, donnant les obstacles sur les trajectoires possibles de la pièce en {\ttfamily d3} en faisant~: \mintinline{c++}{occupancies = mask & board}. Ce bitboard est donné dans la table \ref{tab:occupancies_d3_move23}. Il y a un $1$ pour chaque case contenant une pièce ou un trou. Ce qu'il nous faut, c'est de pouvoir indexer une table, appelons la \mintinline{c++}{uint64_t MOVES_D3[]}, grâce au bitboard \mintinline{c++}{occupancies}, pour obtenir le bitboard des coups possibles à partir de la case {\ttfamily d3}. Ce bitboard est représenté dans la table \ref{tab:bb_move23_d3_moves}. Il ne nous restera plus qu'à parcourir chacun des bits à $1$ dans ce bitboard pour connaitre les cases où l'on peut se rendre et créer le coup correspondant. Pour obtenir l'index dans \mintinline{c++}{MOVES_D3}, on va utiliser la technique des magic bitboard que nous avons décrite dans la section précédente. Pour la case {\ttfamily d3}, il va nous falloir trouver une valeur \mintinline{c++}{K} et une valeur \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}) pour pouvoir obtenir le bitboard des coups possibles en faisant~: \mintinline{c++}{MOVES_D3[occupancies * MAGIC >> (64 - K)]}.\\
+% Prenons comme exemple la case {\ttfamily d3}. Nous avons tout d'abord besoin d'un masque qui va nous permettre d'isoler les cases du plateau atteignables par la pièce en {\ttfamily d3} sans prendre en considération les obstacles. Ce masque est représenté dans la table \ref{tab:mask_for_d3}. Soit \mintinline{c++}{mask} le masque de la table \ref{tab:mask_for_d3} et \mintinline{c++}{board} le bitboard de la table \ref{tab:board_move23} représentant le plateau de jeu de la figure \ref{fig:move23_position}. On obtient le bitboard \mintinline{c++}{occupancies}, donnant les obstacles sur les trajectoires possibles de la pièce en {\ttfamily d3} en faisant~: \mintinline{c++}{occupancies = mask & board}. Ce bitboard est donné dans la table \ref{tab:occupancies_d3_move23}. Il y a un $1$ pour chaque case contenant une pièce ou un trou. Ce qu'il nous faut, c'est de pouvoir indexer une table, appelons la \mintinline{c++}{uint64_t MOVES_D3[]}, grâce au bitboard \mintinline{c++}{occupancies}, pour obtenir le bitboard des coups possibles à partir de la case {\ttfamily d3}. Ce bitboard est représenté dans la table \ref{tab:bb_move23_d3_moves}. Il ne nous restera plus qu'à parcourir chacun des bits à $1$ dans ce bitboard pour connaitre les cases où l'on peut se rendre et créer le coup correspondant. Pour obtenir l'index dans \mintinline{c++}{MOVES_D3}, on va utiliser la technique des magic bitboard que nous avons décrite dans la section précédente. Pour la case {\ttfamily d3}, il va nous falloir trouver une valeur \mintinline{c++}{K} et une valeur \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}) pour pouvoir obtenir le bitboard des coups possibles en faisant~: \mintinline{c++}{MOVES_D3[occupancies * MAGIC >> (64 - K)]}.
+Let's take square {\ttfamily d3} as an example. We first need a mask that will allow us to isolate the board squares reachable by the piece at {\ttfamily d3} without considering obstacles. This mask is represented in table \ref{tab:mask_for_d3}. Let \mintinline{c++}{mask} be the mask from table \ref{tab:mask_for_d3} and \mintinline{c++}{board} be the bitboard from table \ref{tab:board_move23} representing the game board from figure \ref{fig:move23_position}. We obtain the bitboard \mintinline{c++}{occupancies}, giving the obstacles on the possible trajectories of the piece at {\ttfamily d3} by doing: \mintinline{c++}{occupancies = mask & board}. This bitboard is given in table \ref{tab:occupancies_d3_move23}. There is a $1$ for each square containing a piece or a hole. What we need is to be able to index a table, let's call it \mintinline{c++}{uint64_t MOVES_D3[]}, using the bitboard \mintinline{c++}{occupancies}, to obtain the bitboard of possible moves from square {\ttfamily d3}. This bitboard is represented in table \ref{tab:bb_move23_d3_moves}. Then we only need to iterate through each $1$ bit in this bitboard to know which squares we can move to and create the corresponding move. To obtain the index in \mintinline{c++}{MOVES_D3}, we will use the magic bitboard technique we described in the previous section. For square {\ttfamily d3}, we need to find a value \mintinline{c++}{K} and a value \mintinline{c++}{MAGIC} (see listing \ref{lst:magic_perfect_hashing}) to be able to obtain the bitboard of possible moves by doing: \mintinline{c++}{MOVES_D3[occupancies * MAGIC >> (64 - K)]}.\\
 
-Pour trouver une constante \mintinline{c++}{MAGIC} pour la case {\ttfamily d3}, nous allons avoir besoin d'énumérer tous les placements d'obstacles possibles sur les cases où peut se rendre la pièce en {\ttfamily d3}. Cela veut dire que l'on doit énumérer tous les sous-ensembles de $1$ du bitboard de la table \ref{tab:mask_for_d3}. Huit sous-ensembles de cette énumération sont présentés dans la figure \ref{fig:subsets_for_d3}. Il y a $25$ cases sur la trajectoire de la pièce en {\ttfamily d3} (voir la table \ref{tab:mask_for_d3}), cela veut dire qu'il y a $2^{25} = 33,554,432$ sous-ensembles à énumérer~!
-Nous voudrions réduire ce nombre de configurations des obstacles possibles sur la trajectoire de la pièce. En effet, comme nous le verrons lorsque nous détaillerons le code pour déterminer la valeur de la constante \mintinline{c++}{MAGIC}, la place mémoire pour stocker les coups possibles pour une case donnée va dépendre de ce nombre de configurations.\\
+% Pour trouver une constante \mintinline{c++}{MAGIC} pour la case {\ttfamily d3}, nous allons avoir besoin d'énumérer tous les placements d'obstacles possibles sur les cases où peut se rendre la pièce en {\ttfamily d3}. Cela veut dire que l'on doit énumérer tous les sous-ensembles de $1$ du bitboard de la table \ref{tab:mask_for_d3}. Huit sous-ensembles de cette énumération sont présentés dans la figure \ref{fig:subsets_for_d3}. Il y a $25$ cases sur la trajectoire de la pièce en {\ttfamily d3} (voir la table \ref{tab:mask_for_d3}), cela veut dire qu'il y a $2^{25} = 33,554,432$ sous-ensembles à énumérer~!
+To find a \mintinline{c++}{MAGIC} constant for square {\ttfamily d3}, we will need to enumerate all possible obstacle placements on the squares reachable by the piece at {\ttfamily d3}. This means we must enumerate all subsets of $1$ bits of the bitboard in table \ref{tab:mask_for_d3}. Eight subsets from this enumeration are presented in figure \ref{fig:subsets_for_d3}. There are $25$ squares on the trajectory of the piece at {\ttfamily d3} (see table \ref{tab:mask_for_d3}), which means there are $2^{25} = 33,554,432$ subsets to enumerate!
+
+% Nous voudrions réduire ce nombre de configurations des obstacles possibles sur la trajectoire de la pièce. En effet, comme nous le verrons lorsque nous détaillerons le code pour déterminer la valeur de la constante \mintinline{c++}{MAGIC}, la place mémoire pour stocker les coups possibles pour une case donnée va dépendre de ce nombre de configurations.
+We would like to reduce this number of possible obstacle configurations on the piece's trajectory. Indeed, as we will see when we detail the code to determine the value of the \mintinline{c++}{MAGIC} constant, the memory space to store the possible moves for a given square will depend on this number of configurations.\\
 
 \begin{figure}[htpb]
 \centering
@@ -2087,7 +2093,7 @@ Nous voudrions réduire ce nombre de configurations des obstacles possibles sur 
 \multicolumn{1}{c|}{} & \scriptsize a & \scriptsize b & \scriptsize c & \scriptsize d & \scriptsize e & \scriptsize f & \scriptsize g & \scriptsize h \\
 \cline{2-9}
 \end{tabular}
-\caption{18 bits set (full)}
+\caption{25 bits set (full)}
 \end{subfigure}
 
 \caption{Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones}
@@ -2095,11 +2101,13 @@ Nous voudrions réduire ce nombre de configurations des obstacles possibles sur 
 \end{figure}
  
 \label{par:edge_exclusion}
-Pour réduire ce nombre de configurations, nous n'allons pas considérer les cases sur les bords du plateau pour enlever les bits à $1$ sur les lignes 1 et 8 et les colonnes a et h du masque de la table \ref{tab:mask_for_d3}. On obtient le bitboard de la table \ref{tab:mask_for_d3_without_edge}. Il nous manquera l'information sur les bords, mais on supposera que s'il est possible de jouer en {\ttfamily d7} par exemple, il sera aussi possible de jouer en {\ttfamily d8}. Bien sûr il se peut qu'il y ait un obstacle en {\ttfamily d8}, mais on pourra facilement éliminer ce coup impossible comme nous le verrons dans la suite de ce chapitre (partie \ref{subsection:making_and_unmaking_moves}). Avec cette réduction, il nous reste $2^{17} = 131072$ sous-ensembles à énumérer. C'est bien mieux, mais nous allons pouvoir encore réduire ce nombre.\\
+% Pour réduire ce nombre de configurations, nous n'allons pas considérer les cases sur les bords du plateau pour enlever les bits à $1$ sur les lignes 1 et 8 et les colonnes a et h du masque de la table \ref{tab:mask_for_d3}. On obtient le bitboard de la table \ref{tab:mask_for_d3_without_edge}. Il nous manquera l'information sur les bords, mais on supposera que s'il est possible de jouer en {\ttfamily d7} par exemple, il sera aussi possible de jouer en {\ttfamily d8}. Bien sûr il se peut qu'il y ait un obstacle en {\ttfamily d8}, mais on pourra facilement éliminer ce coup impossible comme nous le verrons dans la suite de ce chapitre (partie \ref{subsection:list_of_moves}). Avec cette réduction, il nous reste $2^{17} = 131072$ sous-ensembles à énumérer. C'est bien mieux, mais nous allons pouvoir encore réduire ce nombre.
+To reduce this number of configurations, we will not consider the squares on the board edges to remove the $1$ bits on ranks 1 and 8 and files a and h from the mask in table \ref{tab:mask_for_d3}. We obtain the bitboard in table \ref{tab:mask_for_d3_without_edge}. We will be missing information about the edges, but we will assume that if it's possible to play to {\ttfamily d7} for example, it will also be possible to play to {\ttfamily d8}. Of course there might be an obstacle at {\ttfamily d8}, but we can easily eliminate this impossible move as we will see later in this chapter (section \ref{subsection:list_of_moves}). With this reduction, we are left with $2^{17} = 131,072$ subsets to enumerate. That's much better, but we can still reduce this number further.\\
 
 \begin{table}[htpb]
 \centering
-\caption{Masque pour les cases atteignables pour la pièce en {\ttfamily d3} en excluant les bords du plateau}
+% \caption{Masque pour les cases atteignables pour la pièce en {\ttfamily d3} en excluant les bords du plateau}
+\caption{Mask for reachable squares for the piece at {\ttfamily d3} excluding board edges}
 \label{tab:mask_for_d3_without_edge}
 \begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
 \hline
@@ -2116,8 +2124,11 @@ Pour réduire ce nombre de configurations, nous n'allons pas considérer les cas
 \end{tabular}
 \end{table}
 
-En effet, on peut scinder les mouvements d'une pièce en mouvements diagonaux et orthogonaux. Nous obtiendrons deux tableaux~: \mintinline{c++}{MOVES_D3_DIAG} et \mintinline{c++}{MOVES_D3_ORTHO}. Nous aurons à consulter deux tableaux au lieu d'un seul, pour obtenir les coups possibles en {\ttfamily d3} (ou n'importe quelle autre case), mais nous allons gagner beaucoup de place mémoire. Nous verrons comment combiner les valeurs de ces deux tableaux plus loin dans ce chapitre. Au lieu du masque de la table \ref{tab:mask_for_d3_without_edge}, nous aurons maintenant les deux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
-Pour le masque orthogonal de la figure \ref{fig:orthogonal_mask_d3}, on a $2^{10} = 1024$ sous-ensembles et pour le masque diagonal de la figure \ref{fig:diagonal_mask_d3}, on a $2^{7} = 128$ sous-ensembles, on passe donc de $2^{17} = 131072$ à $2^{10} + 2^{7} = 1152$ configurations d'obstacles à considérer pour la pièce en {\ttfamily d3}~!\\
+% En effet, on peut scinder les mouvements d'une pièce en mouvements diagonaux et orthogonaux. Nous obtiendrons deux tableaux~: \mintinline{c++}{MOVES_D3_DIAG} et \mintinline{c++}{MOVES_D3_ORTHO}. Nous aurons à consulter deux tableaux au lieu d'un seul, pour obtenir les coups possibles en {\ttfamily d3} (ou n'importe quelle autre case), mais nous allons gagner beaucoup de place mémoire. Nous verrons comment combiner les valeurs de ces deux tableaux plus loin dans ce chapitre. Au lieu du masque de la table \ref{tab:mask_for_d3_without_edge}, nous aurons maintenant les deux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
+Indeed, we can split a piece's moves into diagonal and orthogonal moves. We will obtain two tables: \mintinline{c++}{MOVES_D3_DIAG} and \mintinline{c++}{MOVES_D3_ORTHO}. We will need to consult two tables instead of one to obtain the possible moves at {\ttfamily d3} (or any other square), but we will save a lot of memory space. We will see how to combine the values from these two tables later in this chapter. Instead of the mask from table \ref{tab:mask_for_d3_without_edge}, we will now have the two masks from figure \ref{fig:diagonal_orthogonal_masks_d3}.
+
+% Pour le masque orthogonal de la figure \ref{fig:orthogonal_mask_d3}, on a $2^{10} = 1024$ sous-ensembles et pour le masque diagonal de la figure \ref{fig:diagonal_mask_d3}, on a $2^{7} = 128$ sous-ensembles, on passe donc de $2^{17} = 131072$ à $2^{10} + 2^{7} = 1152$ configurations d'obstacles à considérer pour la pièce en {\ttfamily d3}~!
+For the orthogonal mask in figure \ref{fig:orthogonal_mask_d3}, we have $2^{10} = 1,024$ subsets and for the diagonal mask in figure \ref{fig:diagonal_mask_d3}, we have $2^{7} = 128$ subsets, so we go from $2^{17} = 131,072$ to $2^{10} + 2^{7} = 1,152$ obstacle configurations to consider for the piece at {\ttfamily d3}!\\
 
 \begin{figure}[htpb]
 \centering
@@ -2161,11 +2172,12 @@ Pour le masque orthogonal de la figure \ref{fig:orthogonal_mask_d3}, on a $2^{10
 \label{fig:diagonal_mask_d3}
 \end{subfigure}
 
-\caption{Diagonal and orthogonal masks for d3 without edge squares}
+\caption{Orthogonal and diagonal masks for d3 without edge squares}
 \label{fig:diagonal_orthogonal_masks_d3}
 \end{figure}
 
-Nous pouvons maintenant étudier comment trouver les constantes \mintinline{c++}{MAGIC} et \mintinline{c++}{K} pour les coups diagonaux et orthogonaux de chacune des cases du plateau. Le code est donné dans le listing \ref{lst:find_magic}\footnote{J'ai essayé d'utiliser le solveur \gls{z3} pour obtenir ces constantes mais sans succès.}. Une exécution de ce programme\footnote{Au vu du générateur aléatoire et de son initialisation, le programme pourra trouver des constantes différentes pour des exécutions différentes.} est donnée dans le listing \ref{lst:find_magic_exec}\footnote{La sortie est reformatée pour être plus lisible.}.
+% Nous pouvons maintenant étudier comment trouver les constantes \mintinline{c++}{MAGIC} et \mintinline{c++}{K} pour les coups orthogonaux et diagonaux de chacune des cases du plateau. Le code est donné dans le listing \ref{lst:find_magic}\footnote{J'ai essayé d'utiliser le solveur \gls{z3} pour obtenir ces constantes mais sans succès.}. Une exécution de ce programme\footnote{Au vu du générateur aléatoire et de son initialisation, le programme pourra trouver des constantes différentes pour des exécutions différentes.} est donnée dans le listing \ref{lst:find_magic_exec}\footnote{La sortie est reformatée pour être plus lisible.}.
+We can now study how to find the \mintinline{c++}{MAGIC} and \mintinline{c++}{K} constants for the orthogonal and diagonal moves of each square on the board. The code is given in listing \ref{lst:find_magic}\footnote{I tried to use the \gls{z3} solver to obtain these constants but without success.}. An execution of this program\footnote{Given the random generator and its initialization, the program may find different constants for different executions.} is given in listing \ref{lst:find_magic_exec}\footnote{The output is reformatted for readability.}.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
@@ -2218,8 +2230,8 @@ uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied) {
             if (!is_ok(to) || manhattan_distance(s, to) > 2) break;
             uint64_t bb = square_bb(to);            
             if ((square_bb(to) & occupied) != 0) break;
-            s = to;
             moves |= bb;
+            s = to;
         } 
     }
     return moves;
@@ -2286,27 +2298,38 @@ int main() {
     }
 }
 \end{minted}
-\captionof{listing}{Programme permettant de trouver les constantes \mintinline{c++}{K} et \mintinline{c++}{MAGIC} du listing \ref{lst:magic_perfect_hashing}}
+% \captionof{listing}{Programme permettant de trouver les constantes \mintinline{c++}{K} et \mintinline{c++}{MAGIC} du listing \ref{lst:magic_perfect_hashing} pour les configurations d'obstacles d'un type de mouvement et d'une case donnés}
+\captionof{listing}{Program to find the \mintinline{c++}{K} and \mintinline{c++}{MAGIC} constants from listing \ref{lst:magic_perfect_hashing} for the obstacle configurations of a given move type and square}
 \label{lst:find_magic}
 \end{mdframed} 
 
-Dans le listing \ref{lst:find_magic},
+% Dans le listing \ref{lst:find_magic},
+In listing \ref{lst:find_magic},
 
 \begin{itemize}
 
-\item À la ligne 39, la fonction \mintinline{c++}{uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied)} va nous permettre de créer le masque des cases accessibles à partir de la case \mintinline{c++}{sq} et pour le type de mouvement \mintinline{c++}{mt}, qui sera soit orthogonal (\mintinline{c++}{ORTHOGONAL} à la ligne 35), soit diagonal (\mintinline{c++}{DIAGONAL} à la ligne 36). Le masque créé sera similaire aux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
+% \item À la ligne 39, la fonction \mintinline{c++}{uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied)} va nous permettre de créer le masque des cases accessibles à partir de la case \mintinline{c++}{sq} et pour le type de mouvement \mintinline{c++}{mt}, qui sera soit orthogonal (\mintinline{c++}{ORTHOGONAL} à la ligne 35), soit diagonal (\mintinline{c++}{DIAGONAL} à la ligne 36). Le masque créé sera similaire aux masques de la figure \ref{fig:diagonal_orthogonal_masks_d3}.
+\item At line 39, the function \mintinline{c++}{uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied)} will allow us to create the mask of squares reachable from square \mintinline{c++}{sq} for the move type \mintinline{c++}{mt}, which will be either orthogonal (\mintinline{c++}{ORTHOGONAL} at line 35) or diagonal (\mintinline{c++}{DIAGONAL} at line 36). The created mask will be similar to the masks in figure \ref{fig:diagonal_orthogonal_masks_d3}.
 \begin{itemize}
-\item Aux lignes 43 à 53, nous parcourons tour à tour une des directions selon le type de mouvement, en partant de la case de départ (\mintinline{c++}{sq})jusqu'à rencontrer un obstacle.
-\item À la ligne on test si on ne sort pas du plateau ou si on ne fait pas le tour, par exemple, si l'on se trouve dans la case \mintinline{c++}{SQ_A8} et que la direction est \mintinline{c++}{EAST}, \mintinline{c++}{SQ_H8 + EAST == SQ_B1}, le test avec la distance de Manhattan va nous permettre de d'exclure ce genre de cas (voir à la ligne 28 la définition de la distance de Manhattan et le listing \ref{lst:files_and_ranks} pour les définitions de \mintinline{c++}{File} et \mintinline{c++}{Rank}).
-\item À la ligne 48, on transforme la case où l'on se trouve en un bitboard qui contient un seul $1$, sur le bit correspondant à la case.
-\item À la ligne 49, on test s'il n'y a pas un obstacle sur la case où l'on se trouve grâce au bitboard que l'on vient de créer et du bitboard \mintinline{c++}{occupied} contenant les obstacles du plateau.
-\item À la ligne 50, on se déplace d'une case dans la direction \mintinline{c++}{d}.
-\item À la ligne 51, on ajoute la case d'où l'on vient comme coup possible.
+% \item Aux lignes 43 à 53, nous parcourons tour à tour une des directions selon le type de mouvement, en partant de la case de départ (\mintinline{c++}{sq}) jusqu'à rencontrer un obstacle.
+\item At lines 43 to 53, we iterate through each direction according to the move type, starting from the starting square (\mintinline{c++}{sq}) until we encounter an obstacle.
+% \item À la ligne 47, on test si on ne sort pas du plateau ou si on ne fait pas le tour, par exemple, si l'on se trouve dans la case \mintinline{c++}{SQ_A8} et que la direction est \mintinline{c++}{EAST}, \mintinline{c++}{SQ_H8 + EAST == SQ_B1}, le test avec la distance de Manhattan va nous permettre d'exclure ce genre de cas (voir à la ligne 28 la définition de la distance de Manhattan et le listing \ref{lst:files_and_ranks} pour les définitions de \mintinline{c++}{File} et \mintinline{c++}{Rank}).
+\item At line 47, we test whether we go off the board or wrap around, for example, if we are at square \mintinline{c++}{SQ_A8} and the direction is \mintinline{c++}{EAST}, \mintinline{c++}{SQ_H8 + EAST == SQ_B1}, the test with Manhattan distance will allow us to exclude this kind of case (see line 28 for the definition of Manhattan distance and listing \ref{lst:files_and_ranks} for the definitions of \mintinline{c++}{File} and \mintinline{c++}{Rank}).
+% \item À la ligne 48, on transforme la case de destination \mintinline{c++}{to} en un bitboard qui contient un seul $1$, sur le bit correspondant à la case.
+\item At line 48, we transform the destination square \mintinline{c++}{to} into a bitboard that contains a single $1$, on the bit corresponding to the square.
+% \item À la ligne 49, on test s'il n'y a pas un obstacle sur la case où l'on ve se rendre grâce au bitboard que l'on vient de créer et du bitboard \mintinline{c++}{occupied} contenant les obstacles du plateau.
+\item At line 49, we test whether there is an obstacle on the square we want to move to using the bitboard we just created and the bitboard \mintinline{c++}{occupied} containing the obstacles on the board.
+% \item À la ligne 50, on ajoute la nouvelle case comme coup possible.
+\item At line 50, we add the new square as a possible move.
+% \item À la ligne 51, on se déplace d'une case dans la direction \mintinline{c++}{d}.
+\item At line 51, we move one square in direction \mintinline{c++}{d}.
 \end{itemize}
 
-\item À la ligne 57, la fonction \mintinline{c++}{pair<int, uint64_t> magic_for_square(MoveType mt, Square sq)} va renvoyer une paire dont le premier élément sera la valeur de \mintinline{c++}{K}, et le deuxième élément sera la constante \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}), pour le type de mouvement \mintinline{c++}{mt} (\mintinline{c++}{ORTHOGONAL} ou \mintinline{c++}{DIAGONAL}) et la case \mintinline{c++}{sq}.
+% \item À la ligne 57, la fonction \mintinline{c++}{pair<int, uint64_t> magic_for_square(MoveType mt, Square sq)} va renvoyer une paire dont le premier élément sera la valeur de \mintinline{c++}{K}, et le deuxième élément sera la constante \mintinline{c++}{MAGIC} (voir listing \ref{lst:magic_perfect_hashing}), pour le type de mouvement \mintinline{c++}{mt} (\mintinline{c++}{ORTHOGONAL} ou \mintinline{c++}{DIAGONAL}) et la case \mintinline{c++}{sq}.
+\item At line 57, the function \mintinline{c++}{pair<int, uint64_t> magic_for_square(MoveType mt, Square sq)} will return a pair whose first element will be the value of \mintinline{c++}{K}, and whose second element will be the \mintinline{c++}{MAGIC} constant (see listing \ref{lst:magic_perfect_hashing}), for the move type \mintinline{c++}{mt} (\mintinline{c++}{ORTHOGONAL} or \mintinline{c++}{DIAGONAL}) and square \mintinline{c++}{sq}.
 \begin{itemize}
-\item Aux lignes 59 à 60, on crée un masque qui va couvrir les bords du plateaux mais en faisant attention de ne pas exclure des cases qui doivent rester accessibles par la pièce. Par exemple, si \mintinline{c++}{sq == SQ_A1}, on obtient le bitboard de la figure \ref{fig:edges_mask_a1} et si \mintinline{c++}{sq == SQ_C2}, on obtient celui de la figure \ref{fig:edges_mask_c2}.
+% \item Aux lignes 59 à 60, on crée un masque qui va couvrir les bords du plateaux mais en faisant attention de ne pas exclure des cases qui doivent rester accessibles par la pièce. Par exemple, si \mintinline{c++}{sq == SQ_A1}, on obtient le bitboard de la figure \ref{fig:edges_mask_a1} et si \mintinline{c++}{sq == SQ_C2}, on obtient celui de la figure \ref{fig:edges_mask_c2}.
+\item At lines 59 to 60, we create a mask that will cover the board edges but being careful not to exclude squares that must remain accessible by the piece. For example, if \mintinline{c++}{sq == SQ_A1}, we obtain the bitboard from figure \ref{fig:edges_mask_a1} and if \mintinline{c++}{sq == SQ_C2}, we obtain the one from figure \ref{fig:edges_mask_c2}.
 
 \begin{figure}[htpb]
 \centering
@@ -2354,12 +2377,15 @@ Dans le listing \ref{lst:find_magic},
 \label{fig:edge_masks}
 \end{figure}
 
-\item À la ligne 61, on crée le bitboard \mintinline{c++}{moves_bb} des cases accessibles par la pièce à partir de la case \mintinline{c++}{sq}. Le paramètre \mintinline{c++}{occupied} est égal à zéro pour indiquer qu'il n'y a aucun obstacle. On retire les bords avec \mintinline{c++}{& ~edges} comme nous l'avions vu au paragraphe \ref{par:edge_exclusion}.
+% \item À la ligne 61, on crée le bitboard \mintinline{c++}{moves_bb} des cases accessibles par la pièce à partir de la case \mintinline{c++}{sq}. Le paramètre \mintinline{c++}{occupied} est égal à zéro pour indiquer qu'il n'y a aucun obstacle. On retire les bords avec \mintinline{c++}{& ~edges} comme nous l'avions vu au paragraphe \ref{par:edge_exclusion}.
+\item At line 61, we create the bitboard \mintinline{c++}{moves_bb} of squares accessible by the piece from square \mintinline{c++}{sq}. The parameter \mintinline{c++}{occupied} is equal to zero to indicate that there are no obstacles. We remove the edges with \mintinline{c++}{& ~edges} as we saw in paragraph \ref{par:edge_exclusion}.
 
-\item Aux lignes 62 à 71, on va créer toutes les configurations d'obstacles sur les cases accessibles par la pièce en \mintinline{c++}{sq}, sans considérer les cases dans \mintinline{c++}{edge}, en énumérant tous les sous-ensembles du bitboard \mintinline{c++}{moves_bb}.
+% \item Aux lignes 62 à 71, on va créer toutes les configurations d'obstacles sur les cases accessibles par la pièce en \mintinline{c++}{sq}, sans considérer les cases dans \mintinline{c++}{edge}, en énumérant tous les sous-ensembles du bitboard \mintinline{c++}{moves_bb}.
+\item At lines 62 to 71, we will create all obstacle configurations on the squares accessible by the piece at \mintinline{c++}{sq}, without considering the squares in \mintinline{c++}{edge}, by enumerating all subsets of the bitboard \mintinline{c++}{moves_bb}.
 
 \begin{itemize}
-\item Aux lignes 62 et 63, le vecteur \mintinline{c++}{occupancies} va contenir toutes les configurations d'obstacles sur la trajectoire de la pièce, sans considérer les cases dans \mintinline{c++}{edge}, et pour chacune de ces configurations, le vecteur \mintinline{c++}{possible_moves} va contenir le bitboard des coups possibles pour cette configuration. Par exemple, on pourrait avoir comme configuration d'obstacles le bitboard de la figure \ref{fig:occupancy_d3_23} et les coups possibles associés seraient représentés par le bitboard de la figure \ref{fig:possible_moves_d3_23}.
+% \item Aux lignes 62 et 63, le vecteur \mintinline{c++}{occupancies} va contenir toutes les configurations d'obstacles sur la trajectoire de la pièce, sans considérer les cases dans \mintinline{c++}{edge}, et pour chacune de ces configurations, le vecteur \mintinline{c++}{possible_moves} va contenir le bitboard des coups possibles pour cette configuration. Par exemple, on pourrait avoir comme configuration d'obstacles le bitboard de la figure \ref{fig:occupancy_d3_23} et les coups possibles associés seraient représentés par le bitboard de la figure \ref{fig:possible_moves_d3_23}.
+\item At lines 62 and 63, the vector \mintinline{c++}{occupancies} will contain all obstacle configurations on the piece's trajectory, without considering the squares in \mintinline{c++}{edge}, and for each of these configurations, the vector \mintinline{c++}{possible_moves} will contain the bitboard of possible moves for that configuration. For example, we could have as an obstacle configuration the bitboard from figure \ref{fig:occupancy_d3_23} and the associated possible moves would be represented by the bitboard from figure \ref{fig:possible_moves_d3_23}.
 
 \begin{figure}[H]
 \centering
@@ -2407,7 +2433,8 @@ Dans le listing \ref{lst:find_magic},
 \label{fig:occupancy_example}
 \end{figure}
 
-\item La boucle entre les lignes 66 et 71 va permettre d'énumérer tous les sous-ensembles du bitboard \mintinline{c++}{moves_bb}. On utilise pour se faire la technique appelée \emph{Carry-Rippler}\footnote{Si vous êtes intéressés par ce genre d'astuces de manipulation bit-à-bit, vous aimerez l'ouvrage \emph{Hacker's Delight}\cite{warren2012hackersdelight}.} à la ligne 70. Prenons un exemple fictif avec \mintinline{c++}{moves_bb = 0b1011}. On obtient alors
+% \item La boucle entre les lignes 66 et 71 va permettre d'énumérer tous les sous-ensembles du bitboard \mintinline{c++}{moves_bb}. On utilise pour se faire la technique appelée \emph{Carry-Rippler}\footnote{Si vous êtes intéressés par ce genre d'astuces de manipulation bit-à-bit, vous aimerez l'ouvrage \emph{Hacker's Delight}\cite{warren2012hackersdelight}.} à la ligne 70. Prenons un exemple fictif avec \mintinline{c++}{moves_bb = 0b1011}. On obtient alors
+\item The loop between lines 66 and 71 will allow us to enumerate all subsets of the bitboard \mintinline{c++}{moves_bb}. To do this, we use the technique called \emph{Carry-Rippler}\footnote{If you are interested in this kind of bit manipulation tricks, you will love the book \emph{Hacker's Delight}\cite{warren2012hackersdelight}.} at line 70. Let's take a fictitious example with \mintinline{c++}{moves_bb = 0b1011}. We then obtain
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
 uint64_t b = 0;                 // b == 0
 b = (0 - 0b1011) & 0b1011;      // b == 0b0001
@@ -2422,34 +2449,45 @@ b = (0b1011 - 0b1011) & 0b1011; // b == 0
 
 \vspace{0.3cm}
 
-\item À la ligne 68, on crée les coups possibles pour la configuration d'obstacles \mintinline{c++}{b}. Notons que comme \mintinline{c++}{b} ne couvre pas les cases de \mintinline{c++}{edge}, si aucun obstacle dans \mintinline{c++}{b} ne bloque les déplacements de la pièce jusqu'à une case dans \mintinline{c++}{edge}, celle-ci apparaîtra dans les coups possibles. 
+% \item À la ligne 68, on crée les coups possibles pour la configuration d'obstacles \mintinline{c++}{b}. Notons que comme \mintinline{c++}{b} ne couvre pas les cases de \mintinline{c++}{edge}, si aucun obstacle dans \mintinline{c++}{b} ne bloque les déplacements de la pièce jusqu'à une case dans \mintinline{c++}{edge}, celle-ci apparaîtra dans les coups possibles.
+\item At line 68, we create the possible moves for the obstacle configuration \mintinline{c++}{b}. Note that since \mintinline{c++}{b} does not cover the squares in \mintinline{c++}{edge}, if no obstacle in \mintinline{c++}{b} blocks the piece's moves to a square in \mintinline{c++}{edge}, it will appear in the possible moves.
 
 \end{itemize}
 
-\item À la ligne 72, on compte le nombre de bits à $1$ dans le bitboard \mintinline{c++}{moves_bb}, ce qui revient à compter le nombre de sous-ensembles de configurations d'obstacles. Nous fixons \mintinline{c++}{k} à cette valeur, ce qui veut dire que pour la case \mintinline{c++}{sq} et le type de mouvement \mintinline{c++}{mt}, la place occupée par notre table de hachage parfait sera de $2^k$\footnote{C'est la façon de faire dans le logiciel Stockfish\cite{stockfish2025}.}. Notons que certaines configurations d'obstacles produisent les mêmes coups possibles, il est donc peut-être possible d'obtenir une valeur de \mintinline{c++}{k} plus petite. Mais cette façon de faire permet de trouver les différentes constantes \mintinline{c++}{MAGIC} très rapidement et la place mémoire consommée est relativement faible ($105$Kio en tout).
+% \item À la ligne 72, on compte le nombre de bits à $1$ dans le bitboard \mintinline{c++}{moves_bb}. Nous fixons \mintinline{c++}{k} à cette valeur, ce qui veut dire que pour la case \mintinline{c++}{sq} et le type de mouvement \mintinline{c++}{mt}, la place occupée par notre table de hachage parfait\footnote{C'est la façon de faire dans le logiciel Stockfish\cite{stockfish2025}.} sera de $2^k$. Notons que certaines configurations d'obstacles produisent les mêmes coups possibles, il est donc peut-être possible d'obtenir une valeur de \mintinline{c++}{k} plus petite. Mais cette façon de faire permet de trouver les différentes constantes \mintinline{c++}{MAGIC} très rapidement et la place mémoire consommée est relativement faible (moins $110$Kio en tout).
+\item At line 72, we count the number of $1$ bits in the bitboard \mintinline{c++}{moves_bb}. We set \mintinline{c++}{k} to this value, which means that for square \mintinline{c++}{sq} and move type \mintinline{c++}{mt}, the space occupied by our perfect hash table\footnote{This is the approach used in the Stockfish software\cite{stockfish2025}.} will be $2^k$. Note that some obstacle configurations produce the same possible moves, so it might be possible to obtain a smaller value of \mintinline{c++}{k}. But this approach allows us to find the different \mintinline{c++}{MAGIC} constants very quickly and the memory consumed is relatively small (less than $110$ KiB in total).
 
-\item Aux lignes 74 à 76, on met en place le générateur aléatoire qui va nous permettre de créer les constantes \mintinline{c++}{MAGIC}.
+% \item Aux lignes 74 à 76, on met en place le générateur aléatoire qui va nous permettre de créer les constantes \mintinline{c++}{MAGIC}.
+\item At lines 74 to 76, we set up the random generator that will allow us to create the \mintinline{c++}{MAGIC} constants.
 
-\item À la ligne 77, le tableau \mintinline{c++}{seen} va nous permettre de mémoriser les indices, obtenues par la formule de la ligne 84, que l'on a déjà rencontrés.
+% \item À la ligne 77, le tableau \mintinline{c++}{seen} va nous permettre de mémoriser les indices, obtenues par la formule de la ligne 84, que l'on a déjà rencontrés.
+\item At line 77, the array \mintinline{c++}{seen} will allow us to memorize the indices, obtained by the formula at line 84, that we have already encountered.
 
-\item À la ligne 78, le tableau \mintinline{c++}{moves} va nous permettre de mémoriser les coups possibles pour un indice donné. Il se peut que deux configurations d'obstacles différentes donnent lieu aux mêmes coups possibles, ce tableau nous permettra de ne pas considérer comme des collisions ces deux configurations différentes menant au même indice, mais ayant les mêmes coups possibles.
+% \item À la ligne 78, le tableau \mintinline{c++}{moves} va nous permettre de mémoriser les coups possibles pour un indice donné. Il se peut que deux configurations d'obstacles différentes donnent lieu aux mêmes coups possibles, ce tableau nous permettra de ne pas considérer comme des collisions ces deux configurations différentes menant au même indice, mais ayant les mêmes coups possibles.
+\item At line 78, the array \mintinline{c++}{moves} will allow us to memorize the possible moves for a given index. It may happen that two different obstacle configurations lead to the same possible moves, this array will allow us not to consider as collisions these two different configurations leading to the same index but having the same possible moves.
 
-\item La boucle de la ligne 79 à 96 va rechercher la constante \mintinline{c++}{MAGIC} permettant de créer le hachage parfait pour la case \mintinline{c++}{sq} et la valeur \mintinline{c++}{k}. Notons que cette boucle est potentiellement infinie. Nous informons le compilateur, à la ligne 97, que cette partie du code ne sera jamais atteinte grâce à la fonction \mintinline{c++}{std::unreachable}.
+% \item La boucle de la ligne 79 à 96 va rechercher la constante \mintinline{c++}{MAGIC} permettant de créer le hachage parfait pour la case \mintinline{c++}{sq} et la valeur \mintinline{c++}{k}. Notons que cette boucle est potentiellement infinie. Nous informons le compilateur, à la ligne 97, que cette partie du code ne sera jamais atteinte grâce à la fonction \mintinline{c++}{std::unreachable}.
+\item The loop from line 79 to 96 will search for the \mintinline{c++}{MAGIC} constant that allows creating the perfect hash for square \mintinline{c++}{sq} and value \mintinline{c++}{k}. Note that this loop is potentially infinite. We inform the compiler, at line 97, that this part of the code will never be reached thanks to the function \mintinline{c++}{std::unreachable}.
 
-\item À la ligne 80, on génère un candidat \mintinline{c++}{MAGIC}. On génère trois nombres aléatoires et on fait un ET bit-à-bit entre eux pour obtenir un nombre aléatoire avec moins de bits à $1$. Cette astuce est très importante car sans celle-ci nous n'arrivions pas à trouver un en temps raisonnable les constantes \mintinline{c++}{MAGIC}~!
+% \item À la ligne 80, on génère un candidat \mintinline{c++}{MAGIC}. On génère trois nombres aléatoires et on fait un ET bit-à-bit entre eux pour obtenir un nombre aléatoire avec moins de bits à $1$. Cette astuce est très importante car sans celle-ci nous n'arrivions pas à trouver un en temps raisonnable les constantes \mintinline{c++}{MAGIC}~!\footnote{Notons que l'utilisation de cette astuce pour le listing \ref{lst:random_magic} ralentissait l'obtention de la constante \mintinline{c++}{MAGIC}.}
+\item At line 80, we generate a \mintinline{c++}{MAGIC} candidate. We generate three random numbers and perform a bitwise AND between them to obtain a random number with fewer $1$ bits. This trick is very important because without it we couldn't find the \mintinline{c++}{MAGIC} constants in a reasonable time!\footnote{Note that using this trick for listing \ref{lst:random_magic} slowed down obtaining the \mintinline{c++}{MAGIC} constant.}
 
-\item Aux lignes 82 à 92, on vérifie qu'il n'y a pas de collisions pour la constante considérée. Si c'est le cas, on retourne la valeur \mintinline{c++}{k} et la constante magique trouvée.
+% \item Aux lignes 82 à 92, on vérifie qu'il n'y a pas de collisions pour la constante considérée. Si c'est le cas, on retourne la valeur \mintinline{c++}{k} et la constante magique trouvée.
+\item At lines 82 to 92, we verify that there are no collisions for the constant being considered. If this is the case, we return the value \mintinline{c++}{k} and the magic constant found.
 
 \begin{itemize}
-\item À la ligne 84, pour une configuration d'obstacles donnée, on calcule son indice \mintinline{c++}{index} grâce à la fonction de hachage parfait \mintinline{c++}{magic * occ >> (64 - k)}.
+% \item À la ligne 84, pour une configuration d'obstacles donnée, on calcule son indice \mintinline{c++}{index} grâce à la fonction de hachage parfait~: \mintinline{c++}{(magic * occ >> (64 - k))}.
+\item At line 84, for a given obstacle configuration, we calculate its index \mintinline{c++}{index} using the perfect hash function: \mintinline{c++}{(magic * occ >> (64 - k))}.
 
-\item À la ligne 85, on test s'il y a une collision. On utilise une petite astuce classique pour ne pas avoir à réinitialiser \mintinline{c++}{seen} à zéro à chaque fois que l'on va tester un nouveau candidat \mintinline{c++}{magic}. La variable \mintinline{c++}{cnt} nous permet de savoir si la valeur contenue dans seen pour la case index est une valeur mise à jour pour un ancien candidat \mintinline{c++}{magic} ou est pour le candidat actuel. En effet, si \mintinline{c++}{seen[index]} est inférieur à \mintinline{c++}{cnt}, la valeur n'est plus d'actualité. Maintenant, la partie \mintinline{c++}{moves[index] != possible_moves[j]} nous permet d'ignorer une collision qui produit les mêmes coups possibles. 
+% \item À la ligne 85, on test s'il y a une collision. On utilise une petite astuce classique pour ne pas avoir à réinitialiser \mintinline{c++}{seen} à zéro à chaque fois que l'on va tester un nouveau candidat \mintinline{c++}{magic}. La variable \mintinline{c++}{cnt} nous permet de savoir si la valeur contenue dans seen pour la case index est une valeur mise à jour pour un ancien candidat \mintinline{c++}{magic} ou est pour le candidat actuel. En effet, si \mintinline{c++}{seen[index]} est inférieur à \mintinline{c++}{cnt}, la valeur n'est plus d'actualité. Maintenant, la partie \mintinline{c++}{(moves[index] != possible_moves[j])} nous permet d'ignorer une collision qui produit les mêmes coups possibles.
+\item At line 85, we test whether there is a collision. We use a classic little trick to avoid having to reinitialize \mintinline{c++}{seen} to zero each time we test a new \mintinline{c++}{magic} candidate. The variable \mintinline{c++}{cnt} allows us to know whether the value contained in seen for position index is a value updated for an old \mintinline{c++}{magic} candidate or is for the current candidate. Indeed, if \mintinline{c++}{seen[index]} is less than \mintinline{c++}{cnt}, the value is no longer current. Now, the part \mintinline{c++}{(moves[index] != possible_moves[j])} allows us to ignore a collision that produces the same possible moves.
 
 \end{itemize}
 
 \end{itemize}
 
-\item Aux lignes 100 à 116, le \mintinline{c++}{main} va produire et afficher sur la sortie standard toutes les valeurs de \mintinline{c++}{k} et toutes les constantes \mintinline{c++}{MAGIC} pour chacune des cases du plateau et pour les deux types de mouvement. Ces constantes vont nous servir bientôt pour initialiser la table de tous les coups possibles pour chacune des configurations d'obstacles. On peut voir une sortie possible dans le listing \ref{lst:find_magic_exec}.
+% \item Aux lignes 100 à 116, le \mintinline{c++}{main} va produire et afficher sur la sortie standard toutes les valeurs de \mintinline{c++}{k} et toutes les constantes \mintinline{c++}{MAGIC} pour chacune des cases du plateau et pour les deux types de mouvement. Ces constantes vont nous servir bientôt pour initialiser la table de tous les coups possibles pour chacune des configurations d'obstacles. On peut voir une sortie possible dans le listing \ref{lst:find_magic_exec}.
+\item At lines 100 to 116, the \mintinline{c++}{main} will produce and display on standard output all values of \mintinline{c++}{k} and all \mintinline{c++}{MAGIC} constants for each square on the board and for both move types. These constants will soon be used to initialize the table of all possible moves for each of the obstacle configurations. We can see a possible output in listing \ref{lst:find_magic_exec}.
 
 \end{itemize}
 
@@ -2530,24 +2568,10 @@ uint64_t D_MAGIC[64] = {
     0x4000182008c20048,   0x112088105020200,
 };
 \end{minted}
-\captionof{listing}{Exemple de la sortie pour une exécution du programme du listing \ref{lst:find_magic}}
+% \captionof{listing}{Exemple de la sortie pour une exécution du programme du listing \ref{lst:find_magic}}
+\captionof{listing}{Example output from one execution of the program from listing \ref{lst:find_magic}}
 \label{lst:find_magic_exec}
 \end{mdframed} 
-
-Maintenant que nous détenons les constantes \mintinline{c++}{MAGIC}, nous allons pouvoir initialiser grâce à elles des tableaux, décrits dans le listing \ref{lst:magic_tables}, qui vont stocker les informations nécessaires nous permettant de générer les coups possibles à partir d'une case donnée et d'une configuration d'obstacles.
-\begin{itemize}
-\item À la ligne 1, le tableau \mintinline{c++}{orthogonalTable} contiendra les bitboards des coups possibles pour tous les coups orthogonaux, pour toutes les cases et toutes les configurations d'obstacles. La valeur $102400$ pour la taille de ce tableau s'obtient en faisant
-\begin{minted}[breaklines,fontsize=\small]{c++}
-size_t size = 0;
-for (int i = 0; i < 64; i++) {
-    size += 1 << O_K[i];
-}
-\end{minted}
-\item À la ligne 2, le tableau \mintinline{c++}{diagonalTable} fera de même mais pour les coups diagonaux.
-\item À la ligne 3, le tableau \mintinline{c++}{orthogonalMagics} va définir pour chaque case du plateau les différentes informations nous permettant d'appliquer le hachage parfait et retrouver les coups possibles dans le tableau \mintinline{c++}{orthogonalTable}. Nous allons décrire juste après la structure \mintinline{c++}{Magic} présentée dans le listing \ref{lst:magic_struct}.
-\item À la ligne 4, le tableau \mintinline{c++}{diagonalMagics} fera de même pour les coups diagonaux.
-\end{itemize}
-
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
@@ -2556,22 +2580,28 @@ uint64_t diagonalTable[5248];
 Magic orthogonalMagics[SQUARE_NB];
 Magic diagonalMagics[SQUARE_NB];
 \end{minted}
-\captionof{listing}{Les tableaux nous permettant de générer les coups possibles à partir d'une case donnée et d'une configuration d'obstacles}
+% \captionof{listing}{Les tableaux nous permettant de générer les coups possibles à partir d'une case donnée et d'une configuration d'obstacles}
+\captionof{listing}{The tables allowing us to generate possible moves from a given square and an obstacle configuration}
 \label{lst:magic_tables}
 \end{mdframed}
 
-Le listing \ref{lst:magic_struct} décrit la structure permettant de stocker les informations permettant d'appliquer le hachage parfait pour une case donnée.
+% Maintenant que nous détenons les constantes \mintinline{c++}{MAGIC}, nous allons pouvoir initialiser grâce à elles des tableaux, décrits dans le listing \ref{lst:magic_tables}, qui vont stocker les informations nécessaires nous permettant de générer les coups possibles à partir d'une case donnée et d'une configuration d'obstacles.
+Now that we have the \mintinline{c++}{MAGIC} constants, we will be able to use them to initialize the tables described in listing \ref{lst:magic_tables}, which will store the necessary information allowing us to generate possible moves from a given square and an obstacle configuration.
 \begin{itemize}
-\item À la ligne 2, l'attribut \mintinline{c++}{mask} est le bitboard permettant d'isoler la partie du plateau qui contient les cases concernées par le déplacement de la pièce pour la case et le type de déplacement considérés. Ce masque correspond à la variable \mintinline{c++}{moves_bb} à la ligne 61 du listing \ref{lst:find_magic}.
-
-\item À la ligne 3, l'attribut \mintinline{c++}{magic} est la constante \mintinline{c++}{MAGIC} que l'on a trouvé pour la case et le déplacement considérés. Ce attribut prendra la valeur d'une des constantes des tables \mintinline{c++}{O_MAGIC} ou \mintinline{c++}{D_MAGIC} du listing \ref{lst:find_magic_exec}.
-
-\item À la ligne 4, l'attribut \mintinline{c++}{moves} est un pointeur sur la partie de la table \mintinline{c++}{orthogonalTable} ou \mintinline{c++}{diagonalTable}, selon le type de déplacement, qui contiendra les coups possibles pour la case considérée.
-
-\item À la ligne 5, l'attribut \mintinline{c++}{shift} est le déplacement \mintinline{c++}{(64 - K)} dans la formule du listing \ref{lst:magic_perfect_hashing}.
-
-\item Aux lignes 7 à 9, la fonction \mintinline{c++}{uint32_t index(uint64_t occupied) const}, calcule la position dans \mintinline{c++}{moves} où trouver le bitboard des coups possibles. On retrouve la formule du listing \ref{lst:magic_perfect_hashing} avec le masque appliquée aux obstacles pour ne considérer que ceux dans la trajectoire de la pièce.
-
+% \item À la ligne 1, le tableau \mintinline{c++}{orthogonalTable} contiendra les bitboards des coups possibles pour tous les coups orthogonaux, pour toutes les cases et toutes les configurations d'obstacles. La valeur $102400$ pour la taille de ce tableau s'obtient en faisant
+\item At line 1, the \mintinline{c++}{orthogonalTable} array will contain the bitboards of possible moves for all orthogonal moves, for all squares and all obstacle configurations. The value $102400$ for the size of this table is obtained by calculating
+\begin{minted}[breaklines,fontsize=\small]{c++}
+size_t size = 0;
+for (int i = 0; i < 64; i++) {
+    size += 1 << O_K[i];
+}
+\end{minted}
+% \item À la ligne 2, le tableau \mintinline{c++}{diagonalTable} fera de même mais pour les coups diagonaux.
+\item At line 2, the \mintinline{c++}{diagonalTable} array does the same but for diagonal moves.
+% \item À la ligne 3, le tableau \mintinline{c++}{orthogonalMagics} va définir pour chaque case du plateau les différentes informations nous permettant d'appliquer le hachage parfait et retrouver les coups possibles dans le tableau \mintinline{c++}{orthogonalTable}.
+\item At line 3, the \mintinline{c++}{orthogonalMagics} array will define for each square of the board the different information allowing us to apply the perfect hashing and retrieve the possible moves in the \mintinline{c++}{orthogonalTable} array.
+% \item À la ligne 4, le tableau \mintinline{c++}{diagonalMagics} fera de même pour les coups diagonaux.
+\item At line 4, the \mintinline{c++}{diagonalMagics} array does the same for diagonal moves.
 \end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
@@ -2587,18 +2617,28 @@ struct Magic {
     }
 };
 \end{minted}
-\captionof{listing}{Structure de donnée nous permettant de stocker les informations utiles pour trouver les coups possibles pour une case et une configuration d'obstacles données}
+% \captionof{listing}{Structure de donnée nous permettant de stocker les informations utiles pour trouver les coups possibles pour une case et une configuration d'obstacles données}
+\captionof{listing}{Data structure allowing us to store the useful information to find possible moves for a given square and obstacle configuration}
 \label{lst:magic_struct}
-\end{mdframed} 
+\end{mdframed}
 
-La fonction \mintinline{c++}{uint64_t moves_bb(Square sq, uint64_t occupied)} du listing \ref{lst:possible_moves} va se servir des tables du listing \ref{lst:magic_tables} pour calculer le bitboard des coups possibles, orthogonaux et diagonaux, pour la case \mintinline{c++}{sq} et la configuration d'obstacles \mintinline{c++}{occupied}. C'est cette fonction qui sera utilisée pour la génération des coups dans la partie \ref{subsection:making_and_unmaking_moves}. Pour ce faire,
-
+% Le listing \ref{lst:magic_struct} décrit la structure permettant de stocker les informations permettant d'appliquer le hachage parfait pour une case donnée.
+Listing \ref{lst:magic_struct} describes the structure allowing us to store the information for applying the perfect hashing for a given square.
 \begin{itemize}
-\item À la ligne 2, on calcule l'index \mintinline{c++}{idx_omoves}, grâce au hachage parfait, en utilisant la structure \mintinline{c++}{Magic} pour la case \mintinline{c++}{sq} et les coups orthogonaux.
+% \item À la ligne 2, l'attribut \mintinline{c++}{mask} est le bitboard permettant d'isoler la partie du plateau qui contient les cases concernées par le déplacement de la pièce pour la case et le type de déplacement considérés. Ce masque correspond à la variable \mintinline{c++}{moves_bb} à la ligne 61 du listing \ref{lst:find_magic}.
+\item At line 2, the \mintinline{c++}{mask} attribute is the bitboard allowing us to isolate the part of the board that contains the squares affected by the piece's movement for the considered square and movement type. This mask corresponds to the \mintinline{c++}{moves_bb} variable at line 61 of listing \ref{lst:find_magic}.
 
-\item À la ligne 3, on calcule l'index \mintinline{c++}{idx_dmoves}, grâce au hachage parfait, en utilisant la structure \mintinline{c++}{Magic} pour la case \mintinline{c++}{sq} et les coups diagonaux.
+% \item À la ligne 3, l'attribut \mintinline{c++}{magic} est la constante \mintinline{c++}{MAGIC} que l'on a trouvé pour la case et le déplacement considérés. Ce attribut prendra la valeur d'une des constantes des tables \mintinline{c++}{O_MAGIC} ou \mintinline{c++}{D_MAGIC} du listing \ref{lst:find_magic_exec}.
+\item At line 3, the \mintinline{c++}{magic} attribute is the \mintinline{c++}{MAGIC} constant that we found for the considered square and movement. This attribute will take the value of one of the constants from the \mintinline{c++}{O_MAGIC} or \mintinline{c++}{D_MAGIC} tables from listing \ref{lst:find_magic_exec}.
 
-\item Aux lignes 4 et 5, on peut récupérer le bitboard des coups possibles orthogonaux (ligne 4) et faire l'union de ceux-ci avec les coups diagonaux en combinant ce bitboard par un OU bit-à-bit avec celui des coups possibles diagonaux (ligne 5). On obtient ainsi le bitboard de tous les coups possibles pour la pièce en \mintinline{c++}{sq} en prenant en considération tous les obstacles du bitboard \mintinline{c++}{occupied}.
+% \item À la ligne 4, l'attribut \mintinline{c++}{moves} est un pointeur sur la partie de la table \mintinline{c++}{orthogonalTable} ou \mintinline{c++}{diagonalTable}, selon le type de déplacement, qui contiendra les coups possibles pour la case considérée.
+\item At line 4, the \mintinline{c++}{moves} attribute is a pointer to the part of the \mintinline{c++}{orthogonalTable} or \mintinline{c++}{diagonalTable}, depending on the movement type, that will contain the possible moves for the considered square.
+
+% \item À la ligne 5, l'attribut \mintinline{c++}{shift} est le déplacement \mintinline{c++}{(64 - K)} dans la formule du listing \ref{lst:magic_perfect_hashing}.
+\item At line 5, the \mintinline{c++}{shift} attribute is the shift \mintinline{c++}{(64 - K)} in the formula from listing \ref{lst:magic_perfect_hashing}.
+
+% \item Aux lignes 7 à 9, la fonction \mintinline{c++}{uint32_t index(uint64_t occupied) const}, calcule la position dans \mintinline{c++}{moves} où trouver le bitboard des coups possibles. On retrouve la formule du listing \ref{lst:magic_perfect_hashing} avec le masque appliquée aux obstacles pour ne considérer que ceux dans la trajectoire de la pièce.
+\item At lines 7 to 9, the function \mintinline{c++}{uint32_t index(uint64_t occupied) const} calculates the position in \mintinline{c++}{moves} where to find the bitboard of possible moves. We find the formula from listing \ref{lst:magic_perfect_hashing} with the mask applied to the obstacles to only consider those in the piece's trajectory.
 
 \end{itemize}
 
@@ -2611,9 +2651,25 @@ uint64_t moves_bb(Square sq, uint64_t occupied) {
             diagonalMagics[sq].moves[idx_dmoves];
 }
 \end{minted}
-\captionof{listing}{La fonction \mintinline{c++}{moves_bb} utilisent les éléments des listings \ref{lst:magic_tables} et \ref{lst:magic_struct} pour calculer efficacement le bitboard des coups possibles pour une case et une configuration d'obstacles données}
+% \captionof{listing}{La fonction \mintinline{c++}{moves_bb} utilisent les éléments des listings \ref{lst:magic_tables} et \ref{lst:magic_struct} pour calculer efficacement le bitboard des coups possibles pour une case et une configuration d'obstacles données}
+\captionof{listing}{The \mintinline{c++}{moves_bb} function uses the elements from listings \ref{lst:magic_tables} and \ref{lst:magic_struct} to efficiently compute the bitboard of possible moves for a given square and obstacle configuration}
 \label{lst:possible_moves}
 \end{mdframed}
+
+% La fonction \mintinline{c++}{uint64_t moves_bb(Square sq, uint64_t occupied)} du listing \ref{lst:possible_moves} va se servir des tables du listing \ref{lst:magic_tables} pour calculer le bitboard des coups possibles, orthogonaux et diagonaux, pour la case \mintinline{c++}{sq} et la configuration d'obstacles \mintinline{c++}{occupied}. C'est cette fonction qui sera utilisée pour la génération des coups dans la partie \ref{subsection:list_of_moves}. Pour ce faire,
+The function \mintinline{c++}{uint64_t moves_bb(Square sq, uint64_t occupied)} from listing \ref{lst:possible_moves} will use the tables from listing \ref{lst:magic_tables} to compute the bitboard of possible moves, both orthogonal and diagonal, for the square \mintinline{c++}{sq} and the obstacle configuration \mintinline{c++}{occupied}. This function will be used for move generation in section \ref{subsection:list_of_moves}. To do this,
+
+\begin{itemize}
+% \item À la ligne 2, on calcule l'index \mintinline{c++}{idx_omoves}, grâce au hachage parfait, en utilisant la structure \mintinline{c++}{Magic} pour la case \mintinline{c++}{sq} et les coups orthogonaux.
+\item At line 2, we compute the index \mintinline{c++}{idx_omoves} using the perfect hashing, by using the \mintinline{c++}{Magic} structure for the square \mintinline{c++}{sq} and orthogonal moves.
+
+% \item À la ligne 3, on calcule l'index \mintinline{c++}{idx_dmoves}, grâce au hachage parfait, en utilisant la structure \mintinline{c++}{Magic} pour la case \mintinline{c++}{sq} et les coups diagonaux.
+\item At line 3, we compute the index \mintinline{c++}{idx_dmoves} using the perfect hashing, by using the \mintinline{c++}{Magic} structure for the square \mintinline{c++}{sq} and diagonal moves.
+
+% \item Aux lignes 4 et 5, on peut récupérer le bitboard des coups possibles orthogonaux (ligne 4) et faire l'union de ceux-ci avec les coups diagonaux en combinant ce bitboard par un OU bit-à-bit avec celui des coups possibles diagonaux (ligne 5). On obtient ainsi le bitboard de tous les coups possibles pour la pièce en \mintinline{c++}{sq} en prenant en considération tous les obstacles du bitboard \mintinline{c++}{occupied}.
+\item At lines 4 and 5, we can retrieve the bitboard of possible orthogonal moves (line 4) and create the union of these with the diagonal moves by combining this bitboard using a bitwise OR with the bitboard of possible diagonal moves (line 5). We thus obtain the bitboard of all possible moves for the piece at \mintinline{c++}{sq}, taking into consideration all obstacles from the bitboard \mintinline{c++}{occupied}.
+
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
@@ -2626,6 +2682,8 @@ void init() {
 \label{lst:magic_init}
 \end{mdframed}
 
+% La fonction \mintinline{c++}{void init()} du listing \ref{lst:magic_init} initialisera une fois pour toute, en début de programme, les différentes tables. On appelle juste aux lignes lignes 2 et 3 la fonction \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} décrite dans le listing \ref{lst:find_magics} pour les coups orthogonaux et diagonaux avec les tables associées.
+The function \mintinline{c++}{void init()} from listing \ref{lst:magic_init} will initialize once and for all, at the beginning of the program, the different tables. We simply call at lines 2 and 3 the function \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} described in listing \ref{lst:find_magics} for orthogonal and diagonal moves with their associated tables.\\ 
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
@@ -2648,8 +2706,7 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
         m.mask = moves_bb;
         m.shift = 64 - popcount(m.mask);
         m.magic = (mt == ORTHOGONAL ? O_MAGIC : D_MAGIC)[sq];        
-        m.moves = sq == SQ_A1 ? table : magics[sq - 1].moves + size;
-        size = 0;
+        m.moves = table + size;
         uint64_t b = 0;
         do {
             occupancies.push_back(b);
@@ -2657,7 +2714,7 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
             b = (b - moves_bb) & moves_bb;
             size++;
         } while (b);
-        for (int32_t j = 0; j < size; j++) {
+        for (size_t j = 0; j < occupancies.size(); j++) {
             int32_t index = m.index(occupancies[j]);
             m.moves[index] = possible_moves[j];
         }
@@ -2667,6 +2724,50 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
 \captionof{listing}{}
 \label{lst:find_magics}
 \end{mdframed} 
+
+
+% La fonction \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} va initialiser les différentes tables pour le type de mouvement considéré \mintinline{c++}{mt}. Elle est très similaire à la fonction du listing \ref{lst:find_magic} qui nous a permis de trouver les constantes \mintinline{c++}{MAGIC}.
+The function \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} will initialize the different tables for the considered movement type \mintinline{c++}{mt}. It is very similar to the function from listing \ref{lst:find_magic} which allowed us to find the \mintinline{c++}{MAGIC} constants.
+
+\begin{itemize}
+% \item Les lignes 4 et 5 reprennent les constantes magiques que nous avions trouvées en lançant le programme du listing \ref{lst:find_magic} et dont l'exécution fut donnée dans le listing \ref{lst:find_magic_exec}.
+\item Lines 4 and 5 use the magic constants that we found by running the program from listing \ref{lst:find_magic}, whose execution output was given in listing \ref{lst:find_magic_exec}.
+
+% \item À la ligne 8, le tableau \mintinline{c++}{occupancies} va contenir toutes les configurations d'obstacles pour la case considérée pour chaque tour de la boucle de la ligne 10. Le tableau \mintinline{c++}{possible_moves} lui va contenir le bitboard des coups possibles pour une configuration d'obstacles donnée. Notons que nous aurions pu placer ces deux tableaux à partir de la ligne 11, car ils doivent être réinitialisés à chaque tour de la boucle de la ligne 10. Mais il est plus efficace de faire appel à la méthode \mintinline{c++}{clear} aux lignes 11 et 12, cela va nous éviter des allocations inutiles.
+\item At line 8, the \mintinline{c++}{occupancies} array will contain all obstacle configurations for the considered square for each iteration of the loop at line 10. The \mintinline{c++}{possible_moves} array will contain the bitboard of possible moves for a given obstacle configuration. Note that we could have placed these two arrays starting from line 11, since they must be reinitialized at each iteration of the loop at line 10. However, it is more efficient to call the \mintinline{c++}{clear} method at lines 11 and 12, which will avoid unnecessary allocations.
+
+% \item La boucle comprenant les lignes 10 à 32, va mettre à jour le paramètre \mintinline{c++}{magics} pour toutes les cases du plateau et stocker les coups possibles dans une zone du paramètre \mintinline{c++}{table}.
+\item The loop comprising lines 10 to 32 will update the \mintinline{c++}{magics} parameter for all squares of the board and store the possible moves in a region of the \mintinline{c++}{table} parameter.
+
+% \item On peut reconnaître, des lignes 14 à 27, l'énumération des sous-ensembles d'obstacles que nous avons étudiez dans le listing \ref{lst:find_magic}. On va mettre à jour la structure \mintinline{c++}{Magic} \mintinline{c++}{m} de la ligne 13, correspondant à la case \mintinline{c++}{sq}, avec
+\item We can recognize, from lines 14 to 27, the enumeration of obstacle subsets that we studied in listing \ref{lst:find_magic}. We will update the \mintinline{c++}{Magic} structure \mintinline{c++}{m} from line 13, corresponding to the square \mintinline{c++}{sq}, with
+\begin{itemize}
+% \item À la ligne 17, le masque des cases à considérer pour le déplacement de la pièce en \mintinline{c++}{sq} et le mouvement \mintinline{c++}{mt}.
+\item At line 17, the mask of squares to consider for the movement of the piece at \mintinline{c++}{sq} and the movement type \mintinline{c++}{mt}.
+% \item À la ligne 18, le décalage vers la droite à effectuer après la multiplication~: \mintinline{c++}{(occupied & mask) * magic} (voir listing \ref{lst:magic_struct}).
+\item At line 18, the right shift to perform after the multiplication: \mintinline{c++}{(occupied & mask) * magic} (see listing \ref{lst:magic_struct}).
+% \item À la ligne 19, la constante magique à utiliser pour le type de mouvement \mintinline{c++}{mt} et la case considérée \mintinline{c++}{sq}.
+\item At line 19, the magic constant to use for the movement type \mintinline{c++}{mt} and the considered square \mintinline{c++}{sq}.
+\end{itemize}
+
+% \item À la ligne 20, on calcule l'adresse du début de l'emplacement dans la tableau \mintinline{c++}{table} qui va permettre de stocker les coups possibles pour chaque configuration d'obstacles. Pour se faire, on utilise la variable \mintinline{c++}{size} qui compte le nombre de configurations d'obstacles que nous avons traitées depuis le début de la boucle \mintinline{c++}{for}.
+\item At line 20, we compute the address of the beginning of the location in the \mintinline{c++}{table} array that will allow us to store the possible moves for each obstacle configuration. To do this, we use the \mintinline{c++}{size} variable which counts the number of obstacle configurations we have processed since the beginning of the \mintinline{c++}{for} loop.
+
+% \item Enfin, aux lignes 28 à 31, pour chaque configuration d'obstacles, on calcule son index grâce au hachage parfait et l'on stocke les coups possibles dans la zone du tableau \mintinline{c++}{table} réservée à cet effet.
+\item Finally, at lines 28 to 31, for each obstacle configuration, we compute its index using the perfect hashing and we store the possible moves in the region of the \mintinline{c++}{table} array reserved for this purpose.
+
+\end{itemize}
+
+
+% Maintenant que nous avons à notre disposition la fonction \mintinline{c++}{moves_bb} du listing \ref{lst:possible_moves} il va être assez facile de générer la liste des coups possible dans une position donnée du jeu. Mais avant de faire cela, nous allons tout d'abord décrire la façon de représenter un coup.
+Now that we have at our disposal the function \mintinline{c++}{moves_bb} from listing \ref{lst:possible_moves}, it will be quite easy to generate the list of possible moves in a given position of the game. But before doing that, we will first describe how to represent a move.
+
+\subsection{Move Representation}
+
+
+
+\subsection{List of Moves for a Given Board Configuration}
+\label{subsection:list_of_moves}
 
 \subsection{Making and Unmaking Moves}
 \label{subsection:making_and_unmaking_moves}

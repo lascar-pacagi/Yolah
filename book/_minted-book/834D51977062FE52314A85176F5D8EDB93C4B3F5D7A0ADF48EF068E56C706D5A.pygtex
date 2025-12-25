@@ -1,0 +1,6 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{init}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{init\PYGZus{}magics}\PYG{p}{(}\PYG{n}{ORTHOGONAL}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{orthogonalTable}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{);}
+\PYG{+w}{    }\PYG{n}{init\PYGZus{}magics}\PYG{p}{(}\PYG{n}{DIAGONAL}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{diagonalTable}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{diagonalMagics}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

@@ -1,0 +1,3 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n}{init\PYGZus{}magics}\PYG{p}{(}\PYG{n}{MoveType}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{table}\PYG{p}{[],}\PYG{+w}{ }\PYG{n}{Magic}\PYG{+w}{ }\PYG{n}{magics}\PYG{p}{[])}
+\end{Verbatim}

@@ -12,8 +12,8 @@
 \addvspace {10\p@ }
 \contentsline {figure}{\numberline {2.1}{\ignorespaces Board configuration corresponding to move 21 of the game given as an example in the previous chapter (Figure \ref {fig:game_example_move21})\relax }}{12}{figure.caption.14}%
 \contentsline {figure}{\numberline {2.2}{\ignorespaces Board position example (after move 23 in figure \ref {fig:game_example_middle})\relax }}{28}{figure.caption.22}%
-\contentsline {figure}{\numberline {2.3}{\ignorespaces Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones\relax }}{31}{figure.caption.28}%
-\contentsline {figure}{\numberline {2.4}{\ignorespaces Diagonal and orthogonal masks for d3 without edge squares\relax }}{33}{figure.caption.30}%
+\contentsline {figure}{\numberline {2.3}{\ignorespaces Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones\relax }}{32}{figure.caption.28}%
+\contentsline {figure}{\numberline {2.4}{\ignorespaces Orthogonal and diagonal masks for d3 without edge squares\relax }}{33}{figure.caption.30}%
 \contentsline {figure}{\numberline {2.5}{\ignorespaces Edge masks excluding the rank and file of the piece\relax }}{37}{figure.caption.31}%
 \contentsline {figure}{\numberline {2.6}{\ignorespaces Example of occupancy configuration and corresponding possible moves\relax }}{38}{figure.caption.32}%
 \addvspace {10\p@ }
