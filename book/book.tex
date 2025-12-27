@@ -2248,7 +2248,7 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
     int size = 0;
     do {
         occupancies.push_back(b);
-        possible_moves.push_back(sliding_moves(mt, sq, b));
+        possible_moves.push_back(reachable_squares(mt, sq, b));
         size++;
         b = (b - moves_bb) & moves_bb;
     } while (b);
@@ -2702,7 +2702,7 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
         Magic& m = magics[sq];
         uint64_t edges = ((Rank1BB | Rank8BB) & ~rank_bb(sq)) | 
                             ((FileABB | FileHBB) & ~file_bb(sq));
-        uint64_t moves_bb = sliding_moves(mt, sq, 0) & ~edges;
+        uint64_t moves_bb = reachable_squares(mt, sq, 0) & ~edges;
         m.mask = moves_bb;
         m.shift = 64 - popcount(m.mask);
         m.magic = (mt == ORTHOGONAL ? O_MAGIC : D_MAGIC)[sq];        
@@ -2710,7 +2710,7 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
         uint64_t b = 0;
         do {
             occupancies.push_back(b);
-            possible_moves.push_back(sliding_moves(mt, sq, b));
+            possible_moves.push_back(reachable_squares(mt, sq, b));
             b = (b - moves_bb) & moves_bb;
             size++;
         } while (b);
@@ -2764,15 +2764,269 @@ Now that we have at our disposal the function \mintinline{c++}{moves_bb} from li
 
 \subsection{Move Representation}
 
+% Nous allons représenter un coup par une paire, dont le premier élément est la case de départ, et le deuxième élément est la case d'arrivée. Par exemple, la partie déroulée dans les figures \ref{fig:game_example_opening}, \ref{fig:game_example_middle} et \ref{fig:game_example_end} sera textuellement représentée par les coups suivants~:
+We will represent a move by a pair, whose first element is the departure square and the second element is the arrival square. For example, the game shown in figures \ref{fig:game_example_opening}, \ref{fig:game_example_middle}, and \ref{fig:game_example_end} will be textually represented by the following moves:
+\begin{minted}[breaklines,fontsize=\small,frame=none]{shell}
+a1:a2  h1:f3  h8:f6  a8:c6  d5:d6  d4:b2  d6:e6  e5:g5  f6:f5  f3:g4
+f5:h7  g5:h5  e4:f4  h5:f7  e6:e8  g4:g1  e8:b8  b2:d2  a2:a3  g1:f2
+a3:a6  d2:d3  f4:h2  d3:b5  a6:a4  b5:b3  a4:c4  b3:c3  h2:g2  f2:f1
+b8:c7  c3:a5  c4:c5  c6:d7  g2:g3  f7:g7  c5:b4  a5:b6  g3:h4  b6:b7
+h7:g8  d7:d8  c7:c8  f1:b1  g8:f8  d8:e7  h4:h3  a1:a1  b1:c1  a1:a1
+c1:e1  a1:a1  e1:e3  a1:a1  e3:e2  a1:a1  e2:d1  a1:a1  d1:c2  a1:a1
+g7:g6  a1:a1  g6:h6  a1:a1  b7:a7
+\end{minted}
 
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+class Move {
+    uint16_t data;
+public:
+    Move() = default;
+    constexpr explicit Move(uint16_t d) : data(d) {}
+    constexpr explicit Move(Square from, 
+                            Square to) : data((to << 6) + from) {}
+    constexpr Square from_sq() const {
+        return Square(data & 0x3F);
+    }
+    constexpr Square to_sq() const {
+        return Square((data >> 6) & 0x3F);
+    }    
+    static constexpr Move none() { return Move(0); }
+    constexpr bool operator==(const Move& m) const { 
+        return data == m.data; 
+    }
+    constexpr bool operator!=(const Move& m) const { 
+        return data != m.data; 
+    }
+    constexpr explicit operator bool() const { return data != 0; }
+    constexpr uint16_t raw() const { return data; }
+};
+
+std::ostream& operator<<(std::ostream& os, const Move& m) {
+    static constexpr std::string_view square2string[SQUARE_NB] = {
+        "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+        "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
+        "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+        "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
+        "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+        "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
+        "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+        "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
+    };
+    os << square2string[m.from_sq()] << ':' << square2string[m.to_sq()];
+    return os;
+}
+\end{minted}
+% \captionof{listing}{Représentation d'un coup, les cases de départ et d'arrivée sont chacune stockées sur $6$ bits}
+\captionof{listing}{Move representation, the departure and arrival squares are each stored on $6$ bits}
+\label{lst:move_struct}
+\end{mdframed} 
+
+% La structure \mintinline{c++}{Move}, présentée dans le listing \ref{lst:move_struct}, représente un coup en utilisant un entier non signé sur 16 bits~: \mintinline{c++}{uint16_t data}. On a besoin de $6$ bits pour représenter la case de départ et de $6$ autres bits pour représenter la case d'arrivée.
+The \mintinline{c++}{Move} structure, presented in listing \ref{lst:move_struct}, represents a move using an unsigned 16-bit integer: \mintinline{c++}{uint16_t data}. We need $6$ bits to represent the departure square and $6$ other bits to represent the arrival square.
+\begin{itemize}
+% \item Aux lignes 6-7, on construit le coup à partir de la case de départ \mintinline{c++}{from} et de la case d'arrivée \mintinline{c++}{to}. On place le numéro de la case de départ dans les $6$ bits de poids faibles de \mintinline{c++}{data} et la case d'arrivée à partir du bit $6$.
+\item At lines 6-7, we construct the move from the departure square \mintinline{c++}{from} and the arrival square \mintinline{c++}{to}. We place the departure square number in the $6$ least significant bits of \mintinline{c++}{data} and the arrival square starting from bit $6$.
+
+% \item À la ligne 8, la fonction \mintinline{c++}{Square from_sq()} permet de récupérer la case dont le numéro se trouve dans les bits $0$ à $5$ de \mintinline{c++}{data}. Ce qui correspond à la case de départ.
+\item At line 8, the function \mintinline{c++}{Square from_sq()} retrieves the square whose number is located in bits $0$ to $5$ of \mintinline{c++}{data}. This corresponds to the departure square.
+
+% \item À la ligne 11, la fonction \mintinline{c++}{Square to_sq()} permet de récupérer la case dont le numéro se trouve dans les bits $6$ à $11$ de \mintinline{c++}{data}. Ce qui correspond à la case d'arrivée.
+\item At line 11, the function \mintinline{c++}{Square to_sq()} retrieves the square whose number is located in bits $6$ to $11$ of \mintinline{c++}{data}. This corresponds to the arrival square.
+
+% \item On représente le fait de passer son tour, ce qui arrive quand on ne peut plus jouer mais que l'adversaire possède encore des coups à sa disposition, par le coup fictif {\ttfamily a1:a1}. La fonction \mintinline{c++}{Move none()}, décrite à la ligne 14, rend ce coup. La case de départ et la case d'arrivée sont \mintinline{c++}{SQ_A1 == 0}.
+\item We represent passing one's turn, which occurs when a player can no longer move but the opponent still has moves available, by the fictitious move {\ttfamily a1:a1}. The function \mintinline{c++}{Move none()}, described at line 14, returns this move. The departure square and arrival square are both \mintinline{c++}{SQ_A1 == 0}.
+
+% \item À la ligne 25, la fonction \mintinline{c++}{ostream& operator<<(std::ostream& os, const Move& m)} permet d'afficher un coup au format~: {\ttfamily case de départ:case d'arrivée}.
+\item At line 25, the function \mintinline{c++}{ostream& operator<<(std::ostream& os, const Move& m)} displays a move in the format: {\ttfamily departure square:arrival square}.
+
+\end{itemize}
 
 \subsection{List of Moves for a Given Board Configuration}
 \label{subsection:list_of_moves}
 
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+static constexpr uint16_t MAX_NB_MOVES = 75;
+class MoveList {
+    Move moveList[MAX_NB_MOVES], *last;
+public:
+    explicit MoveList() : last(moveList) {}
+    const Move* begin() const { return moveList; }
+    const Move* end() const { return last; }
+    Move* begin() { return moveList; }
+    Move* end() { return last; }
+    size_t size() const { return last - moveList; }
+    const Move& operator[](size_t i) const { return moveList[i]; }
+    Move& operator[](size_t i) { return moveList[i]; }
+    Move* data() { return moveList; }
+    friend class Yolah;
+};
+\end{minted}
+\captionof{listing}{Classe représentant une liste de coups}
+\label{lst:move_list_class}
+\end{mdframed} 
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+inline Square lsb(uint64_t b) {
+    return Square(std::countr_zero(b));
+}
+inline Square pop_lsb(uint64_t& b) {
+    const Square s = lsb(b);
+    b &= b - 1;
+    return s;
+}
+class Yolah {
+    uint64_t black = BLACK_INITIAL_POSITION;
+    uint64_t white = WHITE_INITIAL_POSITION;
+    uint64_t holes = 0;
+    uint8_t black_score = 0;
+    uint8_t white_score = 0;
+    uint8_t ply = 0;
+public:
+    // ...
+};
+void Yolah::moves(uint8_t player, MoveList& moves) const {
+    Move* moveList = moves.moveList;
+    uint64_t occupied = black | white | holes;
+    uint64_t bb = player == BLACK ? black : white;
+    while (bb) {
+        Square   from = pop_lsb(bb);
+        uint64_t b    = moves_bb(from, occupied) & ~occupied;        
+        while (b) {
+            *moveList++ = Move(from, pop_lsb(b));
+        }
+    }    
+    if (moveList == moves.moveList) [[unlikely]] {
+        *moveList++ = Move::none();
+    }
+    moves.last = moveList;
+}
+uint8_t Yolah::current_player() const {
+    return ply & 1;   
+}
+void Yolah::moves(MoveList& moves) const {
+    this->moves(current_player(), moves);
+}
+\end{minted}
+\captionof{listing}{Génération des coups possibles pour un joueur dans la position courante du jeu}
+\label{lst:get_moves}
+\end{mdframed} 
+
 \subsection{Making and Unmaking Moves}
 \label{subsection:making_and_unmaking_moves}
 
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+void Yolah::play(Move m) {
+    if (m != Move::none()) [[likely]] {                    
+        uint64_t pos1 = square_bb(m.from_sq());
+        uint64_t pos2 = square_bb(m.to_sq());
+        if (ply & 1) {
+            white ^= pos1 | pos2;
+            white_score++;
+        } else {
+            black ^= pos1 | pos2;
+            black_score++;
+        }
+        empty |= pos1;
+    }
+    ply++;
+}
+\end{minted}
+\captionof{listing}{Le coup \mintinline{c++}{m} est joué dans la position courante du jeu}
+\label{lst:making_moves}
+\end{mdframed} 
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+void Yolah::undo(Move m) {
+    ply--;
+    if (m != Move::none()) [[likely]] {                    
+        uint64_t pos1 = square_bb(m.from_sq());
+        uint64_t pos2 = square_bb(m.to_sq());
+        if (ply & 1) {
+            white ^= pos1 | pos2;
+            white_score--;
+        } else {
+            black ^= pos1 | pos2;
+            black_score--;
+        }
+        empty ^= pos1;
+    }
+}
+\end{minted}
+\captionof{listing}{Le dernier coup joué \mintinline{c++}{m} est annulé}
+\label{lst:unmaking_moves}
+\end{mdframed}
+
 \section{Testing with Random Games}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+ostream& operator<<(ostream& os, const Yolah& yolah) {
+    char grid[8][8];
+    uint64_t black = yolah.black;
+    uint64_t white = yolah.white;
+    uint64_t empty = yolah.empty;    
+    for (int i = 0; i < 8; i++) {        
+        for (int j = 0; j < 8; j++) {
+           if (black & uint64_t(1) << j) grid[i][j] = 'X';
+           else if (white & uint64_t(1) << j) grid[i][j] = 'O'; 
+           else if (empty & uint64_t(1) << j) grid[i][j] = ' ';
+           else grid[i][j] = '.';
+        }
+        black >>= 8;
+        white >>= 8;
+        empty >>= 8;
+    }
+    const char* letters = "    a   b   c   d   e   f   g   h";
+    const char* line = "  +---+---+---+---+---+---+---+---+";
+    os << letters << '\n';
+    for (int i = 7; i >= 0; i--) {
+        os << line << '\n';
+        os << i + 1 << ' ';
+        for (int j = 0; j < 8; j++) {
+            os << "| " << grid[i][j] << " ";
+        }
+        os << "| " << i + 1 << '\n';
+    }
+    os << line << '\n';
+    os << letters << '\n';
+    const auto [black_score, white_score] = yolah.score();
+    os << "score: " << black_score << '/' << white_score << '\n';
+    return os;
+}
+void play_random_games(size_t nb_games) {
+    MoveList moves;    
+    random_device rd;
+    mt19937 mt(rd());
+    for (size_t i = 0; i < nb_games; i++) {
+        Yolah yolah;    
+        while (!yolah.game_over()) {                 
+            cout << yolah << '\n';        
+            yolah.moves(moves);
+            cout << format("# moves: {}\n", moves.size());
+            for (const auto& m : moves) {
+                cout << m << ' ';
+            }
+            cout << '\n';
+            uniform_int_distribution<uint64_t> d(0, moves.size() - 1);    
+            Move m = moves[d(mt)];
+            cout << m << '\n';
+            std::string _;
+            std::getline(std::cin, _);
+            yolah.play(m);
+        }
+        cout << yolah << '\n';
+    }
+}
+\end{minted}
+\captionof{listing}{Playing random games, displaying the list of moves and the board to check the engine}
+\label{lst:random_games_testing}
+\end{mdframed}
+
 
 
 \section{What's Next}

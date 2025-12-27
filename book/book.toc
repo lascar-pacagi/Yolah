@@ -11,18 +11,18 @@
 \contentsline {section}{\numberline {2.3}Generating Possible Piece Moves}{19}{section.2.3}%
 \contentsline {subsection}{\numberline {2.3.1}Magic Perfect Hashing Function}{19}{subsection.2.3.1}%
 \contentsline {subsection}{\numberline {2.3.2}Magic Bitboards for Piece Moves}{28}{subsection.2.3.2}%
-\contentsline {subsection}{\numberline {2.3.3}Move Representation}{46}{subsection.2.3.3}%
-\contentsline {subsection}{\numberline {2.3.4}List of Moves for a Given Board Configuration}{46}{subsection.2.3.4}%
-\contentsline {subsection}{\numberline {2.3.5}Making and Unmaking Moves}{46}{subsection.2.3.5}%
-\contentsline {section}{\numberline {2.4}Testing with Random Games}{46}{section.2.4}%
-\contentsline {section}{\numberline {2.5}What's Next}{46}{section.2.5}%
-\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{46}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{47}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{49}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{51}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{53}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{55}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{57}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{59}{chapter.9}%
-\contentsline {chapter}{Acronymes}{61}{section*.33}%
-\contentsline {chapter}{Bibliography}{63}{appendix*.35}%
+\contentsline {subsection}{\numberline {2.3.3}Move Representation}{45}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}List of Moves for a Given Board Configuration}{47}{subsection.2.3.4}%
+\contentsline {subsection}{\numberline {2.3.5}Making and Unmaking Moves}{49}{subsection.2.3.5}%
+\contentsline {section}{\numberline {2.4}Testing with Random Games}{50}{section.2.4}%
+\contentsline {section}{\numberline {2.5}What's Next}{50}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{50}{section.2.6}%
+\contentsline {chapter}{\numberline {3}AI Players}{51}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{53}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{55}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{57}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{59}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{61}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{63}{chapter.9}%
+\contentsline {chapter}{Acronymes}{65}{section*.33}%
+\contentsline {chapter}{Bibliography}{67}{appendix*.35}%
