@@ -118,11 +118,11 @@ Square& operator++(Square& d) {
     return d = Square(int(d) + 1);
 }
 
-inline Square lsb(uint64_t b) {
+constexpr Square lsb(uint64_t b) {
     return Square(std::countr_zero(b));
 }
 
-inline Square pop_lsb(uint64_t& b) {
+Square pop_lsb(uint64_t& b) {
     const Square s = lsb(b);
     b &= b - 1;
     return s;
@@ -357,303 +357,44 @@ public:
         uint64_t occupied = black | white | holes;
         uint64_t bb = player == BLACK ? black : white;
 
-        // static const auto handlers = []() {
-        //     using Handler = void(*)(Square, uint64_t&, Move*&);
-        //     std::array<Handler, 21> result;
-
-        //     result[1] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[2] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[3] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[4] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[5] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[6] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[7] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[8] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[9] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[10] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[11] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[12] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[13] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[14] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[15] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[16] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[17] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[18] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[19] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     result[20] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //         *moveList++ = Move(from, pop_lsb(b));
-        //     };
-
-        //     // General case (0 and > 20)
-        //     result[0] = [](Square from, uint64_t& b, Move*& moveList) {
-        //         while (b) {
-        //             *moveList++ = Move(from, pop_lsb(b));
-        //         }
-        //     };
-
-        //     return result;
-        // }();
-
+        // Version 1
         while (bb) {
-        //for (int i = __builtin_popcountll(bb); i > 0; i--) {
-            Square   from = pop_lsb(bb);
-            uint64_t b    = moves_bb(from, occupied) & ~occupied;
+            Square from = pop_lsb(bb);
+            uint64_t b = moves_bb(from, occupied) & ~occupied;
             while (b) {
                 *moveList++ = Move(from, pop_lsb(b));
             }
-            // int count = __builtin_popcountll(b);
-            // handlers[count > 20 ? 0 : count](from, b, moveList);
         }
+
+        // Version 2
+        // Square from0 = pop_lsb(bb);
+        // Square from1 = pop_lsb(bb);
+        // Square from2 = pop_lsb(bb);
+        // Square from3 = pop_lsb(bb);
+        
+        // uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+        // uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+        // uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+        // uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+        
+        // while (b0) {
+        //     *moveList++ = Move(from0, pop_lsb(b0));
+        // }
+        // while (b1) {
+        //     *moveList++ = Move(from1, pop_lsb(b1));
+        // }
+        // while (b2) {
+        //     *moveList++ = Move(from2, pop_lsb(b2));
+        // }
+        // while (b3) {
+        //     *moveList++ = Move(from3, pop_lsb(b3));
+        // }
+
+        
         if (moveList == moves.moveList) [[unlikely]] {
             *moveList++ = Move::none();
         }
+
         moves.last = moveList;
     }
 
@@ -1038,6 +779,6 @@ namespace test {
 
 int main() {
     magic::init();
-    play_random_games<false>(1000000);
-    //test::random_games(1000);
+    //play_random_games<false>(10000000);
+    test::random_games(1000);
 }
