@@ -158,9 +158,9 @@ class Net(nn.Module):
             fc.weight.data.clamp_(-127/64, 127/64)
             fc.bias.data.clamp_(-127/64, 127/64)
 
-NB_EPOCHS=50
-MODEL_PATH="./"
-#MODEL_PATH="/mnt/"
+NB_EPOCHS=300
+#MODEL_PATH="./"
+MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
@@ -309,4 +309,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = GameDataset(GAME_DIR)
-    mp.spawn(main, args=(world_size, 512 * 2, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
