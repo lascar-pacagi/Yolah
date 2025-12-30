@@ -41,12 +41,12 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.1.1}Game Rules}{1}{subsection.1.1.1}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {1.2}{\ignorespaces The initial configuration of the Yolah game\relax }}{2}{figure.caption.5}\protected@file@percent }
 \newlabel{fig:yolah_initial_configuration}{{1.2}{2}{The initial configuration of the Yolah game\relax }{figure.caption.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {1.3}{\ignorespaces Possible moves (small black crosses) for the black piece located on square {\ttfamily  d5}\relax }}{3}{figure.caption.6}\protected@file@percent }
-\newlabel{fig:yolah_moves1}{{1.3}{3}{Possible moves (small black crosses) for the black piece located on square {\ttfamily d5}\relax }{figure.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1.3}{\ignorespaces Possible moves (black crosses) for the black piece located on square {\ttfamily  d5}\relax }}{3}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:yolah_moves1}{{1.3}{3}{Possible moves (black crosses) for the black piece located on square {\ttfamily d5}\relax }{figure.caption.6}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {1.4}{\ignorespaces Black just moved from {\ttfamily  d5} to {\ttfamily  b7}. The starting square {\ttfamily  d5} becomes inaccessible and impassable for the rest of the game\relax }}{3}{figure.caption.7}\protected@file@percent }
 \newlabel{fig:yolah_moves2}{{1.4}{3}{Black just moved from {\ttfamily d5} to {\ttfamily b7}. The starting square {\ttfamily d5} becomes inaccessible and impassable for the rest of the game\relax }{figure.caption.7}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {1.5}{\ignorespaces Possible moves (small white crosses) for the white piece located on square {\ttfamily  e5}\relax }}{4}{figure.caption.8}\protected@file@percent }
-\newlabel{fig:yolah_moves3}{{1.5}{4}{Possible moves (small white crosses) for the white piece located on square {\ttfamily e5}\relax }{figure.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1.5}{\ignorespaces Possible moves (white crosses) for the white piece located on square {\ttfamily  e5}\relax }}{4}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:yolah_moves3}{{1.5}{4}{Possible moves (white crosses) for the white piece located on square {\ttfamily e5}\relax }{figure.caption.8}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {1.6}{\ignorespaces White just moved from {\ttfamily  e5} to {\ttfamily  f5}. The starting square {\ttfamily  e5} becomes inaccessible and impassable for the rest of the game. The score is one point each (each player has moved once)\relax }}{4}{figure.caption.9}\protected@file@percent }
 \newlabel{fig:yolah_moves4}{{1.6}{4}{White just moved from {\ttfamily e5} to {\ttfamily f5}. The starting square {\ttfamily e5} becomes inaccessible and impassable for the rest of the game. The score is one point each (each player has moved once)\relax }{figure.caption.9}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.1.2}Interesting Characteristics of Yolah for Developing AIs}{5}{subsection.1.1.2}\protected@file@percent }
@@ -259,127 +259,131 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}Magic Bitboards for Piece Moves}{28}{subsection.2.3.2}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {2.2}{\ignorespaces Board position example (after move 23 in figure \ref  {fig:game_example_middle})\relax }}{28}{figure.caption.22}\protected@file@percent }
 \newlabel{fig:move23_position}{{2.2}{28}{Board position example (after move 23 in figure \ref {fig:game_example_middle})\relax }{figure.caption.22}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2.11}{\ignorespaces Possible moves for white piece at d3\relax }}{28}{table.caption.23}\protected@file@percent }
-\newlabel{tab:move23_d3_moves}{{2.11}{28}{Possible moves for white piece at d3\relax }{table.caption.23}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2.12}{\ignorespaces Bitboard of possible moves for the piece at d3 (see table \ref  {tab:move23_d3_moves})\relax }}{29}{table.caption.24}\protected@file@percent }
-\newlabel{tab:bb_move23_d3_moves}{{2.12}{29}{Bitboard of possible moves for the piece at d3 (see table \ref {tab:move23_d3_moves})\relax }{table.caption.24}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2.13}{\ignorespaces Masque pour les cases atteignables par la pièce en d3 sans considérer les éventuels obstacles\relax }}{29}{table.caption.25}\protected@file@percent }
-\newlabel{tab:mask_for_d3}{{2.13}{29}{Masque pour les cases atteignables par la pièce en d3 sans considérer les éventuels obstacles\relax }{table.caption.25}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2.14}{\ignorespaces Board bitboard\relax }}{30}{table.caption.26}\protected@file@percent }
-\newlabel{tab:board_move23}{{2.14}{30}{Board bitboard\relax }{table.caption.26}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2.15}{\ignorespaces Occupancies bitboard (\mintinline {c++}{mask & board}) for d3\relax }}{30}{table.caption.27}\protected@file@percent }
-\newlabel{tab:occupancies_d3_move23}{{2.15}{30}{Occupancies bitboard (\mintinline {c++}{mask & board}) for d3\relax }{table.caption.27}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.3}{\ignorespaces Possible moves (small white crosses) for the white piece at {\ttfamily  d3}\relax }}{28}{figure.caption.23}\protected@file@percent }
+\newlabel{fig:move23_d3_moves}{{2.3}{28}{Possible moves (small white crosses) for the white piece at {\ttfamily d3}\relax }{figure.caption.23}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.11}{\ignorespaces Bitboard of possible moves for the piece at d3 (see figure \ref  {fig:move23_d3_moves})\relax }}{29}{table.caption.24}\protected@file@percent }
+\newlabel{tab:bb_move23_d3_moves}{{2.11}{29}{Bitboard of possible moves for the piece at d3 (see figure \ref {fig:move23_d3_moves})\relax }{table.caption.24}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.12}{\ignorespaces Masque pour les cases atteignables par la pièce en d3 sans considérer les éventuels obstacles\relax }}{29}{table.caption.25}\protected@file@percent }
+\newlabel{tab:mask_for_d3}{{2.12}{29}{Masque pour les cases atteignables par la pièce en d3 sans considérer les éventuels obstacles\relax }{table.caption.25}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.13}{\ignorespaces Board bitboard\relax }}{30}{table.caption.26}\protected@file@percent }
+\newlabel{tab:board_move23}{{2.13}{30}{Board bitboard\relax }{table.caption.26}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.14}{\ignorespaces Occupancies bitboard (\mintinline {c++}{mask & board}) for d3\relax }}{30}{table.caption.27}\protected@file@percent }
+\newlabel{tab:occupancies_d3_move23}{{2.14}{30}{Occupancies bitboard (\mintinline {c++}{mask & board}) for d3\relax }{table.caption.27}{}}
 \newlabel{par:edge_exclusion}{{2.3.2}{31}{Magic Bitboards for Piece Moves}{figure.caption.28}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2.16}{\ignorespaces Mask for reachable squares for the piece at {\ttfamily  d3} excluding board edges\relax }}{31}{table.caption.29}\protected@file@percent }
-\newlabel{tab:mask_for_d3_without_edge}{{2.16}{31}{Mask for reachable squares for the piece at {\ttfamily d3} excluding board edges\relax }{table.caption.29}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2.3}{\ignorespaces Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones\relax }}{32}{figure.caption.28}\protected@file@percent }
-\newlabel{fig:subsets_for_d3}{{2.3}{32}{Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones\relax }{figure.caption.28}{}}
-\newlabel{fig:orthogonal_mask_d3}{{2.4a}{33}{Orthogonal mask\relax }{figure.caption.30}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.4}{\ignorespaces Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones\relax }}{32}{figure.caption.28}\protected@file@percent }
+\newlabel{fig:subsets_for_d3}{{2.4}{32}{Six subsets of the mask for d3 showing different occupancy patterns (0 to 25 bits set) from the $2^{25}$ possible ones\relax }{figure.caption.28}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.15}{\ignorespaces Mask for reachable squares for the piece at {\ttfamily  d3} excluding board edges\relax }}{33}{table.caption.29}\protected@file@percent }
+\newlabel{tab:mask_for_d3_without_edge}{{2.15}{33}{Mask for reachable squares for the piece at {\ttfamily d3} excluding board edges\relax }{table.caption.29}{}}
+\newlabel{fig:orthogonal_mask_d3}{{2.5a}{33}{Orthogonal mask\relax }{figure.caption.30}{}}
 \newlabel{sub@fig:orthogonal_mask_d3}{{a}{33}{Orthogonal mask\relax }{figure.caption.30}{}}
-\newlabel{fig:diagonal_mask_d3}{{2.4b}{33}{Diagonal mask\relax }{figure.caption.30}{}}
+\newlabel{fig:diagonal_mask_d3}{{2.5b}{33}{Diagonal mask\relax }{figure.caption.30}{}}
 \newlabel{sub@fig:diagonal_mask_d3}{{b}{33}{Diagonal mask\relax }{figure.caption.30}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2.4}{\ignorespaces Orthogonal and diagonal masks for d3 without edge squares\relax }}{33}{figure.caption.30}\protected@file@percent }
-\newlabel{fig:diagonal_orthogonal_masks_d3}{{2.4}{33}{Orthogonal and diagonal masks for d3 without edge squares\relax }{figure.caption.30}{}}
-\zref@newlabel{mdf@pagelabel-17}{\default{2.3.2}\page{33}\abspage{43}\mdf@pagevalue{33}}
-\zref@newlabel{mdf@pagelabel-18}{\default{2.3.2}\page{34}\abspage{44}\mdf@pagevalue{34}}
-\zref@newlabel{mdf@pagelabel-19}{\default{2.3.2}\page{35}\abspage{45}\mdf@pagevalue{35}}
-\zref@newlabel{mdf@pagelabel-20}{\default{2.3.2}\page{36}\abspage{46}\mdf@pagevalue{36}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.5}{\ignorespaces Orthogonal and diagonal masks for d3 without edge squares\relax }}{33}{figure.caption.30}\protected@file@percent }
+\newlabel{fig:diagonal_orthogonal_masks_d3}{{2.5}{33}{Orthogonal and diagonal masks for d3 without edge squares\relax }{figure.caption.30}{}}
+\zref@newlabel{mdf@pagelabel-17}{\default{2.3.2}\page{34}\abspage{44}\mdf@pagevalue{34}}
+\zref@newlabel{mdf@pagelabel-18}{\default{2.3.2}\page{35}\abspage{45}\mdf@pagevalue{35}}
+\zref@newlabel{mdf@pagelabel-19}{\default{2.3.2}\page{36}\abspage{46}\mdf@pagevalue{36}}
 \@writefile{lol}{\contentsline {listing}{\numberline {12}{\ignorespaces Program to find the \mintinline {c++}{K} and \mintinline {c++}{MAGIC} constants from listing \ref  {lst:magic_perfect_hashing} for the obstacle configurations of a given move type and square\relax }}{36}{listing.12}\protected@file@percent }
 \newlabel{lst:find_magic}{{12}{36}{Program to find the \mintinline {c++}{K} and \mintinline {c++}{MAGIC} constants from listing \ref {lst:magic_perfect_hashing} for the obstacle configurations of a given move type and square\relax }{listing.12}{}}
-\newlabel{fig:edges_mask_a1}{{2.5a}{37}{Edge mask for square a1\relax }{figure.caption.31}{}}
-\newlabel{sub@fig:edges_mask_a1}{{a}{37}{Edge mask for square a1\relax }{figure.caption.31}{}}
-\newlabel{fig:edges_mask_c2}{{2.5b}{37}{Edge mask for square c2\relax }{figure.caption.31}{}}
-\newlabel{sub@fig:edges_mask_c2}{{b}{37}{Edge mask for square c2\relax }{figure.caption.31}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2.5}{\ignorespaces Edge masks excluding the rank and file of the piece\relax }}{37}{figure.caption.31}\protected@file@percent }
-\newlabel{fig:edge_masks}{{2.5}{37}{Edge masks excluding the rank and file of the piece\relax }{figure.caption.31}{}}
 \abx@aux@cite{0}{warren2012hackersdelight}
 \abx@aux@segm{0}{0}{warren2012hackersdelight}
+\newlabel{fig:edges_mask_a1}{{2.6a}{38}{Edge mask for square a1\relax }{figure.caption.31}{}}
+\newlabel{sub@fig:edges_mask_a1}{{a}{38}{Edge mask for square a1\relax }{figure.caption.31}{}}
+\newlabel{fig:edges_mask_c2}{{2.6b}{38}{Edge mask for square c2\relax }{figure.caption.31}{}}
+\newlabel{sub@fig:edges_mask_c2}{{b}{38}{Edge mask for square c2\relax }{figure.caption.31}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.6}{\ignorespaces Edge masks excluding the rank and file of the piece\relax }}{38}{figure.caption.31}\protected@file@percent }
+\newlabel{fig:edge_masks}{{2.6}{38}{Edge masks excluding the rank and file of the piece\relax }{figure.caption.31}{}}
+\newlabel{fig:occupancy_d3_23}{{2.7a}{38}{Occupancy configuration example\relax }{figure.caption.32}{}}
+\newlabel{sub@fig:occupancy_d3_23}{{a}{38}{Occupancy configuration example\relax }{figure.caption.32}{}}
+\newlabel{fig:possible_moves_d3_23}{{2.7b}{38}{Possible moves for this occupancy\relax }{figure.caption.32}{}}
+\newlabel{sub@fig:possible_moves_d3_23}{{b}{38}{Possible moves for this occupancy\relax }{figure.caption.32}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.7}{\ignorespaces Example of occupancy configuration and corresponding possible moves\relax }}{38}{figure.caption.32}\protected@file@percent }
+\newlabel{fig:occupancy_example}{{2.7}{38}{Example of occupancy configuration and corresponding possible moves\relax }{figure.caption.32}{}}
 \abx@aux@cite{0}{stockfish2025}
 \abx@aux@segm{0}{0}{stockfish2025}
-\newlabel{fig:occupancy_d3_23}{{2.6a}{38}{Occupancy configuration example\relax }{figure.caption.32}{}}
-\newlabel{sub@fig:occupancy_d3_23}{{a}{38}{Occupancy configuration example\relax }{figure.caption.32}{}}
-\newlabel{fig:possible_moves_d3_23}{{2.6b}{38}{Possible moves for this occupancy\relax }{figure.caption.32}{}}
-\newlabel{sub@fig:possible_moves_d3_23}{{b}{38}{Possible moves for this occupancy\relax }{figure.caption.32}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2.6}{\ignorespaces Example of occupancy configuration and corresponding possible moves\relax }}{38}{figure.caption.32}\protected@file@percent }
-\newlabel{fig:occupancy_example}{{2.6}{38}{Example of occupancy configuration and corresponding possible moves\relax }{figure.caption.32}{}}
-\zref@newlabel{mdf@pagelabel-21}{\default{2.3.2}\page{40}\abspage{50}\mdf@pagevalue{40}}
-\zref@newlabel{mdf@pagelabel-22}{\default{2.3.2}\page{41}\abspage{51}\mdf@pagevalue{41}}
-\@writefile{lol}{\contentsline {listing}{\numberline {13}{\ignorespaces Example output from one execution of the program from listing \ref  {lst:find_magic}\relax }}{41}{listing.13}\protected@file@percent }
-\newlabel{lst:find_magic_exec}{{13}{41}{Example output from one execution of the program from listing \ref {lst:find_magic}\relax }{listing.13}{}}
-\zref@newlabel{mdf@pagelabel-23}{\default{2.3.2}\page{41}\abspage{51}\mdf@pagevalue{41}}
-\@writefile{lol}{\contentsline {listing}{\numberline {14}{\ignorespaces The tables allowing us to generate possible moves from a given square and an obstacle configuration\relax }}{41}{listing.14}\protected@file@percent }
-\zref@newlabel{mdf@pagelabel-24}{\default{2.3.2}\page{42}\abspage{52}\mdf@pagevalue{42}}
+\zref@newlabel{mdf@pagelabel-20}{\default{2.3.2}\page{40}\abspage{50}\mdf@pagevalue{40}}
+\zref@newlabel{mdf@pagelabel-21}{\default{2.3.2}\page{41}\abspage{51}\mdf@pagevalue{41}}
+\zref@newlabel{mdf@pagelabel-22}{\default{2.3.2}\page{42}\abspage{52}\mdf@pagevalue{42}}
+\@writefile{lol}{\contentsline {listing}{\numberline {13}{\ignorespaces Example output from one execution of the program from listing \ref  {lst:find_magic}\relax }}{42}{listing.13}\protected@file@percent }
+\newlabel{lst:find_magic_exec}{{13}{42}{Example output from one execution of the program from listing \ref {lst:find_magic}\relax }{listing.13}{}}
+\zref@newlabel{mdf@pagelabel-23}{\default{2.3.2}\page{42}\abspage{52}\mdf@pagevalue{42}}
+\@writefile{lol}{\contentsline {listing}{\numberline {14}{\ignorespaces The tables allowing us to generate possible moves from a given square and an obstacle configuration\relax }}{42}{listing.14}\protected@file@percent }
 \newlabel{lst:magic_tables}{{14}{42}{The tables allowing us to generate possible moves from a given square and an obstacle configuration\relax }{listing.14}{}}
-\zref@newlabel{mdf@pagelabel-25}{\default{2.3.2}\page{42}\abspage{52}\mdf@pagevalue{42}}
-\@writefile{lol}{\contentsline {listing}{\numberline {15}{\ignorespaces Data structure allowing us to store the useful information to find possible moves for a given square and obstacle configuration\relax }}{42}{listing.15}\protected@file@percent }
-\newlabel{lst:magic_struct}{{15}{42}{Data structure allowing us to store the useful information to find possible moves for a given square and obstacle configuration\relax }{listing.15}{}}
+\zref@newlabel{mdf@pagelabel-24}{\default{2.3.2}\page{42}\abspage{52}\mdf@pagevalue{42}}
+\zref@newlabel{mdf@pagelabel-25}{\default{2.3.2}\page{43}\abspage{53}\mdf@pagevalue{43}}
+\@writefile{lol}{\contentsline {listing}{\numberline {15}{\ignorespaces Data structure allowing us to store the useful information to find possible moves for a given square and obstacle configuration\relax }}{43}{listing.15}\protected@file@percent }
+\newlabel{lst:magic_struct}{{15}{43}{Data structure allowing us to store the useful information to find possible moves for a given square and obstacle configuration\relax }{listing.15}{}}
 \zref@newlabel{mdf@pagelabel-26}{\default{2.3.2}\page{43}\abspage{53}\mdf@pagevalue{43}}
 \@writefile{lol}{\contentsline {listing}{\numberline {16}{\ignorespaces The \mintinline {c++}{moves_bb} function uses the elements from listings \ref  {lst:magic_tables} and \ref  {lst:magic_struct} to efficiently compute the bitboard of possible moves for a given square and obstacle configuration\relax }}{43}{listing.16}\protected@file@percent }
 \newlabel{lst:possible_moves}{{16}{43}{The \mintinline {c++}{moves_bb} function uses the elements from listings \ref {lst:magic_tables} and \ref {lst:magic_struct} to efficiently compute the bitboard of possible moves for a given square and obstacle configuration\relax }{listing.16}{}}
-\zref@newlabel{mdf@pagelabel-27}{\default{2.3.2}\page{43}\abspage{53}\mdf@pagevalue{43}}
-\zref@newlabel{mdf@pagelabel-28}{\default{2.3.2}\page{44}\abspage{54}\mdf@pagevalue{44}}
+\zref@newlabel{mdf@pagelabel-27}{\default{2.3.2}\page{44}\abspage{54}\mdf@pagevalue{44}}
 \@writefile{lol}{\contentsline {listing}{\numberline {17}{\ignorespaces \relax }}{44}{listing.17}\protected@file@percent }
 \newlabel{lst:magic_init}{{17}{44}{\relax }{listing.17}{}}
-\zref@newlabel{mdf@pagelabel-29}{\default{2.3.2}\page{44}\abspage{54}\mdf@pagevalue{44}}
-\zref@newlabel{mdf@pagelabel-30}{\default{2.3.2}\page{45}\abspage{55}\mdf@pagevalue{45}}
+\zref@newlabel{mdf@pagelabel-28}{\default{2.3.2}\page{44}\abspage{54}\mdf@pagevalue{44}}
+\zref@newlabel{mdf@pagelabel-29}{\default{2.3.2}\page{45}\abspage{55}\mdf@pagevalue{45}}
 \@writefile{lol}{\contentsline {listing}{\numberline {18}{\ignorespaces \relax }}{45}{listing.18}\protected@file@percent }
 \newlabel{lst:find_magics}{{18}{45}{\relax }{listing.18}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}Move Representation}{45}{subsection.2.3.3}\protected@file@percent }
-\zref@newlabel{mdf@pagelabel-31}{\default{2.3.3}\page{46}\abspage{56}\mdf@pagevalue{46}}
-\zref@newlabel{mdf@pagelabel-32}{\default{2.3.3}\page{47}\abspage{57}\mdf@pagevalue{47}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}Move Representation}{46}{subsection.2.3.3}\protected@file@percent }
+\zref@newlabel{mdf@pagelabel-30}{\default{2.3.3}\page{46}\abspage{56}\mdf@pagevalue{46}}
+\zref@newlabel{mdf@pagelabel-31}{\default{2.3.3}\page{47}\abspage{57}\mdf@pagevalue{47}}
 \@writefile{lol}{\contentsline {listing}{\numberline {19}{\ignorespaces Move representation, the departure and arrival squares are each stored on $6$ bits\relax }}{47}{listing.19}\protected@file@percent }
 \newlabel{lst:move_struct}{{19}{47}{Move representation, the departure and arrival squares are each stored on $6$ bits\relax }{listing.19}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.4}List of Moves for a Given Board Configuration}{47}{subsection.2.3.4}\protected@file@percent }
-\newlabel{subsection:list_of_moves}{{2.3.4}{47}{List of Moves for a Given Board Configuration}{subsection.2.3.4}{}}
-\zref@newlabel{mdf@pagelabel-33}{\default{2.3.4}\page{47}\abspage{57}\mdf@pagevalue{47}}
-\zref@newlabel{mdf@pagelabel-34}{\default{2.3.4}\page{48}\abspage{58}\mdf@pagevalue{48}}
-\@writefile{lol}{\contentsline {listing}{\numberline {20}{\ignorespaces \relax }}{48}{listing.20}\protected@file@percent }
-\newlabel{lst:move_list_class}{{20}{48}{\relax }{listing.20}{}}
-\zref@newlabel{mdf@pagelabel-35}{\default{2.3.4}\page{48}\abspage{58}\mdf@pagevalue{48}}
-\zref@newlabel{mdf@pagelabel-36}{\default{2.3.4}\page{49}\abspage{59}\mdf@pagevalue{49}}
-\@writefile{lol}{\contentsline {listing}{\numberline {21}{\ignorespaces \relax }}{49}{listing.21}\protected@file@percent }
-\newlabel{lst:get_moves}{{21}{49}{\relax }{listing.21}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.5}Making and Unmaking Moves}{49}{subsection.2.3.5}\protected@file@percent }
-\newlabel{subsection:making_and_unmaking_moves}{{2.3.5}{49}{Making and Unmaking Moves}{subsection.2.3.5}{}}
-\zref@newlabel{mdf@pagelabel-37}{\default{2.3.5}\page{49}\abspage{59}\mdf@pagevalue{49}}
-\@writefile{lol}{\contentsline {listing}{\numberline {22}{\ignorespaces \relax }}{49}{listing.22}\protected@file@percent }
-\newlabel{lst:making_moves}{{22}{49}{\relax }{listing.22}{}}
-\zref@newlabel{mdf@pagelabel-38}{\default{2.3.5}\page{49}\abspage{59}\mdf@pagevalue{49}}
-\zref@newlabel{mdf@pagelabel-39}{\default{2.3.5}\page{50}\abspage{60}\mdf@pagevalue{50}}
-\@writefile{lol}{\contentsline {listing}{\numberline {23}{\ignorespaces \relax }}{50}{listing.23}\protected@file@percent }
-\newlabel{lst:unmaking_moves}{{23}{50}{\relax }{listing.23}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.4}Testing with Random Games}{50}{section.2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.5}What's Next}{50}{section.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{50}{section.2.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}AI Players}{51}{chapter.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.4}List of Moves for a Given Board Configuration}{48}{subsection.2.3.4}\protected@file@percent }
+\newlabel{subsection:list_of_moves}{{2.3.4}{48}{List of Moves for a Given Board Configuration}{subsection.2.3.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.8}{\ignorespaces Dans cette position, le joueur noir à le choix entre $60$ coups\relax }}{48}{figure.caption.33}\protected@file@percent }
+\newlabel{fig:more_moves}{{2.8}{48}{Dans cette position, le joueur noir à le choix entre $60$ coups\relax }{figure.caption.33}{}}
+\zref@newlabel{mdf@pagelabel-32}{\default{2.3.4}\page{48}\abspage{58}\mdf@pagevalue{48}}
+\zref@newlabel{mdf@pagelabel-33}{\default{2.3.4}\page{49}\abspage{59}\mdf@pagevalue{49}}
+\@writefile{lol}{\contentsline {listing}{\numberline {20}{\ignorespaces Classe représentant une liste de coups\relax }}{49}{listing.20}\protected@file@percent }
+\newlabel{lst:move_list_class}{{20}{49}{Classe représentant une liste de coups\relax }{listing.20}{}}
+\zref@newlabel{mdf@pagelabel-34}{\default{2.3.4}\page{49}\abspage{59}\mdf@pagevalue{49}}
+\zref@newlabel{mdf@pagelabel-35}{\default{2.3.4}\page{50}\abspage{60}\mdf@pagevalue{50}}
+\@writefile{lol}{\contentsline {listing}{\numberline {21}{\ignorespaces Génération des coups possibles pour un joueur dans la position courante du jeu\relax }}{50}{listing.21}\protected@file@percent }
+\newlabel{lst:get_moves}{{21}{50}{Génération des coups possibles pour un joueur dans la position courante du jeu\relax }{listing.21}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.5}Making and Unmaking Moves}{50}{subsection.2.3.5}\protected@file@percent }
+\newlabel{subsection:making_and_unmaking_moves}{{2.3.5}{50}{Making and Unmaking Moves}{subsection.2.3.5}{}}
+\zref@newlabel{mdf@pagelabel-36}{\default{2.3.5}\page{50}\abspage{60}\mdf@pagevalue{50}}
+\@writefile{lol}{\contentsline {listing}{\numberline {22}{\ignorespaces Le coup \mintinline {c++}{m} est joué dans la position courante du jeu\relax }}{50}{listing.22}\protected@file@percent }
+\newlabel{lst:making_moves}{{22}{50}{Le coup \mintinline {c++}{m} est joué dans la position courante du jeu\relax }{listing.22}{}}
+\zref@newlabel{mdf@pagelabel-37}{\default{2.3.5}\page{50}\abspage{60}\mdf@pagevalue{50}}
+\zref@newlabel{mdf@pagelabel-38}{\default{2.3.5}\page{51}\abspage{61}\mdf@pagevalue{51}}
+\@writefile{lol}{\contentsline {listing}{\numberline {23}{\ignorespaces Le dernier coup joué \mintinline {c++}{m} est annulé\relax }}{51}{listing.23}\protected@file@percent }
+\newlabel{lst:unmaking_moves}{{23}{51}{Le dernier coup joué \mintinline {c++}{m} est annulé\relax }{listing.23}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Testing with Random Games}{51}{section.2.4}\protected@file@percent }
+\zref@newlabel{mdf@pagelabel-39}{\default{2.4}\page{51}\abspage{61}\mdf@pagevalue{51}}
+\@writefile{lol}{\contentsline {listing}{\numberline {24}{\ignorespaces Playing random games, displaying the list of moves and the board to check the engine visually\relax }}{51}{listing.24}\protected@file@percent }
+\newlabel{lst:random_games_testing}{{24}{51}{Playing random games, displaying the list of moves and the board to check the engine visually\relax }{listing.24}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}What's Next}{51}{section.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{51}{section.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}AI Players}{53}{chapter.3}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:ai}{{3}{51}{AI Players}{chapter.3}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {4}Monte Carlo Player}{53}{chapter.4}\protected@file@percent }
+\newlabel{ch:ai}{{3}{53}{AI Players}{chapter.3}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}Monte Carlo Player}{55}{chapter.4}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:monte_carlo}{{4}{53}{Monte Carlo Player}{chapter.4}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {5}MCTS Player}{55}{chapter.5}\protected@file@percent }
+\newlabel{ch:monte_carlo}{{4}{55}{Monte Carlo Player}{chapter.4}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}MCTS Player}{57}{chapter.5}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:mcts}{{5}{55}{MCTS Player}{chapter.5}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {6}Minmax Player}{57}{chapter.6}\protected@file@percent }
+\newlabel{ch:mcts}{{5}{57}{MCTS Player}{chapter.5}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {6}Minmax Player}{59}{chapter.6}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:minmax}{{6}{57}{Minmax Player}{chapter.6}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{59}{chapter.7}\protected@file@percent }
+\newlabel{ch:minmax}{{6}{59}{Minmax Player}{chapter.6}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{61}{chapter.7}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:nnue}{{7}{59}{Minmax with Neural Network Player}{chapter.7}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {8}AI Tournament}{61}{chapter.8}\protected@file@percent }
+\newlabel{ch:nnue}{{7}{61}{Minmax with Neural Network Player}{chapter.7}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {8}AI Tournament}{63}{chapter.8}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:tournament}{{8}{61}{AI Tournament}{chapter.8}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {9}Conclusion}{63}{chapter.9}\protected@file@percent }
+\newlabel{ch:tournament}{{8}{63}{AI Tournament}{chapter.8}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {9}Conclusion}{65}{chapter.9}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:conclusion}{{9}{63}{Conclusion}{chapter.9}{}}
-\@writefile{toc}{\contentsline {chapter}{Acronymes}{65}{section*.33}\protected@file@percent }
+\newlabel{ch:conclusion}{{9}{65}{Conclusion}{chapter.9}{}}
+\@writefile{toc}{\contentsline {chapter}{Acronymes}{67}{section*.34}\protected@file@percent }
 \gdef\minted@oldcachelist{,
   friendly.pygstyle,
   A559A65D3B5842B1C45A868FE3224AF593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
@@ -541,7 +545,7 @@
   EAA020F0D27D6B5375320250D961420993C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  498AB8E85F9D1DD26107167FE70E8971EAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
+  297A505F7B12F61E435A33239A8F7900EAAEBAE48CE0730BDF2691B1963EEA46.pygtex,
   46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   46028609922581AFCFC377A820AB568493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
@@ -656,7 +660,7 @@
   834D51977062FE52314A85176F5D8EDB93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   74FE08967F799223999833F1E53A62F993C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   C6B43D5F8276BD863A6193C9C62C406593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  188B7C870649C84E951EE12152AD81CF93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  F3E3F35C7C1553B767A797DA655AC42A93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   C6B43D5F8276BD863A6193C9C62C406593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   4483370FB420A8DA6CBFFBB60E772C7E93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   C4095D4590099DED924328B1720C4A0493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
@@ -678,8 +682,8 @@
   91E454EBA04C1ACA45D1EF5D17C6528593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   8AFB93DF9265CD8AB1DF1ECAAC0D74E793C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   4E648BE5D383FB0E311CF4F69D76EEDA93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  B65BEEA96D8115E1CA98B2D8AF62191084A67EB0BC471627C24F387903F0D3C0.pygtex,
-  2885701989680BC39AC6165BEC2EA3BD93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  AFCB2D1E3D7515D6677B540E7F8A8B0484A67EB0BC471627C24F387903F0D3C0.pygtex,
+  A3C8220836B00D1A1E8BD1FB1F5C943C93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   2CB14BA63DE29B5B409E59A8C4757A7D93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   A32ABA055D70B4F90D05B3B51F4FE3B793C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   A0531DB54FA845D213FD40D3A3146D4693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
@@ -692,11 +696,18 @@
   2E547E21C2928F9E9933F49E9DC9CA8993C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   4893428AACE1E99040E3B091C781ED5493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
   D2BDC4F8541829E1CDF6B4021A8EBFC593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  2D303BE4BFD751FF89371EBE5C85400193C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  1692E3FFCC10F042CACAB50AF9E4CF1F93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  22FBBC09CEDC2334508E883ABBDE98B393C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
-  1F40ED3E2866EBF6F677825BEF06EDAD93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex}
-\@writefile{toc}{\contentsline {chapter}{Bibliography}{67}{appendix*.35}\protected@file@percent }
+  6370763D34BC12DBD4BCF7EEB9177BA593C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  1F4B483E4186C89C4C0885E1E7E78BEB93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  BD4F3F55B909570AF7693E05DC47023693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  793B5D8FED24AC30BFAEB60790735D2693C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  6F8F6C458287DD3D5EC56C11B906D98C93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  69B64623F86DEF16CE17D454B8BE41AE93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  69B64623F86DEF16CE17D454B8BE41AE93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  59D79D38DD15B1D39B5990ABA6689EA493C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  69B64623F86DEF16CE17D454B8BE41AE93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  69B64623F86DEF16CE17D454B8BE41AE93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex,
+  D41D8CD98F00B204E9800998ECF8427E93C4B3F5D7A0ADF48EF068E56C706D5A.pygtex}
+\@writefile{toc}{\contentsline {chapter}{Bibliography}{69}{appendix*.36}\protected@file@percent }
 \abx@aux@read@bbl@mdfivesum{F36CB37906639E7E84DEE5E6E9FD3A67}
 \abx@aux@defaultrefcontext{0}{anthropic2025claude}{none/global//global/global}
 \abx@aux@defaultrefcontext{0}{cppreference}{none/global//global/global}
@@ -707,4 +718,4 @@
 \abx@aux@defaultrefcontext{0}{moura2008z3}{none/global//global/global}
 \abx@aux@defaultrefcontext{0}{googlebenchmark2025}{none/global//global/global}
 \abx@aux@defaultrefcontext{0}{warren2012hackersdelight}{none/global//global/global}
-\gdef \@abspage@last{77}
+\gdef \@abspage@last{79}

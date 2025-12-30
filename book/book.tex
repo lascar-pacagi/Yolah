@@ -289,11 +289,11 @@
 
 \section{The Yolah Game}
 
-% J'ai créé le jeu Yolah dans le but d'illustrer des techniques efficaces d'implémentation de jeux de plateaux
-% et d'intelligences artificielles pour mes étudiants. Je me suis inspiré du jeu des pingouins dont vous pouvez voir la boîte dans la figure \ref{fig:pingouins} (je le conseille \smiley)
+% Nous avons créé le jeu Yolah dans le but d'illustrer des techniques efficaces d'implémentation de jeux de plateaux
+% et d'intelligences artificielles pour nos étudiants. Nous nous sommes inspirés du jeu des pingouins dont vous pouvez voir la boîte dans la figure \ref{fig:pingouins} (nous le conseillons \smiley)
 
-I created the Yolah game to illustrate effective techniques for implementing board games
-and artificial intelligences for my students. I was inspired by the Pingouins game, whose box you can see in Figure~\ref{fig:pingouins} (I highly recommend it \smiley)
+We created the Yolah game to illustrate effective techniques for implementing board games
+and artificial intelligences for our students. We were inspired by the Pingouins game, whose box you can see in Figure~\ref{fig:pingouins} (we highly recommend it \smiley)
 
 \begin{figure}[htpb]
 \centering
@@ -304,14 +304,14 @@ and artificial intelligences for my students. I was inspired by the Pingouins ga
 \end{figure}
 
 \begin{importantbox}
-% J'ai fait au mieux de mes connaissances actuelles (\emph{ars longa, vita brevis}) pour implémenter mon jeu et les IA associées. Mais comme tout bon scientifique, il faudra regarder mon travail avec un oeil critique.
-I have done my best with my current knowledge (\emph{ars longa, vita brevis}) to implement my game and the associated AIs. But like any good scientist, you should look at my work with a critical eye.
-% J'ai écrit le livre en français (plus facile pour moi) et j'ai demandé à un assistant (Claude) de le traduire pour moi.
-I wrote the book in French (easier for me) and asked an AI assistant (Claude~\cite{anthropic2025claude}) to translate it for me.
+% Nous avons fait de notre mieux avec nos connaissances actuelles (\emph{ars longa, vita brevis}) pour implémenter notre jeu et les IA associées. Mais comme tout bon scientifique, il faudra regarder notre travail avec un œil critique.
+We have done our best with our current knowledge (\emph{ars longa, vita brevis}) to implement our game and the associated AIs. But like any good scientist, you should look at our work with a critical eye.
+% Nous avons écrit le livre en français (plus facile pour nous) et nous avons demandé à un assistant (Claude) de le traduire pour nous.
+We wrote the book in French (easier for us) and asked an AI assistant (Claude~\cite{anthropic2025claude}) to translate it for us.
 \end{importantbox}
 
-% Je vais maintenant décrire les règles du jeu, puis j'expliquerai pourquoi j'ai choisi ces règles, je donnerai un exemple de partie entre deux IA et je présenterai la suite du livre.
-I will now describe the rules of the game, then I will explain why I chose these rules, I will give an example of a game between two AIs and then I will present the rest of the book.
+% Nous allons maintenant décrire les règles du jeu, puis nous expliquerons pourquoi nous avons choisi ces règles, nous donnerons un exemple de partie entre deux IA et nous présenterons la suite du livre.
+We will now describe the rules of the game, then we will explain why we chose these rules, we will give an example of a game between two AIs and then we will present the rest of the book.
 
 \subsection{Game Rules}
 
@@ -339,7 +339,7 @@ chooses to move their piece located at {\ttfamily d5}, the squares where it can 
 \centering
 \includegraphics[width=0.67\textwidth]{yolah_moves1.pdf}
 % \caption{Mouvements possibles (petites croix noires) pour le pion noir situé sur la case {\ttfamily d5})}
-\caption{Possible moves (small black crosses) for the black piece located on square {\ttfamily d5}}
+\caption{Possible moves (black crosses) for the black piece located on square {\ttfamily d5}}
 \label{fig:yolah_moves1}
 \end{figure}
 
@@ -369,7 +369,7 @@ The possible moves for this white piece are shown in Figure~\ref{fig:yolah_moves
 \centering
 \includegraphics[width=0.67\textwidth]{yolah_moves3.pdf}
 % \caption{Mouvements possibles (petites croix blanches) pour le pion blanc situé sur la case {\ttfamily e5})}
-\caption{Possible moves (small white crosses) for the white piece located on square {\ttfamily e5}}
+\caption{Possible moves (white crosses) for the white piece located on square {\ttfamily e5}}
 \label{fig:yolah_moves3}
 \end{figure}
 
@@ -408,13 +408,13 @@ To summarize, the rules of Yolah are as follows:
 % \subsection{Caractéristiques intéressantes de Yolah pour développer des IA}
 \subsection{Interesting Characteristics of Yolah for Developing AIs}
 
-% J'ai choisi les règles précédentes pour Yolah, d'une part parce que j'aimais bien la dynamique du jeu des Pingouins, mais aussi parce qu'il n'y a pas de cycle dans le jeu, il n'y a donc pas besoin de règles spéciales pour éviter qu'une partie ne se termine pas. Le nombre de coups à disposition de chacun des joueurs est assez important au début (mais raisonnable) \footnote{56 coups possibles pour le joueur noir en début de partie.}, mais il va diminuer petit à petit avec l'apparition des trous \footnote{Le nombre de coups possibles ne diminue pas forcément après chaque coup, il existe des configurations où le joueur a plus de 56 coups à sa disposition.}. Cela permet aux IA de pouvoir regarder un nombre assez important de coups à l'avance.
+% Nous avons choisi les règles précédentes pour Yolah, d'une part parce que nous aimions bien la dynamique du jeu des Pingouins, mais aussi parce qu'il n'y a pas de cycle dans le jeu, il n'y a donc pas besoin de règles spéciales pour éviter qu'une partie ne se termine pas. Le nombre de coups à disposition de chacun des joueurs est assez important au début (mais raisonnable) \footnote{56 coups possibles pour le joueur noir en début de partie.}, mais il va diminuer petit à petit avec l'apparition des trous \footnote{Le nombre de coups possibles ne diminue pas forcément après chaque coup, il existe des configurations où le joueur a plus de 56 coups à sa disposition.}. Cela permet aux IA de pouvoir regarder un nombre assez important de coups à l'avance.
 
-I chose the above rules for Yolah, on the one hand because I liked the dynamics of the Penguin game, but also because there are no cycles in the game, so there is no need for special rules to prevent a game from never ending. The number of moves available to each player is quite large at the beginning (but reasonable)\footnote{56 possible moves for the black player at the start of the game.}, but it will decrease little by little with the appearance of holes\footnote{The number of possible moves does not necessarily decrease after each move; there are configurations where the player has more than 56 available moves.}. This allows the AIs to look ahead a fairly large number of moves.\\
+We chose the above rules for Yolah, on the one hand because we liked the dynamics of the Penguin game, but also because there are no cycles in the game, so there is no need for special rules to prevent a game from never ending. The number of moves available to each player is quite large at the beginning (but reasonable)\footnote{56 possible moves for the black player at the start of the game.}, but it will decrease little by little with the appearance of holes\footnote{The number of possible moves does not necessarily decrease after each move; there are configurations where the player has more than 56 available moves.}. This allows the AIs to look ahead a fairly large number of moves.\\
 
-% Je voulais aussi pouvoir réutiliser des concepts utilisés pour l'implémentation efficace du jeu d'échecs, et la taille du plateau et le déplacement des pions (même façon de se déplacer qu'une Dame aux échecs) me permettent de faire cela.
+% Nous voulions aussi pouvoir réutiliser des concepts utilisés pour l'implémentation efficace du jeu d'échecs, et la taille du plateau et le déplacement des pions (même façon de se déplacer qu'une Dame aux échecs) nous permettent de faire cela.
 
-I also wanted to be able to reuse concepts used for the efficient implementation of chess, and the size of the board and the movement of the pieces (same way of moving as a Queen in chess) allow me to do that.
+We also wanted to be able to reuse concepts used for the efficient implementation of chess, and the size of the board and the movement of the pieces (same way of moving as a Queen in chess) allow us to do that.
 
 % \subsection{Exemple de partie}
 \subsection{Game Example}
@@ -431,7 +431,7 @@ The progression of the game is described in Figures~\ref{fig:game_example_openin
 
 The white AI estimates that it is winning starting from move 10 (see Figure~\ref{fig:game_example_move10}). We can see at move 30 (see Figure~\ref{fig:game_example_move30}) that it has successfully isolated a zone where black can no longer access. At move 32 (see Figure~\ref{fig:game_example_move32}) it moves one of its pieces out of the isolated zone because the other piece will be able to collect all the points from that zone. It is more useful to use the other piece to gather points elsewhere. Note that starting from move 47 (see Figure~\ref{fig:game_example_move47} onward), black has no more available moves and must therefore pass their turn.\\
 
-% La partie est gagnée par le joueur blanc 32 à 24, ce qui est un très bon score car le jeu Yolah me semble être à l'avantage des noirs.
+% La partie est gagnée par le joueur blanc 32 à 24, ce qui est un très bon score car le jeu Yolah nous semble être à l'avantage des noirs.
 
 The game is won by the white player 32 to 24, which is a very good score because the Yolah game seems to favor black.
 
@@ -1491,9 +1491,9 @@ Now that we know how to test for game over, we will study how to efficiently gen
 
 \section{Generating Possible Piece Moves}
 
-% La génération des coups possibles va utiliser une technique appelée les magic bitboard. Pour comprendre cette technique je vais tout d'abord présenter sur un exemple simple le hachage parfait magique. Je me suis inspiré de l'article pour cet exemple.
+% La génération des coups possibles va utiliser une technique appelée les magic bitboard. Pour comprendre cette technique nous allons tout d'abord présenter sur un exemple simple le hachage parfait magique. Nous nous sommes inspirés de l'article pour cet exemple.
 Move generation will use a technique called \emph{magic bitboards}, which is a perfect hash function that maps blocker occupancy patterns to unique lookup table indices without collisions % (nous allons voir tout cela en détail dans la suite de ce chapitre)
-(we will see all this in detail later in this chapter). To understand this technique, I will first present perfect hashing through a simple example. Throughout this chapter, I will use the terms \emph{perfect hashing} and \emph{magic bitboards} interchangeably, as they refer to the same technique in this context. I drew inspiration from \cite{kannan2008magicbitboards} for this example.
+(we will see all this in detail later in this chapter). To understand this technique, we will first present perfect hashing through a simple example. Throughout this chapter, we will use the terms \emph{perfect hashing} and \emph{magic bitboards} interchangeably, as they refer to the same technique in this context. We drew inspiration from \cite{kannan2008magicbitboards} for this example.
 
 \subsection{Magic Perfect Hashing Function}
 
@@ -1866,40 +1866,29 @@ Now that we have seen how the magic perfect hashing technique works through a si
 
 \subsection{Magic Bitboards for Piece Moves}
 
-% Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case donnée, donner la liste des coups possibles pour cette configuration de jeu. Par exemple, pour le plateau de la figure \ref{fig:move23_position} dont les coups possibles pour la pièce en {\ttfamily d3} sont représentées par des étoiles dans la table \ref{tab:move23_d3_moves}, on voudrait très efficacement pouvoir obtenir le bitboard de la table \ref{tab:bb_move23_d3_moves} indiquant les différents coups possibles.
-For each board configuration, we want to be able to provide, for a given square, the list of possible moves for that game configuration. For example, for the board in figure \ref{fig:move23_position} where the possible moves for the piece at {\ttfamily d3} are represented by stars in table \ref{tab:move23_d3_moves}, we would like to very efficiently obtain the bitboard shown in table \ref{tab:bb_move23_d3_moves} indicating the different possible moves.\\
+% Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case donnée, donner la liste des coups possibles pour cette configuration de jeu. Par exemple, pour le plateau de la figure \ref{fig:move23_position} dont les coups possibles pour la pièce en {\ttfamily d3} sont représentées par des petites croix blanches dans la figure \ref{fig:move23_d3_moves}, on voudrait très efficacement pouvoir obtenir le bitboard de la table \ref{tab:bb_move23_d3_moves} indiquant les différents coups possibles.
+For each board configuration, we want to be able to provide, for a given square, the list of possible moves for that game configuration. For example, for the board in figure \ref{fig:move23_position} where the possible moves for the piece at {\ttfamily d3} are represented by small white crosses in figure \ref{fig:move23_d3_moves}, we would like to very efficiently obtain the bitboard shown in table \ref{tab:bb_move23_d3_moves} indicating the different possible moves.\\
 
 \begin{figure}[htpb]
 \centering
-\includegraphics[width=0.45\textwidth]{yolah_game_example_move23_no_arrow.png}
+\includegraphics[width=0.5\textwidth]{yolah_game_example_move23_no_arrow.png}
 % \caption{Position du plateau après le coup 23}
 \caption{Board position example (after move 23 in figure \ref{fig:game_example_middle})}
 \label{fig:move23_position}
 \end{figure}
 
 
-\begin{table}[htpb]
+\begin{figure}[htpb]
 \centering
-\caption{Possible moves for white piece at d3}
-\label{tab:move23_d3_moves}
-\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
-\hline
-8 & \raisebox{-0.3ex}{$\blacksquare$} & $\bullet$ & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
-7 & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ & $\circ$ & $\cdot$ & $\bullet$ \\ \hline
-6 & $\bullet$ & $\cdot$ & $\circ$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ \\ \hline
-5 & $\cdot$ & $\boldsymbol{\ast}$ & $\cdot$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
-4 & $\cdot$ & $\cdot$ & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ \\ \hline
-3 & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & $\boldsymbol{\ast}$ & $\circ$ & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & $\cdot$ & $\cdot$ \\ \hline
-2 & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & $\circ$ & $\cdot$ & $\bullet$ \\ \hline
-1 & \raisebox{-0.3ex}{$\blacksquare$} & $\boldsymbol{\ast}$ & $\cdot$ & $\cdot$ & $\cdot$ & $\boldsymbol{\ast}$ & \raisebox{-0.3ex}{$\blacksquare$} & \raisebox{-0.3ex}{$\blacksquare$} \\ \hline
-\multicolumn{1}{c|}{} & a & b & c & d & e & f & g & h \\
-\cline{2-9}
-\end{tabular}
-\end{table}
+\includegraphics[width=0.5\textwidth]{move23_d3_possible_moves.pdf}
+% \caption{Coups possibles (petites croix blanches) pour le pion blanc situé sur la case {\ttfamily d3}}
+\caption{Possible moves (small white crosses) for the white piece at {\ttfamily d3}}
+\label{fig:move23_d3_moves}
+\end{figure}
 
 \begin{table}[htpb]
 \centering
-\caption{Bitboard of possible moves for the piece at d3 (see table \ref{tab:move23_d3_moves})}
+\caption{Bitboard of possible moves for the piece at d3 (see figure \ref{fig:move23_d3_moves})}
 \label{tab:bb_move23_d3_moves}
 \begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
 \hline
@@ -2176,8 +2165,8 @@ For the orthogonal mask in figure \ref{fig:orthogonal_mask_d3}, we have $2^{10} 
 \label{fig:diagonal_orthogonal_masks_d3}
 \end{figure}
 
-% Nous pouvons maintenant étudier comment trouver les constantes \mintinline{c++}{MAGIC} et \mintinline{c++}{K} pour les coups orthogonaux et diagonaux de chacune des cases du plateau. Le code est donné dans le listing \ref{lst:find_magic}\footnote{J'ai essayé d'utiliser le solveur \gls{z3} pour obtenir ces constantes mais sans succès.}. Une exécution de ce programme\footnote{Au vu du générateur aléatoire et de son initialisation, le programme pourra trouver des constantes différentes pour des exécutions différentes.} est donnée dans le listing \ref{lst:find_magic_exec}\footnote{La sortie est reformatée pour être plus lisible.}.
-We can now study how to find the \mintinline{c++}{MAGIC} and \mintinline{c++}{K} constants for the orthogonal and diagonal moves of each square on the board. The code is given in listing \ref{lst:find_magic}\footnote{I tried to use the \gls{z3} solver to obtain these constants but without success.}. An execution of this program\footnote{Given the random generator and its initialization, the program may find different constants for different executions.} is given in listing \ref{lst:find_magic_exec}\footnote{The output is reformatted for readability.}.
+% Nous pouvons maintenant étudier comment trouver les constantes \mintinline{c++}{MAGIC} et \mintinline{c++}{K} pour les coups orthogonaux et diagonaux de chacune des cases du plateau. Le code est donné dans le listing \ref{lst:find_magic}\footnote{Nous avons essayé d'utiliser le solveur \gls{z3} pour obtenir ces constantes mais sans succès.}. Une exécution de ce programme\footnote{Au vu du générateur aléatoire et de son initialisation, le programme pourra trouver des constantes différentes pour des exécutions différentes.} est donnée dans le listing \ref{lst:find_magic_exec}\footnote{La sortie est reformatée pour être plus lisible.}.
+We can now study how to find the \mintinline{c++}{MAGIC} and \mintinline{c++}{K} constants for the orthogonal and diagonal moves of each square on the board. The code is given in listing \ref{lst:find_magic}\footnote{We tried to use the \gls{z3} solver to obtain these constants but without success.}. An execution of this program\footnote{Given the random generator and its initialization, the program may find different constants for different executions.} is given in listing \ref{lst:find_magic_exec}\footnote{The output is reformatted for readability.}.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
@@ -2845,21 +2834,35 @@ The \mintinline{c++}{Move} structure, presented in listing \ref{lst:move_struct}
 \subsection{List of Moves for a Given Board Configuration}
 \label{subsection:list_of_moves}
 
+La liste des coups possibles dans une configuration donnée du jeu est représentée par la classe \mintinline{c++}{MoveList} présentée dans le listing \ref{lst:move_list_class}.
+
+\begin{itemize}
+\item À la ligne 1, la constante \mintinline{c++}{MAX_NB_MOVES} est une borne supérieure du nombre maximum de coups possibles pour les joueurs. Dans la configuration de départ, le joueur noir a le choix entre $14 * 4 = 56$ coups. Notons que ce nombre de coups possibles ne diminue pas forcément, par exemple, dans la configuration de la figure \ref{fig:more_moves}, le joueur noir a le choix entre $60$ coups. Pour obtenir cette borne supérieure, nous avons lancer beaucoup de parties aléatoires, et observer le maximum de coups disponibles pour les joueurs durant ces parties.
+\end{itemize}
+
+\begin{figure}[htpb]
+\centering
+\includegraphics[width=0.5\textwidth]{more_moves.png}
+\caption{Dans cette position, le joueur noir à le choix entre $60$ coups}
+\label{fig:more_moves}
+\end{figure}
+
+
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
 static constexpr uint16_t MAX_NB_MOVES = 75;
 class MoveList {
     Move moveList[MAX_NB_MOVES], *last;
 public:
-    explicit MoveList() : last(moveList) {}
-    const Move* begin() const { return moveList; }
-    const Move* end() const { return last; }
-    Move* begin() { return moveList; }
-    Move* end() { return last; }
-    size_t size() const { return last - moveList; }
-    const Move& operator[](size_t i) const { return moveList[i]; }
-    Move& operator[](size_t i) { return moveList[i]; }
-    Move* data() { return moveList; }
+    constexpr MoveList() noexcept : last(moveList) {}
+    constexpr const Move* begin() const noexcept { return moveList; }
+    constexpr const Move* end() const noexcept { return last; }
+    constexpr Move* begin() noexcept { return moveList; }
+    constexpr Move* end() noexcept { return last; }
+    constexpr size_t size() const noexcept { return last - moveList; }
+    constexpr const Move& operator[](size_t i) const { return moveList[i]; }
+    constexpr Move& operator[](size_t i) { return moveList[i]; }
+    constexpr Move* data() noexcept { return moveList; }
     friend class Yolah;
 };
 \end{minted}
@@ -2869,10 +2872,10 @@ public:
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
-inline Square lsb(uint64_t b) {
+constexpr Square lsb(uint64_t b) {
     return Square(std::countr_zero(b));
 }
-inline Square pop_lsb(uint64_t& b) {
+Square pop_lsb(uint64_t& b) {
     const Square s = lsb(b);
     b &= b - 1;
     return s;
@@ -2887,26 +2890,26 @@ class Yolah {
 public:
     // ...
 };
-void Yolah::moves(uint8_t player, MoveList& moves) const {
+void Yolah::moves(uint8_t player, MoveList& moves) const noexcept {
     Move* moveList = moves.moveList;
     uint64_t occupied = black | white | holes;
     uint64_t bb = player == BLACK ? black : white;
     while (bb) {
         Square   from = pop_lsb(bb);
-        uint64_t b    = moves_bb(from, occupied) & ~occupied;        
+        uint64_t b    = moves_bb(from, occupied) & ~occupied;
         while (b) {
             *moveList++ = Move(from, pop_lsb(b));
         }
-    }    
+    }
     if (moveList == moves.moveList) [[unlikely]] {
         *moveList++ = Move::none();
     }
     moves.last = moveList;
 }
-uint8_t Yolah::current_player() const {
-    return ply & 1;   
+constexpr uint8_t Yolah::current_player() const noexcept {
+    return ply & 1;
 }
-void Yolah::moves(MoveList& moves) const {
+void Yolah::moves(MoveList& moves) const noexcept {
     this->moves(current_player(), moves);
 }
 \end{minted}
@@ -2965,68 +2968,10 @@ void Yolah::undo(Move m) {
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
-ostream& operator<<(ostream& os, const Yolah& yolah) {
-    char grid[8][8];
-    uint64_t black = yolah.black;
-    uint64_t white = yolah.white;
-    uint64_t empty = yolah.empty;    
-    for (int i = 0; i < 8; i++) {        
-        for (int j = 0; j < 8; j++) {
-           if (black & uint64_t(1) << j) grid[i][j] = 'X';
-           else if (white & uint64_t(1) << j) grid[i][j] = 'O'; 
-           else if (empty & uint64_t(1) << j) grid[i][j] = ' ';
-           else grid[i][j] = '.';
-        }
-        black >>= 8;
-        white >>= 8;
-        empty >>= 8;
-    }
-    const char* letters = "    a   b   c   d   e   f   g   h";
-    const char* line = "  +---+---+---+---+---+---+---+---+";
-    os << letters << '\n';
-    for (int i = 7; i >= 0; i--) {
-        os << line << '\n';
-        os << i + 1 << ' ';
-        for (int j = 0; j < 8; j++) {
-            os << "| " << grid[i][j] << " ";
-        }
-        os << "| " << i + 1 << '\n';
-    }
-    os << line << '\n';
-    os << letters << '\n';
-    const auto [black_score, white_score] = yolah.score();
-    os << "score: " << black_score << '/' << white_score << '\n';
-    return os;
-}
-void play_random_games(size_t nb_games) {
-    MoveList moves;    
-    random_device rd;
-    mt19937 mt(rd());
-    for (size_t i = 0; i < nb_games; i++) {
-        Yolah yolah;    
-        while (!yolah.game_over()) {                 
-            cout << yolah << '\n';        
-            yolah.moves(moves);
-            cout << format("# moves: {}\n", moves.size());
-            for (const auto& m : moves) {
-                cout << m << ' ';
-            }
-            cout << '\n';
-            uniform_int_distribution<uint64_t> d(0, moves.size() - 1);    
-            Move m = moves[d(mt)];
-            cout << m << '\n';
-            std::string _;
-            std::getline(std::cin, _);
-            yolah.play(m);
-        }
-        cout << yolah << '\n';
-    }
-}
 \end{minted}
-\captionof{listing}{Playing random games, displaying the list of moves and the board to check the engine}
+\captionof{listing}{Playing random games, displaying the list of moves and the board to check the engine visually}
 \label{lst:random_games_testing}
 \end{mdframed}
-
 
 
 \section{What's Next}

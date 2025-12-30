@@ -1,0 +1,17 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{Yolah::play}\PYG{p}{(}\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{m}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{[[}\PYG{n}{likely}\PYG{p}{]]}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{white\PYGZus{}score}\PYG{o}{++}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{black\PYGZus{}score}\PYG{o}{++}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{n}{empty}\PYG{+w}{ }\PYG{o}{|=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{ply}\PYG{o}{++}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

@@ -547,19 +547,19 @@ ostream& operator<<(ostream& os, const Yolah& yolah) {
 
 class PRNG {
     uint64_t s;
-    uint64_t rand64() {
+    uint64_t rand64() noexcept {
         s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
         return s * 2685821657736338717ULL;
     }
    public:
-    PRNG(uint64_t seed) :
-        s(seed) {
-    }
-    uint64_t seed() {
+    constexpr PRNG(uint64_t seed) noexcept : s(seed) {}
+
+    constexpr uint64_t seed() const noexcept {
         return s;
     }
+
     template<typename T>
-    T rand() {
+    T rand() noexcept {
         return T(rand64());
     }
 };

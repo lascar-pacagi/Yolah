@@ -36,9 +36,11 @@ COLOR_PIECE_OUTLINE_WHITE = (30, 30, 30)     # Black outline for white pieces
 COLOR_ARROW = (255, 140, 0)           # Orange for last move arrow
 COLOR_TEXT = (0, 0, 0)                # Black for labels
 COLOR_BORDER = (0, 0, 0)              # Black border
+COLOR_MOVE_CROSS_BLACK = (30, 30, 30)      # Black cross for black piece moves
+COLOR_MOVE_CROSS_WHITE = (240, 240, 240)   # White cross for white piece moves
 
 
-def draw_board(yolah, last_move=None, board_size=800, show_labels=True):
+def draw_board(yolah, last_move=None, board_size=800, show_labels=True, show_moves_for=None):
     """
     Draw the Yolah board with pieces and optional labels.
 
@@ -47,6 +49,7 @@ def draw_board(yolah, last_move=None, board_size=800, show_labels=True):
         last_move: Optional Move to highlight with an arrow
         board_size: Size of the board in pixels
         show_labels: Whether to show file/rank labels
+        show_moves_for: Optional square string (e.g., "d3") to show possible moves with crosses
 
     Returns:
         PIL Image object
@@ -107,6 +110,85 @@ def draw_board(yolah, last_move=None, board_size=800, show_labels=True):
                 # Empty cell (no piece can be placed here)
                 draw.rectangle([x, y, x + square_size, y + square_size],
                              fill=COLOR_EMPTY_SQUARE, outline=COLOR_BORDER)
+
+    # Draw possible moves crosses if requested
+    if show_moves_for is not None:
+        from yolah import Square
+        try:
+            # Parse the square (e.g., "d3")
+            from_sq = Square.from_str(show_moves_for)
+
+            # Get the cell at this square to determine piece color
+            from_i, from_j = from_sq.to_coordinates()
+            piece_cell = grid[from_i][from_j]
+
+            if piece_cell == Cell.BLACK or piece_cell == Cell.WHITE:
+                # Determine cross color based on piece
+                cross_color = COLOR_MOVE_CROSS_BLACK if piece_cell == Cell.BLACK else COLOR_MOVE_CROSS_WHITE
+
+                # Determine which player owns this piece
+                player = Yolah.BLACK_PLAYER if piece_cell == Cell.BLACK else Yolah.WHITE_PLAYER
+
+                # Get all legal moves for this player (not just current player)
+                legal_moves = yolah.moves_for(player)
+
+                # Filter moves that start from the specified square
+                moves_from_square = [m for m in legal_moves if m.from_sq == from_sq]
+
+                # Draw a cross on each destination square
+                cross_size = square_size // 4  # Larger cross
+                # Compensate for irradiation illusion - black appears thinner than white
+                thickness_factor = 1.15 if piece_cell == Cell.BLACK else 1.0
+                cross_width = int(max(8, square_size // 10) * thickness_factor)
+                outline_width = max(3, cross_width // 4)  # Outline thickness
+
+                for move in moves_from_square:
+                    to_i, to_j = move.to_sq.to_coordinates()
+                    to_display_row = Yolah.DIM - 1 - to_i
+                    cx = label_margin + to_j * square_size + square_size // 2
+                    cy = label_margin + to_display_row * square_size + square_size // 2
+
+                    # Determine outline color (opposite of cross color for contrast)
+                    outline_color = COLOR_BLACK_PIECE if piece_cell == Cell.WHITE else COLOR_WHITE_PIECE
+
+                    # Cross endpoints
+                    endpoints = [
+                        (cx - cross_size, cy - cross_size),  # top-left
+                        (cx + cross_size, cy + cross_size),  # bottom-right
+                        (cx - cross_size, cy + cross_size),  # bottom-left
+                        (cx + cross_size, cy - cross_size),  # top-right
+                    ]
+
+                    # Draw X cross with closed black border around it
+                    total_width = cross_width + outline_width * 2
+                    half_total = total_width // 2
+                    half_cross = cross_width // 2
+
+                    # Draw outline circles at endpoints first (for closed corners)
+                    for ex, ey in endpoints:
+                        draw.ellipse([ex - half_total, ey - half_total,
+                                     ex + half_total, ey + half_total],
+                                    fill=outline_color)
+
+                    # Draw outline lines
+                    draw.line([cx - cross_size, cy - cross_size, cx + cross_size, cy + cross_size],
+                             fill=outline_color, width=total_width)
+                    draw.line([cx - cross_size, cy + cross_size, cx + cross_size, cy - cross_size],
+                             fill=outline_color, width=total_width)
+
+                    # Draw white circles at endpoints (for closed corners)
+                    for ex, ey in endpoints:
+                        draw.ellipse([ex - half_cross, ey - half_cross,
+                                     ex + half_cross, ey + half_cross],
+                                    fill=cross_color)
+
+                    # Draw the white cross on top
+                    draw.line([cx - cross_size, cy - cross_size, cx + cross_size, cy + cross_size],
+                             fill=cross_color, width=cross_width)
+                    draw.line([cx - cross_size, cy + cross_size, cx + cross_size, cy - cross_size],
+                             fill=cross_color, width=cross_width)
+        except Exception as e:
+            print(f"Warning: Could not draw moves for square '{show_moves_for}': {e}")
 
     # Draw labels if requested
     if show_labels:
@@ -181,7 +263,8 @@ def parse_moves(moves_str):
 
 
 def generate_board_diagram(moves_str=None, output_file="board.png",
-                          board_size=800, show_labels=True, show_last_move=True):
+                          board_size=800, show_labels=True, show_last_move=True,
+                          show_moves_for=None):
     """
     Generate a board diagram and save it to a file.
 
@@ -191,6 +274,7 @@ def generate_board_diagram(moves_str=None, output_file="board.png",
         board_size: Size of the board in pixels
         show_labels: Whether to show file/rank labels
         show_last_move: Whether to show an arrow for the last move
+        show_moves_for: Optional square string (e.g., "d3") to show possible moves with crosses
     """
     # Create Yolah game
     yolah = Yolah()
@@ -210,7 +294,7 @@ def generate_board_diagram(moves_str=None, output_file="board.png",
 
     # Draw board
     last_move_to_show = last_move if (show_last_move and last_move) else None
-    img = draw_board(yolah, last_move_to_show, board_size, show_labels)
+    img = draw_board(yolah, last_move_to_show, board_size, show_labels, show_moves_for)
 
     # Save image
     img.save(output_file)
@@ -255,6 +339,8 @@ Examples:
                        help='Hide file/rank labels')
     parser.add_argument('--no-arrow', action='store_true',
                        help='Hide last move arrow')
+    parser.add_argument('--show-moves', type=str, default=None,
+                       help='Show possible moves for a piece at given square (e.g., "d3")')
 
     args = parser.parse_args()
 
@@ -263,7 +349,8 @@ Examples:
         output_file=args.output,
         board_size=args.size,
         show_labels=not args.no_labels,
-        show_last_move=not args.no_arrow
+        show_last_move=not args.no_arrow,
+        show_moves_for=args.show_moves
     )
 
 
