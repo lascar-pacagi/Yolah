@@ -1,0 +1,3 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{::}\PYG{n}{moves}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}
+\end{Verbatim}

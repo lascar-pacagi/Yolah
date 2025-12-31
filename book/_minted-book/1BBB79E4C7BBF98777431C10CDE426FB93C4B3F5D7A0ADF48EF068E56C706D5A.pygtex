@@ -1,0 +1,7 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{n}{MoveList}\PYG{+w}{ }\PYG{n}{list}\PYG{p}{;}
+\PYG{c+c1}{// ...}
+\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{list}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{c+c1}{// ...}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

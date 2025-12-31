@@ -303,17 +303,17 @@ std::ostream& operator<<(std::ostream& os, const Move& m) {
 
 static constexpr uint16_t MAX_NB_MOVES = 75;
 class MoveList {
-    Move moveList[MAX_NB_MOVES], *last;
+    Move move_list[MAX_NB_MOVES], *last;
 public:
-    constexpr MoveList() noexcept : last(moveList) {}
-    constexpr const Move* begin() const noexcept { return moveList; }
+    constexpr MoveList() noexcept : last(move_list) {}
+    constexpr const Move* begin() const noexcept { return move_list; }
     constexpr const Move* end() const noexcept { return last; }
-    constexpr Move* begin() noexcept { return moveList; }
+    constexpr Move* begin() noexcept { return move_list; }
     constexpr Move* end() noexcept { return last; }
-    constexpr size_t size() const noexcept { return last - moveList; }
-    constexpr const Move& operator[](size_t i) const { return moveList[i]; }
-    constexpr Move& operator[](size_t i) { return moveList[i]; }
-    constexpr Move* data() noexcept { return moveList; }
+    constexpr size_t size() const noexcept { return last - move_list; }
+    constexpr const Move& operator[](size_t i) const { return move_list[i]; }
+    constexpr Move& operator[](size_t i) { return move_list[i]; }
+    constexpr Move* data() noexcept { return move_list; }
     friend class Yolah;
 };
 
@@ -353,7 +353,7 @@ public:
     }
 
     void moves(uint8_t player, MoveList& moves) const noexcept {
-        Move* moveList = moves.moveList;
+        Move* move_list = moves.move_list;
         uint64_t occupied = black | white | holes;
         uint64_t bb = player == BLACK ? black : white;
 
@@ -362,7 +362,7 @@ public:
             Square from = pop_lsb(bb);
             uint64_t b = moves_bb(from, occupied) & ~occupied;
             while (b) {
-                *moveList++ = Move(from, pop_lsb(b));
+                *move_list++ = Move(from, pop_lsb(b));
             }
         }
 
@@ -378,24 +378,24 @@ public:
         // uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
         
         // while (b0) {
-        //     *moveList++ = Move(from0, pop_lsb(b0));
+        //     *move_list++ = Move(from0, pop_lsb(b0));
         // }
         // while (b1) {
-        //     *moveList++ = Move(from1, pop_lsb(b1));
+        //     *move_list++ = Move(from1, pop_lsb(b1));
         // }
         // while (b2) {
-        //     *moveList++ = Move(from2, pop_lsb(b2));
+        //     *move_list++ = Move(from2, pop_lsb(b2));
         // }
         // while (b3) {
-        //     *moveList++ = Move(from3, pop_lsb(b3));
+        //     *move_list++ = Move(from3, pop_lsb(b3));
         // }
 
         
-        if (moveList == moves.moveList) [[unlikely]] {
-            *moveList++ = Move::none();
+        if (move_list == moves.move_list) [[unlikely]] {
+            *move_list++ = Move::none();
         }
 
-        moves.last = moveList;
+        moves.last = move_list;
     }
 
     void moves(MoveList& moves) const noexcept {
@@ -576,12 +576,14 @@ void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
     size_t black_wins = 0;
     size_t white_wins = 0;
     size_t draws = 0;
+    size_t max_nb_moves = 0;
 
     for (size_t i = 0; i < nb_games; i++) {
         Yolah yolah;    
         while (!yolah.game_over()) {                 
             if constexpr (STEP_BY_STEP) cout << yolah << '\n';        
             yolah.moves(moves);
+            max_nb_moves = max(max_nb_moves, moves.size());
             if constexpr (STEP_BY_STEP) {
                 sort(begin(moves), end(moves));
                 cout << format("# moves: {}\n", moves.size());
@@ -600,7 +602,7 @@ void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
             yolah.play(m);
         }
         if constexpr (STEP_BY_STEP) cout << yolah << '\n';
-
+        
         auto [black_score, white_score] = yolah.score();
         if (black_score > white_score) {
             black_wins++;
@@ -617,16 +619,94 @@ void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
         cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
         cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
         cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+        cout << format("Max #moves:  {}\n", max_nb_moves);
     }
 }
 
 namespace test {
-    void random_games(size_t nb_games, optional<uint64_t> seed) {
+    namespace {
+        using std::format;
+
         constexpr string_view RED    = "\033[1;31m";
         constexpr string_view GREEN  = "\033[1;32m";
         constexpr string_view YELLOW = "\033[1;33m";
         constexpr string_view RESET  = "\033[0m";
         constexpr string_view BOLD   = "\033[1m";
+
+        struct TestResult {
+            bool passed;
+            string message;
+            operator bool() const { return passed; }
+        };
+
+        TestResult pass() { return {true, ""}; }
+        TestResult fail(string msg) { return {false, std::move(msg)}; }
+
+        TestResult check_move_count(const MoveList& fast, const vector<Move>& expected) {
+            if (fast.size() != expected.size()) {
+                return fail(format("# of moves: expected {} got {}", expected.size(), fast.size()));
+            }
+            return pass();
+        }
+
+        TestResult check_move_lists_equal(MoveList& fast, vector<Move>& expected, const Yolah& yolah) {
+            sort(begin(fast), end(fast));
+            sort(begin(expected), end(expected));
+            if (equal(begin(fast), end(fast), begin(expected), end(expected))) {
+                return pass();
+            }
+            ostringstream oss;
+            oss << "move lists differ\n" << yolah << '\n';
+            vector<Move> only_in_fast, only_in_expected;
+            set_difference(begin(fast), end(fast), begin(expected), end(expected), back_inserter(only_in_fast));
+            set_difference(begin(expected), end(expected), begin(fast), end(fast), back_inserter(only_in_expected));
+            if (!only_in_expected.empty()) {
+                oss << "  Only in expected: ";
+                for (const auto& m : only_in_expected) oss << m << ' ';
+                oss << '\n';
+            }
+            if (!only_in_fast.empty()) {
+                oss << "  Only in fast: ";
+                for (const auto& m : only_in_fast) oss << m << ' ';
+                oss << '\n';
+            }
+            return fail(oss.str());
+        }
+
+        TestResult check_undo(const Yolah& before, const Yolah& after) {
+            if (before == after) return pass();
+            ostringstream oss;
+            oss << "undo failed\n  Previous state:\n" << before
+                << "\n  State after undo:\n" << after << '\n';
+            return fail(oss.str());
+        }
+
+        TestResult check_game_over_moves(const Yolah& yolah, const MoveList& moves) {
+            if (moves.size() == 1 && moves[0] == Move::none()) return pass();
+            ostringstream oss;
+            oss << "only Move::none() should be available when game is over\n"
+                << YolahWithMoves(yolah, moves) << '\n';
+            return fail(oss.str());
+        }
+    }
+
+    void random_games(size_t nb_games, optional<uint64_t> seed) {
+        MoveList fast_moves;
+        random_device rd;
+        mt19937 mt(seed.value_or(rd()));
+        size_t total_tests = 0;
+        size_t passed_tests = 0;
+
+        auto run_test = [&](TestResult result) -> bool {
+            total_tests++;
+            if (result) {
+                passed_tests++;
+                return true;
+            }
+            cout << format("{}FAIL:{} {}\n", RED, RESET, result.message);
+            return false;
+        };
+
         auto slow_moves_generation = [](const Yolah& yolah) {
             vector<Move> res;
             uint64_t occupied = yolah.black | yolah.white | yolah.holes;
@@ -649,7 +729,7 @@ namespace test {
                                 res.emplace_back(from, to);
                                 ii += di;
                                 jj += dj;
-                            }                   
+                            }
                         }
                     }
                 }
@@ -657,113 +737,73 @@ namespace test {
             if (res.empty()) res.push_back(Move::none());
             return res;
         };
-        MoveList moves1;
-        random_device rd;
-        mt19937 mt(seed.value_or(rd()));
-        size_t total_tests = 0;
-        size_t passed_tests = 0;
+
+        auto check_none_move_execution = [](const Yolah& before, const Yolah& after) -> TestResult {
+            if (before.black != after.black || before.white != after.white ||
+                before.holes != after.holes || before.black_score != after.black_score ||
+                after.ply != before.ply + 1) {
+                return fail("Move::none() must only change the ply number");
+            }
+            return pass();
+        };
+
+        auto check_regular_move_execution = [](const Yolah& before, const Yolah& after, Move m) -> TestResult {
+            uint64_t player_bb = before.current_player() == BLACK ? after.black : after.white;
+            uint64_t from_bb = square_bb(m.from_sq());
+            uint64_t to_bb = square_bb(m.to_sq());
+
+            if (!(player_bb & from_bb) && (player_bb & to_bb) && (after.holes & from_bb)) {
+                return pass();
+            }
+            ostringstream oss;
+            oss << "move execution incorrect\n" << after << "\n  Move: " << m << '\n';
+            if ((player_bb & from_bb) != 0) oss << "  From square should be cleared\n";
+            if ((player_bb & to_bb) == 0) oss << "  To square should be set\n";
+            if ((after.holes & from_bb) == 0) oss << "  From square should be a hole\n";
+            return fail(oss.str());
+        };
+
         cout << format("{}\n=== Running Random Games Tests ===\n{}", BOLD, RESET);
+
         for (size_t i = 0; i < nb_games; i++) {
-            Yolah yolah;    
+            Yolah yolah;
             while (!yolah.game_over()) {
-                total_tests++;                 
-                yolah.moves(moves1);
-                vector<Move> moves2 = slow_moves_generation(yolah);
-                if (moves1.size() != moves2.size()) {
-                    cout << format("{}FAIL:{} # of moves, should be {} got {}\n", RED, RESET, moves2.size(), moves1.size());
-                    break;
-                }
-                passed_tests++;
-                total_tests++;
-                sort(begin(moves1), end(moves1));
-                sort(begin(moves2), end(moves2));
-                if (!equal(begin(moves1), end(moves1), begin(moves2), end(moves2))) {
-                    cout << format("{}FAIL:{} move lists differ\n", RED, RESET);
-                    vector<Move> only_in_moves1, only_in_moves2;
-                    set_difference(begin(moves1), end(moves1), begin(moves2), end(moves2), back_inserter(only_in_moves1));
-                    set_difference(begin(moves2), end(moves2), begin(moves1), end(moves1), back_inserter(only_in_moves2));
-                    cout << yolah << '\n';
-                    if (!only_in_moves2.empty()) {
-                        cout << format("  Only in correct moves: ");
-                        for (const auto& m : only_in_moves2) cout << m << ' ';
-                        cout << '\n';
-                    }
-                    if (!only_in_moves1.empty()) {
-                        cout << format("  Only in fast: ");
-                        for (const auto& m : only_in_moves1) cout << m << ' ';
-                        cout << '\n';
-                    }                    
-                    break;
-                }
-                passed_tests++;
-                uniform_int_distribution<int> d(0, moves1.size() - 1);
-                Move m = moves1[d(mt)];
-                Yolah old = yolah;
+                yolah.moves(fast_moves);
+                vector<Move> expected_moves = slow_moves_generation(yolah);
+
+                if (!run_test(check_move_count(fast_moves, expected_moves))) break;
+                if (!run_test(check_move_lists_equal(fast_moves, expected_moves, yolah))) break;
+
+                uniform_int_distribution<int> d(0, fast_moves.size() - 1);
+                Move m = fast_moves[d(mt)];
+                Yolah before = yolah;
                 yolah.play(m);
-                total_tests++;
+
                 if (m == Move::none()) {
-                    if (old.black != yolah.black || old.white != yolah.white || 
-                        old.holes != yolah.holes || old.black_score != yolah.black_score || 
-                        yolah.ply != old.ply + 1) {
-                            cout << format("{}FAIL:{} Move::none() must only change the ply number\n", RED, RESET);
-                            break;
-                    }
-                    passed_tests++;
+                    if (!run_test(check_none_move_execution(before, yolah))) break;
                 } else {
-                    uint64_t player_bb = old.current_player() == BLACK ? yolah.black : yolah.white;
-                    uint64_t from_bb = square_bb(m.from_sq());
-                    uint64_t to_bb = square_bb(m.to_sq());
-                    if ((player_bb & from_bb) || !(player_bb & to_bb) || !(yolah.holes & from_bb)) {
-                        cout << format("{}FAIL:{} move execution incorrect\n", RED, RESET);
-                        cout << yolah << '\n';
-                        cout << "  Move: " << m << '\n';
-                        if ((player_bb & from_bb) != 0) {
-                            cout << "  From square should be cleared\n";
-                        }
-                        if ((player_bb & to_bb) != 0) {
-                            cout << "  To square should be set\n";
-                        }
-                        if ((yolah.holes & from_bb) == 0) {
-                            cout << "  From square should be a hole\n";
-                        }
-                        break;
-                    }
-                    passed_tests++;
-                }                                
-                yolah.undo(m);
-                total_tests++;
-                if (yolah != old) {
-                    cout << format("{}FAIL:{} undo failed\n", RED, RESET);
-                    cout << "  Previous state:\n" << old << '\n';
-                    cout << "  State after undo:\n" << yolah << '\n';
-                    break;
+                    if (!run_test(check_regular_move_execution(before, yolah, m))) break;
                 }
-                passed_tests++;
+
+                yolah.undo(m);
+                if (!run_test(check_undo(before, yolah))) break;
                 yolah.play(m);
             }
+
             if (!yolah.game_over()) continue;
-            total_tests++;
-            yolah.moves(moves1);
-            if (moves1.size() == 0 || moves1[0] != Move::none()) {                    
-                cout << format("{}FAIL:{} only Move::none() should be available when game is over\n", RED, RESET);
-                cout << YolahWithMoves(yolah, moves1) << '\n';
-                continue;
-            }
-            passed_tests++;
-            total_tests++;
+
+            yolah.moves(fast_moves);
+            if (!run_test(check_game_over_moves(yolah, fast_moves))) continue;
+
             yolah.play(Move::none());
-            yolah.moves(moves1);
-            if (moves1.size() == 0 || moves1[0] != Move::none()) {
-                cout << format("{}FAIL:{} only Move::none() should be available when game is over\n", RED, RESET);
-                cout << YolahWithMoves(yolah, moves1) << '\n';
-                continue;
-            }
-            passed_tests++;
+            yolah.moves(fast_moves);
+            if (!run_test(check_game_over_moves(yolah, fast_moves))) continue;
         }
+
         cout << format("\n{}=== Test Summary ==={}\n", BOLD, RESET);
         cout << format("Total tests: {}\n", total_tests);
         cout << format("Passed: {}{}{}\n", GREEN, passed_tests, RESET);
-        cout << format("Failed: {}{}{}\n", RED, total_tests - passed_tests, RESET);
+        cout << format("Failed: {}{}{}\n", (passed_tests == total_tests ? GREEN : RED), total_tests - passed_tests, RESET);
         if (passed_tests == total_tests) {
             cout << format("{}All tests passed!{}\n", GREEN, RESET);
         } else {
@@ -779,6 +819,6 @@ namespace test {
 
 int main() {
     magic::init();
-    //play_random_games<false>(10000000);
-    test::random_games(1000);
+    //play_random_games<false>(1000000);
+    test::random_games(10000, 42);
 }

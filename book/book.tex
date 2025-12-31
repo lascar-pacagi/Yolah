@@ -333,7 +333,7 @@ The Yolah game board is shown in Figure~\ref{fig:yolah_initial_configuration}.
 You can see four black pieces and four white pieces placed symmetrically. Black starts by choosing one of their four pieces.
 A piece can never disappear from the board because Yolah is a game without captures. A piece moves in all eight directions
 as far as it wishes as long as it is not blocked by another piece or a hole (a concept we will soon discuss). For example, if black
-chooses to move their piece located at {\ttfamily d5}, the squares where it can land are indicated by small black crosses in Figure~\ref{fig:yolah_moves1}.\\
+chooses to move their piece located at {\ttfamily d5}, the squares where it can land are indicated by black crosses in Figure~\ref{fig:yolah_moves1}.\\
 
 \begin{figure}[htpb]
 \centering
@@ -1641,7 +1641,7 @@ int main() {
 \item On lines 21 to 28, the \mintinline{c++}{for} loop tests all bitboards, finds the index for each using the hash (\mintinline{c++}{index} function), and verifies there are no collisions (line 23) with indices obtained for previous bitboards.
 
 % \item Enfin, aux lignes 29 à 42, si nous avons trouvé une constante MAGIC qui permet de créer le hachage parfait magique, nous affichons celle-ci puis nous affichons un tableau en C++ qui contient la position du bit à 1 pour chacun des bitboard. La sortie de ce programme, pour une exécution donnée, est donnée ci-dessous.
-\item Finally, on lines 29 to 42, if we found a \mintinline{c++}{MAGIC} constant that creates magic perfect hashing, we display it and then display a \emph{C++} array containing the position of the 1-bit for each bitboard. The output of this program for a given execution is shown below. 
+\item Finally, on lines 29 to 42, if we found a \mintinline{c++}{MAGIC} constant that creates magic perfect hashing, we display it and then display a C++ array containing the position of the 1-bit for each bitboard. The output of this program for a given execution is shown below. 
 
 \begin{minted}[breaklines,fontsize=\small]{cpp}
 found magic for K = 7: 0x65e4d4ee86638416
@@ -1740,7 +1740,7 @@ if solver.check() == sat:
 \item On line 21, we run the solver, which returns \mintinline{python}{sat} if it found a \mintinline{python}{MAGIC} value satisfying the constraints. Note that if the solver returns \mintinline{python}{unsat} instead of \mintinline{python}{sat}, it means no $64$-bit integer allows perfect hashing. Even though the search space is very large, on my machine, finding a solution takes less than a second!
 
 % \item Les lignes 22 à 32 permettent d'afficher sur la sortie standard la valeur MAGIC ainsi que le tableau C++ des valeurs obtenues. Ce tableau est donné ci-dessous.
-\item Lines 22 to 32 print to standard output the \mintinline{python}{MAGIC} value and the \emph{C++} array of obtained values. This array is shown below. 
+\item Lines 22 to 32 print to standard output the \mintinline{python}{MAGIC} value and the C++ array of obtained values. This array is shown below. 
 
 \begin{minted}[breaklines,fontsize=\small]{cpp}
 found magic for K = 6: 0x2643c51ab9dfa5b
@@ -1766,7 +1766,7 @@ Note that in \emph{Python} it was important to perform the operation \mintinline
 \end{minted}
 
 % En C++ nous aurions
-In \emph{C++} we would have:
+In C++ we would have:
 
 \begin{minted}[breaklines,fontsize=\small]{cpp}
    0x2643c51ab9dfa5b * 0x8000000000000000 >> 58
@@ -1867,7 +1867,7 @@ Now that we have seen how the magic perfect hashing technique works through a si
 \subsection{Magic Bitboards for Piece Moves}
 
 % Pour chaque configuration du plateau de jeu, nous voulons pouvoir, pour une case donnée, donner la liste des coups possibles pour cette configuration de jeu. Par exemple, pour le plateau de la figure \ref{fig:move23_position} dont les coups possibles pour la pièce en {\ttfamily d3} sont représentées par des petites croix blanches dans la figure \ref{fig:move23_d3_moves}, on voudrait très efficacement pouvoir obtenir le bitboard de la table \ref{tab:bb_move23_d3_moves} indiquant les différents coups possibles.
-For each board configuration, we want to be able to provide, for a given square, the list of possible moves for that game configuration. For example, for the board in figure \ref{fig:move23_position} where the possible moves for the piece at {\ttfamily d3} are represented by small white crosses in figure \ref{fig:move23_d3_moves}, we would like to very efficiently obtain the bitboard shown in table \ref{tab:bb_move23_d3_moves} indicating the different possible moves.\\
+For each board configuration, we want to be able to provide, for a given square, the list of possible moves for that game configuration. For example, for the board in figure \ref{fig:move23_position} where the possible moves for the piece at {\ttfamily d3} are represented by white crosses in figure \ref{fig:move23_d3_moves}, we would like to very efficiently obtain the bitboard shown in table \ref{tab:bb_move23_d3_moves} indicating the different possible moves.\\
 
 \begin{figure}[htpb]
 \centering
@@ -1882,7 +1882,7 @@ For each board configuration, we want to be able to provide, for a given square,
 \centering
 \includegraphics[width=0.5\textwidth]{move23_d3_possible_moves.pdf}
 % \caption{Coups possibles (petites croix blanches) pour le pion blanc situé sur la case {\ttfamily d3}}
-\caption{Possible moves (small white crosses) for the white piece at {\ttfamily d3}}
+\caption{Possible moves (white crosses) for the white piece at {\ttfamily d3}}
 \label{fig:move23_d3_moves}
 \end{figure}
 
@@ -2834,41 +2834,105 @@ The \mintinline{c++}{Move} structure, presented in listing \ref{lst:move_struct}
 \subsection{List of Moves for a Given Board Configuration}
 \label{subsection:list_of_moves}
 
-La liste des coups possibles dans une configuration donnée du jeu est représentée par la classe \mintinline{c++}{MoveList} présentée dans le listing \ref{lst:move_list_class}.
+% La liste des coups possibles dans une configuration donnée du jeu est représentée par la classe \mintinline{c++}{MoveList} présentée dans le listing \ref{lst:move_list_class}.
+The list of possible moves in a given game configuration is represented by the \mintinline{c++}{MoveList} class presented in listing \ref{lst:move_list_class}.
 
 \begin{itemize}
-\item À la ligne 1, la constante \mintinline{c++}{MAX_NB_MOVES} est une borne supérieure du nombre maximum de coups possibles pour les joueurs. Dans la configuration de départ, le joueur noir a le choix entre $14 * 4 = 56$ coups. Notons que ce nombre de coups possibles ne diminue pas forcément, par exemple, dans la configuration de la figure \ref{fig:more_moves}, le joueur noir a le choix entre $60$ coups. Pour obtenir cette borne supérieure, nous avons lancer beaucoup de parties aléatoires, et observer le maximum de coups disponibles pour les joueurs durant ces parties.
-\end{itemize}
+% \item À la ligne 1, la constante \mintinline{c++}{MAX_NB_MOVES} est une borne supérieure du nombre maximum de coups possibles pour les joueurs. Dans la configuration de départ, le joueur noir a le choix entre $14 \times 4 = 56$ coups. Notons que ce nombre de coups possibles ne diminue pas forcément, par exemple, dans la configuration de la figure \ref{fig:more_moves}, le joueur noir a le choix entre $60$ coups. Pour obtenir cette borne supérieure, nous avons lancé beaucoup de parties aléatoires et observé le maximum de coups disponibles pour les joueurs durant ces parties.
+\item At line 1, the constant \mintinline{c++}{MAX_NB_MOVES} is an upper bound on the maximum number of possible moves for the players. In the starting configuration, the black player has a choice of $14 \times 4 = 56$ moves. Note that this number of possible moves does not necessarily decrease; for example, in the configuration shown in figure \ref{fig:more_moves}, the black player has a choice of $60$ moves. To obtain this upper bound, we ran many random games and observed the maximum number of available moves for players during these games.
 
 \begin{figure}[htpb]
 \centering
 \includegraphics[width=0.5\textwidth]{more_moves.png}
-\caption{Dans cette position, le joueur noir à le choix entre $60$ coups}
+% \caption{Dans cette position, le joueur noir a le choix entre $60$ coups}
+\caption{In this position, the black player has a choice of $60$ moves}
 \label{fig:more_moves}
 \end{figure}
 
+% \item À la ligne 3, les coups seront stockés dans le tableau \mintinline{c++}{move_list} qui, dans notre utilisation, comme nous le verrons plus tard, sera placé sur la pile. Le pointeur \mintinline{c++}{last} pointera sur la case juste après le dernier coup (ce qui est plus pratique pour l'implémentation). Par exemple, si le joueur courant ne dispose que des coups \mintinline{c++}{Move(SQ_A1, SQ_A2)} et \mintinline{c++}{Move(SQ_H8, SQ_G7)}, nous aurons alors la configuration suivante~:
+\item At line 3, moves will be stored in the \mintinline{c++}{move_list} array which, in our usage as we will see later, will be placed on the stack. The \mintinline{c++}{last} pointer will point to the cell just after the last move (which is more convenient for implementation). For example, if the current player only has the moves \mintinline{c++}{Move(SQ_A1, SQ_A2)} and \mintinline{c++}{Move(SQ_H8, SQ_G7)}, we will have the following configuration:
+
+\begin{verbatim}
+                      last
+                        |
+                        v
+    +-------+-------+-------+-------+     +-------+
+    | a1:a2 | h8:g7 |       |       | ... |       |
+    +-------+-------+-------+-------+     +-------+
+       [0]     [1]     [2]     [3]           [74]
+\end{verbatim}
+
+% \item Aux lignes 6 à 9, les fonctions \mintinline{c++}{begin} et \mintinline{c++}{end} vont nous permettre d'itérer sur un objet de type \mintinline{c++}{MoveList}. Nous pourrons faire par exemple~:
+\item At lines 6 to 9, the \mintinline{c++}{begin} and \mintinline{c++}{end} functions allow us to iterate over a \mintinline{c++}{MoveList} object. For example, we can write:
+\begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
+MoveList list;
+// ...
+for (Move m : list) {
+    // ...
+}
+\end{minted}
+
+% \item Le reste des fonctions vont nous permettre de récupérer la taille (\mintinline{c++}{size} à la ligne 10), de pouvoir indexer la liste comme un tableau (\mintinline{c++}{operator[]} aux lignes 11 à 14) et de récupérer directement le pointeur sur le début du tableau \mintinline{c++}{move_list} (\mintinline{c++}{data} à la ligne 15).
+\item The remaining functions allow us to retrieve the size (\mintinline{c++}{size} at line 10), index the list like an array (\mintinline{c++}{operator[]} at lines 11 to 14), and directly obtain the pointer to the beginning of the \mintinline{c++}{move_list} array (\mintinline{c++}{data} at line 15).
+
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
 static constexpr uint16_t MAX_NB_MOVES = 75;
 class MoveList {
-    Move moveList[MAX_NB_MOVES], *last;
+    Move move_list[MAX_NB_MOVES], *last;
 public:
-    constexpr MoveList() noexcept : last(moveList) {}
-    constexpr const Move* begin() const noexcept { return moveList; }
+    constexpr MoveList() noexcept : last(move_list) {}
+    constexpr const Move* begin() const noexcept { return move_list; }
     constexpr const Move* end() const noexcept { return last; }
-    constexpr Move* begin() noexcept { return moveList; }
+    constexpr Move* begin() noexcept { return move_list; }
     constexpr Move* end() noexcept { return last; }
-    constexpr size_t size() const noexcept { return last - moveList; }
-    constexpr const Move& operator[](size_t i) const { return moveList[i]; }
-    constexpr Move& operator[](size_t i) { return moveList[i]; }
-    constexpr Move* data() noexcept { return moveList; }
+    constexpr size_t size() const noexcept { return last - move_list; }
+    constexpr const Move& operator[](size_t i) const { 
+        return move_list[i]; 
+    }
+    constexpr Move& operator[](size_t i) { return move_list[i]; }
+    constexpr Move* data() noexcept { return move_list; }
     friend class Yolah;
 };
 \end{minted}
-\captionof{listing}{Classe représentant une liste de coups}
+% \captionof{listing}{Classe représentant une liste de coups}
+\captionof{listing}{Class representing a list of moves}
 \label{lst:move_list_class}
-\end{mdframed} 
+\end{mdframed}
+
+% La fonction \mintinline{c++}{void Yolah::moves(uint8_t player, MoveList& moves)} présentée à la ligne 19 du listing \ref{lst:get_moves}, va placer dans le paramètre \mintinline{c++}{moves} de type \mintinline{c++}{MoveList} les coups possibles dans la configuration actuelle du jeu pour le joueur en paramètre (\mintinline{c++}{player}) (qui vaut soit \mintinline{c++}{BLACK}, soit \mintinline{c++}{WHITE})\footnote{Il s'avèrera intéressant dans la suite du livre de pouvoir récupérer les coups possibles d'un joueur même si ce n'est pas son tour de jouer.}. Dans cette fonction,
+The function \mintinline{c++}{void Yolah::moves(uint8_t player, MoveList& moves)} presented at line 19 of listing \ref{lst:get_moves}, will store in the \mintinline{c++}{moves} parameter of type \mintinline{c++}{MoveList} the possible moves in the current game configuration for the player passed as parameter (\mintinline{c++}{player}) (which is either \mintinline{c++}{BLACK} or \mintinline{c++}{WHITE})\footnote{It will prove useful later in this book to be able to retrieve a player's possible moves even when it is not their turn to play.}. In this function,
+
+\begin{itemize}
+% \item La boucle entre les lignes 23 et 29 va parcourir chaque pièce du joueur \mintinline{c++}{player}, dont les positions sont données dans le bitboard \mintinline{c++}{bb}, et générer tous les coups possibles pour chacune d'entre elles.
+\item The loop between lines 23 and 29 iterates over each piece of player \mintinline{c++}{player}, whose positions are given in the bitboard \mintinline{c++}{bb}, and generates all possible moves for each of them.
+\begin{itemize}
+% \item À la ligne 24, on récupère la case correspondant à la position du bit à $1$ le plus à droite dans le bitboard \mintinline{c++}{bb}. On utilise pour cela la fonction \mintinline{c++}{Square pop_lsb(uint64_t& b)} définie à la ligne 4. Cette fonction nous renvoie la case correspondant à la position du bit à $1$ le plus à droite dans le bitboard \mintinline{c++}{b} et, de plus, elle met un $0$ à la place du $1$ dans cette position. Par exemple,
+\item At line 24, we retrieve the square corresponding to the position of the rightmost $1$ bit in the bitboard \mintinline{c++}{bb}. We use the function \mintinline{c++}{Square pop_lsb(uint64_t& b)} defined at line 4 for this purpose. This function returns the square corresponding to the position of the rightmost $1$ bit in the bitboard \mintinline{c++}{b} and, additionally, sets that bit to $0$. For example,
+\begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
+uint64_t bb = 0b1000100100010000;
+Square sq = pop_lsb(bb);
+// sq == SQ_E1
+// bb ==      0b1000100100000000
+\end{minted}
+
+% \item À la ligne 25, on utilise notre fonction utilisant les bitboards magiques \mintinline{c++}{moves_bb} pour générer le bitboard contenant tous les coups possibles pour cette position et cette configuration d'obstacles. Nous avions dit au paragraphe \ref{par:edge_exclusion} à la page \pageref{par:edge_exclusion} que nous devrions gérer les éventuels obstacles sur les bords que nous avions ignorés. Rappelez-vous que pour limiter le nombre de configurations d'obstacles à considérer, nous avions ignoré les bords du plateau. En conséquence, il se peut que nous autorisions des coups sur les bords alors qu'il y a des obstacles. Il est très facile d'éliminer ces éventuels coups illégaux en éliminant les coups qui sont sur des cases occupées en faisant~: \mintinline{c++}{& ~occupied}.
+\item At line 25, we use our magic bitboard function \mintinline{c++}{moves_bb} to generate the bitboard containing all possible moves for this position and obstacle configuration. We mentioned in paragraph \ref{par:edge_exclusion} on page \pageref{par:edge_exclusion} that we would need to handle potential obstacles on the edges that we had ignored. Remember that to limit the number of obstacle configurations to consider, we had ignored the board edges. As a consequence, we might allow moves to edge squares even when there are obstacles there. It is very easy to eliminate these potentially illegal moves by removing moves that land on occupied squares using: \mintinline{c++}{& ~occupied}.
+
+% \item Aux lignes 26 à 28, nous parcourons le bitboard \mintinline{c++}{b} des coups possibles et utilisons de nouveau la fonction \mintinline{c++}{pop_lsb} pour récupérer les cases d'arrivée des différents coups (la position de départ étant la position \mintinline{c++}{from} de la pièce considérée), afin de construire un objet de type \mintinline{c++}{Move} que nous plaçons dans le tableau \mintinline{c++}{moves.move_list}.
+\item At lines 26 to 28, we iterate through the bitboard \mintinline{c++}{b} of possible moves and again use the \mintinline{c++}{pop_lsb} function to retrieve the destination squares of the various moves (the starting position being the \mintinline{c++}{from} position of the piece under consideration), in order to construct a \mintinline{c++}{Move} object that we place in the \mintinline{c++}{moves.move_list} array.
+
+\end{itemize}
+
+% \item Aux lignes 30 à 32, on vérifie que le joueur avait au moins un coup à sa disposition, en regardant si le pointeur \mintinline{c++}{move_list} pointe toujours sur le début du tableau \mintinline{c++}{moves.move_list}. Si c'est le cas, ce qui n'est pas l'occurrence la plus fréquente\footnote{Nous indiquons cela en utilisant la construction \mintinline{c++}{[[unlikely]]} du langage C++.}, nous ajoutons le coup indiquant que le joueur passe (\mintinline{c++}{Move::none()}), comme unique coup possible pour le joueur.
+\item At lines 30 to 32, we check whether the player had at least one move available, by checking if the \mintinline{c++}{move_list} pointer still points to the beginning of the \mintinline{c++}{moves.move_list} array. If so, which is not the most frequent occurrence\footnote{We indicate this using the C++ \mintinline{c++}{[[unlikely]]} attribute.}, we add the pass move (\mintinline{c++}{Move::none()}) as the only possible move for the player.
+
+% \item Enfin, à la ligne 33, nous plaçons le pointeur de fin \mintinline{c++}{moves.last} sur la case juste après celle contenant le dernier coup.
+\item Finally, at line 33, we set the end pointer \mintinline{c++}{moves.last} to the cell just after the one containing the last move.
+
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
@@ -2891,20 +2955,20 @@ public:
     // ...
 };
 void Yolah::moves(uint8_t player, MoveList& moves) const noexcept {
-    Move* moveList = moves.moveList;
+    Move* move_list = moves.move_list;
     uint64_t occupied = black | white | holes;
     uint64_t bb = player == BLACK ? black : white;
     while (bb) {
         Square   from = pop_lsb(bb);
         uint64_t b    = moves_bb(from, occupied) & ~occupied;
         while (b) {
-            *moveList++ = Move(from, pop_lsb(b));
+            *move_list++ = Move(from, pop_lsb(b));
         }
     }
-    if (moveList == moves.moveList) [[unlikely]] {
-        *moveList++ = Move::none();
+    if (move_list == moves.move_list) [[unlikely]] {
+        *move_list++ = Move::none();
     }
-    moves.last = moveList;
+    moves.last = move_list;
 }
 constexpr uint8_t Yolah::current_player() const noexcept {
     return ply & 1;
@@ -2913,9 +2977,13 @@ void Yolah::moves(MoveList& moves) const noexcept {
     this->moves(current_player(), moves);
 }
 \end{minted}
-\captionof{listing}{Génération des coups possibles pour un joueur dans la position courante du jeu}
+% \captionof{listing}{Génération des coups possibles pour un joueur dans la position courante du jeu}
+\captionof{listing}{Generating possible moves for a player in the current game position}
 \label{lst:get_moves}
-\end{mdframed} 
+\end{mdframed}
+
+% La fonction \mintinline{c++}{uint8_t current_player()} positionnée à la ligne 35 du listing \ref{lst:get_moves} renvoie le joueur courant. Pour ce faire, elle teste si le nombre de coups joués depuis le début de la partie est pair ou impair. Le joueur noir joue dans les positions où \mintinline{c++}{ply} vaut 0, 2, 4, 6, \ldots, tandis que le joueur blanc joue dans les positions où \mintinline{c++}{ply} vaut 1, 3, 5, 7, \ldots. On teste la parité en regardant le bit de poids faible de \mintinline{c++}{ply} ; on obtient en faisant \mintinline{c++}{(ply & 1)}~: $0$ quand c'est pair (ce qui correspond bien à \mintinline{c++}{BLACK}) et $1$ quand c'est impair (ce qui correspond bien à \mintinline{c++}{WHITE}).
+The function \mintinline{c++}{uint8_t current_player()} at line 35 of listing \ref{lst:get_moves} returns the current player. To do this, it tests whether the number of moves played since the beginning of the game is even or odd. The black player plays in positions where \mintinline{c++}{ply} equals 0, 2, 4, 6, \ldots, while the white player plays in positions where \mintinline{c++}{ply} equals 1, 3, 5, 7, \ldots. We test parity by examining the least significant bit of \mintinline{c++}{ply}; using \mintinline{c++}{(ply & 1)} yields: $0$ when even (which corresponds to \mintinline{c++}{BLACK}) and $1$ when odd (which corresponds to \mintinline{c++}{WHITE}). 
 
 \subsection{Making and Unmaking Moves}
 \label{subsection:making_and_unmaking_moves}

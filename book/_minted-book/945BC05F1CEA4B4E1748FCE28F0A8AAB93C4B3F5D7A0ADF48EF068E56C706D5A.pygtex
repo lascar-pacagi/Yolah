@@ -1,0 +1,6 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mb}{0b1000100100010000}\PYG{p}{;}
+\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{bb}\PYG{p}{);}
+\PYG{c+c1}{// sq == SQ\PYGZus{}E1}
+\PYG{c+c1}{// bb ==      0b1000100100000000}
+\end{Verbatim}

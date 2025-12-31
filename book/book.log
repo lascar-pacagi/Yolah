@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  30 DEC 2025 01:26
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.27)  31 DEC 2025 17:19
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -4214,42 +4214,263 @@ A.pygtex)
 <more_moves.png, id=798, 883.3pt x 883.3pt>
 File: more_moves.png Graphic file (type png)
 <use more_moves.png>
-Package pdftex.def Info: more_moves.png  used on input line 2845.
+Package pdftex.def Info: more_moves.png  used on input line 2846.
 (pdftex.def)             Requested size: 217.4502pt x 217.44147pt.
-Package mdframed Info: mdframed works in twoside mode on input line 2851.
-Package mdframed Info: mdframed detected package amsthm 
- changed the theorem header of amsthm
-(mdframed)              on input line 2851.
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/D707FFEB8A5C59698D8E66909C17B4F193C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/6961D7607F40A71BC7F0111A7C0BB44393C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/FFD46033C88E89BCE5FE24692FF9173693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/A98232605DB8B0C6BA6E5BB75EF0C85893C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/CC4922508743906E8B3F14F6DDDB95FD93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/B0061974914468DE549A2AF8CED1031693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/6370763D34BC12DBD4BCF7EEB9177BA593C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
 \openout4 = `book.pyg'.
 
 
-(./_minted-book/BD4F3F55B909570AF7693E05DC47023693C4B3F5D7A0ADF48EF068E56C706D5
+(./_minted-book/1BBB79E4C7BBF98777431C10CDE426FB93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex [48 <./more_moves.png (PNG copy)>])
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/645D0AC840C62F57C46E38CEF156742693C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
+\openout5 = `book.pyg'.
 
-Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 2869.
-See the caption package documentation for explanation.
 
-[48 <./more_moves.png (PNG copy)>]
-Package mdframed Info: mdframed works in twoside mode on input line 2873.
+(./_minted-book/3EC3EDF36FF50ADB5393642A9D4DDAA993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/D707FFEB8A5C59698D8E66909C17B4F193C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/6137CDE4893C59F76F005A8123D8E8E693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+Package mdframed Info: mdframed works in twoside mode on input line 2880.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 2873.
+(mdframed)              on input line 2880.
 \openout4 = `book.pyg'.
 
 
-(./_minted-book/793B5D8FED24AC30BFAEB60790735D2693C4B3F5D7A0ADF48EF068E56C706D5
+(./_minted-book/DFF1B173EC8E376C0A7D78D01DBFF92893C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 2916.
+(caption)                particular \caption on input line 2901.
 See the caption package documentation for explanation.
 
-[49]
-Package mdframed Info: mdframed works in twoside mode on input line 2923.
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/279A1AD29AFF09D132C3086689AA6A4B93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/436E2671A1B5A98944375A19C9E2D37793C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/6370763D34BC12DBD4BCF7EEB9177BA593C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/BF2DA182F1EE595FD676485F92F7A0E293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/BC7C0F864688846C5BB844711268003993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C826EC1F38B8091BCEAE58E4E92B870293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/BF2DA182F1EE595FD676485F92F7A0E293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/BFCC9DA4F2E1D313C63CD0A4EE7604E993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/BFCC9DA4F2E1D313C63CD0A4EE7604E993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/FEFF6D1A0703C63B515D3CCCAF84C94493C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/3B5D5C3712955042212316173CCF37BE93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout4 = `book.pyg'.
+
+
+(./_minted-book/945BC05F1CEA4B4E1748FCE28F0A8AAB93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex
+Overfull \hbox (7.95053pt too wide) in paragraph at lines 2913--1
+\T1/cmr/m/n/12 most $\OT1/cmr/m/n/12 1$ \T1/cmr/m/n/12 bit in the bit-board \T1
+/cmtt/m/n/10.95 bb\T1/cmr/m/n/12 . We use the func-tion \T1/cmtt/m/n/10.95 Squa
+re[] []pop_lsb([]uint64_t[][]&[][]
+ []
+
+[49])
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/4E648BE5D383FB0E311CF4F69D76EEDA93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C9ED4E881BA8C6AE20DFA107AC91D9AB93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/3B5D5C3712955042212316173CCF37BE93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/539535ECFE3A8B6CA77C802879B887D993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/A0531DB54FA845D213FD40D3A3146D4693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/2CB14BA63DE29B5B409E59A8C4757A7D93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/26156020ECB7D4524C9E4C7BEBDC5BE693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/D707FFEB8A5C59698D8E66909C17B4F193C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/26156020ECB7D4524C9E4C7BEBDC5BE693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/2BCA84D756D16624D479325B39C4258B93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/F36CA4499475260F75AA54302E83836293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/8343559605598C04498E95572A582E4C93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+Package mdframed Info: mdframed works in twoside mode on input line 2937.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 2923.
+(mdframed)              on input line 2937.
+\openout4 = `book.pyg'.
+
+
+(./_minted-book/1DB1B8C6F6AA9FE121210B668DF9376C93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 2981.
+See the caption package documentation for explanation.
+
+[50]
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/7EF6AF8EE994B6656D74A14C9ADC26A393C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/5E5859C72F4C1142181A8CC267AAB1A093C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/5E5859C72F4C1142181A8CC267AAB1A093C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/5E5859C72F4C1142181A8CC267AAB1A093C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/49B1E0B8C47D028536E08ED8582F629F93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/BC7C0F864688846C5BB844711268003993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/C826EC1F38B8091BCEAE58E4E92B870293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+Package mdframed Info: mdframed works in twoside mode on input line 2991.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 2991.
 \openout4 = `book.pyg'.
 
 
@@ -4257,7 +4478,7 @@ Package mdframed Info: mdframed detected package amsthm
 A.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 2941.
+(caption)                particular \caption on input line 3009.
 See the caption package documentation for explanation.
 
 \openout5 = `book.pyg'.
@@ -4269,11 +4490,11 @@ A.pygtex)
 
 
 (./_minted-book/69B64623F86DEF16CE17D454B8BE41AE93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-Package mdframed Info: mdframed works in twoside mode on input line 2945.
+A.pygtex) [51]
+Package mdframed Info: mdframed works in twoside mode on input line 3013.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 2945.
+(mdframed)              on input line 3013.
 \openout4 = `book.pyg'.
 
 
@@ -4281,7 +4502,7 @@ Package mdframed Info: mdframed detected package amsthm
 A.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 2963.
+(caption)                particular \caption on input line 3031.
 See the caption package documentation for explanation.
 
 \openout5 = `book.pyg'.
@@ -4293,11 +4514,11 @@ A.pygtex)
 
 
 (./_minted-book/69B64623F86DEF16CE17D454B8BE41AE93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex) [50]
-Package mdframed Info: mdframed works in twoside mode on input line 2969.
+A.pygtex)
+Package mdframed Info: mdframed works in twoside mode on input line 3037.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 2969.
+(mdframed)              on input line 3037.
 \openout4 = `book.pyg'.
 
 
@@ -4305,63 +4526,67 @@ Package mdframed Info: mdframed detected package amsthm
 A.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 2972.
+(caption)                particular \caption on input line 3040.
 See the caption package documentation for explanation.
 
-[51] [52
 
-]
-Chapter 3.
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [52]
 [53] [54
 
 ]
-Chapter 4.
+Chapter 3.
 [55] [56
 
 ]
-Chapter 5.
+Chapter 4.
 [57] [58
 
 ]
-Chapter 6.
+Chapter 5.
 [59] [60
 
 ]
-Chapter 7.
+Chapter 6.
 [61] [62
 
 ]
-Chapter 8.
+Chapter 7.
 [63] [64
 
 ]
-Chapter 9.
+Chapter 8.
 [65] [66
 
-] (./book.acr) (./book.gls) [67
+]
+Chapter 9.
+[67] [68
+
+] (./book.acr) (./book.gls) [69
 
 
-] [68
+] [70
 
 ]
-Overfull \hbox (4.54851pt too wide) in paragraph at lines 3271--3271
+Overfull \hbox (4.54851pt too wide) in paragraph at lines 3339--3339
 []\T1/cmr/m/n/12 Stockfish Team. \T1/cmr/m/it/12 Stock-fish: Open Source Chess 
 En-gine\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 https : / / stockfishchess .
  []
 
 
-Overfull \hbox (1.5946pt too wide) in paragraph at lines 3271--3271
+Overfull \hbox (1.5946pt too wide) in paragraph at lines 3339--3339
 []\T1/cmr/m/n/12 Pradyumna Kan-nan. \T1/cmr/m/it/12 Magic Move-Bitboard Gen-er-
 a-tion in Com-puter Chess\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 http :
  []
 
 
-Overfull \hbox (1.26596pt too wide) in paragraph at lines 3271--3271
+Overfull \hbox (1.26596pt too wide) in paragraph at lines 3339--3339
 []\T1/cmr/m/n/12 Google. \T1/cmr/m/it/12 Google Bench-mark: A mi-crobench-mark 
 sup-port li-brary\T1/cmr/m/n/12 . [][]$\T1/cmtt/m/n/12 https : / / github .
  []
 
-[69] (./book.aux)
+[71] (./book.aux)
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
@@ -4377,11 +4602,11 @@ Package logreq Info: Writing requests to 'book.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 54493 strings out of 478287
- 1179170 string characters out of 5849289
- 2050239 words of memory out of 5000000
- 70744 multiletter control sequences out of 15000+600000
- 498366 words of font info for 103 fonts, out of 8000000 for 9000
+ 54672 strings out of 478287
+ 1194044 string characters out of 5849289
+ 2053327 words of memory out of 5000000
+ 70811 multiletter control sequences out of 15000+600000
+ 498053 words of font info for 102 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  91i,21n,117p,1879b,2309s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc}{/usr/share/texmf/
@@ -4389,34 +4614,33 @@ fonts/enc/dvips/cm-super/cm-super-ts1.enc}{/usr/share/texlive/texmf-dist/fonts/
 enc/dvips/fontawesome/fontawesometwo.enc}</usr/share/texlive/texmf-dist/fonts/t
 ype1/public/fontawesome/FontAwesome.pfb></usr/share/texlive/texmf-dist/fonts/ty
 pe1/public/amsfonts/cm/cmmi12.pfb></usr/share/texlive/texmf-dist/fonts/type1/pu
-blic/amsfonts/cm/cmmi6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/am
-sfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/
-cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8
-.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb><
-/usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/sh
-are/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/sha
-re/texmf/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/texmf/fonts/type1
-/public/cm-super/sfbx0600.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfb
-x1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb></usr/shar
-e/texmf/fonts/type1/public/cm-super/sfbx1440.pfb></usr/share/texmf/fonts/type1/
-public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx
-2488.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfcc1200.pfb></usr/share
-/texmf/fonts/type1/public/cm-super/sfit1095.pfb></usr/share/texmf/fonts/type1/p
-ublic/cm-super/sfrm0600.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0
-700.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0800.pfb></usr/share/
-texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf/fonts/type1/pu
-blic/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm12
-00.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1440.pfb></usr/share/t
-exmf/fonts/type1/public/cm-super/sfrm1728.pfb></usr/share/texmf/fonts/type1/pub
-lic/cm-super/sfti1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti120
-0.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/te
-xmf/fonts/type1/public/cm-super/sftt1095.pfb></usr/share/texmf/fonts/type1/publ
-ic/cm-super/sftt1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt2488
-.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/wasy-type1/wasy10.pfb>
-Output written on book.pdf (79 pages, 3159651 bytes).
+blic/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/am
+sfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/
+cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy1
+0.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10
+.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/tex
+mf/fonts/type1/public/cm-super/sfbx0600.pfb></usr/share/texmf/fonts/type1/publi
+c/cm-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.
+pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1440.pfb></usr/share/texm
+f/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public
+/cm-super/sfbx2488.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfcc1200.p
+fb></usr/share/texmf/fonts/type1/public/cm-super/sfit1095.pfb></usr/share/texmf
+/fonts/type1/public/cm-super/sfrm0600.pfb></usr/share/texmf/fonts/type1/public/
+cm-super/sfrm0700.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0800.pf
+b></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf/
+fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/c
+m-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1440.pfb
+></usr/share/texmf/fonts/type1/public/cm-super/sfrm1728.pfb></usr/share/texmf/f
+onts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts/type1/public/cm
+-super/sfti1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb>
+</usr/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb></usr/share/texmf/fo
+nts/type1/public/cm-super/sftt1200.pfb></usr/share/texmf/fonts/type1/public/cm-
+super/sftt2488.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/wasy-type1
+/wasy10.pfb>
+Output written on book.pdf (81 pages, 3151228 bytes).
 PDF statistics:
- 1098 PDF objects out of 1200 (max. 8388607)
- 837 compressed objects within 9 object streams
- 190 named destinations out of 1000 (max. 500000)
+ 1105 PDF objects out of 1200 (max. 8388607)
+ 846 compressed objects within 9 object streams
+ 194 named destinations out of 1000 (max. 500000)
  708 words of extra memory for PDF output out of 10000 (max. 10000000)
 
