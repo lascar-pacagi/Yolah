@@ -1,0 +1,14 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{+w}{    }\PYG{c+cm}{/* return type */}\PYG{+w}{ }\PYG{n}{recursive}\PYG{p}{(}\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{,}\PYG{+w}{ }\PYG{c+cm}{/* other parameters */}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{c+c1}{// ...}
+\PYG{+w}{        }\PYG{n}{MoveList}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{;}
+\PYG{+w}{        }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{moves}\PYG{p}{(}\PYG{n}{moves}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{play}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
+\PYG{+w}{            }\PYG{n}{recursive}\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{,}\PYG{+w}{ }\PYG{c+cm}{/* ... */}\PYG{p}{);}
+\PYG{+w}{            }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{undo}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{c+c1}{// ...}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{c+c1}{// ...}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

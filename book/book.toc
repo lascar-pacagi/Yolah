@@ -14,15 +14,15 @@
 \contentsline {subsection}{\numberline {2.3.3}Move Representation}{46}{subsection.2.3.3}%
 \contentsline {subsection}{\numberline {2.3.4}List of Moves for a Given Board Configuration}{48}{subsection.2.3.4}%
 \contentsline {subsection}{\numberline {2.3.5}Making and Unmaking Moves}{51}{subsection.2.3.5}%
-\contentsline {section}{\numberline {2.4}Testing with Random Games}{52}{section.2.4}%
-\contentsline {section}{\numberline {2.5}What's Next}{53}{section.2.5}%
-\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{53}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{55}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{57}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{59}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{61}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{63}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{65}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{67}{chapter.9}%
-\contentsline {chapter}{Acronymes}{69}{section*.34}%
-\contentsline {chapter}{Bibliography}{71}{appendix*.36}%
+\contentsline {section}{\numberline {2.4}Testing with Random Games}{56}{section.2.4}%
+\contentsline {section}{\numberline {2.5}What's Next}{56}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{56}{section.2.6}%
+\contentsline {chapter}{\numberline {3}AI Players}{57}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{59}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{61}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{63}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{65}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{67}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{69}{chapter.9}%
+\contentsline {chapter}{Acronymes}{71}{section*.34}%
+\contentsline {chapter}{Bibliography}{73}{appendix*.36}%

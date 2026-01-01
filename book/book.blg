@@ -1,15 +1,15 @@
 [0] Config.pm:307> INFO - This is Biber 2.17
 [0] Config.pm:310> INFO - Logfile is 'book.blg'
-[55] biber:340> INFO - === Wed Dec 31, 2025, 17:19:09
+[55] biber:340> INFO - === Thu Jan  1, 2026, 15:28:23
 [65] Biber.pm:418> INFO - Reading 'book.bcf'
-[113] Biber.pm:972> INFO - Found 9 citekeys in bib section 0
-[122] Biber.pm:4383> INFO - Processing section 0
-[130] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
+[114] Biber.pm:972> INFO - Found 9 citekeys in bib section 0
+[123] Biber.pm:4383> INFO - Processing section 0
+[131] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
 [132] bibtex.pm:1713> INFO - LaTeX decoding ...
 [166] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
 [223] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
-[223] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
-[223] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
-[223] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
+[224] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
+[224] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
+[224] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
 [230] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
 [232] bbl.pm:757> INFO - Output to book.bbl

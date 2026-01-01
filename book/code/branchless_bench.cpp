@@ -194,23 +194,35 @@ tuple<ll, ll, ll, ll> play_branchless() {
     // uint64_t* bb[2] = {&black, &white};
     // uint8_t* scores[2] = {&black_score, &white_score};
     for (const auto& m : MOVES) {
-        if (m != Move::none()) [[likely]] {
-            uint64_t pos1 = square_bb(m.from_sq());
-            uint64_t pos2 = square_bb(m.to_sq());
-            uint64_t pos = pos1 | pos2;
-            int player = ply & 1;
-            // uint64_t white_mask = -uint64_t(ply & 1);
-            // uint64_t black_mask = ~white_mask;
-            
-            // black ^= pos & black_mask;
-            // white ^= pos & white_mask;
-            // black_score += black_mask & 1;
-            // white_score += white_mask & 1;
-            // *bb[player] ^= pos;
-            // *scores[player]++;             
-            empty |= pos1;
+        uint64_t pos1 = square_bb(m.from_sq());
+        uint64_t pos2 = square_bb(m.to_sq());
+        bool is_none_move = m == Move::none();
+        if (ply & 1) {
+            white ^= pos1 ^ pos2;
+            white_score += !is_none_move;
+        } else {
+            black ^= pos1 ^ pos2;
+            black_score += !is_none_move;
         }
+        empty |= pos1 * !is_none_move;
         ply++;
+        // if (m != Move::none()) [[likely]] {
+        //     uint64_t pos1 = square_bb(m.from_sq());
+        //     uint64_t pos2 = square_bb(m.to_sq());
+        //     uint64_t pos = pos1 | pos2;
+        //     int player = ply & 1;
+        //     // uint64_t white_mask = -uint64_t(ply & 1);
+        //     // uint64_t black_mask = ~white_mask;
+            
+        //     // black ^= pos & black_mask;
+        //     // white ^= pos & white_mask;
+        //     // black_score += black_mask & 1;
+        //     // white_score += white_mask & 1;
+        //     // *bb[player] ^= pos;
+        //     // *scores[player]++;             
+        //     empty |= pos1;
+        // }
+        // ply++;
         // uint64_t move_mask = -uint64_t(m != Move::none());        
         // uint64_t pos1 = square_bb(m.from_sq()) & move_mask;
         // uint64_t pos2 = square_bb(m.to_sq()) & move_mask;

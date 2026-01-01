@@ -10,7 +10,7 @@
 \PYG{+w}{            }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
 \PYG{+w}{            }\PYG{n}{black\PYGZus{}score}\PYG{o}{++}\PYG{p}{;}
 \PYG{+w}{        }\PYG{p}{\PYGZcb{}}
-\PYG{+w}{        }\PYG{n}{empty}\PYG{+w}{ }\PYG{o}{|=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{p}{;}
+\PYG{+w}{        }\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{|=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{p}{;}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}
 \PYG{+w}{    }\PYG{n}{ply}\PYG{o}{++}\PYG{p}{;}
 \PYG{p}{\PYGZcb{}}

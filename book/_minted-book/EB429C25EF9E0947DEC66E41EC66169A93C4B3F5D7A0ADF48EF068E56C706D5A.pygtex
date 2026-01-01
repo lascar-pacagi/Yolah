@@ -1,0 +1,12 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mb}{0b1000100100010000}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{SQ\PYGZus{}E1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G1}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{    }\PYG{c+c1}{// pos1 ==            0b010000;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{    }\PYG{c+c1}{// pos2 ==            0b100000;}
+\PYG{+w}{    }\PYG{c+c1}{// pos1 | pos2 ==     0b110000;}
+\PYG{+w}{    }\PYG{c+c1}{// white == 0b1000100100010000;}
+\PYG{+w}{    }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
+\PYG{+w}{    }\PYG{c+c1}{// white == 0b1000100100100000;}
+\end{Verbatim}

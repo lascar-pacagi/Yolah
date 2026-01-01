@@ -2482,7 +2482,7 @@ b = (0b1011 - 0b1011) & 0b1011; // b == 0
 
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, breaklines,fontsize=\small]{shell}
+\begin{minted}[linenos, breaklines,fontsize=\small]{text}
 int O_K[64] = {
     12, 11, 11, 11, 11, 11, 11, 12,
     11, 10, 10, 10, 10, 10, 10, 11,
@@ -2755,7 +2755,7 @@ Now that we have at our disposal the function \mintinline{c++}{moves_bb} from li
 
 % Nous allons représenter un coup par une paire, dont le premier élément est la case de départ, et le deuxième élément est la case d'arrivée. Par exemple, la partie déroulée dans les figures \ref{fig:game_example_opening}, \ref{fig:game_example_middle} et \ref{fig:game_example_end} sera textuellement représentée par les coups suivants~:
 We will represent a move by a pair, whose first element is the departure square and the second element is the arrival square. For example, the game shown in figures \ref{fig:game_example_opening}, \ref{fig:game_example_middle}, and \ref{fig:game_example_end} will be textually represented by the following moves:
-\begin{minted}[breaklines,fontsize=\small,frame=none]{shell}
+\begin{minted}[breaklines,fontsize=\small,frame=none]{text}
 a1:a2  h1:f3  h8:f6  a8:c6  d5:d6  d4:b2  d6:e6  e5:g5  f6:f5  f3:g4
 f5:h7  g5:h5  e4:f4  h5:f7  e6:e8  g4:g1  e8:b8  b2:d2  a2:a3  g1:f2
 a3:a6  d2:d3  f4:h2  d3:b5  a6:a4  b5:b3  a4:c4  b3:c3  h2:g2  f2:f1
@@ -2988,6 +2988,49 @@ The function \mintinline{c++}{uint8_t current_player()} at line 35 of listing \r
 \subsection{Making and Unmaking Moves}
 \label{subsection:making_and_unmaking_moves}
 
+% Pour terminer l'implémentation de Yolah, il nous reste à pouvoir répercuter un coup dans le jeu. La fonction \mintinline{c++}{void play(Move m)} du listing \ref{lst:making_moves} va modifier l'état du plateau en jouant le coup \mintinline{c++}{m} passé en paramètre.
+To complete the Yolah implementation, we still need to be able to apply a move to the game. The function \mintinline{c++}{void play(Move m)} in listing \ref{lst:making_moves} will modify the board state by playing the move \mintinline{c++}{m} passed as parameter.
+
+\begin{itemize}
+% \item À la ligne 2, on vérifie que le joueur ne passe pas son tour\footnote{Ce qu'il doit faire si et seulement s'il ne dispose d'aucun coup valide.}, nous utilisons la construction \mintinline{c++}{[[likely]]}, car il est beaucoup plus fréquent que le joueur puisse jouer. Qu'il passe ou non son tour, on incrémente, à la ligne 14, l'attribut \mintinline{c++}{ply} qui nous sert à compter le nombre de coups joués dans la partie et à déterminer le joueur courant.
+\item At line 2, we check that the player is not passing their turn\footnote{Which they must do if and only if they have no valid move available.}; we use the \mintinline{c++}{[[likely]]} attribute because it is much more common for the player to be able to play. Whether they pass or not, we increment, at line 14, the \mintinline{c++}{ply} attribute which we use to count the number of moves played in the game and to determine the current player.
+
+% \item À la ligne 3, \mintinline{c++}{pos1} est le bitboard correspondant à la case de départ du coup.
+\item At line 3, \mintinline{c++}{pos1} is the bitboard corresponding to the move's source square.
+
+% \item À la ligne 4, \mintinline{c++}{pos2} est le bitboard correspondant à la case d'arrivée du coup.
+\item At line 4, \mintinline{c++}{pos2} is the bitboard corresponding to the move's destination square.
+
+% \item À la ligne 5, on teste si c'est aux blancs de jouer.
+\item At line 5, we test if it is white's turn to play.
+\begin{itemize}
+% \item Si c'est le cas, on va inverser, à la ligne 6, grâce au OU exclusif, les bits correspondant aux cases de départ et d'arrivée du coup dans le bitboard \mintinline{c++}{white} donnant la position des pièces du joueur blanc. Par exemple,
+\item If so, we toggle, at line 6, using XOR, the bits corresponding to the source and destination squares of the move in the \mintinline{c++}{white} bitboard which gives the position of the white player's pieces. For example,
+\begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
+    uint64_t white = 0b1000100100010000;
+    Move m = Move(SQ_E1, SQ_G1);
+    uint64_t pos1 = square_bb(m.from_sq());
+    // pos1 ==            0b010000;
+    uint64_t pos2 = square_bb(m.to_sq());
+    // pos2 ==            0b100000;
+    // pos1 | pos2 ==     0b110000;
+    // white == 0b1000100100010000;
+    white ^= pos1 | pos2;
+    // white == 0b1000100100100000;
+\end{minted}
+% Puis à la ligne 7, on augmente le score du joueur blanc car il vient d'effectuer un coup.
+Then at line 7, we increase the white player's score because they have just made a move.
+
+% \item Si c'est au noir de jouer, on procède de même, mais pour le bitboard \mintinline{c++}{black} du joueur noir à la ligne 9, et on augmente son score à la ligne 10.
+\item If it is black's turn to play, we proceed similarly, but for the black player's \mintinline{c++}{black} bitboard at line 9, and we increase their score at line 10.
+
+\end{itemize}
+
+% \item À la ligne 12, on élimine la case de départ du coup en ajoutant un trou au bitboard \mintinline{c++}{holes} à la position correspondant à la case de départ du coup.
+\item At line 12, we eliminate the source square of the move by adding a hole to the \mintinline{c++}{holes} bitboard at the position corresponding to the move's source square.
+
+\end{itemize}
+
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
 void Yolah::play(Move m) {
@@ -3001,14 +3044,39 @@ void Yolah::play(Move m) {
             black ^= pos1 | pos2;
             black_score++;
         }
-        empty |= pos1;
+        holes |= pos1;
     }
     ply++;
 }
 \end{minted}
-\captionof{listing}{Le coup \mintinline{c++}{m} est joué dans la position courante du jeu}
+% \captionof{listing}{Le coup \mintinline{c++}{m} est joué dans la position courante du jeu}
+\captionof{listing}{The move \mintinline{c++}{m} is played in the current game position}
 \label{lst:making_moves}
-\end{mdframed} 
+\end{mdframed}
+
+% Il va s'avérer utile pour plusieurs de nos IA de pouvoir défaire le coup précédemment joué. La fonction \mintinline{c++}{void undo(Move m)} du listing \ref{lst:unmaking_moves} va effectuer le traitement inverse de celui effectué par la fonction \mintinline{c++}{void play(Move m)} afin de remettre le plateau de jeu dans l'état dans lequel il était avant de jouer le coup \mintinline{c++}{m}. Typiquement, on utilisera \mintinline{c++}{undo} comme suit~:
+It will prove useful for several of our AIs to be able to undo the previously played move. The function \mintinline{c++}{void undo(Move m)} in listing \ref{lst:unmaking_moves} will perform the inverse operation of that performed by the function \mintinline{c++}{void play(Move m)} in order to restore the game board to the state it was in before playing move \mintinline{c++}{m}. Typically, we will use \mintinline{c++}{undo} as follows:
+\begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
+    /* return type */ recursive(Yolah& yolah, /* other parameters */) {
+        // ...
+        MoveList moves;
+        yolah.moves(moves);
+        for (Move m : moves) {
+            yolah.play(m);
+            recursive(yolah, /* ... */);
+            yolah.undo(m);
+        }
+        // ...
+        return // ...
+    }    
+\end{minted}
+
+% Il est plus efficace, dans le listing précédent, d'utiliser la fonction \mintinline{c++}{undo} que de sauvegarder l'état complet du jeu avant l'appel récursif, puis de le restaurer après l'appel. Le benchmark du listing \ref{lst:undo_vs_restore_bench} teste cette affirmation. La fonction \mintinline{c++}{uint64_t count_nodes_with_undo(Yolah& yolah, int depth)} à la ligne 1 va tester la restauration de l'état du jeu grâce à la fonction \mintinline{c++}{undo} et va faire un nombre d'appels récursifs contrôlé par le paramètre \mintinline{c++}{depth}.\\
+% La fonction \mintinline{c++}{uint64_t count_nodes_with_restore(Yolah& yolah, int depth)} à la ligne 15 va, quant à elle, tester la restauration grâce à la sauvegarde de l'état complet du jeu à la ligne 23. L'état précédent est restauré grâce à l'affectation à la ligne 28.\\
+% Le résultat est donné dans le listing \ref{lst:undo_vs_restore_bench_result}. Le gain serait encore plus prononcé pour un jeu ayant un état plus conséquent que celui de Yolah.
+In the previous listing, it is more efficient to use the \mintinline{c++}{undo} function than to save the complete game state before the recursive call and then restore it afterward. The benchmark in listing \ref{lst:undo_vs_restore_bench} tests this assertion. The function \mintinline{c++}{count_nodes_with_undo} at line 1 tests state restoration using the \mintinline{c++}{undo} function and makes a number of recursive calls controlled by the \mintinline{c++}{depth} parameter.\\
+The function \mintinline{c++}{count_nodes_with_restore} at line 15 tests restoration by saving the complete game state at line 23. The previous state is restored via the assignment at line 28.\\
+The results are given in listing \ref{lst:undo_vs_restore_bench_result}. The performance gain would be even more pronounced for a game with a larger state than Yolah's.
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
@@ -3028,9 +3096,103 @@ void Yolah::undo(Move m) {
     }
 }
 \end{minted}
-\captionof{listing}{Le dernier coup joué \mintinline{c++}{m} est annulé}
+% \captionof{listing}{Le dernier coup joué \mintinline{c++}{m} est annulé}
+\captionof{listing}{The last played move \mintinline{c++}{m} is undone}
 \label{lst:unmaking_moves}
 \end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+uint64_t count_nodes_with_undo(Yolah& yolah, int depth) {
+    if (depth == 0 || yolah.game_over()) {
+        return 1;
+    }
+    uint64_t count = 0;
+    MoveList moves;
+    yolah.moves(moves);
+    for (const Move& m : moves) {
+        yolah.play(m);
+        count += count_nodes_with_undo(yolah, depth - 1);
+        yolah.undo(m);
+    }
+    return count;
+}
+uint64_t count_nodes_with_restore(Yolah& yolah, int depth) {
+    if (depth == 0 || yolah.game_over()) {
+        return 1;
+    }
+    uint64_t count = 0;
+    MoveList moves;
+    yolah.moves(moves);
+    // Save the complete state
+    Yolah saved = yolah;
+    for (const Move& m : moves) {
+        yolah.play(m);
+        count += count_nodes_with_restore(yolah, depth - 1);
+        // Restore the complete state
+        yolah = saved;
+    }
+    return count;
+}
+static void BM_recursive_with_undo(benchmark::State& state) {
+    magic::init();
+    int depth = state.range(0);
+    for (auto _ : state) {
+        Yolah yolah;
+        uint64_t nodes = count_nodes_with_undo(yolah, depth);
+        benchmark::DoNotOptimize(nodes);
+    }
+    // Calculate nodes for reporting
+    Yolah yolah;
+    uint64_t nodes = count_nodes_with_undo(yolah, depth);
+    state.SetItemsProcessed(state.iterations() * nodes);
+    state.counters["nodes"] = nodes;
+}
+static void BM_recursive_with_restore(benchmark::State& state) {
+    magic::init();
+    int depth = state.range(0);
+    for (auto _ : state) {
+        Yolah yolah;
+        uint64_t nodes = count_nodes_with_restore(yolah, depth);
+        benchmark::DoNotOptimize(nodes);
+    }
+    // Calculate nodes for reporting
+    Yolah yolah;
+    uint64_t nodes = count_nodes_with_restore(yolah, depth);
+    state.SetItemsProcessed(state.iterations() * nodes);
+    state.counters["nodes"] = nodes;
+}
+// Test at various depths
+BENCHMARK(BM_recursive_with_undo)->Arg(3)->Arg(4)->Arg(5);
+BENCHMARK(BM_recursive_with_restore)->Arg(3)->Arg(4)->Arg(5);
+
+BENCHMARK_MAIN();
+\end{minted}
+% \captionof{listing}{Benchmark pour tester l'affirmation que la fonction \mintinline{c++}{undo} apporte un gain par rapport à une sauvegarde de l'état complet du jeu}
+\captionof{listing}{Benchmark to test the assertion that the \mintinline{c++}{undo} function provides a performance gain over saving the complete game state}
+\label{lst:undo_vs_restore_bench}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[breaklines,fontsize=\small]{text}
+Run on (12 X 4400 MHz CPU s)
+CPU Caches: L1 Data 32 KiB (x6), L1 Instruction 32 KiB (x6),
+            L2 Unified 256 KiB (x6), L3 Unified 12288 KiB (x1)
+
+Benchmark                       Time (ms)   Throughput
+------------------------------------------------------
+BM_recursive_with_undo/3             1.09    150.4 M/s
+BM_recursive_with_undo/4            56.50    153.1 M/s
+BM_recursive_with_undo/5          3059.00    149.3 M/s
+BM_recursive_with_restore/3          1.24    132.3 M/s
+BM_recursive_with_restore/4         70.00    123.6 M/s
+BM_recursive_with_restore/5       3492.00    130.8 M/s
+\end{minted}
+% \captionof{listing}{Résultats du benchmark du listing \ref{lst:undo_vs_restore_bench}}
+\captionof{listing}{Benchmark results from listing \ref{lst:undo_vs_restore_bench}}
+\label{lst:undo_vs_restore_bench_result}
+\end{mdframed}
+
 
 \section{Testing with Random Games}
 
