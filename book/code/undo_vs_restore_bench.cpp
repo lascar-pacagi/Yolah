@@ -336,7 +336,6 @@ uint64_t count_nodes_with_restore(Yolah& yolah, int depth) {
 // =============================================================================
 
 static void BM_recursive_with_undo(benchmark::State& state) {
-    init_all_magics();
     int depth = state.range(0);
     for (auto _ : state) {
         Yolah yolah;
@@ -351,7 +350,6 @@ static void BM_recursive_with_undo(benchmark::State& state) {
 }
 
 static void BM_recursive_with_restore(benchmark::State& state) {
-    init_all_magics();
     int depth = state.range(0);
     for (auto _ : state) {
         Yolah yolah;
@@ -368,5 +366,8 @@ static void BM_recursive_with_restore(benchmark::State& state) {
 // Test at various depths
 BENCHMARK(BM_recursive_with_undo)->Arg(3)->Arg(4)->Arg(5);
 BENCHMARK(BM_recursive_with_restore)->Arg(3)->Arg(4)->Arg(5);
-
-BENCHMARK_MAIN();
+int main(int argc, char** argv) {
+    init_all_magics();
+    benchmark::Initialize(&argc, argv);
+    benchmark::RunSpecifiedBenchmarks();
+}

@@ -1,4 +1,5 @@
 #include <bits/stdc++.h>
+#include <immintrin.h>
 
 using namespace std;
 
@@ -241,11 +242,9 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
     }
 }
 
-namespace magic {
-    void init() {
-        init_magics(ORTHOGONAL, orthogonalTable, orthogonalMagics);
-        init_magics(DIAGONAL, diagonalTable, diagonalMagics);
-    }
+void init_all_magics() {
+    init_magics(ORTHOGONAL, orthogonalTable, orthogonalMagics);
+    init_magics(DIAGONAL, diagonalTable, diagonalMagics);
 }
 
 // =============================================================================
@@ -277,7 +276,7 @@ public:
         return data != m.data;
     }
     constexpr bool operator<(const Move& m) const noexcept {
-        return data < m.data;
+        return make_pair(from_sq(), to_sq()) < make_pair(m.from_sq(), m.to_sq());
     }
     constexpr explicit operator bool() const noexcept { return data != 0; }
 };
@@ -316,6 +315,29 @@ public:
     constexpr Move* data() noexcept { return move_list; }
     friend class Yolah;
 };
+
+class PRNG {
+    uint64_t s;
+    uint64_t rand64() noexcept {
+        s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
+        return s * 2685821657736338717ULL;
+    }
+   public:
+    constexpr PRNG(uint64_t seed) noexcept : s(seed) {}
+
+    constexpr uint64_t seed() const noexcept {
+        return s;
+    }
+
+    template<typename T>
+    T rand() noexcept {
+        return T(rand64());
+    }
+};
+
+constexpr uint32_t reduce(uint32_t x, uint32_t N) {
+    return ((uint64_t) x * (uint64_t) N) >> 32;
+}
 
 // =============================================================================
 // YOLAH CLASS
@@ -402,6 +424,41 @@ public:
         this->moves(current_player(), moves);
     }
 
+    Move random_move(PRNG& prng) const noexcept {
+        uint64_t occupied = black | white | holes;
+        uint64_t player_bb = current_player() == BLACK ? black : white;
+        Square from0 = pop_lsb(player_bb);
+        Square from1 = pop_lsb(player_bb);
+        Square from2 = pop_lsb(player_bb);
+        Square from3 = pop_lsb(player_bb);
+        uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+        uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+        uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+        uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+        uint32_t n0 = popcount(b0);
+        uint32_t n1 = popcount(b1);
+        uint32_t n2 = popcount(b2);
+        uint32_t n3 = popcount(b3);
+        uint32_t n = n0 + n1 + n2 + n3;
+        if (n == 0) [[unlikely]] {
+            return Move::none();
+        }
+        uint32_t bit = reduce(prng.rand<uint32_t>(), n);
+        int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
+        bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+        Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
+        uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];        
+        Square to = Square(std::countr_zero(_pdep_u64(1ULL << bit, bb)));
+        return Move(from, to);
+        /*while (bb) {
+            uint32_t tz = std::countr_zero(bb);
+        if (bit-- == 0)
+            return 1ULL << tz;
+        bb &= bb - 1;
+        }
+        */
+    }
+
     void play(Move m) noexcept {
         if (m != Move::none()) [[likely]] {
             uint64_t pos1 = square_bb(m.from_sq());
@@ -469,37 +526,43 @@ ostream& operator<<(ostream& os, const YolahWithMoves& ym) {
     uint64_t white = yolah.white;
     uint64_t holes = yolah.holes;
     static constexpr string_view players[] = {"Black player", "White player"};
-    os << players[yolah.current_player()] << '\n';
+    uint8_t player = yolah.current_player();    
+    os << players[player] << '\n';
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
             Square dst = Square(i * 8 + j);
             if (any_of(begin(moves), end(moves), [&](const Move& m) {
                 return m.to_sq() == dst;
             })) {
-                grid[i][j] = '*';
-            } 
-            else if (black & uint64_t(1) << j) grid[i][j] = 'X';
-            else if (white & uint64_t(1) << j) grid[i][j] = 'O';
-            else if (holes & uint64_t(1) << j) grid[i][j] = ' ';
+                grid[i][j] = player == BLACK ? 'X' : 'x';
+            }
+            else if (black & uint64_t(1) << j) grid[i][j] = 'B';
+            else if (white & uint64_t(1) << j) grid[i][j] = 'W';
+            else if (holes & uint64_t(1) << j) grid[i][j] = 'H';
             else grid[i][j] = '.';
         }
         black >>= 8;
         white >>= 8;
         holes >>= 8;
     }
-    const char* letters = "    a   b   c   d   e   f   g   h";
-    const char* line = "  +---+---+---+---+---+---+---+---+";
-    os << letters << '\n';
+    // UTF-8 box drawing characters
+    os << "\n  ┌───┬───┬───┬───┬───┬───┬───┬───┐\n";
     for (int i = 7; i >= 0; i--) {
-        os << line << '\n';
-        os << i + 1 << ' ';
+        os << i + 1 << " │";
         for (int j = 0; j < 8; j++) {
-            os << "| " << grid[i][j] << " ";
+            char c = grid[i][j];
+            if (c == 'B') os << " ○ ";
+            else if (c == 'W') os << " ● ";
+            else if (c == 'H') os << "   ";
+            else if (c == '.') os << " · ";
+            else os << ' ' << c << ' ';
+            os << "│";
         }
-        os << "| " << i + 1 << '\n';
+        os << '\n';
+        if (i > 0) os << "  ├───┼───┼───┼───┼───┼───┼───┼───┤\n";
     }
-    os << line << '\n';
-    os << letters << '\n';
+    os << "  └───┴───┴───┴───┴───┴───┴───┴───┘\n";
+    os << "    a   b   c   d   e   f   g   h\n";
     const auto [black_score, white_score] = yolah.score();
     os << "score: " << int(black_score) << '/' << int(white_score) << '\n';
     return os;
@@ -545,28 +608,6 @@ ostream& operator<<(ostream& os, const Yolah& yolah) {
 //     }
 // }
 
-class PRNG {
-    uint64_t s;
-    uint64_t rand64() noexcept {
-        s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
-        return s * 2685821657736338717ULL;
-    }
-   public:
-    constexpr PRNG(uint64_t seed) noexcept : s(seed) {}
-
-    constexpr uint64_t seed() const noexcept {
-        return s;
-    }
-
-    template<typename T>
-    T rand() noexcept {
-        return T(rand64());
-    }
-};
-
-constexpr uint32_t reduce(uint32_t x, uint32_t N) {
-    return ((uint64_t) x * (uint64_t) N) >> 32;
-}
 
 template<bool STEP_BY_STEP = true>
 void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
@@ -589,7 +630,7 @@ void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
                 cout << format("# moves: {}\n", moves.size());
                 for (const auto& m : moves) {
                     cout << m << ' ';
-                }            
+                }
                 cout << "\n\n";
                 cout << YolahWithMoves(yolah, moves) << '\n';
             }
@@ -621,6 +662,35 @@ void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
         cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
         cout << format("Max #moves:  {}\n", max_nb_moves);
     }
+}
+
+void play_random_games_fast(size_t nb_games, optional<uint64_t> seed = nullopt) {
+    MoveList moves;
+    random_device rd;
+    PRNG prng(seed.value_or(rd()));
+    size_t black_wins = 0;
+    size_t white_wins = 0;
+    size_t draws = 0;    
+    for (size_t i = 0; i < nb_games; i++) {
+        Yolah yolah;    
+        while (!yolah.game_over()) {                 
+            Move m = yolah.random_move(prng);
+            yolah.play(m);
+        }
+        auto [black_score, white_score] = yolah.score();
+        if (black_score > white_score) {
+            black_wins++;
+        } else if (white_score > black_score) {
+            white_wins++;
+        } else {
+            draws++;
+        }
+    }
+    cout << format("\n=== Game Statistics ===\n");
+    cout << format("Total games: {}\n", nb_games);
+    cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+    cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+    cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
 }
 
 namespace test {
@@ -818,7 +888,8 @@ namespace test {
 // =============================================================================
 
 int main() {
-    magic::init();
+    init_all_magics();
     //play_random_games<false>(1000000);
-    test::random_games(10000, 42);
+    play_random_games_fast(1000000);
+    //test::random_games(10000, 42);
 }

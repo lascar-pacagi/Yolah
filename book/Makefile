@@ -21,7 +21,7 @@ MAIN_TEX = $(MAIN).tex
 MAIN_PDF = $(MAIN).pdf
 
 # LaTeX compiler settings
-LATEX = pdflatex
+LATEX = xelatex
 LATEX_FLAGS = --shell-escape -interaction=nonstopmode -halt-on-error
 BIBER = biber
 MAKEGLOSSARIES = makeglossaries

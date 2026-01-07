@@ -71,6 +71,11 @@
 
 % Define code background color
 \definecolor{codebg}{RGB}{248,248,248}
+\definecolor{terminalaccent}{RGB}{76,175,80}  % Green accent for terminal
+
+% Font for terminal output with box-drawing characters
+\usepackage{fontspec}
+\setmonofont{DejaVu Sans Mono}[Scale=0.9]
 
 % Algorithms
 \usepackage{algorithm}
@@ -253,10 +258,10 @@
 \thispagestyle{empty}
 \vspace*{\fill}
 \begin{center}
-\textit{À Sar\textbf{ah}, \textbf{H}ug\textbf{o} et C\'e\textbf{ly}a \textcolor{red}{\faHeart}}\\
-\textit{\textbf{ahholy}}\\
-\textit{\textbf{aholy}}\\
-\textit{\textbf{yolah}}\\
+\textit{À Sarah, Hugo et C\'elya \textcolor{red}{\faHeart}}\\
+% \textit{\textbf{ahholy}}\\
+% \textit{\textbf{aholy}}\\
+% \textit{\textbf{yolah}}\\
 \end{center}
 \vspace*{\fill}
 \clearpage
@@ -290,10 +295,10 @@
 \section{The Yolah Game}
 
 % Nous avons créé le jeu Yolah dans le but d'illustrer des techniques efficaces d'implémentation de jeux de plateaux
-% et d'intelligences artificielles pour nos étudiants. Nous nous sommes inspirés du jeu des pingouins dont vous pouvez voir la boîte dans la figure \ref{fig:pingouins} (nous le conseillons \smiley)
+% et d'intelligences artificielles pour nos étudiants. Yolah est une variante du jeu des pingouins dont vous pouvez voir la boîte dans la figure \ref{fig:pingouins} (nous le conseillons \smiley)
 
-We created the Yolah game to illustrate effective techniques for implementing board games
-and artificial intelligences for our students. We were inspired by the Pingouins game, whose box you can see in Figure~\ref{fig:pingouins} (we highly recommend it \smiley)
+We designed Yolah, a variant of the Pingouins game, to illustrate effective techniques for implementing board games
+and artificial players for our students. You can see the Pingouins game box in Figure~\ref{fig:pingouins} (we highly recommend this game!)
 
 \begin{figure}[htpb]
 \centering
@@ -408,13 +413,23 @@ To summarize, the rules of Yolah are as follows:
 % \subsection{Caractéristiques intéressantes de Yolah pour développer des IA}
 \subsection{Interesting Characteristics of Yolah for Developing AIs}
 
+% Nous avons choisi de modifier les règles du jeu des pingouins et d'obtenir les règles de notre variante Yolah pour pouvoir réutiliser des concepts utilisés pour l'implémentation du jeu d'échecs. C'est pour cela que nous utilisons un plateau identique à celui des échecs, et pas les cases hexagonales du jeu des Pingouins.
+% Le déplacement des pions devient ainsi identique au déplacement d'une Dame.
+% Comme dans le jeu des pingouins, il n'y a pas de cycle dans le jeu, et il n'y a donc pas besoin de règles spéciales pour qu'une partie se termine.
+% Le nombre de coups à disposition de chacun des joueurs est assez important, mais raisonnable, au début (plus important que pour le jeu des Pingouins) \footnote{56 coups possibles pour le joueur noir en début de partie.}, mais il va diminuer petit à petit avec l'apparition des trous \footnote{Le nombre de coups possibles ne diminue pas forcément après chaque coup, il existe des configurations où le joueur a plus de 56 coups à sa disposition.}. Cela permet aux joueurs artificiels de pouvoir regarder un nombre assez important de coups à l'avance.
+% Par rapport au jeu des Pingouins nous avons éliminé les valeurs différentes entre certaines cases et nous avons fixé une configuration de départ pour simplifier le jeu et le rendre symétrique.
+
+We chose to modify the rules of the Pingouins game to create our Yolah variant, allowing us to reuse concepts from chess implementation. This is why we use a board identical to that of chess, rather than the hexagonal tiles of the Pingouins game.
+Piece movement thus becomes identical to that of a Queen in chess.
+As in the Pingouins game, there are no cycles in the game, so there is no need for special rules to ensure a game terminates.
+The number of moves available to each player is quite large, but reasonable, at the start (larger than for the Pingouins game) \footnote{56 possible moves for the black player at the start of the game.}, but it gradually decreases as holes appear \footnote{The number of possible moves does not necessarily decrease after each move; there are configurations where a player has more than 56 moves available.}. This allows artificial players to look ahead a fairly large number of moves.
+Compared to the Pingouins game, we removed the varying point values of tiles and defined a fixed starting configuration to simplify the game and make it symmetric. 
+
 % Nous avons choisi les règles précédentes pour Yolah, d'une part parce que nous aimions bien la dynamique du jeu des Pingouins, mais aussi parce qu'il n'y a pas de cycle dans le jeu, il n'y a donc pas besoin de règles spéciales pour éviter qu'une partie ne se termine pas. Le nombre de coups à disposition de chacun des joueurs est assez important au début (mais raisonnable) \footnote{56 coups possibles pour le joueur noir en début de partie.}, mais il va diminuer petit à petit avec l'apparition des trous \footnote{Le nombre de coups possibles ne diminue pas forcément après chaque coup, il existe des configurations où le joueur a plus de 56 coups à sa disposition.}. Cela permet aux IA de pouvoir regarder un nombre assez important de coups à l'avance.
 
-We chose the above rules for Yolah, on the one hand because we liked the dynamics of the Penguin game, but also because there are no cycles in the game, so there is no need for special rules to prevent a game from never ending. The number of moves available to each player is quite large at the beginning (but reasonable)\footnote{56 possible moves for the black player at the start of the game.}, but it will decrease little by little with the appearance of holes\footnote{The number of possible moves does not necessarily decrease after each move; there are configurations where the player has more than 56 available moves.}. This allows the AIs to look ahead a fairly large number of moves.\\
 
-% Nous voulions aussi pouvoir réutiliser des concepts utilisés pour l'implémentation efficace du jeu d'échecs, et la taille du plateau et le déplacement des pions (même façon de se déplacer qu'une Dame aux échecs) nous permettent de faire cela.
+%  Nous voulions aussi pouvoir réutiliser des concepts utilisés pour l'implémentation efficace du jeu d'échecs, et la taille du plateau et le déplacement des pions (même façon de se déplacer qu'une Dame aux échecs) nous permettent de faire cela.
 
-We also wanted to be able to reuse concepts used for the efficient implementation of chess, and the size of the board and the movement of the pieces (same way of moving as a Queen in chess) allow us to do that.
 
 % \subsection{Exemple de partie}
 \subsection{Game Example}
@@ -926,7 +941,7 @@ The game is won by the white player 32 to 24, which is a very good score because
 
 % Dans le prochain chapitre, nous allons étudier l'implémentation du jeu Yolah en C++ \cite{cppreference}, cette implémentation se veut efficace car il sera important pour les IA de pouvoir jouer beaucoup de parties à la seconde~; leur niveau de jeu va en dépendre.
 
-In the next chapter, we will study the implementation of the Yolah game in \cite{cppreference}. This implementation is designed to be efficient because it will be important for the AIs to be able to play many games per second; their level of play will depend on it.\\
+In the next chapter, we will study the implementation of the Yolah game in C++ \cite{cppreference}. This implementation is designed to be efficient because it will be important for the AIs to be able to play many games per second; their level of play will depend on it.\\
 
 % Le chapitre \ref{ch:ai} décrit l'interface commune de nos différentes IA, le chapitre \ref{ch:monte_carlo} présente une IA très simple basée sur une recherche Monte-Carlo. L'IA suivante, décrite au chapitre \ref{fig:mcts}, est une évolution de la précédente et permettra, contrairement à l'IA Monte-Carlo, de développer un arbre de jeu. Notons que ces deux IA ne nécessiteront pas d'heuristiques apportées par l'humain et n'ont besoin que des règles du jeu. Le chapitre \ref{ch:minmax} présente une IA basée sur une recherche arborescente minmax avec des heuristiques fournies par l'humain. L'heuristique utilisée par l'IA est une combinaison linéaire des heuristiques fournies par l'humain~; les pondérations de chacune des heuristiques dans cette combinaison linéaire sont apprises grâce à un algorithme génétique. Notre dernière, et plus forte IA, est présentée au chapitre \ref{ch:nnue}. Un réseau de neurones est utilisé à la place des heuristiques. Ce réseau de neurones est entraîné sur un ensemble de parties jouées par l'IA précédente.
 
@@ -1623,7 +1638,7 @@ int main() {
 \item On line 9, the lookup table \mintinline{c++}{positions} associates each long integer containing only one 1-bit with its position. This table is initialized on lines 10 to 12.
 
 % \item À la ligne 13, la constante K est le nombre de bits de notre clé obtenue par hachage parfait magique. Il faut que K permette de représenter toutes les valeurs que l'on doit couvrir. Par exemple, ici nous avons 64 valeurs possibles, car nous avons 64 positions possibles pour le bit à 1 dans un entier long sur 64 bits. Avec K == 7, on peut couvrir 2^7, soit 128 valeurs différentes. Notons que c'est plus que les 64 valeurs dont nous avons besoin et que K == 6 suffirait (K == 5 serait trop petit). Mais en essayant de trouver la constante MAGIC au hasard pour K == 6, ce programme ne trouvait pas en un temps raisonnable (nous verrons après une autre façon de faire pour réussir pour K == 6).
-\item On line 13, the constant \mintinline{c++}{K} is the number of bits in our key obtained by magic perfect hashing. \mintinline{c++}{K} must be large enough to represent all values we need to cover. For example, here we have $64$ possible values since we have $64$ possible positions for the 1-bit in a $64$-bit long integer. With \mintinline{c++}{K == 7}, we can cover $2^7 = 128$ different values. Note that this is more than the $64$ values we need, and \mintinline{c++}{K == 6} would suffice (\mintinline{c++}{K == 5} would be too small). However, when trying to find the \mintinline{c++}{MAGIC} constant randomly for \mintinline{c++}{K == 6}, this program could not find one in reasonable time \frownie{} (we will see another approach to succeed with \mintinline{c++}{K == 6} \smiley).
+\item On line 13, the constant \mintinline{c++}{K} is the number of bits in our key obtained by magic perfect hashing. \mintinline{c++}{K} must be large enough to represent all values we need to cover. For example, here we have $64$ possible values since we have $64$ possible positions for the 1-bit in a $64$-bit long integer. With \mintinline{c++}{K == 7}, we can cover $2^7 = 128$ different values. Note that this is more than the $64$ values we need, and \mintinline{c++}{K == 6} would suffice (\mintinline{c++}{K == 5} would be too small). However, when trying to find the \mintinline{c++}{MAGIC} constant randomly for \mintinline{c++}{K == 6}, this program could not find one in reasonable time (we will see another approach to succeed with \mintinline{c++}{K == 6}).
 
 % \item Aux lignes 14 à 16, la fonction index calcule l'index de clé bitboard (ce bitboard contient un seul bit à 1) en utilisant la formule pour notre hachage parfait magique.
 \item On lines 14 to 16, the \mintinline{c++}{index} function calculates the index for key \mintinline{c++}{bitboard} (this bitboard contains only one 1-bit) using the magic perfect hashing formula.
@@ -2481,8 +2496,8 @@ b = (0b1011 - 0b1011) & 0b1011; // b == 0
 \end{itemize}
 
 
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, breaklines,fontsize=\small]{text}
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+\begin{minted}[fontsize=\small,breaklines,frame=none]{text}
 int O_K[64] = {
     12, 11, 11, 11, 11, 11, 11, 12,
     11, 10, 10, 10, 10, 10, 10, 11,
@@ -2557,11 +2572,14 @@ uint64_t D_MAGIC[64] = {
     0x4000182008c20048,   0x112088105020200,
 };
 \end{minted}
+\end{mdframed}
+%\vspace{-\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
 % \captionof{listing}{Exemple de la sortie pour une exécution du programme du listing \ref{lst:find_magic}}
 \captionof{listing}{Example output from one execution of the program from listing \ref{lst:find_magic}}
 \label{lst:find_magic_exec}
-\end{mdframed} 
-
+\end{mdframed}
+\
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
 uint64_t orthogonalTable[102400];
@@ -2662,17 +2680,17 @@ The function \mintinline{c++}{uint64_t moves_bb(Square sq, uint64_t occupied)} f
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
-void init() {
+void init_all_magics() {
     init_magics(ORTHOGONAL, orthogonalTable, orthogonalMagics);
     init_magics(DIAGONAL, diagonalTable, diagonalMagics);
 }
 \end{minted}
-\captionof{listing}{}
+\captionof{listing}{Initialisation of all the magic bitboards}
 \label{lst:magic_init}
 \end{mdframed}
 
 % La fonction \mintinline{c++}{void init()} du listing \ref{lst:magic_init} initialisera une fois pour toute, en début de programme, les différentes tables. On appelle juste aux lignes lignes 2 et 3 la fonction \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} décrite dans le listing \ref{lst:find_magics} pour les coups orthogonaux et diagonaux avec les tables associées.
-The function \mintinline{c++}{void init()} from listing \ref{lst:magic_init} will initialize once and for all, at the beginning of the program, the different tables. We simply call at lines 2 and 3 the function \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} described in listing \ref{lst:find_magics} for orthogonal and diagonal moves with their associated tables.\\ 
+The function \mintinline{c++}{void init_all_magics()} from listing \ref{lst:magic_init} will initialize once and for all, at the beginning of the program, the different tables. We simply call at lines 2 and 3 the function \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} described in listing \ref{lst:find_magics} for orthogonal and diagonal moves with their associated tables.\\ 
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
@@ -2710,7 +2728,7 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
     }
 }
 \end{minted}
-\captionof{listing}{}
+\captionof{listing}{TO DO}
 \label{lst:find_magics}
 \end{mdframed} 
 
@@ -3135,7 +3153,6 @@ uint64_t count_nodes_with_restore(Yolah& yolah, int depth) {
     return count;
 }
 static void BM_recursive_with_undo(benchmark::State& state) {
-    magic::init();
     int depth = state.range(0);
     for (auto _ : state) {
         Yolah yolah;
@@ -3149,14 +3166,12 @@ static void BM_recursive_with_undo(benchmark::State& state) {
     state.counters["nodes"] = nodes;
 }
 static void BM_recursive_with_restore(benchmark::State& state) {
-    magic::init();
     int depth = state.range(0);
     for (auto _ : state) {
         Yolah yolah;
         uint64_t nodes = count_nodes_with_restore(yolah, depth);
         benchmark::DoNotOptimize(nodes);
     }
-    // Calculate nodes for reporting
     Yolah yolah;
     uint64_t nodes = count_nodes_with_restore(yolah, depth);
     state.SetItemsProcessed(state.iterations() * nodes);
@@ -3165,17 +3180,25 @@ static void BM_recursive_with_restore(benchmark::State& state) {
 // Test at various depths
 BENCHMARK(BM_recursive_with_undo)->Arg(3)->Arg(4)->Arg(5);
 BENCHMARK(BM_recursive_with_restore)->Arg(3)->Arg(4)->Arg(5);
-
-BENCHMARK_MAIN();
+int main(int argc, char** argv) {
+    init_all_magics();
+    benchmark::Initialize(&argc, argv);
+    benchmark::RunSpecifiedBenchmarks();
+}
 \end{minted}
 % \captionof{listing}{Benchmark pour tester l'affirmation que la fonction \mintinline{c++}{undo} apporte un gain par rapport à une sauvegarde de l'état complet du jeu}
 \captionof{listing}{Benchmark to test the assertion that the \mintinline{c++}{undo} function provides a performance gain over saving the complete game state}
 \label{lst:undo_vs_restore_bench}
 \end{mdframed}
 
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[breaklines,fontsize=\small]{text}
+% \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+% \begin{minted}[breaklines,fontsize=\small]{text}
+% \begin{mdframed}[skipabove=\baselineskip,hidealllines=true,backgroundcolor=black]
+% \color{white}
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+\begin{minted}[fontsize=\small,breaklines,frame=none]{text}
 Run on (12 X 4400 MHz CPU s)
+
 CPU Caches: L1 Data 32 KiB (x6), L1 Instruction 32 KiB (x6),
             L2 Unified 256 KiB (x6), L3 Unified 12288 KiB (x1)
 
@@ -3188,21 +3211,178 @@ BM_recursive_with_restore/3          1.24    132.3 M/s
 BM_recursive_with_restore/4         70.00    123.6 M/s
 BM_recursive_with_restore/5       3492.00    130.8 M/s
 \end{minted}
+\end{mdframed}
+%\vspace{-\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
 % \captionof{listing}{Résultats du benchmark du listing \ref{lst:undo_vs_restore_bench}}
 \captionof{listing}{Benchmark results from listing \ref{lst:undo_vs_restore_bench}}
 \label{lst:undo_vs_restore_bench_result}
 \end{mdframed}
 
-
 \section{Testing with Random Games}
+
+Nous présentons deux manières de tester notre implémentation de Yolah. Ces deux façons de faire se basent sur le déroulement de parties aléatoires. Dans un premier temps nous inspectons visuellement si tout semble correct, et une fois les éventuels bugs "faciles" détectés, nous passons à une batterie de tests importante, toujours en générant des parties aléatoires, mais cette fois-ci en testant des propriétés du jeu qui devraient être respectées par notre implémentation et en comparant la génération des coups à base de magic bitboards avec une implémentation beaucoup plus simple (mais bien moins efficace) pour vérifier que les deux implémentations différentes donnent les mêmes résultats. Une fois cette batterie de tests passée avec succès, nous profilons le code en générant un ensemble de parties aléatoires, et en se basant sur cette analyse, nous améliorons le temps d'exécution du programme.\\
+
+Le code pour tester visuellement notre implémentation est donné dans le listing \ref{lst:random_games_testing}. Un début d'exécution de ce code est donné dans le listing \ref{lst:random_games_testing_exec}.
+
+\begin{itemize}
+
+\item 
+
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
+void play_random_games(size_t nb_games, optional<uint64_t> seed=nullopt) {
+    MoveList moves;
+    random_device rd;
+    mt19937 mt(seed.value_or(rd()));
+    for (size_t i = 0; i < nb_games; i++) {
+        Yolah yolah;    
+        while (!yolah.game_over()) {                 
+            yolah.moves(moves);
+            sort(begin(moves), end(moves));
+            cout << format("# moves: {}\n", moves.size());
+            for (const auto& m : moves) {
+                cout << m << ' ';
+            }            
+            cout << "\n\n";
+            cout << YolahWithMoves(yolah, moves) << '\n';
+            uniform_int_distribution<uint64_t> d(0, moves.size()-1);    
+            Move m = moves[d(mt)];
+            cout << m << '\n';
+            std::string _;
+            std::getline(std::cin, _);            
+            yolah.play(m);
+        }
+        cout << yolah << '\n';
+    }
+}
+int main() {
+    init_all_magics();
+    play_random_games(42);
+}
 \end{minted}
 \captionof{listing}{Playing random games, displaying the list of moves and the board to check the engine visually}
 \label{lst:random_games_testing}
 \end{mdframed}
 
+\newpage
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+Black player
+  ┌───┬───┬───┬───┬───┬───┬───┬───┐
+8 │ ○ │ · │ · │ · │ · │ · │ · │ ● │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+7 │ · │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+6 │ · │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+5 │ · │ · │ · │ ● │ ○ │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+4 │ · │ · │ · │ ○ │ ● │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+3 │ · │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+2 │ · │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+1 │ ● │ · │ · │ · │ · │ · │ · │ ○ │
+  └───┴───┴───┴───┴───┴───┴───┴───┘
+    a   b   c   d   e   f   g   h
+score: 0/0
+
+# moves: 56
+a1:b1 a1:c1 a1:d1 a1:e1 a1:f1 a1:g1 a1:a2 a1:b2 a1:a3 a1:c3 a1:a4 a1:a5
+a1:a6 a1:a7 e4:b1 e4:e1 e4:c2 e4:e2 e4:g2 e4:d3 e4:e3 e4:f3 e4:f4 e4:g4
+e4:h4 e4:f5 e4:g6 e4:h7 d5:a2 d5:b3 d5:c4 d5:a5 d5:b5 d5:c5 d5:c6 d5:d6
+d5:e6 d5:b7 d5:d7 d5:f7 d5:d8 d5:g8 h8:h2 h8:h3 h8:h4 h8:h5 h8:f6 h8:h6
+h8:g7 h8:h7 h8:b8 h8:c8 h8:d8 h8:e8 h8:f8 h8:g8
+
+Black player
+  ┌───┬───┬───┬───┬───┬───┬───┬───┐
+8 │ ○ │ X │ X │ X │ X │ X │ X │ ● │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+7 │ X │ X │ · │ X │ · │ X │ X │ X │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+6 │ X │ · │ X │ X │ X │ X │ X │ X │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+5 │ X │ X │ X │ ● │ ○ │ X │ · │ X │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+4 │ X │ · │ X │ ○ │ ● │ X │ X │ X │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+3 │ X │ X │ X │ X │ X │ X │ · │ X │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+2 │ X │ X │ X │ · │ X │ · │ X │ X │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+1 │ ● │ X │ X │ X │ X │ X │ X │ ○ │
+  └───┴───┴───┴───┴───┴───┴───┴───┘
+    a   b   c   d   e   f   g   h
+score: 0/0
+
+d5:a2
+
+White player
+  ┌───┬───┬───┬───┬───┬───┬───┬───┐
+8 │ ○ │ · │ · │ · │ · │ · │ · │ ● │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+7 │ · │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+6 │ · │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+5 │ · │ · │ · │   │ ○ │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+4 │ · │ · │ · │ ○ │ ● │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+3 │ · │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+2 │ ● │ · │ · │ · │ · │ · │ · │ · │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+1 │ ● │ · │ · │ · │ · │ · │ · │ ○ │
+  └───┴───┴───┴───┴───┴───┴───┴───┘
+    a   b   c   d   e   f   g   h
+score: 1/0
+
+# moves: 55
+h1:b1 h1:c1 h1:d1 h1:e1 h1:f1 h1:g1 h1:g2 h1:h2 h1:f3 h1:h3 h1:h4 h1:h5
+h1:h6 h1:h7 d4:d1 d4:g1 d4:b2 d4:d2 d4:f2 d4:c3 d4:d3 d4:e3 d4:a4 d4:b4
+d4:c4 d4:c5 d4:b6 d4:a7 e5:h2 e5:g3 e5:f4 e5:f5 e5:g5 e5:h5 e5:d6 e5:e6
+e5:f6 e5:c7 e5:e7 e5:g7 e5:b8 e5:e8 a8:a3 a8:a4 a8:a5 a8:a6 a8:c6 a8:a7
+a8:b7 a8:b8 a8:c8 a8:d8 a8:e8 a8:f8 a8:g8
+
+White player
+  ┌───┬───┬───┬───┬───┬───┬───┬───┐
+8 │ ○ │ x │ x │ x │ x │ x │ x │ ● │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+7 │ x │ x │ x │ · │ x │ · │ x │ x │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+6 │ x │ x │ x │ x │ x │ x │ · │ x │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+5 │ x │ · │ x │   │ ○ │ x │ x │ x │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+4 │ x │ x │ x │ ○ │ ● │ x │ · │ x │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+3 │ x │ · │ x │ x │ x │ x │ x │ x │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+2 │ ● │ x │ · │ x │ · │ x │ x │ x │
+  ├───┼───┼───┼───┼───┼───┼───┼───┤
+1 │ ● │ x │ x │ x │ x │ x │ x │ ○ │
+  └───┴───┴───┴───┴───┴───┴───┴───┘
+    a   b   c   d   e   f   g   h
+score: 1/0
+
+h1:f1
+
+
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{Début du déroulement du programme du listing \ref{lst:random_games_testing}}
+\label{lst:random_games_testing_exec}
+\end{mdframed}
 
 \section{What's Next}
 

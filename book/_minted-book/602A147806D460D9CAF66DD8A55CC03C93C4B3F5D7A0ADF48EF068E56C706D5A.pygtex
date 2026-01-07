@@ -31,7 +31,6 @@
 \PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{count}\PYG{p}{;}
 \PYG{p}{\PYGZcb{}}
 \PYG{k}{static}\PYG{+w}{ }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{BM\PYGZus{}recursive\PYGZus{}with\PYGZus{}undo}\PYG{p}{(}\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{State}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
-\PYG{+w}{    }\PYG{n}{magic}\PYG{o}{::}\PYG{n}{init}\PYG{p}{();}
 \PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{depth}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{.}\PYG{n}{range}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{);}
 \PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{n}{Yolah}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{;}
@@ -45,14 +44,12 @@
 \PYG{+w}{    }\PYG{n}{state}\PYG{p}{.}\PYG{n}{counters}\PYG{p}{[}\PYG{l+s}{\PYGZdq{}nodes\PYGZdq{}}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{nodes}\PYG{p}{;}
 \PYG{p}{\PYGZcb{}}
 \PYG{k}{static}\PYG{+w}{ }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{BM\PYGZus{}recursive\PYGZus{}with\PYGZus{}restore}\PYG{p}{(}\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{State}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
-\PYG{+w}{    }\PYG{n}{magic}\PYG{o}{::}\PYG{n}{init}\PYG{p}{();}
 \PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{depth}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{.}\PYG{n}{range}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{);}
 \PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{n}{Yolah}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{;}
 \PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nodes}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{count\PYGZus{}nodes\PYGZus{}with\PYGZus{}restore}\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{depth}\PYG{p}{);}
 \PYG{+w}{        }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{DoNotOptimize}\PYG{p}{(}\PYG{n}{nodes}\PYG{p}{);}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}
-\PYG{+w}{    }\PYG{c+c1}{// Calculate nodes for reporting}
 \PYG{+w}{    }\PYG{n}{Yolah}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nodes}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{count\PYGZus{}nodes\PYGZus{}with\PYGZus{}restore}\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{depth}\PYG{p}{);}
 \PYG{+w}{    }\PYG{n}{state}\PYG{p}{.}\PYG{n}{SetItemsProcessed}\PYG{p}{(}\PYG{n}{state}\PYG{p}{.}\PYG{n}{iterations}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{nodes}\PYG{p}{);}
@@ -61,6 +58,9 @@
 \PYG{c+c1}{// Test at various depths}
 \PYG{n}{BENCHMARK}\PYG{p}{(}\PYG{n}{BM\PYGZus{}recursive\PYGZus{}with\PYGZus{}undo}\PYG{p}{)}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{Arg}\PYG{p}{(}\PYG{l+m+mi}{3}\PYG{p}{)}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{Arg}\PYG{p}{(}\PYG{l+m+mi}{4}\PYG{p}{)}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{Arg}\PYG{p}{(}\PYG{l+m+mi}{5}\PYG{p}{);}
 \PYG{n}{BENCHMARK}\PYG{p}{(}\PYG{n}{BM\PYGZus{}recursive\PYGZus{}with\PYGZus{}restore}\PYG{p}{)}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{Arg}\PYG{p}{(}\PYG{l+m+mi}{3}\PYG{p}{)}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{Arg}\PYG{p}{(}\PYG{l+m+mi}{4}\PYG{p}{)}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{Arg}\PYG{p}{(}\PYG{l+m+mi}{5}\PYG{p}{);}
-
-\PYG{n}{BENCHMARK\PYGZus{}MAIN}\PYG{p}{();}
+\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n+nf}{main}\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{argc}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{o}{**}\PYG{+w}{ }\PYG{n}{argv}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{init\PYGZus{}all\PYGZus{}magics}\PYG{p}{();}
+\PYG{+w}{    }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{Initialize}\PYG{p}{(}\PYG{o}{\PYGZam{}}\PYG{n}{argc}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{argv}\PYG{p}{);}
+\PYG{+w}{    }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{RunSpecifiedBenchmarks}\PYG{p}{();}
+\PYG{p}{\PYGZcb{}}
 \end{Verbatim}
