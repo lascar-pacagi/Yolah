@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     //     data::generate_symmetries(input, output);
     // }
     
-    data::generate_symmetries2("../data/games", "../nnue/data");
+    //data::generate_symmetries2("../data/games", "../nnue/data");
     //data::analyze_games2("../nnue/data", cout);
 /*
     LogicNetLearning::Builder builder;

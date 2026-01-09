@@ -276,6 +276,67 @@
       \field{title}{Hacker's Delight}
       \field{year}{2012}
     \endentry
+    \entry{claessen2000quickcheck}{inproceedings}{}
+      \name{author}{2}{}{%
+        {{hash=b5810f3c048af7890859f522af846370}{%
+           family={Claessen},
+           familyi={C\bibinitperiod},
+           given={Koen},
+           giveni={K\bibinitperiod}}}%
+        {{hash=05db43db1a50c29c0eca01fd35ec8758}{%
+           family={Hughes},
+           familyi={H\bibinitperiod},
+           given={John},
+           giveni={J\bibinitperiod}}}%
+      }
+      \list{organization}{1}{%
+        {ACM}%
+      }
+      \strng{namehash}{63eb59c9175e0a68b08f258c32e88a31}
+      \strng{fullhash}{63eb59c9175e0a68b08f258c32e88a31}
+      \strng{bibnamehash}{63eb59c9175e0a68b08f258c32e88a31}
+      \strng{authorbibnamehash}{63eb59c9175e0a68b08f258c32e88a31}
+      \strng{authornamehash}{63eb59c9175e0a68b08f258c32e88a31}
+      \strng{authorfullhash}{63eb59c9175e0a68b08f258c32e88a31}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Proceedings of the fifth ACM SIGPLAN international conference on Functional programming}
+      \field{title}{QuickCheck: a lightweight tool for random testing of Haskell programs}
+      \field{year}{2000}
+      \field{pages}{268\bibrangedash 279}
+      \range{pages}{12}
+    \endentry
+    \entry{mckeeman1998differential}{incollection}{}
+      \name{author}{1}{}{%
+        {{hash=10bf6dcbb0cbc6458271f522d9408e2f}{%
+           family={McKeeman},
+           familyi={M\bibinitperiod},
+           given={William\bibnamedelima M},
+           giveni={W\bibinitperiod\bibinitdelim M\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {Digital Equipment Corporation}%
+      }
+      \strng{namehash}{10bf6dcbb0cbc6458271f522d9408e2f}
+      \strng{fullhash}{10bf6dcbb0cbc6458271f522d9408e2f}
+      \strng{bibnamehash}{10bf6dcbb0cbc6458271f522d9408e2f}
+      \strng{authorbibnamehash}{10bf6dcbb0cbc6458271f522d9408e2f}
+      \strng{authornamehash}{10bf6dcbb0cbc6458271f522d9408e2f}
+      \strng{authorfullhash}{10bf6dcbb0cbc6458271f522d9408e2f}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Digital Technical Journal}
+      \field{number}{1}
+      \field{title}{Differential testing for software}
+      \field{volume}{10}
+      \field{year}{1998}
+      \field{pages}{100\bibrangedash 107}
+      \range{pages}{8}
+    \endentry
   \enddatalist
 \endrefsection
 \endinput

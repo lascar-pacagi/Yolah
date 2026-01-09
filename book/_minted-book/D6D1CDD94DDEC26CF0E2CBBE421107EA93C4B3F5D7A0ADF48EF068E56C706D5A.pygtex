@@ -1,0 +1,5 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{+w}{    }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{play}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
+\PYG{+w}{    }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{undo}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
+\PYG{+w}{    }\PYG{n}{Yolah}\PYG{+w}{ }\PYG{n}{after}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{;}
+\end{Verbatim}

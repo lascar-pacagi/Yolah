@@ -1,5 +1,6 @@
 \begin{Verbatim}[commandchars=\\\{\}]
-\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{play\PYGZus{}random\PYGZus{}games}\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}games}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{optional}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{seed}\PYG{o}{=}\PYG{n}{nullopt}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{play\PYGZus{}random\PYGZus{}games}\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}games}\PYG{p}{,}
+\PYG{+w}{                       }\PYG{n}{optional}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{seed}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{nullopt}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{MoveList}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{random\PYGZus{}device}\PYG{+w}{ }\PYG{n}{rd}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{mt19937}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{(}\PYG{n}{seed}\PYG{p}{.}\PYG{n}{value\PYGZus{}or}\PYG{p}{(}\PYG{n}{rd}\PYG{p}{()));}

@@ -1,0 +1,210 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{namespace}\PYG{+w}{ }\PYG{n+nn}{test}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{RED}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}033}\PYG{l+s}{[1;31m\PYGZdq{}}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{GREEN}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}033}\PYG{l+s}{[1;32m\PYGZdq{}}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{YELLOW}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}033}\PYG{l+s}{[1;33m\PYGZdq{}}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{RESET}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}033}\PYG{l+s}{[0m\PYGZdq{}}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{BOLD}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}033}\PYG{l+s}{[1m\PYGZdq{}}\PYG{p}{;}
+
+\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{TestResult}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{  }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{n}{passed}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{string}\PYG{+w}{ }\PYG{n}{message}\PYG{p}{;}
+\PYG{+w}{  }\PYG{k}{operator}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{passed}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{};}
+\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{pass}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n+nb}{true}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}\PYGZdq{}}\PYG{p}{\PYGZcb{};}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{fail}\PYG{p}{(}\PYG{n}{string}\PYG{+w}{ }\PYG{n}{msg}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n+nb}{false}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{move}\PYG{p}{(}\PYG{n}{msg}\PYG{p}{)\PYGZcb{};}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+
+\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{check\PYGZus{}move\PYGZus{}count}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{fast}\PYG{p}{,}
+\PYG{+w}{                            }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{n}{Move}\PYG{o}{\PYGZgt{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{expected}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{  }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{fast}\PYG{p}{.}\PYG{n}{size}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{expected}\PYG{p}{.}\PYG{n}{size}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{fail}\PYG{p}{(}\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}\PYGZsh{} of moves: expected \PYGZob{}\PYGZcb{} got \PYGZob{}\PYGZcb{}\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{                }\PYG{n}{expected}\PYG{p}{.}\PYG{n}{size}\PYG{p}{(),}\PYG{+w}{ }\PYG{n}{fast}\PYG{p}{.}\PYG{n}{size}\PYG{p}{()));}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{  }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{pass}\PYG{p}{();}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{check\PYGZus{}move\PYGZus{}lists\PYGZus{}equal}\PYG{p}{(}\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{fast}\PYG{p}{,}
+\PYG{+w}{                                  }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{n}{Move}\PYG{o}{\PYGZgt{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{expected}\PYG{p}{,}
+\PYG{+w}{                                  }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{  }\PYG{n}{sort}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{));}
+\PYG{+w}{  }\PYG{n}{sort}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{));}
+\PYG{+w}{  }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{equal}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{)))}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{pass}\PYG{p}{();}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{  }\PYG{n}{ostringstream}\PYG{+w}{ }\PYG{n}{oss}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}move lists differ}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{yolah}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{n}{Move}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{only\PYGZus{}in\PYGZus{}fast}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{only\PYGZus{}in\PYGZus{}expected}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{set\PYGZus{}difference}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}
+\PYG{+w}{                 }\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}
+\PYG{+w}{                 }\PYG{n}{back\PYGZus{}inserter}\PYG{p}{(}\PYG{n}{only\PYGZus{}in\PYGZus{}fast}\PYG{p}{));}
+\PYG{+w}{  }\PYG{n}{set\PYGZus{}difference}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}
+\PYG{+w}{                 }\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}
+\PYG{+w}{                 }\PYG{n}{back\PYGZus{}inserter}\PYG{p}{(}\PYG{n}{only\PYGZus{}in\PYGZus{}expected}\PYG{p}{));}
+\PYG{+w}{  }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{only\PYGZus{}in\PYGZus{}expected}\PYG{p}{.}\PYG{n}{empty}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}  Only in expected: \PYGZdq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{k}{auto}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{only\PYGZus{}in\PYGZus{}expected}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{} \PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{  }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{only\PYGZus{}in\PYGZus{}fast}\PYG{p}{.}\PYG{n}{empty}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}  Only in fast: \PYGZdq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{k}{auto}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{only\PYGZus{}in\PYGZus{}fast}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{} \PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{  }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{fail}\PYG{p}{(}\PYG{n}{oss}\PYG{p}{.}\PYG{n}{str}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{check\PYGZus{}undo}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{before}\PYG{p}{,}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{  }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{before}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{pass}\PYG{p}{();}
+\PYG{+w}{  }\PYG{n}{ostringstream}\PYG{+w}{ }\PYG{n}{oss}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}undo failed}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{  Previous state:}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{before}
+\PYG{+w}{      }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{  State after undo:}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{after}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{  }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{fail}\PYG{p}{(}\PYG{n}{oss}\PYG{p}{.}\PYG{n}{str}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{check\PYGZus{}game\PYGZus{}over\PYGZus{}moves}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{,}
+\PYG{+w}{                                 }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{  }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{moves}\PYG{p}{.}\PYG{n}{size}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{pass}\PYG{p}{();}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{  }\PYG{n}{ostringstream}\PYG{+w}{ }\PYG{n}{oss}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}only Move::none() should be available when game is over}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}
+\PYG{+w}{      }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{YolahWithMoves}\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{  }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{fail}\PYG{p}{(}\PYG{n}{oss}\PYG{p}{.}\PYG{n}{str}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{random\PYGZus{}games}\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}games}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{optional}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{seed}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{  }\PYG{n}{MoveList}\PYG{+w}{ }\PYG{n}{fast\PYGZus{}moves}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{random\PYGZus{}device}\PYG{+w}{ }\PYG{n}{rd}\PYG{p}{;}
+\PYG{+w}{  }\PYG{n}{mt19937}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{(}\PYG{n}{seed}\PYG{p}{.}\PYG{n}{value\PYGZus{}or}\PYG{p}{(}\PYG{n}{rd}\PYG{p}{()));}
+\PYG{+w}{  }\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{total\PYGZus{}tests}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{passed\PYGZus{}tests}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+
+\PYG{+w}{  }\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{run\PYGZus{}test}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{[}\PYG{o}{\PYGZam{}}\PYG{p}{](}\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n}{result}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{total\PYGZus{}tests}\PYG{o}{++}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{result}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{n}{passed\PYGZus{}tests}\PYG{o}{++}\PYG{p}{;}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n+nb}{true}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}\PYGZob{}\PYGZcb{}FAIL:\PYGZob{}\PYGZcb{} \PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RED}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RESET}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{result}\PYG{p}{.}\PYG{n}{message}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n+nb}{false}\PYG{p}{;}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{};}
+
+\PYG{+w}{  }\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{slow\PYGZus{}moves\PYGZus{}generation}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{[](}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{n}{Move}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{white}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{holes}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{white}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{black}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{      }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{j}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{i}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{j}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{from\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{from\PYGZus{}bb}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{continue}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{di}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{\PYGZhy{}1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{di}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{di}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{          }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{dj}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{\PYGZhy{}1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{dj}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{dj}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{di}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{dj}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{continue}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{ii}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{di}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{jj}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{dj}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{for}\PYG{p}{(;;)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{              }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{ii}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{||}\PYG{+w}{ }\PYG{n}{ii}\PYG{+w}{ }\PYG{o}{\PYGZgt{}=}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{||}\PYG{+w}{ }\PYG{n}{jj}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{||}\PYG{+w}{ }\PYG{n}{jj}\PYG{+w}{ }\PYG{o}{\PYGZgt{}=}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{              }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{ii}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{jj}\PYG{p}{);}
+\PYG{+w}{              }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{to\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{to}\PYG{p}{);}
+\PYG{+w}{              }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{to\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{              }\PYG{n}{res}\PYG{p}{.}\PYG{n}{emplace\PYGZus{}back}\PYG{p}{(}\PYG{n}{from}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{);}
+\PYG{+w}{              }\PYG{n}{ii}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{n}{di}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{jj}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{n}{dj}\PYG{p}{;}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{          }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{      }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{res}\PYG{p}{.}\PYG{n}{empty}\PYG{p}{())}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{.}\PYG{n}{push\PYGZus{}back}\PYG{p}{(}\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{());}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{;}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{};}
+
+\PYG{+w}{  }\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{check\PYGZus{}none\PYGZus{}move\PYGZus{}execution}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{[](}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{before}\PYG{p}{,}
+\PYG{+w}{                                      }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{before}\PYG{p}{.}\PYG{n}{black}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{.}\PYG{n}{black}\PYG{+w}{ }\PYG{o}{||}\PYG{+w}{ }\PYG{n}{before}\PYG{p}{.}\PYG{n}{white}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{.}\PYG{n}{white}\PYG{+w}{ }\PYG{o}{||}
+\PYG{+w}{        }\PYG{n}{before}\PYG{p}{.}\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{.}\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{||}
+\PYG{+w}{        }\PYG{n}{before}\PYG{p}{.}\PYG{n}{black\PYGZus{}score}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{.}\PYG{n}{black\PYGZus{}score}\PYG{+w}{ }\PYG{o}{||}
+\PYG{+w}{        }\PYG{n}{after}\PYG{p}{.}\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{before}\PYG{p}{.}\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{      }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{fail}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}Move::none() must only change the ply number\PYGZdq{}}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{pass}\PYG{p}{();}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{};}
+
+\PYG{+w}{  }\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{check\PYGZus{}regular\PYGZus{}move\PYGZus{}execution}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{[](}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{before}\PYG{p}{,}
+\PYG{+w}{                                         }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{,}
+\PYG{+w}{                                         }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{before}\PYG{p}{.}\PYG{n}{current\PYGZus{}player}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{?}
+\PYG{+w}{                         }\PYG{n}{after}\PYG{p}{.}\PYG{n}{black}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{after}\PYG{p}{.}\PYG{n}{white}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{from\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{to\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{p}{(}\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{from\PYGZus{}bb}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{to\PYGZus{}bb}\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{after}\PYG{p}{.}\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{from\PYGZus{}bb}\PYG{p}{))}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{      }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{pass}\PYG{p}{();}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{ostringstream}\PYG{+w}{ }\PYG{n}{oss}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}move execution incorrect}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{after}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{  Move: \PYGZdq{}}
+\PYG{+w}{        }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{from\PYGZus{}bb}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}  From square should be cleared}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{to\PYGZus{}bb}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}  To square should be set}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{after}\PYG{p}{.}\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{from\PYGZus{}bb}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}  From square should be a hole}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{fail}\PYG{p}{(}\PYG{n}{oss}\PYG{p}{.}\PYG{n}{str}\PYG{p}{());}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{};}
+
+\PYG{+w}{  }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}\PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{=== Running Random Games Tests ===}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZob{}\PYGZcb{}\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{                 }\PYG{n}{BOLD}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RESET}\PYG{p}{);}
+
+\PYG{+w}{  }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}games}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{Yolah}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{game\PYGZus{}over}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{      }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{moves}\PYG{p}{(}\PYG{n}{fast\PYGZus{}moves}\PYG{p}{);}
+\PYG{+w}{      }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{n}{Move}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{expected\PYGZus{}moves}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{slow\PYGZus{}moves\PYGZus{}generation}\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{);}
+\PYG{+w}{      }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{run\PYGZus{}test}\PYG{p}{(}\PYG{n}{check\PYGZus{}move\PYGZus{}count}\PYG{p}{(}\PYG{n}{fast\PYGZus{}moves}\PYG{p}{,}
+\PYG{+w}{                                     }\PYG{n}{expected\PYGZus{}moves}\PYG{p}{)))}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{      }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{run\PYGZus{}test}\PYG{p}{(}\PYG{n}{check\PYGZus{}move\PYGZus{}lists\PYGZus{}equal}\PYG{p}{(}\PYG{n}{fast\PYGZus{}moves}\PYG{p}{,}
+\PYG{+w}{                                           }\PYG{n}{expected\PYGZus{}moves}\PYG{p}{,}
+\PYG{+w}{                                           }\PYG{n}{yolah}\PYG{p}{)))}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{      }\PYG{n}{uniform\PYGZus{}int\PYGZus{}distribution}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{int}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{fast\PYGZus{}moves}\PYG{p}{.}\PYG{n}{size}\PYG{p}{()}\PYG{l+m+mi}{\PYGZhy{}1}\PYG{p}{);}
+\PYG{+w}{      }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{fast\PYGZus{}moves}\PYG{p}{[}\PYG{n}{d}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{)];}
+\PYG{+w}{      }\PYG{n}{Yolah}\PYG{+w}{ }\PYG{n}{before}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{;}
+\PYG{+w}{      }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{play}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
+\PYG{+w}{      }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{m}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{run\PYGZus{}test}\PYG{p}{(}\PYG{n}{check\PYGZus{}none\PYGZus{}move\PYGZus{}execution}\PYG{p}{(}\PYG{n}{before}\PYG{p}{,}
+\PYG{+w}{                                                }\PYG{n}{yolah}\PYG{p}{)))}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{      }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{run\PYGZus{}test}\PYG{p}{(}\PYG{n}{check\PYGZus{}regular\PYGZus{}move\PYGZus{}execution}\PYG{p}{(}\PYG{n}{before}\PYG{p}{,}
+\PYG{+w}{                                                   }\PYG{n}{yolah}\PYG{p}{,}
+\PYG{+w}{                                                   }\PYG{n}{m}\PYG{p}{)))}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{      }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{      }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{undo}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
+\PYG{+w}{      }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{run\PYGZus{}test}\PYG{p}{(}\PYG{n}{check\PYGZus{}undo}\PYG{p}{(}\PYG{n}{before}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{)))}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{      }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{play}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{game\PYGZus{}over}\PYG{p}{())}\PYG{+w}{ }\PYG{k}{continue}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{moves}\PYG{p}{(}\PYG{n}{fast\PYGZus{}moves}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{run\PYGZus{}test}\PYG{p}{(}\PYG{n}{check\PYGZus{}game\PYGZus{}over\PYGZus{}moves}\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{fast\PYGZus{}moves}\PYG{p}{)))}\PYG{+w}{ }\PYG{k}{continue}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{play}\PYG{p}{(}\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{());}
+\PYG{+w}{    }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{moves}\PYG{p}{(}\PYG{n}{fast\PYGZus{}moves}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{run\PYGZus{}test}\PYG{p}{(}\PYG{n}{check\PYGZus{}game\PYGZus{}over\PYGZus{}moves}\PYG{p}{(}\PYG{n}{yolah}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{fast\PYGZus{}moves}\PYG{p}{)))}\PYG{+w}{ }\PYG{k}{continue}\PYG{p}{;}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{  }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZob{}\PYGZcb{}=== Test Summary ===\PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{BOLD}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RESET}\PYG{p}{);}
+\PYG{+w}{  }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}Total tests: \PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{total\PYGZus{}tests}\PYG{p}{);}
+\PYG{+w}{  }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}Passed: \PYGZob{}\PYGZcb{}\PYGZob{}\PYGZcb{}\PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{GREEN}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{passed\PYGZus{}tests}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RESET}\PYG{p}{);}
+\PYG{+w}{  }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}Failed: \PYGZob{}\PYGZcb{}\PYGZob{}\PYGZcb{}\PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{                 }\PYG{p}{(}\PYG{n}{passed\PYGZus{}tests}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{total\PYGZus{}tests}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{GREEN}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{RED}\PYG{p}{),}
+\PYG{+w}{                 }\PYG{n}{total\PYGZus{}tests}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{passed\PYGZus{}tests}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RESET}\PYG{p}{);}
+\PYG{+w}{  }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{passed\PYGZus{}tests}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{total\PYGZus{}tests}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}\PYGZob{}\PYGZcb{}All tests passed!\PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{GREEN}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RESET}\PYG{p}{);}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{double}\PYG{+w}{ }\PYG{n}{pass\PYGZus{}rate}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mf}{100.0}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{passed\PYGZus{}tests}\PYG{+w}{ }\PYG{o}{/}\PYG{+w}{ }\PYG{n}{total\PYGZus{}tests}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}\PYGZob{}\PYGZcb{}Pass rate: \PYGZob{}:.2f\PYGZcb{}\PYGZpc{}\PYGZob{}\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{                   }\PYG{n}{YELLOW}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pass\PYGZus{}rate}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RESET}\PYG{p}{);}
+\PYG{+w}{  }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{}\PYGZcb{}}
+
+\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{main}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{  }\PYG{n}{init\PYGZus{}all\PYGZus{}magics}\PYG{p}{();}
+\PYG{+w}{  }\PYG{n}{test}\PYG{o}{::}\PYG{n}{random\PYGZus{}games}\PYG{p}{(}\PYG{l+m+mi}{10000}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{42}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

@@ -545,7 +545,6 @@ ostream& operator<<(ostream& os, const YolahWithMoves& ym) {
         white >>= 8;
         holes >>= 8;
     }
-    // UTF-8 box drawing characters
     os << "\n  ┌───┬───┬───┬───┬───┬───┬───┬───┐\n";
     for (int i = 7; i >= 0; i--) {
         os << i + 1 << " │";
@@ -890,6 +889,6 @@ namespace test {
 int main() {
     init_all_magics();
     //play_random_games<false>(1000000);
-    play_random_games_fast(1000000);
-    //test::random_games(10000, 42);
+    //play_random_games_fast(1000000);
+    test::random_games(10000, 42);
 }

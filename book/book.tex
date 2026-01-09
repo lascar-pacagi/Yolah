@@ -67,6 +67,7 @@
     baselinestretch=1.2,
     tabsize=4
 }
+\setmintedinline{breaklines}
 \usepackage{mdframed}
 
 % Define code background color
@@ -76,6 +77,9 @@
 % Font for terminal output with box-drawing characters
 \usepackage{fontspec}
 \setmonofont{DejaVu Sans Mono}[Scale=0.9]
+
+% Custom breakable inline code command
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
 
 % Algorithms
 \usepackage{algorithm}
@@ -182,7 +186,7 @@
 \title{
     \Huge\textbf{Yolah Board Game} \\
     \vspace{0.5cm}
-    \Large Building a Two-Player Perfect-Information Game with AI Players\\ 
+    \Large Building a Two-Player Perfect-Information Game with Artificial Players\\ 
 }
 
 \author{
@@ -298,7 +302,7 @@
 % et d'intelligences artificielles pour nos étudiants. Yolah est une variante du jeu des pingouins dont vous pouvez voir la boîte dans la figure \ref{fig:pingouins} (nous le conseillons \smiley)
 
 We designed Yolah, a variant of the Pingouins game, to illustrate effective techniques for implementing board games
-and artificial players for our students. You can see the Pingouins game box in Figure~\ref{fig:pingouins} (we highly recommend this game!)
+and artificial players for our students. You can see the Pingouins game box in Figure~\ref{fig:pingouins}.
 
 \begin{figure}[htpb]
 \centering
@@ -3221,19 +3225,37 @@ BM_recursive_with_restore/5       3492.00    130.8 M/s
 
 \section{Testing with Random Games}
 
-Nous présentons deux manières de tester notre implémentation de Yolah. Ces deux façons de faire se basent sur le déroulement de parties aléatoires. Dans un premier temps nous inspectons visuellement si tout semble correct, et une fois les éventuels bugs "faciles" détectés, nous passons à une batterie de tests importante, toujours en générant des parties aléatoires, mais cette fois-ci en testant des propriétés du jeu qui devraient être respectées par notre implémentation et en comparant la génération des coups à base de magic bitboards avec une implémentation beaucoup plus simple (mais bien moins efficace) pour vérifier que les deux implémentations différentes donnent les mêmes résultats. Une fois cette batterie de tests passée avec succès, nous profilons le code en générant un ensemble de parties aléatoires, et en se basant sur cette analyse, nous améliorons le temps d'exécution du programme.\\
+Nous présentons deux manières de tester notre implémentation de Yolah. Ces deux façons de faire se basent sur le déroulement de parties aléatoires. Dans un premier temps nous inspectons visuellement si tout semble correct, et une fois les éventuels bugs "faciles" détectés, nous passons à une batterie de tests importante, toujours en générant des parties aléatoires, mais cette fois-ci en testant des propriétés du jeu qui devraient être respectées par notre implémentation et en comparant la génération des coups à base de magic bitboards avec une implémentation beaucoup plus simple (mais bien moins efficace) pour vérifier que les deux implémentations différentes donnent les mêmes résultats. Une fois cette batterie de tests passée avec succès, nous profilons le code en générant un ensemble de parties aléatoires, et en se basant sur cette analyse, nous améliorons le temps d'exécution du programme.
+
+\subsection{Tests par observation de parties aléatoires}
 
 Le code pour tester visuellement notre implémentation est donné dans le listing \ref{lst:random_games_testing}. Un début d'exécution de ce code est donné dans le listing \ref{lst:random_games_testing_exec}.
 
 \begin{itemize}
 
-\item 
+\item Aux lignes 4 et 5, nous initialisons un générateur pseudo-aléatoire, soit avec une graine donnée par l'utilisateur (paramètre \mintinline{c++}{seed}) pour pouvoir reproduire le test, ou un nombre aléatoire en utilisant \mintinline{c++}{random_device}\footnote{Ce générateur va générer des nombres aléatoires de haute qualité, en utilisant par exemple {\ttfamily /dev/urandom} pour Linux. Par contre, l'obtention du nombre aléatoire va être assez lente comparée à l'utilisation d'un générateur pseudo-aléatoire comme \mintinline{c++}{mt19937} par exemple. Un des usages typique de \mintinline{c++}{random_device} est d'initialiser un générateur pseudo-aléatoire comme nous le faisons ici.}.
+
+\item La boucle des lignes 5 à 24 va jouer \mintinline{c++}{nb_games} parties aléatoires.
+\begin{itemize}
+\item À la ligne 6, on initialise une nouvelle partie.
+\item Aux lignes 7 à 22, on joue la partie aléatoire.
+\begin{itemize}
+\item Aux lignes 8 et 9, on récupère la liste des coups possibles dans la position actuelle du jeu et on les tries pour rendre l'affichage des coups possibles plus lisible.
+\item Aux lignes 10 à 13, on affiche le nombre de coups possibles puis la liste de tous les coups. Vous pouvez voir le résultat dans le listing \ref{lst:random_games_testing_exec}. 
+\item À la ligne 15, on affiche le plateau avec les coups représentés par des croix. Cela permet de voir facilement si des coups manquent ou si des coups sont de trop.
+\item Aux lignes 16 à 18, on choisit un coup aléatoirement et on l'affiche.
+\item Aux lignes 19 à 20, on attend l'appuie sur la touche entrée pour continuer la boucle. Cela nous laisse le temps d'analyser les sorties.
+
+\end{itemize}
+
+\end{itemize}
 
 \end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{c++}
-void play_random_games(size_t nb_games, optional<uint64_t> seed=nullopt) {
+void play_random_games(size_t nb_games, 
+                       optional<uint64_t> seed = nullopt) {
     MoveList moves;
     random_device rd;
     mt19937 mt(seed.value_or(rd()));
@@ -3266,8 +3288,6 @@ int main() {
 \captionof{listing}{Playing random games, displaying the list of moves and the board to check the engine visually}
 \label{lst:random_games_testing}
 \end{mdframed}
-
-\newpage
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -3383,6 +3403,289 @@ h1:f1
 \captionof{listing}{Début du déroulement du programme du listing \ref{lst:random_games_testing}}
 \label{lst:random_games_testing_exec}
 \end{mdframed}
+
+\subsection{Tests différentiels et tests basés sur les propriétés}
+
+L'observation des parties aléatoires précédentes nous permet de détecter rapidement des bugs éventuels. Cette façon de faire est bien pratique pour voir en détail le fonctionnement de notre programme. Mais nous voulons aussi une manière de tester automatiquement notre jeu. Pour ce faire, nous allons tester le jeu en testant des propriétés qu'il doit vérifier. Nous allons aussi générer les coups possibles d'une manière simple (et peu efficace) dans laquelle nous avons une grande confiance, justement car elle est basique à implémenter, et pouvoir comparer les coups générés par notre jeu avec ceux générés simplement. Tous ces tests se feront sur des parties générées aléatoirement. Nous allons ainsi pouvoir produire assez facilement une très grande quantité de tests. Cette façon de tester s'appelle les \emph{tests basés sur les propriétés} \cite{claessen2000quickcheck} et les \emph{tests différentiels} \cite{mckeeman1998differential}. Les tests basés sur les propriétés consistent à vérifier que certaines propriétés invariantes sont toujours respectées lors de l'exécution de scénarios générés aléatoirement. Les tests différentiels comparent les résultats de deux implémentations différentes du même algorithme : une implémentation optimisée (notre générateur de coups avec magic bitboards) et une implémentation de référence simple mais manifestement correcte.\\
+
+Le code du listing \ref{lst:random_games_property_based_testing} illustre cette approche des tests.
+
+\begin{itemize}
+\item Aux lignes 8 à 12, la structure \mintinline{c++}{TestResult} va contenir le résultat d'un test donné. L'attribut \mintinline{c++}{passed} est à vrai lorsque le test a réussi et à faux sinon. L'attribut \mintinline{c++}{message} stocke le diagnostic qui sera utilisé en cas d'erreur (voir la fonction \mintinline{c++}{run_test} à la ligne 80).
+
+\item À la ligne 13, la fonction \mintinline{c++}{pass} rend un \mintinline{c++}{TestResult} qui indique que le test c'est déroulé correctement.
+
+\item À la ligne 14, la fonction \mintinline{c++}{fail(string msg)} rend un \mintinline{c++}{TestResult} qui indique que le test a échoué avec le diagnostique d'erreur \mintinline{c++}{msg}.
+
+\item Aux lignes 16 à 23, la fonction \mintinline{c++}{check_move_count} est notre premier test différentiel. Le premier paramètre \mintinline{c++}{fast} est la liste des coups obtenue grâce aux bitboards magiques, et le deuxième paramètre \mintinline{c++}{expected} est la liste de coups obtenue avec une méthode simple qui sera décrite plus loin et qui est définie aux lignes 87 à 114. Nous vérifions dans ce test que les nombres de coups produits par les deux approches sont bien identiques.
+
+\item Aux lignes 25 à 53, la fonction \mintinline{c++}{check_move_lists_equal} est notre deuxième et dernier test différentiel. On vérifie que les listes de coups sont identiques, en les triant tout d'abord aux lignes 28 et 29, puis en vérifiant que les deux listes de coups sont maintenant identiques à la ligne 30. Le reste de la fonction crée un message d'erreur en calculant les différences entre les deux listes.
+
+\item Aux lignes 55 à 61, la fonction \mintinline{c++}{check_undo} va vérifier la propriété suivante. 
+Soit \mintinline{c++}{yolah} une configuration quelconque du jeu et \mintinline{c++}{m} un coup possible dans cette position. Posons \mintinline{c++}{Yolah before = yolah;}, puis effectuons les actions suivantes.
+\begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
+    yolah.play(m);
+    yolah.undo(m);
+    Yolah after = yolah;
+\end{minted}
+On vérifie que l'annulation d'un coup fonctionne correctement en testant si \mintinline{c++}{before == after} à la ligne 56.
+
+\item La deuxième propriété que l'on va tester est donnée dans la fonction \mintinline{c++}{check_game}\\\mintinline{c++}{_over_move} à la ligne 63. On y teste que le seul coup possible dans une position terminale du jeu est le coup \mintinline{c++}{Move::none()}. En effet, les joueurs n'ont plus de coups à disposition et ils doivent donc passer leur tour. À la ligne 65, on vérifie qu'il n'y a qu'un seul coup et que celui-ci est bien le coup \mintinline{c++}{Move::none()}.
+
+\item Les dernières propriétés sont définies dans la fonction de test principale \mintinline{c++}{random_games} définie à la ligne 74. Ces dernières propriétés sont placées au sein de cette fonction, car elles ont besoin d'accéder aux attributs privés de la classe \mintinline{c++}{Yolah} et \mintinline{c++}{random_games} est déclarée \mintinline{c++}{friend} de cette classe.
+\begin{itemize}
+\item Aux lignes 87 à 114 est définie la function \mintinline{c++}{slow_moves_generation} qui permet d'obtenir la liste des coups possibles dans la configuration du jeu \mintinline{c++}{yolah} passée en paramètre (ligne 87). Comme nous le disions, cette façon de générer les coups est bien plus simple que celle à base de bitboards magiques. Nous avons une grande confiance dans l'exactitude de \mintinline{c++}{slow_moves_generation}. Le paramètre \mintinline{c++}{expected} dans \mintinline{c++}{check_move_lists_equal} à la ligne 25, a été instancié par une liste de coups obtenue grâce à \mintinline{c++}{slow_move_generation}. Les boucles aux lignes 91 et 92, vont parcourir toutes les cases du plateau. On construit la case de départ du coup \mintinline{c++}{from} à la ligne 93, puis on vérifie à la ligne 95 que cette case contient un pion du joueur pour lequel on crée la liste de coups (ligne 90). Les boucles aux lignes 96 et 97 vont parcourir toutes les directions possibles pour la pièce, on fait attention à filtrer le déplacement nul à la ligne 98. Enfin, la boucle de la ligne 100 à 107 va se déplacer dans la direction choisie \mintinline{c++}{(di, dj)} tant qu'on ne sort pas du plateau et qu'il n'y a pas d'obstacles. Si on sort du plateau à la ligne 101, ou qu'un obstacle est détecté à la ligne 104, on sort de la boucle pour essayer une nouvelle direction. On n'oublie pas à la ligne 112 d'ajouter le coup \mintinline{c++}{Move::none()} si aucun coup n'était possible. Cette façon de construire tous les coups possibles est très intuitive, mais inefficace.
+\end{itemize}
+
+\item À la ligne 116, nous allons tester la propriété que le coup \mintinline{c++}{Move::none()} doit seulement incrémenter le nombre de coups dans la partie grâce à la fonction \mintinline{c++}{check_none_move_execution}.
+
+\item À la ligne 127, la fonction \mintinline{c++}{check_regular_move_execution} va tester les propriétés que doit vérifier un coup normal. Aux lignes 134 et 136, on vérifie que la pièce n'est plus sur la case de départ du coup, qu'elle se trouve maintenant sur la case d'arrivée du coup, et enfin qu'un trou est apparu sur la case de départ du coup.
+
+\item Les lignes 136 à 188 déroulent \mintinline{c++}{nb_games} parties aléatoires en exécutant tous les tests.
+
+\item Les lignes 190 à 202 affichent un résumé des tests. Le listing \ref{lst:random_games_property_based_testing_exec} donne le résultat de l'exécution du \mintinline{c++}{main}.
+
+\end{itemize}
+
+
+\begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
+\begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
+namespace test {
+constexpr string_view RED = "\033[1;31m";
+constexpr string_view GREEN = "\033[1;32m";
+constexpr string_view YELLOW = "\033[1;33m";
+constexpr string_view RESET = "\033[0m";
+constexpr string_view BOLD = "\033[1m";
+
+struct TestResult {
+  bool passed; 
+  string message;
+  operator bool() const { return passed; }
+};
+TestResult pass() { return {true, ""}; }
+TestResult fail(string msg) { return {false, std::move(msg)}; }
+
+TestResult check_move_count(const MoveList& fast,
+                            const vector<Move>& expected) {
+  if (fast.size() != expected.size()) {
+    return fail(format("# of moves: expected {} got {}",
+                expected.size(), fast.size()));
+  }
+  return pass();
+}
+
+TestResult check_move_lists_equal(MoveList& fast, 
+                                  vector<Move>& expected,
+                                  const Yolah& yolah) {
+  sort(begin(fast), end(fast));
+  sort(begin(expected), end(expected));
+  if (equal(begin(fast), end(fast), begin(expected), end(expected))) {
+    return pass();
+  }
+  ostringstream oss;
+  oss << "move lists differ\n" << yolah << '\n';
+  vector<Move> only_in_fast, only_in_expected;
+  set_difference(begin(fast), end(fast), 
+                 begin(expected), end(expected),
+                 back_inserter(only_in_fast));
+  set_difference(begin(expected), end(expected), 
+                 begin(fast), end(fast),
+                 back_inserter(only_in_expected));
+  if (!only_in_expected.empty()) {
+    oss << "  Only in expected: ";
+    for (const auto& m : only_in_expected) oss << m << ' ';
+    oss << '\n';
+  }
+  if (!only_in_fast.empty()) {
+    oss << "  Only in fast: ";
+    for (const auto& m : only_in_fast) oss << m << ' ';
+    oss << '\n';
+  }
+  return fail(oss.str());
+}
+
+TestResult check_undo(const Yolah& before, const Yolah& after) {
+  if (before == after) return pass();
+  ostringstream oss;
+  oss << "undo failed\n  Previous state:\n" << before
+      << "\n  State after undo:\n" << after << '\n';
+  return fail(oss.str());
+}
+
+TestResult check_game_over_moves(const Yolah& yolah, 
+                                 const MoveList& moves) {
+  if (moves.size() == 1 && moves[0] == Move::none()) {
+    return pass();
+  }
+  ostringstream oss;
+  oss << "only Move::none() should be available when game is over\n"
+      << YolahWithMoves(yolah, moves) << '\n';
+  return fail(oss.str());
+}
+
+void random_games(size_t nb_games, optional<uint64_t> seed) {
+  MoveList fast_moves; 
+  random_device rd; 
+  mt19937 mt(seed.value_or(rd()));
+  size_t total_tests = 0, passed_tests = 0;
+
+  auto run_test = [&](TestResult result) {
+    total_tests++;
+    if (result) { passed_tests++; return true; }
+    cout << format("{}FAIL:{} {}\n", RED, RESET, result.message);
+    return false;
+  };
+
+  auto slow_moves_generation = [](const Yolah& yolah) {
+    vector<Move> res;
+    uint64_t occupied = yolah.black | yolah.white | yolah.holes;
+    uint64_t player_bb = (yolah.ply & 1) ? yolah.white : yolah.black;
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
+        Square from = Square(i * 8 + j);
+        uint64_t from_bb = square_bb(from);
+        if ((player_bb & from_bb) == 0) continue;
+        for (int di = -1; di <= 1; di++) {
+          for (int dj = -1; dj <= 1; dj++) {
+            if (di == 0 && dj == 0) continue;
+            int ii = i + di, jj = j + dj;
+            for(;;) {
+              if (ii < 0 || ii >= 8 || jj < 0 || jj >= 8) break;
+              Square to = Square(ii * 8 + jj);
+              uint64_t to_bb = square_bb(to);
+              if (to_bb & occupied) break;
+              res.emplace_back(from, to);
+              ii += di; jj += dj;
+            }
+          }
+        }
+      }
+    }
+    if (res.empty()) res.push_back(Move::none());
+    return res;
+  };
+
+  auto check_none_move_execution = [](const Yolah& before, 
+                                      const Yolah& after) {
+    if (before.black != after.black || before.white != after.white ||
+        before.holes != after.holes || 
+        before.black_score != after.black_score ||
+        after.ply != before.ply + 1) {
+      return fail("Move::none() must only change the ply number");
+    }
+    return pass();
+  };
+
+  auto check_regular_move_execution = [](const Yolah& before, 
+                                         const Yolah& after,
+                                         Move m) {
+    uint64_t player_bb = before.current_player() == BLACK ?
+                         after.black : after.white;
+    uint64_t from_bb = square_bb(m.from_sq());
+    uint64_t to_bb = square_bb(m.to_sq());
+    if (!(player_bb & from_bb) && (player_bb & to_bb) 
+        && (after.holes & from_bb)) {
+      return pass();
+    }
+    ostringstream oss;
+    oss << "move execution incorrect\n" << after << "\n  Move: " 
+        << m << '\n';
+    if ((player_bb & from_bb) != 0) {
+        oss << "  From square should be cleared\n";
+    }
+    if ((player_bb & to_bb) == 0) {
+        oss << "  To square should be set\n";
+    }
+    if ((after.holes & from_bb) == 0) {
+        oss << "  From square should be a hole\n";
+    }
+    return fail(oss.str());
+  };
+
+  cout << format("{}\n=== Running Random Games Tests ===\n{}", 
+                 BOLD, RESET);
+
+  for (size_t i = 0; i < nb_games; i++) {
+    Yolah yolah;
+    while (!yolah.game_over()) {
+      yolah.moves(fast_moves);
+      vector<Move> expected_moves = slow_moves_generation(yolah);
+      if (!run_test(check_move_count(fast_moves, 
+                                     expected_moves))) break;
+      if (!run_test(check_move_lists_equal(fast_moves, 
+                                           expected_moves, 
+                                           yolah))) break;
+      uniform_int_distribution<int> d(0, fast_moves.size()-1);
+      Move m = fast_moves[d(mt)];
+      Yolah before = yolah;
+      yolah.play(m);
+      if (m == Move::none()) {
+        if (!run_test(check_none_move_execution(before, 
+                                                yolah))) break;
+      } else {
+        if (!run_test(check_regular_move_execution(before, 
+                                                   yolah, 
+                                                   m))) break;
+      }
+      yolah.undo(m);
+      if (!run_test(check_undo(before, yolah))) break;
+      yolah.play(m);
+    }
+    if (!yolah.game_over()) continue;
+    yolah.moves(fast_moves);
+    if (!run_test(check_game_over_moves(yolah, fast_moves))) continue;
+    yolah.play(Move::none()); 
+    yolah.moves(fast_moves);
+    if (!run_test(check_game_over_moves(yolah, fast_moves))) continue;
+  }
+
+  cout << format("\n{}=== Test Summary ==={}\n", BOLD, RESET);
+  cout << format("Total tests: {}\n", total_tests);
+  cout << format("Passed: {}{}{}\n", GREEN, passed_tests, RESET);
+  cout << format("Failed: {}{}{}\n",
+                 (passed_tests == total_tests ? GREEN : RED),
+                 total_tests - passed_tests, RESET);
+  if (passed_tests == total_tests) {
+    cout << format("{}All tests passed!{}\n", GREEN, RESET);
+  } else {
+    double pass_rate = 100.0 * passed_tests / total_tests;
+    cout << format("{}Pass rate: {:.2f}%{}\n", 
+                   YELLOW, pass_rate, RESET);
+  }
+}}
+
+int main() {
+  init_all_magics();
+  test::random_games(10000, 42);
+}
+\end{minted}
+\captionof{listing}{TO DO}
+\label{lst:random_games_property_based_testing}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+
+=== Running Random Games Tests ===
+
+=== Test Summary ===
+Total tests: 2223036
+Passed: 2223036
+Failed: 0
+All tests passed!
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{Résultats de l'exécution du programme du listing \ref{lst:random_games_property_based_testing}}
+\label{lst:random_games_property_based_testing_exec}
+\end{mdframed}
+
+
+\subsection{Tests de performance}
+
 
 \section{What's Next}
 

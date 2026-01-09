@@ -1,0 +1,3 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{n}{fail}\PYG{p}{(}\PYG{n}{string}\PYG{+w}{ }\PYG{n}{msg}\PYG{p}{)}
+\end{Verbatim}
