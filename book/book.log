@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999993 (TeX Live 2022/dev/Debian) (preloaded format=xelatex 2024.3.27)  9 JAN 2026 22:33
+This is XeTeX, Version 3.141592653-2.6-0.999993 (TeX Live 2022/dev/Debian) (preloaded format=xelatex 2024.3.27)  14 JAN 2026 17:57
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -1709,7 +1709,23 @@ Package csquotes Info: Checking for multilingual support...
 Package csquotes Info: ... found 'babel' package.
 Package csquotes Info: Adjusting default style.
 Package csquotes Info: Redefining alias 'default' -> 'english'.
- (./book.aux)
+ (./book.aux
+
+LaTeX Warning: Label `lst:' multiply defined.
+
+
+LaTeX Warning: Label `lst:' multiply defined.
+
+
+LaTeX Warning: Label `lst:' multiply defined.
+
+
+LaTeX Warning: Label `lst:' multiply defined.
+
+
+LaTeX Warning: Label `lst:' multiply defined.
+
+)
 \openout1 = `book.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 226.
@@ -1723,7 +1739,7 @@ LaTeX Font Info:    ... okay on input line 226.
 LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 226.
 LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 2
 26.
-(/usr/share/texlive/texmf-dist/tex/latex/base/ts1cmr.fd
+ (/usr/share/texlive/texmf-dist/tex/latex/base/ts1cmr.fd
 File: ts1cmr.fd 2019/12/16 v2.5j Standard LaTeX font definitions
 )
 LaTeX Font Info:    ... okay on input line 226.
@@ -4682,6 +4698,70 @@ A.pygtex)
 \openout5 = `book.pyg'.
 
 
+(./_minted-book/A94E69862A19C4722ADCCB415B891C3293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/315152FFA709A0A423744EF089FEA38393C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/A94E69862A19C4722ADCCB415B891C3293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/A0531DB54FA845D213FD40D3A3146D4693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/23F164589D7A91F66A2E967D0124A5BB93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/182025B2445C73B34E51E1772A9AFBBF93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+LaTeX Warning: Reference `lst:chapter02' on page 60 undefined on input line 342
+0.
+
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/76A6935E5AA13A553737AE62D89D797793C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/0B7359DCB0D3C154B5800B9D553073E593C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/16C0F4BE9695FE48706DFEBD921055F793C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/522CA0BBE691CD240B1D80441F7DD50E93C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/6D8BF3F74DB8A66650B8B54FF999796793C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/F36CA4499475260F75AA54302E83836293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex) [60]
+\openout5 = `book.pyg'.
+
+
 (./_minted-book/B1D1769DCB40A846E8565AB64101850B93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
 \openout5 = `book.pyg'.
@@ -4693,7 +4773,7 @@ A.pygtex)
 
 
 (./_minted-book/6C64917CC4A2B48514CE95BFED6C99CF93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex) [60]
+A.pygtex)
 \openout5 = `book.pyg'.
 
 
@@ -4732,12 +4812,7 @@ A.pygtex)
 \openout5 = `book.pyg'.
 
 
-(./_minted-book/BFCA4C41900BE3DEBD53C6C929FBD55D93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/6930E995AB5AF5E8CD317F31FE6E4A5F93C4B3F5D7A0ADF48EF068E56C706D5
+(./_minted-book/D90F1CF0FA90CA4916258E015CD08E3893C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
 \openout5 = `book.pyg'.
 
@@ -4749,88 +4824,11 @@ A.pygtex)
 
 (./_minted-book/F36CA4499475260F75AA54302E83836293C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/1026BAB27E4A35C74EEDB004323742AD93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/E1734B8EC56BEA3F9AB003A3CB324D7F93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/1026BAB27E4A35C74EEDB004323742AD93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/4C063A8E53377864A5F08830AFAAA0C093C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-Overfull \hbox (23.3176pt too wide) in paragraph at lines 3435--3437
-[]\TU/lmr/m/n/12 Les dernières propriétés sont définies dans la fonction de tes
-t principale \TU/DejaVuSansMono(0)/m/n/10.95 random_games
+Overfull \hbox (54.22688pt too wide) in paragraph at lines 3436--3437
+[]\TU/lmr/m/n/12 La deuxième propriété que l’on va tester est donnée dans la fo
+nction \TU/DejaVuSansMono(0)/m/n/10.95 check_game_over_move
  []
 
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/A94E69862A19C4722ADCCB415B891C3293C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/315152FFA709A0A423744EF089FEA38393C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/A94E69862A19C4722ADCCB415B891C3293C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/6C64917CC4A2B48514CE95BFED6C99CF93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/986F18EEC8FA9361F88DB8D48DA80F8493C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/047535F709F8CFA423EB95880103D97F93C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/A0531DB54FA845D213FD40D3A3146D4693C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/6D8BF3F74DB8A66650B8B54FF999796793C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/F36CA4499475260F75AA54302E83836293C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
-Overfull \hbox (30.9362pt too wide) in paragraph at lines 3437--3438
-\TU/DejaVuSansMono(0)/m/n/10.95 slow_moves_generation\TU/lmr/m/n/12 . Le paramè
-tre \TU/DejaVuSansMono(0)/m/n/10.95 expected \TU/lmr/m/n/12 dans \TU/DejaVuSans
-Mono(0)/m/n/10.95 check_move_lists_equal
- []
-
-[61]
-\openout5 = `book.pyg'.
-
-
-(./_minted-book/F36CA4499475260F75AA54302E83836293C4B3F5D7A0ADF48EF068E56C706D5
-A.pygtex)
 \openout5 = `book.pyg'.
 
 
@@ -4839,7 +4837,17 @@ A.pygtex)
 \openout5 = `book.pyg'.
 
 
+(./_minted-book/F36CA4499475260F75AA54302E83836293C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex) [61]
+\openout5 = `book.pyg'.
+
+
 (./_minted-book/A27E799060BB2C64605A704DE8ADD5C093C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+\openout5 = `book.pyg'.
+
+
+(./_minted-book/1026BAB27E4A35C74EEDB004323742AD93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
 \openout5 = `book.pyg'.
 
@@ -4851,82 +4859,452 @@ A.pygtex)
 
 (./_minted-book/7C897C2167F77748644493434066AE0493C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
-Package mdframed Info: mdframed works in twoside mode on input line 3451.
+Package mdframed Info: mdframed works in twoside mode on input line 3450.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 3451.
+(mdframed)              on input line 3450.
 \openout4 = `book.pyg'.
 
 
-(./_minted-book/925089F4634C0A15F26912ACBCD0011993C4B3F5D7A0ADF48EF068E56C706D5
+(./_minted-book/D49AD0BDCEA5E329E8E39F5D185C681C93C4B3F5D7A0ADF48EF068E56C706D5
 A.pygtex)
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 3662.
+(caption)                particular \caption on input line 3692.
 See the caption package documentation for explanation.
 
-[62] [63] [64] [65] [66]
-Package mdframed Info: mdframed works in twoside mode on input line 3666.
+[62] [63] [64] [65] [66] [67]
+Package mdframed Info: mdframed works in twoside mode on input line 3696.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 3666.
-Package mdframed Info: mdframed works in twoside mode on input line 3681.
+(mdframed)              on input line 3696.
+Package mdframed Info: mdframed works in twoside mode on input line 3711.
 Package mdframed Info: mdframed detected package amsthm 
  changed the theorem header of amsthm
-(mdframed)              on input line 3681.
+(mdframed)              on input line 3711.
 
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 3682.
+(caption)                particular \caption on input line 3712.
 See the caption package documentation for explanation.
 
-[67] [68
+Package mdframed Info: mdframed works in twoside mode on input line 3719.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3719.
+\openout4 = `book.pyg'.
 
-]
-Chapter 3.
-[69] [70
 
-]
-Chapter 4.
-[71] [72
+(./_minted-book/58B14B4204B043AF0C4EF56ACB2E430993C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
 
-]
-Chapter 5.
-[73] [74
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 3757.
+See the caption package documentation for explanation.
 
-]
-Chapter 6.
-[75] [76
+[68]
+Package mdframed Info: mdframed works in twoside mode on input line 3769.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3769.
+Package mdframed Info: mdframed works in twoside mode on input line 3787.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3787.
 
-]
-Chapter 7.
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 3788.
+See the caption package documentation for explanation.
+
+Package mdframed Info: mdframed works in twoside mode on input line 3792.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3792.
+
+Overfull \hbox (209.01509pt too wide) in paragraph at lines 3803--3803
+[]\TU/DejaVuSansMono(0)/m/n/10.95 17 671 802 014      cycles                   
+ #    4,046 GHz                       ( +-  0,09% )  (49,84%)[] 
+ []
+
+
+Overfull \hbox (209.01505pt too wide) in paragraph at lines 3804--3804
+[]\TU/DejaVuSansMono(0)/m/n/10.95 24 345 746 995      instructions             
+ #    1,37  insn per cycle            ( +-  0,01% )  (62,38%)[] 
+ []
+
+
+Overfull \hbox (209.01508pt too wide) in paragraph at lines 3805--3805
+[] \TU/DejaVuSansMono(0)/m/n/10.95 2 431 465 524      branches                 
+ #  556,680 M/sec                     ( +-  0,01% )  (62,44%)[] 
+ []
+
+
+Overfull \hbox (209.01501pt too wide) in paragraph at lines 3806--3806
+[]   \TU/DejaVuSansMono(0)/m/n/10.95 275 869 723      branch-misses            
+ #   11,35% of all branches           ( +-  0,02% )  (62,54%)[] 
+ []
+
+
+Overfull \hbox (209.01503pt too wide) in paragraph at lines 3807--3807
+[] \TU/DejaVuSansMono(0)/m/n/10.95 3 133 561 281      L1-dcache-loads          
+ #  717,424 M/sec                     ( +-  0,01% )  (62,63%)[] 
+ []
+
+
+Overfull \hbox (209.01495pt too wide) in paragraph at lines 3808--3808
+[]   \TU/DejaVuSansMono(0)/m/n/10.95 146 564 424      L1-dcache-load-misses    
+ #    4,68% of all L1-dcache accesses ( +-  0,07% )  (62,63%)[] 
+ []
+
+
+Overfull \hbox (209.01508pt too wide) in paragraph at lines 3809--3809
+[]    \TU/DejaVuSansMono(0)/m/n/10.95 54 670 067      LLC-loads                
+ #   12,517 M/sec                     ( +-  0,27% )  (50,00%)[] 
+ []
+
+
+Overfull \hbox (209.01498pt too wide) in paragraph at lines 3810--3810
+[]        \TU/DejaVuSansMono(0)/m/n/10.95 77 427      LLC-load-misses          
+ #    0,14% of all LL-cache accesses  ( +- 22,57% )  (49,91%)[] 
+ []
+
+[69]
+Package mdframed Info: mdframed works in twoside mode on input line 3817.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3817.
+
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 3818.
+See the caption package documentation for explanation.
+
+Package mdframed Info: mdframed works in twoside mode on input line 3822.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3822.
+\openout4 = `book.pyg'.
+
+
+(./_minted-book/747DBE7DCB4EF172CFC5C99B6AB06DE093C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 3844.
+See the caption package documentation for explanation.
+
+Package mdframed Info: mdframed works in twoside mode on input line 3849.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3849.
+\openout4 = `book.pyg'.
+
+
+(./_minted-book/468AC2152698C988EAEBCF12246DFD9793C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 3886.
+See the caption package documentation for explanation.
+
+[70]
+Package mdframed Info: mdframed works in twoside mode on input line 3890.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3890.
+Package mdframed Info: mdframed works in twoside mode on input line 3908.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3908.
+
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 3909.
+See the caption package documentation for explanation.
+
+Package mdframed Info: mdframed works in twoside mode on input line 3914.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3914.
+
+Overfull \hbox (209.01509pt too wide) in paragraph at lines 3925--3925
+[]\TU/DejaVuSansMono(0)/m/n/10.95 12 832 947 780      cycles                   
+ #    4,021 GHz                       ( +-  0,18% )  (49,84%)[] 
+ []
+
+
+Overfull \hbox (209.01505pt too wide) in paragraph at lines 3926--3926
+[]\TU/DejaVuSansMono(0)/m/n/10.95 23 589 523 540      instructions             
+ #    1,82  insn per cycle            ( +-  0,01% )  (62,38%)[] 
+ []
+
+
+Overfull \hbox (209.01508pt too wide) in paragraph at lines 3927--3927
+[] \TU/DejaVuSansMono(0)/m/n/10.95 2 328 267 849      branches                 
+ #  729,484 M/sec                     ( +-  0,01% )  (62,40%)[] 
+ []
+
+
+Overfull \hbox (209.01501pt too wide) in paragraph at lines 3928--3928
+[]   \TU/DejaVuSansMono(0)/m/n/10.95 236 977 678      branch-misses            
+ #   10,17% of all branches           ( +-  0,01% )  (62,53%)[] 
+ []
+
+
+Overfull \hbox (209.01505pt too wide) in paragraph at lines 3929--3929
+[] \TU/DejaVuSansMono(0)/m/n/10.95 3 513 433 988      L1-dcache-loads          
+ #    1,101 G/sec                     ( +-  0,01% )  (62,66%)[] 
+ []
+
+
+Overfull \hbox (209.01495pt too wide) in paragraph at lines 3930--3930
+[]   \TU/DejaVuSansMono(0)/m/n/10.95 145 286 847      L1-dcache-load-misses    
+ #    4,13% of all L1-dcache accesses ( +-  0,07% )  (62,68%)[] 
+ []
+
+
+Overfull \hbox (209.01508pt too wide) in paragraph at lines 3931--3931
+[]    \TU/DejaVuSansMono(0)/m/n/10.95 54 964 849      LLC-loads                
+ #   17,221 M/sec                     ( +-  0,29% )  (50,01%)[] 
+ []
+
+
+Overfull \hbox (209.01498pt too wide) in paragraph at lines 3932--3932
+[]        \TU/DejaVuSansMono(0)/m/n/10.95 38 307      LLC-load-misses          
+ #    0,07% of all LL-cache accesses  ( +- 12,03% )  (49,88%)[] 
+ []
+
+[71]
+Package mdframed Info: Not enough space on this page on input line 3937.
+Package mdframed Info: mdframed works in twoside mode on input line 3939.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3939.
+
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 3940.
+See the caption package documentation for explanation.
+
+Package mdframed Info: mdframed works in twoside mode on input line 3944.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 3944.
+\openout4 = `book.pyg'.
+
+
+(./_minted-book/13E65A08B29A9890D5AE422D9E5F36B693C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 4004.
+See the caption package documentation for explanation.
+
+[72]
+Package mdframed Info: mdframed works in twoside mode on input line 4009.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 4009.
+ [73]
+Package mdframed Info: Not enough space on this page on input line 4025.
+Package mdframed Info: mdframed works in twoside mode on input line 4027.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 4027.
+
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 4028.
+See the caption package documentation for explanation.
+
+Package mdframed Info: mdframed works in twoside mode on input line 4033.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 4033.
+
+Overfull \hbox (203.08192pt too wide) in paragraph at lines 4044--4044
+[] \TU/DejaVuSansMono(0)/m/n/10.95 6 446 405 052      cycles                   
+ #    4,085 GHz                      ( +-  0,10% )  (49,63%)[] 
+ []
+
+
+Overfull \hbox (203.08188pt too wide) in paragraph at lines 4045--4045
+[]\TU/DejaVuSansMono(0)/m/n/10.95 15 466 860 279      instructions             
+ #    2,41  insn per cycle           ( +-  0,01% )  (62,28%)[] 
+ []
+
+
+Overfull \hbox (203.08192pt too wide) in paragraph at lines 4046--4046
+[]   \TU/DejaVuSansMono(0)/m/n/10.95 793 399 286      branches                 
+ #  502,748 M/sec                    ( +-  0,01% )  (62,53%)[] 
+ []
+
+
+Overfull \hbox (203.08186pt too wide) in paragraph at lines 4047--4047
+[]     \TU/DejaVuSansMono(0)/m/n/10.95 2 206 340      branch-misses            
+ #    0,28% of all branches          ( +-  0,07% )  (62,79%)[] 
+ []
+
+
+Overfull \hbox (203.08188pt too wide) in paragraph at lines 4048--4048
+[] \TU/DejaVuSansMono(0)/m/n/10.95 3 605 550 330      L1-dcache-loads          
+ #    2,285 G/sec                    ( +-  0,01% )  (62,83%)[] 
+ []
+
+
+Overfull \hbox (214.94812pt too wide) in paragraph at lines 4049--4049
+[]   \TU/DejaVuSansMono(0)/m/n/10.95 145 697 914      L1-dcache-load-misses    
+ #    4,03% of all L1-dcache accesses  ( +-  0,04% )  (62,75%)[] 
+ []
+
+
+Overfull \hbox (203.08191pt too wide) in paragraph at lines 4050--4050
+[]    \TU/DejaVuSansMono(0)/m/n/10.95 55 012 701      LLC-loads                
+ #   34,860 M/sec                    ( +-  0,26% )  (49,86%)[] 
+ []
+
+
+Overfull \hbox (209.01498pt too wide) in paragraph at lines 4051--4051
+[]        \TU/DejaVuSansMono(0)/m/n/10.95 11 412      LLC-load-misses          
+ #    0,02% of all LL-cache accesses  ( +- 16,80% )  (49,60%)[] 
+ []
+
+Package mdframed Info: mdframed works in twoside mode on input line 4058.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 4058.
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 4059.
+See the caption package documentation for explanation.
+
+Package mdframed Info: mdframed works in twoside mode on input line 4064.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 4064.
+\openout4 = `book.pyg'.
+
+
+(./_minted-book/BE6F8191ABE4E0012E5A5E66131AE3F193C4B3F5D7A0ADF48EF068E56C706D5
+A.pygtex)
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 4179.
+See the caption package documentation for explanation.
+
+[74] [75] [76]
+Package mdframed Info: mdframed works in twoside mode on input line 4183.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 4183.
+
+Overfull \hbox (72.55243pt too wide) in paragraph at lines 4193--4193
+[]\TU/DejaVuSansMono(0)/m/n/10.95 ---------------------------------------------
+--------------------------------------[] 
+ []
+
+
+Overfull \hbox (72.55225pt too wide) in paragraph at lines 4194--4194
+[]\TU/DejaVuSansMono(0)/m/n/10.95 Benchmark                         Time       
+      CPU   Iterations UserCounters...[] 
+ []
+
+
+Overfull \hbox (72.55243pt too wide) in paragraph at lines 4195--4195
+[]\TU/DejaVuSansMono(0)/m/n/10.95 ---------------------------------------------
+--------------------------------------[] 
+ []
+
+
+Overfull \hbox (143.75012pt too wide) in paragraph at lines 4196--4196
+[]\TU/DejaVuSansMono(0)/m/n/10.95 BM_random_prng_modulo          2651 ns       
+  2651 ns       258011 items_per_second=377.285k/s[] 
+ []
+
+
+Overfull \hbox (143.75012pt too wide) in paragraph at lines 4197--4197
+[]\TU/DejaVuSansMono(0)/m/n/10.95 BM_random_prng_reduce          1667 ns       
+  1667 ns       417675 items_per_second=599.745k/s[] 
+ []
+
+
+Overfull \hbox (143.75014pt too wide) in paragraph at lines 4198--4198
+[]\TU/DejaVuSansMono(0)/m/n/10.95 BM_random_mt19937              5114 ns       
+  5114 ns       122426 items_per_second=195.541k/s[] 
+ []
+
+
+Overfull \hbox (143.7501pt too wide) in paragraph at lines 4199--4199
+[]\TU/DejaVuSansMono(0)/m/n/10.95 BM_random_mt19937_modulo       6069 ns       
+  6068 ns       116983 items_per_second=164.794k/s[] 
+ []
+
+
+Overfull \hbox (137.81694pt too wide) in paragraph at lines 4200--4200
+[]\TU/DejaVuSansMono(0)/m/n/10.95 BM_random_mt19937_reduce       4868 ns       
+  4868 ns       146061 items_per_second=205.41k/s[] 
+ []
+
+Package mdframed Info: mdframed works in twoside mode on input line 4205.
+Package mdframed Info: mdframed detected package amsthm 
+ changed the theorem header of amsthm
+(mdframed)              on input line 4205.
+
+Package caption Warning: The option `hypcap=true' will be ignored for this
+(caption)                particular \caption on input line 4206.
+See the caption package documentation for explanation.
+
 [77] [78
 
 ]
-Chapter 8.
+Chapter 3.
 [79] [80
 
 ]
-Chapter 9.
+Chapter 4.
 [81] [82
 
-] (./book.acr) (./book.gls) [83
-
-
-] [84
+]
+Chapter 5.
+[83] [84
 
 ]
-Overfull \hbox (17.50659pt too wide) in paragraph at lines 3984--3984
+Chapter 6.
+[85] [86
+
+]
+Chapter 7.
+[87] [88
+
+]
+Chapter 8.
+[89] [90
+
+]
+Chapter 9.
+[91] [92
+
+] (./book.acr) (./book.gls) [93
+
+
+] [94
+
+]
+Overfull \hbox (17.50659pt too wide) in paragraph at lines 4504--4504
 []\TU/lmr/m/n/12 Stockfish Team. \TU/lmr/m/it/12 Stockfish: Open Source Chess E
 ngine\TU/lmr/m/n/12 . [][]$[][][][][] [] [] [] [][][][][][][][][][][][][][] []
  []
 
-[85] (./book.aux)
+[95] (./book.aux)
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
 
 LaTeX Warning: There were undefined references.
+
+
+LaTeX Warning: There were multiply-defined labels.
 
 Package rerunfilecheck Info: File `book.out' has not changed.
 (rerunfilecheck)             Checksum: E670B3DF00CC697031F4055428AD580E;5071.
@@ -4937,12 +5315,12 @@ Package logreq Info: Writing requests to 'book.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 56488 strings out of 476191
- 1299800 string characters out of 5812072
- 2190228 words of memory out of 5000000
- 75134 multiletter control sequences out of 15000+600000
+ 56560 strings out of 476191
+ 1303503 string characters out of 5812072
+ 2191511 words of memory out of 5000000
+ 75191 multiletter control sequences out of 15000+600000
  484144 words of font info for 118 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  91i,21n,117p,1879b,4874s stack positions out of 5000i,500n,10000p,200000b,80000s
 
-Output written on book.pdf (95 pages).
+Output written on book.pdf (105 pages).

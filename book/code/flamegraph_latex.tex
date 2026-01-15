@@ -1,0 +1,60 @@
+% Flamegraph ASCII pour inclusion dans LaTeX
+% Utiliser avec \begin{verbatim} ou minted
+
+\subsection{Flamegraph du profil d'exécution}
+
+Le flamegraph ci-dessous montre la répartition du temps d'exécution.
+La largeur de chaque barre représente le pourcentage de temps CPU consommé.
+
+\begin{verbatim}
+╔═══════════════════════════════════════════════════════════════════════╗
+║ play_random_games                                        90.0%        ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║ ├─ moves_bb ─────────────────────────────┐              23.9%        ║
+║ │  └─ Magic::index ────────┐              │               8.1%        ║
+║ │                           │              │                           ║
+║ ├─ Yolah::moves ──────────────────────┐   │              20.6%        ║
+║ │                                      │   │                           ║
+║ ├─ pop_lsb ────────────┐               │   │              12.9%        ║
+║ │                      │               │   │                           ║
+║ ├─ Move::Move ─────────────┐           │   │              13.0%        ║
+║ │                           │           │   │                           ║
+║ ├─ Yolah::play ──┐          │           │   │               3.1%        ║
+║ │                │          │           │   │                           ║
+║ └─ game_over ┐   │          │           │   │               1.2%        ║
+║              │   │          │           │   │                           ║
+╠══════════════╧═══╧══════════╧═══════════╧═══╧═══════════════════════╣
+║ uniform_int_distribution + mt19937                        9.1%        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+\end{verbatim}
+
+\begin{table}[h]
+\centering
+\caption{Répartition du temps d'exécution (flamegraph)}
+\label{tab:flamegraph}
+\begin{tabular}{lrp{6cm}}
+\toprule
+\textbf{Fonction} & \textbf{Temps CPU} & \textbf{Description} \\
+\midrule
+\code{moves\_bb} & 23.9\% & Génération des coups avec magic bitboards \\
+\code{Yolah::moves} & 20.6\% & Logique de génération des coups \\
+\code{Move::Move} & 13.0\% & Construction des objets Move \\
+\code{pop\_lsb} & 12.9\% & Extraction du bit de poids faible \\
+\code{Magic::index} & 8.1\% & Calcul de l'index magic \\
+\code{Yolah::play} & 3.1\% & Exécution d'un coup \\
+\code{game\_over} & 1.2\% & Détection de fin de partie \\
+\midrule
+RNG (mt19937) & 9.1\% & Génération de nombres aléatoires \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Observations:}
+\begin{itemize}
+\item La génération de coups (\texttt{moves\_bb} + \texttt{Yolah::moves})
+      représente 44.5\% du temps total.
+\item Les opérations bit-level (\texttt{pop\_lsb}, \texttt{Magic::index})
+      consomment 21\% du temps.
+\item Le générateur de nombres aléatoires (nécessaire pour les tests)
+      représente 9.1\% du temps.
+\end{itemize}

@@ -17,15 +17,15 @@
 \contentsline {section}{\numberline {2.4}Testing with Random Games}{56}{section.2.4}%
 \contentsline {subsection}{\numberline {2.4.1}Tests par observation de parties aléatoires}{56}{subsection.2.4.1}%
 \contentsline {subsection}{\numberline {2.4.2}Tests différentiels et tests basés sur les propriétés}{60}{subsection.2.4.2}%
-\contentsline {subsection}{\numberline {2.4.3}Tests de performance}{67}{subsection.2.4.3}%
-\contentsline {section}{\numberline {2.5}What's Next}{67}{section.2.5}%
-\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{67}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{69}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{71}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{73}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{75}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{77}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{79}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{81}{chapter.9}%
-\contentsline {chapter}{Acronymes}{83}{section*.34}%
-\contentsline {chapter}{Bibliography}{85}{appendix*.36}%
+\contentsline {subsection}{\numberline {2.4.3}Tests de performance}{68}{subsection.2.4.3}%
+\contentsline {section}{\numberline {2.5}What's Next}{77}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{77}{section.2.6}%
+\contentsline {chapter}{\numberline {3}AI Players}{79}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{81}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{83}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{85}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{87}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{89}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{91}{chapter.9}%
+\contentsline {chapter}{Acronymes}{93}{section*.34}%
+\contentsline {chapter}{Bibliography}{95}{appendix*.36}%

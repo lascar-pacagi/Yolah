@@ -1,0 +1,6 @@
+
+=== Game Statistics ===
+Total games: 1000000
+Black wins:  498503 (49.9%)
+White wins:  395975 (39.6%)
+Draws:       105522 (10.6%)

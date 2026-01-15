@@ -1,0 +1,101 @@
+# ========
+# captured on    : Sun Jan 11 17:10:54 2026
+# header version : 1
+# data offset    : 344
+# data size      : 36785656
+# feat offset    : 36786000
+# hostname : TheTurk
+# os release : 5.15.0-164-generic
+# perf version : 5.15.193
+# arch : x86_64
+# nrcpus online : 12
+# nrcpus avail : 12
+# cpudesc : Intel(R) Xeon(R) E-2176M CPU @ 2.70GHz
+# cpuid : GenuineIntel,6,158,10
+# total memory : 32691176 kB
+# cmdline : /usr/lib/linux-tools-5.15.0-164/perf record -F 999 --call-graph dwarf -g ./chapter02 
+# event : name = cycles, , id = { 5933, 5934, 5935, 5936, 5937, 5938, 5939, 5940, 5941, 5942, 5943, 5944 }, size = 128, { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|ADDR|CALLCHAIN|PERIOD|REGS_USER|STACK_USER|DATA_SRC, read_format = ID, disabled = 1, inherit = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, precise_ip = 3, mmap_data = 1, sample_id_all = 1, exclude_guest = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: intel_pt = 8, software = 1, power = 20, uncore_cbox_4 = 15, uprobe = 7, uncore_imc = 10, cpu = 4, cstate_core = 18, uncore_cbox_2 = 13, breakpoint = 5, uncore_cbox_0 = 11, tracepoint = 2, cstate_pkg = 19, uncore_arb = 17, kprobe = 6, uncore_cbox_5 = 16, msr = 9, uncore_cbox_3 = 14, uncore_cbox_1 = 12
+# CACHE info available, use -I to display
+# time of first sample : 538966.716099
+# time of last sample : 538971.107810
+# sample duration :   4391.711 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info 206: bpf_prog_c8b47a902f1cc68b addr 0xffffffffc49553b0 size 289
+# bpf_prog_info 207: bpf_prog_6deef7357e7b4530 addr 0xffffffffc4cc510c size 55
+# bpf_prog_info 208: bpf_prog_6deef7357e7b4530 addr 0xffffffffc4fdbb24 size 55
+# bpf_prog_info 209: bpf_prog_ee0e253c78993a24 addr 0xffffffffc526ebd0 size 259
+# bpf_prog_info 210: bpf_prog_e3dbd137be8d6168 addr 0xffffffffc5a6cafc size 310
+# bpf_prog_info 211: bpf_prog_6deef7357e7b4530 addr 0xffffffffc5a7aaa4 size 55
+# bpf_prog_info 212: bpf_prog_6deef7357e7b4530 addr 0xffffffffc5a7c834 size 55
+# bpf_prog_info 213: bpf_prog_8b9c33f36f812014 addr 0xffffffffc5a74584 size 448
+# bpf_prog_info 214: bpf_prog_6deef7357e7b4530 addr 0xffffffffc5a97c00 size 55
+# bpf_prog_info 215: bpf_prog_6deef7357e7b4530 addr 0xffffffffc5a995e4 size 55
+# bpf_prog_info 216: bpf_prog_ee0e253c78993a24 addr 0xffffffffc5a9b200 size 259
+# bpf_prog_info 217: bpf_prog_0ecd07b7b633809f addr 0xffffffffc5a9d8e0 size 308
+# bpf_prog_info 218: bpf_prog_6deef7357e7b4530 addr 0xffffffffc5a9fc18 size 55
+# bpf_prog_info 219: bpf_prog_6deef7357e7b4530 addr 0xffffffffc5aa1a44 size 55
+# cpu pmu capabilities: branches=32, max_precise=3, pmu_name=skylake
+# missing features: TRACING_DATA BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY HYBRID_CPU_PMU_CAPS 
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cycles'
+# Event count (approx.): 18105335667
+#
+# Overhead       Samples        Period  Symbol                                                                                                                                                                                                                             IPC   [IPC Coverage]
+# ........  ............  ............  .................................................................................................................................................................................................................................  ....................
+#
+    91.84%          3993   16628158956  [.] play_random_games                                                                                                                                                                                                              -      -            
+            |          
+            |--25.36%--Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+            |--23.74%--moves_bb (inlined)
+            |          Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+            |--12.82%--Move::Move (inlined)
+            |          Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+            |--10.47%--std::__countr_zero<unsigned long> (inlined)
+            |          std::countr_zero<unsigned long> (inlined)
+            |          lsb (inlined)
+            |          pop_lsb (inlined)
+            |          Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+             --7.96%--Magic::index (inlined)
+                       moves_bb (inlined)
+                       Yolah::moves (inlined)
+                       Yolah::moves (inlined)
+                       play_random_games
+                       0xffffffffffffffff
+
+     3.90%           169     705819580  [.] std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()                                                 -      -            
+            |          
+             --3.25%--std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> (inlined)
+                       std::uniform_int_distribution<unsigned long>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >
+                       std::uniform_int_distribution<unsigned long>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> > (inlined)
+                       play_random_games
+                       0xffffffffffffffff
+
+     3.42%           150     620082676  [.] std::uniform_int_distribution<unsigned long>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >  -      -            
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

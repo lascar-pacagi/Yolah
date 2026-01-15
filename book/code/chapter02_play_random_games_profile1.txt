@@ -1,0 +1,33 @@
+Simplifying profile: /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/profile.txt -> /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/profile_clean.txt
+Simplified: 31 lines -> 21 lines (10 filtered)
+
+Reading profile from: /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/profile_clean.txt
+Collapsing chains matching: play_random_games:uniform_int_distribution
+Flame graph tree written to: /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/flamegraph_tree.txt
+
+================================================================================
+Preview:
+================================================================================
+Flame Graph Tree - Yolah Performance Profile
+================================================================================
+
+chapter02                                          100.00%
+└── main                                           100.00%
+    ├── play_random_games                           96.85%
+    │   ├── moves                                   78.19%
+    │   │   ├── moves_bb                            36.89%
+    │   │   │   └── Magic::index                     8.44%
+    │   │   └── Move::Move                          14.56%
+    │   ├── std::uniform_int_distribution<unsig...   7.50%
+    │   │   └── std::mersenne_twister_engine<un...   5.99%
+    │   ├── game_over                                5.14%
+    │   │   └── shift<                               3.86%
+    │   └── play                                     2.63%
+    └── diagonalMagics                               2.44%
+        └── std::uniform_int_distribution<unsig...   2.44%
+
+================================================================================
+Note: Percentages show portion of total CPU time
+Tree shows call hierarchy from bottom (root) to top (leaves)
+
+... (see full output in flamegraph_tree.txt)

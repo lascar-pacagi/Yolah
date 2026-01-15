@@ -1,0 +1,114 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{NB\PYGZus{}ITERATIONS}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1000}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{SEED}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{42}\PYG{p}{;}
+
+\PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{PRNG}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{rand64}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{12}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{25}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{27}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{2685821657736338717ULL}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{   }\PYG{k}{public}\PYG{o}{:}
+\PYG{+w}{    }\PYG{n}{PRNG}\PYG{p}{(}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{seed}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{:}
+\PYG{+w}{        }\PYG{n}{s}\PYG{p}{(}\PYG{n}{seed}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{seed}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{template}\PYG{o}{\PYGZlt{}}\PYG{k}{typename}\PYG{+w}{ }\PYG{n+nc}{T}\PYG{o}{\PYGZgt{}}
+\PYG{+w}{    }\PYG{n}{T}\PYG{+w}{ }\PYG{n}{rand}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{T}\PYG{p}{(}\PYG{n}{rand64}\PYG{p}{());}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{reduce}\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{x}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{((}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{x}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{32}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{random\PYGZus{}prng\PYGZus{}modulo}\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{PRNG}\PYG{+w}{ }\PYG{n}{prng}\PYG{p}{(}\PYG{n}{SEED}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{n}{prng}\PYG{p}{.}\PYG{n}{rand}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{\PYGZpc{}}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{static}\PYG{+w}{ }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{BM\PYGZus{}random\PYGZus{}prng\PYGZus{}modulo}\PYG{p}{(}\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{State}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{DoNotOptimize}\PYG{p}{(}\PYG{n}{random\PYGZus{}prng\PYGZus{}modulo}\PYG{p}{(}\PYG{n}{NB\PYGZus{}ITERATIONS}\PYG{p}{));}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{state}\PYG{p}{.}\PYG{n}{SetItemsProcessed}\PYG{p}{(}\PYG{n}{state}\PYG{p}{.}\PYG{n}{iterations}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+\PYG{n}{BENCHMARK}\PYG{p}{(}\PYG{n}{BM\PYGZus{}random\PYGZus{}prng\PYGZus{}modulo}\PYG{p}{);}
+
+\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{random\PYGZus{}prng\PYGZus{}reduce}\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{PRNG}\PYG{+w}{ }\PYG{n}{prng}\PYG{p}{(}\PYG{n}{SEED}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{n}{reduce}\PYG{p}{(}\PYG{n}{prng}\PYG{p}{.}\PYG{n}{rand}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{p}{(),}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{static}\PYG{+w}{ }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{BM\PYGZus{}random\PYGZus{}prng\PYGZus{}reduce}\PYG{p}{(}\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{State}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{DoNotOptimize}\PYG{p}{(}\PYG{n}{random\PYGZus{}prng\PYGZus{}reduce}\PYG{p}{(}\PYG{n}{NB\PYGZus{}ITERATIONS}\PYG{p}{));}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{state}\PYG{p}{.}\PYG{n}{SetItemsProcessed}\PYG{p}{(}\PYG{n}{state}\PYG{p}{.}\PYG{n}{iterations}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+\PYG{n}{BENCHMARK}\PYG{p}{(}\PYG{n}{BM\PYGZus{}random\PYGZus{}prng\PYGZus{}reduce}\PYG{p}{);}
+
+\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{random\PYGZus{}mt19937}\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{mt19937}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{(}\PYG{n}{SEED}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{n}{uniform\PYGZus{}int\PYGZus{}distribution}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{p}{\PYGZob{}}\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{\PYGZcb{}(}\PYG{n}{mt}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{static}\PYG{+w}{ }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{BM\PYGZus{}random\PYGZus{}mt19937}\PYG{p}{(}\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{State}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{DoNotOptimize}\PYG{p}{(}\PYG{n}{random\PYGZus{}mt19937}\PYG{p}{(}\PYG{n}{NB\PYGZus{}ITERATIONS}\PYG{p}{));}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{state}\PYG{p}{.}\PYG{n}{SetItemsProcessed}\PYG{p}{(}\PYG{n}{state}\PYG{p}{.}\PYG{n}{iterations}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+\PYG{n}{BENCHMARK}\PYG{p}{(}\PYG{n}{BM\PYGZus{}random\PYGZus{}mt19937}\PYG{p}{);}
+
+\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{random\PYGZus{}mt19937\PYGZus{}modulo}\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{mt19937}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{(}\PYG{n}{SEED}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{n}{uniform\PYGZus{}int\PYGZus{}distribution}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{p}{\PYGZob{}\PYGZcb{}(}\PYG{n}{mt}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZpc{}}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{static}\PYG{+w}{ }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{BM\PYGZus{}random\PYGZus{}mt19937\PYGZus{}modulo}\PYG{p}{(}\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{State}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{DoNotOptimize}\PYG{p}{(}\PYG{n}{random\PYGZus{}mt19937\PYGZus{}modulo}\PYG{p}{(}\PYG{n}{NB\PYGZus{}ITERATIONS}\PYG{p}{));}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{state}\PYG{p}{.}\PYG{n}{SetItemsProcessed}\PYG{p}{(}\PYG{n}{state}\PYG{p}{.}\PYG{n}{iterations}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+\PYG{n}{BENCHMARK}\PYG{p}{(}\PYG{n}{BM\PYGZus{}random\PYGZus{}mt19937\PYGZus{}modulo}\PYG{p}{);}
+
+\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{random\PYGZus{}mt19937\PYGZus{}reduce}\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{mt19937}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{(}\PYG{n}{SEED}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}iterations}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{res}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{n}{reduce}\PYG{p}{(}\PYG{n}{uniform\PYGZus{}int\PYGZus{}distribution}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint32\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{p}{\PYGZob{}\PYGZcb{}(}\PYG{n}{mt}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{res}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{static}\PYG{+w}{ }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{BM\PYGZus{}random\PYGZus{}mt19937\PYGZus{}reduce}\PYG{p}{(}\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{State}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{auto}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{state}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{benchmark}\PYG{o}{::}\PYG{n}{DoNotOptimize}\PYG{p}{(}\PYG{n}{random\PYGZus{}mt19937\PYGZus{}reduce}\PYG{p}{(}\PYG{n}{NB\PYGZus{}ITERATIONS}\PYG{p}{));}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{state}\PYG{p}{.}\PYG{n}{SetItemsProcessed}\PYG{p}{(}\PYG{n}{state}\PYG{p}{.}\PYG{n}{iterations}\PYG{p}{());}
+\PYG{p}{\PYGZcb{}}
+\PYG{n}{BENCHMARK}\PYG{p}{(}\PYG{n}{BM\PYGZus{}random\PYGZus{}mt19937\PYGZus{}reduce}\PYG{p}{);}
+
+\PYG{n}{BENCHMARK\PYGZus{}MAIN}\PYG{p}{();}
+\end{Verbatim}

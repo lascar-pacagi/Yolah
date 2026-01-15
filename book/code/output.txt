@@ -1,0 +1,701 @@
+--------------------------------------------------------------------------------
+I1 cache:         32768 B, 64 B, 8-way associative
+D1 cache:         32768 B, 64 B, 8-way associative
+LL cache:         12582912 B, 64 B, 24-way associative
+Command:          ./chapter02
+Data file:        cachegrind.out.2590266
+Events recorded:  Ir I1mr ILmr Dr D1mr DLmr Dw D1mw DLmw Bc Bcm Bi Bim
+Events shown:     Dr D1mr DLmr Dw D1mw DLmw
+Event sort order: Ir I1mr ILmr Dr D1mr DLmr Dw D1mw DLmw Bc Bcm Bi Bim
+Thresholds:       0.1 100 100 100 100 100 100 100 100 100 100 100 100
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Dr                     D1mr                 DLmr           Dw                     D1mw             DLmw            
+--------------------------------------------------------------------------------
+3,131,172,343 (100.0%) 140,531,862 (100.0%) 7,960 (100.0%) 1,962,180,940 (100.0%) 126,383 (100.0%) 16,580 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Dr                     D1mr                 DLmr           Dw                     D1mw            DLmw             file:function
+--------------------------------------------------------------------------------
+2,534,674,337 (80.95%) 130,664,574 (92.98%)     1 ( 0.01%) 1,451,318,247 (73.96%)    166 ( 0.13%)      5 ( 0.03%)  /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/chapter02.cpp:play_random_games(unsigned long, std::optional<unsigned long>)
+            0                    0              0                      0               0               0           /usr/include/c++/13/bit:play_random_games(unsigned long, std::optional<unsigned long>)
+  220,465,429 ( 7.04%)   4,713,356 ( 3.35%)     0            110,276,861 ( 5.62%) 88,268 (69.84%)      1 ( 0.01%)  /usr/include/c++/13/bits/random.tcc:std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()()
+  275,471,420 ( 8.80%)           0              0            275,471,420 (14.04%)      0               0           /usr/include/c++/13/bits/uniform_int_dist.h:unsigned long std::uniform_int_distribution<unsigned long>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned long>::param_type const&) [clone .constprop.0] [clone .isra.0]
+   42,204,054 ( 1.35%)   5,123,262 ( 3.65%)     2 ( 0.03%)    14,038,587 ( 0.72%)      0               0           /usr/include/c++/13/bits/random.tcc:std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand()
+   55,094,284 ( 1.76%)           0              0            110,188,568 ( 5.62%)      0               0           /usr/include/c++/13/bits/uniform_int_dist.h:play_random_games(unsigned long, std::optional<unsigned long>)
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /usr/include/c++/13/bit
+--------------------------------------------------------------------------------
+Dr         D1mr       DLmr       Dw         D1mw       DLmw       
+
+-- line 255 ----------------------------------------
+.          .          .          .          .          .           
+.          .          .          .          .          .                 constexpr auto _Nd_ull = __int_traits<unsigned long long>::__digits;
+.          .          .          .          .          .                 constexpr auto _Nd_ul = __int_traits<unsigned long>::__digits;
+.          .          .          .          .          .                 constexpr auto _Nd_u = __int_traits<unsigned>::__digits;
+.          .          .          .          .          .           
+.          .          .          .          .          .                 if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_u)
+.          .          .          .          .          .           	return __builtin_ctz(__x);
+.          .          .          .          .          .                 else if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_ul)
+0          0          0          0          0          0           	return __builtin_ctzl(__x);
+.          .          .          .          .          .                 else if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_ull)
+.          .          .          .          .          .           	return __builtin_ctzll(__x);
+.          .          .          .          .          .                 else // (_Nd > _Nd_ull)
+.          .          .          .          .          .           	{
+.          .          .          .          .          .           	  static_assert(_Nd <= (2 * _Nd_ull),
+.          .          .          .          .          .           			"Maximum supported integer size is 128-bit");
+.          .          .          .          .          .           
+.          .          .          .          .          .           	  constexpr auto __max_ull = __int_traits<unsigned long long>::__max;
+-- line 271 ----------------------------------------
+-- line 293 ----------------------------------------
+.          .          .          .          .          .           
+.          .          .          .          .          .                 constexpr auto _Nd_ull = __int_traits<unsigned long long>::__digits;
+.          .          .          .          .          .                 constexpr auto _Nd_ul = __int_traits<unsigned long>::__digits;
+.          .          .          .          .          .                 constexpr auto _Nd_u = __int_traits<unsigned>::__digits;
+.          .          .          .          .          .           
+.          .          .          .          .          .                 if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_u)
+.          .          .          .          .          .           	return __builtin_popcount(__x);
+.          .          .          .          .          .                 else if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_ul)
+0          0          0          0          0          0           	return __builtin_popcountl(__x);
+.          .          .          .          .          .                 else if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_ull)
+.          .          .          .          .          .           	return __builtin_popcountll(__x);
+.          .          .          .          .          .                 else // (_Nd > _Nd_ull)
+.          .          .          .          .          .           	{
+.          .          .          .          .          .           	  static_assert(_Nd <= (2 * _Nd_ull),
+.          .          .          .          .          .           			"Maximum supported integer size is 128-bit");
+.          .          .          .          .          .           
+.          .          .          .          .          .           	  constexpr auto __max_ull = __int_traits<unsigned long long>::__max;
+-- line 309 ----------------------------------------
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /usr/include/c++/13/bits/random.tcc
+--------------------------------------------------------------------------------
+Dr                   D1mr               DLmr       Dw                  D1mw            DLmw       
+
+-- line 322 ----------------------------------------
+          .                  .          .                   .               .          .           	   _UIntType __a, size_t __u, _UIntType __d, size_t __s,
+          .                  .          .                   .               .          .           	   _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+          .                  .          .                   .               .          .           	   _UIntType __f>
+          .                  .          .                   .               .          .               void
+          .                  .          .                   .               .          .               mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+          .                  .          .                   .               .          .           			    __s, __b, __t, __c, __l, __f>::
+          .                  .          .                   .               .          .               seed(result_type __sd)
+          .                  .          .                   .               .          .               {
+          0                  0          0                   1 ( 0.00%)      0          0                 _M_x[0] = __detail::__mod<_UIntType,
+          .                  .          .                   .               .          .           	__detail::_Shift<_UIntType, __w>::__value>(__sd);
+          .                  .          .                   .               .          .           
+          1 ( 0.00%)         0          0                   0               0          0                 for (size_t __i = 1; __i < state_size; ++__i)
+          .                  .          .                   .               .          .           	{
+          .                  .          .                   .               .          .           	  _UIntType __x = _M_x[__i - 1];
+          0                  0          0                   0               0          0           	  __x ^= __x >> (__w - 2);
+          0                  0          0                   0               0          0           	  __x *= __f;
+          .                  .          .                   .               .          .           	  __x += __detail::__mod<_UIntType, __n>(__i);
+          0                  0          0                 623 ( 0.00%)     70 ( 0.06%) 0           	  _M_x[__i] = __detail::__mod<_UIntType,
+          .                  .          .                   .               .          .           	    __detail::_Shift<_UIntType, __w>::__value>(__x);
+          .                  .          .                   .               .          .           	}
+          0                  0          0                   1 ( 0.00%)      0          0                 _M_p = state_size;
+          .                  .          .                   .               .          .               }
+          .                  .          .                   .               .          .           
+          .                  .          .                   .               .          .             template<typename _UIntType,
+          .                  .          .                   .               .          .           	   size_t __w, size_t __n, size_t __m, size_t __r,
+          .                  .          .                   .               .          .           	   _UIntType __a, size_t __u, _UIntType __d, size_t __s,
+          .                  .          .                   .               .          .           	   _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+          .                  .          .                   .               .          .           	   _UIntType __f>
+          .                  .          .                   .               .          .               template<typename _Sseq>
+-- line 350 ----------------------------------------
+-- line 389 ----------------------------------------
+          .                  .          .                   .               .          .                 }
+          .                  .          .                   .               .          .           
+          .                  .          .                   .               .          .             template<typename _UIntType, size_t __w,
+          .                  .          .                   .               .          .           	   size_t __n, size_t __m, size_t __r,
+          .                  .          .                   .               .          .           	   _UIntType __a, size_t __u, _UIntType __d, size_t __s,
+          .                  .          .                   .               .          .           	   _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+          .                  .          .                   .               .          .           	   _UIntType __f>
+          .                  .          .                   .               .          .               void
+          0                  0          0                   0               0          0               mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+          .                  .          .                   .               .          .           			    __s, __b, __t, __c, __l, __f>::
+          .                  .          .                   .               .          .               _M_gen_rand(void)
+          .                  .          .                   .               .          .               {
+          .                  .          .                   .               .          .                 const _UIntType __upper_mask = (~_UIntType()) << __r;
+          .                  .          .                   .               .          .                 const _UIntType __lower_mask = ~__upper_mask;
+          .                  .          .                   .               .          .           
+          0                  0          0                   0               0          0                 for (size_t __k = 0; __k < (__n - __m); ++__k)
+          .                  .          .                   .               .          .                   {
+  5,120,994 ( 0.16%)         0          0                   0               0          0           	  _UIntType __y = ((_M_x[__k] & __upper_mask)
+  5,120,994 ( 0.16%) 2,506,841 ( 1.78%) 0                   0               0          0           			   | (_M_x[__k + 1] & __lower_mask));
+  5,120,994 ( 0.16%)   889,835 ( 0.63%) 0           5,032,701 ( 0.26%)      0          0           	  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+          0                  0          0              88,293 ( 0.00%)      0          0           		       ^ ((__y & 0x01) ? __a : 0));
+          .                  .          .                   .               .          .                   }
+          .                  .          .                   .               .          .           
+          0                  0          0                   0               0          0                 for (size_t __k = (__n - __m); __k < (__n - 1); ++__k)
+          .                  .          .                   .               .          .           	{
+  8,829,300 ( 0.28%)    88,293 ( 0.06%) 1 ( 0.01%)          0               0          0           	  _UIntType __y = ((_M_x[__k] & __upper_mask)
+  8,829,300 ( 0.28%) 1,638,293 ( 1.17%) 1 ( 0.01%)          0               0          0           			   | (_M_x[__k + 1] & __lower_mask));
+  8,741,007 ( 0.28%)         0          0           8,741,007 ( 0.45%)      0          0           	  _M_x[__k] = (_M_x[__k + (__m - __n)] ^ (__y >> 1)
+     88,293 ( 0.00%)         0          0                   0               0          0           		       ^ ((__y & 0x01) ? __a : 0));
+          .                  .          .                   .               .          .           	}
+          .                  .          .                   .               .          .           
+     88,293 ( 0.00%)         0          0                   0               0          0                 _UIntType __y = ((_M_x[__n - 1] & __upper_mask)
+     88,293 ( 0.00%)         0          0                   0               0          0           		       | (_M_x[0] & __lower_mask));
+     88,293 ( 0.00%)         0          0                   0               0          0                 _M_x[__n - 1] = (_M_x[__m - 1] ^ (__y >> 1)
+          0                  0          0              88,293 ( 0.00%)      0          0           		       ^ ((__y & 0x01) ? __a : 0));
+          0                  0          0              88,293 ( 0.00%)      0          0                 _M_p = 0;
+     88,293 ( 0.00%)         0          0                   0               0          0               }
+          .                  .          .                   .               .          .           
+          .                  .          .                   .               .          .             template<typename _UIntType, size_t __w,
+          .                  .          .                   .               .          .           	   size_t __n, size_t __m, size_t __r,
+          .                  .          .                   .               .          .           	   _UIntType __a, size_t __u, _UIntType __d, size_t __s,
+          .                  .          .                   .               .          .           	   _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+          .                  .          .                   .               .          .           	   _UIntType __f>
+          .                  .          .                   .               .          .               void
+          .                  .          .                   .               .          .               mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+-- line 433 ----------------------------------------
+-- line 445 ----------------------------------------
+          .                  .          .                   .               .          .             template<typename _UIntType, size_t __w,
+          .                  .          .                   .               .          .           	   size_t __n, size_t __m, size_t __r,
+          .                  .          .                   .               .          .           	   _UIntType __a, size_t __u, _UIntType __d, size_t __s,
+          .                  .          .                   .               .          .           	   _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+          .                  .          .                   .               .          .           	   _UIntType __f>
+          .                  .          .                   .               .          .               typename
+          .                  .          .                   .               .          .               mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+          .                  .          .                   .               .          .           			    __s, __b, __t, __c, __l, __f>::result_type
+          0                  0          0          55,094,284 ( 2.81%)      0          0               mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+          .                  .          .                   .               .          .           			    __s, __b, __t, __c, __l, __f>::
+          .                  .          .                   .               .          .               operator()()
+          .                  .          .                   .               .          .               {
+          .                  .          .                   .               .          .                 // Reload the vector - cost is O(n) amortized over n calls.
+ 55,094,284 ( 1.76%)         0          0                   0               0          0                 if (_M_p >= state_size)
+          0                  0          0              88,293 ( 0.00%) 88,268 (69.84%) 1 ( 0.01%)  	_M_gen_rand();
+          .                  .          .                   .               .          .           
+          .                  .          .                   .               .          .                 // Calculate o(x(i)).
+ 55,182,577 ( 1.76%) 4,713,356 ( 3.35%) 0          55,094,284 ( 2.81%)      0          0                 result_type __z = _M_x[_M_p++];
+          0                  0          0                   0               0          0                 __z ^= (__z >> __u) & __d;
+          0                  0          0                   0               0          0                 __z ^= (__z << __s) & __b;
+          0                  0          0                   0               0          0                 __z ^= (__z << __t) & __c;
+          0                  0          0                   0               0          0                 __z ^= (__z >> __l);
+          .                  .          .                   .               .          .           
+          .                  .          .                   .               .          .                 return __z;
+110,188,568 ( 3.52%)         0          0                   0               0          0               }
+          .                  .          .                   .               .          .           
+          .                  .          .                   .               .          .             template<typename _UIntType, size_t __w,
+          .                  .          .                   .               .          .           	   size_t __n, size_t __m, size_t __r,
+          .                  .          .                   .               .          .           	   _UIntType __a, size_t __u, _UIntType __d, size_t __s,
+          .                  .          .                   .               .          .           	   _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+          .                  .          .                   .               .          .           	   _UIntType __f, typename _CharT, typename _Traits>
+          .                  .          .                   .               .          .               std::basic_ostream<_CharT, _Traits>&
+          .                  .          .                   .               .          .               operator<<(std::basic_ostream<_CharT, _Traits>& __os,
+-- line 477 ----------------------------------------
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/chapter02.cpp
+--------------------------------------------------------------------------------
+Dr                     D1mr                 DLmr        Dw                     D1mw            DLmw            
+
+-- line 90 ----------------------------------------
+            .                    .           .                      .               .               .               return s >= SQ_A1 && s <= SQ_H8;
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr File file_of(Square s) {
+            .                    .           .                      .               .               .               return File(s & 7);
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr Rank rank_of(Square s) {
+           64 ( 0.00%)           0           0                      0               0               0               return Rank(s >> 3);
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr uint64_t rank_bb(Rank r) {
+            0                    0           0                    128 ( 0.00%)      0               0               return Rank1BB << (8 * r);
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr uint64_t rank_bb(Square s) {
+            .                    .           .                      .               .               .               return rank_bb(rank_of(s));
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr uint64_t file_bb(File f) {
+           64 ( 0.00%)          27 ( 0.00%)  0                    128 ( 0.00%)      0               0               return FileABB << f;
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr uint64_t file_bb(Square s) {
+            .                    .           .                      .               .               .               return file_bb(file_of(s));
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr uint64_t square_bb(Square s) {
+            0                    0           0                      0               0               0               return uint64_t(1) << s;
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr Square operator+(Square s, Direction d) {
+      431,104 ( 0.01%)           0           0                      0               0               0               return Square(int(s) + int(d));
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           Square& operator++(Square& d) {
+            .                    .           .                      .               .               .               return d = Square(int(d) + 1);
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           constexpr Square lsb(uint64_t b) {
+            .                    .           .                      .               .               .               return Square(std::countr_zero(b));
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           Square pop_lsb(uint64_t& b) {
+            .                    .           .                      .               .               .               const Square s = lsb(b);
+            0                    0           0                      0               0               0               b &= b - 1;
+            .                    .           .                      .               .               .               return s;
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           int manhattan_distance(Square sq1, Square sq2) {
+      360,910 ( 0.01%)           0           0                      0               0               0               int d_rank = std::abs(rank_of(sq1) - rank_of(sq2));
+      360,672 ( 0.01%)           0           0                      0               0               0               int d_file = std::abs(file_of(sq1) - file_of(sq2));
+            0                    0           0                      0               0               0               return d_rank + d_file;
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           // SHIFT TEMPLATE FOR BITBOARD MANIPULATION
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           template<Direction D>
+            .                    .           .                      .               .               .           constexpr uint64_t shift(uint64_t b) {
+            .                    .           .                      .               .               .               if constexpr (D == NORTH)
+            0                    0           0                      0               0               0                   return b << NORTH;
+            .                    .           .                      .               .               .               else if constexpr (D == SOUTH)
+            0                    0           0                      0               0               0                   return b >> -SOUTH;
+            .                    .           .                      .               .               .               else if constexpr (D == EAST)
+            0                    0           0                      0               0               0                   return (b & ~FileHBB) << EAST;
+            .                    .           .                      .               .               .               else if constexpr (D == WEST)
+            0                    0           0                      0               0               0                   return (b & ~FileABB) >> -WEST;
+            .                    .           .                      .               .               .               else if constexpr (D == NORTH_EAST)
+            0                    0           0                      0               0               0                   return (b & ~FileHBB) << NORTH_EAST;
+            .                    .           .                      .               .               .               else if constexpr (D == NORTH_WEST)
+            0                    0           0                      1 ( 0.00%)      0               0                   return (b & ~FileABB) << NORTH_WEST;
+            .                    .           .                      .               .               .               else if constexpr (D == SOUTH_EAST)
+            0                    0           0                      0               0               0                   return (b & ~FileHBB) >> -SOUTH_EAST;
+            .                    .           .                      .               .               .               else if constexpr (D == SOUTH_WEST)
+            0                    0           0                      0               0               0                   return (b & ~FileABB) >> -SOUTH_WEST;
+            .                    .           .                      .               .               .               else return 0;
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           // REACHABLE SQUARES GENERATION
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied) {
+       15,808 ( 0.00%)           0           0                      0               0               0               uint64_t  moves    = 0;
+      204,864 ( 0.01%)          30 ( 0.00%)  1 ( 0.01%)       102,464 ( 0.01%)     29 ( 0.02%)      0               Direction o_dir[4] = {NORTH, SOUTH, EAST, WEST};
+       10,560 ( 0.00%)           1 ( 0.00%)  0                  5,312 ( 0.00%)      1 ( 0.00%)      0               Direction d_dir[4] = {NORTH_EAST,SOUTH_EAST,SOUTH_WEST,NORTH_WEST};
+      409,856 ( 0.01%)           0           0                      0               0               0               for (Direction d : (mt == ORTHOGONAL ? o_dir : d_dir)) {
+            .                    .           .                      .               .               .                   Square s = sq;
+            .                    .           .                      .               .               .                   while (true) {
+            .                    .           .                      .               .               .                       Square to = s + d;
+            0                    0           0                      0               0               0                       if (!is_ok(to) || manhattan_distance(s, to) > 2) break;
+            .                    .           .                      .               .               .                       uint64_t bb = square_bb(to);
+            0                    0           0                      0               0               0                       if ((square_bb(to) & occupied) != 0) break;
+            0                    0           0                      0               0               0                       moves |= bb;
+            .                    .           .                      .               .               .                       s = to;
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .               return moves;
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           // MAGIC BITBOARDS
+-- line 193 ----------------------------------------
+-- line 195 ----------------------------------------
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           struct Magic {
+            .                    .           .                      .               .               .               uint64_t  mask;
+            .                    .           .                      .               .               .               uint64_t  magic;
+            .                    .           .                      .               .               .               uint64_t* moves;
+            .                    .           .                      .               .               .               uint32_t  shift;
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               uint32_t index(uint64_t occupied) const {
+1,322,586,016 (42.24%)   1,423,141 ( 1.01%)  0                      0               0               0                   return uint32_t( ((occupied & mask) * magic) >> shift );
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           };
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           uint64_t orthogonalTable[102400];
+            .                    .           .                      .               .               .           uint64_t diagonalTable[5248];
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           Magic orthogonalMagics[SQUARE_NB];
+            .                    .           .                      .               .               .           Magic diagonalMagics[SQUARE_NB];
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           uint64_t moves_bb(Square sq, uint64_t occupied) {
+            .                    .           .                      .               .               .               uint32_t idx_omoves = orthogonalMagics[sq].index(occupied);
+            .                    .           .                      .               .               .               uint32_t idx_dmoves = diagonalMagics[sq].index(occupied);
+  220,377,136 ( 7.04%)           0           0                      0               0               0               auto tmp = orthogonalMagics[sq].moves[idx_omoves];
+  661,131,408 (21.11%) 129,241,392 (91.97%)  0                      0               0               0               return tmp | diagonalMagics[sq].moves[idx_dmoves];
+            .                    .           .                      .               .               .               // return orthogonalMagics[sq].moves[idx_omoves] |
+            .                    .           .                      .               .               .               //         diagonalMagics[sq].moves[idx_dmoves];
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
+            .                    .           .                      .               .               .               static constexpr uint64_t O_MAGIC[64] = { 0x80011040002082,0x40022002100040,0x1880200081181000,0x2080240800100080,0x8080024400800800,0x4100080400024100,0xc080028001000a00,0x80146043000080,0x8120802080034004,0x8401000200240,0x202001282002044,0x81010021000b1000,0x808044000800,0x300080800c000200,0x8c000268411004,0x810080058020c100,0xc248608010400080,0x30024040002000,0x9001010042102000,0x210009001002,0xa0061d0018001100,0x2410808004000600,0x6400240008025001,0xc10600010340a4,0x628080044011,0x4810014040002000,0x380200080801000,0x10018580080010,0x101040080180180,0x9208020080040080,0x10400a21008,0x6800104200010484,0x21400280800020,0x9400402008401001,0x8430006800200400,0x8104411202000820,0x8010171000408,0x1202000402001008,0x881100904002208,0x15a0800a49802100,0x224001808004,0x4420201002424000,0xc04500020008080,0x2503009004210008,0x42801010010,0x2000400090100,0x8080011810040002,0x44401c008046000d,0x4000800521104100,0x82000b080400080,0x10821022420200,0x9488a82104100100,0x1004800041100,0x81600a0034008080,0xa00056210280400,0x5124088200,0x4210410010228202,0x1802230840001081,0x1002102000400901,0x1100c46010000901,0x281000408001003,0xc001001c00028809,0x10020008008c4102,0x280005008c014222,};
+            .                    .           .                      .               .               .               static constexpr uint64_t D_MAGIC[64] = { 0x811100100408200,0x412100401044020,0x404044c00408002,0xa0c070200010102,0x104042001400008,0x8802013008080000,0x1001008860080080,0x20220044202800,0x2002610802080160,0x4080800808610,0x91c2800a10a0132,0x400242401822000,0x8530040420040001,0x142010c210048,0x8841820801241004,0x804212084108801,0x2032402094100484,0x40202110010210a2,0x8010000800202020,0x800240421a800,0x62200401a00444,0x224082200820845,0x106021492012000,0x8481020082849000,0x40a110c59602800,0x10020108020400,0x208c020844080010,0x2000480004012020,0x8001004004044000,0xa044104128080200,0x1108008015cc1400,0x8284004801844400,0x8180a020c2004,0x9101004080100,0x8840264108800c0,0xc004200900200900,0x8040008020020020,0x20010802e1920200,0x80204000480a0,0xc0a80a100008400,0x4018808114000,0x90092200b9000,0x80020c0048000400,0x6018005500,0x80a0204110a00,0x4018808407201,0x6050040806500280,0x108208400c40180,0x803081210840480,0x201210402200200,0x200010400920042,0x902000a884110010,0x851002021004,0x43c08020120,0x6140500501010044,0x200a04440400c028,0x14a002084046000,0x10002409041040,0x100022020500880b,0x1000000000460802,0x21084104410,0x8000001053300104,0x4000182008c20048,0x112088105020200,};
+            .                    .           .                      .               .               .               using namespace std;
+            2 ( 0.00%)           0           0                      4 ( 0.00%)      0               0               int32_t size = 0;
+            0                    0           0                      4 ( 0.00%)      1 ( 0.00%)      0               vector<uint64_t> occupancies;
+            0                    0           0                     12 ( 0.00%)      0               0               vector<uint64_t> possible_moves;
+          384 ( 0.00%)          28 ( 0.00%)  0                      0               0               0               for (Square sq = SQ_A1; sq <= SQ_H8; ++sq) {
+            .                    .           .                      .               .               .                   occupancies.clear();
+            .                    .           .                      .               .               .                   possible_moves.clear();
+            .                    .           .                      .               .               .                   Magic& m = magics[sq];
+            0                    0           0                      0               0               0                   uint64_t edges = ((Rank1BB | Rank8BB) & ~rank_bb(sq)) |
+            0                    0           0                      0               0               0                                       ((FileABB | FileHBB) & ~file_bb(sq));
+            0                    0           0                    128 ( 0.00%)      0               0                   uint64_t moves_bb = reachable_squares(mt, sq, 0) & ~edges;
+            0                    0           0                    128 ( 0.00%)      0               0                   m.mask = moves_bb;
+          128 ( 0.00%)           0           0                    128 ( 0.00%)     66 ( 0.05%)     64 ( 0.39%)          m.shift = 64 - popcount(m.mask);
+          126 ( 0.00%)          35 ( 0.00%) 16 ( 0.20%)             0               0               0                   m.magic = (mt == ORTHOGONAL ? O_MAGIC : D_MAGIC)[sq];
+          128 ( 0.00%)           0           0                    128 ( 0.00%)      0               0                   m.moves = table + size;
+            0                    0           0                      0               0               0                   uint64_t b = 0;
+            .                    .           .                      .               .               .                   do {
+            .                    .           .                      .               .               .                       occupancies.push_back(b);
+            .                    .           .                      .               .               .                       possible_moves.push_back(reachable_squares(mt, sq, b));
+      107,648 ( 0.00%)           0           0                      0               0               0                       b = (b - moves_bb) & moves_bb;
+      107,648 ( 0.00%)           0           0                      0               0               0                       size++;
+            0                    0           0                      0               0               0                   } while (b);
+            0                    0           0                      0               0               0                   for (size_t j = 0; j < occupancies.size(); j++) {
+            .                    .           .                      .               .               .                       int32_t index = m.index(occupancies[j]);
+      107,776 ( 0.00%)       7,797 ( 0.01%)  0                107,648 ( 0.01%) 18,431 (14.58%) 13,456 (81.16%)              m.moves[index] = possible_moves[j];
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            1 ( 0.00%)           0           0                      7 ( 0.00%)      0               0           void init_all_magics() {
+            .                    .           .                      .               .               .               init_magics(ORTHOGONAL, orthogonalTable, orthogonalMagics);
+            .                    .           .                      .               .               .               init_magics(DIAGONAL, diagonalTable, diagonalMagics);
+            6 ( 0.00%)           1 ( 0.00%)  0                      0               0               0           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           // MOVE CLASS
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           class Move {
+            .                    .           .                      .               .               .               uint16_t data;
+            .                    .           .                      .               .               .           public:
+            .                    .           .                      .               .               .               constexpr Move() noexcept = default;
+            .                    .           .                      .               .               .               constexpr explicit Move(uint16_t d) noexcept : data(d) {}
+            .                    .           .                      .               .               .               constexpr explicit Move(Square from, Square to) noexcept
+            0                    0           0          1,222,556,146 (62.31%)    163 ( 0.13%)      2 ( 0.01%)          : data((to << 6) + from) {}
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               constexpr Square from_sq() const noexcept {
+            .                    .           .                      .               .               .                   return Square(data & 0x3F);
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .               constexpr Square to_sq() const noexcept {
+            0                    0           0                      0               0               0                   return Square((data >> 6) & 0x3F);
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .               constexpr uint16_t raw() const noexcept { return data; }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               static constexpr Move none() noexcept { return Move(0); }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               constexpr bool operator==(const Move& m) const noexcept {
+            .                    .           .                      .               .               .                   return data == m.data;
+            .                    .           .                      .               .               .               }
+-- line 283 ----------------------------------------
+-- line 308 ----------------------------------------
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           // MOVELIST CLASS
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           static constexpr uint16_t MAX_NB_MOVES = 75;
+            .                    .           .                      .               .               .           class MoveList {
+            .                    .           .                      .               .               .               Move move_list[MAX_NB_MOVES], *last;
+            .                    .           .                      .               .               .           public:
+            0                    0           0                      1 ( 0.00%)      1 ( 0.00%)      1 ( 0.01%)      constexpr MoveList() noexcept : last(move_list) {}
+            .                    .           .                      .               .               .               constexpr const Move* begin() const noexcept { return move_list; }
+            .                    .           .                      .               .               .               constexpr const Move* end() const noexcept { return last; }
+            .                    .           .                      .               .               .               constexpr Move* begin() noexcept { return move_list; }
+            .                    .           .                      .               .               .               constexpr Move* end() noexcept { return last; }
+            0                    0           0                      0               0               0               constexpr size_t size() const noexcept { return last - move_list; }
+            .                    .           .                      .               .               .               constexpr const Move& operator[](size_t i) const { return move_list[i]; }
+            .                    .           .                      .               .               .               constexpr Move& operator[](size_t i) { return move_list[i]; }
+            .                    .           .                      .               .               .               constexpr Move* data() noexcept { return move_list; }
+            .                    .           .                      .               .               .               friend class Yolah;
+            .                    .           .                      .               .               .           };
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           class PRNG {
+            .                    .           .                      .               .               .               uint64_t s;
+-- line 329 ----------------------------------------
+-- line 360 ----------------------------------------
+            .                    .           .                      .               .               .               uint64_t black = BLACK_INITIAL_POSITION;
+            .                    .           .                      .               .               .               uint64_t white = WHITE_INITIAL_POSITION;
+            .                    .           .                      .               .               .               uint64_t holes = 0;
+            .                    .           .                      .               .               .               uint8_t black_score = 0;
+            .                    .           .                      .               .               .               uint8_t white_score = 0;
+            .                    .           .                      .               .               .               uint8_t ply = 0;
+            .                    .           .                      .               .               .           public:
+            .                    .           .                      .               .               .               constexpr bool game_over() const noexcept {
+            0                    0           0                      0               0               0                   uint64_t possible = ~holes & ~black & ~white;
+            0                    0           0                      0               0               0                   uint64_t players  = black | white;
+            0                    0           0                      0               0               0                   uint64_t around_players = shift<NORTH>(players) |
+            0                    0           0                      0               0               0                       shift<SOUTH>(players) | shift<EAST>(players) |
+            0                    0           0                      0               0               0                       shift<WEST>(players) | shift<NORTH_EAST>(players) |
+            0                    0           0                      0               0               0                       shift<NORTH_WEST>(players) | shift<SOUTH_EAST>(players) |
+            0                    0           0                      0               0               0                       shift<SOUTH_WEST>(players);
+            .                    .           .                      .               .               .                   return (around_players & possible) == 0;
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               constexpr uint8_t current_player() const noexcept {
+            .                    .           .                      .               .               .                   return ply & 1;
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               constexpr uint8_t nb_plies() const noexcept {
+-- line 382 ----------------------------------------
+-- line 396 ----------------------------------------
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               constexpr uint8_t get(int i, int j) const noexcept {        
+            .                    .           .                      .               .               .                   return get(square_of(i, j));
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               void moves(uint8_t player, MoveList& moves) const noexcept {
+            .                    .           .                      .               .               .                   Move* move_list = moves.move_list;
+            0                    0           0                      0               0               0                   uint64_t occupied = black | white | holes;
+            0                    0           0             55,094,284 ( 2.81%)      0               0                   uint64_t bb = player == BLACK ? black : white;
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .                   // Version 1
+            0                    0           0            110,188,568 ( 5.62%)      0               0                   while (bb) {
+            .                    .           .                      .               .               .                       Square from = pop_lsb(bb);
+            0                    0           0                      0               0               0                       uint64_t b = moves_bb(from, occupied) & ~occupied;
+            0                    0           0                      0               0               0                       while (b) {
+            0                    0           0                      0               0               0                           *move_list++ = Move(from, pop_lsb(b));
+            .                    .           .                      .               .               .                       }
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .                   // Version 2
+            .                    .           .                      .               .               .                   // Square from0 = pop_lsb(bb);
+            .                    .           .                      .               .               .                   // Square from1 = pop_lsb(bb);
+            .                    .           .                      .               .               .                   // Square from2 = pop_lsb(bb);
+            .                    .           .                      .               .               .                   // Square from3 = pop_lsb(bb);
+-- line 420 ----------------------------------------
+-- line 432 ----------------------------------------
+            .                    .           .                      .               .               .                   // }
+            .                    .           .                      .               .               .                   // while (b2) {
+            .                    .           .                      .               .               .                   //     *move_list++ = Move(from2, pop_lsb(b2));
+            .                    .           .                      .               .               .                   // }
+            .                    .           .                      .               .               .                   // while (b3) {
+            .                    .           .                      .               .               .                   //     *move_list++ = Move(from3, pop_lsb(b3));
+            .                    .           .                      .               .               .                   // }
+            .                    .           .                      .               .               .                   
+  110,188,568 ( 3.52%)           0           0                      0               0               0                   if (move_list == moves.move_list) [[unlikely]] {
+            0                    0           0              3,384,952 ( 0.17%)      0               0                       *move_list++ = Move::none();
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .           
+            0                    0           0             55,094,284 ( 2.81%)      0               0                   moves.last = move_list;
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               void moves(MoveList& moves) const noexcept {
+            .                    .           .                      .               .               .                   this->moves(current_player(), moves);
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               // Move random_move(PRNG& prng) const noexcept {
+            .                    .           .                      .               .               .               //     uint64_t occupied = black | white | holes;
+-- line 452 ----------------------------------------
+-- line 515 ----------------------------------------
+            .                    .           .                      .               .               .                   if (bit-- == 0)
+            .                    .           .                      .               .               .                       return 1ULL << tz;
+            .                    .           .                      .               .               .                   bb &= bb - 1;
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .                   */
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               void play(Move m) noexcept {
+   55,094,284 ( 1.76%)           0           0                      0               0               0                   if (m != Move::none()) [[likely]] {
+            .                    .           .                      .               .               .                       uint64_t pos1 = square_bb(m.from_sq());
+            .                    .           .                      .               .               .                       uint64_t pos2 = square_bb(m.to_sq());
+   51,709,332 ( 1.65%)           0           0                      0               0               0                       if (ply & 1) {
+            0                    0           0                      0               0               0                           white ^= pos1 | pos2;
+   25,610,709 ( 0.82%)           0           0                      0               0               0                           white_score++;
+            .                    .           .                      .               .               .                       } else {
+            0                    0           0                      0               0               0                           black ^= pos1 | pos2;
+   26,098,623 ( 0.83%)           0           0                      0               0               0                           black_score++;
+            .                    .           .                      .               .               .                       }
+            0                    0           0                      0               0               0                       holes |= pos1;
+            .                    .           .                      .               .               .                   }
+            0                    0           0                      0               0               0                   ply++;
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .               void undo(Move m) noexcept {
+            .                    .           .                      .               .               .                   ply--;
+            .                    .           .                      .               .               .                   if (m != Move::none()) [[likely]] {
+            .                    .           .                      .               .               .                       uint64_t pos1 = square_bb(m.from_sq());
+            .                    .           .                      .               .               .                       uint64_t pos2 = square_bb(m.to_sq());
+            .                    .           .                      .               .               .                       if (ply & 1) {
+-- line 543 ----------------------------------------
+-- line 651 ----------------------------------------
+            .                    .           .                      .               .               .           //                 std::getline(std::cin, _);
+            .                    .           .                      .               .               .           //             }
+            .                    .           .                      .               .               .           //             yolah.play(m);
+            .                    .           .                      .               .               .           //         }
+            .                    .           .                      .               .               .           //         if constexpr (STEP_BY_STEP) cout << yolah << '\n';
+            .                    .           .                      .               .               .           //     }
+            .                    .           .                      .               .               .           // }
+            .                    .           .                      .               .               .           
+            3 ( 0.00%)           2 ( 0.00%)  1 ( 0.01%)            10 ( 0.00%)      2 ( 0.00%)      2 ( 0.01%)  void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
+            .                    .           .                      .               .               .               MoveList moves;
+            .                    .           .                      .               .               .               random_device rd;
+            .                    .           .                      .               .               .               mt19937 mt(seed.value_or(rd()));
+            0                    0           0                      0               0               0               size_t black_wins = 0;
+            0                    0           0                      0               0               0               size_t white_wins = 0;
+            0                    0           0                      1 ( 0.00%)      0               0               size_t draws = 0;
+            .                    .           .                      .               .               .           //    size_t max_nb_moves = 0;
+    1,000,002 ( 0.03%)           0           0                      0               0               0               for (size_t i = 0; i < nb_games; i++) {
+            0                    0           0              5,000,000 ( 0.25%)      0               0                   Yolah yolah;    
+            0                    0           0                      0               0               0                   while (!yolah.game_over()) {                 
+            .                    .           .                      .               .               .                       yolah.moves(moves);
+            .                    .           .                      .               .               .           //            max_nb_moves = max(max_nb_moves, moves.size());
+            0                    0           0                      0               0               0                       uniform_int_distribution<uint64_t> d(0, moves.size() - 1);    
+   55,094,284 ( 1.76%)           0           0                      0               0               0                       Move m = moves[d(mt)];
+            .                    .           .                      .               .               .                       yolah.play(m);
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .                   auto [black_score, white_score] = yolah.score();
+    5,000,000 ( 0.16%)       7,858 ( 0.01%)  0                      0               0               0                   if (black_score > white_score) {
+            0                    0           0                      0               0               0                       black_wins++;
+    1,001,752 ( 0.03%)           0           0                      0               0               0                   } else if (white_score > black_score) {
+            0                    0           0                      0               0               0                       white_wins++;
+            .                    .           .                      .               .               .                   } else {
+      105,408 ( 0.00%)           0           0                      0               0               0                       draws++;
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .               cout << format("\n=== Game Statistics ===\n");
+            .                    .           .                      .               .               .               cout << format("Total games: {}\n", nb_games);
+            1 ( 0.00%)           1 ( 0.00%)  0                      0               0               0               cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+            1 ( 0.00%)           0           0                      0               0               0               cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+            1 ( 0.00%)           0           0                      0               0               0               cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+            .                    .           .                      .               .               .           //    cout << format("Max #moves:  {}\n", max_nb_moves);    
+            9 ( 0.00%)           1 ( 0.00%)  0                      0               0               0           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           // void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
+            .                    .           .                      .               .               .           //     MoveList moves;
+            .                    .           .                      .               .               .           //     random_device rd;
+            .                    .           .                      .               .               .           //     PRNG prng(seed.value_or(rd()));
+            .                    .           .                      .               .               .           //     size_t black_wins = 0;
+            .                    .           .                      .               .               .           //     size_t white_wins = 0;
+            .                    .           .                      .               .               .           //     size_t draws = 0;
+-- line 699 ----------------------------------------
+-- line 1041 ----------------------------------------
+            .                    .           .                      .               .               .                   }
+            .                    .           .                      .               .               .               }
+            .                    .           .                      .               .               .           }
+            .                    .           .                      .               .               .           
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           // MAIN
+            .                    .           .                      .               .               .           // =============================================================================
+            .                    .           .                      .               .               .           
+            0                    0           0                      0               0               0           int main() {
+            0                    0           0                      1 ( 0.00%)      0               0               init_all_magics();
+            0                    0           0                      1 ( 0.00%)      0               0               play_random_games(1000000, 42);
+            .                    .           .                      .               .               .               //play_random_games<false>(1000000, 42);
+            .                    .           .                      .               .               .               //play_random_games_fast(1000000, 42);
+            .                    .           .                      .               .               .               //test::random_games(10000, 42);
+            1 ( 0.00%)           0           0                      0               0               0           }
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /usr/include/c++/13/bits/uniform_int_dist.h
+--------------------------------------------------------------------------------
+Dr                   D1mr       DLmr       Dw                   D1mw       DLmw       
+
+-- line 196 ----------------------------------------
+          .          .          .                    .          .          .                 { return this->b(); }
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .                 /**
+          .          .          .                    .          .          .                  * @brief Generating functions.
+          .          .          .                    .          .          .                  */
+          .          .          .                    .          .          .                 template<typename _UniformRandomBitGenerator>
+          .          .          .                    .          .          .           	result_type
+          .          .          .                    .          .          .           	operator()(_UniformRandomBitGenerator& __urng)
+ 55,094,284 ( 1.76%) 0          0          110,188,568 ( 5.62%) 0          0                   { return this->operator()(__urng, _M_param); }
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .                 template<typename _UniformRandomBitGenerator>
+          .          .          .                    .          .          .           	result_type
+          .          .          .                    .          .          .           	operator()(_UniformRandomBitGenerator& __urng,
+          .          .          .                    .          .          .           		   const param_type& __p);
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .                 template<typename _ForwardIterator,
+          .          .          .                    .          .          .           	       typename _UniformRandomBitGenerator>
+-- line 212 ----------------------------------------
+-- line 261 ----------------------------------------
+          .          .          .                    .          .          .           	  static_assert(!_Up_traits::__is_signed, "U must be unsigned");
+          .          .          .                    .          .          .           	  static_assert(!_Wp_traits::__is_signed, "W must be unsigned");
+          .          .          .                    .          .          .           	  static_assert(_Wp_traits::__digits == (2 * _Up_traits::__digits),
+          .          .          .                    .          .          .           			"W must be twice as wide as U");
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .           	  // reference: Fast Random Integer Generation in an Interval
+          .          .          .                    .          .          .           	  // ACM Transactions on Modeling and Computer Simulation 29 (1), 2019
+          .          .          .                    .          .          .           	  // https://arxiv.org/abs/1805.10941
+          0          0          0           55,094,284 ( 2.81%) 0          0           	  _Wp __product = _Wp(__g()) * _Wp(__range);
+          .          .          .                    .          .          .           	  _Up __low = _Up(__product);
+          0          0          0                    0          0          0           	  if (__low < __range)
+          .          .          .                    .          .          .           	    {
+          .          .          .                    .          .          .           	      _Up __threshold = -__range % __range;
+          .          .          .                    .          .          .           	      while (__low < __threshold)
+          .          .          .                    .          .          .           		{
+          .          .          .                    .          .          .           		  __product = _Wp(__g()) * _Wp(__range);
+          .          .          .                    .          .          .           		  __low = _Up(__product);
+          .          .          .                    .          .          .           		}
+          .          .          .                    .          .          .           	    }
+          0          0          0                    0          0          0           	  return __product >> _Up_traits::__digits;
+          .          .          .                    .          .          .           	}
+          .          .          .                    .          .          .               };
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .             template<typename _IntType>
+          .          .          .                    .          .          .               template<typename _UniformRandomBitGenerator>
+          .          .          .                    .          .          .                 typename uniform_int_distribution<_IntType>::result_type
+          0          0          0          220,377,136 (11.23%) 0          0                 uniform_int_distribution<_IntType>::
+          .          .          .                    .          .          .                 operator()(_UniformRandomBitGenerator& __urng,
+          .          .          .                    .          .          .           		 const param_type& __param)
+          .          .          .                    .          .          .                 {
+          .          .          .                    .          .          .           	typedef typename _UniformRandomBitGenerator::result_type _Gresult_type;
+          .          .          .                    .          .          .           	typedef typename make_unsigned<result_type>::type __utype;
+          .          .          .                    .          .          .           	typedef typename common_type<_Gresult_type, __utype>::type __uctype;
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .           	constexpr __uctype __urngmin = _UniformRandomBitGenerator::min();
+-- line 295 ----------------------------------------
+-- line 297 ----------------------------------------
+          .          .          .                    .          .          .           	static_assert( __urngmin < __urngmax,
+          .          .          .                    .          .          .           	    "Uniform random bit generator must define min() < max()");
+          .          .          .                    .          .          .           	constexpr __uctype __urngrange = __urngmax - __urngmin;
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .           	const __uctype __urange
+          .          .          .                    .          .          .           	  = __uctype(__param.b()) - __uctype(__param.a());
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .           	__uctype __ret;
+          0          0          0                    0          0          0           	if (__urngrange > __urange)
+          .          .          .                    .          .          .           	  {
+          .          .          .                    .          .          .           	    // downscaling
+          .          .          .                    .          .          .           
+          0          0          0                    0          0          0           	    const __uctype __uerange = __urange + 1; // __urange can be zero
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .           #if defined __UINT64_TYPE__ && defined __UINT32_TYPE__
+          .          .          .                    .          .          .           #if __SIZEOF_INT128__
+          .          .          .                    .          .          .           	    if _GLIBCXX17_CONSTEXPR (__urngrange == __UINT64_MAX__)
+          .          .          .                    .          .          .           	      {
+          .          .          .                    .          .          .           		// __urng produces values that use exactly 64-bits,
+          .          .          .                    .          .          .           		// so use 128-bit integers to downscale to desired range.
+          .          .          .                    .          .          .           		__UINT64_TYPE__ __u64erange = __uerange;
+-- line 317 ----------------------------------------
+-- line 365 ----------------------------------------
+          .          .          .                    .          .          .           		__ret = __tmp + (__uctype(__urng()) - __urngmin);
+          .          .          .                    .          .          .           	      }
+          .          .          .                    .          .          .           	    while (__ret > __urange || __ret < __tmp);
+          .          .          .                    .          .          .           	  }
+          .          .          .                    .          .          .           	else
+          .          .          .                    .          .          .           	  __ret = __uctype(__urng()) - __urngmin;
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .           	return __ret + __param.a();
+275,471,420 ( 8.80%) 0          0                    0          0          0                 }
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .           
+          .          .          .                    .          .          .             template<typename _IntType>
+          .          .          .                    .          .          .               template<typename _ForwardIterator,
+          .          .          .                    .          .          .           	     typename _UniformRandomBitGenerator>
+          .          .          .                    .          .          .                 void
+          .          .          .                    .          .          .                 uniform_int_distribution<_IntType>::
+          .          .          .                    .          .          .                 __generate_impl(_ForwardIterator __f, _ForwardIterator __t,
+-- line 381 ----------------------------------------
+
+--------------------------------------------------------------------------------
+Dr                     D1mr                 DLmr        Dw                     D1mw             DLmw            
+--------------------------------------------------------------------------------
+3,130,350,475 (99.97%) 140,516,932 (99.99%) 20 ( 0.25%) 1,961,510,529 (99.97%) 107,032 (84.69%) 13,526 (81.58%)  events annotated
+

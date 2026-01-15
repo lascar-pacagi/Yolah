@@ -1,6 +1,6 @@
 <?xml version="1.0" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" width="1200" height="422" onload="init(evt)" viewBox="0 0 1200 422" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg version="1.1" width="1200" height="502" onload="init(evt)" viewBox="0 0 1200 502" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
 <!-- NOTES:  -->
 <defs>
@@ -422,285 +422,273 @@
 	}
 ]]>
 </script>
-<rect x="0.0" y="0" width="1200.0" height="422.0" fill="url(#background)"  />
+<rect x="0.0" y="0" width="1200.0" height="502.0" fill="url(#background)"  />
 <text id="title" x="600.00" y="24" >Flame Graph</text>
-<text id="details" x="10.00" y="405" > </text>
+<text id="details" x="10.00" y="485" > </text>
 <text id="unzoom" x="10.00" y="24" class="hide">Reset Zoom</text>
 <text id="search" x="1090.00" y="24" >Search</text>
 <text id="ignorecase" x="1174.00" y="24" >ic</text>
-<text id="matched" x="1090.00" y="405" > </text>
+<text id="matched" x="1090.00" y="485" > </text>
 <g id="frames">
 <g >
-<title>square_bb (85,719,685 samples, 0.69%)</title><rect x="1170.2" y="245" width="8.1" height="15.0" fill="rgb(239,159,38)" rx="2" ry="2" />
-<text  x="1173.20" y="255.5" ></text>
+<title>Move::Move (2,320,853,171 samples, 12.82%)</title><rect x="385.4" y="357" width="151.3" height="15.0" fill="rgb(205,3,0)" rx="2" ry="2" />
+<text  x="388.40" y="367.5" >Move::Move</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (12,340,470 samples, 0.10%)</title><rect x="944.7" y="149" width="1.1" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.67" y="159.5" ></text>
+<title>update_load_avg (4,088,727 samples, 0.02%)</title><rect x="536.7" y="197" width="0.2" height="15.0" fill="rgb(240,165,39)" rx="2" ry="2" />
+<text  x="539.66" y="207.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (12,340,470 samples, 0.10%)</title><rect x="944.7" y="117" width="1.1" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.67" y="127.5" ></text>
+<title>Yolah::moves (14,822,429,237 samples, 81.87%)</title><rect x="86.2" y="373" width="966.0" height="15.0" fill="rgb(247,194,46)" rx="2" ry="2" />
+<text  x="89.21" y="383.5" >Yolah::moves</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="85" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="95.5" ></text>
+<title>Move::to_sq (24,658,401 samples, 0.14%)</title><rect x="1072.7" y="373" width="1.6" height="15.0" fill="rgb(232,124,29)" rx="2" ry="2" />
+<text  x="1075.72" y="383.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (12,340,470 samples, 0.10%)</title><rect x="944.7" y="133" width="1.1" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.67" y="143.5" ></text>
+<title>x64_sys_call (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="85" width="1.3" height="15.0" fill="rgb(247,194,46)" rx="2" ry="2" />
+<text  x="1190.94" y="95.5" ></text>
 </g>
 <g >
-<title>lsb (1,530,957,955 samples, 12.33%)</title><rect x="960.0" y="213" width="145.5" height="15.0" fill="rgb(239,160,38)" rx="2" ry="2" />
-<text  x="963.00" y="223.5" >lsb</text>
+<title>__hrtimer_run_queues (4,088,727 samples, 0.02%)</title><rect x="536.7" y="293" width="0.2" height="15.0" fill="rgb(237,150,35)" rx="2" ry="2" />
+<text  x="539.66" y="303.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="213" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="223.5" ></text>
+<title>std::uniform_int_distribution&lt;unsigned long&gt;::operator (959,739,881 samples, 5.30%)</title><rect x="1094.0" y="373" width="62.6" height="15.0" fill="rgb(218,60,14)" rx="2" ry="2" />
+<text  x="1097.01" y="383.5" >std::u..</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,112,235 samples, 0.03%)</title><rect x="635.7" y="213" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="638.68" y="223.5" ></text>
+<title>__x64_sys_brk (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="69" width="1.3" height="15.0" fill="rgb(220,72,17)" rx="2" ry="2" />
+<text  x="1190.94" y="79.5" ></text>
 </g>
 <g >
-<title>reduce (111,480,448 samples, 0.90%)</title><rect x="1178.3" y="261" width="10.6" height="15.0" fill="rgb(230,119,28)" rx="2" ry="2" />
-<text  x="1181.35" y="271.5" ></text>
+<title>std::countr_zero&lt;unsigned long&gt; (1,895,298,815 samples, 10.47%)</title><rect x="928.7" y="325" width="123.5" height="15.0" fill="rgb(212,32,7)" rx="2" ry="2" />
+<text  x="931.72" y="335.5" >std::countr_zer..</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (12,340,470 samples, 0.10%)</title><rect x="944.7" y="181" width="1.1" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.67" y="191.5" ></text>
+<title>tick_sched_handle (4,088,727 samples, 0.02%)</title><rect x="536.7" y="261" width="0.2" height="15.0" fill="rgb(219,68,16)" rx="2" ry="2" />
+<text  x="539.66" y="271.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="69" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="79.5" ></text>
+<title>std::mersenne_twister_engine&lt;unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul&gt;::_M_gen_rand (115,265,435 samples, 0.64%)</title><rect x="1149.0" y="325" width="7.6" height="15.0" fill="rgb(207,12,3)" rx="2" ry="2" />
+<text  x="1152.05" y="335.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="149" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="159.5" ></text>
+<title>systrim (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="197" width="1.3" height="15.0" fill="rgb(227,105,25)" rx="2" ry="2" />
+<text  x="1190.94" y="207.5" ></text>
 </g>
 <g >
-<title>_nv039977rm (4,133,188 samples, 0.03%)</title><rect x="636.1" y="213" width="0.4" height="15.0" fill="rgb(249,206,49)" rx="2" ry="2" />
-<text  x="639.07" y="223.5" ></text>
+<title>_int_free (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="213" width="1.3" height="15.0" fill="rgb(247,196,46)" rx="2" ry="2" />
+<text  x="1190.94" y="223.5" ></text>
 </g>
 <g >
-<title>Move::Move (2,007,561,806 samples, 16.16%)</title><rect x="445.7" y="229" width="190.8" height="15.0" fill="rgb(205,3,0)" rx="2" ry="2" />
-<text  x="448.73" y="239.5" >Move::Move</text>
+<title>std::allocator_traits&lt;std::allocator&lt;unsigned long&gt; &gt;::deallocate (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="277" width="1.3" height="15.0" fill="rgb(228,110,26)" rx="2" ry="2" />
+<text  x="1190.94" y="287.5" ></text>
 </g>
 <g >
-<title>play_random_games&lt;false&gt; (12,385,930,198 samples, 99.73%)</title><rect x="12.2" y="277" width="1176.7" height="15.0" fill="rgb(207,13,3)" rx="2" ry="2" />
-<text  x="15.17" y="287.5" >play_random_games&lt;false&gt;</text>
+<title>__libc_start_call_main (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="389" width="1.3" height="15.0" fill="rgb(210,26,6)" rx="2" ry="2" />
+<text  x="1190.94" y="399.5" ></text>
 </g>
 <g >
-<title>_dl_map_object_deps (10,752,915 samples, 0.09%)</title><rect x="1188.9" y="261" width="1.1" height="15.0" fill="rgb(219,68,16)" rx="2" ry="2" />
-<text  x="1191.94" y="271.5" ></text>
+<title>MoveList::size (61,940,081 samples, 0.34%)</title><rect x="30.4" y="389" width="4.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="33.37" y="399.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="133" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="143.5" ></text>
+<title>moves_bb (5,739,382,974 samples, 31.70%)</title><rect x="536.9" y="357" width="374.1" height="15.0" fill="rgb(254,229,54)" rx="2" ry="2" />
+<text  x="539.93" y="367.5" >moves_bb</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (8,304,902 samples, 0.07%)</title><rect x="945.1" y="69" width="0.7" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="948.05" y="79.5" ></text>
+<title>lsb (1,895,298,815 samples, 10.47%)</title><rect x="928.7" y="341" width="123.5" height="15.0" fill="rgb(239,160,38)" rx="2" ry="2" />
+<text  x="931.72" y="351.5" >lsb</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="181" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="191.5" ></text>
+<title>__glibc_morecore (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="181" width="1.3" height="15.0" fill="rgb(253,221,52)" rx="2" ry="2" />
+<text  x="1190.94" y="191.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,130,766 samples, 0.03%)</title><rect x="945.5" y="53" width="0.3" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="948.45" y="63.5" ></text>
+<title>Magic::index (1,441,855,722 samples, 7.96%)</title><rect x="817.0" y="341" width="94.0" height="15.0" fill="rgb(244,181,43)" rx="2" ry="2" />
+<text  x="820.01" y="351.5" >Magic::index</text>
 </g>
 <g >
-<title>__libc_start_main_impl (12,408,760,045 samples, 99.91%)</title><rect x="10.0" y="325" width="1178.9" height="15.0" fill="rgb(218,63,15)" rx="2" ry="2" />
-<text  x="13.00" y="335.5" >__libc_start_main_impl</text>
+<title>square_bb (82,742,594 samples, 0.46%)</title><rect x="1074.3" y="373" width="5.4" height="15.0" fill="rgb(239,159,38)" rx="2" ry="2" />
+<text  x="1077.33" y="383.5" ></text>
 </g>
 <g >
-<title>Yolah::play (767,230,037 samples, 6.18%)</title><rect x="1105.5" y="261" width="72.8" height="15.0" fill="rgb(246,191,45)" rx="2" ry="2" />
-<text  x="1108.45" y="271.5" >Yolah::p..</text>
+<title>chapter02 (18,104,862,100 samples, 100.00%)</title><rect x="10.0" y="437" width="1180.0" height="15.0" fill="rgb(230,118,28)" rx="2" ry="2" />
+<text  x="13.00" y="447.5" >chapter02</text>
 </g>
 <g >
-<title>main (12,408,760,045 samples, 99.91%)</title><rect x="10.0" y="293" width="1178.9" height="15.0" fill="rgb(243,179,42)" rx="2" ry="2" />
-<text  x="13.00" y="303.5" >main</text>
+<title>std::__new_allocator&lt;unsigned long&gt;::deallocate (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="245" width="1.3" height="15.0" fill="rgb(243,174,41)" rx="2" ry="2" />
+<text  x="1190.94" y="255.5" ></text>
 </g>
 <g >
-<title>reachable_squares (22,829,847 samples, 0.18%)</title><rect x="10.0" y="245" width="2.2" height="15.0" fill="rgb(226,97,23)" rx="2" ry="2" />
-<text  x="13.00" y="255.5" ></text>
+<title>scheduler_tick (4,088,727 samples, 0.02%)</title><rect x="536.7" y="229" width="0.2" height="15.0" fill="rgb(246,190,45)" rx="2" ry="2" />
+<text  x="539.66" y="239.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="197" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="207.5" ></text>
+<title>std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt;::~vector (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="325" width="1.3" height="15.0" fill="rgb(210,25,6)" rx="2" ry="2" />
+<text  x="1190.94" y="335.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="37" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="47.5" ></text>
+<title>[unknown] (18,073,657,799 samples, 99.83%)</title><rect x="10.0" y="421" width="1177.9" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="13.00" y="431.5" >[unknown]</text>
 </g>
 <g >
-<title>Magic::index (659,563,112 samples, 5.31%)</title><rect x="882.0" y="213" width="62.7" height="15.0" fill="rgb(244,181,43)" rx="2" ry="2" />
-<text  x="885.01" y="223.5" >Magic:..</text>
+<title>pop_lsb (2,167,416,890 samples, 11.97%)</title><rect x="911.0" y="357" width="141.2" height="15.0" fill="rgb(212,32,7)" rx="2" ry="2" />
+<text  x="913.99" y="367.5" >pop_lsb</text>
 </g>
 <g >
-<title>Move::to_sq (33,207,499 samples, 0.27%)</title><rect x="1167.0" y="245" width="3.2" height="15.0" fill="rgb(232,124,29)" rx="2" ry="2" />
-<text  x="1170.05" y="255.5" ></text>
+<title>Yolah::play (421,566,145 samples, 2.33%)</title><rect x="1052.2" y="389" width="27.5" height="15.0" fill="rgb(246,191,45)" rx="2" ry="2" />
+<text  x="1055.25" y="399.5" >Y..</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="117" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="127.5" ></text>
+<title>all (18,105,335,667 samples, 100%)</title><rect x="10.0" y="453" width="1180.0" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
+<text  x="13.00" y="463.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,112,235 samples, 0.03%)</title><rect x="635.7" y="197" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="638.68" y="207.5" ></text>
+<title>Yolah::moves (14,822,429,237 samples, 81.87%)</title><rect x="86.2" y="389" width="966.0" height="15.0" fill="rgb(247,194,46)" rx="2" ry="2" />
+<text  x="89.21" y="399.5" >Yolah::moves</text>
 </g>
 <g >
-<title>pop_lsb (1,679,956,882 samples, 13.53%)</title><rect x="945.8" y="229" width="159.7" height="15.0" fill="rgb(212,32,7)" rx="2" ry="2" />
-<text  x="948.84" y="239.5" >pop_lsb</text>
+<title>std::uniform_int_distribution&lt;unsigned long&gt;::operator (1,178,972,084 samples, 6.51%)</title><rect x="1079.7" y="389" width="76.9" height="15.0" fill="rgb(218,60,14)" rx="2" ry="2" />
+<text  x="1082.72" y="399.5" >std::uni..</text>
 </g>
 <g >
-<title>__libc_start_call_main (12,408,760,045 samples, 99.91%)</title><rect x="10.0" y="309" width="1178.9" height="15.0" fill="rgb(210,26,6)" rx="2" ry="2" />
-<text  x="13.00" y="319.5" >__libc_start_call_main</text>
+<title>std::_Vector_base&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt;::~_Vector_base (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="309" width="1.3" height="15.0" fill="rgb(209,18,4)" rx="2" ry="2" />
+<text  x="1190.94" y="319.5" ></text>
 </g>
 <g >
-<title>PRNG::rand&lt;unsigned int&gt; (266,869,954 samples, 2.15%)</title><rect x="52.3" y="261" width="25.4" height="15.0" fill="rgb(240,163,39)" rx="2" ry="2" />
-<text  x="55.30" y="271.5" >P..</text>
+<title>main (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="373" width="1.3" height="15.0" fill="rgb(243,179,42)" rx="2" ry="2" />
+<text  x="1190.94" y="383.5" ></text>
 </g>
 <g >
-<title>chapter02 (12,419,512,960 samples, 100.00%)</title><rect x="10.0" y="357" width="1180.0" height="15.0" fill="rgb(230,118,28)" rx="2" ry="2" />
-<text  x="13.00" y="367.5" >chapter02</text>
+<title>_start (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="421" width="1.3" height="15.0" fill="rgb(245,185,44)" rx="2" ry="2" />
+<text  x="1190.94" y="431.5" ></text>
 </g>
 <g >
-<title>std::countr_zero&lt;unsigned long&gt; (1,530,957,955 samples, 12.33%)</title><rect x="960.0" y="197" width="145.5" height="15.0" fill="rgb(212,32,7)" rx="2" ry="2" />
-<text  x="963.00" y="207.5" >std::countr_zero&lt;u..</text>
+<title>shift&lt; (446,630,355 samples, 2.47%)</title><rect x="57.1" y="373" width="29.1" height="15.0" fill="rgb(224,90,21)" rx="2" ry="2" />
+<text  x="60.10" y="383.5" >sh..</text>
 </g>
 <g >
-<title>init_magics (22,829,847 samples, 0.18%)</title><rect x="10.0" y="261" width="2.2" height="15.0" fill="rgb(226,99,23)" rx="2" ry="2" />
-<text  x="13.00" y="271.5" ></text>
+<title>task_tick_fair (4,088,727 samples, 0.02%)</title><rect x="536.7" y="213" width="0.2" height="15.0" fill="rgb(217,57,13)" rx="2" ry="2" />
+<text  x="539.66" y="223.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="165" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="175.5" ></text>
+<title>update_process_times (4,088,727 samples, 0.02%)</title><rect x="536.7" y="245" width="0.2" height="15.0" fill="rgb(250,209,50)" rx="2" ry="2" />
+<text  x="539.66" y="255.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,112,235 samples, 0.03%)</title><rect x="635.7" y="181" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="638.68" y="191.5" ></text>
+<title>__split_vma (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="37" width="1.3" height="15.0" fill="rgb(237,150,36)" rx="2" ry="2" />
+<text  x="1190.94" y="47.5" ></text>
 </g>
 <g >
-<title>_dl_start (10,752,915 samples, 0.09%)</title><rect x="1188.9" y="325" width="1.1" height="15.0" fill="rgb(237,151,36)" rx="2" ry="2" />
-<text  x="1191.94" y="335.5" ></text>
+<title>std::allocator&lt;unsigned long&gt;::deallocate (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="261" width="1.3" height="15.0" fill="rgb(215,49,11)" rx="2" ry="2" />
+<text  x="1190.94" y="271.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="133" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="143.5" ></text>
+<title>std::_Vector_base&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt;::_M_deallocate (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="293" width="1.3" height="15.0" fill="rgb(225,94,22)" rx="2" ry="2" />
+<text  x="1190.94" y="303.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (12,340,470 samples, 0.10%)</title><rect x="944.7" y="197" width="1.1" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.67" y="207.5" ></text>
+<title>sysvec_apic_timer_interrupt (4,088,727 samples, 0.02%)</title><rect x="536.7" y="341" width="0.2" height="15.0" fill="rgb(220,69,16)" rx="2" ry="2" />
+<text  x="539.66" y="351.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="149" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="159.5" ></text>
+<title>entry_SYSCALL_64_after_hwframe (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="117" width="1.3" height="15.0" fill="rgb(218,63,15)" rx="2" ry="2" />
+<text  x="1190.94" y="127.5" ></text>
 </g>
 <g >
-<title>_dl_start_final (10,752,915 samples, 0.09%)</title><rect x="1188.9" y="309" width="1.1" height="15.0" fill="rgb(252,216,51)" rx="2" ry="2" />
-<text  x="1191.94" y="319.5" ></text>
+<title>entry_SYSCALL_64_safe_stack (11,368,308 samples, 0.06%)</title><rect x="1189.2" y="421" width="0.8" height="15.0" fill="rgb(231,120,28)" rx="2" ry="2" />
+<text  x="1192.23" y="431.5" ></text>
 </g>
 <g >
-<title>Yolah::moves (10,105,733,488 samples, 81.37%)</title><rect x="145.3" y="245" width="960.2" height="15.0" fill="rgb(247,194,46)" rx="2" ry="2" />
-<text  x="148.32" y="255.5" >Yolah::moves</text>
+<title>__GI___sbrk (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="149" width="1.3" height="15.0" fill="rgb(211,28,6)" rx="2" ry="2" />
+<text  x="1190.94" y="159.5" ></text>
 </g>
 <g >
-<title>shift&lt; (410,160,429 samples, 3.30%)</title><rect x="106.4" y="245" width="38.9" height="15.0" fill="rgb(224,90,21)" rx="2" ry="2" />
-<text  x="109.35" y="255.5" >shi..</text>
+<title>std::__countr_zero&lt;unsigned long&gt; (1,895,298,815 samples, 10.47%)</title><rect x="928.7" y="309" width="123.5" height="15.0" fill="rgb(234,136,32)" rx="2" ry="2" />
+<text  x="931.72" y="319.5" >std::__countr_z..</text>
 </g>
 <g >
-<title>_dl_sysdep_start (10,752,915 samples, 0.09%)</title><rect x="1188.9" y="293" width="1.1" height="15.0" fill="rgb(234,137,32)" rx="2" ry="2" />
-<text  x="1191.94" y="303.5" ></text>
+<title>tick_sched_timer (4,088,727 samples, 0.02%)</title><rect x="536.7" y="277" width="0.2" height="15.0" fill="rgb(254,227,54)" rx="2" ry="2" />
+<text  x="539.66" y="287.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="197" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="207.5" ></text>
+<title>do_syscall_64 (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="101" width="1.3" height="15.0" fill="rgb(209,20,4)" rx="2" ry="2" />
+<text  x="1190.94" y="111.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="117" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="127.5" ></text>
+<title>std::uniform_int_distribution&lt;unsigned long&gt;::_S_nd&lt;unsigned long, std::mersenne_twister_engine&lt;unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul&gt;, unsigned int&gt; (901,743,419 samples, 4.98%)</title><rect x="1097.8" y="357" width="58.8" height="15.0" fill="rgb(250,210,50)" rx="2" ry="2" />
+<text  x="1100.79" y="367.5" >std::u..</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="101" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="111.5" ></text>
+<title>__GI___sbrk (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="165" width="1.3" height="15.0" fill="rgb(211,28,6)" rx="2" ry="2" />
+<text  x="1190.94" y="175.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="165" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="175.5" ></text>
+<title>__libc_start_main_impl (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="405" width="1.3" height="15.0" fill="rgb(218,63,15)" rx="2" ry="2" />
+<text  x="1190.94" y="415.5" ></text>
 </g>
 <g >
-<title>std::__countr_zero&lt;unsigned long&gt; (1,530,957,955 samples, 12.33%)</title><rect x="960.0" y="181" width="145.5" height="15.0" fill="rgb(234,136,32)" rx="2" ry="2" />
-<text  x="963.00" y="191.5" >std::__countr_zero..</text>
+<title>Yolah::game_over (794,834,506 samples, 4.39%)</title><rect x="34.4" y="389" width="51.8" height="15.0" fill="rgb(245,187,44)" rx="2" ry="2" />
+<text  x="37.40" y="399.5" >Yolah..</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (12,340,470 samples, 0.10%)</title><rect x="944.7" y="213" width="1.1" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.67" y="223.5" ></text>
+<title>std::mersenne_twister_engine&lt;unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul&gt;::operator (117,560,926 samples, 0.65%)</title><rect x="1156.6" y="405" width="7.6" height="15.0" fill="rgb(235,139,33)" rx="2" ry="2" />
+<text  x="1159.56" y="415.5" ></text>
 </g>
 <g >
-<title>magic::init (22,829,847 samples, 0.18%)</title><rect x="10.0" y="277" width="2.2" height="15.0" fill="rgb(233,132,31)" rx="2" ry="2" />
-<text  x="13.00" y="287.5" ></text>
+<title>__GI___libc_free (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="229" width="1.3" height="15.0" fill="rgb(252,218,52)" rx="2" ry="2" />
+<text  x="1190.94" y="239.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="229" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="239.5" ></text>
+<title>std::uniform_int_distribution&lt;unsigned long&gt;::_S_nd&lt;unsigned long, std::mersenne_twister_engine&lt;unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul&gt;, unsigned int&gt; (120,056,739 samples, 0.66%)</title><rect x="1180.1" y="389" width="7.8" height="15.0" fill="rgb(250,210,50)" rx="2" ry="2" />
+<text  x="1183.11" y="399.5" ></text>
 </g>
 <g >
-<title>Yolah::moves (10,105,733,488 samples, 81.37%)</title><rect x="145.3" y="261" width="960.2" height="15.0" fill="rgb(247,194,46)" rx="2" ry="2" />
-<text  x="148.32" y="271.5" >Yolah::moves</text>
+<title>hrtimer_interrupt (4,088,727 samples, 0.02%)</title><rect x="536.7" y="309" width="0.2" height="15.0" fill="rgb(228,109,26)" rx="2" ry="2" />
+<text  x="539.66" y="319.5" ></text>
 </g>
 <g >
-<title>Yolah::game_over (712,266,680 samples, 5.73%)</title><rect x="77.7" y="261" width="67.6" height="15.0" fill="rgb(245,187,44)" rx="2" ry="2" />
-<text  x="80.65" y="271.5" >Yolah::..</text>
+<title>std::uniform_int_distribution&lt;unsigned long&gt;::operator (363,866,884 samples, 2.01%)</title><rect x="1164.2" y="405" width="23.7" height="15.0" fill="rgb(218,60,14)" rx="2" ry="2" />
+<text  x="1167.22" y="415.5" >s..</text>
 </g>
 <g >
-<title>all (12,419,934,967 samples, 100%)</title><rect x="10.0" y="373" width="1180.0" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="13.00" y="383.5" ></text>
+<title>std::mersenne_twister_engine&lt;unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul&gt;::operator (703,524,089 samples, 3.89%)</title><rect x="1110.7" y="341" width="45.9" height="15.0" fill="rgb(235,139,33)" rx="2" ry="2" />
+<text  x="1113.71" y="351.5" >std:..</text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (8,304,902 samples, 0.07%)</title><rect x="945.1" y="85" width="0.7" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="948.05" y="95.5" ></text>
+<title>__sysvec_apic_timer_interrupt (4,088,727 samples, 0.02%)</title><rect x="536.7" y="325" width="0.2" height="15.0" fill="rgb(242,173,41)" rx="2" ry="2" />
+<text  x="539.66" y="335.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (12,340,470 samples, 0.10%)</title><rect x="944.7" y="165" width="1.1" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.67" y="175.5" ></text>
+<title>play_random_games (17,592,229,989 samples, 97.17%)</title><rect x="10.0" y="405" width="1146.6" height="15.0" fill="rgb(224,89,21)" rx="2" ry="2" />
+<text  x="13.00" y="415.5" >play_random_games</text>
 </g>
 <g >
-<title>MoveList::size (128,382,411 samples, 1.03%)</title><rect x="40.1" y="261" width="12.2" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
-<text  x="43.10" y="271.5" ></text>
+<title>__do_sys_brk (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="53" width="1.3" height="15.0" fill="rgb(217,58,13)" rx="2" ry="2" />
+<text  x="1190.94" y="63.5" ></text>
 </g>
 <g >
-<title>_start (12,419,512,960 samples, 100.00%)</title><rect x="10.0" y="341" width="1180.0" height="15.0" fill="rgb(245,185,44)" rx="2" ry="2" />
-<text  x="13.00" y="351.5" >_start</text>
+<title>init_magics (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="341" width="1.3" height="15.0" fill="rgb(226,99,23)" rx="2" ry="2" />
+<text  x="1190.94" y="351.5" ></text>
 </g>
 <g >
-<title>PRNG::rand64 (266,869,954 samples, 2.15%)</title><rect x="52.3" y="245" width="25.4" height="15.0" fill="rgb(250,210,50)" rx="2" ry="2" />
-<text  x="55.30" y="255.5" >P..</text>
+<title>__brk (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="133" width="1.3" height="15.0" fill="rgb(225,94,22)" rx="2" ry="2" />
+<text  x="1190.94" y="143.5" ></text>
 </g>
 <g >
-<title>moves_bb (3,256,304,402 samples, 26.22%)</title><rect x="636.5" y="229" width="309.3" height="15.0" fill="rgb(254,229,54)" rx="2" ry="2" />
-<text  x="639.47" y="239.5" >moves_bb</text>
+<title>init_all_magics (19,835,993 samples, 0.11%)</title><rect x="1187.9" y="357" width="1.3" height="15.0" fill="rgb(240,165,39)" rx="2" ry="2" />
+<text  x="1190.94" y="367.5" ></text>
 </g>
 <g >
-<title>dl_main (10,752,915 samples, 0.09%)</title><rect x="1188.9" y="277" width="1.1" height="15.0" fill="rgb(236,145,34)" rx="2" ry="2" />
-<text  x="1191.94" y="287.5" ></text>
+<title>__update_load_avg_cfs_rq (4,088,727 samples, 0.02%)</title><rect x="536.7" y="181" width="0.2" height="15.0" fill="rgb(228,107,25)" rx="2" ry="2" />
+<text  x="539.66" y="191.5" ></text>
 </g>
 <g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="53" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="63.5" ></text>
-</g>
-<g >
-<title>[[kernel.kallsyms]] (4,169,793 samples, 0.03%)</title><rect x="1169.8" y="181" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="1172.81" y="191.5" ></text>
-</g>
-<g >
-<title>[[kernel.kallsyms]] (8,304,902 samples, 0.07%)</title><rect x="945.1" y="101" width="0.7" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="948.05" y="111.5" ></text>
-</g>
-<g >
-<title>[[kernel.kallsyms]] (4,163,886 samples, 0.03%)</title><rect x="944.3" y="101" width="0.4" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
-<text  x="947.27" y="111.5" ></text>
+<title>asm_sysvec_apic_timer_interrupt (4,088,727 samples, 0.02%)</title><rect x="536.7" y="357" width="0.2" height="15.0" fill="rgb(232,127,30)" rx="2" ry="2" />
+<text  x="539.66" y="367.5" ></text>
 </g>
 </g>
 </svg>

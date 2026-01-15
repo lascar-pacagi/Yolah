@@ -47,6 +47,9 @@ enum MoveType {
 
 constexpr uint8_t BLACK = 0;
 constexpr uint8_t WHITE = 1;
+constexpr uint8_t HOLE  = 2;
+constexpr uint8_t FREE  = 3;
+
 
 // =============================================================================
 // BITBOARD CONSTANTS
@@ -78,6 +81,10 @@ constexpr uint64_t WHITE_INITIAL_POSITION =
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+constexpr Square square_of(int i, int j) {
+    return Square(i * 8 + j);
+}
 
 constexpr bool is_ok(Square s) {
     return s >= SQ_A1 && s <= SQ_H8;
@@ -206,8 +213,7 @@ Magic diagonalMagics[SQUARE_NB];
 uint64_t moves_bb(Square sq, uint64_t occupied) {
     uint32_t idx_omoves = orthogonalMagics[sq].index(occupied);
     uint32_t idx_dmoves = diagonalMagics[sq].index(occupied);
-    return orthogonalMagics[sq].moves[idx_omoves] |
-            diagonalMagics[sq].moves[idx_dmoves];
+    return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
 }
 
 void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
@@ -370,8 +376,24 @@ public:
         return ply & 1;
     }
 
+    constexpr uint8_t nb_plies() const noexcept {
+        return ply;
+    }
+
     constexpr pair<uint8_t, uint8_t> score() const noexcept {
         return {black_score, white_score};
+    }    
+
+    constexpr uint8_t get(Square sq) const noexcept {
+        uint64_t bb = square_bb(sq);
+        if (holes & bb) return HOLE;
+        if (black & bb) return BLACK;
+        if (white & bb) return WHITE;
+        return FREE;
+    }
+
+    constexpr uint8_t get(int i, int j) const noexcept {        
+        return get(square_of(i, j));
     }
 
     void moves(uint8_t player, MoveList& moves) const noexcept {
@@ -380,38 +402,37 @@ public:
         uint64_t bb = player == BLACK ? black : white;
 
         // Version 1
-        while (bb) {
-            Square from = pop_lsb(bb);
-            uint64_t b = moves_bb(from, occupied) & ~occupied;
-            while (b) {
-                *move_list++ = Move(from, pop_lsb(b));
-            }
-        }
+        // while (bb) {
+        //     Square from = pop_lsb(bb);
+        //     uint64_t b = moves_bb(from, occupied) & ~occupied;
+        //     while (b) {
+        //         *move_list++ = Move(from, pop_lsb(b));
+        //     }
+        // }
 
         // Version 2
-        // Square from0 = pop_lsb(bb);
-        // Square from1 = pop_lsb(bb);
-        // Square from2 = pop_lsb(bb);
-        // Square from3 = pop_lsb(bb);
+        Square from0 = pop_lsb(bb);
+        Square from1 = pop_lsb(bb);
+        Square from2 = pop_lsb(bb);
+        Square from3 = pop_lsb(bb);
         
-        // uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
-        // uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
-        // uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
-        // uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+        uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+        uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+        uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+        uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
         
-        // while (b0) {
-        //     *move_list++ = Move(from0, pop_lsb(b0));
-        // }
-        // while (b1) {
-        //     *move_list++ = Move(from1, pop_lsb(b1));
-        // }
-        // while (b2) {
-        //     *move_list++ = Move(from2, pop_lsb(b2));
-        // }
-        // while (b3) {
-        //     *move_list++ = Move(from3, pop_lsb(b3));
-        // }
-
+        while (b0) {
+            *move_list++ = Move(from0, pop_lsb(b0));
+        }
+        while (b1) {
+            *move_list++ = Move(from1, pop_lsb(b1));
+        }
+        while (b2) {
+            *move_list++ = Move(from2, pop_lsb(b2));
+        }
+        while (b3) {
+            *move_list++ = Move(from3, pop_lsb(b3));
+        }
         
         if (move_list == moves.move_list) [[unlikely]] {
             *move_list++ = Move::none();
@@ -424,7 +445,42 @@ public:
         this->moves(current_player(), moves);
     }
 
-    Move random_move(PRNG& prng) const noexcept {
+    // Move random_move(PRNG& prng) const noexcept {
+    //     uint64_t occupied = black | white | holes;
+    //     uint64_t player_bb = current_player() == BLACK ? black : white;
+    //     Square from0 = pop_lsb(player_bb);
+    //     Square from1 = pop_lsb(player_bb);
+    //     Square from2 = pop_lsb(player_bb);
+    //     Square from3 = pop_lsb(player_bb);
+    //     uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+    //     uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+    //     uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+    //     uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+    //     uint32_t n0 = popcount(b0);
+    //     uint32_t n1 = popcount(b1);
+    //     uint32_t n2 = popcount(b2);
+    //     uint32_t n3 = popcount(b3);
+    //     uint32_t n = n0 + n1 + n2 + n3;
+    //     if (n == 0) [[unlikely]] {
+    //         return Move::none();
+    //     }
+    //     uint32_t bit = reduce(prng.rand<uint32_t>(), n);
+    //     int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
+    //     bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+    //     Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
+    //     uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];        
+    //     Square to = Square(std::countr_zero(_pdep_u64(1ULL << bit, bb)));
+    //     return Move(from, to);
+    //     /*while (bb) {
+    //         uint32_t tz = std::countr_zero(bb);
+    //     if (bit-- == 0)
+    //         return 1ULL << tz;
+    //     bb &= bb - 1;
+    //     }
+    //     */
+    // }
+
+Move random_move(mt19937& mt) const noexcept {
         uint64_t occupied = black | white | holes;
         uint64_t player_bb = current_player() == BLACK ? black : white;
         Square from0 = pop_lsb(player_bb);
@@ -443,7 +499,8 @@ public:
         if (n == 0) [[unlikely]] {
             return Move::none();
         }
-        uint32_t bit = reduce(prng.rand<uint32_t>(), n);
+        uniform_int_distribution<uint32_t> d(0, n - 1);
+        uint32_t bit = d(mt);
         int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
         bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
         Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
@@ -503,9 +560,6 @@ public:
     constexpr bool operator!=(const Yolah& other) const noexcept {
         return !(*this == other);
     }
-
-    friend void test::random_games(size_t nb_games, optional<uint64_t> seed);
-    friend ostream& operator<<(ostream& os, const YolahWithMoves& yolah);
 };
 
 // =============================================================================
@@ -522,28 +576,20 @@ ostream& operator<<(ostream& os, const YolahWithMoves& ym) {
     char grid[8][8];
     const Yolah& yolah = ym.yolah;
     const MoveList& moves = ym.moves;
-    uint64_t black = yolah.black;
-    uint64_t white = yolah.white;
-    uint64_t holes = yolah.holes;
     static constexpr string_view players[] = {"Black player", "White player"};
+    static constexpr char content[] = {'B', 'W', 'H', '.'};
     uint8_t player = yolah.current_player();    
     os << players[player] << '\n';
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            Square dst = Square(i * 8 + j);
+            Square dst = square_of(i, j);
             if (any_of(begin(moves), end(moves), [&](const Move& m) {
                 return m.to_sq() == dst;
             })) {
                 grid[i][j] = player == BLACK ? 'X' : 'x';
             }
-            else if (black & uint64_t(1) << j) grid[i][j] = 'B';
-            else if (white & uint64_t(1) << j) grid[i][j] = 'W';
-            else if (holes & uint64_t(1) << j) grid[i][j] = 'H';
-            else grid[i][j] = '.';
+            else grid[i][j] = content[yolah.get(dst)];
         }
-        black >>= 8;
-        white >>= 8;
-        holes >>= 8;
     }
     os << "\n  ┌───┬───┬───┬───┬───┬───┬───┬───┐\n";
     for (int i = 7; i >= 0; i--) {
@@ -607,42 +653,23 @@ ostream& operator<<(ostream& os, const Yolah& yolah) {
 //     }
 // }
 
-
-template<bool STEP_BY_STEP = true>
 void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
     MoveList moves;
     random_device rd;
-    PRNG prng(seed.value_or(rd()));
+    mt19937 mt(seed.value_or(rd()));
     size_t black_wins = 0;
     size_t white_wins = 0;
     size_t draws = 0;
-    size_t max_nb_moves = 0;
-
+//    size_t max_nb_moves = 0;
     for (size_t i = 0; i < nb_games; i++) {
         Yolah yolah;    
         while (!yolah.game_over()) {                 
-            if constexpr (STEP_BY_STEP) cout << yolah << '\n';        
             yolah.moves(moves);
-            max_nb_moves = max(max_nb_moves, moves.size());
-            if constexpr (STEP_BY_STEP) {
-                sort(begin(moves), end(moves));
-                cout << format("# moves: {}\n", moves.size());
-                for (const auto& m : moves) {
-                    cout << m << ' ';
-                }
-                cout << "\n\n";
-                cout << YolahWithMoves(yolah, moves) << '\n';
-            }
-            Move m = moves[reduce(prng.rand<uint32_t>(), moves.size())];
-            if constexpr (STEP_BY_STEP) {
-                cout << m << '\n';
-                std::string _;
-                std::getline(std::cin, _);
-            }
+//            max_nb_moves = max(max_nb_moves, moves.size());
+            uniform_int_distribution<uint64_t> d(0, moves.size() - 1);    
+            Move m = moves[d(mt)];
             yolah.play(m);
         }
-        if constexpr (STEP_BY_STEP) cout << yolah << '\n';
-        
         auto [black_score, white_score] = yolah.score();
         if (black_score > white_score) {
             black_wins++;
@@ -652,28 +679,144 @@ void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
             draws++;
         }
     }
-
-    if constexpr (!STEP_BY_STEP) {
-        cout << format("\n=== Game Statistics ===\n");
-        cout << format("Total games: {}\n", nb_games);
-        cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
-        cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
-        cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
-        cout << format("Max #moves:  {}\n", max_nb_moves);
-    }
+    cout << format("\n=== Game Statistics ===\n");
+    cout << format("Total games: {}\n", nb_games);
+    cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+    cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+    cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+//    cout << format("Max #moves:  {}\n", max_nb_moves);    
 }
+
+// void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
+//     MoveList moves;
+//     random_device rd;
+//     PRNG prng(seed.value_or(rd()));
+//     size_t black_wins = 0;
+//     size_t white_wins = 0;
+//     size_t draws = 0;
+//     size_t max_nb_moves = 0;
+//     for (size_t i = 0; i < nb_games; i++) {
+//         Yolah yolah;    
+//         while (!yolah.game_over()) {                 
+//             yolah.moves(moves);
+//             max_nb_moves = max(max_nb_moves, moves.size());    
+//             Move m = moves[reduce(prng.rand<uint32_t>(), moves.size())];
+//             yolah.play(m);
+//         }
+//         auto [black_score, white_score] = yolah.score();
+//         if (black_score > white_score) {
+//             black_wins++;
+//         } else if (white_score > black_score) {
+//             white_wins++;
+//         } else {
+//             draws++;
+//         }
+//     }
+//     cout << format("\n=== Game Statistics ===\n");
+//     cout << format("Total games: {}\n", nb_games);
+//     cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+//     cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+//     cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+//     cout << format("Max #moves:  {}\n", max_nb_moves);    
+// }
+
+// template<bool STEP_BY_STEP = true>
+// void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
+//     MoveList moves;
+//     random_device rd;
+//     PRNG prng(seed.value_or(rd()));
+//     size_t black_wins = 0;
+//     size_t white_wins = 0;
+//     size_t draws = 0;
+//     size_t max_nb_moves = 0;
+
+//     for (size_t i = 0; i < nb_games; i++) {
+//         Yolah yolah;    
+//         while (!yolah.game_over()) {                 
+//             if constexpr (STEP_BY_STEP) cout << yolah << '\n';        
+//             yolah.moves(moves);
+//             max_nb_moves = max(max_nb_moves, moves.size());
+//             if constexpr (STEP_BY_STEP) {
+//                 sort(begin(moves), end(moves));
+//                 cout << format("# moves: {}\n", moves.size());
+//                 for (const auto& m : moves) {
+//                     cout << m << ' ';
+//                 }
+//                 cout << "\n\n";
+//                 cout << YolahWithMoves(yolah, moves) << '\n';
+//             }
+//             Move m = moves[reduce(prng.rand<uint32_t>(), moves.size())];
+//             if constexpr (STEP_BY_STEP) {
+//                 cout << m << '\n';
+//                 std::string _;
+//                 std::getline(std::cin, _);
+//             }
+//             yolah.play(m);
+//         }
+//         if constexpr (STEP_BY_STEP) cout << yolah << '\n';
+        
+//         auto [black_score, white_score] = yolah.score();
+//         if (black_score > white_score) {
+//             black_wins++;
+//         } else if (white_score > black_score) {
+//             white_wins++;
+//         } else {
+//             draws++;
+//         }
+//     }
+
+//     if constexpr (!STEP_BY_STEP) {
+//         cout << format("\n=== Game Statistics ===\n");
+//         cout << format("Total games: {}\n", nb_games);
+//         cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+//         cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+//         cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+//         cout << format("Max #moves:  {}\n", max_nb_moves);
+//     }
+// }
+
+// void play_random_games_fast(size_t nb_games, optional<uint64_t> seed = nullopt) {
+//     MoveList moves;
+//     random_device rd;
+//     PRNG prng(seed.value_or(rd()));
+//     size_t black_wins = 0;
+//     size_t white_wins = 0;
+//     size_t draws = 0;
+//     size_t max_nb_moves = 0;
+//     for (size_t i = 0; i < nb_games; i++) {
+//         Yolah yolah;
+//         while (!yolah.game_over()) {
+//             Move m = yolah.random_move(prng);
+//             yolah.play(m);
+//         }
+//         auto [black_score, white_score] = yolah.score();
+//         if (black_score > white_score) {
+//             black_wins++;
+//         } else if (white_score > black_score) {
+//             white_wins++;
+//         } else {
+//             draws++;
+//         }
+//     }
+//     cout << format("\n=== Game Statistics ===\n");
+//     cout << format("Total games: {}\n", nb_games);
+//     cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+//     cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+//     cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+// }
 
 void play_random_games_fast(size_t nb_games, optional<uint64_t> seed = nullopt) {
     MoveList moves;
     random_device rd;
-    PRNG prng(seed.value_or(rd()));
+    mt19937 mt(seed.value_or(rd()));
     size_t black_wins = 0;
     size_t white_wins = 0;
-    size_t draws = 0;    
+    size_t draws = 0;
+    size_t max_nb_moves = 0;
     for (size_t i = 0; i < nb_games; i++) {
-        Yolah yolah;    
-        while (!yolah.game_over()) {                 
-            Move m = yolah.random_move(prng);
+        Yolah yolah;
+        while (!yolah.game_over()) {
+            Move m = yolah.random_move(mt);
             yolah.play(m);
         }
         auto [black_score, white_score] = yolah.score();
@@ -710,6 +853,33 @@ namespace test {
 
         TestResult pass() { return {true, ""}; }
         TestResult fail(string msg) { return {false, std::move(msg)}; }
+
+        vector<Move> slow_moves_generation(const Yolah& yolah) {
+            vector<Move> res;
+            for (int i = 0; i < 8; i++) {
+                for (int j = 0; j < 8; j++) {
+                    Square from = square_of(i, j);
+                    if (yolah.get(from) != yolah.current_player()) continue;
+                    for (int di = -1; di <= 1; di++) {
+                        for (int dj = -1; dj <= 1; dj++) {
+                            if (di == 0 && dj == 0) continue;
+                            int ii = i + di;
+                            int jj = j + dj;
+                            for(;;) {
+                                if (ii < 0 || ii >= 8 || jj < 0 || jj >= 8) break;
+                                Square to = square_of(ii, jj);                                
+                                if (yolah.get(to) != FREE) break;                                
+                                res.emplace_back(from, to);
+                                ii += di;
+                                jj += dj;
+                            }
+                        }
+                    }
+                }
+            }
+            if (res.empty()) res.push_back(Move::none());
+            return res;
+        };
 
         TestResult check_move_count(const MoveList& fast, const vector<Move>& expected) {
             if (fast.size() != expected.size()) {
@@ -759,6 +929,49 @@ namespace test {
         }
     }
 
+    TestResult check_none_move_execution(const Yolah& before, const Yolah& after) {
+        bool ok = true;
+        for (Square sq = SQ_A1; sq <= SQ_H8; ++sq) {
+            if (before.get(sq) != after.get(sq)) {
+                ok = false;
+                break;
+            }
+        }
+        if (!ok) {
+            return fail("Move::none() must not change the board content");
+        }
+        if (before.nb_plies() + 1 != after.nb_plies()) {
+            return fail("Move::none() must increment the number of plies");
+        }
+        return pass();
+    };
+
+    TestResult check_regular_move_execution(const Yolah& before, const Yolah& after, Move m) {
+        Square from = m.from_sq();
+        Square to = m.to_sq();
+        bool ok = true;
+        for (Square sq = SQ_A1; sq <= SQ_H8; ++sq) {
+            if (sq == from || sq == to) continue;
+            if (before.get(sq) != after.get(sq)) {
+                ok = false;
+                break;
+            }
+        }
+        if (ok && before.nb_plies() + 1 == after.nb_plies() && 
+            after.get(from) == HOLE && after.get(to) == before.current_player()) {
+                return pass();
+        }
+        ostringstream oss;
+        oss << "Move execution incorrect\n" << after << "\n  Move: " << m << '\n';
+        if (!ok) oss << " Squares not concerned by the Move must not changed";
+        if (after.get(from) != HOLE) oss << "  From square should be hole\n";
+        if (after.get(to) != before.current_player()) {
+            oss << " To square should contain a piece from " << (before.current_player() == BLACK ? "black" : "white") << " player\n";
+        }
+        if (before.nb_plies() + 1 != after.nb_plies()) oss << " The number of plies must be incremented\n";
+        return fail(oss.str());
+    };
+
     void random_games(size_t nb_games, optional<uint64_t> seed) {
         MoveList fast_moves;
         random_device rd;
@@ -775,63 +988,7 @@ namespace test {
             cout << format("{}FAIL:{} {}\n", RED, RESET, result.message);
             return false;
         };
-
-        auto slow_moves_generation = [](const Yolah& yolah) {
-            vector<Move> res;
-            uint64_t occupied = yolah.black | yolah.white | yolah.holes;
-            uint64_t player_bb = (yolah.ply & 1) ? yolah.white : yolah.black;
-            for (int i = 0; i < 8; i++) {
-                for (int j = 0; j < 8; j++) {
-                    Square from = Square(i * 8 + j);
-                    uint64_t from_bb = square_bb(from);
-                    if ((player_bb & from_bb) == 0) continue;
-                    for (int di = -1; di <= 1; di++) {
-                        for (int dj = -1; dj <= 1; dj++) {
-                            if (di == 0 && dj == 0) continue;
-                            int ii = i + di;
-                            int jj = j + dj;
-                            for(;;) {
-                                if (ii < 0 || ii >= 8 || jj < 0 || jj >= 8) break;
-                                Square to = Square(ii * 8 + jj);
-                                uint64_t to_bb = square_bb(to);
-                                if (to_bb & occupied) break;
-                                res.emplace_back(from, to);
-                                ii += di;
-                                jj += dj;
-                            }
-                        }
-                    }
-                }
-            }
-            if (res.empty()) res.push_back(Move::none());
-            return res;
-        };
-
-        auto check_none_move_execution = [](const Yolah& before, const Yolah& after) -> TestResult {
-            if (before.black != after.black || before.white != after.white ||
-                before.holes != after.holes || before.black_score != after.black_score ||
-                after.ply != before.ply + 1) {
-                return fail("Move::none() must only change the ply number");
-            }
-            return pass();
-        };
-
-        auto check_regular_move_execution = [](const Yolah& before, const Yolah& after, Move m) -> TestResult {
-            uint64_t player_bb = before.current_player() == BLACK ? after.black : after.white;
-            uint64_t from_bb = square_bb(m.from_sq());
-            uint64_t to_bb = square_bb(m.to_sq());
-
-            if (!(player_bb & from_bb) && (player_bb & to_bb) && (after.holes & from_bb)) {
-                return pass();
-            }
-            ostringstream oss;
-            oss << "move execution incorrect\n" << after << "\n  Move: " << m << '\n';
-            if ((player_bb & from_bb) != 0) oss << "  From square should be cleared\n";
-            if ((player_bb & to_bb) == 0) oss << "  To square should be set\n";
-            if ((after.holes & from_bb) == 0) oss << "  From square should be a hole\n";
-            return fail(oss.str());
-        };
-
+        
         cout << format("{}\n=== Running Random Games Tests ===\n{}", BOLD, RESET);
 
         for (size_t i = 0; i < nb_games; i++) {
@@ -888,7 +1045,8 @@ namespace test {
 
 int main() {
     init_all_magics();
-    //play_random_games<false>(1000000);
-    //play_random_games_fast(1000000);
-    test::random_games(10000, 42);
+    //play_random_games(1000000, 42);
+    //play_random_games<false>(1000000, 42);
+    play_random_games_fast(1000000, 42);
+    //test::random_games(10000, 42);
 }

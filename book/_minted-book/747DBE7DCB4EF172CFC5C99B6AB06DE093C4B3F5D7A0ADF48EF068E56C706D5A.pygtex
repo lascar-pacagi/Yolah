@@ -1,0 +1,21 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{moves}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{holes}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{player}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{white}\PYG{p}{;}
+
+\PYG{+w}{    }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{bb}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{from}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{b}\PYG{p}{));}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{move\PYGZus{}list}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{move\PYGZus{}list}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{[[}\PYG{n}{unlikely}\PYG{p}{]]}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{();}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{last}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

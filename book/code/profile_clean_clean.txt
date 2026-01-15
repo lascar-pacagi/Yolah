@@ -1,0 +1,55 @@
+# To display the perf.data header info, please use --header/--header-only options.
+# Total Lost Samples: 0
+# Samples: 1K of event 'cycles'
+# Event count (approx.): 6430879324
+# Overhead       Samples  Symbol                                                                                                                                                                                                                            IPC   [IPC Coverage]
+# ........  ............  ................................................................................................................................................................................................................................  ....................
+    86.88%          1329  [.] play_random_games_fast                                                                                                                                                                                                        -      -            
+            |          
+            |--43.41%--moves_bb (inlined)
+            |          random_move (inlined)
+            |          play_random_games_fast
+            |          0xffffffffffffffff
+            |          
+            |--12.34%--random_move (inlined)
+            |          play_random_games_fast
+            |          0xffffffffffffffff
+            |          
+            |--7.23%--Magic::index (inlined)
+            |          moves_bb (inlined)
+            |          random_move (inlined)
+            |          play_random_games_fast
+            |          0xffffffffffffffff
+            |          
+            |--3.95%--play (inlined)
+            |          play_random_games_fast
+            |          0xffffffffffffffff
+            |          
+            |--3.92%--std::__countr_zero<unsigned long> (inlined)
+            |          std::countr_zero<unsigned long> (inlined)
+            |          lsb (inlined)
+            |          pop_lsb (inlined)
+            |          random_move (inlined)
+            |          play_random_games_fast
+            |          0xffffffffffffffff
+            |          
+             --3.02%--game_over (inlined)
+                       play_random_games_fast
+                       0xffffffffffffffff
+     7.31%           110  [.] std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >  -      -            
+            |          
+             --5.57%--std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >
+                       |          
+                        --3.63%--std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> > (inlined)
+                                  random_move (inlined)
+                                  play_random_games_fast
+                                  0xffffffffffffffff
+     4.30%            67  [.] std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()                                                -      -            
+            |          
+             --3.27%--std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> (inlined)
+                       std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >
+                       std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> > (inlined)
+                       random_move (inlined)
+                       play_random_games_fast
+                       0xffffffffffffffff
+# (Cannot load tips.txt file, please install perf!)

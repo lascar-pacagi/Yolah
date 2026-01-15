@@ -1,0 +1,85 @@
+chapter02;[[kernel.kallsyms]] 20518543
+chapter02;[[kernel.kallsyms]] 1
+chapter02;main;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 446410782
+chapter02;main;std::uniform_int_distribution<unsigned long>::operator 483239490
+chapter02;main;play_random_games 3182387539
+chapter02;main;play_random_games;MoveList::size 871970880
+chapter02;main;play_random_games;game_over 2123383262
+chapter02;main;play_random_games;game_over;[[kernel.kallsyms]] 4045170
+chapter02;main;play_random_games;game_over;shift< 4854235330
+chapter02;main;play_random_games;game_over;shift<;[[kernel.kallsyms]] 27955
+chapter02;main;play_random_games;game_over;shift<;[[kernel.kallsyms]] 8336677
+chapter02;main;play_random_games;game_over;shift<;[[kernel.kallsyms]] 4679
+chapter02;main;play_random_games;moves 36538417900
+chapter02;main;play_random_games;moves;Move::Move 23125258858
+chapter02;main;play_random_games;moves;Move::Move;[[kernel.kallsyms]] 12452025
+chapter02;main;play_random_games;moves;Move::Move;[[kernel.kallsyms]] 4080363
+chapter02;main;play_random_games;moves;Move::Move;[[kernel.kallsyms]] 4084494
+chapter02;main;play_random_games;moves;Move::Move;[[kernel.kallsyms]] 16626839
+chapter02;main;play_random_games;moves;Move::Move;[[kernel.kallsyms]] 24707735
+chapter02;main;play_random_games;moves;Move::Move;[[kernel.kallsyms]];idma64_irq 20736035
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 57629753
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 4078986
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 8161352
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 4045059
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 53633316
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 53691144
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 3975729
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 4035949
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]] 4195025
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]];pvclock_gtod_notify 4180585
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]];idma64_irq 32941638
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]];pkg_thermal_notify;[[kernel.kallsyms]] 4160014
+chapter02;main;play_random_games;moves;[[kernel.kallsyms]];pkg_thermal_notify 4053607
+chapter02;main;play_random_games;moves;moves_bb 42316664366
+chapter02;main;play_random_games;moves;moves_bb;Magic::index 14338556396
+chapter02;main;play_random_games;moves;moves_bb;Magic::index;[[kernel.kallsyms]] 24615704
+chapter02;main;play_random_games;moves;moves_bb;Magic::index;[[kernel.kallsyms]] 4151936
+chapter02;main;play_random_games;moves;moves_bb;Magic::index;[[kernel.kallsyms]] 20362989
+chapter02;main;play_random_games;moves;moves_bb;Magic::index;[[kernel.kallsyms]] 12286849
+chapter02;main;play_random_games;moves;moves_bb;Magic::index;[[kernel.kallsyms]] 66262942
+chapter02;main;play_random_games;moves;moves_bb;Magic::index;[[kernel.kallsyms]] 23940
+chapter02;main;play_random_games;moves;moves_bb;Magic::index;[[kernel.kallsyms]];idma64_irq 37412282
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 12473482
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 4145158
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 8195427
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 4180127
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 4233397
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 3979675
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 25046590
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]] 35856
+chapter02;main;play_random_games;moves;moves_bb;[[kernel.kallsyms]];idma64_irq 4149158
+chapter02;main;play_random_games;moves;pop_lsb 1140510175
+chapter02;main;play_random_games;moves;pop_lsb;[[kernel.kallsyms]] 4133512
+chapter02;main;play_random_games;play 5458337171
+chapter02;main;play_random_games;play;Move::to_sq 425269289
+chapter02;main;play_random_games;play;[[kernel.kallsyms]] 12533979
+chapter02;main;play_random_games;play;[[kernel.kallsyms]] 4190132
+chapter02;main;play_random_games;play;[[kernel.kallsyms]];idma64_irq 8116520
+chapter02;main;play_random_games;play;square_bb 619938330
+chapter02;main;play_random_games;[[kernel.kallsyms]] 4071441
+chapter02;main;play_random_games;std::max<unsigned long> 1764623292
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator 82408880
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;[[kernel.kallsyms]] 8320083
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;[[kernel.kallsyms]] 4063013
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 387661712
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator 4894422237
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;[[kernel.kallsyms]] 16581858
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;[[kernel.kallsyms]] 8274297
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> 2819136978
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 2056367651
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;[[kernel.kallsyms]] 4133358
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;[[kernel.kallsyms]] 4167229
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;[[kernel.kallsyms]] 8321218
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;[[kernel.kallsyms]];idma64_irq 4180890
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand 875260823
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand;[[kernel.kallsyms]] 4187735
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand;[[kernel.kallsyms]] 8295261
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand;[[kernel.kallsyms]];idma64_irq 4148234
+chapter02;main;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 231175922
+chapter02;main;std::uniform_int_distribution<unsigned long>::operator 70120836
+chapter02;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 4646078858
+chapter02;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;[[kernel.kallsyms]] 8277811
+chapter02;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;[[kernel.kallsyms]];idma64_irq 8263082
+perf-exec;[[kernel.kallsyms]] 394891
+perf-exec;[[kernel.kallsyms]] 12757

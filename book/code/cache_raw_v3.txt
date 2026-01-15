@@ -1,0 +1,1725 @@
+ Period                  |	Source code & Disassembly of chapter02 for anon group { L1-dcache-loads, L1-dcache-load-misses } (1278 samples, percent: local period)
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                         :
+                         :
+                         :
+                         : 3    Disassembly of section .text:
+                         :
+                         : 5    0000000000009740 <play_random_games_fast(unsigned long, std::optional<unsigned long>)>:
+                         : 6    play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 808  //     cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+                         : 809  //     cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+                         : 810  //     cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+                         : 811  // }
+                         :
+                         : 813  void play_random_games_fast(size_t nb_games, optional<uint64_t> seed = nullopt) {
+           0           0 :   9740:   endbr64
+           0           0 :   9744:   push   %r15
+           0           0 :   9746:   push   %r14
+           0           0 :   9748:   push   %r13
+           0           0 :   974a:   push   %r12
+           0           0 :   974c:   push   %rbp
+           0           0 :   974d:   push   %rbx
+           0           0 :   974e:   sub    $0x1000,%rsp
+           0           0 :   9755:   orq    $0x0,(%rsp)
+           0           0 :   975a:   sub    $0x1000,%rsp
+           0           0 :   9761:   orq    $0x0,(%rsp)
+           0           0 :   9766:   sub    $0x8b8,%rsp
+           0           0 :   976d:   mov    %rsi,0x70(%rsp)
+                         : 827  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Alloc_hider::_Alloc_hider(char*, std::allocator<char> const&):
+                         : 189  _Alloc_hider(pointer __dat, const _Alloc& __a = _Alloc())
+                         : 190  : allocator_type(__a), _M_p(__dat) { }
+                         : 191  #else
+                         : 192  _GLIBCXX20_CONSTEXPR
+                         : 193  _Alloc_hider(pointer __dat, const _Alloc& __a)
+                         : 194  : allocator_type(__a), _M_p(__dat) { }
+           0           0 :   9772:   lea    0x1520(%rsp),%rbx
+                         : 196  std::random_device::random_device():
+                         : 1658 /** The type of the generated random value. */
+                         : 1659 typedef unsigned int result_type;
+                         :
+                         : 1661 // constructors, destructors and member functions
+                         :
+                         : 1663 random_device() { _M_init("default"); }
+           0           0 :   977a:   lea    0x190(%rsp),%r15
+                         : 1665 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+           0           0 :   9782:   mov    %rdi,%rbp
+           0           0 :   9785:   mov    %rdx,0x78(%rsp)
+                         : 810  std::random_device::random_device():
+           0           0 :   978a:   mov    %rbx,%rsi
+           0           0 :   978d:   mov    %r15,%rdi
+                         : 1660 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+           0           0 :   9790:   mov    %fs:0x28,%rax
+           0           0 :   9799:   mov    %rax,0x28a8(%rsp)
+           0           0 :   97a1:   xor    %eax,%eax
+                         : 811  MoveList::MoveList():
+                         : 313  constexpr MoveList() noexcept : last(move_list) {}
+           0           0 :   97a3:   lea    0xf0(%rsp),%rax
+                         : 315  std::char_traits<char>::copy(char*, char const*, unsigned long):
+                         : 445  return __s1;
+                         : 446  #if __cplusplus >= 202002L
+                         : 447  if (std::__is_constant_evaluated())
+                         : 448  return __gnu_cxx::char_traits<char_type>::copy(__s1, __s2, __n);
+                         : 449  #endif
+                         : 450  return static_cast<char_type*>(__builtin_memcpy(__s1, __s2, __n));
+           0           0 :   97ab:   movl   $0x61666564,0x1530(%rsp)
+                         : 452  MoveList::MoveList():
+           0           0 :   97b6:   mov    %rax,0x188(%rsp)
+                         : 314  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Alloc_hider::_Alloc_hider(char*, std::allocator<char> const&):
+           0           0 :   97be:   lea    0x1530(%rsp),%rax
+           0           0 :   97c6:   mov    %rbx,0x30(%rsp)
+           0           0 :   97cb:   mov    %rax,0x1520(%rsp)
+                         : 192  std::char_traits<char>::copy(char*, char const*, unsigned long):
+           0           0 :   97d3:   movl   $0x746c7561,0x1533(%rsp)
+                         : 446  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_length(unsigned long):
+                         : 218  { _M_dataplus._M_p = __p; }
+                         :
+                         : 220  _GLIBCXX20_CONSTEXPR
+                         : 221  void
+                         : 222  _M_length(size_type __length)
+                         : 223  { _M_string_length = __length; }
+           0           0 :   97de:   movq   $0x7,0x1528(%rsp)
+                         : 225  std::char_traits<char>::assign(char&, char const&):
+                         : 368  __c1 = __c2;
+           0           0 :   97ea:   movb   $0x0,0x1537(%rsp)
+                         : 370  std::random_device::random_device():
+           0           0 :   97f2:   call   3710 <std::random_device::_M_init(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt>
+                         : 1659 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::~basic_string():
+                         : 792  /**
+                         : 793  *  @brief  Destroy the string instance.
+                         : 794  */
+                         : 795  _GLIBCXX20_CONSTEXPR
+                         : 796  ~basic_string()
+                         : 797  { _M_dispose(); }
+           0           0 :   97f7:   mov    %rbx,%rdi
+           0           0 :   97fa:   call   e0c0 <std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_dispose()>
+                         : 800  std::random_device::operator()():
+                         : 1680 entropy() const noexcept
+                         : 1681 { return this->_M_getentropy(); }
+                         :
+                         : 1683 result_type
+                         : 1684 operator()()
+                         : 1685 { return this->_M_getval(); }
+           0           0 :   97ff:   mov    %r15,%rdi
+           0           0 :   9802:   call   3690 <std::random_device::_M_getval()@plt>
+                         : 1688 unsigned long std::optional<unsigned long>::value_or<unsigned int>(unsigned int&&) const &:
+                         : 1029 value_or(_Up&& __u) const&
+                         : 1030 {
+                         : 1031 static_assert(is_copy_constructible_v<_Tp>);
+                         : 1032 static_assert(is_convertible_v<_Up&&, _Tp>);
+                         :
+                         : 1034 if (this->_M_is_engaged())
+           0           0 :   9807:   cmpb   $0x0,0x78(%rsp)
+                         : 1032 return this->_M_get();
+                         : 1033 else
+                         : 1034 return static_cast<_Tp>(std::forward<_Up>(__u));
+           0           0 :   980c:   mov    %eax,%eax
+                         : 1029 if (this->_M_is_engaged())
+           0           0 :   980e:   jne    9f8a <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x84a>
+                         : 1031 std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::seed(unsigned long):
+                         : 330  void
+                         : 331  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+                         : 332  __s, __b, __t, __c, __l, __f>::
+                         : 333  seed(result_type __sd)
+                         : 334  {
+                         : 335  _M_x[0] = __detail::__mod<_UIntType,
+           0           0 :   9814:   mov    %rax,0x1520(%rsp)
+                         : 333  __detail::_Shift<_UIntType, __w>::__value>(__sd);
+                         :
+                         : 335  for (size_t __i = 1; __i < state_size; ++__i)
+           0           0 :   981c:   mov    0x30(%rsp),%rsi
+           0           0 :   9821:   mov    $0x1,%ecx
+           0           0 :   9826:   mov    %rax,%rdx
+           0           0 :   9829:   nopl   0x0(%rax)
+                         : 336  {
+                         : 337  _UIntType __x = _M_x[__i - 1];
+                         : 338  __x ^= __x >> (__w - 2);
+           0           0 :   9830:   mov    %rdx,%rax
+           0           0 :   9833:   shr    $0x1e,%rax
+           0           0 :   9837:   xor    %rdx,%rax
+                         : 337  __x *= __f;
+           0           0 :   983a:   imul   $0x6c078965,%rax,%rax
+                         : 339  std::__detail::_Mod<unsigned long, 4294967296ul, 1ul, 0ul, true, true>::__calc(unsigned long):
+                         : 143  __res %= __m;
+           0           0 :   9841:   lea    (%rax,%rcx,1),%edx
+                         : 145  std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::seed(unsigned long):
+                         : 339  __x += __detail::__mod<_UIntType, __n>(__i);
+                         : 340  _M_x[__i] = __detail::__mod<_UIntType,
+           0           0 :   9844:   mov    %rdx,(%rsi,%rcx,8)
+                         : 333  for (size_t __i = 1; __i < state_size; ++__i)
+           0           0 :   9848:   inc    %rcx
+           0           0 :   984b:   cmp    $0x270,%rcx
+           0           0 :   9852:   jne    9830 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0xf0>
+                         : 342  __detail::_Shift<_UIntType, __w>::__value>(__x);
+                         : 343  }
+                         : 344  _M_p = state_size;
+           0           0 :   9854:   movq   $0x270,0x28a0(%rsp)
+                         : 346  play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 813  MoveList moves;
+                         : 814  random_device rd;
+                         : 815  mt19937 mt(seed.value_or(rd()));
+                         : 816  size_t black_wins = 0;
+                         : 817  size_t white_wins = 0;
+           0           0 :   9860:   xor    %r13d,%r13d
+                         : 812  size_t black_wins = 0;
+           0           0 :   9863:   xor    %r12d,%r12d
+                         : 814  size_t draws = 0;
+           0           0 :   9866:   movq   $0x0,0x58(%rsp)
+                         : 816  size_t max_nb_moves = 0;
+                         : 817  for (size_t i = 0; i < nb_games; i++) {
+           0           0 :   986f:   test   %rbp,%rbp
+           0           0 :   9872:   je     9cec <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x5ac>
+                         : 820  unsigned long shift<(Direction)7>(unsigned long):
+                         : 162  return (b & ~FileABB) << NORTH_WEST;
+           0           0 :   9878:   mov    %r13,0x60(%rsp)
+           0           0 :   987d:   xor    %eax,%eax
+           0           0 :   987f:   mov    %r12,0x50(%rsp)
+           0           0 :   9884:   mov    %rbp,0x48(%rsp)
+           0           0 :   9889:   mov    %r15,0x68(%rsp)
+           0           0 :   988e:   xchg   %ax,%ax
+                         : 169  play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 817  Yolah yolah;
+           0           0 :   9890:   movabs $0x100001008000080,%r15
+           0           0 :   989a:   movabs $0x8000000810000001,%rbx
+                         : 818  while (!yolah.game_over()) {
+           0           0 :   98a4:   movl   $0x0,0xc(%rsp)
+                         : 817  Yolah yolah;
+           0           0 :   98ac:   movb   $0x0,0x3e(%rsp)
+           0           0 :   98b1:   mov    %r15,%rbp
+           0           0 :   98b4:   mov    %rbx,%r9
+           0           0 :   98b7:   movb   $0x0,0x3f(%rsp)
+           0           0 :   98bc:   movq   $0x0,(%rsp)
+           0           0 :   98c4:   mov    %rax,0x40(%rsp)
+                         : 818  while (!yolah.game_over()) {
+           0           0 :   98c9:   jmp    98df <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x19f>
+           0           0 :   98cb:   nopl   0x0(%rax,%rax,1)
+                         : 821  Yolah::play(Move):
+                         : 525  white_score++;
+           0           0 :   98d0:   incb   0x3e(%rsp)
+                         : 524  white ^= pos1 | pos2;
+    11367713           0 :   98d4:   xor    %rdx,%rbp
+                         : 530  holes |= pos1;
+           0           0 :   98d7:   or     %rax,(%rsp)
+                         : 532  ply++;
+    18145527      463409 :   98db:   incl   0xc(%rsp)
+                         : 534  Yolah::game_over() const:
+                         : 366  uint64_t players  = black | white;
+    29662221      543753 :   98df:   mov    %rbp,%r12
+                         : 368  unsigned long shift<(Direction)1>(unsigned long):
+                         : 156  return (b & ~FileHBB) << EAST;
+    34021905           0 :   98e2:   movabs $0xfefefefefefefefe,%rdi
+                         : 158  unsigned long shift<(Direction)-1>(unsigned long):
+                         : 158  return (b & ~FileABB) >> -WEST;
+     9046232           0 :   98ec:   movabs $0x7f7f7f7f7f7f7f7f,%rbx
+                         : 160  unsigned long shift<(Direction)-7>(unsigned long):
+                         : 164  return (b & ~FileHBB) >> -SOUTH_EAST;
+           0           0 :   98f6:   movabs $0xfefefefefefefe,%rcx
+                         : 166  Yolah::game_over() const:
+                         : 366  uint64_t players  = black | white;
+    13512051           0 :   9900:   or     %r9,%r12
+                         : 368  unsigned long shift<(Direction)8>(unsigned long):
+                         : 152  return b << NORTH;
+    18317273       91381 :   9903:   mov    %r12,%rax
+                         : 154  unsigned long shift<(Direction)-8>(unsigned long):
+                         : 154  return b >> -SOUTH;
+     4536105           0 :   9906:   mov    %r12,%rdx
+     2342812           0 :   9909:   shr    $0x8,%rdx
+                         : 157  unsigned long shift<(Direction)8>(unsigned long):
+                         : 152  return b << NORTH;
+     6827978           0 :   990d:   shl    $0x8,%rax
+                         : 154  Yolah::game_over() const:
+                         : 367  uint64_t around_players = shift<NORTH>(players) |
+    18115337           0 :   9911:   or     %rdx,%rax
+                         : 369  unsigned long shift<(Direction)1>(unsigned long):
+                         : 156  return (b & ~FileHBB) << EAST;
+     4581245           0 :   9914:   lea    (%r12,%r12,1),%rdx
+     2305337           0 :   9918:   and    %rdi,%rdx
+                         : 159  unsigned long shift<(Direction)9>(unsigned long):
+                         : 160  return (b & ~FileHBB) << NORTH_EAST;
+    13811120           0 :   991b:   sub    $0xfe,%rdi
+                         : 162  Yolah::game_over() const:
+                         : 368  shift<SOUTH>(players) | shift<EAST>(players) |
+    43060627           0 :   9922:   or     %rdx,%rax
+                         : 370  unsigned long shift<(Direction)-1>(unsigned long):
+                         : 158  return (b & ~FileABB) >> -WEST;
+    15645218           0 :   9925:   mov    %r12,%rdx
+           0           0 :   9928:   shr    %rdx
+    13702574           0 :   992b:   and    %rbx,%rdx
+                         : 162  unsigned long shift<(Direction)7>(unsigned long):
+                         : 162  return (b & ~FileABB) << NORTH_WEST;
+    24968739           0 :   992e:   sub    $0x7f,%rbx
+                         : 164  Yolah::game_over() const:
+                         : 368  shift<SOUTH>(players) | shift<EAST>(players) |
+    13711145           0 :   9932:   or     %rdx,%rax
+                         : 370  unsigned long shift<(Direction)9>(unsigned long):
+                         : 160  return (b & ~FileHBB) << NORTH_EAST;
+     4538294           0 :   9935:   mov    %r12,%rdx
+    16017852           0 :   9938:   shl    $0x9,%rdx
+    15720556           0 :   993c:   and    %rdi,%rdx
+                         : 164  Yolah::game_over() const:
+                         : 369  shift<WEST>(players) | shift<NORTH_EAST>(players) |
+    20565773           0 :   993f:   or     %rdx,%rax
+                         : 371  unsigned long shift<(Direction)7>(unsigned long):
+                         : 162  return (b & ~FileABB) << NORTH_WEST;
+    22759858           0 :   9942:   mov    %r12,%rdx
+    27663577           0 :   9945:   shl    $0x7,%rdx
+    29107235           0 :   9949:   and    %rbx,%rdx
+                         : 166  Yolah::game_over() const:
+                         : 369  shift<WEST>(players) | shift<NORTH_EAST>(players) |
+    13765326           0 :   994c:   or     %rdx,%rax
+                         : 371  unsigned long shift<(Direction)-7>(unsigned long):
+                         : 164  return (b & ~FileHBB) >> -SOUTH_EAST;
+    22297229      463858 :   994f:   mov    %r12,%rdx
+    24611775           0 :   9952:   shr    $0x7,%rdx
+    22793389      368490 :   9956:   and    %rcx,%rdx
+                         : 168  unsigned long shift<(Direction)-9>(unsigned long):
+                         : 166  return (b & ~FileABB) >> -SOUTH_WEST;
+    13810770           0 :   9959:   movabs $0x7f7f7f7f7f7f7f,%rcx
+                         : 168  Yolah::game_over() const:
+                         : 370  shift<NORTH_WEST>(players) | shift<SOUTH_EAST>(players) |
+    24990851           0 :   9963:   or     %rdx,%rax
+                         : 372  unsigned long shift<(Direction)-9>(unsigned long):
+                         : 166  return (b & ~FileABB) >> -SOUTH_WEST;
+    42160831           0 :   9966:   mov    %r12,%rdx
+    31914651           0 :   9969:   shr    $0x9,%rdx
+     2276792           0 :   996d:   and    %rcx,%rdx
+                         : 170  Yolah::game_over() const:
+                         : 371  shift<SOUTH_WEST>(players);
+     4648739           0 :   9970:   or     %rdx,%rax
+                         : 365  uint64_t possible = ~holes & ~black & ~white;
+    47463154           0 :   9973:   mov    (%rsp),%rdx
+    33837097           0 :   9977:   or     %rbp,%rdx
+    13731571           0 :   997a:   or     %r9,%rdx
+                         : 369  play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 818  while (!yolah.game_over()) {
+    13690069           0 :   997d:   andn   %rax,%rdx,%rdx
+    25102372           0 :   9982:   je     9cb0 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x570>
+                         : 821  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 484  uint64_t occupied = black | white | holes;
+    52448256       93662 :   9988:   mov    (%rsp),%rax
+                         : 485  uint64_t player_bb = current_player() == BLACK ? black : white;
+           0           0 :   998c:   mov    %r9,%rcx
+                         : 484  uint64_t occupied = black | white | holes;
+           0           0 :   998f:   or     %rax,%r12
+                         : 485  uint64_t player_bb = current_player() == BLACK ? black : white;
+    29228431           0 :   9992:   movzbl 0xc(%rsp),%eax
+    20208348       93023 :   9997:   and    $0x1,%eax
+     4466068           0 :   999a:   cmovne %rbp,%rcx
+           0       93732 :   999e:   mov    %al,0x3d(%rsp)
+                         : 490  int std::__countr_zero<unsigned long>(unsigned long):
+                         : 253  __countr_zero(_Tp __x) noexcept
+                         : 254  {
+                         : 255  using __gnu_cxx::__int_traits;
+                         : 256  constexpr auto _Nd = __int_traits<_Tp>::__digits;
+                         :
+                         : 258  if (__x == 0)
+     2329109           0 :   99a2:   test   %rcx,%rcx
+           0           0 :   99a5:   je     9c78 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x538>
+                         : 263  constexpr auto _Nd_u = __int_traits<unsigned>::__digits;
+                         :
+                         : 265  if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_u)
+                         : 266  return __builtin_ctz(__x);
+                         : 267  else if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_ul)
+                         : 268  return __builtin_ctzl(__x);
+    11096496       92413 :   99ab:   xor    %r11d,%r11d
+           0           0 :   99ae:   tzcnt  %rcx,%r11
+                         : 253  if (__x == 0)
+     9224095       91550 :   99b3:   blsr   %rcx,%rcx
+                         : 263  return __builtin_ctzl(__x);
+           0           0 :   99b8:   movslq %r11d,%r8
+                         : 253  if (__x == 0)
+    13798017           0 :   99bb:   je     9f38 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x7f8>
+                         : 263  return __builtin_ctzl(__x);
+           0       92825 :   99c1:   xor    %r10d,%r10d
+           0       91347 :   99c4:   tzcnt  %rcx,%r10
+                         : 253  if (__x == 0)
+           0           0 :   99c9:   blsr   %rcx,%rcx
+                         : 263  return __builtin_ctzl(__x);
+     6982226           0 :   99ce:   movslq %r10d,%rdx
+                         : 253  if (__x == 0)
+     2333150           0 :   99d1:   je     9f60 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x820>
+                         : 263  return __builtin_ctzl(__x);
+     9059510           0 :   99d7:   xor    %esi,%esi
+           0           0 :   99d9:   tzcnt  %rcx,%rsi
+                         : 266  pop_lsb(unsigned long&):
+                         : 135  b &= b - 1;
+     6858080           0 :   99de:   blsr   %rcx,%rcx
+           0           0 :   99e3:   tzcnt  %rcx,%rcx
+                         : 138  int std::__countr_zero<unsigned long>(unsigned long):
+     6881041           0 :   99e8:   movslq %esi,%rax
+                         : 248  __countr_zero(_Tp __x) noexcept
+     4601654           0 :   99eb:   movslq %ecx,%rdi
+                         : 250  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+     9163607           0 :   99ee:   movzbl %cl,%ecx
+     4591976           0 :   99f1:   movzbl %sil,%esi
+     6821946           0 :   99f5:   movzbl %r10b,%r10d
+     4477083           0 :   99f9:   movzbl %r11b,%r11d
+    17905075       93481 :   99fd:   shl    $0x8,%ecx
+     4558863           0 :   9a00:   shl    $0x5,%r8
+     2252210           0 :   9a04:   shl    $0x5,%rdx
+    13709606           0 :   9a08:   or     %esi,%ecx
+    27516870           0 :   9a0a:   lea    0x14f8f(%rip),%rsi        # 1e9a0 <orthogonalMagics>
+     4564573           0 :   9a11:   shl    $0x5,%rax
+     9022729           0 :   9a15:   shl    $0x8,%ecx
+     9072052           0 :   9a18:   shl    $0x5,%rdi
+    68105213           0 :   9a1c:   or     %r10d,%ecx
+    13355920           0 :   9a1f:   shl    $0x8,%ecx
+     6957145           0 :   9a22:   or     %r11d,%ecx
+     9058063           0 :   9a25:   mov    %ecx,0x10(%rsp)
+    22906667       92038 :   9a29:   lea    (%rsi,%r8,1),%rcx
+                         : 234  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+           0           0 :   9a2d:   mov    (%rcx),%r11
+           0       92646 :   9a30:   mov    0x18(%rcx),%r10d
+                         : 206  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0           0 :   9a34:   mov    0x10(%rcx),%rbx
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+    20625942       94343 :   9a38:   and    %r12,%r11
+           0       92481 :   9a3b:   imul   0x8(%rcx),%r11
+                         : 206  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0           0 :   9a40:   lea    0x14759(%rip),%rcx        # 1e1a0 <diagonalMagics>
+           0           0 :   9a47:   add    %rcx,%r8
+                         : 219  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     6793839       93967 :   9a4a:   mov    0x18(%r8),%r13d
+     2324961      272685 :   9a4e:   shrx   %r10,%r11,%r11
+           0           0 :   9a53:   mov    (%r8),%r10
+                         : 207  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+     4554118           0 :   9a56:   mov    %r11d,%r11d
+     4568604       92399 :   9a59:   mov    (%rbx,%r11,8),%r15
+                         : 219  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+   140952131    10018030 :   9a5d:   and    %r12,%r10
+           0           0 :   9a60:   imul   0x8(%r8),%r10
+                         : 206  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0           0 :   9a65:   mov    0x10(%r8),%r8
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+           0           0 :   9a69:   shrx   %r13,%r10,%r10
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+    11448847      367140 :   9a6e:   mov    %r10d,%r10d
+           0           0 :   9a71:   or     (%r8,%r10,8),%r15
+    50472692      636201 :   9a75:   lea    (%rsi,%rdx,1),%r8
+     2291191           0 :   9a79:   add    %rcx,%rdx
+                         : 221  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+    11242136           0 :   9a7c:   mov    (%r8),%r10
+           0           0 :   9a7f:   mov    0x18(%r8),%r11d
+                         : 206  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 490  uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+     6634736           0 :   9a83:   andn   %r15,%r12,%r15
+                         : 492  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     2257720           0 :   9a88:   mov    0x18(%rdx),%ebx
+     6906579      467813 :   9a8b:   and    %r12,%r10
+           0           0 :   9a8e:   imul   0x8(%r8),%r10
+     4610061           0 :   9a93:   shrx   %r11,%r10,%r10
+                         : 208  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+     2335819           0 :   9a98:   mov    0x10(%r8),%r11
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     2277956      187430 :   9a9c:   mov    (%rdx),%r8
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0       92533 :   9a9f:   mov    %r10d,%r10d
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+           0           0 :   9aa2:   and    %r12,%r8
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0       91266 :   9aa5:   mov    (%r11,%r10,8),%r14
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+   183602216    11715126 :   9aa9:   imul   0x8(%rdx),%r8
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0           0 :   9aae:   mov    0x10(%rdx),%rdx
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+           0           0 :   9ab2:   shrx   %rbx,%r8,%r8
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+     2130483       91611 :   9ab7:   mov    %r8d,%r8d
+     6923991      647023 :   9aba:   or     (%rdx,%r8,8),%r14
+    11454460      551704 :   9abe:   lea    (%rsi,%rax,1),%rdx
+     2246887           0 :   9ac2:   add    %rcx,%rax
+     2251072           0 :   9ac5:   add    %rdi,%rsi
+                         : 222  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     9099796     1008295 :   9ac8:   mov    (%rdx),%r8
+     6819774      179034 :   9acb:   mov    0x18(%rdx),%r10d
+                         : 206  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 491  uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+           0      185462 :   9acf:   andn   %r14,%r12,%r14
+                         : 493  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+           0           0 :   9ad4:   mov    0x18(%rax),%r11d
+     4503075      647082 :   9ad8:   and    %r12,%r8
+     2280595      185937 :   9adb:   imul   0x8(%rdx),%r8
+     2265894           0 :   9ae0:   shrx   %r10,%r8,%r8
+                         : 208  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+     4621484       92210 :   9ae5:   mov    0x10(%rdx),%r10
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     4591018      643532 :   9ae9:   mov    (%rax),%rdx
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0       92480 :   9aec:   mov    %r8d,%r8d
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     2317813           0 :   9aef:   and    %r12,%rdx
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+     2331618           0 :   9af2:   mov    (%r10,%r8,8),%r13
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+   209366664    10703498 :   9af6:   imul   0x8(%rax),%rdx
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0           0 :   9afb:   mov    0x10(%rax),%rax
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+           0       91744 :   9aff:   shrx   %r11,%rdx,%rdx
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0           0 :   9b04:   mov    %edx,%edx
+     9108264      920089 :   9b06:   or     (%rax,%rdx,8),%r13
+                         : 219  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+    18192305     1003378 :   9b0a:   mov    (%rsi),%rdx
+                         : 205  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 492  uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+           0       93658 :   9b0d:   andn   %r13,%r12,%r13
+                         : 494  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     4592852      463941 :   9b12:   and    %r12,%rdx
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+    11265358      692394 :   9b15:   add    %rdi,%rcx
+                         : 218  int std::__popcount<unsigned long>(unsigned long):
+                         : 301  constexpr auto _Nd_u = __int_traits<unsigned>::__digits;
+                         :
+                         : 303  if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_u)
+                         : 304  return __builtin_popcount(__x);
+                         : 305  else if _GLIBCXX17_CONSTEXPR (_Nd <= _Nd_ul)
+                         : 306  return __builtin_popcountl(__x);
+           0       93727 :   9b18:   xor    %ebx,%ebx
+           0           0 :   9b1a:   xor    %r8d,%r8d
+                         : 309  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+    11275109      183167 :   9b1d:   imul   0x8(%rsi),%rdx
+     8942964     1474968 :   9b22:   mov    0x18(%rsi),%eax
+                         : 206  int std::__popcount<unsigned long>(unsigned long):
+           0           0 :   9b25:   popcnt %r14,%rbx
+     2260409      180433 :   9b2a:   popcnt %r13,%r8
+                         : 303  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+    27475755      920328 :   9b2f:   mov    0x10(%rsi),%rsi
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+     2246762      737832 :   9b33:   mov    0x18(%rcx),%edi
+                         : 205  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 498  uint32_t n = n0 + n1 + n2 + n3;
+     2269182       93296 :   9b36:   mov    %r8,0x18(%rsp)
+                         : 500  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+    23020461      922328 :   9b3b:   shrx   %rax,%rdx,%rdx
+           0      186057 :   9b40:   mov    (%rcx),%rax
+                         : 206  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+     4533139      372143 :   9b43:   mov    %edx,%edx
+           0           0 :   9b45:   mov    (%rsi,%rdx,8),%rdx
+                         : 219  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+   218193764     9678342 :   9b49:   and    %r12,%rax
+           0           0 :   9b4c:   imul   0x8(%rcx),%rax
+                         : 206  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+           0      639739 :   9b51:   mov    0x10(%rcx),%rcx
+                         : 218  Magic::index(unsigned long) const:
+                         : 203  return uint32_t( ((occupied & mask) * magic) >> shift );
+           0      185258 :   9b55:   shrx   %rdi,%rax,%rax
+                         : 205  moves_bb(Square, unsigned long):
+                         : 216  return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
+    22672048      832917 :   9b5a:   mov    %eax,%eax
+           0       93474 :   9b5c:   or     (%rcx,%rax,8),%rdx
+                         : 219  int std::__popcount<unsigned long>(unsigned long):
+     4524925     1201255 :   9b60:   xor    %ecx,%ecx
+     2303500           0 :   9b62:   popcnt %r15,%rcx
+                         : 303  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 498  uint32_t n = n0 + n1 + n2 + n3;
+     9001317      361275 :   9b67:   lea    (%rbx,%rcx,1),%r11d
+                         : 493  uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+           0       90447 :   9b6b:   andn   %rdx,%r12,%r12
+                         : 495  int std::__popcount<unsigned long>(unsigned long):
+     4624787      738842 :   9b70:   xor    %edx,%edx
+                         : 302  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 498  uint32_t n = n0 + n1 + n2 + n3;
+           0           0 :   9b72:   lea    (%r11,%r8,1),%r10d
+                         : 500  int std::__popcount<unsigned long>(unsigned long):
+    22728217      554000 :   9b76:   popcnt %r12,%rdx
+                         : 302  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+    24985381     1099646 :   9b7b:   mov    %rcx,0x20(%rsp)
+                         : 499  if (n == 0) [[unlikely]] {
+     2281414      546004 :   9b80:   add    %r10d,%edx
+                         : 498  uint32_t n = n0 + n1 + n2 + n3;
+     9247233      464877 :   9b83:   mov    %r11d,0x38(%rsp)
+                         : 499  if (n == 0) [[unlikely]] {
+    11586024      370291 :   9b88:   mov    %r10d,0x14(%rsp)
+           0      369487 :   9b8d:   je     98db <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x19b>
+                         : 502  unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&):
+                         : 204  * @brief Generating functions.
+                         : 205  */
+                         : 206  template<typename _UniformRandomBitGenerator>
+                         : 207  result_type
+                         : 208  operator()(_UniformRandomBitGenerator& __urng)
+                         : 209  { return this->operator()(__urng, _M_param); }
+    15843100     3674455 :   9b93:   mov    0x30(%rsp),%rdi
+                         : 211  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 502  uniform_int_distribution<uint32_t> d(0, n - 1);
+           0           0 :   9b98:   dec    %edx
+                         : 504  unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&):
+     9263612      739021 :   9b9a:   xor    %esi,%esi
+     2276554           0 :   9b9c:   mov    %r9,0x28(%rsp)
+     2307400     1381478 :   9ba1:   call   8790 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]>
+                         : 207  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 504  int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
+           0           0 :   9ba6:   mov    0x20(%rsp),%rcx
+    43061162     8014091 :   9bab:   mov    0x38(%rsp),%r11d
+           0      637125 :   9bb0:   xor    %edx,%edx
+           0           0 :   9bb2:   mov    0x14(%rsp),%r10d
+                         : 506  Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
+           0           0 :   9bb7:   mov    0x10(%rsp),%edi
+                         : 504  int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
+    50186529     1562226 :   9bbb:   cmp    %ecx,%eax
+                         : 505  bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+     2281427      275500 :   9bbd:   mov    0x18(%rsp),%r8
+                         : 507  Yolah::play(Move):
+                         : 520  if (m != Move::none()) [[likely]] {
+           0           0 :   9bc2:   mov    0x28(%rsp),%r9
+                         : 522  Yolah::random_move(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&) const:
+                         : 504  int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
+           0           0 :   9bc7:   setae  %dl
+    68588391     1099150 :   9bca:   cmp    %r11d,%eax
+                         : 506  Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
+     9244948           0 :   9bcd:   mov    %edi,0xd0(%rsp)
+                         : 504  int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
+           0           0 :   9bd4:   sbb    $0xffffffff,%edx
+     6783074           0 :   9bd7:   cmp    %r10d,%eax
+    79944270      548827 :   9bda:   sbb    $0xffffffff,%edx
+                         : 505  bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+     4630211           0 :   9bdd:   xor    %r10d,%r10d
+           0           0 :   9be0:   test   %edx,%edx
+                         : 506  Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
+           0           0 :   9be2:   movslq %edx,%rdi
+                         : 505  bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+    63712501       91538 :   9be5:   cmovle %r10d,%ecx
+     6826848       90498 :   9be9:   cmp    $0x1,%edx
+                         : 506  Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
+           0           0 :   9bec:   movsbw 0xd0(%rsp,%rdi,1),%si
+                         : 507  uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];
+     4660845     1204777 :   9bf5:   mov    %r15,0xd0(%rsp)
+                         : 505  bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+    20622433     2656830 :   9bfd:   cmovle %r10d,%ebx
+                         : 507  uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];
+           0       90569 :   9c01:   mov    %r14,0xd8(%rsp)
+           0           0 :   9c09:   mov    %r13,0xe0(%rsp)
+                         : 505  bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+           0     1005369 :   9c11:   add    %ecx,%ebx
+                         : 507  uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];
+           0     4247453 :   9c13:   mov    %r12,0xe8(%rsp)
+                         : 505  bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+           0      461986 :   9c1b:   sub    %ebx,%eax
+           0           0 :   9c1d:   cmp    $0x2,%edx
+                         : 508  Square to = Square(std::countr_zero(_pdep_u64(1ULL << bit, bb)));
+           0       92014 :   9c20:   mov    $0x1,%edx
+                         : 505  bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+    16102482     1020891 :   9c25:   cmovle %r10d,%r8d
+           0           0 :   9c29:   sub    %r8d,%eax
+                         : 508  Square to = Square(std::countr_zero(_pdep_u64(1ULL << bit, bb)));
+           0           0 :   9c2c:   shlx   %rax,%rdx,%rax
+                         : 510  _pdep_u64(unsigned long long, unsigned long long):
+                         :
+                         : 72   extern __inline unsigned long long
+                         : 73   __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+                         : 74   _pdep_u64 (unsigned long long __X, unsigned long long __Y)
+                         : 75   {
+                         : 76   return __builtin_ia32_pdep_di (__X, __Y);
+           0           0 :   9c31:   pdep   0xd0(%rsp,%rdi,8),%rax,%rax
+    34319544       93802 :   9c3b:   tzcnt  %rax,%rax
+                         : 79   Move::Move(Square, Square):
+                         : 266  : data((to << 6) + from) {}
+           0       89380 :   9c40:   shl    $0x6,%eax
+                         : 268  Yolah::play(Move):
+                         : 520  if (m != Move::none()) [[likely]] {
+    11377295       93844 :   9c43:   add    %ax,%si
+           0           0 :   9c46:   je     98db <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x19b>
+                         : 523  square_bb(Square):
+                         : 118  return uint64_t(1) << s;
+     8892665           0 :   9c4c:   shlx   %rsi,%rdx,%rax
+                         : 120  Move::to_sq() const:
+                         : 272  return Square((data >> 6) & 0x3F);
+    25153912       91337 :   9c51:   shr    $0x6,%si
+                         : 274  square_bb(Square):
+                         : 118  return uint64_t(1) << s;
+           0           0 :   9c55:   shlx   %rsi,%rdx,%rdx
+                         : 120  Yolah::play(Move):
+                         : 524  white ^= pos1 | pos2;
+     9067529      183712 :   9c5a:   or     %rax,%rdx
+                         : 523  if (ply & 1) {
+     4586300      186375 :   9c5d:   cmpb   $0x0,0x3d(%rsp)
+     2321440           0 :   9c62:   jne    98d0 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x190>
+                         : 528  black_score++;
+           0           0 :   9c68:   incb   0x3f(%rsp)
+                         : 527  black ^= pos1 | pos2;
+    11502126      185701 :   9c6c:   xor    %rdx,%r9
+                         : 528  black_score++;
+           0           0 :   9c6f:   jmp    98d7 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x197>
+           0           0 :   9c74:   nopl   0x0(%rax)
+                         : 531  int std::__countr_zero<unsigned long>(unsigned long):
+           0           0 :   9c78:   mov    $0x40,%eax
+           0           0 :   9c7d:   mov    $0x40,%edx
+           0           0 :   9c82:   mov    $0x40,%r8d
+           0           0 :   9c88:   mov    $0x40,%ecx
+                         : 532  lsb(unsigned long):
+                         : 130  return Square(std::countr_zero(b));
+           0           0 :   9c8d:   mov    $0x40,%esi
+           0           0 :   9c92:   mov    $0x40,%r10d
+           0           0 :   9c98:   mov    $0x40,%r11d
+                         : 134  int std::__countr_zero<unsigned long>(unsigned long):
+                         : 254  return _Nd;
+           0           0 :   9c9e:   mov    $0x40,%edi
+           0           0 :   9ca3:   jmp    99ee <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x2ae>
+           0           0 :   9ca8:   nopl   0x0(%rax,%rax,1)
+                         : 258  play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 823  Move m = yolah.random_move(mt);
+                         : 824  yolah.play(m);
+                         : 825  }
+                         : 826  auto [black_score, white_score] = yolah.score();
+                         : 827  if (black_score > white_score) {
+     6835772           0 :   9cb0:   movzbl 0x3f(%rsp),%ebx
+     2299899           0 :   9cb5:   mov    0x40(%rsp),%rax
+           0           0 :   9cba:   cmp    %bl,0x3e(%rsp)
+           0           0 :   9cbe:   jae    9f20 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x7e0>
+                         : 824  black_wins++;
+           0           0 :   9cc4:   incq   0x50(%rsp)
+                         : 816  for (size_t i = 0; i < nb_games; i++) {
+           0           0 :   9cc9:   mov    0x48(%rsp),%rdi
+           0           0 :   9cce:   inc    %rax
+           0           0 :   9cd1:   cmp    %rdi,%rax
+           0           0 :   9cd4:   jne    9890 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x150>
+           0           0 :   9cda:   mov    0x60(%rsp),%r13
+           0           0 :   9cdf:   mov    0x50(%rsp),%r12
+           0           0 :   9ce4:   mov    %rdi,%rbp
+           0           0 :   9ce7:   mov    0x68(%rsp),%r15
+                         : 822  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<>(std::basic_format_string<char>):
+                         :
+                         : 3744 template<typename... _Args>
+                         : 3745 [[nodiscard]]
+                         : 3746 inline string
+                         : 3747 format(format_string<_Args...> __fmt, _Args&&... __args)
+                         : 3748 { return std::vformat(__fmt.get(), std::make_format_args(__args...)); }
+           0           0 :   9cec:   lea    0xd0(%rsp),%rbx
+           0           0 :   9cf4:   xor    %ecx,%ecx
+           0           0 :   9cf6:   xor    %r8d,%r8d
+           0           0 :   9cf9:   mov    $0x19,%esi
+           0           0 :   9cfe:   lea    0xf40f(%rip),%rdx        # 19114 <_IO_stdin_used+0x114>
+           0           0 :   9d05:   mov    %rbx,%rdi
+           0           0 :   9d08:   call   171f0 <std::vformat[abi:cxx11](std::basic_string_view<char, std::char_traits<char> >, std::basic_format_args<std::basic_format_context<std::__format::_Sink_iter<char>, char> >)>
+                         : 3756 std::basic_ostream<char, std::char_traits<char> >& std::operator<< <char, std::char_traits<char>, std::allocator<char> >(std::basic_ostream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&):
+                         : 4025 operator<<(basic_ostream<_CharT, _Traits>& __os,
+                         : 4026 const basic_string<_CharT, _Traits, _Alloc>& __str)
+                         : 4027 {
+                         : 4028 // _GLIBCXX_RESOLVE_LIB_DEFECTS
+                         : 4029 // 586. string inserter not a formatted function
+                         : 4030 return __ostream_insert(__os, __str.data(), __str.size());
+           0           0 :   9d0d:   lea    0x1436c(%rip),%r14        # 1e080 <std::cout@GLIBCXX_3.4>
+           0           0 :   9d14:   mov    0xd8(%rsp),%rdx
+           0           0 :   9d1c:   mov    0xd0(%rsp),%rsi
+           0           0 :   9d24:   mov    %r14,%rdi
+           0           0 :   9d27:   call   3620 <std::basic_ostream<char, std::char_traits<char> >& std::__ostream_insert<char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*, long)@plt>
+                         : 4036 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::~basic_string():
+                         : 792  { _M_dispose(); }
+           0           0 :   9d2c:   mov    %rbx,%rdi
+           0           0 :   9d2f:   call   e0c0 <std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_dispose()>
+                         : 795  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<unsigned long&>(std::basic_format_string<char, std::type_identity<unsigned long&>::type>, unsigned long&):
+           0           0 :   9d34:   mov    $0x61,%ecx
+           0           0 :   9d39:   lea    0x80(%rsp),%r8
+           0           0 :   9d41:   mov    $0x10,%esi
+           0           0 :   9d46:   lea    0xf3e1(%rip),%rdx        # 1912e <_IO_stdin_used+0x12e>
+           0           0 :   9d4d:   mov    %rbx,%rdi
+           0           0 :   9d50:   mov    %rbp,0x80(%rsp)
+           0           0 :   9d58:   call   171f0 <std::vformat[abi:cxx11](std::basic_string_view<char, std::char_traits<char> >, std::basic_format_args<std::basic_format_context<std::__format::_Sink_iter<char>, char> >)>
+                         : 3744 std::basic_ostream<char, std::char_traits<char> >& std::operator<< <char, std::char_traits<char>, std::allocator<char> >(std::basic_ostream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&):
+                         : 4025 return __ostream_insert(__os, __str.data(), __str.size());
+           0           0 :   9d5d:   mov    0xd8(%rsp),%rdx
+           0           0 :   9d65:   mov    0xd0(%rsp),%rsi
+           0           0 :   9d6d:   mov    %r14,%rdi
+           0           0 :   9d70:   call   3620 <std::basic_ostream<char, std::char_traits<char> >& std::__ostream_insert<char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*, long)@plt>
+                         : 4030 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::~basic_string():
+                         : 792  { _M_dispose(); }
+           0           0 :   9d75:   mov    %rbx,%rdi
+           0           0 :   9d78:   call   e0c0 <std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_dispose()>
+                         : 795  play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 833  draws++;
+                         : 834  }
+                         : 835  }
+                         : 836  cout << format("\n=== Game Statistics ===\n");
+                         : 837  cout << format("Total games: {}\n", nb_games);
+                         : 838  cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+           0           0 :   9d7d:   test   %rbp,%rbp
+           0           0 :   9d80:   js     9fef <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x8af>
+           0           0 :   9d86:   vxorpd %xmm4,%xmm4,%xmm4
+           0           0 :   9d8a:   vcvtsi2sd %rbp,%xmm4,%xmm0
+           0           0 :   9d8f:   vmovsd %xmm0,(%rsp)
+                         : 844  std::__format::_Arg_store<std::basic_format_context<std::__format::_Sink_iter<char>, char>, unsigned long long, double>::_Arg_store<unsigned long, double>(unsigned long&, double&):
+                         : 3281 : _M_args{_S_make_elt(__a)...}
+           0           0 :   9d94:   mov    %r12,0x90(%rsp)
+                         : 3283 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+           0           0 :   9d9c:   test   %r12,%r12
+           0           0 :   9d9f:   js     9fd0 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x890>
+           0           0 :   9da5:   vxorpd %xmm5,%xmm5,%xmm5
+           0           0 :   9da9:   vcvtsi2sd %r12,%xmm5,%xmm0
+           0           0 :   9dae:   vmulsd 0x10942(%rip),%xmm0,%xmm0        # 1a6f8 <std::__detail::__from_chars_alnum_to_val_table<false>::value+0x2f8>
+                         : 838  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<unsigned long&, double>(std::basic_format_string<char, std::type_identity<unsigned long&>::type, std::type_identity<double>::type>, unsigned long&, double&&):
+                         : 3743 { return std::vformat(__fmt.get(), std::make_format_args(__args...)); }
+           0           0 :   9db6:   mov    $0x1062,%ecx
+           0           0 :   9dbb:   lea    0x90(%rsp),%r8
+           0           0 :   9dc3:   mov    $0x1a,%esi
+           0           0 :   9dc8:   lea    0xf370(%rip),%rdx        # 1913f <_IO_stdin_used+0x13f>
+           0           0 :   9dcf:   mov    %rbx,%rdi
+                         : 3749 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+           0           0 :   9dd2:   vdivsd (%rsp),%xmm0,%xmm0
+                         : 834  std::__format::_Arg_store<std::basic_format_context<std::__format::_Sink_iter<char>, char>, unsigned long long, double>::_Arg_store<unsigned long, double>(unsigned long&, double&):
+                         : 3281 : _M_args{_S_make_elt(__a)...}
+           0           0 :   9dd7:   vmovsd %xmm0,0xa0(%rsp)
+                         : 3283 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<unsigned long&, double>(std::basic_format_string<char, std::type_identity<unsigned long&>::type, std::type_identity<double>::type>, unsigned long&, double&&):
+                         : 3743 { return std::vformat(__fmt.get(), std::make_format_args(__args...)); }
+           0           0 :   9de0:   call   171f0 <std::vformat[abi:cxx11](std::basic_string_view<char, std::char_traits<char> >, std::basic_format_args<std::basic_format_context<std::__format::_Sink_iter<char>, char> >)>
+                         : 3745 std::basic_ostream<char, std::char_traits<char> >& std::operator<< <char, std::char_traits<char>, std::allocator<char> >(std::basic_ostream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&):
+                         : 4025 return __ostream_insert(__os, __str.data(), __str.size());
+           0           0 :   9de5:   mov    0xd8(%rsp),%rdx
+           0           0 :   9ded:   mov    0xd0(%rsp),%rsi
+           0           0 :   9df5:   mov    %r14,%rdi
+           0           0 :   9df8:   call   3620 <std::basic_ostream<char, std::char_traits<char> >& std::__ostream_insert<char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*, long)@plt>
+                         : 4030 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::~basic_string():
+                         : 792  { _M_dispose(); }
+           0           0 :   9dfd:   mov    %rbx,%rdi
+           0           0 :   9e00:   call   e0c0 <std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_dispose()>
+                         : 795  std::__format::_Arg_store<std::basic_format_context<std::__format::_Sink_iter<char>, char>, unsigned long long, double>::_Arg_store<unsigned long, double>(unsigned long&, double&):
+                         : 3281 : _M_args{_S_make_elt(__a)...}
+           0           0 :   9e05:   mov    %r13,0xb0(%rsp)
+                         : 3283 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 834  cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+           0           0 :   9e0d:   test   %r13,%r13
+           0           0 :   9e10:   js     9fb1 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x871>
+           0           0 :   9e16:   vxorpd %xmm6,%xmm6,%xmm6
+           0           0 :   9e1a:   vcvtsi2sd %r13,%xmm6,%xmm0
+           0           0 :   9e1f:   vmulsd 0x108d1(%rip),%xmm0,%xmm0        # 1a6f8 <std::__detail::__from_chars_alnum_to_val_table<false>::value+0x2f8>
+                         : 840  std::basic_format_args<std::basic_format_context<std::__format::_Sink_iter<char>, char> >::basic_format_args<unsigned long long, double>(std::__format::_Arg_store<std::basic_format_context<std::__format::_Sink_iter<char>, char>, unsigned long long, double> const&):
+                         : 3308 _M_values = __store._M_args;
+           0           0 :   9e27:   lea    0xb0(%rsp),%rbp
+                         : 3310 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<unsigned long&, double>(std::basic_format_string<char, std::type_identity<unsigned long&>::type, std::type_identity<double>::type>, unsigned long&, double&&):
+                         : 3743 { return std::vformat(__fmt.get(), std::make_format_args(__args...)); }
+           0           0 :   9e2f:   mov    $0x1062,%ecx
+           0           0 :   9e34:   mov    $0x1a,%esi
+           0           0 :   9e39:   mov    %rbp,%r8
+           0           0 :   9e3c:   lea    0xf317(%rip),%rdx        # 1915a <_IO_stdin_used+0x15a>
+           0           0 :   9e43:   mov    %rbx,%rdi
+                         : 3749 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+           0           0 :   9e46:   vdivsd (%rsp),%xmm0,%xmm0
+                         : 835  std::__format::_Arg_store<std::basic_format_context<std::__format::_Sink_iter<char>, char>, unsigned long long, double>::_Arg_store<unsigned long, double>(unsigned long&, double&):
+                         : 3281 : _M_args{_S_make_elt(__a)...}
+           0           0 :   9e4b:   vmovsd %xmm0,0xc0(%rsp)
+                         : 3283 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<unsigned long&, double>(std::basic_format_string<char, std::type_identity<unsigned long&>::type, std::type_identity<double>::type>, unsigned long&, double&&):
+                         : 3743 { return std::vformat(__fmt.get(), std::make_format_args(__args...)); }
+           0           0 :   9e54:   call   171f0 <std::vformat[abi:cxx11](std::basic_string_view<char, std::char_traits<char> >, std::basic_format_args<std::basic_format_context<std::__format::_Sink_iter<char>, char> >)>
+                         : 3745 std::basic_ostream<char, std::char_traits<char> >& std::operator<< <char, std::char_traits<char>, std::allocator<char> >(std::basic_ostream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&):
+                         : 4025 return __ostream_insert(__os, __str.data(), __str.size());
+           0           0 :   9e59:   mov    0xd8(%rsp),%rdx
+           0           0 :   9e61:   mov    0xd0(%rsp),%rsi
+           0           0 :   9e69:   mov    %r14,%rdi
+           0           0 :   9e6c:   call   3620 <std::basic_ostream<char, std::char_traits<char> >& std::__ostream_insert<char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*, long)@plt>
+                         : 4030 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::~basic_string():
+                         : 792  { _M_dispose(); }
+           0           0 :   9e71:   mov    %rbx,%rdi
+           0           0 :   9e74:   call   e0c0 <std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_dispose()>
+                         : 795  std::__format::_Arg_store<std::basic_format_context<std::__format::_Sink_iter<char>, char>, unsigned long long, double>::_Arg_store<unsigned long, double>(unsigned long&, double&):
+                         : 3281 : _M_args{_S_make_elt(__a)...}
+           0           0 :   9e79:   mov    0x58(%rsp),%rax
+           0           0 :   9e7e:   mov    %rax,0xd0(%rsp)
+                         : 3284 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 835  cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+           0           0 :   9e86:   test   %rax,%rax
+           0           0 :   9e89:   js     9f93 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x853>
+           0           0 :   9e8f:   vxorpd %xmm7,%xmm7,%xmm7
+           0           0 :   9e93:   vcvtsi2sd %rax,%xmm7,%xmm0
+           0           0 :   9e98:   vmulsd 0x10858(%rip),%xmm0,%xmm0        # 1a6f8 <std::__detail::__from_chars_alnum_to_val_table<false>::value+0x2f8>
+                         : 841  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<unsigned long&, double>(std::basic_format_string<char, std::type_identity<unsigned long&>::type, std::type_identity<double>::type>, unsigned long&, double&&):
+                         : 3743 { return std::vformat(__fmt.get(), std::make_format_args(__args...)); }
+           0           0 :   9ea0:   mov    $0x1062,%ecx
+           0           0 :   9ea5:   mov    %rbx,%r8
+           0           0 :   9ea8:   mov    $0x1a,%esi
+           0           0 :   9ead:   lea    0xf2c1(%rip),%rdx        # 19175 <_IO_stdin_used+0x175>
+           0           0 :   9eb4:   mov    %rbp,%rdi
+                         : 3749 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+           0           0 :   9eb7:   vdivsd (%rsp),%xmm0,%xmm0
+                         : 836  std::__format::_Arg_store<std::basic_format_context<std::__format::_Sink_iter<char>, char>, unsigned long long, double>::_Arg_store<unsigned long, double>(unsigned long&, double&):
+                         : 3281 : _M_args{_S_make_elt(__a)...}
+           0           0 :   9ebc:   vmovsd %xmm0,0xe0(%rsp)
+                         : 3283 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::format<unsigned long&, double>(std::basic_format_string<char, std::type_identity<unsigned long&>::type, std::type_identity<double>::type>, unsigned long&, double&&):
+                         : 3743 { return std::vformat(__fmt.get(), std::make_format_args(__args...)); }
+           0           0 :   9ec5:   call   171f0 <std::vformat[abi:cxx11](std::basic_string_view<char, std::char_traits<char> >, std::basic_format_args<std::basic_format_context<std::__format::_Sink_iter<char>, char> >)>
+                         : 3745 std::basic_ostream<char, std::char_traits<char> >& std::operator<< <char, std::char_traits<char>, std::allocator<char> >(std::basic_ostream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&):
+                         : 4025 return __ostream_insert(__os, __str.data(), __str.size());
+           0           0 :   9eca:   mov    0xb8(%rsp),%rdx
+           0           0 :   9ed2:   mov    0xb0(%rsp),%rsi
+           0           0 :   9eda:   mov    %r14,%rdi
+           0           0 :   9edd:   call   3620 <std::basic_ostream<char, std::char_traits<char> >& std::__ostream_insert<char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*, long)@plt>
+                         : 4030 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::~basic_string():
+                         : 792  { _M_dispose(); }
+           0           0 :   9ee2:   mov    %rbp,%rdi
+           0           0 :   9ee5:   call   e0c0 <std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_dispose()>
+                         : 795  std::random_device::~random_device():
+                         : 1664 { _M_fini(); }
+           0           0 :   9eea:   mov    %r15,%rdi
+           0           0 :   9eed:   call   3590 <std::random_device::_M_fini()@plt>
+                         : 1667 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 836  }
+           0           0 :   9ef2:   mov    0x28a8(%rsp),%rax
+           0           0 :   9efa:   sub    %fs:0x28,%rax
+           0           0 :   9f03:   jne    a012 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x8d2>
+           0           0 :   9f09:   add    $0x28b8,%rsp
+           0           0 :   9f10:   pop    %rbx
+           0           0 :   9f11:   pop    %rbp
+           0           0 :   9f12:   pop    %r12
+           0           0 :   9f14:   pop    %r13
+           0           0 :   9f16:   pop    %r14
+           0           0 :   9f18:   pop    %r15
+           0           0 :   9f1a:   ret
+           0           0 :   9f1b:   nopl   0x0(%rax,%rax,1)
+                         : 825  } else if (white_score > black_score) {
+           0           0 :   9f20:   movzbl 0x3e(%rsp),%ebx
+           0           0 :   9f25:   cmp    %bl,0x3f(%rsp)
+           0           0 :   9f29:   jae    9f80 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x840>
+                         : 826  white_wins++;
+           0           0 :   9f2b:   incq   0x60(%rsp)
+           0           0 :   9f30:   jmp    9cc9 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x589>
+           0           0 :   9f35:   nopl   (%rax)
+                         : 830  int std::__countr_zero<unsigned long>(unsigned long):
+           0           0 :   9f38:   mov    $0x40,%eax
+           0           0 :   9f3d:   mov    $0x40,%edx
+           0           0 :   9f42:   mov    $0x40,%ecx
+                         : 829  lsb(unsigned long):
+                         : 130  return Square(std::countr_zero(b));
+           0           0 :   9f47:   mov    $0x40,%esi
+           0           0 :   9f4c:   mov    $0x40,%r10d
+                         : 133  int std::__countr_zero<unsigned long>(unsigned long):
+           0           0 :   9f52:   mov    $0x40,%edi
+           0           0 :   9f57:   jmp    99ee <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x2ae>
+           0           0 :   9f5c:   nopl   0x0(%rax)
+           0           0 :   9f60:   mov    $0x40,%eax
+           0           0 :   9f65:   mov    $0x40,%ecx
+                         : 259  lsb(unsigned long):
+           0           0 :   9f6a:   mov    $0x40,%esi
+                         : 131  int std::__countr_zero<unsigned long>(unsigned long):
+           0           0 :   9f6f:   mov    $0x40,%edi
+           0           0 :   9f74:   jmp    99ee <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x2ae>
+           0           0 :   9f79:   nopl   0x0(%rax)
+                         : 257  play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 828  draws++;
+           0           0 :   9f80:   incq   0x58(%rsp)
+           0           0 :   9f85:   jmp    9cc9 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x589>
+                         : 831  std::__detail::_Mod<unsigned long, 4294967296ul, 1ul, 0ul, true, true>::__calc(unsigned long):
+                         : 143  __res %= __m;
+           0           0 :   9f8a:   mov    0x70(%rsp),%eax
+                         : 145  unsigned long std::optional<unsigned long>::value_or<unsigned int>(unsigned int&&) const &:
+                         : 1030 return this->_M_get();
+           0           0 :   9f8e:   jmp    9814 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0xd4>
+                         : 1032 play_random_games_fast(unsigned long, std::optional<unsigned long>):
+                         : 835  cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+           0           0 :   9f93:   mov    %rax,%rdx
+           0           0 :   9f96:   and    $0x1,%eax
+           0           0 :   9f99:   vxorpd %xmm4,%xmm4,%xmm4
+           0           0 :   9f9d:   shr    %rdx
+           0           0 :   9fa0:   or     %rax,%rdx
+           0           0 :   9fa3:   vcvtsi2sd %rdx,%xmm4,%xmm0
+           0           0 :   9fa8:   vaddsd %xmm0,%xmm0,%xmm0
+           0           0 :   9fac:   jmp    9e98 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x758>
+                         : 834  cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+           0           0 :   9fb1:   mov    %r13,%rax
+           0           0 :   9fb4:   and    $0x1,%r13d
+           0           0 :   9fb8:   vxorpd %xmm7,%xmm7,%xmm7
+           0           0 :   9fbc:   shr    %rax
+           0           0 :   9fbf:   or     %r13,%rax
+           0           0 :   9fc2:   vcvtsi2sd %rax,%xmm7,%xmm0
+           0           0 :   9fc7:   vaddsd %xmm0,%xmm0,%xmm0
+           0           0 :   9fcb:   jmp    9e1f <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x6df>
+                         : 833  cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+           0           0 :   9fd0:   mov    %r12,%rax
+           0           0 :   9fd3:   and    $0x1,%r12d
+           0           0 :   9fd7:   vxorpd %xmm6,%xmm6,%xmm6
+           0           0 :   9fdb:   shr    %rax
+           0           0 :   9fde:   or     %r12,%rax
+           0           0 :   9fe1:   vcvtsi2sd %rax,%xmm6,%xmm0
+           0           0 :   9fe6:   vaddsd %xmm0,%xmm0,%xmm0
+           0           0 :   9fea:   jmp    9dae <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x66e>
+           0           0 :   9fef:   mov    %rbp,%rax
+           0           0 :   9ff2:   and    $0x1,%ebp
+           0           0 :   9ff5:   vxorpd %xmm4,%xmm4,%xmm4
+           0           0 :   9ff9:   shr    %rax
+           0           0 :   9ffc:   or     %rbp,%rax
+           0           0 :   9fff:   vcvtsi2sd %rax,%xmm4,%xmm0
+           0           0 :   a004:   vaddsd %xmm0,%xmm0,%xmm5
+           0           0 :   a008:   vmovsd %xmm5,(%rsp)
+           0           0 :   a00d:   jmp    9d94 <play_random_games_fast(unsigned long, std::optional<unsigned long>)+0x654>
+                         : 836  }
+           0           0 :   a012:   call   3610 <__stack_chk_fail@plt>
+           0           0 :   a017:   endbr64
+                         : 839  std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::~basic_string():
+           0           0 :   a01b:   mov    %rax,%rbx
+           0           0 :   a01e:   jmp    3a5c <play_random_games_fast(unsigned long, std::optional<unsigned long>) [clone .cold]>
+           0           0 :   a023:   endbr64
+           0           0 :   a027:   mov    %rax,%rbp
+           0           0 :   a02a:   vzeroupper
+           0           0 :   a02d:   jmp    3a6a <play_random_games_fast(unsigned long, std::optional<unsigned long>) [clone .cold]+0xe>
+           0           0 :   a032:   endbr64
+           0           0 :   a036:   mov    %rax,%rbx
+           0           0 :   a039:   jmp    3a8d <play_random_games_fast(unsigned long, std::optional<unsigned long>) [clone .cold]+0x31>
+           0           0 :   a03e:   endbr64
+           0           0 :   a042:   mov    %rax,%rbp
+           0           0 :   a045:   jmp    3abf <play_random_games_fast(unsigned long, std::optional<unsigned long>) [clone .cold]+0x63>
+           0           0 :   a04a:   endbr64
+           0           0 :   a04e:   mov    %rax,%rbp
+           0           0 :   a051:   jmp    3abf <play_random_games_fast(unsigned long, std::optional<unsigned long>) [clone .cold]+0x63>
+           0           0 :   a056:   endbr64
+           0           0 :   a05a:   mov    %rax,%rbp
+           0           0 :   a05d:   jmp    3abf <play_random_games_fast(unsigned long, std::optional<unsigned long>) [clone .cold]+0x63>
+           0           0 :   a062:   endbr64
+           0           0 :   a066:   mov    %rax,%rbp
+           0           0 :   a069:   jmp    3abf <play_random_games_fast(unsigned long, std::optional<unsigned long>) [clone .cold]+0x63>
+ Period                  |	Source code & Disassembly of chapter02 for anon group { L1-dcache-loads, L1-dcache-load-misses } (168 samples, percent: local period)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                         :
+                         :
+                         :
+                         : 3    Disassembly of section .text:
+                         :
+                         : 5    000000000000eb60 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()()>:
+                         : 6    std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()():
+                         : 453  _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+                         : 454  _UIntType __f>
+                         : 455  typename
+                         : 456  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+                         : 457  __s, __b, __t, __c, __l, __f>::result_type
+                         : 458  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+    38795270     4342450 :   eb60:   endbr64
+                         : 458  __s, __b, __t, __c, __l, __f>::
+                         : 459  operator()()
+                         : 460  {
+                         : 461  // Reload the vector - cost is O(n) amortized over n calls.
+                         : 462  if (_M_p >= state_size)
+           0           0 :   eb64:   mov    0x1380(%rdi),%rax
+                         : 453  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+           0           0 :   eb6b:   push   %rbx
+     2297690           0 :   eb6c:   mov    %rdi,%rbx
+                         : 458  if (_M_p >= state_size)
+    45256496     1481406 :   eb6f:   cmp    $0x26f,%rax
+           0           0 :   eb75:   ja     ebc0 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()()+0x60>
+                         : 462  _M_gen_rand();
+                         :
+                         : 464  // Calculate o(x(i)).
+                         : 465  result_type __z = _M_x[_M_p++];
+           0           0 :   eb77:   lea    0x1(%rax),%rdx
+           0           0 :   eb7b:   mov    (%rbx,%rax,8),%rax
+     2274195           0 :   eb7f:   mov    %rdx,0x1380(%rbx)
+                         : 463  __z ^= (__z >> __u) & __d;
+    36356105     5244848 :   eb86:   mov    %rax,%rdx
+           0           0 :   eb89:   shr    $0xb,%rdx
+           0           0 :   eb8d:   mov    %edx,%edx
+                         : 469  __z ^= (__z << __s) & __b;
+                         : 470  __z ^= (__z << __t) & __c;
+                         : 471  __z ^= (__z >> __l);
+                         :
+                         : 473  return __z;
+                         : 474  }
+     4558777       92475 :   eb8f:   pop    %rbx
+                         : 463  __z ^= (__z >> __u) & __d;
+    36588489     6261183 :   eb90:   xor    %rax,%rdx
+                         : 464  __z ^= (__z << __s) & __b;
+           0       92511 :   eb93:   mov    %rdx,%rax
+           0           0 :   eb96:   shl    $0x7,%rax
+           0       91724 :   eb9a:   and    $0x9d2c5680,%eax
+    36687439     3227978 :   eb9f:   xor    %rdx,%rax
+                         : 465  __z ^= (__z << __t) & __c;
+           0           0 :   eba2:   mov    %rax,%rdx
+           0           0 :   eba5:   shl    $0xf,%rdx
+           0           0 :   eba9:   and    $0xefc60000,%edx
+    84616017     1006425 :   ebaf:   xor    %rax,%rdx
+                         : 466  __z ^= (__z >> __l);
+           0       93009 :   ebb2:   mov    %rdx,%rax
+           0           0 :   ebb5:   shr    $0x12,%rax
+     2309255           0 :   ebb9:   xor    %rdx,%rax
+                         : 469  }
+    93812960     1101447 :   ebbc:   ret
+           0           0 :   ebbd:   nopl   (%rax)
+                         : 459  _M_gen_rand();
+           0           0 :   ebc0:   call   e980 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand()>
+                         : 462  result_type __z = _M_x[_M_p++];
+           0           0 :   ebc5:   mov    0x1380(%rbx),%rax
+           0           0 :   ebcc:   jmp    eb77 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()()+0x17>
+ Period                  |	Source code & Disassembly of chapter02 for anon group { L1-dcache-loads, L1-dcache-load-misses } (130 samples, percent: local period)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                         :
+                         :
+                         :
+                         : 3    Disassembly of section .text:
+                         :
+                         : 5    0000000000008790 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]>:
+                         : 6    unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&):
+                         : 287  };
+                         :
+                         : 289  template<typename _IntType>
+                         : 290  template<typename _UniformRandomBitGenerator>
+                         : 291  typename uniform_int_distribution<_IntType>::result_type
+                         : 292  uniform_int_distribution<_IntType>::
+    11457560      464147 :   8790:   push   %r14
+           0       92937 :   8792:   mov    %esi,%eax
+     4502149      739057 :   8794:   push   %r13
+                         : 302  static_assert( __urngmin < __urngmax,
+                         : 303  "Uniform random bit generator must define min() < max()");
+                         : 304  constexpr __uctype __urngrange = __urngmax - __urngmin;
+                         :
+                         : 306  const __uctype __urange
+                         : 307  = __uctype(__param.b()) - __uctype(__param.a());
+           0       91889 :   8796:   mov    %edx,%r13d
+                         : 301  const __uctype __urange
+     8925071      275923 :   8799:   sub    %rax,%r13
+                         : 287  uniform_int_distribution<_IntType>::
+     4563222           0 :   879c:   push   %r12
+    45212797      913328 :   879e:   mov    %rdi,%r12
+           0      181466 :   87a1:   push   %rbp
+    11355570      820857 :   87a2:   push   %rbx
+     2293981       93083 :   87a3:   mov    %rax,%rbx
+                         :
+                         : 306  __uctype __ret;
+                         : 307  if (__urngrange > __urange)
+    16038103     1107988 :   87a6:   mov    $0xfffffffe,%eax
+           0           0 :   87ab:   cmp    %r13,%rax
+           0           0 :   87ae:   jae    8800 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x70>
+                         : 342  __ret = __uctype(__urng()) - __urngmin;
+                         : 343  while (__ret >= __past);
+                         : 344  __ret /= __scaling;
+                         : 345  }
+                         : 346  }
+                         : 347  else if (__urngrange < __urange)
+           0           0 :   87b0:   mov    $0xffffffff,%eax
+           0           0 :   87b5:   cmp    %rax,%r13
+           0           0 :   87b8:   je     88c8 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x138>
+                         : 364  __uctype __tmp; // wraparound control
+                         : 365  do
+                         : 366  {
+                         : 367  const __uctype __uerngrange = __urngrange + 1;
+                         : 368  __tmp = (__uerngrange * operator()
+                         : 369  (__urng, param_type(0, __urange / __uerngrange)));
+           0           0 :   87be:   mov    $0xffffffff,%edx
+           0           0 :   87c3:   xor    %esi,%esi
+           0           0 :   87c5:   mov    %r12,%rdi
+           0           0 :   87c8:   call   8790 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]>
+                         : 365  __ret = __tmp + (__uctype(__urng()) - __urngmin);
+           0           0 :   87cd:   mov    %r12,%rdi
+                         : 364  (__urng, param_type(0, __urange / __uerngrange)));
+           0           0 :   87d0:   mov    %eax,%ebp
+                         : 365  __ret = __tmp + (__uctype(__urng()) - __urngmin);
+           0           0 :   87d2:   call   eb60 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()()>
+           0           0 :   87d7:   mov    %rax,%rdx
+                         : 363  __tmp = (__uerngrange * operator()
+           0           0 :   87da:   mov    %rbp,%rax
+           0           0 :   87dd:   shl    $0x20,%rax
+           0           0 :   87e1:   add    %rdx,%rax
+           0           0 :   87e4:   setb   %dl
+           0           0 :   87e7:   movzbl %dl,%edx
+                         : 367  }
+                         : 368  while (__ret > __urange || __ret < __tmp);
+           0           0 :   87ea:   cmp    %rax,%r13
+           0           0 :   87ed:   jb     87be <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x2e>
+           0           0 :   87ef:   test   %rdx,%rdx
+           0           0 :   87f2:   jne    87be <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x2e>
+                         : 372  }
+                         : 373  else
+                         : 374  __ret = __uctype(__urng()) - __urngmin;
+                         :
+                         : 376  return __ret + __param.a();
+           0           0 :   87f4:   add    %ebx,%eax
+                         : 373  }
+           0           0 :   87f6:   pop    %rbx
+           0           0 :   87f7:   pop    %rbp
+           0           0 :   87f8:   pop    %r12
+           0           0 :   87fa:   pop    %r13
+           0           0 :   87fc:   pop    %r14
+           0           0 :   87fe:   ret
+           0           0 :   87ff:   nop
+                         : 381  unsigned int std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, unsigned int):
+                         : 269  _Wp __product = _Wp(__g()) * _Wp(__range);
+    11041588      927465 :   8800:   call   eb60 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()()>
+                         : 271  unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&):
+                         : 309  const __uctype __uerange = __urange + 1; // __urange can be zero
+           0           0 :   8805:   inc    %r13
+                         : 311  unsigned int std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, unsigned int):
+                         : 269  _Wp __product = _Wp(__g()) * _Wp(__range);
+           0           0 :   8808:   imul   %r13,%rax
+     2265625           0 :   880c:   mov    %rax,%rcx
+                         : 271  if (__low < __range)
+    40933076     2301757 :   880f:   cmp    %r13d,%eax
+           0           0 :   8812:   jae    88b0 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x120>
+                         : 273  _Up __threshold = -__range % __range;
+           0           0 :   8818:   mov    %r13d,%eax
+           0           0 :   881b:   xor    %edx,%edx
+           0           0 :   881d:   neg    %eax
+           0           0 :   881f:   div    %r13d
+           0           0 :   8822:   mov    %edx,%r14d
+                         : 274  while (__low < __threshold)
+           0           0 :   8825:   cmp    %edx,%ecx
+           0           0 :   8827:   jae    88b0 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x120>
+                         : 277  std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()():
+                         : 458  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+                         : 459  __s, __b, __t, __c, __l, __f>::
+                         : 460  operator()()
+                         : 461  {
+                         : 462  // Reload the vector - cost is O(n) amortized over n calls.
+                         : 463  if (_M_p >= state_size)
+           0           0 :   882d:   mov    0x1380(%r12),%rsi
+           0           0 :   8835:   jmp    8892 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x102>
+           0           0 :   8837:   nopw   0x0(%rax,%rax,1)
+                         : 462  _M_gen_rand();
+                         :
+                         : 464  // Calculate o(x(i)).
+                         : 465  result_type __z = _M_x[_M_p++];
+           0           0 :   8840:   lea    0x1(%rax),%rsi
+           0           0 :   8844:   mov    (%r12,%rax,8),%rax
+           0           0 :   8848:   mov    %rsi,0x1380(%r12)
+                         : 463  __z ^= (__z >> __u) & __d;
+           0           0 :   8850:   mov    %rax,%rdx
+           0           0 :   8853:   shr    $0xb,%rdx
+           0           0 :   8857:   mov    %edx,%edx
+           0           0 :   8859:   xor    %rdx,%rax
+                         : 464  __z ^= (__z << __s) & __b;
+           0           0 :   885c:   mov    %rax,%rdx
+           0           0 :   885f:   shl    $0x7,%rdx
+           0           0 :   8863:   and    $0x9d2c5680,%edx
+           0           0 :   8869:   xor    %rdx,%rax
+                         : 465  __z ^= (__z << __t) & __c;
+           0           0 :   886c:   mov    %rax,%rcx
+           0           0 :   886f:   shl    $0xf,%rcx
+           0           0 :   8873:   and    $0xefc60000,%ecx
+           0           0 :   8879:   xor    %rcx,%rax
+                         : 466  __z ^= (__z >> __l);
+           0           0 :   887c:   mov    %rax,%rdx
+           0           0 :   887f:   shr    $0x12,%rdx
+           0           0 :   8883:   xor    %rdx,%rax
+                         : 470  unsigned int std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, unsigned int):
+                         : 276  __product = _Wp(__g()) * _Wp(__range);
+           0           0 :   8886:   imul   %r13,%rax
+           0           0 :   888a:   mov    %rax,%rcx
+                         : 274  while (__low < __threshold)
+           0           0 :   888d:   cmp    %r14d,%eax
+           0           0 :   8890:   jae    88b0 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0x120>
+                         : 277  std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()():
+                         : 453  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+           0           0 :   8892:   mov    %rsi,%rax
+                         : 458  if (_M_p >= state_size)
+           0           0 :   8895:   cmp    $0x26f,%rsi
+           0           0 :   889c:   jbe    8840 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0xb0>
+                         : 459  _M_gen_rand();
+           0           0 :   889e:   mov    %r12,%rdi
+           0           0 :   88a1:   call   e980 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand()>
+                         : 462  result_type __z = _M_x[_M_p++];
+           0           0 :   88a6:   mov    0x1380(%r12),%rax
+           0           0 :   88ae:   jmp    8840 <unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&) [clone .isra.0]+0xb0>
+                         : 465  unsigned int std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, unsigned int):
+                         : 280  return __product >> _Up_traits::__digits;
+           0           0 :   88b0:   mov    %rcx,%rax
+           0           0 :   88b3:   shr    $0x20,%rax
+                         : 283  unsigned int std::uniform_int_distribution<unsigned int>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >(std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>&, std::uniform_int_distribution<unsigned int>::param_type const&):
+                         : 372  return __ret + __param.a();
+           0           0 :   88b7:   add    %ebx,%eax
+                         : 373  }
+    86634572    10411429 :   88b9:   pop    %rbx
+           0           0 :   88ba:   pop    %rbp
+           0           0 :   88bb:   pop    %r12
+           0           0 :   88bd:   pop    %r13
+    49619240     2028447 :   88bf:   pop    %r14
+           0           0 :   88c1:   ret
+           0           0 :   88c2:   nopw   0x0(%rax,%rax,1)
+                         : 370  __ret = __uctype(__urng()) - __urngmin;
+           0           0 :   88c8:   call   eb60 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()()>
+                         : 372  return __ret + __param.a();
+           0           0 :   88cd:   add    %ebx,%eax
+                         : 373  }
+           0           0 :   88cf:   pop    %rbx
+           0           0 :   88d0:   pop    %rbp
+           0           0 :   88d1:   pop    %r12
+           0           0 :   88d3:   pop    %r13
+           0           0 :   88d5:   pop    %r14
+           0           0 :   88d7:   ret
+ Period                  |	Source code & Disassembly of chapter02 for anon group { L1-dcache-loads, L1-dcache-load-misses } (15 samples, percent: local period)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                         :
+                         :
+                         :
+                         : 3    Disassembly of section .text:
+                         :
+                         : 5    000000000000e980 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand()>:
+                         : 6    std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand():
+                         : 397  size_t __n, size_t __m, size_t __r,
+                         : 398  _UIntType __a, size_t __u, _UIntType __d, size_t __s,
+                         : 399  _UIntType __b, size_t __t, _UIntType __c, size_t __l,
+                         : 400  _UIntType __f>
+                         : 401  void
+                         : 402  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+           0       93594 :   e980:   endbr64
+           0           0 :   e984:   mov    %rdi,%rdx
+           0           0 :   e987:   lea    0x700(%rdi),%rcx
+                         :
+                         : 409  for (size_t __k = 0; __k < (__n - __m); ++__k)
+                         : 410  {
+                         : 411  _UIntType __y = ((_M_x[__k] & __upper_mask)
+                         : 412  | (_M_x[__k + 1] & __lower_mask));
+                         : 413  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   e98e:   vpxor  %xmm7,%xmm7,%xmm7
+                         : 397  mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
+           0           0 :   e992:   mov    %rdi,%rax
+                         : 406  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0           0 :   e995:   mov    $0xffffffff80000000,%rdi
+           0           0 :   e99c:   vmovq  %rdi,%xmm0
+                         : 407  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   e9a1:   mov    $0x7fffffff,%edi
+           0           0 :   e9a6:   vmovq  %rdi,%xmm1
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   e9ab:   mov    $0x1,%edi
+                         : 406  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0           0 :   e9b0:   vpbroadcastq %xmm0,%ymm10
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+     2139370           0 :   e9b5:   vmovq  %rdi,%xmm2
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   e9ba:   mov    $0x9908b0df,%edi
+                         : 407  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   e9bf:   vpbroadcastq %xmm1,%ymm9
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   e9c4:   vmovq  %rdi,%xmm3
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   e9c9:   vpbroadcastq %xmm2,%ymm8
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   e9ce:   vpbroadcastq %xmm3,%ymm6
+           0           0 :   e9d3:   nopl   0x0(%rax,%rax,1)
+                         : 407  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   e9d8:   vpand  0x8(%rax),%ymm9,%ymm5
+                         : 406  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0      365431 :   e9dd:   vpand  (%rax),%ymm10,%ymm4
+           0      360521 :   e9e1:   add    $0x20,%rax
+           0           0 :   e9e5:   vpor   %ymm5,%ymm4,%ymm4
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   e9e9:   vpsrlq $0x1,%ymm4,%ymm5
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0      459721 :   e9ee:   vpand  %ymm8,%ymm4,%ymm4
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0      187742 :   e9f3:   vpxor  0xc48(%rax),%ymm5,%ymm5
+     4629554      278733 :   e9fb:   vpsubq %ymm4,%ymm7,%ymm4
+           0           0 :   e9ff:   vpand  %ymm6,%ymm4,%ymm4
+           0      275826 :   ea03:   vpxor  %ymm4,%ymm5,%ymm4
+     9154992      732723 :   ea07:   vmovdqu %ymm4,-0x20(%rax)
+                         : 404  for (size_t __k = 0; __k < (__n - __m); ++__k)
+           0      369837 :   ea0c:   cmp    %rax,%rcx
+           0           0 :   ea0f:   jne    e9d8 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand()+0x58>
+                         : 406  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0           0 :   ea11:   mov    0x710(%rdx),%rax
+                         : 407  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   ea18:   mov    0x718(%rdx),%rcx
+                         : 406  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0           0 :   ea1f:   vpunpcklqdq %xmm0,%xmm0,%xmm0
+                         : 407  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   ea23:   vpunpcklqdq %xmm1,%xmm1,%xmm1
+           0           0 :   ea27:   vpand  0x708(%rdx),%xmm1,%xmm1
+                         : 406  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0           0 :   ea2f:   vpand  0x700(%rdx),%xmm0,%xmm0
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   ea37:   vpunpcklqdq %xmm2,%xmm2,%xmm2
+                         : 407  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   ea3b:   and    $0x7fffffff,%ecx
+           0           0 :   ea41:   lea    0x1378(%rdx),%rsi
+                         :
+                         : 417  for (size_t __k = (__n - __m); __k < (__n - 1); ++__k)
+                         : 418  {
+                         : 419  _UIntType __y = ((_M_x[__k] & __upper_mask)
+                         : 420  | (_M_x[__k + 1] & __lower_mask));
+                         : 421  _M_x[__k] = (_M_x[__k + (__m - __n)] ^ (__y >> 1)
+           0           0 :   ea48:   vpxor  %xmm6,%xmm6,%xmm6
+                         : 406  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0           0 :   ea4c:   and    $0xffffffff80000000,%rax
+           0           0 :   ea52:   or     %rcx,%rax
+           0           0 :   ea55:   vpor   %xmm1,%xmm0,%xmm0
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   ea59:   mov    %rax,%rcx
+           0           0 :   ea5c:   vpsrlq $0x1,%xmm0,%xmm1
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   ea61:   vpand  %xmm2,%xmm0,%xmm0
+           0           0 :   ea65:   and    $0x1,%eax
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   ea68:   shr    %rcx
+           0           0 :   ea6b:   vpxor  %xmm2,%xmm2,%xmm2
+           0           0 :   ea6f:   vpxor  0x1368(%rdx),%xmm1,%xmm1
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   ea77:   neg    %rax
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   ea7a:   xor    0x1378(%rdx),%rcx
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   ea81:   and    $0x9908b0df,%eax
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   ea86:   vpsubq %xmm0,%xmm2,%xmm0
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   ea8a:   xor    %rcx,%rax
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   ea8d:   vpunpcklqdq %xmm3,%xmm3,%xmm2
+                         : 414  _UIntType __y = ((_M_x[__k] & __upper_mask)
+           0           0 :   ea91:   vpbroadcastq 0xbc46(%rip),%ymm3        # 1a6e0 <std::__detail::__from_chars_alnum_to_val_table<false>::value+0x2e0>
+           0       91236 :   ea9a:   lea    0x718(%rdx),%rcx
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   eaa1:   vpand  %xmm2,%xmm0,%xmm0
+                         : 409  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   eaa5:   mov    %rax,0x710(%rdx)
+                         : 416  _M_x[__k] = (_M_x[__k + (__m - __n)] ^ (__y >> 1)
+           0           0 :   eaac:   mov    $0x9908b0df,%eax
+                         : 415  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   eab1:   vpbroadcastq 0xba86(%rip),%ymm2        # 1a540 <std::__detail::__from_chars_alnum_to_val_table<false>::value+0x140>
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   eaba:   vpxor  %xmm0,%xmm1,%xmm0
+                         : 416  _M_x[__k] = (_M_x[__k + (__m - __n)] ^ (__y >> 1)
+           0           0 :   eabe:   vmovq  %rax,%xmm7
+                         : 417  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   eac3:   vpbroadcastq 0xbc1c(%rip),%ymm1        # 1a6e8 <std::__detail::__from_chars_alnum_to_val_table<false>::value+0x2e8>
+                         : 408  _M_x[__k] = (_M_x[__k + __m] ^ (__y >> 1)
+           0           0 :   eacc:   vmovdqu %xmm0,0x700(%rdx)
+                         : 416  _M_x[__k] = (_M_x[__k + (__m - __n)] ^ (__y >> 1)
+           0           0 :   ead4:   vpbroadcastq %xmm7,%ymm0
+                         : 415  | (_M_x[__k + 1] & __lower_mask));
+           0           0 :   ead9:   vpand  0x8(%rcx),%ymm2,%ymm5
+                         : 414  _UIntType __y = ((_M_x[__k] & __upper_mask)
+     2240943       92237 :   eade:   vpand  (%rcx),%ymm3,%ymm4
+     2163049      184869 :   eae2:   add    $0x20,%rcx
+           0           0 :   eae6:   vpor   %ymm5,%ymm4,%ymm4
+                         : 416  _M_x[__k] = (_M_x[__k + (__m - __n)] ^ (__y >> 1)
+           0       92270 :   eaea:   vpsrlq $0x1,%ymm4,%ymm5
+                         : 417  ^ ((__y & 0x01) ? __a : 0));
+     2182026      548530 :   eaef:   vpand  %ymm1,%ymm4,%ymm4
+                         : 416  _M_x[__k] = (_M_x[__k + (__m - __n)] ^ (__y >> 1)
+     2234301      368627 :   eaf3:   vpxor  -0x738(%rcx),%ymm5,%ymm5
+     2344107       92517 :   eafb:   vpsubq %ymm4,%ymm6,%ymm4
+           0           0 :   eaff:   vpand  %ymm0,%ymm4,%ymm4
+     2271111       91639 :   eb03:   vpxor  %ymm4,%ymm5,%ymm4
+     2561759      184305 :   eb07:   vmovdqu %ymm4,-0x20(%rcx)
+                         : 412  for (size_t __k = (__n - __m); __k < (__n - 1); ++__k)
+           0           0 :   eb0c:   cmp    %rcx,%rsi
+           0           0 :   eb0f:   jne    ead9 <std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand()+0x159>
+                         : 420  }
+                         :
+                         : 422  _UIntType __y = ((_M_x[__n - 1] & __upper_mask)
+           0           0 :   eb11:   mov    0x1378(%rdx),%rax
+                         : 421  | (_M_x[0] & __lower_mask));
+           0           0 :   eb18:   mov    (%rdx),%rcx
+                         : 424  _M_x[__n - 1] = (_M_x[__m - 1] ^ (__y >> 1)
+                         : 425  ^ ((__y & 0x01) ? __a : 0));
+                         : 426  _M_p = 0;
+           0           0 :   eb1b:   movq   $0x0,0x1380(%rdx)
+                         : 421  | (_M_x[0] & __lower_mask));
+           0           0 :   eb26:   and    $0x7fffffff,%ecx
+                         : 420  _UIntType __y = ((_M_x[__n - 1] & __upper_mask)
+           0           0 :   eb2c:   and    $0xffffffff80000000,%rax
+           0           0 :   eb32:   or     %rcx,%rax
+                         : 422  _M_x[__n - 1] = (_M_x[__m - 1] ^ (__y >> 1)
+           0           0 :   eb35:   mov    %rax,%rcx
+                         : 423  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   eb38:   and    $0x1,%eax
+                         : 422  _M_x[__n - 1] = (_M_x[__m - 1] ^ (__y >> 1)
+           0           0 :   eb3b:   shr    %rcx
+                         : 423  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   eb3e:   neg    %rax
+                         : 422  _M_x[__n - 1] = (_M_x[__m - 1] ^ (__y >> 1)
+           0           0 :   eb41:   xor    0xc60(%rdx),%rcx
+                         : 423  ^ ((__y & 0x01) ? __a : 0));
+           0           0 :   eb48:   and    $0x9908b0df,%eax
+           0           0 :   eb4d:   xor    %rcx,%rax
+           0           0 :   eb50:   mov    %rax,0x1378(%rdx)
+           0           0 :   eb57:   vzeroupper
+                         : 425  }
+           0           0 :   eb5a:   ret
+ Period                  |	Source code & Disassembly of kcore for anon group { L1-dcache-loads, L1-dcache-load-misses } (2 samples, percent: local period)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+                         :
+                         :
+                         :
+                         : 3                Disassembly of section load0:
+                         :
+                         : 5                ffffffffae20d110 <load0>:
+           0           0 :   ffffffffae20d110:       nopl   0x0(%rax,%rax,1)
+           0           0 :   ffffffffae20d115:       push   %rbp
+           0           0 :   ffffffffae20d116:       mov    %rsp,%rbp
+           0           0 :   ffffffffae20d119:       push   %r15
+           0           0 :   ffffffffae20d11b:       push   %r14
+           0           0 :   ffffffffae20d11d:       push   %r13
+           0           0 :   ffffffffae20d11f:       push   %r12
+           0           0 :   ffffffffae20d121:       push   %rbx
+           0           0 :   ffffffffae20d122:       mov    $0x197e0,%rbx
+           0           0 :   ffffffffae20d129:       sub    $0x20,%rsp
+           0           0 :   ffffffffae20d12d:       add    %gs:0x51e0c443(%rip),%rbx        # 0x19578
+           0           0 :   ffffffffae20d135:       cmpq   $0x0,0x222c133(%rip)        # 0xffffffffb0439270
+           0           0 :   ffffffffae20d13d:       je     0xffffffffae20d2bb
+           0           0 :   ffffffffae20d143:       mov    0x210(%rbx),%r14d
+           0           0 :   ffffffffae20d14a:       test   %r14d,%r14d
+           0           0 :   ffffffffae20d14d:       jne    0xffffffffae20d2bb
+           0           0 :   ffffffffae20d153:       mov    0x218(%rbx),%r15d
+           0           0 :   ffffffffae20d15a:       test   %r15d,%r15d
+           0           0 :   ffffffffae20d15d:       je     0xffffffffae20d2a9
+           0           0 :   ffffffffae20d163:       mov    0x214(%rbx),%eax
+           0           0 :   ffffffffae20d169:       mov    %eax,%edx
+           0           0 :   ffffffffae20d16b:       sub    %r15d,%edx
+           0           0 :   ffffffffae20d16e:       mov    %edx,-0x34(%rbp)
+           0           0 :   ffffffffae20d171:       test   %edx,%edx
+           0           0 :   ffffffffae20d173:       jle    0xffffffffae20d2d4
+           0           0 :   ffffffffae20d179:       movslq %edx,%r8
+           0           0 :   ffffffffae20d17c:       xor    %r12d,%r12d
+           0           0 :   ffffffffae20d17f:       jmp    0xffffffffae20d1b8
+           0           0 :   ffffffffae20d181:       mov    0x1d8(%r13),%eax
+           0           0 :   ffffffffae20d188:       test   $0x1,%al
+           0           0 :   ffffffffae20d18a:       je     0xffffffffae20d196
+           0           0 :   ffffffffae20d18c:       or     $0x4,%eax
+           0           0 :   ffffffffae20d18f:       mov    %eax,0x1d8(%r13)
+           0           0 :   ffffffffae20d196:       mov    $0x4,%esi
+           0           0 :   ffffffffae20d19b:       mov    %r13,%rdi
+           0           0 :   ffffffffae20d19e:       mov    %r8,-0x30(%rbp)
+           0           0 :   ffffffffae20d1a2:       call   0xffffffffae20b180
+           0           0 :   ffffffffae20d1a7:       mov    -0x30(%rbp),%r8
+           0           0 :   ffffffffae20d1ab:       add    $0x1,%r12
+           0           0 :   ffffffffae20d1af:       cmp    %r8,%r12
+           0           0 :   ffffffffae20d1b2:       je     0xffffffffae20d2ce
+           0           0 :   ffffffffae20d1b8:       movslq %r12d,%rsi
+           0           0 :   ffffffffae20d1bb:       movslq %r12d,%rax
+           0           0 :   ffffffffae20d1be:       cmp    $0x3f,%rsi
+           0           0 :   ffffffffae20d1c2:       ja     0xffffffffae20d4bf
+           0           0 :   ffffffffae20d1c8:       mov    0x528(%rbx,%r12,8),%r13
+           0           0 :   ffffffffae20d1d0:       mov    0x184(%r13),%ecx
+           0           0 :   ffffffffae20d1d7:       cmp    $0xffffffff,%ecx
+           0           0 :   ffffffffae20d1da:       je     0xffffffffae20d1ab
+           0           0 :   ffffffffae20d1dc:       cmp    $0x3f,%rax
+           0           0 :   ffffffffae20d1e0:       ja     0xffffffffae20d539
+           0           0 :   ffffffffae20d1e6:       cmp    0x228(%rbx,%r12,4),%ecx
+           0           0 :   ffffffffae20d1ee:       jne    0xffffffffae20d181
+           0           0 :   ffffffffae20d1f0:       mov    0x168(%r13),%r9
+           0           0 :   ffffffffae20d1f7:       mov    %gs:0x51e0c372(%rip),%ecx        # 0x19570
+           0           0 :   ffffffffae20d1fe:       cmp    %ecx,0x188(%r13)
+           0           0 :   ffffffffae20d205:       jne    0xffffffffae20d181
+           0           0 :   ffffffffae20d20b:       cmp    $0x3f,%rax
+           0           0 :   ffffffffae20d20f:       ja     0xffffffffae20d58f
+           0           0 :   ffffffffae20d215:       cmp    0x328(%rbx,%r12,8),%r9
+           0           0 :   ffffffffae20d21d:       jne    0xffffffffae20d181
+           0           0 :   ffffffffae20d223:       jmp    0xffffffffae20d1ab
+           0           0 :   ffffffffae20d225:       mov    $0x40000003,%r8d
+           0           0 :   ffffffffae20d22b:       mov    $0x30c,%eax
+           0           0 :   ffffffffae20d230:       movq   $0x38d,0x170(%r12)
+           0           0 :   ffffffffae20d23c:       mov    %rax,0x178(%r12)
+           0           0 :   ffffffffae20d244:       mov    %r8d,0x180(%r12)
+           0           0 :   ffffffffae20d24c:       testb  $0x4,0x1d8(%r12)
+           0           0 :   ffffffffae20d255:       jne    0xffffffffae20d264
+           0           0 :   ffffffffae20d257:       mov    $0x2,%esi
+           0           0 :   ffffffffae20d25c:       mov    %r12,%rdi
+           0           0 :   ffffffffae20d25f:       call   0xffffffffae20d060
+           0           0 :   ffffffffae20d264:       add    $0x1,%r14d
+           0           0 :   ffffffffae20d268:       cmp    %r14d,0x214(%rbx)
+           0           0 :   ffffffffae20d26f:       jg     0xffffffffae20d2d8
+           0           0 :   ffffffffae20d271:       movl   $0x0,0x218(%rbx)
+           0           0 :   ffffffffae20d27b:       mov    0x222c083(%rip),%eax        # 0xffffffffb0439304
+           0           0 :   ffffffffae20d281:       test   %eax,%eax
+           0           0 :   ffffffffae20d283:       je     0xffffffffae20d2a9
+           0           0 :   ffffffffae20d285:       cmpq   $0x0,0x222bfe3(%rip)        # 0xffffffffb0439270
+           0           0 :   ffffffffae20d28d:       je     0xffffffffae20d2a9
+           0           0 :   ffffffffae20d28f:       mov    0x1701dca(%rip),%rax        # 0xffffffffaf90f060
+           0           0 :   ffffffffae20d296:       mov    $0x400,%esi
+           0           0 :   ffffffffae20d29b:       mov    $0x340,%edi
+           0           0 :   ffffffffae20d2a0:       mov    0x10(%rax),%rax
+           0           0 :   ffffffffae20d2a4:       call   *%rax
+           0           0 :   ffffffffae20d2a6:       nopl   (%rax)
+           0           0 :   ffffffffae20d2a9:       movl   $0x1,0x210(%rbx)
+           0           0 :   ffffffffae20d2b3:       mov    %r15d,%edi
+           0           0 :   ffffffffae20d2b6:       call   0xffffffffae213560
+           0           0 :   ffffffffae20d2bb:       add    $0x20,%rsp
+           0           0 :   ffffffffae20d2bf:       pop    %rbx
+           2           2 :   ffffffffae20d2c0:       pop    %r12
+           0           0 :   ffffffffae20d2c2:       pop    %r13
+           0           0 :   ffffffffae20d2c4:       pop    %r14
+           0           0 :   ffffffffae20d2c6:       pop    %r15
+           0           0 :   ffffffffae20d2c8:       pop    %rbp
+           0           0 :   ffffffffae20d2c9:       ret
+           0           0 :   ffffffffae20d2ca:       int3
+           0           0 :   ffffffffae20d2cb:       int3
+           0           0 :   ffffffffae20d2cc:       int3
+           0           0 :   ffffffffae20d2cd:       int3
+           0           0 :   ffffffffae20d2ce:       mov    0x214(%rbx),%eax
+           0           0 :   ffffffffae20d2d4:       test   %eax,%eax
+           0           0 :   ffffffffae20d2d6:       jle    0xffffffffae20d271
+           0           0 :   ffffffffae20d2d8:       movslq %r14d,%r13
+           0           0 :   ffffffffae20d2db:       cmp    $0x3f,%r13
+           0           0 :   ffffffffae20d2df:       ja     0xffffffffae20d4df
+           0           0 :   ffffffffae20d2e5:       lea    (%rbx,%r13,8),%rcx
+           0           0 :   ffffffffae20d2e9:       mov    0x528(%rcx),%r12
+           0           0 :   ffffffffae20d2f0:       mov    0x184(%r12),%eax
+           0           0 :   ffffffffae20d2f8:       cmp    $0x3f,%r13
+           0           0 :   ffffffffae20d2fc:       ja     0xffffffffae20d517
+           0           0 :   ffffffffae20d302:       mov    0x228(%rbx,%r13,4),%r8d
+           0           0 :   ffffffffae20d30a:       cmp    %r8d,%eax
+           0           0 :   ffffffffae20d30d:       je     0xffffffffae20d420
+           0           0 :   ffffffffae20d313:       cmp    $0x3f,%r13
+           0           0 :   ffffffffae20d317:       ja     0xffffffffae20d49b
+           0           0 :   ffffffffae20d31d:       mov    %gs:0x51e0c24c(%rip),%eax        # 0x19570
+           0           0 :   ffffffffae20d324:       mov    %r8d,0x184(%r12)
+           0           0 :   ffffffffae20d32c:       mov    %eax,0x188(%r12)
+           0           0 :   ffffffffae20d334:       cmp    $0x3f,%r13
+           0           0 :   ffffffffae20d338:       ja     0xffffffffae20d4f3
+           0           0 :   ffffffffae20d33e:       mov    0x328(%rcx),%rax
+           0           0 :   ffffffffae20d345:       add    $0x1,%rax
+           0           0 :   ffffffffae20d349:       mov    %rax,0x328(%rcx)
+           0           0 :   ffffffffae20d350:       mov    0x184(%r12),%edi
+           0           0 :   ffffffffae20d358:       mov    %rax,0x168(%r12)
+           0           0 :   ffffffffae20d360:       cmp    $0x37,%edi
+           0           0 :   ffffffffae20d363:       jg     0xffffffffae20d392
+           0           0 :   ffffffffae20d365:       cmp    $0x2f,%edi
+           0           0 :   ffffffffae20d368:       jg     0xffffffffae20d225
+           0           0 :   ffffffffae20d36e:       je     0xffffffffae20d47e
+           0           0 :   ffffffffae20d374:       cmp    $0x1f,%edi
+           0           0 :   ffffffffae20d377:       jle    0xffffffffae20d39b
+           0           0 :   ffffffffae20d379:       lea    0x2e9(%r8),%eax
+           0           0 :   ffffffffae20d380:       sub    $0x20,%r8d
+           0           0 :   ffffffffae20d384:       cltq
+           0           0 :   ffffffffae20d386:       or     $0x40000000,%r8d
+           0           0 :   ffffffffae20d38d:       jmp    0xffffffffae20d230
+           0           0 :   ffffffffae20d392:       cmp    $0x3a,%edi
+           0           0 :   ffffffffae20d395:       je     0xffffffffae20d47e
+           0           0 :   ffffffffae20d39b:       mov    0x222bf26(%rip),%rax        # 0xffffffffb04392c8
+           0           0 :   ffffffffae20d3a2:       mov    0x222bf17(%rip),%r13d        # 0xffffffffb04392c0
+           0           0 :   ffffffffae20d3a9:       test   %rax,%rax
+           0           0 :   ffffffffae20d3ac:       je     0xffffffffae20d463
+           0           0 :   ffffffffae20d3b2:       mov    $0x1,%esi
+           0           0 :   ffffffffae20d3b7:       call   *%rax
+           0           0 :   ffffffffae20d3b9:       nopl   (%rax)
+           0           0 :   ffffffffae20d3bc:       mov    0x222bf05(%rip),%rcx        # 0xffffffffb04392c8
+           0           0 :   ffffffffae20d3c3:       mov    0x184(%r12),%edi
+           0           0 :   ffffffffae20d3cb:       add    %r13d,%eax
+           0           0 :   ffffffffae20d3ce:       mov    0x222beef(%rip),%r13d        # 0xffffffffb04392c4
+           0           0 :   ffffffffae20d3d5:       mov    %rax,0x170(%r12)
+           0           0 :   ffffffffae20d3dd:       test   %rcx,%rcx
+           0           0 :   ffffffffae20d3e0:       je     0xffffffffae20d477
+           0           0 :   ffffffffae20d3e6:       xor    %esi,%esi
+           0           0 :   ffffffffae20d3e8:       call   *%rcx
+           0           0 :   ffffffffae20d3ea:       nopl   (%rax)
+           0           0 :   ffffffffae20d3ed:       mov    0x184(%r12),%edi
+           0           0 :   ffffffffae20d3f5:       add    %r13d,%eax
+           0           0 :   ffffffffae20d3f8:       mov    %rax,0x178(%r12)
+           0           0 :   ffffffffae20d400:       mov    0x222bec9(%rip),%rax        # 0xffffffffb04392d0
+           0           0 :   ffffffffae20d407:       test   %rax,%rax
+           0           0 :   ffffffffae20d40a:       je     0xffffffffae20d413
+           0           0 :   ffffffffae20d40c:       call   *%rax
+           0           0 :   ffffffffae20d40e:       nopl   (%rax)
+           0           0 :   ffffffffae20d411:       mov    %eax,%edi
+           0           0 :   ffffffffae20d413:       mov    %edi,0x180(%r12)
+           0           0 :   ffffffffae20d41b:       jmp    0xffffffffae20d24c
+           0           0 :   ffffffffae20d420:       mov    0x168(%r12),%r9
+           0           0 :   ffffffffae20d428:       mov    %gs:0x51e0c141(%rip),%eax        # 0x19570
+           0           0 :   ffffffffae20d42f:       cmp    %eax,0x188(%r12)
+           0           0 :   ffffffffae20d437:       jne    0xffffffffae20d313
+           0           0 :   ffffffffae20d43d:       cmp    $0x3f,%r13
+           0           0 :   ffffffffae20d441:       ja     0xffffffffae20d563
+           0           0 :   ffffffffae20d447:       cmp    0x328(%rcx),%r9
+           0           0 :   ffffffffae20d44e:       jne    0xffffffffae20d313
+           0           0 :   ffffffffae20d454:       cmp    %r14d,-0x34(%rbp)
+           0           0 :   ffffffffae20d458:       jle    0xffffffffae20d24c
+           0           0 :   ffffffffae20d45e:       jmp    0xffffffffae20d264
+           0           0 :   ffffffffae20d463:       lea    0x0(%r13,%rdi,1),%eax
+           0           0 :   ffffffffae20d468:       mov    0x222be55(%rip),%r13d        # 0xffffffffb04392c4
+           0           0 :   ffffffffae20d46f:       mov    %rax,0x170(%r12)
+           0           0 :   ffffffffae20d477:       mov    %edi,%eax
+           0           0 :   ffffffffae20d479:       jmp    0xffffffffae20d3f5
+           0           0 :   ffffffffae20d47e:       movq   $0x0,0x170(%r12)
+           0           0 :   ffffffffae20d48a:       movq   $0x0,0x178(%r12)
+           0           0 :   ffffffffae20d496:       jmp    0xffffffffae20d24c
+           0           0 :   ffffffffae20d49b:       mov    %r13,%rsi
+           0           0 :   ffffffffae20d49e:       mov    $0xffffffffb001ec40,%rdi
+           0           0 :   ffffffffae20d4a5:       mov    %r8d,-0x40(%rbp)
+           0           0 :   ffffffffae20d4a9:       mov    %rcx,-0x30(%rbp)
+           0           0 :   ffffffffae20d4ad:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d4b2:       mov    -0x40(%rbp),%r8d
+           0           0 :   ffffffffae20d4b6:       mov    -0x30(%rbp),%rcx
+           0           0 :   ffffffffae20d4ba:       jmp    0xffffffffae20d31d
+           0           0 :   ffffffffae20d4bf:       mov    $0xffffffffb001ed00,%rdi
+           0           0 :   ffffffffae20d4c6:       mov    %r8,-0x40(%rbp)
+           0           0 :   ffffffffae20d4ca:       mov    %eax,-0x30(%rbp)
+           0           0 :   ffffffffae20d4cd:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d4d2:       mov    -0x40(%rbp),%r8
+           0           0 :   ffffffffae20d4d6:       movslq -0x30(%rbp),%rax
+           0           0 :   ffffffffae20d4da:       jmp    0xffffffffae20d1c8
+           0           0 :   ffffffffae20d4df:       mov    %r13,%rsi
+           0           0 :   ffffffffae20d4e2:       mov    $0xffffffffb001eca0,%rdi
+           0           0 :   ffffffffae20d4e9:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d4ee:       jmp    0xffffffffae20d2e5
+           0           0 :   ffffffffae20d4f3:       mov    %r13,%rsi
+           0           0 :   ffffffffae20d4f6:       mov    $0xffffffffb001ec20,%rdi
+           0           0 :   ffffffffae20d4fd:       mov    %r8d,-0x40(%rbp)
+           0           0 :   ffffffffae20d501:       mov    %rcx,-0x30(%rbp)
+           0           0 :   ffffffffae20d505:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d50a:       mov    -0x40(%rbp),%r8d
+           0           0 :   ffffffffae20d50e:       mov    -0x30(%rbp),%rcx
+           0           0 :   ffffffffae20d512:       jmp    0xffffffffae20d33e
+           0           0 :   ffffffffae20d517:       mov    %r13,%rsi
+           0           0 :   ffffffffae20d51a:       mov    $0xffffffffb001ec80,%rdi
+           0           0 :   ffffffffae20d521:       mov    %eax,-0x40(%rbp)
+           0           0 :   ffffffffae20d524:       mov    %rcx,-0x30(%rbp)
+           0           0 :   ffffffffae20d528:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d52d:       mov    -0x40(%rbp),%eax
+           0           0 :   ffffffffae20d530:       mov    -0x30(%rbp),%rcx
+           0           0 :   ffffffffae20d534:       jmp    0xffffffffae20d302
+           0           0 :   ffffffffae20d539:       mov    %rax,%rsi
+           0           0 :   ffffffffae20d53c:       mov    $0xffffffffb001ece0,%rdi
+           0           0 :   ffffffffae20d543:       mov    %r8,-0x48(%rbp)
+           0           0 :   ffffffffae20d547:       mov    %ecx,-0x40(%rbp)
+           0           0 :   ffffffffae20d54a:       mov    %rax,-0x30(%rbp)
+           0           0 :   ffffffffae20d54e:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d553:       mov    -0x48(%rbp),%r8
+           0           0 :   ffffffffae20d557:       mov    -0x40(%rbp),%ecx
+           0           0 :   ffffffffae20d55a:       mov    -0x30(%rbp),%rax
+           0           0 :   ffffffffae20d55e:       jmp    0xffffffffae20d1e6
+           0           0 :   ffffffffae20d563:       mov    %r13,%rsi
+           0           0 :   ffffffffae20d566:       mov    $0xffffffffb001ec60,%rdi
+           0           0 :   ffffffffae20d56d:       mov    %r9,-0x48(%rbp)
+           0           0 :   ffffffffae20d571:       mov    %r8d,-0x40(%rbp)
+           0           0 :   ffffffffae20d575:       mov    %rcx,-0x30(%rbp)
+           0           0 :   ffffffffae20d579:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d57e:       mov    -0x48(%rbp),%r9
+           0           0 :   ffffffffae20d582:       mov    -0x40(%rbp),%r8d
+           0           0 :   ffffffffae20d586:       mov    -0x30(%rbp),%rcx
+           0           0 :   ffffffffae20d58a:       jmp    0xffffffffae20d447
+           0           0 :   ffffffffae20d58f:       mov    %rax,%rsi
+           0           0 :   ffffffffae20d592:       mov    $0xffffffffb001ecc0,%rdi
+           0           0 :   ffffffffae20d599:       mov    %r8,-0x40(%rbp)
+           0           0 :   ffffffffae20d59d:       mov    %r9,-0x30(%rbp)
+           0           0 :   ffffffffae20d5a1:       call   0xffffffffae8a3590
+           0           0 :   ffffffffae20d5a6:       mov    -0x40(%rbp),%r8
+           0           0 :   ffffffffae20d5aa:       mov    -0x30(%rbp),%r9
+           0           0 :   ffffffffae20d5ae:       jmp    0xffffffffae20d215
+           0           0 :   ffffffffae20d5b3:       data16 cs nopw 0x0(%rax,%rax,1)
+           0           0 :   ffffffffae20d5be:       xchg   %ax,%ax

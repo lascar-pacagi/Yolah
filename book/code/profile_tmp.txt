@@ -1,0 +1,22 @@
+Simplifying profile: /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/profile.txt -> /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/profile_clean.txt
+Simplified: 93 lines -> 81 lines (12 filtered)
+
+Reading profile from: /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/profile_clean.txt
+Collapsing chains matching: play_random_games:uniform_int_distribution
+Flame graph tree written to: /home/elucterio/IA/Option/Code/OptionProject/Yolah/book/code/flamegraph_tree.txt
+
+================================================================================
+Preview:
+================================================================================
+Flame Graph Tree - Yolah Performance Profile
+================================================================================
+
+# Event count (approx.):                           100.00%
+
+# Total Lost Samples:                                0.00%
+
+================================================================================
+Note: Percentages show portion of total CPU time
+Tree shows call hierarchy from bottom (root) to top (leaves)
+
+... (see full output in flamegraph_tree.txt)

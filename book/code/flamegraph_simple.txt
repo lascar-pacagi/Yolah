@@ -1,0 +1,37 @@
+Flamegraph - Profil play_random_games (Échantillons: 42K)
+Largeur = % du temps CPU total
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌────┐ ┌──────┐ ┌────┐ ┌─────────────────────────┐ ┌────┐ ┌─┐
+│pop_│ │Move  │ │play│ │      moves_bb           │ │RNG │ │?│  <- Fonctions feuilles
+│lsb │ │::Move│ │    │ │                         │ │    │ │ │
+└─12─┘ └──13──┘ └─3──┘ └───────23.9──────────────┘ └─9──┘ └1┘
+
+┌────┴──────┴─────┴──────────┬──────────────────────┴────┴─┴─┐
+│         Yolah::moves        │   uniform_int_distribution     │  <- Fonctions intermédiaires
+│                             │                                │
+└─────────────20.6────────────┴────────────9.1─────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│                     play_random_games                          │  <- Fonction racine
+│                                                                │
+└────────────────────────────90.0───────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Légende:
+• La LARGEUR des boîtes = % du temps CPU
+• La HAUTEUR = profondeur de la pile d'appels
+• Les boîtes du HAUT sont appelées par celles du BAS
+
+Analyse:
+┌─────────────────────────────────────────────────┬──────────┐
+│ Catégorie                                       │ % Temps  │
+├─────────────────────────────────────────────────┼──────────┤
+│ Génération de coups (moves_bb + Yolah::moves)  │  44.5%   │
+│ Opérations bit-level (pop_lsb + Magic::index)  │  21.0%   │
+│ Construction des coups (Move::Move)             │  13.0%   │
+│ Génération aléatoire (RNG)                      │   9.1%   │
+│ Exécution des coups (play)                      │   3.1%   │
+│ Autres                                          │   9.3%   │
+└─────────────────────────────────────────────────┴──────────┘

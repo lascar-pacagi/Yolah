@@ -1,0 +1,27 @@
+Flamegraph ASCII - Profil d'exécution de play_random_games()
+================================================================
+
+Légende: La largeur des barres représente le temps CPU (%)
+         [■] = 1% de temps CPU
+
+play_random_games (90.0%)
+├─ moves_bb (23.9%)         [■■■■■■■■■■■■■■■■■■■■■■■■]
+│  └─ Magic::index (8.1%)   [■■■■■■■■]
+├─ Yolah::moves (20.6%)     [■■■■■■■■■■■■■■■■■■■■■]
+├─ pop_lsb (12.9%)          [■■■■■■■■■■■■■]
+├─ Move::Move (13.0%)       [■■■■■■■■■■■■■]
+├─ Yolah::play (3.1%)       [■■■]
+├─ Yolah::game_over (1.2%)  [■]
+└─ Autres (5.3%)            [■■■■■]
+
+uniform_int_distribution (4.7%)
+└─ mersenne_twister (3.8%)  [■■■■]
+
+================================================================
+Analyse:
+- 90% du temps dans play_random_games
+  - 23.9% génération des coups (moves_bb)
+  - 20.6% logique de moves
+  - 12.9% extraction de bits (pop_lsb)
+  - 13.0% construction des coups (Move::Move)
+- ~9% génération de nombres aléatoires (RNG)

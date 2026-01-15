@@ -1,0 +1,64 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cycles'
+# Event count (approx.): 18105335667
+#
+#       Overhead  Command / Shared Object / Symbol
+# ..............  ...............................................................................................................................................................................................................
+#
+   100.00%        chapter02
+       99.80%        chapter02        
+          91.84%        [.] play_random_games
+            |          
+            |--25.36%--Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+            |--23.74%--moves_bb (inlined)
+            |          Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+            |--12.82%--Move::Move (inlined)
+            |          Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+            |--10.47%--std::__countr_zero<unsigned long> (inlined)
+            |          std::countr_zero<unsigned long> (inlined)
+            |          lsb (inlined)
+            |          pop_lsb (inlined)
+            |          Yolah::moves (inlined)
+            |          Yolah::moves (inlined)
+            |          play_random_games
+            |          0xffffffffffffffff
+            |          
+             --7.96%--Magic::index (inlined)
+                       moves_bb (inlined)
+                       Yolah::moves (inlined)
+                       Yolah::moves (inlined)
+                       play_random_games
+                       0xffffffffffffffff
+
+           3.90%        [.] std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()
+            |
+            ---std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator()
+               |          
+                --3.25%--std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> (inlined)
+                          std::uniform_int_distribution<unsigned long>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >
+                          std::uniform_int_distribution<unsigned long>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> > (inlined)
+                          play_random_games
+                          0xffffffffffffffff
+
+           3.42%        [.] std::uniform_int_distribution<unsigned long>::operator()<std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul> >
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

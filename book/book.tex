@@ -3417,33 +3417,32 @@ Le code du listing \ref{lst:random_games_property_based_testing} illustre cette 
 
 \item À la ligne 14, la fonction \mintinline{c++}{fail(string msg)} rend un \mintinline{c++}{TestResult} qui indique que le test a échoué avec le diagnostique d'erreur \mintinline{c++}{msg}.
 
-\item Aux lignes 16 à 23, la fonction \mintinline{c++}{check_move_count} est notre premier test différentiel. Le premier paramètre \mintinline{c++}{fast} est la liste des coups obtenue grâce aux bitboards magiques, et le deuxième paramètre \mintinline{c++}{expected} est la liste de coups obtenue avec une méthode simple qui sera décrite plus loin et qui est définie aux lignes 87 à 114. Nous vérifions dans ce test que les nombres de coups produits par les deux approches sont bien identiques.
+\item Aux lignes 17 à 44 est définie la function \mintinline{c++}{slow_moves_generation} qui permet d'obtenir la liste des coups possibles dans la configuration du jeu \mintinline{c++}{yolah} passée en paramètre (ligne 87). Cette fonction va nous permettre de faire les tests différentiels. Comme nous le disions, cette façon de générer les coups est bien plus simple que celle à base de bitboards magiques. Nous avons une grande confiance dans l'exactitude de \mintinline{c++}{slow_moves_generation}. Les boucles aux lignes 19 et 20, vont parcourir toutes les cases du plateau. On construit la case de départ du coup \mintinline{c++}{from} à la ligne 21, puis on vérifie à la ligne 22 que cette case contient un pion du joueur pour lequel on crée la liste de coups. Les fonctions \mintinline{c++}{square_of} et \mintinline{c++}{get_from} sont définies précisément dans le listing \ref{lst:chapter02}, mais \mintinline{c++}{Square square_of(int rank, int file)} va créer une case à partir des coordonnées \mintinline{c++}{(rank, file)} et \mintinline{c++}{uint8_t Yolah::get_from(Square sq)} retourne le type d'élément (un des joueurs, un trou ou un emplacement libre) sur la case \mintinline{c++}{sq}.
+Les boucles aux lignes 23 et 24 vont parcourir toutes les directions possibles pour la pièce, on fait attention à filtrer le déplacement nul à la ligne 25. Enfin, la boucle de la ligne 28 à 37 va se déplacer dans la direction choisie \mintinline{c++}{(di, dj)} tant qu'on ne sort pas du plateau et qu'il n'y a pas d'obstacles. Si on sort du plateau à la ligne 29, ou qu'un obstacle est détecté à la ligne 33, on sort de la boucle pour essayer une nouvelle direction. On n'oublie pas à la ligne 42 d'ajouter le coup \mintinline{c++}{Move::none()} si aucun coup n'était possible. Cette façon de construire tous les coups possibles est très intuitive (mais inefficace).
 
-\item Aux lignes 25 à 53, la fonction \mintinline{c++}{check_move_lists_equal} est notre deuxième et dernier test différentiel. On vérifie que les listes de coups sont identiques, en les triant tout d'abord aux lignes 28 et 29, puis en vérifiant que les deux listes de coups sont maintenant identiques à la ligne 30. Le reste de la fonction crée un message d'erreur en calculant les différences entre les deux listes.
+\item Aux lignes 46 à 53, la fonction \mintinline{c++}{check_move_count} est notre premier test différentiel. Le premier paramètre \mintinline{c++}{fast} est la liste des coups obtenue grâce aux bitboards magiques, et le deuxième paramètre \mintinline{c++}{expected} est la liste de coups obtenue avec la fonction précédente. Nous vérifions dans ce test que les nombres de coups produits par les deux approches sont bien identiques.
 
-\item Aux lignes 55 à 61, la fonction \mintinline{c++}{check_undo} va vérifier la propriété suivante. 
+\item Aux lignes 55 à 84, la fonction \mintinline{c++}{check_move_lists_equal} est notre deuxième et dernier test différentiel. On vérifie que les listes de coups sont identiques, en les triant tout d'abord aux lignes 58 et 59, puis en vérifiant que les deux listes de coups sont maintenant identiques aux lignes 60 et 61. Le reste de la fonction crée un message d'erreur en calculant les différences entre les deux listes.
+
+\item Aux lignes 86 à 92, la fonction \mintinline{c++}{check_undo} va vérifier la propriété suivante. 
 Soit \mintinline{c++}{yolah} une configuration quelconque du jeu et \mintinline{c++}{m} un coup possible dans cette position. Posons \mintinline{c++}{Yolah before = yolah;}, puis effectuons les actions suivantes.
 \begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
     yolah.play(m);
     yolah.undo(m);
     Yolah after = yolah;
 \end{minted}
-On vérifie que l'annulation d'un coup fonctionne correctement en testant si \mintinline{c++}{before == after} à la ligne 56.
+On vérifie que l'annulation d'un coup fonctionne correctement en testant si \mintinline{c++}{before == after} à la ligne 87.
 
-\item La deuxième propriété que l'on va tester est donnée dans la fonction \mintinline{c++}{check_game}\\\mintinline{c++}{_over_move} à la ligne 63. On y teste que le seul coup possible dans une position terminale du jeu est le coup \mintinline{c++}{Move::none()}. En effet, les joueurs n'ont plus de coups à disposition et ils doivent donc passer leur tour. À la ligne 65, on vérifie qu'il n'y a qu'un seul coup et que celui-ci est bien le coup \mintinline{c++}{Move::none()}.
+\item La deuxième propriété que l'on va tester est donnée dans la fonction \mintinline{c++}{check_game_over_move} aux lignes 94 à 101. On y teste que le seul coup possible dans une position terminale du jeu est le coup \mintinline{c++}{Move::none()}. En effet, les joueurs n'ont plus de coups à disposition et ils doivent donc passer leur tour. À la ligne 96, on vérifie qu'il n'y a qu'un seul coup et que celui-ci est bien le coup \mintinline{c++}{Move::none()}.
 
-\item Les dernières propriétés sont définies dans la fonction de test principale \mintinline{c++}{random_games} définie à la ligne 74. Ces dernières propriétés sont placées au sein de cette fonction, car elles ont besoin d'accéder aux attributs privés de la classe \mintinline{c++}{Yolah} et \mintinline{c++}{random_games} est déclarée \mintinline{c++}{friend} de cette classe.
-\begin{itemize}
-\item Aux lignes 87 à 114 est définie la function \mintinline{c++}{slow_moves_generation} qui permet d'obtenir la liste des coups possibles dans la configuration du jeu \mintinline{c++}{yolah} passée en paramètre (ligne 87). Comme nous le disions, cette façon de générer les coups est bien plus simple que celle à base de bitboards magiques. Nous avons une grande confiance dans l'exactitude de \mintinline{c++}{slow_moves_generation}. Le paramètre \mintinline{c++}{expected} dans \mintinline{c++}{check_move_lists_equal} à la ligne 25, a été instancié par une liste de coups obtenue grâce à \mintinline{c++}{slow_move_generation}. Les boucles aux lignes 91 et 92, vont parcourir toutes les cases du plateau. On construit la case de départ du coup \mintinline{c++}{from} à la ligne 93, puis on vérifie à la ligne 95 que cette case contient un pion du joueur pour lequel on crée la liste de coups (ligne 90). Les boucles aux lignes 96 et 97 vont parcourir toutes les directions possibles pour la pièce, on fait attention à filtrer le déplacement nul à la ligne 98. Enfin, la boucle de la ligne 100 à 107 va se déplacer dans la direction choisie \mintinline{c++}{(di, dj)} tant qu'on ne sort pas du plateau et qu'il n'y a pas d'obstacles. Si on sort du plateau à la ligne 101, ou qu'un obstacle est détecté à la ligne 104, on sort de la boucle pour essayer une nouvelle direction. On n'oublie pas à la ligne 112 d'ajouter le coup \mintinline{c++}{Move::none()} si aucun coup n'était possible. Cette façon de construire tous les coups possibles est très intuitive, mais inefficace.
-\end{itemize}
+\item Aux lignes 103 à 119, la fonction \mintinline{c++}{check_none_move_execution} va tester la propriété que le coup \mintinline{c++}{Move::none()} doit seulement incrémenter le nombre de coups dans la partie. Pour ce faire, la boucle à la ligne 106 va tester à la ligne 107, que le contenu de chaque case n'a pas changé après l'exécution du coup nul. Ensuite, à la ligne 115, on teste si le nombre de coups a bien été incrémenté.
 
-\item À la ligne 116, nous allons tester la propriété que le coup \mintinline{c++}{Move::none()} doit seulement incrémenter le nombre de coups dans la partie grâce à la fonction \mintinline{c++}{check_none_move_execution}.
+\item Aux lignes 121 à 156, la fonction \mintinline{c++}{check_regular_move_execution} va tester les propriétés que doit vérifier un coup normal. Aux lignes 126 à 132, on vérifie que les cases qui ne sont pas concernées par le coup n'ont pas changé.
+Aux lignes 133 à 137, on vérifie que le nombre de coups a été incrémenté, qu'un trou est apparu sur la case de départ du coup et enfin que la pièce se trouve maintenant sur la case d'arrivée du coup.
 
-\item À la ligne 127, la fonction \mintinline{c++}{check_regular_move_execution} va tester les propriétés que doit vérifier un coup normal. Aux lignes 134 et 136, on vérifie que la pièce n'est plus sur la case de départ du coup, qu'elle se trouve maintenant sur la case d'arrivée du coup, et enfin qu'un trou est apparu sur la case de départ du coup.
+\item Aux lignes 158 à 234, la fonction \mintinline{c++}{random_games} va lancer tous les tests sur \mintinline{c++}{nb_games} parties aléatoires aux lignes 178 à 219. 221 à 233 Les lignes 190 à 202 affichent un résumé des tests. 
 
-\item Les lignes 136 à 188 déroulent \mintinline{c++}{nb_games} parties aléatoires en exécutant tous les tests.
-
-\item Les lignes 190 à 202 affichent un résumé des tests. Le listing \ref{lst:random_games_property_based_testing_exec} donne le résultat de l'exécution du \mintinline{c++}{main}.
+\item Le listing \ref{lst:random_games_property_based_testing_exec} donne le résultat de l'exécution du \mintinline{c++}{main}. Même si, comme le disait Dijkstra, "Program testing can be used to show the presence of bugs, but never to show their absence," et qu'il faille toujours rester prudent, le grand nombre de configurations du jeu explorées nous donne néanmoins une bonne confiance dans la validité de notre implémentation de Yolah.
 
 \end{itemize}
 
@@ -3451,207 +3450,238 @@ On vérifie que l'annulation d'un coup fonctionne correctement en testant si \mi
 \begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
 \begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
 namespace test {
-constexpr string_view RED = "\033[1;31m";
-constexpr string_view GREEN = "\033[1;32m";
+constexpr string_view RED    = "\033[1;31m";
+constexpr string_view GREEN  = "\033[1;32m";
 constexpr string_view YELLOW = "\033[1;33m";
-constexpr string_view RESET = "\033[0m";
-constexpr string_view BOLD = "\033[1m";
+constexpr string_view RESET  = "\033[0m";
+constexpr string_view BOLD   = "\033[1m";
 
 struct TestResult {
-  bool passed; 
-  string message;
-  operator bool() const { return passed; }
+    bool passed;
+    string message;
+    operator bool() const { return passed; }
 };
+
 TestResult pass() { return {true, ""}; }
 TestResult fail(string msg) { return {false, std::move(msg)}; }
 
-TestResult check_move_count(const MoveList& fast,
+vector<Move> slow_moves_generation(const Yolah& yolah) {
+    vector<Move> res;
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            Square from = square_of(i, j);
+            if (yolah.get(from) != yolah.current_player()) continue;
+            for (int di = -1; di <= 1; di++) {
+                for (int dj = -1; dj <= 1; dj++) {
+                    if (di == 0 && dj == 0) continue;
+                    int ii = i + di;
+                    int jj = j + dj;
+                    for(;;) {
+                        if (ii < 0 || ii >= 8 || jj < 0 || jj >= 8) {
+                            break;
+                        }
+                        Square to = square_of(ii, jj);                                
+                        if (yolah.get(to) != FREE) break;                                
+                        res.emplace_back(from, to);
+                        ii += di;
+                        jj += dj;
+                    }
+                }
+            }
+        }
+    }
+    if (res.empty()) res.push_back(Move::none());
+    return res;
+};
+
+TestResult check_move_count(const MoveList& fast, 
                             const vector<Move>& expected) {
-  if (fast.size() != expected.size()) {
-    return fail(format("# of moves: expected {} got {}",
-                expected.size(), fast.size()));
-  }
-  return pass();
+    if (fast.size() != expected.size()) {
+        return fail(format("# of moves: expected {} got {}", 
+                           expected.size(), fast.size()));
+    }
+    return pass();
 }
 
 TestResult check_move_lists_equal(MoveList& fast, 
-                                  vector<Move>& expected,
+                                  vector<Move>& expected, 
                                   const Yolah& yolah) {
-  sort(begin(fast), end(fast));
-  sort(begin(expected), end(expected));
-  if (equal(begin(fast), end(fast), begin(expected), end(expected))) {
-    return pass();
-  }
-  ostringstream oss;
-  oss << "move lists differ\n" << yolah << '\n';
-  vector<Move> only_in_fast, only_in_expected;
-  set_difference(begin(fast), end(fast), 
-                 begin(expected), end(expected),
-                 back_inserter(only_in_fast));
-  set_difference(begin(expected), end(expected), 
-                 begin(fast), end(fast),
-                 back_inserter(only_in_expected));
-  if (!only_in_expected.empty()) {
-    oss << "  Only in expected: ";
-    for (const auto& m : only_in_expected) oss << m << ' ';
-    oss << '\n';
-  }
-  if (!only_in_fast.empty()) {
-    oss << "  Only in fast: ";
-    for (const auto& m : only_in_fast) oss << m << ' ';
-    oss << '\n';
-  }
-  return fail(oss.str());
+    sort(begin(fast), end(fast));
+    sort(begin(expected), end(expected));
+    if (equal(begin(fast), end(fast), 
+              begin(expected), end(expected))) {
+        return pass();
+    }
+    ostringstream oss;
+    oss << "move lists differ\n" << yolah << '\n';
+    vector<Move> only_in_fast, only_in_expected;
+    set_difference(begin(fast), end(fast), 
+                   begin(expected), end(expected), 
+                   back_inserter(only_in_fast));
+    set_difference(begin(expected), end(expected), 
+                   begin(fast), end(fast), 
+                   back_inserter(only_in_expected));
+    if (!only_in_expected.empty()) {
+        oss << "  Only in expected: ";
+        for (const auto& m : only_in_expected) oss << m << ' ';
+        oss << '\n';
+    }
+    if (!only_in_fast.empty()) {
+        oss << "  Only in fast: ";
+        for (const auto& m : only_in_fast) oss << m << ' ';
+        oss << '\n';
+    }
+    return fail(oss.str());
 }
 
 TestResult check_undo(const Yolah& before, const Yolah& after) {
-  if (before == after) return pass();
-  ostringstream oss;
-  oss << "undo failed\n  Previous state:\n" << before
-      << "\n  State after undo:\n" << after << '\n';
-  return fail(oss.str());
+    if (before == after) return pass();
+    ostringstream oss;
+    oss << "undo failed\n  Previous state:\n" << before
+        << "\n  State after undo:\n" << after << '\n';
+    return fail(oss.str());
 }
 
 TestResult check_game_over_moves(const Yolah& yolah, 
                                  const MoveList& moves) {
-  if (moves.size() == 1 && moves[0] == Move::none()) {
+    if (moves.size() == 1 && moves[0] == Move::none()) return pass();
+    ostringstream oss;
+    oss << "only Move::none() should be available when game is over\n"
+        << YolahWithMoves(yolah, moves) << '\n';
+    return fail(oss.str());
+}
+
+TestResult check_none_move_execution(const Yolah& before, 
+                                     const Yolah& after) {
+    bool ok = true;
+    for (Square sq = SQ_A1; sq <= SQ_H8; ++sq) {
+        if (before.get(sq) != after.get(sq)) {
+            ok = false;
+            break;
+        }
+    }
+    if (!ok) {
+        return fail("Move::none() must not change the board content");
+    }
+    if (before.nb_plies() + 1 != after.nb_plies()) {
+      return fail("Move::none() must increment the number of plies");
+    }
     return pass();
-  }
-  ostringstream oss;
-  oss << "only Move::none() should be available when game is over\n"
-      << YolahWithMoves(yolah, moves) << '\n';
-  return fail(oss.str());
+}
+
+TestResult check_regular_move_execution(const Yolah& before, 
+                                        const Yolah& after, Move m) {
+    Square from = m.from_sq();
+    Square to = m.to_sq();
+    bool ok = true;
+    for (Square sq = SQ_A1; sq <= SQ_H8; ++sq) {
+        if (sq == from || sq == to) continue;
+        if (before.get(sq) != after.get(sq)) {
+            ok = false;
+            break;
+        }
+    }
+    if (ok && before.nb_plies() + 1 == after.nb_plies() && 
+        after.get(from) == HOLE && 
+        after.get(to) == before.current_player()) {
+            return pass();
+    }
+    ostringstream oss;
+    oss << "Move execution incorrect\n" << after 
+        << "\n  Move: " << m << '\n';
+    if (!ok) {
+        oss << " Squares not concerned by the Move must not changed";
+    }
+    if (after.get(from) != HOLE) {
+        oss << "  From square should be hole\n";
+    }
+    if (after.get(to) != before.current_player()) {
+        oss << " To square should contain a piece from " 
+            << (before.current_player() == BLACK ? "black" : "white") 
+            << " player\n";
+    }
+    if (before.nb_plies() + 1 != after.nb_plies()) {
+        oss << " The number of plies must be incremented\n";
+    }
+    return fail(oss.str());
 }
 
 void random_games(size_t nb_games, optional<uint64_t> seed) {
-  MoveList fast_moves; 
-  random_device rd; 
-  mt19937 mt(seed.value_or(rd()));
-  size_t total_tests = 0, passed_tests = 0;
+    MoveList fast_moves;
+    random_device rd;
+    mt19937 mt(seed.value_or(rd()));
+    size_t total_tests = 0;
+    size_t passed_tests = 0;
 
-  auto run_test = [&](TestResult result) {
-    total_tests++;
-    if (result) { passed_tests++; return true; }
-    cout << format("{}FAIL:{} {}\n", RED, RESET, result.message);
-    return false;
-  };
-
-  auto slow_moves_generation = [](const Yolah& yolah) {
-    vector<Move> res;
-    uint64_t occupied = yolah.black | yolah.white | yolah.holes;
-    uint64_t player_bb = (yolah.ply & 1) ? yolah.white : yolah.black;
-    for (int i = 0; i < 8; i++) {
-      for (int j = 0; j < 8; j++) {
-        Square from = Square(i * 8 + j);
-        uint64_t from_bb = square_bb(from);
-        if ((player_bb & from_bb) == 0) continue;
-        for (int di = -1; di <= 1; di++) {
-          for (int dj = -1; dj <= 1; dj++) {
-            if (di == 0 && dj == 0) continue;
-            int ii = i + di, jj = j + dj;
-            for(;;) {
-              if (ii < 0 || ii >= 8 || jj < 0 || jj >= 8) break;
-              Square to = Square(ii * 8 + jj);
-              uint64_t to_bb = square_bb(to);
-              if (to_bb & occupied) break;
-              res.emplace_back(from, to);
-              ii += di; jj += dj;
-            }
-          }
+    auto run_test = [&](TestResult result) -> bool {
+        total_tests++;
+        if (result) {
+            passed_tests++;
+            return true;
         }
+        cout << format("{}FAIL:{} {}\n", RED, RESET, result.message);
+        return false;
+    };
+    
+    cout << format("{}\n=== Running Random Games Tests ===\n{}", 
+                   BOLD, RESET);
+
+    for (size_t i = 0; i < nb_games; i++) {
+      Yolah yolah;
+      while (!yolah.game_over()) {
+        yolah.moves(fast_moves);
+        vector<Move> expected_moves = slow_moves_generation(yolah);
+
+        if (!run_test(
+              check_move_count(fast_moves, expected_moves))) break;
+        if (!run_test(
+              check_move_lists_equal(fast_moves, 
+                                     expected_moves, yolah))) break;
+
+        uniform_int_distribution<int> d(0, fast_moves.size() - 1);
+        Move m = fast_moves[d(mt)];
+        Yolah before = yolah;
+        yolah.play(m);
+
+        if (m == Move::none()) {
+            if (!run_test(
+                  check_none_move_execution(before, yolah))) break;
+        } else {
+            if (!run_test(
+                  check_regular_move_execution(before, 
+                                               yolah, m))) break;
+        }
+
+        yolah.undo(m);
+        if (!run_test(check_undo(before, yolah))) break;
+        yolah.play(m);
       }
-    }
-    if (res.empty()) res.push_back(Move::none());
-    return res;
-  };
 
-  auto check_none_move_execution = [](const Yolah& before, 
-                                      const Yolah& after) {
-    if (before.black != after.black || before.white != after.white ||
-        before.holes != after.holes || 
-        before.black_score != after.black_score ||
-        after.ply != before.ply + 1) {
-      return fail("Move::none() must only change the ply number");
-    }
-    return pass();
-  };
+      if (!yolah.game_over()) continue;
 
-  auto check_regular_move_execution = [](const Yolah& before, 
-                                         const Yolah& after,
-                                         Move m) {
-    uint64_t player_bb = before.current_player() == BLACK ?
-                         after.black : after.white;
-    uint64_t from_bb = square_bb(m.from_sq());
-    uint64_t to_bb = square_bb(m.to_sq());
-    if (!(player_bb & from_bb) && (player_bb & to_bb) 
-        && (after.holes & from_bb)) {
-      return pass();
-    }
-    ostringstream oss;
-    oss << "move execution incorrect\n" << after << "\n  Move: " 
-        << m << '\n';
-    if ((player_bb & from_bb) != 0) {
-        oss << "  From square should be cleared\n";
-    }
-    if ((player_bb & to_bb) == 0) {
-        oss << "  To square should be set\n";
-    }
-    if ((after.holes & from_bb) == 0) {
-        oss << "  From square should be a hole\n";
-    }
-    return fail(oss.str());
-  };
-
-  cout << format("{}\n=== Running Random Games Tests ===\n{}", 
-                 BOLD, RESET);
-
-  for (size_t i = 0; i < nb_games; i++) {
-    Yolah yolah;
-    while (!yolah.game_over()) {
       yolah.moves(fast_moves);
-      vector<Move> expected_moves = slow_moves_generation(yolah);
-      if (!run_test(check_move_count(fast_moves, 
-                                     expected_moves))) break;
-      if (!run_test(check_move_lists_equal(fast_moves, 
-                                           expected_moves, 
-                                           yolah))) break;
-      uniform_int_distribution<int> d(0, fast_moves.size()-1);
-      Move m = fast_moves[d(mt)];
-      Yolah before = yolah;
-      yolah.play(m);
-      if (m == Move::none()) {
-        if (!run_test(check_none_move_execution(before, 
-                                                yolah))) break;
-      } else {
-        if (!run_test(check_regular_move_execution(before, 
-                                                   yolah, 
-                                                   m))) break;
-      }
-      yolah.undo(m);
-      if (!run_test(check_undo(before, yolah))) break;
-      yolah.play(m);
-    }
-    if (!yolah.game_over()) continue;
-    yolah.moves(fast_moves);
-    if (!run_test(check_game_over_moves(yolah, fast_moves))) continue;
-    yolah.play(Move::none()); 
-    yolah.moves(fast_moves);
-    if (!run_test(check_game_over_moves(yolah, fast_moves))) continue;
-  }
+      if (!run_test(
+            check_game_over_moves(yolah, fast_moves))) continue;
 
-  cout << format("\n{}=== Test Summary ==={}\n", BOLD, RESET);
-  cout << format("Total tests: {}\n", total_tests);
-  cout << format("Passed: {}{}{}\n", GREEN, passed_tests, RESET);
-  cout << format("Failed: {}{}{}\n",
-                 (passed_tests == total_tests ? GREEN : RED),
-                 total_tests - passed_tests, RESET);
-  if (passed_tests == total_tests) {
-    cout << format("{}All tests passed!{}\n", GREEN, RESET);
-  } else {
-    double pass_rate = 100.0 * passed_tests / total_tests;
-    cout << format("{}Pass rate: {:.2f}%{}\n", 
-                   YELLOW, pass_rate, RESET);
-  }
+      yolah.play(Move::none());
+      yolah.moves(fast_moves);
+      if (!run_test(
+            check_game_over_moves(yolah, fast_moves))) continue;
+    }
+
+    cout << format("\n{}=== Test Summary ==={}\n", BOLD, RESET);
+    cout << format("Total tests: {}\n", total_tests);
+    cout << format("Passed: {}{}{}\n", GREEN, passed_tests, RESET);
+    cout << format("Failed: {}{}{}\n", 
+                   (passed_tests == total_tests ? GREEN : RED), 
+                   total_tests - passed_tests, RESET);
+    if (passed_tests == total_tests) {
+        cout << format("{}All tests passed!{}\n", GREEN, RESET);
+    } else {
+        double pass_rate = 100.0 * passed_tests / total_tests;
+        cout << format("{}Pass rate: {:.2f}%{}\n", YELLOW, pass_rate, 
+                       RESET);
+    }
 }}
 
 int main() {
@@ -3659,7 +3689,7 @@ int main() {
   test::random_games(10000, 42);
 }
 \end{minted}
-\captionof{listing}{TO DO}
+\captionof{listing}{Tests basés sur les propriétés et différentiels utilisés pour valider notre implémentation.}
 \label{lst:random_games_property_based_testing}
 \end{mdframed}
 
@@ -3686,6 +3716,496 @@ All tests passed!
 
 \subsection{Tests de performance}
 
+\begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
+\begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
+void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
+    MoveList moves;
+    random_device rd;
+    mt19937 mt(seed.value_or(rd()));
+    size_t black_wins = 0;
+    size_t white_wins = 0;
+    size_t draws = 0;
+    for (size_t i = 0; i < nb_games; i++) {
+        Yolah yolah;    
+        while (!yolah.game_over()) {                 
+            yolah.moves(moves);
+            uniform_int_distribution<int> d(0, moves.size() - 1);
+            Move m = moves[d(mt)];
+            yolah.play(m);
+        }
+        auto [black_score, white_score] = yolah.score();
+        if (black_score > white_score) {
+            black_wins++;
+        } else if (white_score > black_score) {
+            white_wins++;
+        } else {
+            draws++;
+        }
+    }
+    cout << format("\n=== Game Statistics ===\n");
+    cout << format("Total games: {}\n", nb_games);
+    cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+    cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+    cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+}
+
+int main() {
+    init_all_magics();
+    play_random_games(1000000, 42);
+}
+\end{minted}
+\captionof{listing}{}
+\label{lst:random_games_perf1}
+\end{mdframed}
+
+% \begin{figure}[htpb]
+% \centering
+% \includegraphics[width=0.4\textwidth]{chapter02_perf1.png}
+% \caption{Flame graph ...}
+% % \caption{La boîte du jeu des pingouins}
+% \label{fig:chapter02_perf1}
+% \end{figure}
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+play_random_games                       96.79%
+├── Yolah::moves                        82.25%
+│       ├── moves_bb                    33.07%
+│       │   └── Magic::index             8.87%
+│       ├── Move::Move                  13.86%
+│       └── pop_lsb                     13.85%
+│           └── lsb                     13.18%
+├── std::uniform_int_distribution<...    5.33%   
+├── Yolah::game_over                     3.89%
+│   └── shift<>                          2.14%
+└── Yolah::play                          3.86%
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:chapter02_perf1}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+=== Game Statistics ===
+Total games: 1000000
+Black wins:  499124 (49.9%)
+White wins:  395468 (39.5%)
+Draws:       105408 (10.5%)
+
+Performance counter stats for './chapter02' (100 runs):
+
+17 671 802 014      cycles                    #    4,046 GHz                       ( +-  0,09% )  (49,84%)
+24 345 746 995      instructions              #    1,37  insn per cycle            ( +-  0,01% )  (62,38%)
+ 2 431 465 524      branches                  #  556,680 M/sec                     ( +-  0,01% )  (62,44%)
+   275 869 723      branch-misses             #   11,35% of all branches           ( +-  0,02% )  (62,54%)
+ 3 133 561 281      L1-dcache-loads           #  717,424 M/sec                     ( +-  0,01% )  (62,63%)
+   146 564 424      L1-dcache-load-misses     #    4,68% of all L1-dcache accesses ( +-  0,07% )  (62,63%)
+    54 670 067      LLC-loads                 #   12,517 M/sec                     ( +-  0,27% )  (50,00%)
+        77 427      LLC-load-misses           #    0,14% of all LL-cache accesses  ( +- 22,57% )  (49,91%)
+
+         4,37002 +- 0,00821 seconds time elapsed  ( +-  0,19% )
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
+\begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
+void moves(uint8_t player, MoveList& moves) const noexcept {
+    Move* move_list = moves.move_list;
+    uint64_t occupied = black | white | holes;
+    uint64_t bb = player == BLACK ? black : white;
+
+    while (bb) {
+        Square from = pop_lsb(bb);
+        uint64_t b = moves_bb(from, occupied) & ~occupied;
+        while (b) {
+            *move_list++ = Move(from, pop_lsb(b));
+        }
+    }
+    
+    if (move_list == moves.move_list) [[unlikely]] {
+        *move_list++ = Move::none();
+    }
+
+    moves.last = move_list;
+}
+\end{minted}
+\captionof{listing}{}
+\label{lst:random_games_perf2}
+\end{mdframed}
+
+
+\begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
+\begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
+void moves(uint8_t player, MoveList& moves) const noexcept {
+    Move* move_list = moves.move_list;
+    uint64_t occupied = black | white | holes;
+    uint64_t bb = player == BLACK ? black : white;
+
+    Square from0 = pop_lsb(bb);
+    Square from1 = pop_lsb(bb);
+    Square from2 = pop_lsb(bb);
+    Square from3 = pop_lsb(bb);
+    
+    uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+    uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+    uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+    uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+    
+    while (b0) {
+        *move_list++ = Move(from0, pop_lsb(b0));
+    }
+    while (b1) {
+        *move_list++ = Move(from1, pop_lsb(b1));
+    }
+    while (b2) {
+        *move_list++ = Move(from2, pop_lsb(b2));
+    }
+    while (b3) {
+        *move_list++ = Move(from3, pop_lsb(b3));
+    }
+
+    if (move_list == moves.move_list) [[unlikely]] {
+        *move_list++ = Move::none();
+    }
+
+    moves.last = move_list;
+}
+\end{minted}
+\captionof{listing}{}
+\label{lst:random_games_perf3}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+play_random_games                           95.17%
+    ├── Yolah::moves                        73.06%
+    │       ├── moves_bb                    26.47%
+    │       │   └── Magic::index             6.30%
+    │       ├── Move::Move                  15.48%
+    │       └── pop_lsb                     11.93%
+    │           └── lsb                     11.68%
+    ├── std::uniform_int_distribution<...    8.61%
+    ├── Yolah::play                          5.87%
+    └── Yolah::game_over                     5.02%
+        └── shift<>                          2.67%
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:}
+\end{mdframed}
+
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+=== Game Statistics ===
+Total games: 1000000
+Black wins:  499124 (49.9%)
+White wins:  395468 (39.5%)
+Draws:       105408 (10.5%)
+
+Performance counter stats for './chapter02' (100 runs):
+
+12 832 947 780      cycles                    #    4,021 GHz                       ( +-  0,18% )  (49,84%)
+23 589 523 540      instructions              #    1,82  insn per cycle            ( +-  0,01% )  (62,38%)
+ 2 328 267 849      branches                  #  729,484 M/sec                     ( +-  0,01% )  (62,40%)
+   236 977 678      branch-misses             #   10,17% of all branches           ( +-  0,01% )  (62,53%)
+ 3 513 433 988      L1-dcache-loads           #    1,101 G/sec                     ( +-  0,01% )  (62,66%)
+   145 286 847      L1-dcache-load-misses     #    4,13% of all L1-dcache accesses ( +-  0,07% )  (62,68%)
+    54 964 849      LLC-loads                 #   17,221 M/sec                     ( +-  0,29% )  (50,01%)
+        38 307      LLC-load-misses           #    0,07% of all LL-cache accesses  ( +- 12,03% )  (49,88%)
+
+         3,19340 +- 0,00975 seconds time elapsed  ( +-  0,31% )
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
+\begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
+Move random_move(mt19937& mt) const noexcept {
+    uint64_t occupied = black | white | holes;
+    uint64_t player_bb = current_player() == BLACK ? black : white;
+    Square from0 = pop_lsb(player_bb);
+    Square from1 = pop_lsb(player_bb);
+    Square from2 = pop_lsb(player_bb);
+    Square from3 = pop_lsb(player_bb);
+    uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+    uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+    uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+    uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+    uint32_t n0 = popcount(b0);
+    uint32_t n1 = popcount(b1);
+    uint32_t n2 = popcount(b2);
+    uint32_t n3 = popcount(b3);
+    uint32_t n = n0 + n1 + n2 + n3;
+    if (n == 0) [[unlikely]] {
+        return Move::none();
+    }
+    uniform_int_distribution<uint32_t> d(0, n - 1);
+    uint32_t bit = d(mt);
+    int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
+    bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
+    Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
+    uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];        
+    Square to = Square(std::countr_zero(_pdep_u64(1ULL << bit, bb)));
+    return Move(from, to);     
+}
+void play_random_games_fast(size_t nb_games, optional<uint64_t> seed = nullopt) {
+    MoveList moves;
+    random_device rd;
+    mt19937 mt(seed.value_or(rd()));
+    size_t black_wins = 0;
+    size_t white_wins = 0;
+    size_t draws = 0;
+    size_t max_nb_moves = 0;
+    for (size_t i = 0; i < nb_games; i++) {
+        Yolah yolah;
+        while (!yolah.game_over()) {
+            Move m = yolah.random_move(mt);
+            yolah.play(m);
+        }
+        auto [black_score, white_score] = yolah.score();
+        if (black_score > white_score) {
+            black_wins++;
+        } else if (white_score > black_score) {
+            white_wins++;
+        } else {
+            draws++;
+        }
+    }
+    cout << format("\n=== Game Statistics ===\n");
+    cout << format("Total games: {}\n", nb_games);
+    cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
+    cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
+    cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+}
+\end{minted}
+\captionof{listing}{}
+\label{lst:random_games_perf4}
+\end{mdframed}
+
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+play_random_games_fast                     96.01%
+    ├── Yolah::random_move                 81.29%
+    │   ├── moves_bb                       47.14%
+    │   │   └── Magic::index                5.99%
+    │   ├── std::uniform_int_distributi... 12.88%
+    │   ├── pop_lsb                         4.36%
+    │   │   └── lsb                         4.11%
+    │   └── std::popcount                   2.79%
+    ├── Yolah::game_over                    9.53%
+    │   └── shift<>                         5.96%
+    └── Yolah::play                         3.95%
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:}
+\end{mdframed}
+
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+=== Game Statistics ===
+Total games: 1000000
+Black wins:  498503 (49.9%)
+White wins:  395975 (39.6%)
+Draws:       105522 (10.6%)
+
+Performance counter stats for './chapter02' (100 runs):
+
+ 6 446 405 052      cycles                    #    4,085 GHz                      ( +-  0,10% )  (49,63%)
+15 466 860 279      instructions              #    2,41  insn per cycle           ( +-  0,01% )  (62,28%)
+   793 399 286      branches                  #  502,748 M/sec                    ( +-  0,01% )  (62,53%)
+     2 206 340      branch-misses             #    0,28% of all branches          ( +-  0,07% )  (62,79%)
+ 3 605 550 330      L1-dcache-loads           #    2,285 G/sec                    ( +-  0,01% )  (62,83%)
+   145 697 914      L1-dcache-load-misses     #    4,03% of all L1-dcache accesses  ( +-  0,04% )  (62,75%)
+    55 012 701      LLC-loads                 #   34,860 M/sec                    ( +-  0,26% )  (49,86%)
+        11 412      LLC-load-misses           #    0,02% of all LL-cache accesses  ( +- 16,80% )  (49,60%)
+
+         1,57951 +- 0,00265 seconds time elapsed  ( +-  0,17% )
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:}
+\end{mdframed}
+
+
+\begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
+\begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
+constexpr uint32_t NB_ITERATIONS = 1000;
+constexpr uint64_t SEED = 42;
+
+class PRNG {
+    uint64_t s;
+    uint64_t rand64() {
+        s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
+        return s * 2685821657736338717ULL;
+    }
+   public:
+    PRNG(uint64_t seed) :
+        s(seed) {
+    }
+    uint64_t seed() {
+        return s;
+    }
+    template<typename T>
+    T rand() {
+        return T(rand64());
+    }
+};
+
+constexpr uint32_t reduce(uint32_t x, uint32_t N) {
+    return ((uint64_t) x * (uint64_t) N) >> 32;
+}
+
+uint32_t random_prng_modulo(uint32_t nb_iterations) {
+    uint32_t res = 0;
+    PRNG prng(SEED);
+    for (uint32_t i = 1; i <= nb_iterations; i++) {
+        res += prng.rand<uint32_t>() % i;
+    }
+    return res;
+}
+
+static void BM_random_prng_modulo(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(random_prng_modulo(NB_ITERATIONS));
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_random_prng_modulo);
+
+uint32_t random_prng_reduce(uint32_t nb_iterations) {
+    uint32_t res = 0;
+    PRNG prng(SEED);
+    for (uint32_t i = 1; i <= nb_iterations; i++) {
+        res += reduce(prng.rand<uint32_t>(), i);
+    }
+    return res;
+}
+
+static void BM_random_prng_reduce(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(random_prng_reduce(NB_ITERATIONS));
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_random_prng_reduce);
+
+uint32_t random_mt19937(uint32_t nb_iterations) {
+    uint32_t res = 0;
+    mt19937 mt(SEED);
+    for (uint32_t i = 1; i <= nb_iterations; i++) {        
+        res += uniform_int_distribution<uint32_t>{0, i - 1}(mt);
+    }
+    return res;
+}
+
+static void BM_random_mt19937(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(random_mt19937(NB_ITERATIONS));
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_random_mt19937);
+
+uint32_t random_mt19937_modulo(uint32_t nb_iterations) {
+    uint32_t res = 0;
+    mt19937 mt(SEED);
+    for (uint32_t i = 1; i <= nb_iterations; i++) {        
+        res += uniform_int_distribution<uint32_t>{}(mt) % i;
+    }
+    return res;
+}
+
+static void BM_random_mt19937_modulo(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(random_mt19937_modulo(NB_ITERATIONS));
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_random_mt19937_modulo);
+
+uint32_t random_mt19937_reduce(uint32_t nb_iterations) {
+    uint32_t res = 0;
+    mt19937 mt(SEED);
+    for (uint32_t i = 1; i <= nb_iterations; i++) {        
+        res += reduce(uniform_int_distribution<uint32_t>{}(mt), i);
+    }
+    return res;
+}
+
+static void BM_random_mt19937_reduce(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(random_mt19937_reduce(NB_ITERATIONS));
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_random_mt19937_reduce);
+
+BENCHMARK_MAIN();
+\end{minted}
+\captionof{listing}{}
+\label{lst:random_generator_bench}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+Run on (12 X 4400 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x6)
+  L1 Instruction 32 KiB (x6)
+  L2 Unified 256 KiB (x6)
+  L3 Unified 12288 KiB (x1)
+Load Average: 0.79, 0.91, 1.05
+-----------------------------------------------------------------------------------
+Benchmark                         Time             CPU   Iterations UserCounters...
+-----------------------------------------------------------------------------------
+BM_random_prng_modulo          2651 ns         2651 ns       258011 items_per_second=377.285k/s
+BM_random_prng_reduce          1667 ns         1667 ns       417675 items_per_second=599.745k/s
+BM_random_mt19937              5114 ns         5114 ns       122426 items_per_second=195.541k/s
+BM_random_mt19937_modulo       6069 ns         6068 ns       116983 items_per_second=164.794k/s
+BM_random_mt19937_reduce       4868 ns         4868 ns       146061 items_per_second=205.41k/s
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:}
+\end{mdframed}
 
 \section{What's Next}
 
