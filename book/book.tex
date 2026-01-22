@@ -3442,7 +3442,7 @@ Aux lignes 133 à 137, on vérifie que le nombre de coups a été incrémenté, 
 
 \item Aux lignes 158 à 234, la fonction \mintinline{c++}{random_games} va lancer tous les tests sur \mintinline{c++}{nb_games} parties aléatoires aux lignes 178 à 219. 221 à 233 Les lignes 190 à 202 affichent un résumé des tests. 
 
-\item Le listing \ref{lst:random_games_property_based_testing_exec} donne le résultat de l'exécution du \mintinline{c++}{main}. Même si, comme le disait Dijkstra, "Program testing can be used to show the presence of bugs, but never to show their absence," et qu'il faille toujours rester prudent, le grand nombre de configurations du jeu explorées nous donne néanmoins une bonne confiance dans la validité de notre implémentation de Yolah.
+\item Le listing \ref{lst:random_games_property_based_testing_exec} donne le résultat de l'exécution du \mintinline{c++}{main}. Même si, comme le disait Dijkstra, "Program testing can be used to show the presence of bugs, but never to show their absence," et qu'il faille toujours rester prudent, le grand nombre de configurations du jeu explorées nous donne néanmoins une bonne confiance dans la validité de notre implémentation de Yolah. Maintenant que nous avons testé notre implémentation, nous allons étudier les performances de celle-ci.
 
 \end{itemize}
 
@@ -3714,11 +3714,22 @@ All tests passed!
 \end{mdframed}
 
 
+
 \subsection{Tests de performance}
+
+Nous allons analyser les performances de notre implémentation de Yolah en utilisant le programme du listing \ref{lst:random_games_perf1} qui ressemble au programme du listing \ref{fig:lst:random_games_testing}. Mais contrairement à ce dernier, le programme du listing \ref{fig:random_games_perf1} n'arrête pas le déroulement des parties et affiche quelques statistiques sur les parties.
+\begin{itemize}
+\item À la ligne 5, \mintinline{c++}{black_wins} va comptabiliser le nombre de victoire du joueur noir tout au long des \mintinline{c++}{nb_games} parties. À ligne 27, on affiche le nombre de victoire du joueur noir et le pourcentage que cela représente par rapport à toutes les parties jouées.
+\item À la ligne 6, \mintinline{c++}{white_wins} va comptabiliser le nombre de victoire du joueur blanc. On affiche à la ligne 28 les statistiques associées.
+\item À la ligne 7, on procède de même pour le nombre de parties nulles grâce à la variable \mintinline{c++}{draws}.
+\item Aux lignes 10 à 15, on joue une partie aléatoire, en obtenant la liste des coups disponibles à la ligne 11, puis en sélectionnant un coup aléatoire à la ligne 13 puis en jouant ce coup à la ligne 14.
+\item Nous allons jouer un million de parties comme nous pouvons le voir dans le \mintinline{c++}{main} à la ligne 34.
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
 \begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
-void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
+void play_random_games(size_t nb_games, 
+                       optional<uint64_t> seed = nullopt) {
     MoveList moves;
     random_device rd;
     mt19937 mt(seed.value_or(rd()));
@@ -3744,11 +3755,16 @@ void play_random_games(size_t nb_games, optional<uint64_t> seed = nullopt) {
     }
     cout << format("\n=== Game Statistics ===\n");
     cout << format("Total games: {}\n", nb_games);
-    cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
-    cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
-    cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+    cout << format("Black wins:  {} ({:.1f}%)\n", 
+                    black_wins, 
+                    100.0 * black_wins / nb_games);
+    cout << format("White wins:  {} ({:.1f}%)\n", 
+                    white_wins, 
+                    100.0 * white_wins / nb_games);
+    cout << format("Draws:       {} ({:.1f}%)\n", 
+                    draws, 
+                    100.0 * draws / nb_games);
 }
-
 int main() {
     init_all_magics();
     play_random_games(1000000, 42);
@@ -3765,6 +3781,23 @@ int main() {
 % % \caption{La boîte du jeu des pingouins}
 % \label{fig:chapter02_perf1}
 % \end{figure}
+
+% Nous utilisons \texttt{perf}~\cite{perf} pour collecter les données de performance et 
+% \texttt{stackcollapse-perf.pl}, issu du projet FlameGraph~\cite{flamegraph}, 
+% pour analyser les traces d'appels.
+
+Nous allons d'abord analyser les traces d'appels des fonctions pour déterminer les parties du code les plus coûteuses en temps. Nous utilisons l'outil \texttt{perf}~\cite{perf} pour collecter les données de performance et \texttt{stackcollapse-perf.pl}, issu du projet \texttt{FlameGraph}~\cite{flamegraph}, pour analyser les traces d'appels. La commande que nous avons utilisé est la suivante.
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+$ sudo perf record -g ./chapter02
+$ sudo perf script | stackcollapse-perf.pl > profile.txt
+\end{verbatim}
+}
+\end{mdframed}
+
+Nous avons demandé à Claude \cite{anthropic2025claude} de générer un script Python permettant de visualiser les traces d'appels sous la forme d'un arbre qui est représenté dans le listing \ref{lst:chapter02_perf1}.
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -3810,6 +3843,19 @@ Performance counter stats for './chapter02' (100 runs):
         77 427      LLC-load-misses           #    0,14% of all LL-cache accesses  ( +- 22,57% )  (49,91%)
 
          4,37002 +- 0,00821 seconds time elapsed  ( +-  0,19% )
+\end{verbatim}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{}
+\label{lst:}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+
 \end{verbatim}
 }
 \end{mdframed}

@@ -2357,17 +2357,23 @@
     <bcf:citekey order="11">stockfish2025</bcf:citekey>
     <bcf:citekey order="12">claessen2000quickcheck</bcf:citekey>
     <bcf:citekey order="13">mckeeman1998differential</bcf:citekey>
-    <bcf:citekey order="14">anthropic2025claude</bcf:citekey>
-    <bcf:citekey order="15">cppreference</bcf:citekey>
-    <bcf:citekey order="16">stockfish2025</bcf:citekey>
-    <bcf:citekey order="17">kannan2008magicbitboards</bcf:citekey>
-    <bcf:citekey order="18">kroening2016decision</bcf:citekey>
-    <bcf:citekey order="19">biere2021handbook</bcf:citekey>
-    <bcf:citekey order="20">moura2008z3</bcf:citekey>
-    <bcf:citekey order="21">googlebenchmark2025</bcf:citekey>
-    <bcf:citekey order="22">warren2012hackersdelight</bcf:citekey>
-    <bcf:citekey order="23">claessen2000quickcheck</bcf:citekey>
-    <bcf:citekey order="24">mckeeman1998differential</bcf:citekey>
+    <bcf:citekey order="14">perf</bcf:citekey>
+    <bcf:citekey order="15">flamegraph</bcf:citekey>
+    <bcf:citekey order="16">claude</bcf:citekey>
+    <bcf:citekey order="17">anthropic2025claude</bcf:citekey>
+    <bcf:citekey order="18">cppreference</bcf:citekey>
+    <bcf:citekey order="19">stockfish2025</bcf:citekey>
+    <bcf:citekey order="20">kannan2008magicbitboards</bcf:citekey>
+    <bcf:citekey order="21">kroening2016decision</bcf:citekey>
+    <bcf:citekey order="22">biere2021handbook</bcf:citekey>
+    <bcf:citekey order="23">moura2008z3</bcf:citekey>
+    <bcf:citekey order="24">googlebenchmark2025</bcf:citekey>
+    <bcf:citekey order="25">warren2012hackersdelight</bcf:citekey>
+    <bcf:citekey order="26">claessen2000quickcheck</bcf:citekey>
+    <bcf:citekey order="27">mckeeman1998differential</bcf:citekey>
+    <bcf:citekey order="28">perf</bcf:citekey>
+    <bcf:citekey order="29">flamegraph</bcf:citekey>
+    <bcf:citekey order="30">claude</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="none">

@@ -1045,8 +1045,8 @@ namespace test {
 
 int main() {
     init_all_magics();
-    //play_random_games(1000000, 42);
+    play_random_games(1000000, 42);
     //play_random_games<false>(1000000, 42);
-    play_random_games_fast(1000000, 42);
+    //play_random_games_fast(1000000, 42);
     //test::random_games(10000, 42);
 }

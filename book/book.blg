@@ -1,15 +1,19 @@
 [0] Config.pm:307> INFO - This is Biber 2.17
 [0] Config.pm:310> INFO - Logfile is 'book.blg'
-[60] biber:340> INFO - === Wed Jan 14, 2026, 17:57:43
-[72] Biber.pm:418> INFO - Reading 'book.bcf'
-[124] Biber.pm:972> INFO - Found 11 citekeys in bib section 0
-[135] Biber.pm:4383> INFO - Processing section 0
-[145] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
-[148] bibtex.pm:1713> INFO - LaTeX decoding ...
-[189] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
-[262] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
-[262] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
-[262] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
-[262] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
-[270] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
-[274] bbl.pm:757> INFO - Output to book.bbl
+[56] biber:340> INFO - === Wed Jan 21, 2026, 23:10:04
+[66] Biber.pm:418> INFO - Reading 'book.bcf'
+[115] Biber.pm:972> INFO - Found 14 citekeys in bib section 0
+[125] Biber.pm:4383> INFO - Processing section 0
+[132] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
+[134] bibtex.pm:1713> INFO - LaTeX decoding ...
+[172] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
+[237] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
+[237] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[238] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
+[238] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
+[244] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
+[248] bbl.pm:757> INFO - Output to book.bbl
+[248] Biber.pm:130> WARN - I didn't find a database entry for 'perf' (section 0)
+[248] Biber.pm:130> WARN - I didn't find a database entry for 'flamegraph' (section 0)
+[248] Biber.pm:130> WARN - I didn't find a database entry for 'claude' (section 0)
+[248] Biber.pm:132> INFO - WARNINGS: 3

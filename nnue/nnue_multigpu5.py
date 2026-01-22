@@ -159,8 +159,8 @@ class Net(nn.Module):
             fc.bias.data.clamp_(-127/64, 127/64)
 
 NB_EPOCHS=300
-MODEL_PATH="./"
-#MODEL_PATH="/mnt/"
+#MODEL_PATH="./"
+MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
@@ -286,8 +286,7 @@ def main(rank, world_size, batch_size, dataset):
     if rank == 0:
         print(len(dataset), flush=True)
 
-    # Split dataset into train and validation (90/10 split)
-    train_size = int(0.9 * len(dataset))
+    train_size = int(0.95 * len(dataset))
     val_size = len(dataset) - train_size
     trainset, valset = random_split(dataset, [train_size, val_size])
 
@@ -309,4 +308,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = GameDataset(GAME_DIR)
-    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 512 * 2, dataset), nprocs=world_size)

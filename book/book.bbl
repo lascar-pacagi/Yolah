@@ -338,6 +338,9 @@
       \range{pages}{8}
     \endentry
   \enddatalist
+  \missing{claude}
+  \missing{flamegraph}
+  \missing{perf}
 \endrefsection
 \endinput
 
