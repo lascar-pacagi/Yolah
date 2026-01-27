@@ -402,37 +402,37 @@ public:
         uint64_t bb = player == BLACK ? black : white;
 
         // Version 1
-        // while (bb) {
-        //     Square from = pop_lsb(bb);
-        //     uint64_t b = moves_bb(from, occupied) & ~occupied;
-        //     while (b) {
-        //         *move_list++ = Move(from, pop_lsb(b));
-        //     }
-        // }
+        while (bb) {
+            Square from = pop_lsb(bb);
+            uint64_t b = moves_bb(from, occupied) & ~occupied;
+            while (b) {
+                *move_list++ = Move(from, pop_lsb(b));
+            }
+        }
 
         // Version 2
-        Square from0 = pop_lsb(bb);
-        Square from1 = pop_lsb(bb);
-        Square from2 = pop_lsb(bb);
-        Square from3 = pop_lsb(bb);
+        // Square from0 = pop_lsb(bb);
+        // Square from1 = pop_lsb(bb);
+        // Square from2 = pop_lsb(bb);
+        // Square from3 = pop_lsb(bb);
         
-        uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
-        uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
-        uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
-        uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+        // uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+        // uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+        // uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+        // uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
         
-        while (b0) {
-            *move_list++ = Move(from0, pop_lsb(b0));
-        }
-        while (b1) {
-            *move_list++ = Move(from1, pop_lsb(b1));
-        }
-        while (b2) {
-            *move_list++ = Move(from2, pop_lsb(b2));
-        }
-        while (b3) {
-            *move_list++ = Move(from3, pop_lsb(b3));
-        }
+        // while (b0) {
+        //     *move_list++ = Move(from0, pop_lsb(b0));
+        // }
+        // while (b1) {
+        //     *move_list++ = Move(from1, pop_lsb(b1));
+        // }
+        // while (b2) {
+        //     *move_list++ = Move(from2, pop_lsb(b2));
+        // }
+        // while (b3) {
+        //     *move_list++ = Move(from3, pop_lsb(b3));
+        // }
         
         if (move_list == moves.move_list) [[unlikely]] {
             *move_list++ = Move::none();
