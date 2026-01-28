@@ -18,14 +18,14 @@
 \contentsline {subsection}{\numberline {2.4.1}Tests par observation de parties aléatoires}{56}{subsection.2.4.1}%
 \contentsline {subsection}{\numberline {2.4.2}Tests différentiels et tests basés sur les propriétés}{60}{subsection.2.4.2}%
 \contentsline {subsection}{\numberline {2.4.3}Tests de performance}{68}{subsection.2.4.3}%
-\contentsline {section}{\numberline {2.5}What's Next}{78}{section.2.5}%
-\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{78}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{79}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{81}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{83}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{85}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{87}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{89}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{91}{chapter.9}%
-\contentsline {chapter}{Acronymes}{93}{section*.34}%
-\contentsline {chapter}{Bibliography}{95}{appendix*.36}%
+\contentsline {section}{\numberline {2.5}What's Next}{80}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Complete Commented Game Board Code}{80}{section.2.6}%
+\contentsline {chapter}{\numberline {3}AI Players}{81}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{83}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{85}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{87}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{89}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{91}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{93}{chapter.9}%
+\contentsline {chapter}{Acronymes}{95}{section*.34}%
+\contentsline {chapter}{Bibliography}{97}{appendix*.36}%

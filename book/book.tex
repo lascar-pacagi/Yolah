@@ -207,6 +207,10 @@
 \newacronym{cpu}{CPU}{Central Processing Unit}
 \newacronym{gpu}{GPU}{Graphics Processing Unit}
 \newacronym{z3}{Z3}{Z3 Theorem Prover}
+\newacronym{ipc}{IPC}{Instructions Per Cycle}
+\newacronym{pmu}{PMU}{Performance Monitoring Unit}
+\newacronym{mlp}{MLP}{Memory Level Parallelism}
+\newacronym{llc}{LLC}{Last Level Cache}
 
 % Terms
 \newglossaryentry{bitboard}{
@@ -3717,13 +3721,13 @@ All tests passed!
 
 \subsection{Tests de performance}
 
-Nous allons analyser les performances de notre implémentation de Yolah en utilisant le programme du listing \ref{lst:random_games_perf1} qui ressemble au programme du listing \ref{fig:lst:random_games_testing}. Mais contrairement à ce dernier, le programme du listing \ref{fig:random_games_perf1} n'arrête pas le déroulement des parties et affiche quelques statistiques sur les parties.
+Nous allons analyser les performances de notre implémentation de Yolah en utilisant le programme du listing \ref{lst:random_games_perf1} qui ressemble au programme du listing \ref{lst:random_games_testing}. Mais contrairement à ce dernier, le programme du listing \ref{lst:random_games_perf1} n'arrête pas le déroulement des parties et affiche quelques statistiques sur les parties.
 \begin{itemize}
-\item À la ligne 5, \mintinline{c++}{black_wins} va comptabiliser le nombre de victoire du joueur noir tout au long des \mintinline{c++}{nb_games} parties. À ligne 27, on affiche le nombre de victoire du joueur noir et le pourcentage que cela représente par rapport à toutes les parties jouées.
-\item À la ligne 6, \mintinline{c++}{white_wins} va comptabiliser le nombre de victoire du joueur blanc. On affiche à la ligne 28 les statistiques associées.
-\item À la ligne 7, on procède de même pour le nombre de parties nulles grâce à la variable \mintinline{c++}{draws}.
-\item Aux lignes 10 à 15, on joue une partie aléatoire, en obtenant la liste des coups disponibles à la ligne 11, puis en sélectionnant un coup aléatoire à la ligne 13 puis en jouant ce coup à la ligne 14.
-\item Nous allons jouer un million de parties comme nous pouvons le voir dans le \mintinline{c++}{main} à la ligne 34.
+\item À la ligne 6, \mintinline{c++}{black_wins} va comptabiliser le nombre de victoires du joueur noir tout au long des \mintinline{c++}{nb_games} parties. Aux lignes 28 à 30, on affiche le nombre de victoires du joueur noir et le pourcentage que cela représente par rapport à toutes les parties jouées.
+\item À la ligne 7, \mintinline{c++}{white_wins} va comptabiliser le nombre de victoires du joueur blanc. On affiche aux lignes 31 à 33 les statistiques associées.
+\item À la ligne 8, on procède de même pour le nombre de parties nulles grâce à la variable \mintinline{c++}{draws}.
+\item Aux lignes 11 à 16, on joue une partie aléatoire, en obtenant la liste des coups disponibles à la ligne 12, puis en sélectionnant un coup aléatoire à la ligne 14 puis en jouant ce coup à la ligne 15.
+\item Nous allons jouer un million de parties comme nous pouvons le voir dans le \mintinline{c++}{main} à la ligne 40.
 \end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
@@ -3770,7 +3774,7 @@ int main() {
     play_random_games(1000000, 42);
 }
 \end{minted}
-\captionof{listing}{}
+\captionof{listing}{Nous jouons un million de parties aléatoires pour évaluer les performances de notre implémentation de Yolah}
 \label{lst:random_games_perf1}
 \end{mdframed}
 
@@ -3786,7 +3790,7 @@ int main() {
 % \texttt{stackcollapse-perf.pl}, issu du projet FlameGraph~\cite{flamegraph}, 
 % pour analyser les traces d'appels.
 
-Nous allons d'abord analyser les traces d'appels des fonctions pour déterminer les parties du code les plus coûteuses en temps. Nous utilisons l'outil \texttt{perf}~\cite{perf} pour collecter les données de performance et \texttt{stackcollapse-perf.pl}, issu du projet \texttt{FlameGraph}~\cite{flamegraph}, pour analyser les traces d'appels. La commande que nous avons utilisé est la suivante.
+Nous allons d'abord analyser les traces d'appels des fonctions pour déterminer les parties du code les plus coûteuses en temps. Nous utilisons l'outil \texttt{perf}~\cite{perf} pour collecter les données de performance et \texttt{stackcollapse-perf.pl}, issu du projet \texttt{FlameGraph}~\cite{flamegraph}, pour analyser les traces d'appels. La commande que nous utilisons est la suivante.
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -3798,6 +3802,20 @@ $ sudo perf script | stackcollapse-perf.pl > profile.txt
 \end{mdframed}
 
 Nous avons demandé à Claude \cite{anthropic2025claude} de générer un script Python permettant de visualiser les traces d'appels sous la forme d'un arbre qui est représenté dans le listing \ref{lst:chapter02_perf1}.
+\begin{itemize}
+\item La fonction \mintinline{c++}{play_random_games} compte pour $96.79\%$ du temps d'exécution du programme.
+\item La suite des appels de fonctions se lit en suivant les branches de l'arbre. Par exemple, on peut voir ci-dessous les différents appels de fonctions qui ont amené à l'exécution de \mintinline{c++}{Magic::index}.
+\begin{verbatim}
+play_random_games                       
+├── Yolah::moves                        
+        ├── moves_bb                    
+            └── Magic::index             8.87%
+\end{verbatim}
+on voit de plus que l'exécution de \mintinline{c++}{Magic::index} via cette suite d'appels représente $8.87\%$ du temps d'exécution du programme.
+\item Notons que l'ordre des fonctions ne représente pas l'ordre du listing, les feuilles de l'arbre sont triées selon le pourcentage du temps d'exécution. 
+\item Remarquons aussi que l'on peut déduire facilement le temps passé dans une fonction en dehors des appels de fonctions qu'elle a effectué. Par exemple, pour la fonction \mintinline{c++}{play_random_games}, son temps d'exécution compte pour $96.79\%$ du temps d'exécution du programme. Si on soustrait de ce nombre la somme $(82.25\% + 5.33\% + 3.89\% + 3.86\%)$, qui représente les pourcentages du temps d'exécution du programme des fonctions \mintinline{c++}{Yolah::moves}, \mintinline{c++}{std::uniform_int_distribution}, \mintinline{c++}{Yolah::game_over} et \mintinline{c++}{Yolah::play}, on obient $1.46\%$, qui donne le pourcentage du temps d'exécution total passé dans le reste de la fonction \mintinline{c++}{play_random_games}. La proportion du temps passé dans le reste de la fonction est donc de $1.46/96.79 = 1.5\%$.
+\item L'arbre nous permet de voir rapidement que si l'on souhaite améliorer le temps d'exécution de notre programme, il faut se concentrer sur la fonction \mintinline{c++}{Yolah::moves} appelée par \mintinline{c++}{play_random_games}. En effet, le temps d'exécution de cette fonction représente $82.25\%$ du temps d'exécution total du programme.
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -3818,38 +3836,55 @@ play_random_games                       96.79%
 \end{mdframed}
 %\vspace{-0.5\baselineskip}
 \begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
+\captionof{listing}{Traces d'appels des fonctions permettant d'identifier les fonctions les plus coûteuses}
 \label{lst:chapter02_perf1}
 \end{mdframed}
+
+Grâce au listing \ref{lst:chapter02_perf1}, nous savons que nous devons concentrer nos efforts sur la fonction \mintinline{c++}{Yolah::moves}. Nous allons de nouveau utiliser l'outil \texttt{perf}~\cite{perf} mais cette fois-ci pour accéder aux compteurs de performance matériel (PMU - Performance Monitoring Unit)~\cite{intelsdm} du processeur. Ces compteurs mesurent des évènements tels que les défauts de prédiction de branchement, les défauts de cache, etc. Ces compteurs vont nous guider afin de trouver les faiblesses de notre implémentation\footnote{Pour approfondir le sujet de l'optimisation sur processeurs modernes, vous pouvez consulter~\cite{bakhvalov2024, pikus2021, algorithmica, inteltma}.}. Nous utilisons la commande suivante pour analyser le comportement de notre programme.   
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-=== Game Statistics ===
-Total games: 1000000
-Black wins:  499124 (49.9%)
-White wins:  395468 (39.5%)
-Draws:       105408 (10.5%)
+$ perf stat -r 10 -e cycles,instructions,branches,branch-misses,\
+L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,\
+l1d_pend_miss.pending,l1d_pend_miss.pending_cycles ./chapter02
+\end{verbatim}
+}
+\end{mdframed}
 
-Performance counter stats for './chapter02' (100 runs):
+Le résultat de cette commande est présenté dans le listing \ref{lst:perf_chapter02_1}.
+\begin{itemize}
+\item L'option \texttt{-r 10} de la commande \texttt{perf} ci-dessus permet de lancer le programme dix fois, pour faire la moyenne et calculer l'écart-type\footnote{Plus précisément, l'écart-type en pourcentage de la moyenne.} des résultats obtenus.
+\item Le compteur \texttt{cycles} indique le nombre de cycles effectués par le processeur durant l'exécution de notre programme\footnote{En mode utilisateur et en mode noyau. Les compteurs sont activés quand un processus s'exécute et désactivés lorsqu'il perd la main.}.
+\item Le compteur \texttt{instructions} mesure le nombre d'instructions exécutées par notre programme. Le nombre d'instructions exécutées par cycle \gls{ipc} est de $1.38$. Les processeurs modernes sont super-scalaires, ils ont la capacité d'exécuter plusieurs instructions par cycle. Plus ce nombre est élevé, et plus les unités de calculs du processeur sont utilisées. Nous pourrons comparer cet \gls{ipc} avec celui des versions optimisées que nous développerons par la suite.
+\item Le compteur \texttt{branches} va comptabiliser le nombre total de branchements exécutés (conditionnels, inconditionnels, indirects, appels et retours de fonction).
+\item Le compteur \texttt{branch-misses} indique le nombre de fois où le prédicteur de branchement s'est trompé. Les processeurs modernes, pour ne pas laisser leurs unités de calcul sans travail, exécutent des instructions de manière spéculative, c'est-à-dire avant de connaître le résultat des branchements conditionnels. Lorsque la prédiction est correcte, le processeur a gagné du temps. En cas d'erreur, les instructions exécutées spéculativement sont annulées, et le processeur reprend l'exécution du programme au bon endroit après le branchement. Ces erreurs de branchements sont coûteuses. Dans notre cas, le prédicteur de branchement se trompe dans $11.30\%$ des cas. Ce taux est élevé et c'est la première chose que nous allons essayer d'améliorer. 
 
-17 671 802 014      cycles                    #    4,046 GHz                       ( +-  0,09% )  (49,84%)
-24 345 746 995      instructions              #    1,37  insn per cycle            ( +-  0,01% )  (62,38%)
- 2 431 465 524      branches                  #  556,680 M/sec                     ( +-  0,01% )  (62,44%)
-   275 869 723      branch-misses             #   11,35% of all branches           ( +-  0,02% )  (62,54%)
- 3 133 561 281      L1-dcache-loads           #  717,424 M/sec                     ( +-  0,01% )  (62,63%)
-   146 564 424      L1-dcache-load-misses     #    4,68% of all L1-dcache accesses ( +-  0,07% )  (62,63%)
-    54 670 067      LLC-loads                 #   12,517 M/sec                     ( +-  0,27% )  (50,00%)
-        77 427      LLC-load-misses           #    0,14% of all LL-cache accesses  ( +- 22,57% )  (49,91%)
+\end{itemize}
 
-         4,37002 +- 0,00821 seconds time elapsed  ( +-  0,19% )
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim} Performance counter stats for './chapter02' (10 runs):
+
+    17 675 748 046      cycles                        ( +-  0.14% )
+    24 357 812 457      instructions   # 1.38 IPC     ( +-  0.03% )
+     2 429 931 966      branches                      ( +-  0.03% )
+       274 551 866      branch-misses  # 11.30%       ( +-  0.03% )
+     3 132 479 051      L1-dcache-loads               ( +-  0.03% )
+       147 715 205      L1-dcache-load-misses # 4.71% ( +-  0.16% )
+        53 089 459      LLC-loads                     ( +-  1.24% )
+            24 898      LLC-load-misses # 0.05%       ( +- 31.02% )
+     2 413 363 382      l1d_pend_miss.pending         ( +-  0.78% )
+     2 202 499 896      l1d_pend_miss.pending_cycles  ( +-  0.70% )
+
+           4.23 +- 0.01 seconds time elapsed
 \end{verbatim}
 }
 \end{mdframed}
 %\vspace{-0.5\baselineskip}
 \begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
-\label{lst:}
+\captionof{listing}{Compteurs de performances pour le programme du listing \ref{lst:random_games_perf1}.}
+\label{lst:perf_chapter02_1}
 \end{mdframed}
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]

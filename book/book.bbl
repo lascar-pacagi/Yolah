@@ -337,10 +337,174 @@
       \field{pages}{100\bibrangedash 107}
       \range{pages}{8}
     \endentry
+    \entry{perf}{misc}{}
+      \name{author}{1}{}{%
+        {{hash=7de7d8b485d1dd1da35d8913e80a95c7}{%
+           family={{Linux Kernel Developers}},
+           familyi={L\bibinitperiod}}}%
+      }
+      \strng{namehash}{7de7d8b485d1dd1da35d8913e80a95c7}
+      \strng{fullhash}{7de7d8b485d1dd1da35d8913e80a95c7}
+      \strng{bibnamehash}{7de7d8b485d1dd1da35d8913e80a95c7}
+      \strng{authorbibnamehash}{7de7d8b485d1dd1da35d8913e80a95c7}
+      \strng{authornamehash}{7de7d8b485d1dd1da35d8913e80a95c7}
+      \strng{authorfullhash}{7de7d8b485d1dd1da35d8913e80a95c7}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://perf.wiki.kernel.org/}}
+      \field{note}{Accessed: 2025-01-21}
+      \field{title}{perf: Linux profiling with performance counters}
+      \field{year}{2025}
+    \endentry
+    \entry{flamegraph}{misc}{}
+      \name{author}{1}{}{%
+        {{hash=b45aef384111d7e9dd71b74ba427b5f1}{%
+           family={Gregg},
+           familyi={G\bibinitperiod},
+           given={Brendan},
+           giveni={B\bibinitperiod}}}%
+      }
+      \strng{namehash}{b45aef384111d7e9dd71b74ba427b5f1}
+      \strng{fullhash}{b45aef384111d7e9dd71b74ba427b5f1}
+      \strng{bibnamehash}{b45aef384111d7e9dd71b74ba427b5f1}
+      \strng{authorbibnamehash}{b45aef384111d7e9dd71b74ba427b5f1}
+      \strng{authornamehash}{b45aef384111d7e9dd71b74ba427b5f1}
+      \strng{authorfullhash}{b45aef384111d7e9dd71b74ba427b5f1}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://github.com/brendangregg/FlameGraph}}
+      \field{note}{Includes stackcollapse-perf.pl. Accessed: 2025-01-21}
+      \field{title}{FlameGraph: Stack trace visualizer}
+      \field{year}{2011}
+    \endentry
+    \entry{intelsdm}{manual}{}
+      \name{author}{1}{}{%
+        {{hash=b7f0fb90e404efb48f8a85a517dec3c9}{%
+           family={{Intel Corporation}},
+           familyi={I\bibinitperiod}}}%
+      }
+      \strng{namehash}{b7f0fb90e404efb48f8a85a517dec3c9}
+      \strng{fullhash}{b7f0fb90e404efb48f8a85a517dec3c9}
+      \strng{bibnamehash}{b7f0fb90e404efb48f8a85a517dec3c9}
+      \strng{authorbibnamehash}{b7f0fb90e404efb48f8a85a517dec3c9}
+      \strng{authornamehash}{b7f0fb90e404efb48f8a85a517dec3c9}
+      \strng{authorfullhash}{b7f0fb90e404efb48f8a85a517dec3c9}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{chapter}{20}
+      \field{howpublished}{\url{https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html}}
+      \field{note}{Chapter 20: Performance Monitoring}
+      \field{title}{Intel® 64 and IA-32 Architectures Software Developer's Manual}
+      \field{volume}{3B}
+      \field{year}{2024}
+    \endentry
+    \entry{bakhvalov2024}{book}{}
+      \name{author}{1}{}{%
+        {{hash=f8daffcd6b90bad99f89e1444b6a3d89}{%
+           family={Bakhvalov},
+           familyi={B\bibinitperiod},
+           given={Denis},
+           giveni={D\bibinitperiod}}}%
+      }
+      \strng{namehash}{f8daffcd6b90bad99f89e1444b6a3d89}
+      \strng{fullhash}{f8daffcd6b90bad99f89e1444b6a3d89}
+      \strng{bibnamehash}{f8daffcd6b90bad99f89e1444b6a3d89}
+      \strng{authorbibnamehash}{f8daffcd6b90bad99f89e1444b6a3d89}
+      \strng{authornamehash}{f8daffcd6b90bad99f89e1444b6a3d89}
+      \strng{authorfullhash}{f8daffcd6b90bad99f89e1444b6a3d89}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{edition}{2nd}
+      \field{howpublished}{\url{https://book.easyperf.net/perf_book}}
+      \field{note}{Accessed: 2025-01-28}
+      \field{title}{Performance Analysis and Tuning on Modern CPUs}
+      \field{year}{2024}
+    \endentry
+    \entry{pikus2021}{book}{}
+      \name{author}{1}{}{%
+        {{hash=160ba67c5c78e58f0e5807730e0f3157}{%
+           family={Pikus},
+           familyi={P\bibinitperiod},
+           given={Fedor\bibnamedelima G.},
+           giveni={F\bibinitperiod\bibinitdelim G\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {Packt Publishing}%
+      }
+      \strng{namehash}{160ba67c5c78e58f0e5807730e0f3157}
+      \strng{fullhash}{160ba67c5c78e58f0e5807730e0f3157}
+      \strng{bibnamehash}{160ba67c5c78e58f0e5807730e0f3157}
+      \strng{authorbibnamehash}{160ba67c5c78e58f0e5807730e0f3157}
+      \strng{authornamehash}{160ba67c5c78e58f0e5807730e0f3157}
+      \strng{authorfullhash}{160ba67c5c78e58f0e5807730e0f3157}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{isbn}{978-1800208117}
+      \field{title}{The Art of Writing Efficient Programs}
+      \field{year}{2021}
+    \endentry
+    \entry{algorithmica}{online}{}
+      \name{author}{1}{}{%
+        {{hash=1a1c12f55474675f4baaa6a11a74f3e8}{%
+           family={Kulikov},
+           familyi={K\bibinitperiod},
+           given={Sergey},
+           giveni={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{1a1c12f55474675f4baaa6a11a74f3e8}
+      \strng{fullhash}{1a1c12f55474675f4baaa6a11a74f3e8}
+      \strng{bibnamehash}{1a1c12f55474675f4baaa6a11a74f3e8}
+      \strng{authorbibnamehash}{1a1c12f55474675f4baaa6a11a74f3e8}
+      \strng{authornamehash}{1a1c12f55474675f4baaa6a11a74f3e8}
+      \strng{authorfullhash}{1a1c12f55474675f4baaa6a11a74f3e8}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{note}{Accessed: 2025-01-28}
+      \field{title}{Algorithms for Modern Hardware}
+      \field{year}{2022}
+      \verb{urlraw}
+      \verb https://en.algorithmica.org/hpc/
+      \endverb
+      \verb{url}
+      \verb https://en.algorithmica.org/hpc/
+      \endverb
+    \endentry
+    \entry{inteltma}{misc}{}
+      \name{author}{1}{}{%
+        {{hash=dcd38563d95bda42cf3f4f1d39c002ec}{%
+           family={Yasin},
+           familyi={Y\bibinitperiod},
+           given={Ahmad},
+           giveni={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{dcd38563d95bda42cf3f4f1d39c002ec}
+      \strng{fullhash}{dcd38563d95bda42cf3f4f1d39c002ec}
+      \strng{bibnamehash}{dcd38563d95bda42cf3f4f1d39c002ec}
+      \strng{authorbibnamehash}{dcd38563d95bda42cf3f4f1d39c002ec}
+      \strng{authornamehash}{dcd38563d95bda42cf3f4f1d39c002ec}
+      \strng{authorfullhash}{dcd38563d95bda42cf3f4f1d39c002ec}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{IEEE International Symposium on Performance Analysis of Systems and Software (ISPASS)}
+      \field{note}{Intel Corporation}
+      \field{title}{A Top-Down Method for Performance Analysis and Counters Architecture}
+      \field{year}{2014}
+    \endentry
   \enddatalist
-  \missing{claude}
-  \missing{flamegraph}
-  \missing{perf}
 \endrefsection
 \endinput
 

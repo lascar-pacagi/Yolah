@@ -1,19 +1,15 @@
 [0] Config.pm:307> INFO - This is Biber 2.17
 [0] Config.pm:310> INFO - Logfile is 'book.blg'
-[56] biber:340> INFO - === Wed Jan 21, 2026, 23:10:04
-[66] Biber.pm:418> INFO - Reading 'book.bcf'
-[115] Biber.pm:972> INFO - Found 14 citekeys in bib section 0
-[125] Biber.pm:4383> INFO - Processing section 0
-[132] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
-[134] bibtex.pm:1713> INFO - LaTeX decoding ...
-[172] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
-[237] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
-[237] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
-[238] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
-[238] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
-[244] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
-[248] bbl.pm:757> INFO - Output to book.bbl
-[248] Biber.pm:130> WARN - I didn't find a database entry for 'perf' (section 0)
-[248] Biber.pm:130> WARN - I didn't find a database entry for 'flamegraph' (section 0)
-[248] Biber.pm:130> WARN - I didn't find a database entry for 'claude' (section 0)
-[248] Biber.pm:132> INFO - WARNINGS: 3
+[60] biber:340> INFO - === Thu Jan 29, 2026, 00:30:30
+[83] Biber.pm:418> INFO - Reading 'book.bcf'
+[137] Biber.pm:972> INFO - Found 18 citekeys in bib section 0
+[147] Biber.pm:4383> INFO - Processing section 0
+[155] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
+[158] bibtex.pm:1713> INFO - LaTeX decoding ...
+[200] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
+[284] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
+[284] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[285] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
+[285] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
+[295] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
+[301] bbl.pm:757> INFO - Output to book.bbl
