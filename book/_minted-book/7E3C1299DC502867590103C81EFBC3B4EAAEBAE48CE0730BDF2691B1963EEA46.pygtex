@@ -8,12 +8,12 @@
 \PYG{+w}{    }\PYG{n}{RANK\PYGZus{}NB}
 \PYG{p}{\PYGZcb{};}
 \PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mh}{0x0101010101010101}\PYG{p}{;}
-\PYG{c+c1}{//   0x0101010101010101}
-\PYG{c+c1}{//== 0b0000000100000001000000010000000100000001000000010000000100000001}
-\PYG{c+c1}{//            a8      a7      a6      a5      a4      a3      a2      a1}
+\PYG{c+c1}{//  0x0101010101010101}
+\PYG{c+c1}{//==0b0000000100000001000000010000000100000001000000010000000100000001}
+\PYG{c+c1}{//           a8      a7      a6      a5      a4      a3      a2      a1}
 
 \PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileHBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{;}
-\PYG{c+c1}{//   0x8080808080808080}
-\PYG{c+c1}{//== 0b1000000010000000100000001000000010000000100000001000000010000000}
-\PYG{c+c1}{//     h8      h7      h6      h5      h4      h3      h2      h1}
+\PYG{c+c1}{//  0x8080808080808080}
+\PYG{c+c1}{//==0b1000000010000000100000001000000010000000100000001000000010000000}
+\PYG{c+c1}{//    h8      h7      h6      h5      h4      h3      h2      h1}
 \end{Verbatim}

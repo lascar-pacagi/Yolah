@@ -1,28 +1,35 @@
-chapter02;[[stack]];std::uniform_int_distribution<unsigned int>::operator 44786826
-chapter02;[unknown];play_random_games_fast 82268410
-chapter02;[unknown];play_random_games_fast;Yolah::game_over 236590387
-chapter02;[unknown];play_random_games_fast;Yolah::game_over;shift< 394905201
-chapter02;[unknown];play_random_games_fast;Yolah::play 228963056
-chapter02;[unknown];play_random_games_fast;Yolah::play;Move::to_sq 4156559
-chapter02;[unknown];play_random_games_fast;Yolah::play;square_bb 28526888
-chapter02;[unknown];play_random_games_fast;Yolah::random_move 854993018
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;Move::Move 4139554
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;_pdep_u64 73098166
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;asm_sysvec_apic_timer_interrupt;sysvec_apic_timer_interrupt;__sysvec_apic_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;tick_sched_timer;tick_sched_do_timer;tick_do_update_jiffies64;update_wall_time;timekeeping_update 4135864
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;moves_bb 2727913784
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;moves_bb;Magic::index 393193020
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;moves_bb;Magic::index;error_entry 4139215
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;pop_lsb 16323458
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;pop_lsb;lsb;std::countr_zero<unsigned long>;std::__countr_zero<unsigned long> 272678700
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;std::popcount<unsigned long>;std::__popcount<unsigned long> 184883054
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;std::uniform_int_distribution<unsigned int>::operator 24312248
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;std::uniform_int_distribution<unsigned int>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 24565165
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::operator 360091227
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> 110670484
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 260647728
-chapter02;[unknown];play_random_games_fast;Yolah::random_move;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand 73213060
-chapter02;_start;__libc_start_main_impl;__libc_start_call_main;main;init_all_magics;init_magics;reachable_squares;manhattan_distance 19655688
-chapter02;_start;_dl_start;_dl_start_final;_dl_sysdep_start;dl_main;_dl_map_object_deps;_dl_catch_exception;openaux;_dl_map_object;_dl_load_cache_lookup;search_cache;_dl_cache_libcmp;asm_exc_page_fault;exc_page_fault;do_user_addr_fault;handle_mm_fault;__handle_mm_fault;handle_pte_fault;do_fault;do_read_fault;filemap_map_pages;next_uptodate_page 11356695
-chapter02;entry_SYSCALL_64_after_hwframe;do_syscall_64;x64_sys_call;__x64_sys_execve;do_execveat_common.isra.0;bprm_execve;bprm_execve.part.0;exec_binprm;search_binary_handler;load_elf_binary;begin_new_exec;flush_signal_handlers 465707
-chapter02;std::uniform_int_distribution<unsigned int>::operator;std::uniform_int_distribution<unsigned int>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 188412163
-perf-exec;entry_SYSCALL_64_after_hwframe;do_syscall_64;x64_sys_call;__x64_sys_execve;do_execveat_common.isra.0;bprm_execve;bprm_execve.part.0;exec_binprm;search_binary_handler;load_elf_binary;begin_new_exec;perf_event_exec;ctx_resched;x86_pmu_enable;intel_pmu_enable_all;native_write_msr 14769
+chapter02;[[stack]];std::uniform_int_distribution<unsigned long>::operator 62785582
+chapter02;[unknown];play_random_games 259124729
+chapter02;[unknown];play_random_games;MoveList::size 45721913
+chapter02;[unknown];play_random_games;Yolah::game_over 203961027
+chapter02;[unknown];play_random_games;Yolah::game_over;shift< 417536928
+chapter02;[unknown];play_random_games;Yolah::game_over;shift<;asm_sysvec_apic_timer_interrupt;sysvec_apic_timer_interrupt;__sysvec_apic_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;tick_sched_timer;tick_sched_do_timer;tick_do_update_jiffies64;update_wall_time;timekeeping_advance 4175611
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves 4276581890
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;Move::Move 2236015343
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;_nv039991rm 8273759
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;asm_common_interrupt;common_interrupt;irqentry_exit;irqentry_exit_to_user_mode;exit_to_user_mode_loop;schedule;__schedule;finish_task_switch.isra.0;__perf_event_task_sched_in;x86_pmu_enable;intel_pmu_enable_all;native_write_msr 31506
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;moves_bb 4027248027
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;moves_bb;Magic::index 1406579509
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;moves_bb;Magic::index;asm_sysvec_apic_timer_interrupt;sysvec_apic_timer_interrupt;__sysvec_apic_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;tick_sched_timer;tick_do_update_jiffies64 4179840
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;moves_bb;Magic::index;asm_sysvec_apic_timer_interrupt;sysvec_apic_timer_interrupt;__sysvec_apic_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;tick_sched_timer;tick_sched_handle;update_process_times;scheduler_tick;perf_event_task_tick;x86_pmu_disable 4182028
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;pop_lsb 91716134
+chapter02;[unknown];play_random_games;Yolah::moves;Yolah::moves;pop_lsb;lsb;std::countr_zero<unsigned long>;std::__countr_zero<unsigned long> 2498162021
+chapter02;[unknown];play_random_games;Yolah::play 390495879
+chapter02;[unknown];play_random_games;Yolah::play;Move::to_sq 12472610
+chapter02;[unknown];play_random_games;Yolah::play;square_bb 81435320
+chapter02;[unknown];play_random_games;std::uniform_int_distribution<unsigned long>::operator 141766891
+chapter02;[unknown];play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::operator 49957497
+chapter02;[unknown];play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::operator;_nv039991rm 4156457
+chapter02;[unknown];play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> 154551255
+chapter02;[unknown];play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 740542783
+chapter02;[unknown];play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;asm_sysvec_apic_timer_interrupt;sysvec_apic_timer_interrupt;__sysvec_apic_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;tick_sched_timer;tick_sched_handle;account_process_tick 4147482
+chapter02;[unknown];play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand 96108015
+chapter02;[unknown];std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 45832943
+chapter02;[unknown];std::uniform_int_distribution<unsigned long>::operator 204217521
+chapter02;[unknown];std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> 66549468
+chapter02;_start;__libc_start_main_impl;__libc_start_call_main;__GI_exit;__run_exit_handlers;_dl_fini;[libstdc++.so.6.0.32];__cxa_finalize;std::ios_base::Init::~Init;std::ostream::flush;__GI__IO_fflush 4142416
+chapter02;_start;__libc_start_main_impl;__libc_start_call_main;main;init_all_magics;init_magics;reachable_squares;manhattan_distance 23256041
+chapter02;_start;_dl_start;_dl_start_final;_dl_sysdep_start;dl_main;_dl_map_object_deps 11148579
+chapter02;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 4174568
+perf-exec;entry_SYSCALL_64_after_hwframe;do_syscall_64;x64_sys_call;__x64_sys_execve;do_execveat_common.isra.0;bprm_execve;bprm_execve.part.0;exec_binprm;search_binary_handler;load_elf_binary;begin_new_exec;__set_task_comm;perf_event_comm;perf_iterate_sb 421040
+perf-exec;entry_SYSCALL_64_after_hwframe;do_syscall_64;x64_sys_call;__x64_sys_execve;do_execveat_common.isra.0;bprm_execve;bprm_execve.part.0;exec_binprm;search_binary_handler;load_elf_binary;begin_new_exec;perf_event_exec;ctx_resched;x86_pmu_enable;intel_pmu_enable_all;native_write_msr 13543

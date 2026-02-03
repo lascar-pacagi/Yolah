@@ -402,38 +402,36 @@ public:
         uint64_t bb = player == BLACK ? black : white;
 
         // Version 1
-        while (bb) {
-            Square from = pop_lsb(bb);
-            uint64_t b = moves_bb(from, occupied) & ~occupied;
-            while (b) {
-                *move_list++ = Move(from, pop_lsb(b));
-            }
-        }
+        // while (bb) {
+        //     Square from = pop_lsb(bb);
+        //     uint64_t b = moves_bb(from, occupied) & ~occupied;
+        //     while (b) {
+        //         *move_list++ = Move(from, pop_lsb(b));
+        //     }
+        // }
 
-        // Version 2
-        // Square from0 = pop_lsb(bb);
-        // Square from1 = pop_lsb(bb);
-        // Square from2 = pop_lsb(bb);
-        // Square from3 = pop_lsb(bb);
-        
-        // uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
-        // uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
-        // uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
-        // uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
-        
-        // while (b0) {
-        //     *move_list++ = Move(from0, pop_lsb(b0));
-        // }
-        // while (b1) {
-        //     *move_list++ = Move(from1, pop_lsb(b1));
-        // }
-        // while (b2) {
-        //     *move_list++ = Move(from2, pop_lsb(b2));
-        // }
-        // while (b3) {
-        //     *move_list++ = Move(from3, pop_lsb(b3));
-        // }
-        
+        Square from0 = pop_lsb(bb);
+        Square from1 = pop_lsb(bb);
+        Square from2 = pop_lsb(bb);
+        Square from3 = pop_lsb(bb);
+
+        uint64_t b0 = moves_bb(from0, occupied) & ~occupied;
+        uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
+        uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
+        uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
+
+        while (b0) {
+            *move_list++ = Move(from0, pop_lsb(b0));
+        }
+        while (b1) {
+            *move_list++ = Move(from1, pop_lsb(b1));
+        }
+        while (b2) {
+            *move_list++ = Move(from2, pop_lsb(b2));
+        }
+        while (b3) {
+            *move_list++ = Move(from3, pop_lsb(b3));
+        }
         if (move_list == moves.move_list) [[unlikely]] {
             *move_list++ = Move::none();
         }
@@ -480,7 +478,7 @@ public:
     //     */
     // }
 
-Move random_move(mt19937& mt) const noexcept {
+    Move random_move(mt19937& mt) const noexcept {
         uint64_t occupied = black | white | holes;
         uint64_t player_bb = current_player() == BLACK ? black : white;
         Square from0 = pop_lsb(player_bb);
@@ -503,15 +501,15 @@ Move random_move(mt19937& mt) const noexcept {
         uint32_t bit = d(mt);
         int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
         bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
-        Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
-        uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];        
+        Square from = std::array{ from0, from1, from2, from3 }[bb_index];
+        uint64_t bb = std::array{ b0, b1, b2, b3 }[bb_index];        
         Square to = Square(std::countr_zero(_pdep_u64(1ULL << bit, bb)));
         return Move(from, to);
         /*while (bb) {
             uint32_t tz = std::countr_zero(bb);
-        if (bit-- == 0)
-            return 1ULL << tz;
-        bb &= bb - 1;
+            if (bit-- == 0)
+                return 1ULL << tz;
+            bb &= bb - 1;
         }
         */
     }

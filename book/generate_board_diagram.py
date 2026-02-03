@@ -264,7 +264,7 @@ def parse_moves(moves_str):
 
 def generate_board_diagram(moves_str=None, output_file="board.png",
                           board_size=800, show_labels=True, show_last_move=True,
-                          show_moves_for=None):
+                          show_moves_for=None, opacity=None):
     """
     Generate a board diagram and save it to a file.
 
@@ -275,6 +275,7 @@ def generate_board_diagram(moves_str=None, output_file="board.png",
         show_labels: Whether to show file/rank labels
         show_last_move: Whether to show an arrow for the last move
         show_moves_for: Optional square string (e.g., "d3") to show possible moves with crosses
+        opacity: Optional opacity value (0.0 to 1.0) for faded background images
     """
     # Create Yolah game
     yolah = Yolah()
@@ -295,6 +296,15 @@ def generate_board_diagram(moves_str=None, output_file="board.png",
     # Draw board
     last_move_to_show = last_move if (show_last_move and last_move) else None
     img = draw_board(yolah, last_move_to_show, board_size, show_labels, show_moves_for)
+
+    # Apply opacity if specified
+    if opacity is not None and 0.0 < opacity < 1.0:
+        img = img.convert('RGBA')
+        data = img.getdata()
+        alpha = int(255 * opacity)
+        new_data = [(r, g, b, alpha) for r, g, b, *_ in data]
+        img.putdata(new_data)
+        print(f"Applied {opacity*100:.0f}% opacity")
 
     # Save image
     img.save(output_file)
@@ -326,6 +336,9 @@ Examples:
 
   # Custom size
   python generate_board_diagram.py --size 1200 --output large_board.png
+
+  # Faded background for book cover (15% opacity)
+  python generate_board_diagram.py --no-labels --opacity 0.15 --output initial_board_faded.png
         """
     )
 
@@ -341,6 +354,8 @@ Examples:
                        help='Hide last move arrow')
     parser.add_argument('--show-moves', type=str, default=None,
                        help='Show possible moves for a piece at given square (e.g., "d3")')
+    parser.add_argument('--opacity', type=float, default=None,
+                       help='Apply opacity (0.0-1.0) for faded background images (e.g., 0.15)')
 
     args = parser.parse_args()
 
@@ -350,7 +365,8 @@ Examples:
         board_size=args.size,
         show_labels=not args.no_labels,
         show_last_move=not args.no_arrow,
-        show_moves_for=args.show_moves
+        show_moves_for=args.show_moves,
+        opacity=args.opacity
     )
 
 

@@ -126,6 +126,8 @@
 \usepackage{enumitem}           % Better lists
 \usepackage{footnote}           % Better footnotes
 \usepackage{csquotes}           % Quotations
+\usepackage{eso-pic}            % Background images
+\usepackage{transparent}        % Transparency for images
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % CUSTOM COLORS
@@ -184,9 +186,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \title{
-    \Huge\textbf{Yolah Board Game} \\
+    {\fontsize{40}{60}\selectfont\textbf{Yolah Board Game}} \\
     \vspace{0.5cm}
-    \Large Building a Two-Player Perfect-Information Game with Artificial Players\\ 
+    \huge Building a Two-Player Perfect-Information Game with Artificial Players\\
 }
 
 \author{
@@ -208,6 +210,7 @@
 \newacronym{gpu}{GPU}{Graphics Processing Unit}
 \newacronym{z3}{Z3}{Z3 Theorem Prover}
 \newacronym{ipc}{IPC}{Instructions Per Cycle}
+\newacronym{ilp}{ILP}{Instruction Level Parallelism}
 \newacronym{pmu}{PMU}{Performance Monitoring Unit}
 \newacronym{mlp}{MLP}{Memory Level Parallelism}
 \newacronym{llc}{LLC}{Last Level Cache}
@@ -236,6 +239,11 @@
 \frontmatter
 
 % Title Page
+\AddToShipoutPictureBG*{%
+    \AtPageCenter{%
+        \makebox(0,0){\includegraphics[height=\paperheight]{initial_board_faded.png}}%
+    }%
+}
 \maketitle
 
 \thispagestyle{empty}
@@ -1393,8 +1401,8 @@ We can thus easily obtain all squares directly adjacent to the pieces on a given
 
 \begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
 shift<NORTH>(board) | shift<SOUTH>(board) | shift<EAST>(board) | 
-shift<WEST>(board) | shift<NORTH_EAST>(board) | shift<NORTH_WEST>(board) |
-shift<SOUTH_EAST>(board) | shift<SOUTH_WEST>(board)
+shift<WEST>(board) | shift<NORTH_EAST>(board) | shift<NORTH_WEST>(board) 
+| shift<SOUTH_EAST>(board) | shift<SOUTH_WEST>(board)
 \end{minted}
 
 % Pour le plateau de la table on obtient les positions représentées par des étoiles dans la table.
@@ -1458,14 +1466,14 @@ enum Rank : uint8_t {
     RANK_NB
 };
 constexpr uint64_t FileABB = 0x0101010101010101;
-//   0x0101010101010101
-//== 0b0000000100000001000000010000000100000001000000010000000100000001  
-//            a8      a7      a6      a5      a4      a3      a2      a1 
+//  0x0101010101010101
+//==0b0000000100000001000000010000000100000001000000010000000100000001  
+//           a8      a7      a6      a5      a4      a3      a2      a1 
 
 constexpr uint64_t FileHBB = FileABB << 7;
-//   0x8080808080808080
-//== 0b1000000010000000100000001000000010000000100000001000000010000000
-//     h8      h7      h6      h5      h4      h3      h2      h1 
+//  0x8080808080808080
+//==0b1000000010000000100000001000000010000000100000001000000010000000
+//    h8      h7      h6      h5      h4      h3      h2      h1 
 \end{minted}
 % \captionof{listing}{Colonnes et rangées}
 \captionof{listing}{Files and ranks}
@@ -1531,14 +1539,14 @@ Suppose we need to find the position of the only 1-bit in an unsigned long integ
 \end{minted}
 
 % Notons que les processeurs possèdent des instructions permettant de calculer efficacement cette fonction, et le compilateur gcc permet de calculer efficacement cette position avec la fonction __builtin_ctzll(unsigned long long x), par exemple,
-Note that processors have instructions to efficiently compute this function\footnote{\mintinline{asm}{tzcnt} on Intel.}, and the {\ttfamily gcc} compiler allows efficient calculation of this position with the function\\ \mintinline{c++}{__builtin_ctzll(unsigned long long x)}\footnote{Returns the number of trailing 0-bits in x, starting at the least significant bit position. If x is 0, the result is undefined.}, for example,
+Note that processors have instructions to efficiently compute this function\footnote{\mintinline{asm}{tzcnt} on Intel.}, and in \texttt{C++} we can efficiently compute this position with the function\\ \mintinline{c++}{std::countr_zero(unsigned long long x)}\footnote{Returns the number of trailing 0-bits in x, starting at the least significant bit position.}, for example,
 
 \begin{minted}[breaklines,fontsize=\small,frame=none]{cpp}
-    position(0b1000) == __builtin_ctzll(0b1000)
+    position(0b1000) == std::countr_zero(0b1000)
 \end{minted}
 
 % Mais nous allons coder cette fonction position en utilisant une fonction magique de hachage parfait. Cette fonction nous servira pour la génération des coups possibles par la suite. En utilisant une table de hachage classique, nous pouvons tout d'abord remplir celle-ci avec les 64 valeurs et simplement consulter cette table par la suite, comme dans le code suivant :
-However, we will code this \mintinline{c++}{position} function using a magic perfect hashing function. This function will be useful for move generation later. Using a standard hash table, we could first fill it with 64 values and then simply look up this table, as in the following code:
+However, we will code this \mintinline{c++}{position} function using a magic perfect hashing function. This kind of function will be useful for move generation later. Using a standard hash table, we could first fill it with 64 values and then simply look up this table, as in the following code:
 
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 unordered_map<uint64_t, uint8_t> table {
@@ -1616,7 +1624,8 @@ int main() {
             seen.insert(i);
         }
         if (found) {
-            cout << format("found magic for K = {}: {:#x}\n", K, MAGIC);
+            cout << format("found magic for K = {}: {:#x}\n", 
+                            K, MAGIC);
             int size = 1 << K;
             vector<int> table(size, -1);
             for (const auto [bitboard, pos] : positions) {
@@ -1652,7 +1661,7 @@ int main() {
 \item On lines 14 to 16, the \mintinline{c++}{index} function calculates the index for key \mintinline{c++}{bitboard} (this bitboard contains only one 1-bit) using the magic perfect hashing formula.
 
 % \item La boucle while, lignes 17 à 43, va boucler jusqu'à trouver la constante MAGIC qui permet de réaliser un hachage parfait magique (du coup cette boucle peut être infinie).
-\item The \mintinline{c++}{while} loop, lines 17 to 43, loops until it finds a \mintinline{c++}{MAGIC} constant that achieves magic perfect hashing (this loop could potentially run forever).
+\item The \mintinline{c++}{while} loop, lines 17 to 44, loops until it finds a \mintinline{c++}{MAGIC} constant that achieves magic perfect hashing (this loop could potentially run forever).
 
 % \item À la ligne 18, on crée la valeur MAGIC au hasard.
 \item On line 18, we create the \mintinline{c++}{MAGIC} value randomly.
@@ -1664,7 +1673,7 @@ int main() {
 \item On lines 21 to 28, the \mintinline{c++}{for} loop tests all bitboards, finds the index for each using the hash (\mintinline{c++}{index} function), and verifies there are no collisions (line 23) with indices obtained for previous bitboards.
 
 % \item Enfin, aux lignes 29 à 42, si nous avons trouvé une constante MAGIC qui permet de créer le hachage parfait magique, nous affichons celle-ci puis nous affichons un tableau en C++ qui contient la position du bit à 1 pour chacun des bitboard. La sortie de ce programme, pour une exécution donnée, est donnée ci-dessous.
-\item Finally, on lines 29 to 42, if we found a \mintinline{c++}{MAGIC} constant that creates magic perfect hashing, we display it and then display a C++ array containing the position of the 1-bit for each bitboard. The output of this program for a given execution is shown below. 
+\item Finally, on lines 29 to 43, if we found a \mintinline{c++}{MAGIC} constant that creates magic perfect hashing, we display it and then display a C++ array containing the position of the 1-bit for each bitboard. The output of this program for a given execution is shown below. 
 
 \begin{minted}[breaklines,fontsize=\small]{cpp}
 found magic for K = 7: 0x65e4d4ee86638416
@@ -1768,10 +1777,10 @@ if solver.check() == sat:
 \begin{minted}[breaklines,fontsize=\small]{cpp}
 found magic for K = 6: 0x2643c51ab9dfa5b
 constexpr uint8_t positions[64] = {
-    0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
-   12, 26, 53,  5, 24, 33, 56, 35, 61,  8, 30, 58, 37, 42, 17, 46,
-   63, 13, 21, 27, 10, 54,  6, 40, 25, 52, 32, 34, 60, 57, 36, 45,
-   62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
+ 0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
+12, 26, 53,  5, 24, 33, 56, 35, 61,  8, 30, 58, 37, 42, 17, 46,
+63, 13, 21, 27, 10, 54,  6, 40, 25, 52, 32, 34, 60, 57, 36, 45,
+62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
 };
 \end{minted}
 
@@ -1802,13 +1811,14 @@ Note that we don't have the same problem on line 18 because \mintinline{python}{
 \end{itemize}
 
 % Pour tester l'efficacité de notre technique de hachage parfait magique, nous allons mettre en place le micro-benchmark donné dans le listing. Nous utilisons la librairie google benchmark pour effectuer ces mesures. Le résultat de l'exécution de ce benchmark est donné dans la figure. La fonction BM_magic_positions utilisant le hachage parfait magique est bien plus rapide que la fonction BM_unordered_map_positions utilisant une table de hachage classique. Bien entendu, la fonction BM_builtin_ctz_positions utilisant une instruction dédiée est la plus efficace (mais ne sera d'aucune utilité pour la génération des coups possibles).
-To test the efficiency of our magic perfect hashing technique, we set up the micro-benchmark shown in Listing \ref{lst:compare_hashmap_magic}. We use the \emph{Google Benchmark} library for these measurements \cite{googlebenchmark2025}. The benchmark execution results are shown in Listing \ref{lst:result_compare_hashmap_magic}. The \mintinline{c++}{BM_magic_positions} function using magic perfect hashing is much faster than the \mintinline{c++}{BM_unordered_map_positions} function using a standard hash table. Of course, the \mintinline{c++}{BM_builtin_ctz_positions} function using a dedicated instruction is the most efficient (but will be of no use for move generation).\\
+To test the efficiency of our magic perfect hashing technique, we set up the micro-benchmark shown in Listing \ref{lst:compare_hashmap_magic}. We use the \emph{Google Benchmark} library for these measurements \cite{googlebenchmark2025}. The benchmark execution results are shown in Listing \ref{lst:result_compare_hashmap_magic}. The \mintinline{c++}{BM_magic_positions} function using magic perfect hashing is much faster than the \mintinline{c++}{BM_unordered_map_positions} function using a standard hash table. Of course, the \mintinline{c++}{BM_countr_zero_positions} function using a dedicated instruction is the most efficient (but will be of no use for move generation).\\
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\small]{cpp}
 #include <benchmark/benchmark.h>
 #include <unordered_map>
 #include <vector>
+#include <bit>
 
 std::vector<uint64_t> generate_isolated_bits() {
     std::vector<uint64_t> samples;
@@ -1821,16 +1831,16 @@ static void BM_magic_positions(benchmark::State& state) {
     constexpr uint64_t MAGIC = 0x2643c51ab9dfa5b;
     constexpr int K = 6;
     constexpr uint8_t positions[64] = {
-         0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
-        12, 26, 53,  5, 24, 33, 56, 35, 61,  8, 30, 58, 37, 42, 17, 46,
-        63, 13, 21, 27, 10, 54,  6, 40, 25, 52, 32, 34, 60, 57, 36, 45,
-        62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
+      0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
+     12, 26, 53,  5, 24, 33, 56, 35, 61,  8, 30, 58, 37, 42, 17, 46,
+     63, 13, 21, 27, 10, 54,  6, 40, 25, 52, 32, 34, 60, 57, 36, 45,
+     62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
     };
     auto samples = generate_isolated_bits();
     size_t idx = 0;
     for (auto _ : state) {
      uint64_t bitboard = samples[idx++ & 63];
-     benchmark::DoNotOptimize(positions[bitboard * MAGIC >> (64 - K)]);
+     benchmark::DoNotOptimize(positions[bitboard*MAGIC >> (64 - K)]);
     }
     state.SetItemsProcessed(state.iterations());
 }
@@ -1849,35 +1859,45 @@ static void BM_unordered_map_positions(benchmark::State& state) {
     state.SetItemsProcessed(state.iterations());
 }
 BENCHMARK(BM_unordered_map_positions);
-static void BM_builtin_ctz_positions(benchmark::State& state) {
+static void BM_countr_zero_positions(benchmark::State& state) {
     auto samples = generate_isolated_bits();
     size_t idx = 0;
     for (auto _ : state) {
         uint64_t bitboard = samples[idx++ & 63];
-        benchmark::DoNotOptimize(__builtin_ctzll(bitboard));
+        benchmark::DoNotOptimize(std::countr_zero(bitboard));
     }
     state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_builtin_ctz_positions);
+BENCHMARK(BM_countr_zero_positions);
 BENCHMARK_MAIN();
 \end{minted}
 % \captionof{listing}{Micro-benchmark pour comparer les temps d'exécution du hachage parfait magique, d'une table de hachage classique et de l'instruction machine dédiée.}
 \captionof{listing}{Micro-benchmark comparing execution times of magic perfect hashing, a standard hash table, and a dedicated machine instruction.}
 \label{lst:compare_hashmap_magic}
-\end{mdframed} 
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[fontsize=\footnotesize]{bash}
+$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02 -lbenchmark
+$ ./chapter02
+\end{minted}
+\end{mdframed}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 \begin{minted}[linenos, breaklines,fontsize=\footnotesize]{text}
 Run on (12 X 4400 MHz CPU s)
-CPU Caches: L1 Data 32 KiB (x6), L1 Instruction 32 KiB (x6),
-            L2 Unified 256 KiB (x6), L3 Unified 12288 KiB (x1)
-Load Average: 0.62, 1.33, 2.92
-
-Benchmark                      Time        CPU    Iterations  Throughput
---------------------------------------------------------------------------
-BM_magic_positions          0.542 ns   0.542 ns   1000000000  1.85 G/s
-BM_unordered_map_positions   30.2 ns    30.2 ns     23361655  33.1 M/s
-BM_builtin_ctz_positions    0.480 ns   0.480 ns   1000000000  2.08 G/s
+CPU Caches:
+  L1 Data 32 KiB (x6)
+  L1 Instruction 32 KiB (x6)
+  L2 Unified 256 KiB (x6)
+  L3 Unified 12288 KiB (x1)
+Load Average: 1.59, 1.78, 1.63
+-----------------------------------------------------------------
+Benchmark                        Time        CPU      Iterations
+-----------------------------------------------------------------
+BM_magic_positions           0.552 ns   0.552 ns      1000000000
+BM_unordered_map_positions    31.1 ns    31.1 ns        22584016
+BM_countr_zero_positions     0.491 ns   0.491 ns      1000000000
 \end{minted}
 % \captionof{listing}{Résultats de l'exécution du micro-benchmark du listing}
 \captionof{listing}{Micro-benchmark execution results from Listing \ref{lst:compare_hashmap_magic}}
@@ -2231,10 +2251,10 @@ enum MoveType {
     DIAGONAL
 };
 
-uint64_t reachable_squares(MoveType mt, Square sq, uint64_t occupied) {
+uint64_t reachable_squares(MoveType mt,Square sq,uint64_t occupied) {
     uint64_t  moves    = 0;
     Direction o_dir[4] = {NORTH, SOUTH, EAST, WEST};
-    Direction d_dir[4] = {NORTH_EAST,SOUTH_EAST,SOUTH_WEST,NORTH_WEST};
+    Direction d_dir[4]={NORTH_EAST,SOUTH_EAST,SOUTH_WEST,NORTH_WEST};
     for (Direction d : (mt == ORTHOGONAL ? o_dir : d_dir)) {
         Square s = sq;
         while (true) {            
@@ -2277,7 +2297,7 @@ std::pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
         for (size_t j = 0; j < occupancies.size(); j++) {
             uint64_t occ = occupancies[j];
             int index = magic * occ >> shift;
-            if (seen[index] == cnt && moves[index] != possible_moves[j]) 
+            if (seen[index]==cnt && moves[index]!=possible_moves[j]) 
             {
                 found = false;
                 break;
@@ -2705,8 +2725,8 @@ The function \mintinline{c++}{void init_all_magics()} from listing \ref{lst:magi
 Square& operator++(Square& d) { return d = Square(int(d) + 1); }
 
 void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
-    static constexpr uint64_t O_MAGIC[64] = { 0x80011040002082, // ...
-    static constexpr uint64_t D_MAGIC[64] = { 0x811100100408200,// ...
+    static constexpr uint64_t O_MAGIC[64]={ 0x80011040002082, //...
+    static constexpr uint64_t D_MAGIC[64]={ 0x811100100408200,//...
     using namespace std;
     int32_t size = 0;
     vector<uint64_t> occupancies;
@@ -2736,7 +2756,8 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
     }
 }
 \end{minted}
-\captionof{listing}{TO DO}
+% Initialisation des différentes tables permettant d'obtenir le bitboard des coups possibles en fonction de la configuration des obstacles.
+\captionof{listing}{Initialization of the various tables used to obtain the bitboard of possible moves based on the obstacle configuration.}
 \label{lst:find_magics}
 \end{mdframed} 
 
@@ -2828,7 +2849,8 @@ std::ostream& operator<<(std::ostream& os, const Move& m) {
         "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
         "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
     };
-    os << square2string[m.from_sq()] << ':' << square2string[m.to_sq()];
+    os << square2string[m.from_sq()] << ':' 
+       << square2string[m.to_sq()];
     return os;
 }
 \end{minted}
@@ -2889,7 +2911,7 @@ The list of possible moves in a given game configuration is represented by the \
 \end{verbatim}
 
 % \item Aux lignes 6 à 9, les fonctions \mintinline{c++}{begin} et \mintinline{c++}{end} vont nous permettre d'itérer sur un objet de type \mintinline{c++}{MoveList}. Nous pourrons faire par exemple~:
-\item At lines 6 to 9, the \mintinline{c++}{begin} and \mintinline{c++}{end} functions allow us to iterate over a \mintinline{c++}{MoveList} object. For example, we can write:
+\item At lines 6 to 11, the \mintinline{c++}{begin} and \mintinline{c++}{end} functions allow us to iterate over a \mintinline{c++}{MoveList} object. For example, we can write:
 \begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
 MoveList list;
 // ...
@@ -2899,7 +2921,7 @@ for (Move m : list) {
 \end{minted}
 
 % \item Le reste des fonctions vont nous permettre de récupérer la taille (\mintinline{c++}{size} à la ligne 10), de pouvoir indexer la liste comme un tableau (\mintinline{c++}{operator[]} aux lignes 11 à 14) et de récupérer directement le pointeur sur le début du tableau \mintinline{c++}{move_list} (\mintinline{c++}{data} à la ligne 15).
-\item The remaining functions allow us to retrieve the size (\mintinline{c++}{size} at line 10), index the list like an array (\mintinline{c++}{operator[]} at lines 11 to 14), and directly obtain the pointer to the beginning of the \mintinline{c++}{move_list} array (\mintinline{c++}{data} at line 15).
+\item The remaining functions allow us to retrieve the size (\mintinline{c++}{size} at lines 12 to 14), index the list like an array (\mintinline{c++}{operator[]} at lines 15 to 18), and directly obtain the pointer to the beginning of the \mintinline{c++}{move_list} array (\mintinline{c++}{data} at line 19).
 
 \end{itemize}
 
@@ -2910,11 +2932,15 @@ class MoveList {
     Move move_list[MAX_NB_MOVES], *last;
 public:
     constexpr MoveList() noexcept : last(move_list) {}
-    constexpr const Move* begin() const noexcept { return move_list; }
+    constexpr const Move* begin() const noexcept { 
+        return move_list; 
+    }
     constexpr const Move* end() const noexcept { return last; }
     constexpr Move* begin() noexcept { return move_list; }
     constexpr Move* end() noexcept { return last; }
-    constexpr size_t size() const noexcept { return last - move_list; }
+    constexpr size_t size() const noexcept { 
+        return last - move_list; 
+    }
     constexpr const Move& operator[](size_t i) const { 
         return move_list[i]; 
     }
@@ -3197,6 +3223,13 @@ int main(int argc, char** argv) {
 % \captionof{listing}{Benchmark pour tester l'affirmation que la fonction \mintinline{c++}{undo} apporte un gain par rapport à une sauvegarde de l'état complet du jeu}
 \captionof{listing}{Benchmark to test the assertion that the \mintinline{c++}{undo} function provides a performance gain over saving the complete game state}
 \label{lst:undo_vs_restore_bench}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[fontsize=\footnotesize]{bash}
+$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02 -lbenchmark
+$ ./chapter02
+\end{minted}
 \end{mdframed}
 
 % \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
@@ -3795,7 +3828,9 @@ Nous allons d'abord analyser les traces d'appels des fonctions pour déterminer 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-$ sudo perf record -g ./chapter02
+$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
+-o chapter02
+$ sudo perf record -F 999 --call-graph dwarf -g ./chapter02
 $ sudo perf script | stackcollapse-perf.pl > profile.txt
 \end{verbatim}
 }
@@ -3845,6 +3880,8 @@ Grâce au listing \ref{lst:chapter02_perf1}, nous savons que nous devons concent
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
+$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
+-o chapter02
 $ perf stat -r 10 -e cycles,instructions,branches,branch-misses,\
 L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,\
 l1d_pend_miss.pending,l1d_pend_miss.pending_cycles ./chapter02
@@ -3853,14 +3890,6 @@ l1d_pend_miss.pending,l1d_pend_miss.pending_cycles ./chapter02
 \end{mdframed}
 
 Le résultat de cette commande est présenté dans le listing \ref{lst:perf_chapter02_1}.
-\begin{itemize}
-\item L'option \texttt{-r 10} de la commande \texttt{perf} ci-dessus permet de lancer le programme dix fois, pour faire la moyenne et calculer l'écart-type\footnote{Plus précisément, l'écart-type en pourcentage de la moyenne.} des résultats obtenus.
-\item Le compteur \texttt{cycles} indique le nombre de cycles effectués par le processeur durant l'exécution de notre programme\footnote{En mode utilisateur et en mode noyau. Les compteurs sont activés quand un processus s'exécute et désactivés lorsqu'il perd la main.}.
-\item Le compteur \texttt{instructions} mesure le nombre d'instructions exécutées par notre programme. Le nombre d'instructions exécutées par cycle \gls{ipc} est de $1.38$. Les processeurs modernes sont super-scalaires, ils ont la capacité d'exécuter plusieurs instructions par cycle. Plus ce nombre est élevé, et plus les unités de calculs du processeur sont utilisées. Nous pourrons comparer cet \gls{ipc} avec celui des versions optimisées que nous développerons par la suite.
-\item Le compteur \texttt{branches} va comptabiliser le nombre total de branchements exécutés (conditionnels, inconditionnels, indirects, appels et retours de fonction).
-\item Le compteur \texttt{branch-misses} indique le nombre de fois où le prédicteur de branchement s'est trompé. Les processeurs modernes, pour ne pas laisser leurs unités de calcul sans travail, exécutent des instructions de manière spéculative, c'est-à-dire avant de connaître le résultat des branchements conditionnels. Lorsque la prédiction est correcte, le processeur a gagné du temps. En cas d'erreur, les instructions exécutées spéculativement sont annulées, et le processeur reprend l'exécution du programme au bon endroit après le branchement. Ces erreurs de branchements sont coûteuses. Dans notre cas, le prédicteur de branchement se trompe dans $11.30\%$ des cas. Ce taux est élevé et c'est la première chose que nous allons essayer d'améliorer. 
-
-\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -3887,18 +3916,26 @@ Le résultat de cette commande est présenté dans le listing \ref{lst:perf_chap
 \label{lst:perf_chapter02_1}
 \end{mdframed}
 
-\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
-{\small
-\begin{verbatim}
+\begin{itemize}
+\item L'option \texttt{-r 10} de la commande \texttt{perf} ci-dessus permet de lancer le programme dix fois, pour faire la moyenne et calculer l'écart-type\footnote{Plus précisément, l'écart-type en pourcentage de la moyenne.} des résultats obtenus.
+\item Le compteur \texttt{cycles} indique le nombre de cycles effectués par le processeur durant l'exécution de notre programme\footnote{En mode utilisateur et en mode noyau. Les compteurs sont activés quand un processus s'exécute et désactivés lorsqu'il perd la main.}.
+\item Le compteur \texttt{instructions} mesure le nombre d'instructions exécutées par notre programme. Le nombre d'instructions exécutées par cycle \gls{ipc} est de $1.38$. Les processeurs modernes sont super-scalaires, ils ont la capacité d'exécuter plusieurs instructions par cycle. Plus ce nombre est élevé, et plus les unités de calculs du processeur sont utilisées. Nous pourrons comparer cet \gls{ipc} avec celui des versions optimisées que nous développerons par la suite.
+\item Le compteur \texttt{branches} va comptabiliser le nombre total de branchements exécutés (conditionnels, inconditionnels, indirects, appels et retours de fonction).
+\item Le compteur \texttt{branch-misses} indique le nombre de fois où le prédicteur de branchement s'est trompé. Les processeurs modernes, pour ne pas laisser leurs unités de calcul sans travail, exécutent des instructions de manière spéculative, c'est-à-dire avant de connaître le résultat des branchements conditionnels. Lorsque la prédiction est correcte, le processeur a gagné du temps. En cas d'erreur, les instructions exécutées spéculativement sont annulées, et le processeur reprend l'exécution du programme au bon endroit après le branchement. Ces erreurs de branchements sont coûteuses. Dans notre cas, le prédicteur de branchement se trompe dans $11{,}30\%$ des cas. Ce taux est élevé et c'est la première chose que nous allons essayer d'améliorer. 
+\item Le compteur \texttt{L1-dcache-loads} mesure le nombre d'accès en lecture au cache de premier niveau, qui est le cache le plus rapide (mais aussi le plus petit).
+\item Le compteur \texttt{L1-dcache-load-misses} indique le nombre de lectures qui n'ont pas trouvé les données dans le cache de premier niveau. Ces lectures ont dû être recherchées dans les caches de niveaux supérieurs, ou en mémoire principale. Ici nous avons un défaut de cache de niveau 1 de $4{,}71\%$. Notre programme accède aux tables des magic bitboards de manière peu prévisible pour le processeur et ces tables ne peuvent pas tenir entièrement dans le cache de niveau 1. Au vu de ces considérations, ce taux de défaut nous semble correct.
+\item Le compteur \texttt{LLC-loads} mesure les accès au cache de dernier niveau, celui placé juste avant la mémoire principale.
+\item Le compteur \texttt{LLC-load-misses} indique le nombre de lectures qui n'ont pas trouvé les données dans le cache de dernier niveau (\gls{llc}). On constate que ce nombre est très faible~: sur les $147\,175\,205$ accès ayant échoué dans le cache L1, seulement $24\,898$ ont nécessité un accès à la mémoire principale. Cela s'explique facilement, car les tables des magic bitboards peuvent tenir entièrement dans le cache de dernier niveau.
+\item Concernant les deux prochains compteurs, nous étions curieux d'étudier le parallélisme des accès à la mémoire \gls{mlp} présente dans les processeurs modernes et étudier cette caractéristique dans notre programme.
+\item Le compteur \texttt{l1d\_pend\_miss.pending} comptabilise, à chaque cycle, le nombre de requêtes mémoire en attente suite à des défauts de cache L1. C'est une somme cumulée~: si pendant 100 cycles il y a 3 requêtes en vol, ce compteur s'incrémente de 300.
+\item Le compteur \texttt{l1d\_pend\_miss.pending\_cycles} compte le nombre de cycles pendant lesquels au moins une requête mémoire est en attente.
+\item Le rapport de ces deux compteurs donne le MLP~:
+\[
+\text{MLP} = \frac{\texttt{l1d\_pend\_miss.pending}}{\texttt{l1d\_pend\_miss.pending\_cycles}} = \frac{2\,413\,363\,382}{2\,202\,499\,896} \approx 1{,}10
+\]
+Cette valeur indique qu'en moyenne, seulement $1{,}10$ requête mémoire est en vol simultanément lorsque le processeur attend des données. Un MLP de 1 signifie que les accès mémoire sont strictement séquentiels~: le processeur attend la fin d'une requête avant d'en lancer une autre. Les processeurs modernes peuvent gérer plusieurs requêtes simultanées. Notre MLP proche de 1 suggère que notre code ne tire pas parti du parallélisme mémoire, probablement à cause de dépendances dans le code de la fonction \mintinline{c++}{moves} qui empêchent le processeur de lancer plusieurs requêtes en parallèle. Il faut toutefois nuancer ce constat~: avec un taux de défaut L1 de seulement $4{,}71\%$, la grande majorité des accès mémoire ($95{,}29\%$) sont satisfaits par le cache L1 en quelques cycles. Le faible MLP n'est donc problématique que pour les $4{,}71\%$ d'accès qui génèrent effectivement une attente. Nous pourrons comparer ce MLP avec les versions optimisées que nous allons développer.  
 
-\end{verbatim}
-}
-\end{mdframed}
-%\vspace{-0.5\baselineskip}
-\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
-\label{lst:}
-\end{mdframed}
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
 \begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
@@ -3906,7 +3943,6 @@ void moves(uint8_t player, MoveList& moves) const noexcept {
     Move* move_list = moves.move_list;
     uint64_t occupied = black | white | holes;
     uint64_t bb = player == BLACK ? black : white;
-
     while (bb) {
         Square from = pop_lsb(bb);
         uint64_t b = moves_bb(from, occupied) & ~occupied;
@@ -3914,11 +3950,9 @@ void moves(uint8_t player, MoveList& moves) const noexcept {
             *move_list++ = Move(from, pop_lsb(b));
         }
     }
-    
     if (move_list == moves.move_list) [[unlikely]] {
         *move_list++ = Move::none();
     }
-
     moves.last = move_list;
 }
 \end{minted}
@@ -3926,6 +3960,87 @@ void moves(uint8_t player, MoveList& moves) const noexcept {
 \label{lst:random_games_perf2}
 \end{mdframed}
 
+Au vu des résultats précédents sur les différents compteurs, le critère qui nous semble le plus important à améliorer est le taux élevé de défauts du prédicteur de branchements. Le listing~\ref{lst:random_games_perf2} rappelle le code de la fonction \mintinline{c++}{moves}. On peut aussi utiliser \texttt{perf} pour analyser plus finement où se situent les défauts de prédiction de branchements dans le code source. La commande que nous utilisons est la suivante.
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
+-o chapter02
+$ sudo perf record -e branch-misses:pp ./chapter02
+$ sudo perf annotate --stdio
+\end{verbatim}
+}
+\end{mdframed}
+
+Une partie du code annoté produit par \texttt{perf annotate} est donnée dans le listing \ref{lst:branch-misses-version1}.
+\begin{itemize}
+\item Le code généré par le compilateur est optimisé et il n'est pas toujours facile de voir la correspondance avec le listing \ref{lst:random_games_perf2}. Le code annoté montre l'assembleur généré par le compilateur et intercale des lignes du source pour essayer de montrer la correspondance avec le code original.
+\item Les pourcentages indiquent la proportion des défauts de prédiction de branchement attribués à chaque instruction par rapport à l'ensemble du programme.
+\item Les défauts de branchement liés à la boucle \mintinline{c++}{while (bb)} de la ligne 5 du listing \ref{lst:random_games_perf2} représentent~: $9{,}24\% + 3{,}52\% = 12{,}76\%$.
+\item Les défauts de branchement liés à la boucle \mintinline{c++}{while (b)} de la ligne 8 du listing \ref{lst:random_games_perf2} représentent~: $4{,}50\% + 6{,}69\% + 67{,}28\% = 78{,}47\%$.
+\item La boucle \mintinline{c++}{while (b)} est donc celle qui génère le plus de défauts de branchement. Cela s'explique par le fait que l'historique des branchements pour cette boucle ne contient pas de motifs réguliers permettant de prédire les branchements futurs. En effet, le nombre d'itérations de cette boucle dépend du nombre de bits à 1 dans \mintinline{c++}{b}, qui représente les cases de destination possibles pour une pièce. Ce nombre varie selon la position des pièces et la configuration des obstacles sur le plateau, rendant toute prédiction difficile pour le processeur.
+\item La boucle \mintinline{c++}{while (bb)}, même si elle génère beaucoup moins de défauts de branchement, est simple à optimiser. En effet, nous savons pertinemment qu'il y aura toujours exactement quatre itérations, car chaque joueur possède quatre pièces. Pour optimiser cette boucle, nous allons la dérouler complètement afin d'éliminer tous les branchements associés. Ce déroulage devrait également offrir des opportunités de parallélisme au niveau des instructions (\gls{ilp}), car le processeur pourra exécuter simultanément les calculs indépendants pour chacune des quatre pièces.
+\end{itemize}
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=5pt,innerrightmargin=5pt,innertopmargin=5pt,innerbottommargin=5pt]
+{\small\ttfamily
+\begin{tabular}{r@{\quad}c@{\quad}r@{\quad}l}
+\multicolumn{4}{@{}l}{\textcolor{blue!70!black}{\textbf{Yolah::moves(unsigned char, MoveList\&) const:}}} \\[2pt]
+\rowcolor{gray!10}
+      & : & 408: & \textcolor{gray}{while (b) \{} \\
+\rowcolor{yellow!30}
+\makebox[3.5em][r]{\textcolor{black!90}{\textbf{4.50}}} & : & 8f2e: & and \%r10,\%rbp \\
+\rowcolor{yellow!35}
+\makebox[3.5em][r]{\textcolor{black!90}{\textbf{6.69}}} & : & 8f31: & je 8f65 \\
+\rowcolor{gray!10}
+      & : & 266: & \textcolor{gray}{: data((to << 6) + from) \{\}} \\
+ 0.00 & : & 8f33: & mov \%r9,\%r11 \\
+\rowcolor{gray!10}
+      & : & 407: & \textcolor{gray}{uint64\_t b = moves\_bb(from, occupied) \& \textasciitilde occupied;} \\
+ 0.00 & : & 8f36: & mov \%rbp,\%rcx \\
+ 0.00 & : & 8f39: & nopl 0x0(\%rax) \\
+\rowcolor{gray!10}
+      & : & 410: & \textcolor{gray}{std::\_\_countr\_zero:} \\
+ 0.00 & : & 8f40: & xor \%esi,\%esi \\
+\rowcolor{gray!10}
+      & : & 409: & \textcolor{gray}{*move\_list++ = Move(from, pop\_lsb(b));} \\
+ 0.00 & : & 8f42: & add \$0x2,\%r11 \\
+ 0.00 & : & 8f46: & tzcnt \%rcx,\%rsi \\
+ 0.00 & : & 8f4b: & shl \$0x6,\%esi \\
+ 0.00 & : & 8f4e: & add \%eax,\%esi \\
+\rowcolor{gray!10}
+      & : & 408: & \textcolor{gray}{while (b) \{} \\
+ 0.00 & : & 8f50: & blsr \%rcx,\%rcx \\
+ 0.00 & : & 8f55: & mov \%si,-0x2(\%r11) \\
+\rowcolor{red!35}
+\makebox[3.5em][r]{\textcolor{black!90}{\textbf{67.28}}} & : & 8f5a: & \textbf{jne 8f40} \\
+ 0.00 & : & 8f5c: & popcnt \%rbp,\%rbp \\
+ 0.00 & : & 8f61: & lea (\%r9,\%rbp,2),\%r9 \\
+\rowcolor{gray!10}
+      & : & 405: & \textcolor{gray}{while (bb) \{} \\
+\rowcolor{orange!30}
+\makebox[3.5em][r]{\textcolor{black!90}{\textbf{9.24}}} & : & 8f65: & test \%rdi,\%rdi \\
+\rowcolor{orange!25}
+\makebox[3.5em][r]{\textcolor{black!90}{\textbf{3.52}}} & : & 8f68: & jne 8ed8 \\
+\end{tabular}
+}
+\end{mdframed}
+%\vspace{-0.5\baselineskip}
+\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+\captionof{listing}{Résultats de \texttt{perf annotate} permettant de trouver les parties du code créant le plus de défauts de branchements. Les pourcentages indiquent la proportion des défauts de prédiction de branchement attribués à chaque instruction par rapport à l'ensemble du programme.}
+\label{lst:branch-misses-version1}
+\end{mdframed}
+
+La nouvelle version de la fonction \mintinline{c++}{moves} du listing \ref{lst:random_games_perf2} avec la boucle \mintinline{c++}{while (bb)} déroulée (ligne 5), est donné dans le listing \ref{lst:random_games_perf3}.
+\begin{itemize}
+\item Aux lignes 6 à 9, nous récupérons les cases des quatre pièces du joueur.
+\item Aux lignes 11 à 14, nous obtenons les bitboards des mouvements possibles pour les quatre pièces du joueur.
+\item Aux lignes 16 à 18, nous créons les coups pour la pièce situé dans la case \mintinline{c++}{from0}.
+\item Aux lignes 19 à 21, nous créons les coups pour la pièce situé dans la case \mintinline{c++}{from1}.
+\item Aux lignes 22 à 24, nous créons les coups pour la pièce situé dans la case \mintinline{c++}{from2}.
+\item Aux lignes 25 à 27, nous créons les coups pour la pièce situé dans la case \mintinline{c++}{from3}.
+\end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
 \begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
@@ -3956,75 +4071,63 @@ void moves(uint8_t player, MoveList& moves) const noexcept {
     while (b3) {
         *move_list++ = Move(from3, pop_lsb(b3));
     }
-
     if (move_list == moves.move_list) [[unlikely]] {
         *move_list++ = Move::none();
     }
-
     moves.last = move_list;
 }
 \end{minted}
-\captionof{listing}{}
+\captionof{listing}{Nouvelle version de la fonction \mintinline{c++}{moves} avec la première boucle \mintinline{c++}{while} déroulée.}
 \label{lst:random_games_perf3}
 \end{mdframed}
 
+Nous exécutons de nouveau la commande suivante, et les résultats sont donnés dans le listing \ref{lst:perf_chapter02_2}.
+
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-play_random_games                           95.17%
-    ├── Yolah::moves                        73.06%
-    │       ├── moves_bb                    26.47%
-    │       │   └── Magic::index             6.30%
-    │       ├── Move::Move                  15.48%
-    │       └── pop_lsb                     11.93%
-    │           └── lsb                     11.68%
-    ├── std::uniform_int_distribution<...    8.61%
-    ├── Yolah::play                          5.87%
-    └── Yolah::game_over                     5.02%
-        └── shift<>                          2.67%
+$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
+-o chapter02
+$ perf stat -r 10 -e cycles,instructions,branches,branch-misses,\
+L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,\
+l1d_pend_miss.pending,l1d_pend_miss.pending_cycles ./chapter02
+\end{verbatim}
+}
+\end{mdframed}
+
+Cette nouvelle version nous permet de réduire le temps d'exécution du programme de $1 - \frac{3{,}06}{4{,}23} \approx 27{,}7\%$. Nous pouvons observer dans le listing \ref{lst:perf_chapter02_2} que nous avons amélioré l'\gls{ipc}, qui passe de $1{,}38$ à $1{,}85$, que nous avons réduit le taux de défauts de branchement de $11{,}30\%$ à $10{,}16\%$, et que le taux de défauts de cache L1 est passé de $4{,}71\%$ à $4{,}12\%$. Le \gls{mlp}, qui mesure le nombre moyen de requêtes mémoire en vol simultanément, s'améliore également de $1{,}10$ à $1{,}35$, ce qui indique que le processeur exploite mieux le parallélisme mémoire pour masquer la latence des accès au cache. Le déroulage de la première boucle \mintinline{c++}{while} a donc permis de donner accès au processeur à plus d'instructions indépendantes et d'exécuter globalement plus d'instructions par cycle. 
+
+
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim} Performance counter stats for './chapter02' (10 runs):
+
+    12 678 510 624      cycles                        ( +-  0.07% )
+    23 599 166 797      instructions   # 1.85 IPC     ( +-  0.03% )
+     2 329 596 530      branches                      ( +-  0.03% )
+       236 669 629      branch-misses  # 10.16%       ( +-  0.04% )
+     3 510 465 683      L1-dcache-loads               ( +-  0.04% )
+       144 745 234      L1-dcache-load-misses # 4.12% ( +-  0.09% )
+        51 642 976      LLC-loads                     ( +-  0.59% )
+            11 608      LLC-load-misses # 0.02%       ( +- 12.06% )
+     2 372 461 194      l1d_pend_miss.pending         ( +-  0.80% )
+     1 756 784 236      l1d_pend_miss.pending_cycles  ( +-  0.77% )
+
+           3.06 +- 0.01 seconds time elapsed
 \end{verbatim}
 }
 \end{mdframed}
 %\vspace{-0.5\baselineskip}
 \begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
-\label{lst:}
+\captionof{listing}{Compteurs de performances pour le programme du listing \ref{lst:random_games_perf3}.}
+\label{lst:perf_chapter02_2}
 \end{mdframed}
 
-
-\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
-{\small
-\begin{verbatim}
-=== Game Statistics ===
-Total games: 1000000
-Black wins:  499124 (49.9%)
-White wins:  395468 (39.5%)
-Draws:       105408 (10.5%)
-
-Performance counter stats for './chapter02' (100 runs):
-
-12 832 947 780      cycles                    #    4,021 GHz                       ( +-  0,18% )  (49,84%)
-23 589 523 540      instructions              #    1,82  insn per cycle            ( +-  0,01% )  (62,38%)
- 2 328 267 849      branches                  #  729,484 M/sec                     ( +-  0,01% )  (62,40%)
-   236 977 678      branch-misses             #   10,17% of all branches           ( +-  0,01% )  (62,53%)
- 3 513 433 988      L1-dcache-loads           #    1,101 G/sec                     ( +-  0,01% )  (62,66%)
-   145 286 847      L1-dcache-load-misses     #    4,13% of all L1-dcache accesses ( +-  0,07% )  (62,68%)
-    54 964 849      LLC-loads                 #   17,221 M/sec                     ( +-  0,29% )  (50,01%)
-        38 307      LLC-load-misses           #    0,07% of all LL-cache accesses  ( +- 12,03% )  (49,88%)
-
-         3,19340 +- 0,00975 seconds time elapsed  ( +-  0,31% )
-\end{verbatim}
-}
-\end{mdframed}
-%\vspace{-0.5\baselineskip}
-\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
-\label{lst:}
-\end{mdframed}
+Nous verrons s'il est nécessaire d'essayer de continuer d'améliorer la fonction \mintinline{c++}{moves} par la suite. En effet, peut-être que le temps d'exécution de celle-ci sera négligeable par rapport au reste du programme dans les prochains chapitres. Par contre, nous aurons besoin d'exécuter des parties aléatoires pour certains joueurs artificiels. Il est donc intéressant d'en améliorer le temps d'exécution. Une façon très efficace d'optimiser un code, c'est de le supprimer~! Nous n'avons pas besoin de générer la liste de tous les coups, puis d'en choisir un aléatoirement seulement après cette génération. Nous pouvons choisir dès le début un coup aléatoirement. Cette génération de la liste de coups est aussi responsable de quasiment tous les défauts de branchement du programme. La fonction \mintinline{c++}{Move Yolah::random_move(mt19937& mt)} du listing~\ref{lst:random_games_perf4} retourne un coup aléatoire dans la position courante du jeu. Nous avons codé cette fonction de façon à éliminer un maximum de branchements. Ce style de programmation, dit \emph{branchless}, privilégie les opérations arithmétiques et logiques aux instructions conditionnelles, évitant ainsi les pénalités liées aux défauts de prédiction de branchement.
 
 \begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
 \begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
-Move random_move(mt19937& mt) const noexcept {
+Move Yolah::random_move(mt19937& mt) const noexcept {
     uint64_t occupied = black | white | holes;
     uint64_t player_bb = current_player() == BLACK ? black : white;
     Square from0 = pop_lsb(player_bb);
@@ -4045,14 +4148,15 @@ Move random_move(mt19937& mt) const noexcept {
     }
     uniform_int_distribution<uint32_t> d(0, n - 1);
     uint32_t bit = d(mt);
-    int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
-    bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
-    Square from = (Square[]){ from0, from1, from2, from3 }[bb_index];
-    uint64_t bb = (uint64_t[]){ b0, b1, b2, b3 }[bb_index];        
-    Square to = Square(std::countr_zero(_pdep_u64(1ULL << bit, bb)));
+    int bb_index = (bit >= n0) + (bit >= n0+n1) + (bit >= n0+n1+n2);
+    bit -= (bb_index > 0)*n0 + (bb_index > 1)*n1 + (bb_index > 2)*n2;
+    Square from = array{ from0, from1, from2, from3 }[bb_index];
+    uint64_t bb = array{ b0, b1, b2, b3 }[bb_index];        
+    Square to = Square(countr_zero(_pdep_u64(1ULL << bit, bb)));
     return Move(from, to);     
 }
-void play_random_games_fast(size_t nb_games, optional<uint64_t> seed = nullopt) {
+void play_random_games_fast(size_t nb_games, 
+                            optional<uint64_t> seed = nullopt) {
     MoveList moves;
     random_device rd;
     mt19937 mt(seed.value_or(rd()));
@@ -4077,15 +4181,31 @@ void play_random_games_fast(size_t nb_games, optional<uint64_t> seed = nullopt) 
     }
     cout << format("\n=== Game Statistics ===\n");
     cout << format("Total games: {}\n", nb_games);
-    cout << format("Black wins:  {} ({:.1f}%)\n", black_wins, 100.0 * black_wins / nb_games);
-    cout << format("White wins:  {} ({:.1f}%)\n", white_wins, 100.0 * white_wins / nb_games);
-    cout << format("Draws:       {} ({:.1f}%)\n", draws, 100.0 * draws / nb_games);
+    cout << format("Black wins:  {} ({:.1f}%)\n", 
+                    black_wins, 
+                    100.0 * black_wins / nb_games);
+    cout << format("White wins:  {} ({:.1f}%)\n", 
+                    white_wins, 
+                    100.0 * white_wins / nb_games);
+    cout << format("Draws:       {} ({:.1f}%)\n", 
+                    draws, 
+                    100.0 * draws / nb_games);
 }
 \end{minted}
 \captionof{listing}{}
 \label{lst:random_games_perf4}
 \end{mdframed}
 
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
+-o chapter02
+$ sudo perf record -F 999 --call-graph dwarf -g ./chapter02
+$ sudo perf script | stackcollapse-perf.pl > profile.txt
+\end{verbatim}
+}
+\end{mdframed}
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -4110,6 +4230,15 @@ play_random_games_fast                     96.01%
 \label{lst:}
 \end{mdframed}
 
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+{\small
+\begin{verbatim}
+$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp\
+-o chapter02
+$ perf stat -r 100 ./chapter02
+\end{verbatim}
+}
+\end{mdframed}
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -4259,6 +4388,13 @@ BENCHMARK_MAIN();
 \end{minted}
 \captionof{listing}{}
 \label{lst:random_generator_bench}
+\end{mdframed}
+
+\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+\begin{minted}[fontsize=\footnotesize]{bash}
+$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02 -lbenchmark
+$ ./chapter02
+\end{minted}
 \end{mdframed}
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]

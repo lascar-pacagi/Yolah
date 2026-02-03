@@ -1,30 +1,23 @@
 Flame Graph Tree - Yolah Performance Profile
 ================================================================================
 
-chapter02                                          100.00%
-└── main                                            99.70%
-    ├── [unknown]                                   96.01%
-    │   └── play_random_games_fast                  96.01%
-    │       ├── Yolah::random_move                  81.29%
-    │       │   ├── moves_bb                        47.14%
-    │       │   │   └── Magic::index                 5.99%
-    │       │   ├── std::uniform_int_distributi...  12.88%
-    │       │   │   └── std::uniform_int_distri...   6.71%
-    │       │   │       └── std::mersenne_twist...   5.04%
-    │       │   ├── pop_lsb                          4.36%
-    │       │   │   └── lsb                          4.11%
-    │       │   │       └── std::countr_zero<un...   4.11%
-    │       │   │           └── std::__countr_z...   4.11%
-    │       │   └── std::popcount<unsigned long>     2.79%
-    │       │       └── std::__popcount<unsigne...   2.79%
-    │       ├── Yolah::game_over                     9.53%
-    │       │   └── shift<                           5.96%
-    │       └── Yolah::play                          3.95%
-    └── std::uniform_int_distribution<unsigned ...   2.84%
-        └── std::uniform_int_distribution<unsig...   2.84%
-            └── std::mersenne_twister_engine<un...   2.84%
-
-perf-exec                                            0.00%
+chapter02                                100.00%
+└── main                                  99.97%
+    ├── play_random_games                 97.45%
+    │   ├── moves                         80.16%
+    │   │   ├── moves_bb                  36.16%
+    │   │   │   └── Magic::index           9.36%
+    │   │   ├── Move::Move                14.88%
+    │   │   └── pop_lsb                    0.61%
+    │   ├── std::uniform_int_distribu...   7.90%
+    │   │   └── std::uniform_int_dist...   6.60%
+    │   │       └── std::mersenne_twi...   5.57%
+    │   │           └── std::mersenne...   0.64%
+    │   ├── game_over                      4.14%
+    │   │   └── shift<                     2.78%
+    │   └── play                           3.22%
+    │       └── square_bb                  0.54%
+    └── std::uniform_int_distribution...   2.22%
 
 ================================================================================
 Note: Percentages show portion of total CPU time

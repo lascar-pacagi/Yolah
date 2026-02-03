@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 #include <unordered_map>
 #include <vector>
+#include <bit>
 
 using ll = uint64_t;
 
@@ -44,16 +45,16 @@ static void BM_unordered_map_positions(benchmark::State& state) {
 }
 BENCHMARK(BM_unordered_map_positions);
 
-static void BM_builtin_ctz_positions(benchmark::State& state) {
+static void BM_countr_zero_positions(benchmark::State& state) {
     auto samples = generate_isolated_bits();
     size_t idx = 0;
     for (auto _ : state) {
         ll bitboard = samples[idx++ & 63];
-        benchmark::DoNotOptimize(__builtin_ctzll(bitboard));
+        benchmark::DoNotOptimize(std::countr_zero(bitboard));
     }
     state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_builtin_ctz_positions);
+BENCHMARK(BM_countr_zero_positions);
 
 BENCHMARK_MAIN();
 

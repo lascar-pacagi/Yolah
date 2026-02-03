@@ -28,7 +28,8 @@
 \PYG{+w}{            }\PYG{n}{seen}\PYG{p}{.}\PYG{n}{insert}\PYG{p}{(}\PYG{n}{i}\PYG{p}{);}
 \PYG{+w}{        }\PYG{p}{\PYGZcb{}}
 \PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{found}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
-\PYG{+w}{            }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}found magic for K = \PYGZob{}\PYGZcb{}: \PYGZob{}:\PYGZsh{}x\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{K}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MAGIC}\PYG{p}{);}
+\PYG{+w}{            }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{(}\PYG{l+s}{\PYGZdq{}found magic for K = \PYGZob{}\PYGZcb{}: \PYGZob{}:\PYGZsh{}x\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{                            }\PYG{n}{K}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MAGIC}\PYG{p}{);}
 \PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{size}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{K}\PYG{p}{;}
 \PYG{+w}{            }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{int}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{table}\PYG{p}{(}\PYG{n}{size}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{\PYGZhy{}1}\PYG{p}{);}
 \PYG{+w}{            }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{k}{auto}\PYG{+w}{ }\PYG{p}{[}\PYG{n}{bitboard}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pos}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{positions}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}

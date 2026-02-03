@@ -1,0 +1,22 @@
+Flame Graph Tree - Yolah Performance Profile
+================================================================================
+
+chapter02                                100.00%
+└── main                                 100.00%
+    ├── play_random_games                 96.18%
+    │   ├── moves                         76.40%
+    │   │   ├── moves_bb                  36.85%
+    │   │   │   └── Magic::index           9.33%
+    │   │   └── Move::Move                15.04%
+    │   ├── std::uniform_int_distribu...   7.23%
+    │   │   └── std::uniform_int_dist...   3.74%
+    │   ├── game_over                      4.54%
+    │   │   └── shift<                     3.16%
+    │   └── play                           4.23%
+    └── std::uniform_int_distribution...   3.38%
+        └── std::uniform_int_distribu...   3.02%
+            └── std::mersenne_twister...   3.02%
+
+================================================================================
+Note: Percentages show portion of total CPU time
+Tree shows call hierarchy from bottom (root) to top (leaves)

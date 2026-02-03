@@ -37,10 +37,10 @@
 \PYG{+w}{    }\PYG{n}{DIAGONAL}
 \PYG{p}{\PYGZcb{};}
 
-\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{reachable\PYGZus{}squares}\PYG{p}{(}\PYG{n}{MoveType}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{reachable\PYGZus{}squares}\PYG{p}{(}\PYG{n}{MoveType}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{,}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{  }\PYG{n}{moves}\PYG{+w}{    }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{o\PYGZus{}dir}\PYG{p}{[}\PYG{l+m+mi}{4}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{NORTH}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{EAST}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{WEST}\PYG{p}{\PYGZcb{};}
-\PYG{+w}{    }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{d\PYGZus{}dir}\PYG{p}{[}\PYG{l+m+mi}{4}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{p}{,}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{p}{\PYGZcb{};}
+\PYG{+w}{    }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{d\PYGZus{}dir}\PYG{p}{[}\PYG{l+m+mi}{4}\PYG{p}{]}\PYG{o}{=}\PYG{p}{\PYGZob{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{p}{,}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{p}{\PYGZcb{};}
 \PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{d}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{mt}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{ORTHOGONAL}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{o\PYGZus{}dir}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{d\PYGZus{}dir}\PYG{p}{))}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{;}
 \PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n+nb}{true}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
@@ -83,7 +83,7 @@
 \PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{n}{occupancies}\PYG{p}{.}\PYG{n}{size}\PYG{p}{();}\PYG{+w}{ }\PYG{n}{j}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{            }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occ}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{occupancies}\PYG{p}{[}\PYG{n}{j}\PYG{p}{];}
 \PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{index}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{magic}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{occ}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{n}{shift}\PYG{p}{;}
-\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{seen}\PYG{p}{[}\PYG{n}{index}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{cnt}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{[}\PYG{n}{index}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{[}\PYG{n}{j}\PYG{p}{])}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{seen}\PYG{p}{[}\PYG{n}{index}\PYG{p}{]}\PYG{o}{==}\PYG{n}{cnt}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{[}\PYG{n}{index}\PYG{p}{]}\PYG{o}{!=}\PYG{n}{possible\PYGZus{}moves}\PYG{p}{[}\PYG{n}{j}\PYG{p}{])}
 \PYG{+w}{            }\PYG{p}{\PYGZob{}}
 \PYG{+w}{                }\PYG{n}{found}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n+nb}{false}\PYG{p}{;}
 \PYG{+w}{                }\PYG{k}{break}\PYG{p}{;}

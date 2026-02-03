@@ -26,11 +26,9 @@
 \PYG{+w}{    }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b3}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{from3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{b3}\PYG{p}{));}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}
-
 \PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{move\PYGZus{}list}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{move\PYGZus{}list}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{[[}\PYG{n}{unlikely}\PYG{p}{]]}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{();}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}
-
 \PYG{+w}{    }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{last}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
 \PYG{p}{\PYGZcb{}}
 \end{Verbatim}

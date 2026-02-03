@@ -1,0 +1,4 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYGZdl{}\PYG{+w}{ }g++\PYG{+w}{ }\PYGZhy{}std\PYG{o}{=}c++23\PYG{+w}{ }\PYGZhy{}O3\PYG{+w}{ }\PYGZhy{}march\PYG{o}{=}native\PYG{+w}{ }\PYGZhy{}Wall\PYG{+w}{ }\PYGZhy{}Wpedantic\PYG{+w}{ }chapter02.cpp\PYG{+w}{ }\PYGZhy{}o\PYG{+w}{ }chapter02\PYG{+w}{ }\PYGZhy{}lbenchmark
+\PYGZdl{}\PYG{+w}{ }./chapter02
+\end{Verbatim}

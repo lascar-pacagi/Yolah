@@ -1,0 +1,25 @@
+chapter02;main;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 446410782
+chapter02;main;std::uniform_int_distribution<unsigned long>::operator 483239490
+chapter02;main;play_random_games 3182387539
+chapter02;main;play_random_games;MoveList::size 871970880
+chapter02;main;play_random_games;game_over 2123383262
+chapter02;main;play_random_games;game_over;shift< 4854235330
+chapter02;main;play_random_games;moves 36538417900
+chapter02;main;play_random_games;moves;Move::Move 23125258858
+chapter02;main;play_random_games;moves;error_return 4088000
+chapter02;main;play_random_games;moves;moves_bb 42316664366
+chapter02;main;play_random_games;moves;moves_bb;Magic::index 14338556396
+chapter02;main;play_random_games;moves;pop_lsb 1140510175
+chapter02;main;play_random_games;play 5458337171
+chapter02;main;play_random_games;play;Move::to_sq 425269289
+chapter02;main;play_random_games;play;square_bb 619938330
+chapter02;main;play_random_games;std::max<unsigned long> 1764623292
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator 82408880
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 387661712
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator 4894422237
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int> 2819136978
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 2056367651
+chapter02;main;play_random_games;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::_M_gen_rand 875260823
+chapter02;main;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 231175922
+chapter02;main;std::uniform_int_distribution<unsigned long>::operator 70120836
+chapter02;std::uniform_int_distribution<unsigned long>::operator;std::uniform_int_distribution<unsigned long>::_S_nd<unsigned long, std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>, unsigned int>;std::mersenne_twister_engine<unsigned long, 32ul, 624ul, 397ul, 31ul, 2567483615ul, 11ul, 4294967295ul, 7ul, 2636928640ul, 15ul, 4022730752ul, 18ul, 1812433253ul>::operator 4646078858

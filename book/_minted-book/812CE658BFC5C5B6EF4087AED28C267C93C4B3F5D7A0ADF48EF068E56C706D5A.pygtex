@@ -34,7 +34,8 @@
 \PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h7\PYGZdq{}}\PYG{p}{,}
 \PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h8\PYGZdq{}}\PYG{p}{,}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{};}
-\PYG{+w}{    }\PYG{n}{os}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{square2string}\PYG{p}{[}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{()]}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}:\PYGZsq{}}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{square2string}\PYG{p}{[}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{()];}
+\PYG{+w}{    }\PYG{n}{os}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{square2string}\PYG{p}{[}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{()]}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}:\PYGZsq{}}
+\PYG{+w}{       }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{square2string}\PYG{p}{[}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{()];}
 \PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{os}\PYG{p}{;}
 \PYG{p}{\PYGZcb{}}
 \end{Verbatim}
