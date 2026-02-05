@@ -1,0 +1,10 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYGZdl{} python find\PYGZus{}magic.py
+found magic for K = 6: 0x2643c51ab9dfa5b
+constexpr uint8\PYGZus{}t positions[64] = \PYGZob{}
+ 0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
+12, 26, 53,  5, 24, 33, 56, 35, 61,  8, 30, 58, 37, 42, 17, 46,
+63, 13, 21, 27, 10, 54,  6, 40, 25, 52, 32, 34, 60, 57, 36, 45,
+62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
+\PYGZcb{};
+\end{Verbatim}

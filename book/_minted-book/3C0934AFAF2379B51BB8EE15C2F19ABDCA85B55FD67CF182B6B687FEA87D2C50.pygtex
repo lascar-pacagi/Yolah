@@ -1,4 +1,7 @@
 \begin{Verbatim}[commandchars=\\\{\}]
+\PYGZdl{} g++ \PYGZhy{}O3 \PYGZhy{}march=native \PYGZhy{}Wall \PYGZhy{}Wpedantic undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench.cpp\PYGZbs{}
+\PYGZhy{}o undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench \PYGZhy{}lbenchmark
+\PYGZdl{} ./undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench
 Run on (12 X 4400 MHz CPU s)
 
 CPU Caches: L1 Data 32 KiB (x6), L1 Instruction 32 KiB (x6),

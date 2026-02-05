@@ -188,7 +188,7 @@
 \title{
     {\fontsize{40}{60}\selectfont\textbf{Yolah Board Game}} \\
     \vspace{0.5cm}
-    \huge Building a Two-Player Perfect-Information Game with Artificial Players\\
+    \huge Building a Two-Player Perfect-Information Game and Artificial Players\\
 }
 
 \author{
@@ -214,6 +214,7 @@
 \newacronym{pmu}{PMU}{Performance Monitoring Unit}
 \newacronym{mlp}{MLP}{Memory Level Parallelism}
 \newacronym{llc}{LLC}{Last Level Cache}
+\newacronym{bmi2}{BMI2}{Bit Manipulation Instruction Set 2}
 
 % Terms
 \newglossaryentry{bitboard}{
@@ -1558,7 +1559,7 @@ int position(uint64_t x) {
 \end{minted}
 
 % La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande. L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des 64 valeurs, que nous allons appeler clés, dans la plage [0, 63].
-Looking up values in this hash table is far more costly than indexing a simple array\footnote{We will measure the performance gain from magic perfect hashing compared to using a standard hash table at the end of this section.}. However, we cannot directly use an array because the indexing values span too large a range—for example, the value \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$!). The idea is to find an efficient hash function that transforms each of the $64$ values\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}—which we call bitboards—into the range $[0, 2^6 - 1 = 63]$.
+Looking up values in this hash table is far more costly than indexing a simple array\footnote{We will measure the performance gain from magic perfect hashing compared to using a standard hash table at the end of this section.}. However, we cannot directly use an array because the indexing values span too large a range—for example, the value \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$)!. The idea is to find an efficient hash function that transforms each of the $64$ values\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}—which we call bitboards—into the range $[0, 2^6 - 1 = 63]$.
 % De plus on veut qu'il n'y ait aucune collision, on parle alors d'un hachage parfait. S'il y a des collisions des positions seraient erronées. Par exemple, si les clés 0b100 et 0b1000000 étaient transformées en l'indice 42, on devrait mettre dans table[42] la valeur 2 ou 6, mais on ne peut pas stocker plus d'une valeur au même emplacement.
 Moreover, we want no collisions—this is called perfect hashing. If there were collisions, positions would be incorrect. For example, if keys \mintinline{c++}{0b100} and \mintinline{c++}{0b1000000} were both transformed to index $42$, we would need to store value $2$ and $6$ in \mintinline{c++}{table[42]}, but we cannot store more than one value at the same location.\\
 % La fonction de hachage parfait magique va avoir la forme suivante :
@@ -1675,19 +1676,23 @@ int main() {
 % \item Enfin, aux lignes 29 à 42, si nous avons trouvé une constante MAGIC qui permet de créer le hachage parfait magique, nous affichons celle-ci puis nous affichons un tableau en C++ qui contient la position du bit à 1 pour chacun des bitboard. La sortie de ce programme, pour une exécution donnée, est donnée ci-dessous.
 \item Finally, on lines 29 to 43, if we found a \mintinline{c++}{MAGIC} constant that creates magic perfect hashing, we display it and then display a C++ array containing the position of the 1-bit for each bitboard. The output of this program for a given execution is shown below. 
 
-\begin{minted}[breaklines,fontsize=\small]{cpp}
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+\begin{minted}[fontsize=\small,breaklines,frame=none]{text}
+$ g++ -O3 -Wall -Wpedantic -march=native -o find_magic
+$ ./find_magic
 found magic for K = 7: 0x65e4d4ee86638416
 uint8_t positions[128] = {
-    63, -1, 54, -1, 49, 55, 33, -1, 50, -1, -1, 56, 34, -1, 43, -1,
-    51, -1, -1, 11, -1, -1, 57,  3, 39, 35, 14, -1, 44, 22, -1, -1,
-    52, 31, -1, -1, -1, -1, 12, 20, -1, 18, -1, -1, 58, -1, -1,  4,
-    60, 40,  0, 36, -1, 15, -1, -1, 45, -1, 27, 23,  6, -1, -1, -1,
-    62, 53, 48, 32, -1, -1, -1, 42, -1, 10, -1,  2, 38, 13, 21, -1,
-    30, -1, -1, 19, 17, -1, -1, -1, 59, -1, -1, -1, -1, 26,  5, -1,
-    61, 47, -1, 41,  9,  1, 37, -1, 29, -1, 16, -1, -1, -1, 25, -1,
-    46, -1,  8, -1, 28, -1, -1, 24, -1,  7, -1, -1, -1, -1, -1, -1
+  63, -1, 54, -1, 49, 55, 33, -1, 50, -1, -1, 56, 34, -1, 43, -1,
+  51, -1, -1, 11, -1, -1, 57,  3, 39, 35, 14, -1, 44, 22, -1, -1,
+  52, 31, -1, -1, -1, -1, 12, 20, -1, 18, -1, -1, 58, -1, -1,  4,
+  60, 40,  0, 36, -1, 15, -1, -1, 45, -1, 27, 23,  6, -1, -1, -1,
+  62, 53, 48, 32, -1, -1, -1, 42, -1, 10, -1,  2, 38, 13, 21, -1,
+  30, -1, -1, 19, 17, -1, -1, -1, 59, -1, -1, -1, -1, 26,  5, -1,
+  61, 47, -1, 41,  9,  1, 37, -1, 29, -1, 16, -1, -1, -1, 25, -1,
+  46, -1,  8, -1, 28, -1, -1, 24, -1,  7, -1, -1, -1, -1, -1, -1
 };
 \end{minted}
+\end{mdframed}
 
 % Pour obtenir la position du bit à 1 pour le bitboard 0b1000 par exemple, il faut donc consulter la valeur suivante :
 To get the position of the 1-bit for bitboard \mintinline{c++}{0b1000} for example, we need to look up the following value:
@@ -1774,7 +1779,9 @@ if solver.check() == sat:
 % \item Les lignes 22 à 32 permettent d'afficher sur la sortie standard la valeur MAGIC ainsi que le tableau C++ des valeurs obtenues. Ce tableau est donné ci-dessous.
 \item Lines 22 to 32 print to standard output the \mintinline{python}{MAGIC} value and the C++ array of obtained values. This array is shown below. 
 
-\begin{minted}[breaklines,fontsize=\small]{cpp}
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+\begin{minted}[fontsize=\small,breaklines,frame=none]{text}
+$ python find_magic.py
 found magic for K = 6: 0x2643c51ab9dfa5b
 constexpr uint8_t positions[64] = {
  0,  1,  2, 14,  3, 22, 28, 15, 11,  4, 23, 55,  7, 29, 41, 16,
@@ -1783,6 +1790,7 @@ constexpr uint8_t positions[64] = {
 62, 20,  9, 39, 51, 31, 59, 44, 19, 38, 50, 43, 18, 49, 48, 47
 };
 \end{minted}
+\end{mdframed}
 
 
 % Notons qu'en Python il était important d'effectuer l'opération index(m, K, bitboard) & size - 1 à la ligne 28 car les nombres entiers ont une précision arbitraire et par exemple nous avons
@@ -1876,15 +1884,11 @@ BENCHMARK_MAIN();
 \label{lst:compare_hashmap_magic}
 \end{mdframed}
 
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[fontsize=\footnotesize]{bash}
-$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02 -lbenchmark
-$ ./chapter02
-\end{minted}
-\end{mdframed}
-
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, breaklines,fontsize=\footnotesize]{text}
+\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+\begin{minted}[breaklines,fontsize=\small,frame=none]{text}
+$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic\
+positions_bench.cpp -o positions -lbenchmark
+$ ./positions
 Run on (12 X 4400 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x6)
@@ -2523,9 +2527,10 @@ b = (0b1011 - 0b1011) & 0b1011; // b == 0
 
 \end{itemize}
 
-
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 \begin{minted}[fontsize=\small,breaklines,frame=none]{text}
+$ g++ -O3 -march=native chapter02.cpp -o chapter02
+$ ./chapter02
 int O_K[64] = {
     12, 11, 11, 11, 11, 11, 11, 12,
     11, 10, 10, 10, 10, 10, 10, 11,
@@ -3225,19 +3230,15 @@ int main(int argc, char** argv) {
 \label{lst:undo_vs_restore_bench}
 \end{mdframed}
 
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[fontsize=\footnotesize]{bash}
-$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02 -lbenchmark
-$ ./chapter02
-\end{minted}
-\end{mdframed}
-
 % \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
 % \begin{minted}[breaklines,fontsize=\small]{text}
 % \begin{mdframed}[skipabove=\baselineskip,hidealllines=true,backgroundcolor=black]
 % \color{white}
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 \begin{minted}[fontsize=\small,breaklines,frame=none]{text}
+$ g++ -O3 -march=native -Wall -Wpedantic undo_vs_restore_bench.cpp\
+-o undo_vs_restore_bench -lbenchmark
+$ ./undo_vs_restore_bench
 Run on (12 X 4400 MHz CPU s)
 
 CPU Caches: L1 Data 32 KiB (x6), L1 Instruction 32 KiB (x6),
@@ -3329,6 +3330,8 @@ int main() {
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
+$ g++ -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02
+$ ./chapter02
 Black player
   ┌───┬───┬───┬───┬───┬───┬───┬───┐
 8 │ ○ │ · │ · │ · │ · │ · │ · │ ● │
@@ -3733,7 +3736,8 @@ int main() {
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-
+$ g++ -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02
+$ ./chapter02
 === Running Random Games Tests ===
 
 === Test Summary ===
@@ -3749,7 +3753,6 @@ All tests passed!
 \captionof{listing}{Résultats de l'exécution du programme du listing \ref{lst:random_games_property_based_testing}}
 \label{lst:random_games_property_based_testing_exec}
 \end{mdframed}
-
 
 
 \subsection{Tests de performance}
@@ -3828,8 +3831,7 @@ Nous allons d'abord analyser les traces d'appels des fonctions pour déterminer 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
--o chapter02
+$ g++ -O3 -g -march=native -Wall -Wpedantic chapter02.cpp -o chapter02
 $ sudo perf record -F 999 --call-graph dwarf -g ./chapter02
 $ sudo perf script | stackcollapse-perf.pl > profile.txt
 \end{verbatim}
@@ -3875,13 +3877,12 @@ play_random_games                       96.79%
 \label{lst:chapter02_perf1}
 \end{mdframed}
 
-Grâce au listing \ref{lst:chapter02_perf1}, nous savons que nous devons concentrer nos efforts sur la fonction \mintinline{c++}{Yolah::moves}. Nous allons de nouveau utiliser l'outil \texttt{perf}~\cite{perf} mais cette fois-ci pour accéder aux compteurs de performance matériel (PMU - Performance Monitoring Unit)~\cite{intelsdm} du processeur. Ces compteurs mesurent des évènements tels que les défauts de prédiction de branchement, les défauts de cache, etc. Ces compteurs vont nous guider afin de trouver les faiblesses de notre implémentation\footnote{Pour approfondir le sujet de l'optimisation sur processeurs modernes, vous pouvez consulter~\cite{bakhvalov2024, pikus2021, algorithmica, inteltma}.}. Nous utilisons la commande suivante pour analyser le comportement de notre programme.   
+Grâce au listing \ref{lst:chapter02_perf1}, nous savons que nous devons concentrer nos efforts sur la fonction \mintinline{c++}{Yolah::moves}. Nous allons de nouveau utiliser l'outil \texttt{perf}~\cite{perf} mais cette fois-ci pour accéder aux compteurs de performance matériel (PMU - Performance Monitoring Unit)~\cite{intelsdm} du processeur. Ces compteurs mesurent des évènements tels que les défauts de prédiction de branchement, les défauts de cache, etc. Ces compteurs vont nous guider afin de trouver les faiblesses de notre implémentation\footnote{Pour approfondir le sujet de l'optimisation sur processeurs modernes, vous pouvez consulter~\cite{bakhvalov2024, pikus2021, algorithmica, inteltma}.}. Nous utilisons les commandes suivantes pour analyser le comportement de notre programme.   
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
--o chapter02
+$ g++ -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02
 $ perf stat -r 10 -e cycles,instructions,branches,branch-misses,\
 L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,\
 l1d_pend_miss.pending,l1d_pend_miss.pending_cycles ./chapter02
@@ -3889,7 +3890,7 @@ l1d_pend_miss.pending,l1d_pend_miss.pending_cycles ./chapter02
 }
 \end{mdframed}
 
-Le résultat de cette commande est présenté dans le listing \ref{lst:perf_chapter02_1}.
+Les résultats sont présentés dans le listing \ref{lst:perf_chapter02_1}.
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
@@ -3965,8 +3966,7 @@ Au vu des résultats précédents sur les différents compteurs, le critère qui
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
--o chapter02
+$ g++ -O3 -g -march=native -Wall -Wpedantic chapter02.cpp -o chapter02
 $ sudo perf record -e branch-misses:pp ./chapter02
 $ sudo perf annotate --stdio
 \end{verbatim}
@@ -4086,7 +4086,7 @@ Nous exécutons de nouveau la commande suivante, et les résultats sont donnés 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
 \begin{verbatim}
-$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
+$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp\
 -o chapter02
 $ perf stat -r 10 -e cycles,instructions,branches,branch-misses,\
 L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,\
@@ -4138,16 +4138,16 @@ Move Yolah::random_move(mt19937& mt) const noexcept {
     uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
     uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
     uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
-    uint32_t n0 = popcount(b0);
-    uint32_t n1 = popcount(b1);
-    uint32_t n2 = popcount(b2);
-    uint32_t n3 = popcount(b3);
-    uint32_t n = n0 + n1 + n2 + n3;
+    int n0 = popcount(b0);
+    int n1 = popcount(b1);
+    int n2 = popcount(b2);
+    int n3 = popcount(b3);
+    int n = n0 + n1 + n2 + n3;
     if (n == 0) [[unlikely]] {
         return Move::none();
     }
-    uniform_int_distribution<uint32_t> d(0, n - 1);
-    uint32_t bit = d(mt);
+    uniform_int_distribution<int> d(0, n - 1);
+    int bit = d(mt);
     int bb_index = (bit >= n0) + (bit >= n0+n1) + (bit >= n0+n1+n2);
     bit -= (bb_index > 0)*n0 + (bb_index > 1)*n1 + (bb_index > 2)*n2;
     Square from = array{ from0, from1, from2, from3 }[bb_index];
@@ -4191,243 +4191,240 @@ void play_random_games_fast(size_t nb_games,
                     draws, 
                     100.0 * draws / nb_games);
 }
+int main() {
+    init_all_magics();
+    play_random_games_fast(1000000, 42);
+}
 \end{minted}
-\captionof{listing}{}
+\captionof{listing}{Génération d'un coup aléatoire sans générer auparavant toute la liste de coups.}
 \label{lst:random_games_perf4}
 \end{mdframed}
 
-\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
-{\small
-\begin{verbatim}
-$ g++ -std=c++23 -O3 -g -march=native -Wall -Wpedantic chapter02.cpp\
--o chapter02
-$ sudo perf record -F 999 --call-graph dwarf -g ./chapter02
-$ sudo perf script | stackcollapse-perf.pl > profile.txt
-\end{verbatim}
+\begin{itemize}
+\item Aux lignes 4 à 7, nous récupérons les cases des pièces du joueur courant.
+\item Aux lignes 8 à 11, nous obtenons les bitboards des coups possibles pour chacune des positions des pièces du joueur.
+\item Aux lignes 12 à 15, nous obtenons, grâce à la fonction \mintinline{c++}{popcount}, qui compte le nombre de bits à 1 dans un bitboard, le nombre de coups pour chacun des bitboards \mintinline{c++}{b0, b1, b2} et \mintinline{c++}{b3}.
+\item Aux lignes 17 à 19, s'il n'y a aucun coups possibles, nous passons notre tour.
+\item Aux lignes 20 à 21, nous générons aléatoirement le numéro du coup dans la variable \mintinline{c++}{bit}, qui correspond à un des bits de \mintinline{c++}{b0, b1, b2} ou \mintinline{c++}{b3}.
+\item À la ligne 22, nous récupérons l'index du bitboard ${\texttt b}_i$ où se trouve le coup \mintinline{c++}{bit}. Par exemple, si \mintinline{c++}{n0 == 5} et \mintinline{c++}{n1 == 12} et \mintinline{c++}{bit == 7}, il faut chercher le coup dans \mintinline{c++}{b1} et le coup correspondra au deuxième bit à 1 dans \mintinline{c++}{b1}. Notons que l'on calcule cet index sans aucun branchement conditionnel. Nous avons remplacé une cascade de \mintinline{c++}{if/else if} par une somme de comparaisons : chaque comparaison \mintinline{c++}{(bit >= ...)} retourne \mintinline{c++}{0} ou \mintinline{c++}{1}, et leur somme donne directement l'index recherché. 
+\item À la ligne 23, nous calculons l'index du bit à 1 dans le bitboard sélectionné. Pour cela, il faut soustraire le nombre de bits à 1 dans les bitboards ${\texttt b}_i$ précédents. Là encore nous utilisons le style \emph{branchless}. 
+\item À la ligne 24, nous sélectionnons la case de départ correspondant au coup aléatoire.
+\item À la ligne 25, nous sélectionnons le bitboard ${\texttt b}_i$ correspondant au coup aléatoire.
+\item À la ligne 26, maintenant que nous avons la case départ du coup, le bitboard \mintinline{c++}{bb} et l'index du bit à 1 dans \mintinline{c++}{bb}, nous pouvons construire le coup aléatoire en construisant la case d'arrivée du coup. Pour calculer la case d'arrivée du coup, nous pourrions utiliser le code suivant.
+\begin{minted}[breaklines,fontsize=\small,frame=none]{c++}
+Square to;
+while (bb) {
+    int tz = countr_zero(bb); // position of the rightmost set bit
+    if (bit-- == 0) {
+        to = Square(tz);
+        break;
+    }
+    bb &= bb - 1; // clear rightmost set bit
 }
-\end{mdframed}
+\end{minted}
+Mais la fonction \mintinline{c++}{_pdep_u64} (Parallel Bits Deposit), qui est basée sur une instruction \gls{bmi2}\footnote{C'est une instruction x86-64 (Intel Haswell+, AMD Zen+).}, permet d'effectuer ce code plus efficacement. En effet, \mintinline{c++}{_pdep_u64(1ULL << bit, bb)} retourne un bitboard avec un seul bit à 1, situé à la position du \mintinline{c++}{bit}-ième bit à 1 de \mintinline{c++}{bb}.
+\item À la ligne 41, dans la fonction \mintinline{c++}{play_random_games_fast}, nous utilisons la fonction \mintinline{c++}{random_move} pour générer directement un coup aléatoire, au lieu de créer tout d'abord toute la liste des coups possibles puis d'en sélectionner un au hasard dans cette dernière.
+
+% nous utilisons l'instruction \mintinline{c++}{_pdep_u64} (Parallel Bits Deposit) pour trouver la case d'arrivée. Cette instruction \gls{bmi2} permet de déposer le bit numéro \mintinline{c++}{bit} parmi les bits à 1 du bitboard \mintinline{c++}{bb}, puis \mintinline{c++}{countr_zero} nous donne la position de ce bit.
+\end{itemize}
+
+Nous testons de nouveau les caractéristiques de notre programme avec \texttt{perf}, les résultats sont donnés dans le listing \ref{lst:perf_chapter02_3}.
+
+
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
 {\small
-\begin{verbatim}
-play_random_games_fast                     96.01%
-    ├── Yolah::random_move                 81.29%
-    │   ├── moves_bb                       47.14%
-    │   │   └── Magic::index                5.99%
-    │   ├── std::uniform_int_distributi... 12.88%
-    │   ├── pop_lsb                         4.36%
-    │   │   └── lsb                         4.11%
-    │   └── std::popcount                   2.79%
-    ├── Yolah::game_over                    9.53%
-    │   └── shift<>                         5.96%
-    └── Yolah::play                         3.95%
-\end{verbatim}
-}
-\end{mdframed}
-%\vspace{-0.5\baselineskip}
-\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
-\label{lst:}
-\end{mdframed}
-
-\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
-{\small
-\begin{verbatim}
+\begin{verbatim} 
 $ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp\
 -o chapter02
-$ perf stat -r 100 ./chapter02
-\end{verbatim}
-}
-\end{mdframed}
+$ perf stat -r 10 -e cycles,instructions,branches,branch-misses,\
+L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,\
+l1d_pend_miss.pending,l1d_pend_miss.pending_cycles ./chapter02
 
-\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
-{\small
-\begin{verbatim}
-=== Game Statistics ===
-Total games: 1000000
-Black wins:  498503 (49.9%)
-White wins:  395975 (39.6%)
-Draws:       105522 (10.6%)
+Performance counter stats for './chapter02' (10 runs):
 
-Performance counter stats for './chapter02' (100 runs):
+     6 293 794 538      cycles                        ( +-  0.22% )
+    15 430 554 773      instructions   # 2.43 IPC     ( +-  0.05% )
+       792 545 398      branches                      ( +-  0.05% )
+         2 354 243      branch-misses  # 0.30%        ( +-  0.26% )
+     3 499 135 163      L1-dcache-loads               ( +-  0.07% )
+       144 657 644      L1-dcache-load-misses # 4.14% ( +-  0.11% )
+        52 835 597      LLC-loads                     ( +-  0.90% )
+            11 787      LLC-load-misses # 0.02%       ( +-  8.82% )
+     2 329 553 474      l1d_pend_miss.pending         ( +-  0.87% )
+     1 708 715 065      l1d_pend_miss.pending_cycles  ( +-  0.82% )
 
- 6 446 405 052      cycles                    #    4,085 GHz                      ( +-  0,10% )  (49,63%)
-15 466 860 279      instructions              #    2,41  insn per cycle           ( +-  0,01% )  (62,28%)
-   793 399 286      branches                  #  502,748 M/sec                    ( +-  0,01% )  (62,53%)
-     2 206 340      branch-misses             #    0,28% of all branches          ( +-  0,07% )  (62,79%)
- 3 605 550 330      L1-dcache-loads           #    2,285 G/sec                    ( +-  0,01% )  (62,83%)
-   145 697 914      L1-dcache-load-misses     #    4,03% of all L1-dcache accesses  ( +-  0,04% )  (62,75%)
-    55 012 701      LLC-loads                 #   34,860 M/sec                    ( +-  0,26% )  (49,86%)
-        11 412      LLC-load-misses           #    0,02% of all LL-cache accesses  ( +- 16,80% )  (49,60%)
-
-         1,57951 +- 0,00265 seconds time elapsed  ( +-  0,17% )
+           1.53 +- 0.00 seconds time elapsed
 \end{verbatim}
 }
 \end{mdframed}
 %\vspace{-0.5\baselineskip}
 \begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
-\label{lst:}
+\captionof{listing}{Compteurs de performances pour le programme du listing \ref{lst:random_games_perf4}.}
+\label{lst:perf_chapter02_3}
 \end{mdframed}
 
+Cette dernière optimisation réduit le temps d'exécution de moitié, passant de $3{,}06$ à $1{,}53$ secondes. L'\gls{ipc} s'améliore de $1{,}85$ à $2{,}43$. Le résultat le plus notable concerne les défauts de branchement : le taux passe de $10{,}16\%$ à $0{,}30\%$. Cette quasi-élimination des défauts de branchement s'explique par le style de programmation \emph{branchless} adopté qui a pu être mis en place car nous n'avons pas à générer dans cette version toute la liste des coups. En remplaçant les structures conditionnelles \mintinline{c++}{if/else} par des expressions arithmétiques (sommes de comparaisons), nous avons supprimé les branchements imprévisibles que le prédicteur de branchement du processeur ne parvenait pas à anticiper. L'instruction \mintinline{c++}{_pdep_u64} contribue également à cette amélioration en évitant une boucle avec un nombre d'itérations variable.
 
-\begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
-\begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
-constexpr uint32_t NB_ITERATIONS = 1000;
-constexpr uint64_t SEED = 42;
+% \begin{mdframed}[skipabove=\baselineskip,topline=false,rightline=false,bottomline=false,leftline=false,linewidth=1pt,linecolor=gray!40,innerleftmargin=8pt]
+% \begin{minted}[linenos, breaklines,fontsize=\small,frame=none,tabsize=2]{c++}
+% constexpr uint32_t NB_ITERATIONS = 1000;
+% constexpr uint64_t SEED = 42;
 
-class PRNG {
-    uint64_t s;
-    uint64_t rand64() {
-        s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
-        return s * 2685821657736338717ULL;
-    }
-   public:
-    PRNG(uint64_t seed) :
-        s(seed) {
-    }
-    uint64_t seed() {
-        return s;
-    }
-    template<typename T>
-    T rand() {
-        return T(rand64());
-    }
-};
+% class PRNG {
+%     uint64_t s;
+%     uint64_t rand64() {
+%         s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
+%         return s * 2685821657736338717ULL;
+%     }
+%    public:
+%     PRNG(uint64_t seed) :
+%         s(seed) {
+%     }
+%     uint64_t seed() {
+%         return s;
+%     }
+%     template<typename T>
+%     T rand() {
+%         return T(rand64());
+%     }
+% };
 
-constexpr uint32_t reduce(uint32_t x, uint32_t N) {
-    return ((uint64_t) x * (uint64_t) N) >> 32;
-}
+% constexpr uint32_t reduce(uint32_t x, uint32_t N) {
+%     return ((uint64_t) x * (uint64_t) N) >> 32;
+% }
 
-uint32_t random_prng_modulo(uint32_t nb_iterations) {
-    uint32_t res = 0;
-    PRNG prng(SEED);
-    for (uint32_t i = 1; i <= nb_iterations; i++) {
-        res += prng.rand<uint32_t>() % i;
-    }
-    return res;
-}
+% uint32_t random_prng_modulo(uint32_t nb_iterations) {
+%     uint32_t res = 0;
+%     PRNG prng(SEED);
+%     for (uint32_t i = 1; i <= nb_iterations; i++) {
+%         res += prng.rand<uint32_t>() % i;
+%     }
+%     return res;
+% }
 
-static void BM_random_prng_modulo(benchmark::State& state) {
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(random_prng_modulo(NB_ITERATIONS));
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-BENCHMARK(BM_random_prng_modulo);
+% static void BM_random_prng_modulo(benchmark::State& state) {
+%     for (auto _ : state) {
+%         benchmark::DoNotOptimize(random_prng_modulo(NB_ITERATIONS));
+%     }
+%     state.SetItemsProcessed(state.iterations());
+% }
+% BENCHMARK(BM_random_prng_modulo);
 
-uint32_t random_prng_reduce(uint32_t nb_iterations) {
-    uint32_t res = 0;
-    PRNG prng(SEED);
-    for (uint32_t i = 1; i <= nb_iterations; i++) {
-        res += reduce(prng.rand<uint32_t>(), i);
-    }
-    return res;
-}
+% uint32_t random_prng_reduce(uint32_t nb_iterations) {
+%     uint32_t res = 0;
+%     PRNG prng(SEED);
+%     for (uint32_t i = 1; i <= nb_iterations; i++) {
+%         res += reduce(prng.rand<uint32_t>(), i);
+%     }
+%     return res;
+% }
 
-static void BM_random_prng_reduce(benchmark::State& state) {
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(random_prng_reduce(NB_ITERATIONS));
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-BENCHMARK(BM_random_prng_reduce);
+% static void BM_random_prng_reduce(benchmark::State& state) {
+%     for (auto _ : state) {
+%         benchmark::DoNotOptimize(random_prng_reduce(NB_ITERATIONS));
+%     }
+%     state.SetItemsProcessed(state.iterations());
+% }
+% BENCHMARK(BM_random_prng_reduce);
 
-uint32_t random_mt19937(uint32_t nb_iterations) {
-    uint32_t res = 0;
-    mt19937 mt(SEED);
-    for (uint32_t i = 1; i <= nb_iterations; i++) {        
-        res += uniform_int_distribution<uint32_t>{0, i - 1}(mt);
-    }
-    return res;
-}
+% uint32_t random_mt19937(uint32_t nb_iterations) {
+%     uint32_t res = 0;
+%     mt19937 mt(SEED);
+%     for (uint32_t i = 1; i <= nb_iterations; i++) {        
+%         res += uniform_int_distribution<uint32_t>{0, i - 1}(mt);
+%     }
+%     return res;
+% }
 
-static void BM_random_mt19937(benchmark::State& state) {
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(random_mt19937(NB_ITERATIONS));
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-BENCHMARK(BM_random_mt19937);
+% static void BM_random_mt19937(benchmark::State& state) {
+%     for (auto _ : state) {
+%         benchmark::DoNotOptimize(random_mt19937(NB_ITERATIONS));
+%     }
+%     state.SetItemsProcessed(state.iterations());
+% }
+% BENCHMARK(BM_random_mt19937);
 
-uint32_t random_mt19937_modulo(uint32_t nb_iterations) {
-    uint32_t res = 0;
-    mt19937 mt(SEED);
-    for (uint32_t i = 1; i <= nb_iterations; i++) {        
-        res += uniform_int_distribution<uint32_t>{}(mt) % i;
-    }
-    return res;
-}
+% uint32_t random_mt19937_modulo(uint32_t nb_iterations) {
+%     uint32_t res = 0;
+%     mt19937 mt(SEED);
+%     for (uint32_t i = 1; i <= nb_iterations; i++) {        
+%         res += uniform_int_distribution<uint32_t>{}(mt) % i;
+%     }
+%     return res;
+% }
 
-static void BM_random_mt19937_modulo(benchmark::State& state) {
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(random_mt19937_modulo(NB_ITERATIONS));
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-BENCHMARK(BM_random_mt19937_modulo);
+% static void BM_random_mt19937_modulo(benchmark::State& state) {
+%     for (auto _ : state) {
+%         benchmark::DoNotOptimize(random_mt19937_modulo(NB_ITERATIONS));
+%     }
+%     state.SetItemsProcessed(state.iterations());
+% }
+% BENCHMARK(BM_random_mt19937_modulo);
 
-uint32_t random_mt19937_reduce(uint32_t nb_iterations) {
-    uint32_t res = 0;
-    mt19937 mt(SEED);
-    for (uint32_t i = 1; i <= nb_iterations; i++) {        
-        res += reduce(uniform_int_distribution<uint32_t>{}(mt), i);
-    }
-    return res;
-}
+% uint32_t random_mt19937_reduce(uint32_t nb_iterations) {
+%     uint32_t res = 0;
+%     mt19937 mt(SEED);
+%     for (uint32_t i = 1; i <= nb_iterations; i++) {        
+%         res += reduce(uniform_int_distribution<uint32_t>{}(mt), i);
+%     }
+%     return res;
+% }
 
-static void BM_random_mt19937_reduce(benchmark::State& state) {
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(random_mt19937_reduce(NB_ITERATIONS));
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-BENCHMARK(BM_random_mt19937_reduce);
+% static void BM_random_mt19937_reduce(benchmark::State& state) {
+%     for (auto _ : state) {
+%         benchmark::DoNotOptimize(random_mt19937_reduce(NB_ITERATIONS));
+%     }
+%     state.SetItemsProcessed(state.iterations());
+% }
+% BENCHMARK(BM_random_mt19937_reduce);
 
-BENCHMARK_MAIN();
-\end{minted}
-\captionof{listing}{}
-\label{lst:random_generator_bench}
-\end{mdframed}
+% BENCHMARK_MAIN();
+% \end{minted}
+% \captionof{listing}{}
+% \label{lst:random_generator_bench}
+% \end{mdframed}
 
-\begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[fontsize=\footnotesize]{bash}
-$ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02 -lbenchmark
-$ ./chapter02
-\end{minted}
-\end{mdframed}
+% \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
+% \begin{minted}[fontsize=\footnotesize]{bash}
+% $ g++ -std=c++23 -O3 -march=native -Wall -Wpedantic chapter02.cpp -o chapter02 -lbenchmark
+% $ ./chapter02
+% \end{minted}
+% \end{mdframed}
 
-\begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
-{\small
-\begin{verbatim}
-Run on (12 X 4400 MHz CPU s)
-CPU Caches:
-  L1 Data 32 KiB (x6)
-  L1 Instruction 32 KiB (x6)
-  L2 Unified 256 KiB (x6)
-  L3 Unified 12288 KiB (x1)
-Load Average: 0.79, 0.91, 1.05
------------------------------------------------------------------------------------
-Benchmark                         Time             CPU   Iterations UserCounters...
------------------------------------------------------------------------------------
-BM_random_prng_modulo          2651 ns         2651 ns       258011 items_per_second=377.285k/s
-BM_random_prng_reduce          1667 ns         1667 ns       417675 items_per_second=599.745k/s
-BM_random_mt19937              5114 ns         5114 ns       122426 items_per_second=195.541k/s
-BM_random_mt19937_modulo       6069 ns         6068 ns       116983 items_per_second=164.794k/s
-BM_random_mt19937_reduce       4868 ns         4868 ns       146061 items_per_second=205.41k/s
-\end{verbatim}
-}
-\end{mdframed}
-%\vspace{-0.5\baselineskip}
-\begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
-\captionof{listing}{}
-\label{lst:}
-\end{mdframed}
+% \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
+% {\small
+% \begin{verbatim}
+% Run on (12 X 4400 MHz CPU s)
+% CPU Caches:
+%   L1 Data 32 KiB (x6)
+%   L1 Instruction 32 KiB (x6)
+%   L2 Unified 256 KiB (x6)
+%   L3 Unified 12288 KiB (x1)
+% Load Average: 0.79, 0.91, 1.05
+% -----------------------------------------------------------------------------------
+% Benchmark                         Time             CPU   Iterations UserCounters...
+% -----------------------------------------------------------------------------------
+% BM_random_prng_modulo          2651 ns         2651 ns       258011 items_per_second=377.285k/s
+% BM_random_prng_reduce          1667 ns         1667 ns       417675 items_per_second=599.745k/s
+% BM_random_mt19937              5114 ns         5114 ns       122426 items_per_second=195.541k/s
+% BM_random_mt19937_modulo       6069 ns         6068 ns       116983 items_per_second=164.794k/s
+% BM_random_mt19937_reduce       4868 ns         4868 ns       146061 items_per_second=205.41k/s
+% \end{verbatim}
+% }
+% \end{mdframed}
+% %\vspace{-0.5\baselineskip}
+% \begin{mdframed}[skipabove=0pt,skipbelow=\baselineskip,hidealllines=true,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=3pt,innerbottommargin=3pt]
+% \captionof{listing}{}
+% \label{lst:}
+% \end{mdframed}
 
 \section{What's Next}
 
 
-\section{Complete Commented Game Board Code}
+
+
+\section{Complete Game Board Code}
 
 
 % \begin{importantbox}

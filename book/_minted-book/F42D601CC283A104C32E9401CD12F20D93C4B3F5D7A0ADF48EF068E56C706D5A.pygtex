@@ -1,0 +1,11 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{;}
+\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{bb}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{tz}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{countr\PYGZus{}zero}\PYG{p}{(}\PYG{n}{bb}\PYG{p}{);}\PYG{+w}{ }\PYG{c+c1}{// position of the rightmost set bit}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{bit}\PYG{o}{\PYGZhy{}\PYGZhy{}}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{to}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{tz}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}=}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}\PYG{+w}{ }\PYG{c+c1}{// clear rightmost set bit}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

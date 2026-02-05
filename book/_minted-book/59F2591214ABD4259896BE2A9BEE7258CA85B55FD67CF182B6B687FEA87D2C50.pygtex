@@ -1,4 +1,6 @@
 \begin{Verbatim}[commandchars=\\\{\}]
+\PYGZdl{} g++ \PYGZhy{}O3 \PYGZhy{}march=native chapter02.cpp \PYGZhy{}o chapter02
+\PYGZdl{} ./chapter02
 int O\PYGZus{}K[64] = \PYGZob{}
     12, 11, 11, 11, 11, 11, 11, 12,
     11, 10, 10, 10, 10, 10, 10, 11,

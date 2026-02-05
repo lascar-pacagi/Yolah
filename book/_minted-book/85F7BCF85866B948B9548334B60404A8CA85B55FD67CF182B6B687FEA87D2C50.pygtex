@@ -1,0 +1,15 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYGZdl{} g++ \PYGZhy{}O3 \PYGZhy{}Wall \PYGZhy{}Wpedantic \PYGZhy{}march=native \PYGZhy{}o find\PYGZus{}magic
+\PYGZdl{} ./find\PYGZus{}magic
+found magic for K = 7: 0x65e4d4ee86638416
+uint8\PYGZus{}t positions[128] = \PYGZob{}
+  63, \PYGZhy{}1, 54, \PYGZhy{}1, 49, 55, 33, \PYGZhy{}1, 50, \PYGZhy{}1, \PYGZhy{}1, 56, 34, \PYGZhy{}1, 43, \PYGZhy{}1,
+  51, \PYGZhy{}1, \PYGZhy{}1, 11, \PYGZhy{}1, \PYGZhy{}1, 57,  3, 39, 35, 14, \PYGZhy{}1, 44, 22, \PYGZhy{}1, \PYGZhy{}1,
+  52, 31, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, 12, 20, \PYGZhy{}1, 18, \PYGZhy{}1, \PYGZhy{}1, 58, \PYGZhy{}1, \PYGZhy{}1,  4,
+  60, 40,  0, 36, \PYGZhy{}1, 15, \PYGZhy{}1, \PYGZhy{}1, 45, \PYGZhy{}1, 27, 23,  6, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1,
+  62, 53, 48, 32, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, 42, \PYGZhy{}1, 10, \PYGZhy{}1,  2, 38, 13, 21, \PYGZhy{}1,
+  30, \PYGZhy{}1, \PYGZhy{}1, 19, 17, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, 59, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, 26,  5, \PYGZhy{}1,
+  61, 47, \PYGZhy{}1, 41,  9,  1, 37, \PYGZhy{}1, 29, \PYGZhy{}1, 16, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, 25, \PYGZhy{}1,
+  46, \PYGZhy{}1,  8, \PYGZhy{}1, 28, \PYGZhy{}1, \PYGZhy{}1, 24, \PYGZhy{}1,  7, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1, \PYGZhy{}1
+\PYGZcb{};
+\end{Verbatim}

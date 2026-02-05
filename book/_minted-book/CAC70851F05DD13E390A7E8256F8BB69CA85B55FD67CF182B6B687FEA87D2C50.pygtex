@@ -1,4 +1,7 @@
 \begin{Verbatim}[commandchars=\\\{\}]
+\PYGZdl{} g++ \PYGZhy{}std=c++23 \PYGZhy{}O3 \PYGZhy{}march=native \PYGZhy{}Wall \PYGZhy{}Wpedantic\PYGZbs{}
+positions\PYGZus{}bench.cpp \PYGZhy{}o positions \PYGZhy{}lbenchmark
+\PYGZdl{} ./positions
 Run on (12 X 4400 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x6)

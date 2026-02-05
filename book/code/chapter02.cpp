@@ -489,16 +489,16 @@ public:
         uint64_t b1 = moves_bb(from1, occupied) & ~occupied;
         uint64_t b2 = moves_bb(from2, occupied) & ~occupied;
         uint64_t b3 = moves_bb(from3, occupied) & ~occupied;
-        uint32_t n0 = popcount(b0);
-        uint32_t n1 = popcount(b1);
-        uint32_t n2 = popcount(b2);
-        uint32_t n3 = popcount(b3);
-        uint32_t n = n0 + n1 + n2 + n3;
+        int n0 = popcount(b0);
+        int n1 = popcount(b1);
+        int n2 = popcount(b2);
+        int n3 = popcount(b3);
+        int n = n0 + n1 + n2 + n3;
         if (n == 0) [[unlikely]] {
             return Move::none();
         }
-        uniform_int_distribution<uint32_t> d(0, n - 1);
-        uint32_t bit = d(mt);
+        uniform_int_distribution<int> d(0, n - 1);
+        int bit = d(mt);
         int bb_index = (bit >= n0) + (bit >= n0 + n1) + (bit >= n0 + n1 + n2);
         bit -= (bb_index > 0) * n0 + (bb_index > 1) * n1 + (bb_index > 2) * n2;
         Square from = std::array{ from0, from1, from2, from3 }[bb_index];
@@ -1043,8 +1043,8 @@ namespace test {
 
 int main() {
     init_all_magics();
-    play_random_games(1000000, 42);
+    //play_random_games(1000000, 42);
     //play_random_games<false>(1000000, 42);
-    //play_random_games_fast(1000000, 42);
+    play_random_games_fast(1000000, 42);
     //test::random_games(10000, 42);
 }
