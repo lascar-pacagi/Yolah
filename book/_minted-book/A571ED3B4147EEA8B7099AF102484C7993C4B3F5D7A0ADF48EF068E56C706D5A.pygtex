@@ -1,0 +1,289 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{c+c1}{// Compact move representation: packs source and destination squares}
+\PYG{c+c1}{// into a 16\PYGZhy{}bit integer (6 bits each). Move::none() encodes a}
+\PYG{c+c1}{// pass (data = 0, i.e., from = a1, to = a1), used when a player has}
+\PYG{c+c1}{// no legal move}
+\PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{Move}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{;}
+\PYG{k}{public}\PYG{o}{:}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{k}{default}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{explicit}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{(}\PYG{n}{d}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{explicit}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{noexcept}
+\PYG{+w}{        }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{((}\PYG{n}{to}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{from}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from\PYGZus{}sq}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{data}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mh}{0x3F}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to\PYGZus{}sq}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{((}\PYG{n}{data}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mh}{0x3F}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{raw}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{none}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{);}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{==}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{.}\PYG{n}{data}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{!=}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{.}\PYG{n}{data}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{\PYGZlt{}}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{make\PYGZus{}pair}\PYG{p}{(}\PYG{n}{from\PYGZus{}sq}\PYG{p}{(),}\PYG{+w}{ }\PYG{n}{to\PYGZus{}sq}\PYG{p}{())}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}
+\PYG{+w}{               }\PYG{n}{make\PYGZus{}pair}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{(),}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{explicit}\PYG{+w}{ }\PYG{k}{operator}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{// Prints a move in \PYGZdq{}from:to\PYGZdq{} notation (e.g., \PYGZdq{}d4:d7\PYGZdq{})}
+\PYG{n}{ostream}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{p}{(}\PYG{n}{ostream}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{os}\PYG{p}{,}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{square2string}\PYG{p}{[}\PYG{n}{SQUARE\PYGZus{}NB}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a1\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b1\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c1\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d1\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e1\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f1\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g1\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h1\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a2\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b2\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c2\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d2\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e2\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f2\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g2\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h2\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a3\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b3\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c3\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d3\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e3\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f3\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g3\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h3\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a4\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b4\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c4\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d4\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e4\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f4\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g4\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h4\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a5\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b5\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c5\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d5\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e5\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f5\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g5\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h5\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a6\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b6\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c6\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d6\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e6\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f6\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g6\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h6\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g7\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h7\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+s}{\PYGZdq{}a8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}b8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}c8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}d8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}e8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}f8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}g8\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}h8\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{};}
+\PYG{+w}{    }\PYG{n}{os}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{square2string}\PYG{p}{[}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{()]}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}:\PYGZsq{}}
+\PYG{+w}{       }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{square2string}\PYG{p}{[}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{()];}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{os}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Stack\PYGZhy{}allocated move list with a fixed capacity. Avoids heap}
+\PYG{c+c1}{// allocation during move generation.}
+\PYG{c+c1}{// Over millions of random games, the observed maximum number of}
+\PYG{c+c1}{// moves never exceeded 73; 75 is a safe upper bound}
+\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{MAX\PYGZus{}NB\PYGZus{}MOVES}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{75}\PYG{p}{;}
+\PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{MoveList}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{[}\PYG{n}{MAX\PYGZus{}NB\PYGZus{}MOVES}\PYG{p}{],}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{last}\PYG{p}{;}
+\PYG{k}{public}\PYG{o}{:}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{last}\PYG{p}{(}\PYG{n}{move\PYGZus{}list}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{begin}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{last}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{begin}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{last}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{size}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{last}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{k}{operator}\PYG{p}{[](}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{[}\PYG{n}{i}\PYG{p}{];}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{k}{operator}\PYG{p}{[](}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{[}\PYG{n}{i}\PYG{p}{];}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{friend}\PYG{+w}{ }\PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{Yolah}\PYG{p}{;}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{// Forward declaration of test function}
+\PYG{k}{namespace}\PYG{+w}{ }\PYG{n+nn}{test}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{random\PYGZus{}games}\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}games}\PYG{p}{,}
+\PYG{+w}{                      }\PYG{n}{optional}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{seed}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{nullopt}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{YolahWithMoves}\PYG{p}{;}
+
+\PYG{c+c1}{// Board game. Uses three bitboards (black, white, holes) to}
+\PYG{c+c1}{// represent the board. Each player starts with 4 pieces. On each}
+\PYG{c+c1}{// turn, a piece slides orthogonally or diagonally to a free square;}
+\PYG{c+c1}{// the departure square becomes a hole. The game ends when no piece}
+\PYG{c+c1}{// can move. The player with the most moves wins}
+\PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{Yolah}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{BLACK\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{WHITE\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{        }\PYG{c+c1}{// destroyed squares}
+\PYG{+w}{    }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{   }\PYG{c+c1}{// number of moves played by black}
+\PYG{+w}{    }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white\PYGZus{}score}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{   }\PYG{c+c1}{// number of moves played by white}
+\PYG{+w}{    }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{           }\PYG{c+c1}{// current ply (0 = black\PYGZsq{}s first turn)}
+\PYG{k}{public}\PYG{o}{:}
+\PYG{+w}{    }\PYG{c+c1}{// The game is over when no piece of either player has an adjacent}
+\PYG{+w}{    }\PYG{c+c1}{// free square}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{n}{game\PYGZus{}over}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{possible}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{black}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{white}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{players}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{white}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{around\PYGZus{}players}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{            }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{            }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{            }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{            }\PYG{n}{shift}\PYG{o}{\PYGZlt{}}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{o}{\PYGZgt{}}\PYG{p}{(}\PYG{n}{players}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{around\PYGZus{}players}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{possible}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Returns BLACK (0) or WHITE (1) based on parity of ply}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{current\PYGZus{}player}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}plies}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{ply}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{pair}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{score}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{black\PYGZus{}score}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{white\PYGZus{}score}\PYG{p}{\PYGZcb{};}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Returns the content of a square: BLACK, WHITE, HOLE, or FREE}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{get}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{sq}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{bb}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{HOLE}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{black}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{bb}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{white}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{bb}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{WHITE}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{FREE}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{get}\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{j}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{get}\PYG{p}{(}\PYG{n}{square\PYGZus{}of}\PYG{p}{(}\PYG{n}{i}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{j}\PYG{p}{));}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Generates all legal moves for the given player into the}
+\PYG{+w}{    }\PYG{c+c1}{// provided MoveList. Since each player always has exactly}
+\PYG{+w}{    }\PYG{c+c1}{// 4 pieces, the first loop is fully unrolled (version 2)}
+\PYG{+w}{    }\PYG{c+c1}{// to avoid branch mispredictions. If no move is available,}
+\PYG{+w}{    }\PYG{c+c1}{// a single Move::none() is added}
+\PYG{+w}{    }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{holes}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{player}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{white}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Version 1: generic loop (commented out, kept for reference)}
+\PYG{+w}{        }\PYG{c+c1}{// while (bb) \PYGZob{}}
+\PYG{+w}{        }\PYG{c+c1}{//     Square from = pop\PYGZus{}lsb(bb);}
+\PYG{+w}{        }\PYG{c+c1}{//     uint64\PYGZus{}t b = moves\PYGZus{}bb(from, occupied) \PYGZam{} \PYGZti{}occupied;}
+\PYG{+w}{        }\PYG{c+c1}{//     while (b) \PYGZob{}}
+\PYG{+w}{        }\PYG{c+c1}{//         *move\PYGZus{}list++ = Move(from, pop\PYGZus{}lsb(b));}
+\PYG{+w}{        }\PYG{c+c1}{//     \PYGZcb{}}
+\PYG{+w}{        }\PYG{c+c1}{// \PYGZcb{}}
+
+\PYG{+w}{        }\PYG{c+c1}{// Version 2: unrolled loop for the 4 pieces}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from0}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from3}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{bb}\PYG{p}{);}
+
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b0}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b3}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{from0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{b0}\PYG{p}{));}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{from1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{b1}\PYG{p}{));}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b2}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{from2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{b2}\PYG{p}{));}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b3}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{from3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{b3}\PYG{p}{));}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{move\PYGZus{}list}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{move\PYGZus{}list}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{[[}\PYG{n}{unlikely}\PYG{p}{]]}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{o}{*}\PYG{n}{move\PYGZus{}list}\PYG{o}{++}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{();}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{        }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{last}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Generates moves for the current player}
+\PYG{+w}{    }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{(}\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{this}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{moves}\PYG{p}{(}\PYG{n}{current\PYGZus{}player}\PYG{p}{(),}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Selects a uniformly random legal move without allocating a}
+\PYG{+w}{    }\PYG{c+c1}{// move list while minimizing branches}
+\PYG{+w}{    }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{random\PYGZus{}move}\PYG{p}{(}\PYG{n}{mt19937}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{holes}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}
+\PYG{+w}{            }\PYG{n}{current\PYGZus{}player}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{white}\PYG{p}{;}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from0}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{player\PYGZus{}bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{player\PYGZus{}bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{player\PYGZus{}bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from3}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{player\PYGZus{}bb}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b0}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b3}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{from3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{occupied}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{n0}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{popcount}\PYG{p}{(}\PYG{n}{b0}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{n1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{popcount}\PYG{p}{(}\PYG{n}{b1}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{n2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{popcount}\PYG{p}{(}\PYG{n}{b2}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{n3}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{popcount}\PYG{p}{(}\PYG{n}{b3}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{n}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{n0}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{n1}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{n2}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{n3}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{n}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{[[}\PYG{n}{unlikely}\PYG{p}{]]}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{();}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{n}{uniform\PYGZus{}int\PYGZus{}distribution}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{int}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{n}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{bit}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{bb\PYGZus{}index}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{bit}\PYG{+w}{ }\PYG{o}{\PYGZgt{}=}\PYG{+w}{ }\PYG{n}{n0}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{bit}\PYG{+w}{ }\PYG{o}{\PYGZgt{}=}\PYG{+w}{ }\PYG{n}{n0}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{n1}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{+}
+\PYG{+w}{                       }\PYG{p}{(}\PYG{n}{bit}\PYG{+w}{ }\PYG{o}{\PYGZgt{}=}\PYG{+w}{ }\PYG{n}{n0}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{n1}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{n2}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{bit}\PYG{+w}{ }\PYG{o}{\PYGZhy{}=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{bb\PYGZus{}index}\PYG{+w}{ }\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{n0}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{bb\PYGZus{}index}\PYG{+w}{ }\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{n1}\PYG{+w}{ }\PYG{o}{+}
+\PYG{+w}{               }\PYG{p}{(}\PYG{n}{bb\PYGZus{}index}\PYG{+w}{ }\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{n2}\PYG{p}{;}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{array}\PYG{p}{\PYGZob{}}\PYG{n}{from0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{from1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{from2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{from3}\PYG{p}{\PYGZcb{}[}\PYG{n}{bb\PYGZus{}index}\PYG{p}{];}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{array}\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{n}{b0}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{b1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{b2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{b3}\PYG{+w}{ }\PYG{p}{\PYGZcb{}[}\PYG{n}{bb\PYGZus{}index}\PYG{p}{];}
+\PYG{+w}{        }\PYG{c+c1}{// \PYGZus{}pdep\PYGZus{}u64 extracts the bit\PYGZhy{}th destination from bb without}
+\PYG{+w}{        }\PYG{c+c1}{// a loop. Example: bb = 0b01010100 (3 set bits),}
+\PYG{+w}{        }\PYG{c+c1}{// bit = 2 (3rd move):}
+\PYG{+w}{        }\PYG{c+c1}{//   1ULL \PYGZlt{}\PYGZlt{} 2           = 0b00000100}
+\PYG{+w}{        }\PYG{c+c1}{//   \PYGZus{}pdep\PYGZus{}u64(0b100,bb) = 0b01000000  (the 3rd set bit of bb)}
+\PYG{+w}{        }\PYG{c+c1}{//   countr\PYGZus{}zero(...)    = 6           (square index)}
+\PYG{+w}{        }\PYG{c+c1}{//}
+\PYG{+w}{        }\PYG{c+c1}{// Without \PYGZus{}pdep\PYGZus{}u64, the equivalent code would be:}
+\PYG{+w}{        }\PYG{c+c1}{// for (int i = 0; i \PYGZlt{} bit; i++) bb \PYGZam{}= bb \PYGZhy{} 1;}
+\PYG{+w}{                                            }\PYG{c+c1}{// bb \PYGZam{}= bb \PYGZhy{} 1}
+\PYG{+w}{                                            }\PYG{c+c1}{// clears the least}
+\PYG{+w}{                                            }\PYG{c+c1}{// significant bit of bb}
+\PYG{+w}{        }\PYG{c+c1}{// Square to = countr\PYGZus{}zero(bb);}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{countr\PYGZus{}zero}\PYG{p}{(}\PYG{n}{\PYGZus{}pdep\PYGZus{}u64}\PYG{p}{(}\PYG{l+m+mi}{1ULL}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{bit}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{bb}\PYG{p}{)));}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{from}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Applies a move: moves the piece from source to destination,}
+\PYG{+w}{    }\PYG{c+c1}{// turns the source square into a hole, and increments the}
+\PYG{+w}{    }\PYG{c+c1}{// player\PYGZsq{}s score.}
+\PYG{+w}{    }\PYG{c+c1}{// For Move::none() (pass), only the ply counter is incremented}
+\PYG{+w}{    }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n}{play}\PYG{p}{(}\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{m}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{[[}\PYG{n}{likely}\PYG{p}{]]}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{            }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
+\PYG{+w}{                }\PYG{n}{white\PYGZus{}score}\PYG{o}{++}\PYG{p}{;}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
+\PYG{+w}{                }\PYG{n}{black\PYGZus{}score}\PYG{o}{++}\PYG{p}{;}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{            }\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{|=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{n}{ply}\PYG{o}{++}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Reverses a move: restores the piece, removes the hole,}
+\PYG{+w}{    }\PYG{c+c1}{// decrements score}
+\PYG{+w}{    }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n}{undo}\PYG{p}{(}\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{ply}\PYG{o}{\PYGZhy{}\PYGZhy{}}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{m}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{::}\PYG{n}{none}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{[[}\PYG{n}{likely}\PYG{p}{]]}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{from\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{            }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{pos2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{to\PYGZus{}sq}\PYG{p}{());}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
+\PYG{+w}{                }\PYG{n}{white\PYGZus{}score}\PYG{o}{\PYGZhy{}\PYGZhy{}}\PYG{p}{;}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{pos2}\PYG{p}{;}
+\PYG{+w}{                }\PYG{n}{black\PYGZus{}score}\PYG{o}{\PYGZhy{}\PYGZhy{}}\PYG{p}{;}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{            }\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{\PYGZca{}=}\PYG{+w}{ }\PYG{n}{pos1}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Equality: compares all state fields}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{==}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{.}\PYG{n}{black}
+\PYG{+w}{            }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{.}\PYG{n}{white}
+\PYG{+w}{            }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{holes}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{.}\PYG{n}{holes}
+\PYG{+w}{            }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{black\PYGZus{}score}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{.}\PYG{n}{black\PYGZus{}score}
+\PYG{+w}{            }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{white\PYGZus{}score}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{.}\PYG{n}{white\PYGZus{}score}
+\PYG{+w}{            }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{.}\PYG{n}{ply}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{!=}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Yolah}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{o}{!}\PYG{p}{(}\PYG{o}{*}\PYG{k}{this}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{other}\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{};}
+\end{Verbatim}

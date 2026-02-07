@@ -1,0 +1,234 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}algorithm\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}array\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}bit\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}cstdint\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}format\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}iostream\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}optional\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}random\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}set\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}sstream\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}string\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}string\PYGZus{}view\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}utility\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}vector\PYGZgt{}}
+\PYG{c+cp}{\PYGZsh{}include}\PYG{+w}{ }\PYG{c+cpf}{\PYGZlt{}immintrin.h\PYGZgt{}}
+\PYG{k}{using}\PYG{+w}{ }\PYG{k}{namespace}\PYG{+w}{ }\PYG{n+nn}{std}\PYG{p}{;}
+
+\PYG{c+c1}{// 8  56   57   58   59   60   61   62   63}
+\PYG{c+c1}{// 7  48   49   50   51   52   53   54   55}
+\PYG{c+c1}{// 6  40   41   42   43   44   45   46   47}
+\PYG{c+c1}{// 5  32   33   34   35   36   37   38   39}
+\PYG{c+c1}{// 4  24   25   26   27   28   29   30   31}
+\PYG{c+c1}{// 3  16   17   18   19   20   21   22   23}
+\PYG{c+c1}{// 2   8    9   10   11   12   13   14   15}
+\PYG{c+c1}{// 1   0    1    2    3    4    5    6    7}
+\PYG{c+c1}{//     a    b    c    d    e    f    g    h}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Square}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H1}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H2}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H3}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H4}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G5}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H5}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H6}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H7}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}A8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}B8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}C8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}D8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}E8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}F8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}G8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H8}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQ\PYGZus{}NONE}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQUARE\PYGZus{}ZERO}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SQUARE\PYGZus{}NB}\PYG{+w}{   }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{64}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{// 8  56     57     58     59     60     61     62     63}
+\PYG{c+c1}{// 7  48     49     50     51     52     53     54     55}
+\PYG{c+c1}{// 6  40     41     42     43     44     45     46     47}
+\PYG{c+c1}{// 5  32     33     34     35     36     37     38     39}
+\PYG{c+c1}{// 4  24     25     26     27     28     29     30     31}
+\PYG{c+c1}{// 3  16     17     18     19     20     21     22     23}
+\PYG{c+c1}{// 2   8      9     10     11     12     13     14     15}
+\PYG{c+c1}{// 1   0      1      2      3      4      5      6      7}
+\PYG{c+c1}{//  FILE\PYGZus{}A FILE\PYGZus{}B FILE\PYGZus{}C FILE\PYGZus{}D FILE\PYGZus{}E FILE\PYGZus{}F FILE\PYGZus{}G FILE\PYGZus{}H}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{File}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{FILE\PYGZus{}A}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}B}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}C}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}D}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}E}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{FILE\PYGZus{}F}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}G}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}H}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{FILE\PYGZus{}NB}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{//  RANK\PYGZus{}8 | 56  57  58  59  60  61  62  63}
+\PYG{c+c1}{//  RANK\PYGZus{}7 | 48  49  50  51  52  53  54  55}
+\PYG{c+c1}{//  RANK\PYGZus{}6 | 40  41  42  43  44  45  46  47}
+\PYG{c+c1}{//  RANK\PYGZus{}5 | 32  33  34  35  36  37  38  39}
+\PYG{c+c1}{//  RANK\PYGZus{}4 | 24  25  26  27  28  29  30  31}
+\PYG{c+c1}{//  RANK\PYGZus{}3 | 16  17  18  19  20  21  22  23}
+\PYG{c+c1}{//  RANK\PYGZus{}2 |  8   9  10  11  12  13  14  15}
+\PYG{c+c1}{//  RANK\PYGZus{}1 |  0   1   2   3   4   5   6   7}
+\PYG{c+c1}{//            a   b   c   d   e   f   g   h}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Rank}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{RANK\PYGZus{}1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}5}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{RANK\PYGZus{}6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}NB}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{// Directions from sq = 27 (d4):}
+\PYG{c+c1}{//}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 8 |  56  |  57  |  58  |  59  |  60  |  61  |  62  |  63  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 7 |  48  |  49  |  50  |  51  |  52  |  53  |  54  |  55  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 6 |  40  |  41  |  42  |  43  |  44  |  45  |  46  |  47  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 5 |  32  |  33  |NW 34 |N  35 |NE 36 |  37  |  38  |  39  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 4 |  24  |  25  |W  26 |\PYGZgt{}\PYGZgt{}27\PYGZlt{}\PYGZlt{}|E  28 |  29  |  30  |  31  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 3 |  16  |  17  |SW 18 |S  19 |SE 20 |  21  |  22  |  23  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 2 |   8  |   9  |  10  |  11  |  12  |  13  |  14  |  15  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{// 1 |   0  |   1  |   2  |   3  |   4  |   5  |   6  |   7  |}
+\PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
+\PYG{c+c1}{//      a      b      c      d      e      f      g      h}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{Direction}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{k+kt}{int8\PYGZus{}t}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{NORTH}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{EAST}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{SOUTH}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{NORTH}\PYG{p}{,}\PYG{+w}{ }\PYG{c+c1}{// \PYGZhy{}8}
+\PYG{+w}{    }\PYG{n}{WEST}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{EAST}\PYG{p}{,}\PYG{+w}{  }\PYG{c+c1}{// \PYGZhy{}1}
+\PYG{+w}{    }\PYG{n}{NORTH\PYGZus{}EAST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{NORTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{EAST}\PYG{p}{,}\PYG{+w}{ }\PYG{c+c1}{// 9}
+\PYG{+w}{    }\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{EAST}\PYG{p}{,}\PYG{+w}{ }\PYG{c+c1}{// \PYGZhy{}7}
+\PYG{+w}{    }\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{WEST}\PYG{p}{,}\PYG{+w}{ }\PYG{c+c1}{// \PYGZhy{}9}
+\PYG{+w}{    }\PYG{n}{NORTH\PYGZus{}WEST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{NORTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{WEST}\PYG{+w}{  }\PYG{c+c1}{// 7}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{// ORTHOGONAL moves from d4:         DIAGONAL moves from d4:}
+\PYG{c+c1}{//}
+\PYG{c+c1}{// 8  .  .  .  *  .  .  .  .         .  .  .  .  .  .  .  *}
+\PYG{c+c1}{// 7  .  .  .  *  .  .  .  .         *  .  .  .  .  .  *  .}
+\PYG{c+c1}{// 6  .  .  .  *  .  .  .  .         .  *  .  .  .  *  .  .}
+\PYG{c+c1}{// 5  .  .  .  *  .  .  .  .         .  .  *  .  *  .  .  .}
+\PYG{c+c1}{// 4  *  *  * sq  *  *  *  *         .  .  . sq  .  .  .  .}
+\PYG{c+c1}{// 3  .  .  .  *  .  .  .  .         .  .  *  .  *  .  .  .}
+\PYG{c+c1}{// 2  .  .  .  *  .  .  .  .         .  *  .  .  .  *  .  .}
+\PYG{c+c1}{// 1  .  .  .  *  .  .  .  .         *  .  .  .  .  .  *  .}
+\PYG{c+c1}{//    a  b  c  d  e  f  g  h         a  b  c  d  e  f  g  h}
+\PYG{k}{enum}\PYG{+w}{ }\PYG{n+nc}{MoveType}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{ORTHOGONAL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{DIAGONAL}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{// Black player}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{c+c1}{// White Player}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{WHITE}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
+\PYG{c+c1}{// Square is destroyed}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{HOLE}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{;}
+\PYG{c+c1}{// Square is free}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FREE}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{3}\PYG{p}{;}
+
+\PYG{c+c1}{// FileABB: bitboard for file A, bits on file A are set to 1,}
+\PYG{c+c1}{// all other bits are set to 0. Other file bitboards are derived}
+\PYG{c+c1}{// by shifting FileABB to the left.}
+\PYG{c+c1}{//}
+\PYG{c+c1}{//    FileABB           FileBBB           FileCBB}
+\PYG{c+c1}{// 8  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{// 7  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{// 6  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{// 5  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{// 4  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{// 3  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{// 2  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{// 1  1 . . . . . . .   . 1 . . . . . .   . . 1 . . . . .}
+\PYG{c+c1}{//    a b c d e f g h   a b c d e f g h   a b c d e f g h}
+\PYG{c+c1}{//}
+\PYG{c+c1}{//    FileDBB           FileEBB           FileFBB}
+\PYG{c+c1}{// 8  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{// 7  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{// 6  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{// 5  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{// 4  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{// 3  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{// 2  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{// 1  . . . 1 . . . .   . . . . 1 . . .   . . . . . 1 . .}
+\PYG{c+c1}{//    a b c d e f g h   a b c d e f g h   a b c d e f g h}
+\PYG{c+c1}{//}
+\PYG{c+c1}{//    FileGBB           FileHBB}
+\PYG{c+c1}{// 8  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{// 7  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{// 6  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{// 5  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{// 4  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{// 3  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{// 2  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{// 1  . . . . . . 1 .   . . . . . . . 1}
+\PYG{c+c1}{//    a b c d e f g h   a b c d e f g h}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mh}{0x0101010101010101}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileBBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileCBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileDBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{3}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileEBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{4}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileFBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{5}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileGBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{FileHBB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{;}
+
+\PYG{c+c1}{// Rank1BB: bitboard for rank 1, bits on rank 1 are set to 1,}
+\PYG{c+c1}{// all other bits are set to 0. Other rank bitboards are derived}
+\PYG{c+c1}{// by shifting Rank1BB to the left by multiples of 8.}
+\PYG{c+c1}{//}
+\PYG{c+c1}{//    Rank1BB           Rank2BB           Rank3BB}
+\PYG{c+c1}{// 8  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 7  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 6  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 5  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 4  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 3  . . . . . . . .   . . . . . . . .   1 1 1 1 1 1 1 1}
+\PYG{c+c1}{// 2  . . . . . . . .   1 1 1 1 1 1 1 1   . . . . . . . .}
+\PYG{c+c1}{// 1  1 1 1 1 1 1 1 1   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{//    a b c d e f g h   a b c d e f g h   a b c d e f g h}
+\PYG{c+c1}{//}
+\PYG{c+c1}{//    Rank4BB           Rank5BB           Rank6BB}
+\PYG{c+c1}{// 8  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 7  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 6  . . . . . . . .   . . . . . . . .   1 1 1 1 1 1 1 1}
+\PYG{c+c1}{// 5  . . . . . . . .   1 1 1 1 1 1 1 1   . . . . . . . .}
+\PYG{c+c1}{// 4  1 1 1 1 1 1 1 1   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 3  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 2  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 1  . . . . . . . .   . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{//    a b c d e f g h   a b c d e f g h   a b c d e f g h}
+\PYG{c+c1}{//}
+\PYG{c+c1}{//    Rank7BB           Rank8BB}
+\PYG{c+c1}{// 8  . . . . . . . .   1 1 1 1 1 1 1 1}
+\PYG{c+c1}{// 7  1 1 1 1 1 1 1 1   . . . . . . . .}
+\PYG{c+c1}{// 6  . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 5  . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 4  . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 3  . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 2  . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{// 1  . . . . . . . .   . . . . . . . .}
+\PYG{c+c1}{//    a b c d e f g h   a b c d e f g h}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mh}{0xFF}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank2BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank3BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank4BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{3}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank5BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{4}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank6BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{5}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank7BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{);}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank8BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{);}
+
+\PYG{c+c1}{// Initial positions: Black starts at a1, d4, e5, h8.}
+\PYG{c+c1}{// White starts at a8, d5, e4, h1.}
+\PYG{c+c1}{//}
+\PYG{c+c1}{// BLACK\PYGZus{}INITIAL\PYGZus{}POSITION       WHITE\PYGZus{}INITIAL\PYGZus{}POSITION}
+\PYG{c+c1}{//}
+\PYG{c+c1}{// 8  .  .  .  .  .  .  .  B    W  .  .  .  .  .  .  .}
+\PYG{c+c1}{// 7  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
+\PYG{c+c1}{// 6  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
+\PYG{c+c1}{// 5  .  .  .  .  B  .  .  .    .  .  .  W  .  .  .  .}
+\PYG{c+c1}{// 4  .  .  .  B  .  .  .  .    .  .  .  .  W  .  .  .}
+\PYG{c+c1}{// 3  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
+\PYG{c+c1}{// 2  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
+\PYG{c+c1}{// 1  B  .  .  .  .  .  .  .    .  .  .  .  .  .  .  W}
+\PYG{c+c1}{//    a  b  c  d  e  f  g  h    a  b  c  d  e  f  g  h}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{BLACK\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{+w}{ }\PYG{o}{=}
+\PYG{l+m+mb}{0b10000000\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}00001000\PYGZsq{}00010000\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}00000001}\PYG{p}{;}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{WHITE\PYGZus{}INITIAL\PYGZus{}POSITION}\PYG{+w}{ }\PYG{o}{=}
+\PYG{l+m+mb}{0b00000001\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}00010000\PYGZsq{}00001000\PYGZsq{}00000000\PYGZsq{}00000000\PYGZsq{}10000000}\PYG{p}{;}
+\end{Verbatim}

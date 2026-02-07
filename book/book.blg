@@ -1,15 +1,15 @@
 [0] Config.pm:307> INFO - This is Biber 2.17
 [0] Config.pm:310> INFO - Logfile is 'book.blg'
-[66] biber:340> INFO - === Sun Feb  1, 2026, 23:06:55
-[79] Biber.pm:418> INFO - Reading 'book.bcf'
-[139] Biber.pm:972> INFO - Found 18 citekeys in bib section 0
-[149] Biber.pm:4383> INFO - Processing section 0
-[160] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
-[162] bibtex.pm:1713> INFO - LaTeX decoding ...
-[209] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
-[310] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
-[310] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
-[310] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
-[310] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
-[321] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
-[327] bbl.pm:757> INFO - Output to book.bbl
+[56] biber:340> INFO - === Sat Feb  7, 2026, 22:17:35
+[69] Biber.pm:418> INFO - Reading 'book.bcf'
+[122] Biber.pm:972> INFO - Found 18 citekeys in bib section 0
+[132] Biber.pm:4383> INFO - Processing section 0
+[139] Biber.pm:4574> INFO - Looking for bibtex file 'references.bib' for section 0
+[141] bibtex.pm:1713> INFO - LaTeX decoding ...
+[187] bibtex.pm:1518> INFO - Found BibTeX data source 'references.bib'
+[280] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
+[280] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[280] Biber.pm:4203> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'en-US'
+[280] Biber.pm:4209> INFO - No sort tailoring available for locale 'en-US'
+[292] bbl.pm:654> INFO - Writing 'book.bbl' with encoding 'UTF-8'
+[298] bbl.pm:757> INFO - Output to book.bbl

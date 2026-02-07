@@ -1,0 +1,246 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{c+c1}{// Returns the square at rank i, file j}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n+nf}{square\PYGZus{}of}\PYG{p}{(}\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{i}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{j}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{i}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{j}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Checks whether a square is within the valid range [A1, H8]}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{n+nf}{is\PYGZus{}ok}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZgt{}=}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}A1}\PYG{+w}{ }\PYG{o}{\PYGZam{}\PYGZam{}}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H8}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Extracts the file (column) from a square: s \PYGZpc{} 8}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{File}\PYG{+w}{ }\PYG{n+nf}{file\PYGZus{}of}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{File}\PYG{p}{(}\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Extracts the rank (row) from a square: s / 8}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Rank}\PYG{+w}{ }\PYG{n+nf}{rank\PYGZus{}of}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Rank}\PYG{p}{(}\PYG{n}{s}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{3}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Returns a bitboard with all bits set on rank r}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{rank\PYGZus{}bb}\PYG{p}{(}\PYG{n}{Rank}\PYG{+w}{ }\PYG{n}{r}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{r}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Returns a bitboard with all bits set on the rank of square s}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{rank\PYGZus{}bb}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{rank\PYGZus{}bb}\PYG{p}{(}\PYG{n}{rank\PYGZus{}of}\PYG{p}{(}\PYG{n}{s}\PYG{p}{));}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Returns a bitboard with all bits set on file f}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{file\PYGZus{}bb}\PYG{p}{(}\PYG{n}{File}\PYG{+w}{ }\PYG{n}{f}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{f}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Returns a bitboard with all bits set on the file of square s}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{file\PYGZus{}bb}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{file\PYGZus{}bb}\PYG{p}{(}\PYG{n}{file\PYGZus{}of}\PYG{p}{(}\PYG{n}{s}\PYG{p}{));}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Returns a bitboard with only the bit corresponding to square s set}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Moves a square in a given direction}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{+}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{k+kt}{int}\PYG{p}{(}\PYG{n}{s}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{k+kt}{int}\PYG{p}{(}\PYG{n}{d}\PYG{p}{));}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Pre\PYGZhy{}increment operator to iterate over squares}
+\PYG{n}{Square}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{++}\PYG{p}{(}\PYG{n}{Square}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{d}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{k+kt}{int}\PYG{p}{(}\PYG{n}{d}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Returns the least significant bit as a Square (index}
+\PYG{c+c1}{// of first set bit)}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{lsb}\PYG{p}{(}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{std}\PYG{o}{::}\PYG{n}{countr\PYGZus{}zero}\PYG{p}{(}\PYG{n}{b}\PYG{p}{));}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Extracts and clears the least significant bit, returns it as}
+\PYG{c+c1}{// a Square}
+\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{b}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{lsb}\PYG{p}{(}\PYG{n}{b}\PYG{p}{);}
+\PYG{+w}{    }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZam{}=}\PYG{+w}{ }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{s}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Computes the Manhattan distance (|rank1 \PYGZhy{} rank2| + |file1 \PYGZhy{} file2|)}
+\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{manhattan\PYGZus{}distance}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq2}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{d\PYGZus{}rank}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{abs}\PYG{p}{(}\PYG{n}{rank\PYGZus{}of}\PYG{p}{(}\PYG{n}{sq1}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{rank\PYGZus{}of}\PYG{p}{(}\PYG{n}{sq2}\PYG{p}{));}
+\PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{d\PYGZus{}file}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{abs}\PYG{p}{(}\PYG{n}{file\PYGZus{}of}\PYG{p}{(}\PYG{n}{sq1}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{file\PYGZus{}of}\PYG{p}{(}\PYG{n}{sq2}\PYG{p}{));}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{d\PYGZus{}rank}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{d\PYGZus{}file}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Shifts all bits of a bitboard in direction D. For horizontal and}
+\PYG{c+c1}{// diagonal shifts, bits on the edge file are masked out to prevent}
+\PYG{c+c1}{// wrapping around the board (e.g., a piece on file H shifted east}
+\PYG{c+c1}{// would appear on file A)}
+\PYG{k}{template}\PYG{o}{\PYGZlt{}}\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{D}\PYG{o}{\PYGZgt{}}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{shift}\PYG{p}{(}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{NORTH}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{NORTH}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{SOUTH}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{EAST}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{FileHBB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{EAST}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{WEST}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{FileABB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{WEST}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{NORTH\PYGZus{}EAST}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{FileHBB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{NORTH\PYGZus{}EAST}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{NORTH\PYGZus{}WEST}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{FileABB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{NORTH\PYGZus{}WEST}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{FileHBB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{D}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{FileABB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{else}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Computes all squares reachable from sq by sliding in the given move}
+\PYG{c+c1}{// type (orthogonal or diagonal), stopping at occupied squares or}
+\PYG{c+c1}{// board edges. Used during magic bitboard initialization to build the}
+\PYG{c+c1}{// move tables}
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{reachable\PYGZus{}squares}\PYG{p}{(}\PYG{n}{MoveType}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}
+\PYG{+w}{                           }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{  }\PYG{n}{moves}\PYG{+w}{    }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{o\PYGZus{}dir}\PYG{p}{[}\PYG{l+m+mi}{4}\PYG{p}{]}\PYG{o}{=}\PYG{p}{\PYGZob{}}\PYG{n}{NORTH}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{EAST}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{WEST}\PYG{p}{\PYGZcb{};}
+\PYG{+w}{    }\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{d\PYGZus{}dir}\PYG{p}{[}\PYG{l+m+mi}{4}\PYG{p}{]}\PYG{o}{=}\PYG{p}{\PYGZob{}}\PYG{n}{NORTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}EAST}\PYG{p}{,}\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{p}{,}\PYG{n}{NORTH\PYGZus{}WEST}\PYG{p}{\PYGZcb{};}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{Direction}\PYG{+w}{ }\PYG{n}{d}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{mt}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{ORTHOGONAL}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{o\PYGZus{}dir}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{d\PYGZus{}dir}\PYG{p}{))}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n+nb}{true}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{is\PYGZus{}ok}\PYG{p}{(}\PYG{n}{to}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{||}\PYG{+w}{ }\PYG{n}{manhattan\PYGZus{}distance}\PYG{p}{(}\PYG{n}{s}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{square\PYGZus{}bb}\PYG{p}{(}\PYG{n}{to}\PYG{p}{);}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{moves}\PYG{+w}{ }\PYG{o}{|=}\PYG{+w}{ }\PYG{n}{bb}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{s}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Magic bitboard entry for one square. The mask isolates the relevant}
+\PYG{c+c1}{// occupancy bits, the magic number maps them to a unique index, and}
+\PYG{c+c1}{// the moves pointer references the precomputed move bitboards in the}
+\PYG{c+c1}{// table}
+\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{Magic}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{  }\PYG{n}{mask}\PYG{p}{;}\PYG{+w}{   }\PYG{c+c1}{// relevant occupancy mask (edges excluded)}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{  }\PYG{n}{magic}\PYG{p}{;}\PYG{+w}{  }\PYG{c+c1}{// magic multiplier for this square}
+\PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{;}\PYG{+w}{  }\PYG{c+c1}{// pointer into the move lookup table}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{  }\PYG{n}{shift}\PYG{p}{;}\PYG{+w}{  }\PYG{c+c1}{// right shift amount = 64 \PYGZhy{} popcount(mask)}
+
+\PYG{+w}{    }\PYG{c+c1}{// Computes the table index for a given occupancy configuration}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{index}\PYG{p}{(}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{p}{(}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{mask}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{n}{magic}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZgt{}\PYGZgt{}}\PYG{+w}{ }\PYG{n}{shift}\PYG{+w}{ }\PYG{p}{);}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{};}
+
+\PYG{c+c1}{// Precomputed move lookup tables for all squares}
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{orthogonalTable}\PYG{p}{[}\PYG{l+m+mi}{102400}\PYG{p}{];}
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{diagonalTable}\PYG{p}{[}\PYG{l+m+mi}{5248}\PYG{p}{];}
+
+\PYG{c+c1}{// Magic bitboard entries for each square}
+\PYG{n}{Magic}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{[}\PYG{n}{SQUARE\PYGZus{}NB}\PYG{p}{];}
+\PYG{n}{Magic}\PYG{+w}{ }\PYG{n}{diagonalMagics}\PYG{p}{[}\PYG{n}{SQUARE\PYGZus{}NB}\PYG{p}{];}
+
+\PYG{c+c1}{// Combines orthogonal and diagonal magic table lookups to return a}
+\PYG{c+c1}{// bitboard of all squares that a piece on sq can reach, given the}
+\PYG{c+c1}{// board occupancy}
+\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{moves\PYGZus{}bb}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{idx\PYGZus{}omoves}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{index}\PYG{p}{(}\PYG{n}{occupied}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k+kt}{uint32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{idx\PYGZus{}dmoves}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{diagonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{index}\PYG{p}{(}\PYG{n}{occupied}\PYG{p}{);}
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{moves}\PYG{p}{[}\PYG{n}{idx\PYGZus{}omoves}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{diagonalMagics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{].}\PYG{n}{moves}\PYG{p}{[}\PYG{n}{idx\PYGZus{}dmoves}\PYG{p}{];}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Initializes magic bitboard tables for a given move type (orthogonal}
+\PYG{c+c1}{// or diagonal). For each square, enumerates all possible occupancy}
+\PYG{c+c1}{// patterns using the Carry\PYGZhy{}Rippler trick, computes the corresponding}
+\PYG{c+c1}{// reachable squares, and stores them in the lookup table indexed by}
+\PYG{c+c1}{// the magic hash}
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{init\PYGZus{}magics}\PYG{p}{(}\PYG{n}{MoveType}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{table}\PYG{p}{[],}\PYG{+w}{ }\PYG{n}{Magic}\PYG{+w}{ }\PYG{n}{magics}\PYG{p}{[])}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{O\PYGZus{}MAGIC}\PYG{p}{[}\PYG{l+m+mi}{64}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{l+m+mh}{0x80011040002082}\PYG{p}{,}\PYG{+w}{   }\PYG{l+m+mh}{0x40022002100040}\PYG{p}{,}\PYG{+w}{   }\PYG{l+m+mh}{0x1880200081181000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x2080240800100080}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x8080024400800800}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x4100080400024100}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0xc080028001000a00}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x80146043000080}\PYG{p}{,}\PYG{+w}{   }\PYG{l+m+mh}{0x8120802080034004}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x8401000200240}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x202001282002044}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x81010021000b1000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x808044000800}\PYG{p}{,}\PYG{+w}{     }\PYG{l+m+mh}{0x300080800c000200}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x8c000268411004}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x810080058020c100}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0xc248608010400080}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x30024040002000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x9001010042102000}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x210009001002}\PYG{p}{,}\PYG{+w}{     }\PYG{l+m+mh}{0xa0061d0018001100}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x2410808004000600}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x6400240008025001}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0xc10600010340a4}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x628080044011}\PYG{p}{,}\PYG{+w}{     }\PYG{l+m+mh}{0x4810014040002000}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x380200080801000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x10018580080010}\PYG{p}{,}\PYG{+w}{   }\PYG{l+m+mh}{0x101040080180180}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x9208020080040080}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x10400a21008}\PYG{p}{,}\PYG{+w}{      }\PYG{l+m+mh}{0x6800104200010484}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x21400280800020}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x9400402008401001}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x8430006800200400}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x8104411202000820}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x8010171000408}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x1202000402001008}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x881100904002208}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x15a0800a49802100}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x224001808004}\PYG{p}{,}\PYG{+w}{     }\PYG{l+m+mh}{0x4420201002424000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0xc04500020008080}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x2503009004210008}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x42801010010}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x2000400090100}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x8080011810040002}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x44401c008046000d}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x4000800521104100}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x82000b080400080}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x10821022420200}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x9488a82104100100}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x1004800041100}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x81600a0034008080}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0xa00056210280400}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x5124088200}\PYG{p}{,}\PYG{+w}{       }\PYG{l+m+mh}{0x4210410010228202}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x1802230840001081}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x1002102000400901}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x1100c46010000901}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x281000408001003}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0xc001001c00028809}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x10020008008c4102}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x280005008c014222}\PYG{p}{,}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{};}
+\PYG{+w}{    }\PYG{k}{static}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{D\PYGZus{}MAGIC}\PYG{p}{[}\PYG{l+m+mi}{64}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{l+m+mh}{0x811100100408200}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x412100401044020}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x404044c00408002}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0xa0c070200010102}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x104042001400008}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x8802013008080000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x1001008860080080}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x20220044202800}\PYG{p}{,}\PYG{+w}{   }\PYG{l+m+mh}{0x2002610802080160}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x4080800808610}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x91c2800a10a0132}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x400242401822000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x8530040420040001}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x142010c210048}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x8841820801241004}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x804212084108801}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x2032402094100484}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x40202110010210a2}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x8010000800202020}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x800240421a800}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x62200401a00444}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x224082200820845}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x106021492012000}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x8481020082849000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x40a110c59602800}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x10020108020400}\PYG{p}{,}\PYG{+w}{   }\PYG{l+m+mh}{0x208c020844080010}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x2000480004012020}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x8001004004044000}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0xa044104128080200}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x1108008015cc1400}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x8284004801844400}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x8180a020c2004}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x9101004080100}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x8840264108800c0}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0xc004200900200900}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x8040008020020020}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x20010802e1920200}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x80204000480a0}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0xc0a80a100008400}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x4018808114000}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x90092200b9000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x80020c0048000400}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x6018005500}\PYG{p}{,}\PYG{+w}{       }\PYG{l+m+mh}{0x80a0204110a00}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x4018808407201}\PYG{p}{,}\PYG{+w}{    }\PYG{l+m+mh}{0x6050040806500280}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x108208400c40180}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x803081210840480}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x201210402200200}\PYG{p}{,}\PYG{+w}{  }\PYG{l+m+mh}{0x200010400920042}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x902000a884110010}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x851002021004}\PYG{p}{,}\PYG{+w}{     }\PYG{l+m+mh}{0x43c08020120}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x6140500501010044}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x200a04440400c028}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x14a002084046000}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x10002409041040}\PYG{p}{,}\PYG{+w}{   }\PYG{l+m+mh}{0x100022020500880b}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x1000000000460802}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x21084104410}\PYG{p}{,}\PYG{+w}{      }\PYG{l+m+mh}{0x8000001053300104}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x4000182008c20048}\PYG{p}{,}
+\PYG{+w}{        }\PYG{l+m+mh}{0x112088105020200}\PYG{p}{,}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{};}
+\PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{size}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{occupancies}\PYG{p}{;}
+\PYG{+w}{    }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{sq}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}A1}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{sq}\PYG{+w}{ }\PYG{o}{\PYGZlt{}=}\PYG{+w}{ }\PYG{n}{SQ\PYGZus{}H8}\PYG{p}{;}\PYG{+w}{ }\PYG{o}{++}\PYG{n}{sq}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{n}{occupancies}\PYG{p}{.}\PYG{n}{clear}\PYG{p}{();}
+\PYG{+w}{        }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{.}\PYG{n}{clear}\PYG{p}{();}
+\PYG{+w}{        }\PYG{n}{Magic}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{magics}\PYG{p}{[}\PYG{n}{sq}\PYG{p}{];}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{edges}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{((}\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Rank8BB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{rank\PYGZus{}bb}\PYG{p}{(}\PYG{n}{sq}\PYG{p}{))}\PYG{+w}{ }\PYG{o}{|}
+\PYG{+w}{                            }\PYG{p}{((}\PYG{n}{FileABB}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{FileHBB}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{file\PYGZus{}bb}\PYG{p}{(}\PYG{n}{sq}\PYG{p}{));}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{reachable\PYGZus{}squares}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{o}{\PYGZti{}}\PYG{n}{edges}\PYG{p}{;}
+\PYG{+w}{        }\PYG{n}{m}\PYG{p}{.}\PYG{n}{mask}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{;}
+\PYG{+w}{        }\PYG{n}{m}\PYG{p}{.}\PYG{n}{shift}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{64}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{popcount}\PYG{p}{(}\PYG{n}{m}\PYG{p}{.}\PYG{n}{mask}\PYG{p}{);}
+\PYG{+w}{        }\PYG{n}{m}\PYG{p}{.}\PYG{n}{magic}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{mt}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{ORTHOGONAL}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{O\PYGZus{}MAGIC}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{D\PYGZus{}MAGIC}\PYG{p}{)[}\PYG{n}{sq}\PYG{p}{];}
+\PYG{+w}{        }\PYG{n}{m}\PYG{p}{.}\PYG{n}{moves}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{table}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{size}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{do}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{occupancies}\PYG{p}{.}\PYG{n}{push\PYGZus{}back}\PYG{p}{(}\PYG{n}{b}\PYG{p}{);}
+\PYG{+w}{            }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{.}\PYG{n}{push\PYGZus{}back}\PYG{p}{(}\PYG{n}{reachable\PYGZus{}squares}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{sq}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{b}\PYG{p}{));}
+\PYG{+w}{            }\PYG{n}{b}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves\PYGZus{}bb}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{size}\PYG{o}{++}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{b}\PYG{p}{);}
+\PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{j}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{n}{occupancies}\PYG{p}{.}\PYG{n}{size}\PYG{p}{();}\PYG{+w}{ }\PYG{n}{j}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{int32\PYGZus{}t}\PYG{+w}{ }\PYG{n}{index}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{.}\PYG{n}{index}\PYG{p}{(}\PYG{n}{occupancies}\PYG{p}{[}\PYG{n}{j}\PYG{p}{]);}
+\PYG{+w}{            }\PYG{n}{m}\PYG{p}{.}\PYG{n}{moves}\PYG{p}{[}\PYG{n}{index}\PYG{p}{]}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{possible\PYGZus{}moves}\PYG{p}{[}\PYG{n}{j}\PYG{p}{];}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Initializes both orthogonal and diagonal magic bitboard tables}
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{init\PYGZus{}all\PYGZus{}magics}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{init\PYGZus{}magics}\PYG{p}{(}\PYG{n}{ORTHOGONAL}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{orthogonalTable}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{orthogonalMagics}\PYG{p}{);}
+\PYG{+w}{    }\PYG{n}{init\PYGZus{}magics}\PYG{p}{(}\PYG{n}{DIAGONAL}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{diagonalTable}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{diagonalMagics}\PYG{p}{);}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

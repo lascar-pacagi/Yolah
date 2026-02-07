@@ -37,8 +37,8 @@
       \field{labeltitlesource}{title}
       \field{howpublished}{\url{https://www.anthropic.com/claude}}
       \field{note}{Large Language Model}
-      \field{title}{Claude Sonnet 4.5}
-      \field{year}{2025}
+      \field{title}{Claude Opus 4.6}
+      \field{year}{2026}
     \endentry
     \entry{cppreference}{online}{}
       \name{author}{1}{}{%
