@@ -327,13 +327,13 @@ and artificial players for our students. You can see the Pingouins game box in F
 
 \begin{importantbox}
 % Nous avons fait de notre mieux avec nos connaissances actuelles (\emph{ars longa, vita brevis}) pour implémenter notre jeu et les IA associées. Mais comme tout bon scientifique, il faudra regarder notre travail avec un œil critique.
-We have done our best with our current knowledge (\emph{ars longa, vita brevis}) to implement our game and the associated AIs. But like any good scientist, you should look at our work with a critical eye.
+We have done our best with our current knowledge (\emph{ars longa, vita brevis}) to implement our game and the associated artificial players. But like any good scientist, you should look at our work with a critical eye.
 % Nous avons écrit le livre en français (plus facile pour nous) et nous avons demandé à un assistant (Claude) de le traduire pour nous.
 We wrote the book in French (easier for us) and asked an AI assistant (Claude~\cite{anthropic2025claude}) to translate it for us.
 \end{importantbox}
 
 % Nous allons maintenant décrire les règles du jeu, puis nous expliquerons pourquoi nous avons choisi ces règles, nous donnerons un exemple de partie entre deux IA et nous présenterons la suite du livre.
-We will now describe the rules of the game, then we will explain why we chose these rules, we will give an example of a game between two AIs and then we will present the rest of the book.
+We will now describe the rules of the game, then we will explain why we chose these rules, we will give an example of a game between two artificial players and then we will present the rest of the book.
 
 \subsection{Game Rules}
 
@@ -379,7 +379,7 @@ Now, if the black piece at {\ttfamily d5} moves to {\ttfamily b7}, which we will
 
 % Un déplacement rapporte un point au joueur qui vient de se déplacer. Par exemple, dans la configuration de la figure \ref{fig:yolah_moves2}, le joueur noir a un point et le joueur blanc qui ne s'est pas encore déplacé a zéro point. Le but du jeu est assez simple à résumer~: il faut se déplacer plus longtemps que son adversaire~!
 
-A move earns one point for the player who just moved. For example, in the configuration of Figure~\ref{fig:yolah_moves2}, the black player has one point and the white player who has not yet moved has zero points. The goal of the game is quite simple to summarize: you must move longer than your opponent!\\
+A move earns one point for the player who just moved. For example, in the configuration of Figure~\ref{fig:yolah_moves2}, the black player has one point and the white player who has not yet moved has zero points. The goal of the game is quite simple to summarize: you must make more moves than your opponent!\\
 
 % Maintenant c'est au tour des blancs de jouer. Ils doivent décider du pion blanc qu'ils vont bouger. Supposons que ce soit le pion en {\ttfamily e5}.
 % Les déplacements possibles de ce pion blanc sont indiqués dans la figure \ref{fig:yolah_moves3}. Si blanc décide d'effectuer le coup {\ttfamily e5:f5}, on se retrouve dans la configuration de la figure \ref{fig:yolah_moves4} et le score est d'un point partout (chaque joueur a joué un coup).
@@ -453,7 +453,7 @@ Compared to the Pingouins game, we removed the varying point values of tiles and
 
 % Pour avoir une idée du déroulement d'une partie du jeu Yolah, nous allons faire jouer deux intelligences artificielles entre elles. La première IA sera basée sur la recherche arborescente Monte-Carlo et la deuxième sera basée sur le MinMax avec réseau neuronal. Nous étudierons ces deux IA dans la suite du livre. La seconde IA est plus forte et vous allez voir sa stratégie d'isolement de zones en action~!
 
-To get an idea of how a Yolah game unfolds, we will have two artificial intelligences play against each other. The first AI will be based on Monte Carlo Tree Search and the second will be based on Minimax with a neural network. We will study both of these AIs later in the book. The second AI is stronger and you will see its zone isolation strategy in action!\\
+To get an idea of how a Yolah game unfolds, we will have two artificial intelligences play against each other. The first AI will be based on Monte Carlo Tree Search and the second will be based on Minimax with a neural network. We will study both of these artificial players later in the book. The second AI is stronger and you will see its zone isolation strategy in action!\\
 
 % Le déroulement de la partie est décrit dans les figures \ref{fig:game_example_opening}, \ref{fig:game_example_middle} et \ref{fig:game_example_end}.
 
@@ -461,7 +461,7 @@ The progression of the game is described in Figures~\ref{fig:game_example_openin
 
 % L'IA des blancs estime qu'elle est gagnante à partir du coup 10 (voir figure \ref{fig:game_example_move10}). On peut voir au coup 30 (voir figure \ref{fig:game_example_move30}) qu'elle a réussi à isoler une zone où les noirs ne pourront plus accéder. Au coup 32 (voir figure \ref{fig:game_example_move32}) elle sort un de ses pions de la zone qu'elle a isolée car l'autre pion pourra collecter tous les points de celle-ci. Il est plus utile d'utiliser l'autre pion pour glaner des points autre part. Notons qu'à partir du coup 47 (voir à partir de la figure \ref{fig:game_example_move47}) les noirs n'ont plus aucun coup disponible et doivent donc passer leur tour.
 
-The white AI estimates that it is winning starting from move 10 (see Figure~\ref{fig:game_example_move10}). We can see at move 30 (see Figure~\ref{fig:game_example_move30}) that it has successfully isolated a zone where black can no longer access. At move 32 (see Figure~\ref{fig:game_example_move32}) it moves one of its pieces out of the isolated zone because the other piece will be able to collect all the points from that zone. It is more useful to use the other piece to gather points elsewhere. Note that starting from move 47 (see Figure~\ref{fig:game_example_move47} onward), black has no more available moves and must therefore pass their turn.\\
+The white AI estimates that it is winning starting from move 10 (see Figure~\ref{fig:game_example_move10}). We can see at move 30 (see Figure~\ref{fig:game_example_move30}) that it has successfully isolated a zone that black can no longer access. At move 32 (see Figure~\ref{fig:game_example_move32}) it moves one of its pieces out of the isolated zone because the other piece will be able to collect all the points from that zone. It is more useful to use the other piece to gather points elsewhere. Note that starting from move 47 (see Figure~\ref{fig:game_example_move47} onward), black has no more available moves and must therefore pass their turn.\\
 
 % La partie est gagnée par le joueur blanc 32 à 24, ce qui est un très bon score car le jeu Yolah nous semble être à l'avantage des noirs.
 
@@ -949,7 +949,7 @@ The game is won by the white player 32 to 24, which is a very good score because
 \hfill
 
 % \caption{Example de partie entre deux IA - coups 39 à 56. Blanc gagne 32 à 24}
-\caption{Game example between two AIs - moves 40 to 56. White wins 32 to 24}
+\caption{Example game between two artificial players -- moves 40 to 56. White wins 32 to 24}
 \label{fig:game_example_end}
 \end{figure}
 
@@ -958,15 +958,15 @@ The game is won by the white player 32 to 24, which is a very good score because
 
 % Dans le prochain chapitre, nous allons étudier l'implémentation du jeu Yolah en C++ \cite{cppreference}, cette implémentation se veut efficace car il sera important pour les IA de pouvoir jouer beaucoup de parties à la seconde~; leur niveau de jeu va en dépendre.
 
-In the next chapter, we will study the implementation of the Yolah game in C++ \cite{cppreference}. This implementation is designed to be efficient because it will be important for the AIs to be able to play many games per second; their level of play will depend on it.\\
+In the next chapter, we will study the implementation of the Yolah game in C++ \cite{cppreference}. This implementation is designed to be efficient because it will be important for the artificial players to be able to play many games per second; their level of play will depend on it. We develop on a Linux operating system, and occasionally use instructions specific to the x86-64 architecture.\\
 
 % Le chapitre \ref{ch:ai} décrit l'interface commune de nos différentes IA, le chapitre \ref{ch:monte_carlo} présente une IA très simple basée sur une recherche Monte-Carlo. L'IA suivante, décrite au chapitre \ref{fig:mcts}, est une évolution de la précédente et permettra, contrairement à l'IA Monte-Carlo, de développer un arbre de jeu. Notons que ces deux IA ne nécessiteront pas d'heuristiques apportées par l'humain et n'ont besoin que des règles du jeu. Le chapitre \ref{ch:minmax} présente une IA basée sur une recherche arborescente minmax avec des heuristiques fournies par l'humain. L'heuristique utilisée par l'IA est une combinaison linéaire des heuristiques fournies par l'humain~; les pondérations de chacune des heuristiques dans cette combinaison linéaire sont apprises grâce à un algorithme génétique. Notre dernière, et plus forte IA, est présentée au chapitre \ref{ch:nnue}. Un réseau de neurones est utilisé à la place des heuristiques. Ce réseau de neurones est entraîné sur un ensemble de parties jouées par l'IA précédente.
 
-Chapter~\ref{ch:ai} describes the common interface for our different AIs. Chapter~\ref{ch:monte_carlo} presents a very simple AI based on Monte Carlo search. The next AI, described in Chapter~\ref{fig:mcts}, is an evolution of the previous one and will allow, unlike the Monte Carlo AI, the development of a game tree. Note that these two AIs will not require heuristics provided by humans and only need the rules of the game. Chapter~\ref{ch:minmax} presents an AI based on minimax tree search with heuristics provided by humans. The heuristic used by the AI is a linear combination of the heuristics provided by humans; the weights of each heuristic in this linear combination are learned using a genetic algorithm. Our last and strongest AI is presented in Chapter~\ref{ch:nnue}. A neural network is used instead of heuristics. This neural network is trained on a set of games played by the previous AI.\\
+Chapter~\ref{ch:ai} describes the common interface for our different AIs. Chapter~\ref{ch:monte_carlo} presents a very simple AI based on Monte Carlo search. The next AI, described in Chapter~\ref{fig:mcts}, is an evolution of the previous one and, unlike the Monte Carlo AI, will allow the development of a game tree. Note that these two AIs do not require human-provided heuristics and only need the rules of the game. Chapter~\ref{ch:minmax} presents an AI based on minimax tree search with heuristics provided by humans. The heuristic used by the AI is a linear combination of the heuristics provided by humans; the weights of each heuristic in this linear combination are learned using a genetic algorithm. Our last and strongest AI is presented in Chapter~\ref{ch:nnue}. A neural network is used instead of heuristics. This neural network is trained on a set of games played by the previous AI.\\
 
 % Le chapitre \ref{ch:tournament} évalue alors toutes ces IA, en les faisant se rencontrer dans un tournoi. Nous conclurons ensuite et proposerons différentes directions pour créer d'autres joueurs artificiels.
 
-Chapter~\ref{ch:tournament} then evaluates all these AIs by having them compete in a tournament. We will then conclude and propose different directions for creating other artificial players.\\
+Chapter~\ref{ch:tournament} then evaluates all these AIs by having them compete in a tournament. We will then conclude and propose various directions for creating other artificial players.\\
 
 % Bonne lecture~!
 
@@ -1037,7 +1037,7 @@ Happy reading!
 
 % Nous allons implémenter la gestion du jeu en C++ en essayant de créer une implémentation efficace pour pouvoir réaliser un maximum de parties à la seconde, ce qui sera important pour obtenir des IA de bons niveaux. Nous testerons notre implémentation en générant un maximum de parties aléatoires en un temps donné à la fin de ce chapitre.
 % Nous allons nous inspirer de l'excellent moteur de jeu d'échecs Stockfish pour les structures de données de Yolah.
-We will implement game management in C++, striving to create an efficient implementation capable of running as many games per second as possible—this will be crucial for developing high-level AIs. We will test our implementation by generating as many random games as possible within a given time at the end of this chapter.
+We will implement game management in C++, striving to create an efficient implementation capable of running as many games per second as possible—this will be crucial for developing high-level AIs. We will test our implementation by generating as many random games as possible within a given time, at the end of this chapter.
 We will draw inspiration from the excellent Stockfish chess engine \cite{stockfish2025} for Yolah's data structures.
 
 \section{Data Structures}
@@ -1066,7 +1066,7 @@ We will represent the positions of black pieces, white pieces, and destroyed squ
 \end{table}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 enum Square : int8_t {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
     SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2,
@@ -1224,7 +1224,7 @@ The attributes of the \mintinline{c++}{Yolah} class are:\\
 % Un objet de type Yolah prendra en mémoire sizeof(Yolah) == 32 octets. Notons qu'avec le padding, il n'aurait pas été judicieux d'écrire, par exemple,
 A \mintinline{c++}{Yolah} object will occupy \mintinline{c++}{sizeof(Yolah) == 32} bytes in memory. Note that due to padding\footnote{\url{https://en.wikipedia.org/wiki/Data_structure_alignment}.}, it would not have been wise to write, for example,
 
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 class Yolah {
     uint64_t black = BLACK_INITIAL_POSITION;
     uint8_t black_score = 0;    
@@ -1297,7 +1297,7 @@ To test for game over, we will need some enumerations and constants (Listings \r
 \end{table}
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 enum Direction : int8_t {
     NORTH = 8,
     EAST  = 1,
@@ -1400,7 +1400,7 @@ shown in Table \ref{tab:shift_north_after}. Note that the piece on {\ttfamily h8
 % On peut ainsi facilement obtenir toutes les cases directement au contact des pièces d'un plateau donné board, en effectuant l'opération suivante :
 We can thus easily obtain all squares directly adjacent to the pieces on a given \mintinline{c++}{board} by performing the following operation:
 
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 shift<NORTH>(board) | shift<SOUTH>(board) | shift<EAST>(board) | 
 shift<WEST>(board) | shift<NORTH_EAST>(board) | shift<NORTH_WEST>(board) 
 | shift<SOUTH_EAST>(board) | shift<SOUTH_WEST>(board)
@@ -1457,7 +1457,7 @@ For the board in Table \ref{tab:before_all_shift}, we get the positions represen
 In the \mintinline{c++}{shift} function code (Listing \ref{lst:shift}), we can see the use of constants \mintinline{c++}{FileHBB} and \mintinline{c++}{FileABB} ({\ttfamily BB} for bitboard). These constants allow us to mask certain bits that would end up in incorrect positions after shifting. For example, if we shift the bitboard shown in Table \ref{tab:before_all_shift} in the \mintinline{c++}{EAST} direction, the white pawn on {\ttfamily h1} would end up on {\ttfamily a2}. To avoid this, before shifting, we eliminate elements from column {\ttfamily h} so they don't end up in column {\ttfamily a} (line 8 of Listing \ref{lst:shift}). The constants \mintinline{c++}{FileABB} and \mintinline{c++}{FileHBB} along with the rank and file enumerations are defined in Listing \ref{lst:files_and_ranks}.    
 
 \begin{mdframed}[skipabove=\baselineskip,hidealllines=true]
-\begin{minted}[linenos, linenos,breaklines,fontsize=\small]{cpp}
+\begin{minted}[linenos,breaklines,fontsize=\small]{cpp}
 enum File : uint8_t {
     FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H,
     FILE_NB
@@ -1559,9 +1559,9 @@ int position(uint64_t x) {
 \end{minted}
 
 % La consultation de cette table de hachage est bien plus coûteuse que l'indexation d'un simple tableau. Mais on ne peut pas directement utiliser un tableau, car les valeurs pour indexer celui-ci sont dans une plage de valeurs trop grande. L'idée c'est de trouver une fonction de hachage efficace pour transformer chacune des 64 valeurs, que nous allons appeler clés, dans la plage [0, 63].
-Looking up values in this hash table is far more costly than indexing a simple array\footnote{We will measure the performance gain from magic perfect hashing compared to using a standard hash table at the end of this section.}. However, we cannot directly use an array because the indexing values span too large a range—for example, the value \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$)!. The idea is to find an efficient hash function that transforms each of the $64$ values\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}—which we call bitboards—into the range $[0, 2^6 - 1 = 63]$.
+Looking up values in this hash table is far more costly than indexing a simple array\footnote{We will measure the performance gain from magic perfect hashing compared to using a standard hash table at the end of this section.}. However, we cannot directly use an array because the indexing values span too large a range—for example, the value \mintinline{c++}{0x8000000000000000} ($9,223,372,036,854,775,808$)! The idea is to find an efficient hash function that transforms each of the $64$ values\footnote{\mintinline{c++}{1, 0b10, 0b100, 0b1000, 0b10000, ...}.}—which we call bitboards—into the range $[0, 2^6 - 1 = 63]$.
 % De plus on veut qu'il n'y ait aucune collision, on parle alors d'un hachage parfait. S'il y a des collisions des positions seraient erronées. Par exemple, si les clés 0b100 et 0b1000000 étaient transformées en l'indice 42, on devrait mettre dans table[42] la valeur 2 ou 6, mais on ne peut pas stocker plus d'une valeur au même emplacement.
-Moreover, we want no collisions—this is called perfect hashing. If there were collisions, positions would be incorrect. For example, if keys \mintinline{c++}{0b100} and \mintinline{c++}{0b1000000} were both transformed to index $42$, we would need to store value $2$ and $6$ in \mintinline{c++}{table[42]}, but we cannot store more than one value at the same location.\\
+Moreover, we want no collisions—this is called perfect hashing. If there were collisions, positions would be incorrect. For example, if keys \mintinline{c++}{0b100} and \mintinline{c++}{0b1000000} were both transformed to index $42$, we would need to store values $2$ and $6$ in \mintinline{c++}{table[42]}, but we cannot store more than one value at the same location.\\
 % La fonction de hachage parfait magique va avoir la forme suivante :
 The magic perfect hashing function will have the following form (listing \ref{lst:magic_perfect_hashing}):
 
@@ -1954,7 +1954,8 @@ For each board configuration, we want to be able to provide, for a given square,
 
 \begin{table}[htpb]
 \centering
-\caption{Masque pour les cases atteignables par la pièce en d3 sans considérer les éventuels obstacles}
+% \caption{Masque pour les cases atteignables par la pièce en d3 sans considérer les éventuels obstacles}
+\caption{Mask for reachable squares for the piece at d3 without considering obstacles}
 \label{tab:mask_for_d3}
 \begin{tabular}{|c|*{8}{>{\centering\arraybackslash}p{0.5cm}|}}
 \hline
@@ -2421,7 +2422,7 @@ In listing \ref{lst:find_magic},
 
 \begin{itemize}
 % \item Aux lignes 62 et 63, le vecteur \mintinline{c++}{occupancies} va contenir toutes les configurations d'obstacles sur la trajectoire de la pièce, sans considérer les cases dans \mintinline{c++}{edge}, et pour chacune de ces configurations, le vecteur \mintinline{c++}{possible_moves} va contenir le bitboard des coups possibles pour cette configuration. Par exemple, on pourrait avoir comme configuration d'obstacles le bitboard de la figure \ref{fig:occupancy_d3_23} et les coups possibles associés seraient représentés par le bitboard de la figure \ref{fig:possible_moves_d3_23}.
-\item At lines 62 and 63, the vector \mintinline{c++}{occupancies} will contain all obstacle configurations on the piece's trajectory, without considering the squares in \mintinline{c++}{edge}, and for each of these configurations, the vector \mintinline{c++}{possible_moves} will contain the bitboard of possible moves for that configuration. For example, we could have as an obstacle configuration the bitboard from figure \ref{fig:occupancy_d3_23} and the associated possible moves would be represented by the bitboard from figure \ref{fig:possible_moves_d3_23}.
+\item At lines 62 and 63, the vector \mintinline{c++}{occupancies} will contain all obstacle configurations on the piece's trajectory, without considering the squares in \mintinline{c++}{edge}, and for each of these configurations, the vector \mintinline{c++}{possible_}\\\mintinline{c++}{moves} will contain the bitboard of possible moves for that configuration. For example, we could have as an obstacle configuration the bitboard from figure \ref{fig:occupancy_d3_23} and the associated possible moves would be represented by the bitboard from figure \ref{fig:possible_moves_d3_23}.
 
 \begin{figure}[H]
 \centering
@@ -2768,7 +2769,7 @@ void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
 
 
 % La fonction \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} va initialiser les différentes tables pour le type de mouvement considéré \mintinline{c++}{mt}. Elle est très similaire à la fonction du listing \ref{lst:find_magic} qui nous a permis de trouver les constantes \mintinline{c++}{MAGIC}.
-The function \mintinline{c++}{void init_magics(MoveType mt, uint64_t table[], Magic magics[])} will initialize the different tables for the considered movement type \mintinline{c++}{mt}. It is very similar to the function from listing \ref{lst:find_magic} which allowed us to find the \mintinline{c++}{MAGIC} constants.
+The function \mintinline{c++}{void init_magics(MoveType mt,uint64_t table[],Magic magics[])} will initialize the different tables for the considered movement type \mintinline{c++}{mt}. It is very similar to the function from listing \ref{lst:find_magic} which allowed us to find the \mintinline{c++}{MAGIC} constants.
 
 \begin{itemize}
 % \item Les lignes 4 et 5 reprennent les constantes magiques que nous avions trouvées en lançant le programme du listing \ref{lst:find_magic} et dont l'exécution fut donnée dans le listing \ref{lst:find_magic_exec}.
@@ -3149,7 +3150,7 @@ void Yolah::undo(Move m) {
             black ^= pos1 | pos2;
             black_score--;
         }
-        empty ^= pos1;
+        holes ^= pos1;
     }
 }
 \end{minted}
@@ -3375,6 +3376,8 @@ e4:h4 e4:f5 e4:g6 e4:h7 d5:a2 d5:b3 d5:c4 d5:a5 d5:b5 d5:c5 d5:c6 d5:d6
 d5:e6 d5:b7 d5:d7 d5:f7 d5:d8 d5:g8 h8:h2 h8:h3 h8:h4 h8:h5 h8:f6 h8:h6
 h8:g7 h8:h7 h8:b8 h8:c8 h8:d8 h8:e8 h8:f8 h8:g8
 
+
+
 Black player
   ┌───┬───┬───┬───┬───┬───┬───┬───┐
 8 │ ○ │ X │ X │ X │ X │ X │ X │ ● │
@@ -3483,7 +3486,7 @@ The code in Listing~\ref{lst:random_games_property_based_testing} illustrates th
 
 % \item Aux lignes 17 à 44 est définie la fonction \mintinline{c++}{slow_moves_generation} qui permet d'obtenir la liste des coups possibles dans la configuration du jeu \mintinline{c++}{yolah} passée en paramètre (ligne 182). Cette fonction va nous permettre de faire les tests différentiels. Comme nous le disions, cette façon de générer les coups est bien plus simple que celle à base de bitboards magiques. Nous avons une grande confiance dans l'exactitude de \mintinline{c++}{slow_moves_generation}. Les boucles aux lignes 19 et 20, vont parcourir toutes les cases du plateau. On construit la case de départ du coup \mintinline{c++}{from} à la ligne 21, puis on vérifie à la ligne 22 que cette case contient un pion du joueur pour lequel on crée la liste de coups. Les fonctions \mintinline{c++}{square_of} et \mintinline{c++}{get} sont définies précisément dans le listing \ref{lst:chapter02}, mais \mintinline{c++}{Square square_of(int rank, int file)} va créer une case à partir des coordonnées \mintinline{c++}{(rank, file)} et \mintinline{c++}{uint8_t Yolah::get(Square sq)} retourne le type d'élément (un des joueurs, un trou ou un emplacement libre) sur la case \mintinline{c++}{sq}.
 % Les boucles aux lignes 23 et 24 vont parcourir toutes les directions possibles pour la pièce, on fait attention à filtrer le déplacement nul à la ligne 25. Enfin, la boucle de la ligne 28 à 37 va se déplacer dans la direction choisie \mintinline{c++}{(di, dj)} tant qu'on ne sort pas du plateau et qu'il n'y a pas d'obstacles. Si on sort du plateau à la ligne 29, ou qu'un obstacle est détecté à la ligne 33, on sort de la boucle pour essayer une nouvelle direction. On n'oublie pas à la ligne 42 d'ajouter le coup \mintinline{c++}{Move::none()} si aucun coup n'était possible. Cette façon de construire tous les coups possibles est très intuitive (mais inefficace).
-\item At lines 17 to 44, the \mintinline{c++}{slow_moves_generation} function is defined, which returns the list of possible moves in the game configuration \mintinline{c++}{yolah} passed as parameter (line 182). This function will allow us to perform the differential tests. As we mentioned, this way of generating moves is much simpler than the magic bitboard approach. We have high confidence in the correctness of \mintinline{c++}{slow_moves_generation}. The loops at lines 19 and 20 iterate over all squares on the board. We construct the move's source square \mintinline{c++}{from} at line 21, then check at line 22 that this square contains a piece belonging to the player for whom we are generating the move list. The functions \mintinline{c++}{square_of} and \mintinline{c++}{get} are defined precisely in Listing~\ref{lst:chapter02}, but \mintinline{c++}{Square square_of(int rank, int file)} creates a square from coordinates \mintinline{c++}{(rank, file)} and \mintinline{c++}{uint8_t Yolah::get(Square sq)} returns the type of element (one of the players, a hole, or a free square) at square \mintinline{c++}{sq}.
+\item At lines 17 to 44, the \mintinline{c++}{slow_moves_generation} function is defined, which returns the list of possible moves in the game configuration \mintinline{c++}{yolah} passed as parameter (line 182). This function will allow us to perform the differential tests. As we mentioned, this way of generating moves is much simpler than the magic bitboard approach. We have high confidence in the correctness of \mintinline{c++}{slow_moves_generation}. The loops at lines 19 and 20 iterate over all squares on the board. We construct the move's source square \mintinline{c++}{from} at line 21, then check at line 22 that this square contains a piece belonging to the player for whom we are generating the move list. The functions \mintinline{c++}{square_of} and \mintinline{c++}{get} are defined precisely in Listings~\ref{lst:board_code_1}--\ref{lst:board_code_4}, but \mintinline{c++}{Square square_of(int rank, int file)} creates a square from coordinates \mintinline{c++}{(rank, file)} and \mintinline{c++}{uint8_t Yolah::get(Square sq)} returns the type of element (one of the players, a hole, or a free square) at square \mintinline{c++}{sq}.
 The loops at lines 23 and 24 iterate over all possible directions for the piece, taking care to filter out the null displacement at line 25. Finally, the loop from line 28 to 37 moves in the chosen direction \mintinline{c++}{(di, dj)} as long as we do not leave the board and there are no obstacles. If we leave the board at line 29, or an obstacle is detected at line 33, we break out of the loop to try a new direction. We do not forget at line 42 to add \mintinline{c++}{Move::none()} if no move was possible. This way of building all possible moves is very intuitive (but inefficient).
 
 % \item Aux lignes 46 à 53, la fonction \mintinline{c++}{check_move_count} est notre premier test différentiel. Le premier paramètre \mintinline{c++}{fast} est la liste des coups obtenue grâce aux bitboards magiques, et le deuxième paramètre \mintinline{c++}{expected} est la liste de coups obtenue avec la fonction précédente. Nous vérifions dans ce test que les nombres de coups produits par les deux approches sont bien identiques.
@@ -3666,7 +3669,7 @@ TestResult check_regular_move_execution(const Yolah& before,
     oss << "Move execution incorrect\n" << after 
         << "\n  Move: " << m << '\n';
     if (!ok) {
-        oss << " Squares not concerned by the Move must not changed";
+        oss << " Squares not concerned by the move must not change";
     }
     if (after.get(from) != HOLE) {
         oss << "  From square should be hole\n";
@@ -3905,9 +3908,9 @@ we can also see that the execution of \mintinline{c++}{Magic::index} through thi
 % \item Notons que l'ordre des fonctions ne représente pas l'ordre du listing, les feuilles de l'arbre sont triées selon le pourcentage du temps d'exécution.
 \item Note that the order of functions does not represent the order in the listing; the tree leaves are sorted by execution time percentage.
 % \item Remarquons aussi que l'on peut déduire facilement le temps passé dans une fonction en dehors des appels de fonctions qu'elle a effectué. Par exemple, pour la fonction \mintinline{c++}{play_random_games}, son temps d'exécution compte pour $96.79\%$ du temps d'exécution du programme. Si on soustrait de ce nombre la somme $(82.25\% + 5.33\% + 3.89\% + 3.86\%)$, qui représente les pourcentages du temps d'exécution du programme des fonctions \mintinline{c++}{Yolah::moves}, \mintinline{c++}{std::uniform_int_distribution}, \mintinline{c++}{Yolah::game_over} et \mintinline{c++}{Yolah::play}, on obtient $1.46\%$, qui donne le pourcentage du temps d'exécution total passé dans le reste de la fonction \mintinline{c++}{play_random_games}. La proportion du temps passé dans le reste de la fonction est donc de $1.46/96.79 = 1.5\%$.
-\item Note also that we can easily deduce the time spent in a function excluding its function calls. For example, for the \mintinline{c++}{play_random_games} function, its execution time accounts for $96.79\%$ of the program's execution time. If we subtract from this number the sum $(82.25\% + 5.33\% + 3.89\% + 3.86\%)$, which represents the execution time percentages of the functions \mintinline{c++}{Yolah::moves}, \mintinline{c++}{std::uniform_int_distribution}, \mintinline{c++}{Yolah::game_over}, and \mintinline{c++}{Yolah::play}, we obtain $1.46\%$, which gives the percentage of total execution time spent in the rest of the \mintinline{c++}{play_random_games} function. The proportion of time spent in the rest of the function is therefore $1.46/96.79 = 1.5\%$.
+\item Note also that we can easily deduce the time spent in a function excluding its function calls. For example, for the \mintinline{c++}{play_random_games} function, its execution time accounts for $96.79\%$ of the program's execution time. If we subtract from this number the sum $(82.25\% + 5.33\% + 3.89\% + 3.86\%)$, which represents the execution time percentages of the functions \mintinline{c++}{Yolah::moves}, \mintinline{c++}{std::uniform_int_distr}\\\mintinline{c++}{ibution}, \mintinline{c++}{Yolah::game_over}, and \mintinline{c++}{Yolah::play}, we obtain $1.46\%$, which gives the percentage of total execution time spent in the rest of the \mintinline{c++}{play_random_games} function. The proportion of time spent in the rest of the function is therefore $1.46/96.79 = 1.5\%$.
 % \item L'arbre nous permet de voir rapidement que si l'on souhaite améliorer le temps d'exécution de notre programme, il faut se concentrer sur la fonction \mintinline{c++}{Yolah::moves} appelée par \mintinline{c++}{play_random_games}. En effet, le temps d'exécution de cette fonction représente $82.25\%$ du temps d'exécution total du programme.
-\item The tree allows us to quickly see that if we wish to improve our program's execution time, we should focus on the \mintinline{c++}{Yolah::moves} function called by \mintinline{c++}{play_random_games}. Indeed, this function's execution time represents $82.25\%$ of the program's total execution time.
+\item The tree allows us to quickly see that if we wish to improve our program's execution time, we should focus on the \mintinline{c++}{Yolah::moves} function called by \mintinline{c++}{play_random_}\\\mintinline{c++}{games}. Indeed, this function's execution time represents $82.25\%$ of the program's total execution time.
 \end{itemize}
 
 \begin{mdframed}[skipabove=\baselineskip,skipbelow=0pt,hidealllines=true,backgroundcolor=black!3,innerleftmargin=10pt,innerrightmargin=5pt,innertopmargin=0pt,innerbottommargin=5pt]
@@ -4033,7 +4036,8 @@ void moves(uint8_t player, MoveList& moves) const noexcept {
     moves.last = move_list;
 }
 \end{minted}
-\captionof{listing}{}
+% \captionof{listing}{Rappel du code de la fonction \mintinline{c++}{moves}}
+\captionof{listing}{Recap of the \mintinline{c++}{moves} function code}
 \label{lst:random_games_perf2}
 \end{mdframed}
 
@@ -4544,7 +4548,7 @@ This last optimization cuts the execution time in half, going from $3.06$ to $1.
 
 We now have at our disposal an efficient implementation of Yolah, whose complete code is given in the following section. With this implementation, we will be able to develop increasingly capable artificial players for our game in the remainder of this book.
 
-\section{Complete Game Board Code}
+\section{Complete Board Game Code}
 
 % Original French (corrected): Le listing complet du code du plateau est donné dans les listings \ref{lst:board_code_1}, \ref{lst:board_code_2}, \ref{lst:board_code_3} et \ref{lst:board_code_4}. Le résultat de l'exécution du programme est donné dans le listing \ref{lst:chapter02_exec}. On peut voir que, sur un million de parties aléatoires, les noirs semblent avoir l'avantage. Notons que cela ne prouve pas que le jeu est gagnant pour les noirs.
 
@@ -5661,7 +5665,7 @@ namespace test {
             oss << "Move execution incorrect\n" << after 
                 << "\n  Move: " << m << '\n';
             if (!ok) {
-                oss << " Squares not concerned by the Move must not changed";
+                oss << " Squares not concerned by the move must not change";
             }
             if (after.get(from) != HOLE) {
                 oss << "  From square should be hole\n";
