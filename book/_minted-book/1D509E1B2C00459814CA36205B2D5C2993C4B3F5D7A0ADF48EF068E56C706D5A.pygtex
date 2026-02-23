@@ -1,5 +1,5 @@
 \begin{Verbatim}[commandchars=\\\{\}]
-\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{moves}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{moves}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{holes}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{player}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{white}\PYG{p}{;}

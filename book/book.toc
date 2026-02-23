@@ -9,7 +9,7 @@
 \contentsline {section}{\numberline {2.1}Data Structures}{11}{section.2.1}%
 \contentsline {section}{\numberline {2.2}Game Over Test}{15}{section.2.2}%
 \contentsline {section}{\numberline {2.3}Generating Possible Piece Moves}{19}{section.2.3}%
-\contentsline {subsection}{\numberline {2.3.1}Magic Perfect Hashing Function}{20}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.1}Magic Perfect Hashing Function}{19}{subsection.2.3.1}%
 \contentsline {subsection}{\numberline {2.3.2}Magic Bitboards for Piece Moves}{28}{subsection.2.3.2}%
 \contentsline {subsection}{\numberline {2.3.3}Move Representation}{46}{subsection.2.3.3}%
 \contentsline {subsection}{\numberline {2.3.4}List of Moves for a Given Board Configuration}{48}{subsection.2.3.4}%
@@ -20,12 +20,12 @@
 \contentsline {subsection}{\numberline {2.4.3}Performance Testing}{68}{subsection.2.4.3}%
 \contentsline {section}{\numberline {2.5}What's Next}{81}{section.2.5}%
 \contentsline {section}{\numberline {2.6}Complete Board Game Code}{81}{section.2.6}%
-\contentsline {chapter}{\numberline {3}AI Players}{111}{chapter.3}%
-\contentsline {chapter}{\numberline {4}Monte Carlo Player}{113}{chapter.4}%
-\contentsline {chapter}{\numberline {5}MCTS Player}{115}{chapter.5}%
-\contentsline {chapter}{\numberline {6}Minmax Player}{117}{chapter.6}%
-\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{119}{chapter.7}%
-\contentsline {chapter}{\numberline {8}AI Tournament}{121}{chapter.8}%
-\contentsline {chapter}{\numberline {9}Conclusion}{123}{chapter.9}%
-\contentsline {chapter}{Acronymes}{125}{section*.34}%
-\contentsline {chapter}{Bibliography}{127}{appendix*.36}%
+\contentsline {chapter}{\numberline {3}Artificial Players}{113}{chapter.3}%
+\contentsline {chapter}{\numberline {4}Monte Carlo Player}{115}{chapter.4}%
+\contentsline {chapter}{\numberline {5}MCTS Player}{117}{chapter.5}%
+\contentsline {chapter}{\numberline {6}Minmax Player}{119}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Minmax with Neural Network Player}{121}{chapter.7}%
+\contentsline {chapter}{\numberline {8}AI Tournament}{123}{chapter.8}%
+\contentsline {chapter}{\numberline {9}Conclusion}{125}{chapter.9}%
+\contentsline {chapter}{Acronymes}{127}{section*.34}%
+\contentsline {chapter}{Bibliography}{129}{appendix*.36}%

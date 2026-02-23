@@ -1,5 +1,6 @@
 \begin{Verbatim}[commandchars=\\\{\}]
-\PYGZdl{} g++ \PYGZhy{}O3 \PYGZhy{}Wall \PYGZhy{}Wpedantic \PYGZhy{}march=native \PYGZhy{}o find\PYGZus{}magic
+\PYGZdl{} g++ \PYGZhy{}std=c++23 \PYGZhy{}O3 \PYGZhy{}Wall \PYGZhy{}Wpedantic \PYGZhy{}march=native\PYGZbs{}
+find\PYGZus{}magic.cpp \PYGZhy{}o find\PYGZus{}magic
 \PYGZdl{} ./find\PYGZus{}magic
 found magic for K = 7: 0x65e4d4ee86638416
 uint8\PYGZus{}t positions[128] = \PYGZob{}

@@ -17,7 +17,7 @@
 \PYG{k}{public}\PYG{o}{:}
 \PYG{+w}{    }\PYG{c+c1}{// ...}
 \PYG{p}{\PYGZcb{};}
-\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{Yolah::moves}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{Yolah::moves}\PYG{p}{(}\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{n}{Move}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{holes}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{player}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{white}\PYG{p}{;}
@@ -33,10 +33,10 @@
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}
 \PYG{+w}{    }\PYG{n}{moves}\PYG{p}{.}\PYG{n}{last}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{move\PYGZus{}list}\PYG{p}{;}
 \PYG{p}{\PYGZcb{}}
-\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{Yolah::current\PYGZus{}player}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint8\PYGZus{}t}\PYG{+w}{ }\PYG{n+nf}{Yolah::current\PYGZus{}player}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{ply}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
 \PYG{p}{\PYGZcb{}}
-\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{Yolah::moves}\PYG{p}{(}\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{Yolah::moves}\PYG{p}{(}\PYG{n}{MoveList}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k}{this}\PYG{o}{\PYGZhy{}\PYGZgt{}}\PYG{n}{moves}\PYG{p}{(}\PYG{n}{current\PYGZus{}player}\PYG{p}{(),}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{);}
 \PYG{p}{\PYGZcb{}}
 \end{Verbatim}

@@ -1,6 +1,6 @@
 \begin{Verbatim}[commandchars=\\\{\}]
-\PYGZdl{} g++ \PYGZhy{}O3 \PYGZhy{}march=native \PYGZhy{}Wall \PYGZhy{}Wpedantic undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench.cpp\PYGZbs{}
-\PYGZhy{}o undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench \PYGZhy{}lbenchmark
+\PYGZdl{} g++ \PYGZhy{}std=c++23 \PYGZhy{}O3 \PYGZhy{}march=native \PYGZhy{}Wall \PYGZhy{}Wpedantic\PYGZbs{}
+undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench.cpp \PYGZhy{}o undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench \PYGZhy{}lbenchmark
 \PYGZdl{} ./undo\PYGZus{}vs\PYGZus{}restore\PYGZus{}bench
 Run on (12 X 4400 MHz CPU s)
 

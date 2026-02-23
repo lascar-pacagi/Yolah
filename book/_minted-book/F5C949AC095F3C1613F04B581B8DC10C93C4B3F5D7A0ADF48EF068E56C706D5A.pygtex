@@ -66,7 +66,6 @@
 \PYG{+w}{    }\PYG{n}{RANK\PYGZus{}1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}2}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}3}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}4}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}5}\PYG{p}{,}
 \PYG{+w}{    }\PYG{n}{RANK\PYGZus{}6}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}7}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}8}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{RANK\PYGZus{}NB}
 \PYG{p}{\PYGZcb{};}
-
 \PYG{c+c1}{// Directions from sq = 27 (d4):}
 \PYG{c+c1}{//}
 \PYG{c+c1}{//   +\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}+}
@@ -97,7 +96,6 @@
 \PYG{+w}{    }\PYG{n}{SOUTH\PYGZus{}WEST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{SOUTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{WEST}\PYG{p}{,}\PYG{+w}{ }\PYG{c+c1}{// \PYGZhy{}9}
 \PYG{+w}{    }\PYG{n}{NORTH\PYGZus{}WEST}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{NORTH}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{WEST}\PYG{+w}{  }\PYG{c+c1}{// 7}
 \PYG{p}{\PYGZcb{};}
-
 \PYG{c+c1}{// ORTHOGONAL moves from d4:         DIAGONAL moves from d4:}
 \PYG{c+c1}{//}
 \PYG{c+c1}{// 8  .  .  .  *  .  .  .  .         .  .  .  .  .  .  .  *}
@@ -213,16 +211,16 @@
 \PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank7BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{);}
 \PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{Rank8BB}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{Rank1BB}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{8}\PYG{+w}{ }\PYG{o}{*}\PYG{+w}{ }\PYG{l+m+mi}{7}\PYG{p}{);}
 
-\PYG{c+c1}{// Initial positions: Black starts at a1, d4, e5, h8.}
-\PYG{c+c1}{// White starts at a8, d5, e4, h1.}
+\PYG{c+c1}{// Initial positions: Black starts at a1, e4, d5, h8.}
+\PYG{c+c1}{// White starts at a8, d4, e5, h1.}
 \PYG{c+c1}{//}
 \PYG{c+c1}{// BLACK\PYGZus{}INITIAL\PYGZus{}POSITION       WHITE\PYGZus{}INITIAL\PYGZus{}POSITION}
 \PYG{c+c1}{//}
 \PYG{c+c1}{// 8  .  .  .  .  .  .  .  B    W  .  .  .  .  .  .  .}
 \PYG{c+c1}{// 7  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
 \PYG{c+c1}{// 6  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
-\PYG{c+c1}{// 5  .  .  .  .  B  .  .  .    .  .  .  W  .  .  .  .}
-\PYG{c+c1}{// 4  .  .  .  B  .  .  .  .    .  .  .  .  W  .  .  .}
+\PYG{c+c1}{// 5  .  .  .  B  .  .  .  .    .  .  .  .  W  .  .  .}
+\PYG{c+c1}{// 4  .  .  .  .  B  .  .  .    .  .  .  W  .  .  .  .}
 \PYG{c+c1}{// 3  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
 \PYG{c+c1}{// 2  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .}
 \PYG{c+c1}{// 1  B  .  .  .  .  .  .  .    .  .  .  .  .  .  .  W}

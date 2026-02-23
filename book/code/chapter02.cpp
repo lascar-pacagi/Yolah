@@ -212,16 +212,16 @@ constexpr uint64_t Rank6BB = Rank1BB << (8 * 5);
 constexpr uint64_t Rank7BB = Rank1BB << (8 * 6);
 constexpr uint64_t Rank8BB = Rank1BB << (8 * 7);
 
-// Initial positions: Black starts at a1, d4, e5, h8.
-// White starts at a8, d5, e4, h1.
+// Initial positions: Black starts at a1, e4, d5, h8.
+// White starts at a8, d4, e5, h1.
 //
 // BLACK_INITIAL_POSITION       WHITE_INITIAL_POSITION
 //
 // 8  .  .  .  .  .  .  .  B    W  .  .  .  .  .  .  .
 // 7  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .
 // 6  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .
-// 5  .  .  .  .  B  .  .  .    .  .  .  W  .  .  .  .
-// 4  .  .  .  B  .  .  .  .    .  .  .  .  W  .  .  .
+// 5  .  .  .  B  .  .  .  .    .  .  .  .  W  .  .  .
+// 4  .  .  .  .  B  .  .  .    .  .  .  W  .  .  .  .
 // 3  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .
 // 2  .  .  .  .  .  .  .  .    .  .  .  .  .  .  .  .
 // 1  B  .  .  .  .  .  .  .    .  .  .  .  .  .  .  W
@@ -273,7 +273,7 @@ constexpr uint64_t file_bb(Square s) {
 
 // Returns a bitboard with only the bit corresponding to square s set
 constexpr uint64_t square_bb(Square s) {
-    return uint64_t(1) << s;
+    return 1ULL << s;
 }
 
 // Moves a square in a given direction
@@ -289,7 +289,7 @@ Square& operator++(Square& d) {
 // Returns the least significant bit as a Square (index 
 // of first set bit)
 constexpr Square lsb(uint64_t b) {
-    return Square(std::countr_zero(b));
+    return Square(countr_zero(b));
 }
 
 // Extracts and clears the least significant bit, returns it as 
@@ -301,9 +301,9 @@ Square pop_lsb(uint64_t& b) {
 }
 
 // Computes the Manhattan distance (|rank1 - rank2| + |file1 - file2|)
-int manhattan_distance(Square sq1, Square sq2) {
-    int d_rank = std::abs(rank_of(sq1) - rank_of(sq2));
-    int d_file = std::abs(file_of(sq1) - file_of(sq2));
+constexpr int manhattan_distance(Square sq1, Square sq2) {
+    int d_rank = abs(rank_of(sq1) - rank_of(sq2));
+    int d_file = abs(file_of(sq1) - file_of(sq2));
     return d_rank + d_file;
 }
 
@@ -388,10 +388,77 @@ uint64_t moves_bb(Square sq, uint64_t occupied) {
     return orthogonalMagics[sq].moves[idx_omoves] | diagonalMagics[sq].moves[idx_dmoves];
 }
 
-// Initializes magic bitboard tables for a given move type (orthogonal 
-// or diagonal). For each square, enumerates all possible occupancy 
-// patterns using the Carry-Rippler trick, computes the corresponding 
-// reachable squares, and stores them in the lookup table indexed by 
+// Finds the magic constant and shift value for a given square and
+// move type. Enumerates all occupancy patterns using the
+// Carry-Rippler trick, then searches for a magic number that
+// produces a perfect hash (no collisions) for all patterns. Returns
+// the number of relevant bits (k) and the magic constant
+pair<int, uint64_t> magic_for_square(MoveType mt, Square sq) {
+    uint64_t edges = ((Rank1BB | Rank8BB) & ~rank_bb(sq)) |
+                        ((FileABB | FileHBB) & ~file_bb(sq));
+    uint64_t moves_bb = reachable_squares(mt, sq, 0) & ~edges;
+    vector<uint64_t> occupancies;
+    vector<uint64_t> possible_moves;
+    uint64_t b = 0;
+    int size = 0;
+    do {
+        occupancies.push_back(b);
+        possible_moves.push_back(reachable_squares(mt, sq, b));
+        size++;
+        b = (b - moves_bb) & moves_bb;
+    } while (b);
+    int k = popcount(moves_bb);
+    int shift = 64 - k;
+    random_device rd;
+    mt19937_64 twister(rd());
+    uniform_int_distribution<uint64_t> d;
+    vector<uint32_t> seen(1 << k);
+    vector<uint64_t> moves(1 << k);
+    for (uint32_t cnt = 0;; cnt++) {
+        uint64_t magic = d(twister) & d(twister) & d(twister);
+        bool found = true;
+        for (size_t j = 0; j < occupancies.size(); j++) {
+            uint64_t occ = occupancies[j];
+            uint32_t index = magic * occ >> shift;
+            if (seen[index]==cnt && moves[index]!=possible_moves[j])
+            {
+                found = false;
+                break;
+            }
+            seen[index] = cnt;
+            moves[index] = possible_moves[j];
+        }
+        if (found) {
+            return {k, magic};
+        }
+    }
+    unreachable();
+}
+
+// Standalone program to find and print all magic constants for both
+// orthogonal and diagonal move types across all 64 squares
+//
+// int main() {
+//   for (MoveType mt : {ORTHOGONAL, DIAGONAL}) {
+//     stringstream ss_k, ss_magic;
+//     ss_k << format("int {}_K[64] = {{",
+//                     mt == ORTHOGONAL ? "H" : "D");
+//     ss_magic << format("uint64_t {}_MAGIC[64] = {{",
+//                         mt == ORTHOGONAL ? "H" : "D");
+//     for (int sq = SQ_A1; sq <= SQ_H8; sq++) {
+//       const auto [k, magic] = magic_for_square(mt, Square(sq));
+//       ss_k << dec << k << ',';
+//       ss_magic << showbase << hex << magic << ',';
+//     }
+//     cout << ss_k.str() << "};\n";
+//     cout << ss_magic.str() << "};\n\n";
+//   }
+// }
+
+// Initializes magic bitboard tables for a given move type (orthogonal
+// or diagonal). For each square, enumerates all possible occupancy
+// patterns using the Carry-Rippler trick, computes the corresponding
+// reachable squares, and stores them in the lookup table indexed by
 // the magic hash
 void init_magics(MoveType mt, uint64_t table[], Magic magics[]) {
     static constexpr uint64_t O_MAGIC[64] = {
@@ -483,36 +550,36 @@ void init_all_magics() {
 class Move {
     uint16_t data;
 public:
-    constexpr Move() noexcept = default;
-    constexpr explicit Move(uint16_t d) noexcept : data(d) {}
-    constexpr explicit Move(Square from, Square to) noexcept
+    constexpr Move() = default;
+    constexpr explicit Move(uint16_t d) : data(d) {}
+    constexpr Move(Square from, Square to)
         : data((to << 6) + from) {}
-    constexpr Square from_sq() const noexcept {
+    constexpr Square from_sq() const {
         return Square(data & 0x3F);
     }
-    constexpr Square to_sq() const noexcept {
+    constexpr Square to_sq() const {
         return Square((data >> 6) & 0x3F);
     }
-    constexpr uint16_t raw() const noexcept { return data; }
-    static constexpr Move none() noexcept { return Move(0); }
-    constexpr bool operator==(const Move& m) const noexcept {
+    constexpr uint16_t raw() const { return data; }
+    static constexpr Move none() { return Move(0); }
+    constexpr bool operator==(const Move& m) const {
         return data == m.data;
     }
-    constexpr bool operator!=(const Move& m) const noexcept {
+    constexpr bool operator!=(const Move& m) const {
         return data != m.data;
     }
-    constexpr bool operator<(const Move& m) const noexcept {
+    constexpr bool operator<(const Move& m) const {
         return make_pair(from_sq(), to_sq()) < 
                make_pair(m.from_sq(), m.to_sq());
     }
-    constexpr explicit operator bool() const noexcept { 
+    constexpr explicit operator bool() const { 
         return data != 0; 
     }
 };
 
 // Prints a move in "from:to" notation (e.g., "d4:d7")
 ostream& operator<<(ostream& os, const Move& m) {
-    static constexpr std::string_view square2string[SQUARE_NB] = {
+    static constexpr string_view square2string[SQUARE_NB] = {
         "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
         "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
         "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
@@ -535,19 +602,19 @@ static constexpr uint16_t MAX_NB_MOVES = 75;
 class MoveList {
     Move move_list[MAX_NB_MOVES], *last;
 public:
-    constexpr MoveList() noexcept : last(move_list) {}
-    constexpr const Move* begin() const noexcept { return move_list; }
-    constexpr const Move* end() const noexcept { return last; }
-    constexpr Move* begin() noexcept { return move_list; }
-    constexpr Move* end() noexcept { return last; }
-    constexpr size_t size() const noexcept { 
+    constexpr MoveList() : last(move_list) {}
+    constexpr const Move* begin() const { return move_list; }
+    constexpr const Move* end() const { return last; }
+    constexpr Move* begin() { return move_list; }
+    constexpr Move* end() { return last; }
+    constexpr size_t size() const { 
         return last - move_list; 
     }
     constexpr const Move& operator[](size_t i) const { 
         return move_list[i]; 
     }
     constexpr Move& operator[](size_t i) { return move_list[i]; }
-    constexpr Move* data() noexcept { return move_list; }
+    constexpr Move* data() { return move_list; }
     friend class Yolah;
 };
 
@@ -573,7 +640,7 @@ class Yolah {
 public:
     // The game is over when no piece of either player has an adjacent 
     // free square
-    constexpr bool game_over() const noexcept {
+    constexpr bool game_over() const {
         uint64_t possible = ~holes & ~black & ~white;
         uint64_t players  = black | white;
         uint64_t around_players = shift<NORTH>(players) |
@@ -585,20 +652,20 @@ public:
     }
 
     // Returns BLACK (0) or WHITE (1) based on parity of ply
-    constexpr uint8_t current_player() const noexcept {
+    constexpr uint8_t current_player() const {
         return ply & 1;
     }
 
-    constexpr uint8_t nb_plies() const noexcept {
+    constexpr uint8_t nb_plies() const {
         return ply;
     }
 
-    constexpr pair<uint8_t, uint8_t> score() const noexcept {
+    constexpr pair<uint8_t, uint8_t> score() const {
         return {black_score, white_score};
     }
 
     // Returns the content of a square: BLACK, WHITE, HOLE, or FREE
-    constexpr uint8_t get(Square sq) const noexcept {
+    constexpr uint8_t get(Square sq) const {
         uint64_t bb = square_bb(sq);
         if (holes & bb) return HOLE;
         if (black & bb) return BLACK;
@@ -606,7 +673,7 @@ public:
         return FREE;
     }
 
-    constexpr uint8_t get(int i, int j) const noexcept {        
+    constexpr uint8_t get(int i, int j) const {        
         return get(square_of(i, j));
     }
 
@@ -615,12 +682,12 @@ public:
     // 4 pieces, the first loop is fully unrolled (version 2) 
     // to avoid branch mispredictions. If no move is available,
     // a single Move::none() is added
-    void moves(uint8_t player, MoveList& moves) const noexcept {
+    void moves(uint8_t player, MoveList& moves) const {
         Move* move_list = moves.move_list;
         uint64_t occupied = black | white | holes;
         uint64_t bb = player == BLACK ? black : white;
 
-        // Version 1: generic loop (commented out, kept for reference)
+        // Version 1: generic loop
         // while (bb) {
         //     Square from = pop_lsb(bb);
         //     uint64_t b = moves_bb(from, occupied) & ~occupied;
@@ -660,13 +727,13 @@ public:
     }
 
     // Generates moves for the current player
-    void moves(MoveList& moves) const noexcept {
+    void moves(MoveList& moves) const {
         this->moves(current_player(), moves);
     }
 
     // Selects a uniformly random legal move without allocating a
     // move list while minimizing branches
-    Move random_move(mt19937& mt) const noexcept {
+    Move random_move(mt19937& mt) const {
         uint64_t occupied = black | white | holes;
         uint64_t player_bb = 
             current_player() == BLACK ? black : white;
@@ -715,7 +782,7 @@ public:
     // turns the source square into a hole, and increments the 
     // player's score.
     // For Move::none() (pass), only the ply counter is incremented
-    void play(Move m) noexcept {
+    void play(Move m) {
         if (m != Move::none()) [[likely]] {
             uint64_t pos1 = square_bb(m.from_sq());
             uint64_t pos2 = square_bb(m.to_sq());
@@ -733,7 +800,7 @@ public:
 
     // Reverses a move: restores the piece, removes the hole, 
     // decrements score
-    void undo(Move m) noexcept {
+    void undo(Move m) {
         ply--;
         if (m != Move::none()) [[likely]] {
             uint64_t pos1 = square_bb(m.from_sq());
@@ -750,7 +817,7 @@ public:
     }
 
     // Equality: compares all state fields
-    constexpr bool operator==(const Yolah& other) const noexcept {
+    constexpr bool operator==(const Yolah& other) const {
         return black == other.black
             && white == other.white
             && holes == other.holes
@@ -759,7 +826,7 @@ public:
             && ply == other.ply;
     }
 
-    constexpr bool operator!=(const Yolah& other) const noexcept {
+    constexpr bool operator!=(const Yolah& other) const {
         return !(*this == other);
     }
 };
@@ -855,8 +922,8 @@ void play_random_games(size_t nb_games,
             Move m = moves[d(mt)];
             if constexpr (STEP_BY_STEP) {
                 cout << m << '\n';
-                std::string _;
-                std::getline(std::cin, _);
+                string _;
+                getline(cin, _);
             }
             yolah.play(m);
         }
@@ -923,7 +990,7 @@ void play_random_games_fast(size_t nb_games,
 // reversibility and game-over detection
 namespace test {
     namespace {
-        using std::format;
+
 
         constexpr string_view RED    = "\033[1;31m";
         constexpr string_view GREEN  = "\033[1;32m";
@@ -939,7 +1006,7 @@ namespace test {
 
         TestResult pass() { return {true, ""}; }
         TestResult fail(string msg) { 
-            return {false, std::move(msg)}; 
+            return {false, move(msg)};
         }
 
         // Reference move generator: brute-force loop over all 
@@ -999,11 +1066,11 @@ namespace test {
             ostringstream oss;
             oss << "move lists differ\n" << yolah << '\n';
             vector<Move> only_in_fast, only_in_expected;
-            set_difference(begin(fast), end(fast), begin(expected), 
-                           end(expected), 
+            set_difference(begin(fast), end(fast), 
+                           begin(expected), end(expected), 
                            back_inserter(only_in_fast));
-            set_difference(begin(expected), end(expected), begin(fast), 
-                           end(fast), 
+            set_difference(begin(expected), end(expected), 
+                           begin(fast), end(fast), 
                            back_inserter(only_in_expected));
             if (!only_in_expected.empty()) {
                 oss << "  Only in expected: ";
@@ -1089,7 +1156,7 @@ namespace test {
             oss << "Move execution incorrect\n" << after 
                 << "\n  Move: " << m << '\n';
             if (!ok) {
-                oss << " Squares not concerned by the Move must not changed";
+                oss << " Squares not concerned by the move must not change";
             }
             if (after.get(from) != HOLE) {
                 oss << "  From square should be hole\n";

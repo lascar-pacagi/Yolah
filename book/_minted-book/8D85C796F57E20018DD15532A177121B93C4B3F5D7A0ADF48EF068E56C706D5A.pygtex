@@ -1,5 +1,5 @@
 \begin{Verbatim}[commandchars=\\\{\}]
-\PYG{n}{Move}\PYG{+w}{ }\PYG{n+nf}{Yolah::random\PYGZus{}move}\PYG{p}{(}\PYG{n}{mt19937}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{k}{noexcept}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{n}{Move}\PYG{+w}{ }\PYG{n+nf}{Yolah::random\PYGZus{}move}\PYG{p}{(}\PYG{n}{mt19937}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{occupied}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{white}\PYG{+w}{ }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{holes}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{uint64\PYGZus{}t}\PYG{+w}{ }\PYG{n}{player\PYGZus{}bb}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{current\PYGZus{}player}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{BLACK}\PYG{+w}{ }\PYG{o}{?}\PYG{+w}{ }\PYG{n}{black}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{white}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from0}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pop\PYGZus{}lsb}\PYG{p}{(}\PYG{n}{player\PYGZus{}bb}\PYG{p}{);}
@@ -29,13 +29,11 @@
 \PYG{p}{\PYGZcb{}}
 \PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{play\PYGZus{}random\PYGZus{}games\PYGZus{}fast}\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}games}\PYG{p}{,}
 \PYG{+w}{                            }\PYG{n}{optional}\PYG{o}{\PYGZlt{}}\PYG{k+kt}{uint64\PYGZus{}t}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{seed}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{nullopt}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
-\PYG{+w}{    }\PYG{n}{MoveList}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{random\PYGZus{}device}\PYG{+w}{ }\PYG{n}{rd}\PYG{p}{;}
 \PYG{+w}{    }\PYG{n}{mt19937}\PYG{+w}{ }\PYG{n}{mt}\PYG{p}{(}\PYG{n}{seed}\PYG{p}{.}\PYG{n}{value\PYGZus{}or}\PYG{p}{(}\PYG{n}{rd}\PYG{p}{()));}
 \PYG{+w}{    }\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{black\PYGZus{}wins}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{white\PYGZus{}wins}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{draws}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
-\PYG{+w}{    }\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{max\PYGZus{}nb\PYGZus{}moves}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{n}{nb\PYGZus{}games}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{++}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{n}{Yolah}\PYG{+w}{ }\PYG{n}{yolah}\PYG{p}{;}
 \PYG{+w}{        }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{game\PYGZus{}over}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}

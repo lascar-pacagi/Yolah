@@ -2,10 +2,10 @@
 \PYG{k}{class}\PYG{+w}{ }\PYG{n+nc}{Move}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{;}
 \PYG{k}{public}\PYG{o}{:}
-\PYG{+w}{    }\PYG{n}{Move}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{k}{default}\PYG{p}{;}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{k}{default}\PYG{p}{;}
 \PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{explicit}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{d}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{(}\PYG{n}{d}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}\PYGZcb{}}
-\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{explicit}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from}\PYG{p}{,}
-\PYG{+w}{                            }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{((}\PYG{n}{to}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{from}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Move}\PYG{p}{(}\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{to}\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{:}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{((}\PYG{n}{to}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{6}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{from}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}\PYGZcb{}}
 \PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{Square}\PYG{+w}{ }\PYG{n}{from\PYGZus{}sq}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{Square}\PYG{p}{(}\PYG{n}{data}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{l+m+mh}{0x3F}\PYG{p}{);}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}
@@ -19,7 +19,9 @@
 \PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{+w}{ }\PYG{k}{operator}\PYG{o}{!=}\PYG{p}{(}\PYG{k}{const}\PYG{+w}{ }\PYG{n}{Move}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{m}\PYG{p}{.}\PYG{n}{data}\PYG{p}{;}
 \PYG{+w}{    }\PYG{p}{\PYGZcb{}}
-\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{explicit}\PYG{+w}{ }\PYG{k}{operator}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k}{explicit}\PYG{+w}{ }\PYG{k}{operator}\PYG{+w}{ }\PYG{k+kt}{bool}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
 \PYG{+w}{    }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{k+kt}{uint16\PYGZus{}t}\PYG{+w}{ }\PYG{n}{raw}\PYG{p}{()}\PYG{+w}{ }\PYG{k}{const}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{data}\PYG{p}{;}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
 \PYG{p}{\PYGZcb{};}
 

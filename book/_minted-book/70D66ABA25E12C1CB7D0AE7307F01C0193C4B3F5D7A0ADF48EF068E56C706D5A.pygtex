@@ -90,8 +90,8 @@
 \PYG{+w}{            }\PYG{n}{Move}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{moves}\PYG{p}{[}\PYG{n}{d}\PYG{p}{(}\PYG{n}{mt}\PYG{p}{)];}
 \PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{STEP\PYGZus{}BY\PYGZus{}STEP}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{                }\PYG{n}{cout}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{m}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
-\PYG{+w}{                }\PYG{n}{std}\PYG{o}{::}\PYG{n}{string}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{p}{;}
-\PYG{+w}{                }\PYG{n}{std}\PYG{o}{::}\PYG{n}{getline}\PYG{p}{(}\PYG{n}{std}\PYG{o}{::}\PYG{n}{cin}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{p}{);}
+\PYG{+w}{                }\PYG{n}{string}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{p}{;}
+\PYG{+w}{                }\PYG{n}{getline}\PYG{p}{(}\PYG{n}{std}\PYG{o}{::}\PYG{n}{cin}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{\PYGZus{}}\PYG{p}{);}
 \PYG{+w}{            }\PYG{p}{\PYGZcb{}}
 \PYG{+w}{            }\PYG{n}{yolah}\PYG{p}{.}\PYG{n}{play}\PYG{p}{(}\PYG{n}{m}\PYG{p}{);}
 \PYG{+w}{        }\PYG{p}{\PYGZcb{}}
@@ -158,7 +158,7 @@
 \PYG{c+c1}{// reversibility and game\PYGZhy{}over detection}
 \PYG{k}{namespace}\PYG{+w}{ }\PYG{n+nn}{test}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{    }\PYG{k}{namespace}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
-\PYG{+w}{        }\PYG{k}{using}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{format}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{using}\PYG{+w}{ }\PYG{n}{format}\PYG{p}{;}
 
 \PYG{+w}{        }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{RED}\PYG{+w}{    }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}033}\PYG{l+s}{[1;31m\PYGZdq{}}\PYG{p}{;}
 \PYG{+w}{        }\PYG{k}{constexpr}\PYG{+w}{ }\PYG{n}{string\PYGZus{}view}\PYG{+w}{ }\PYG{n}{GREEN}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}033}\PYG{l+s}{[1;32m\PYGZdq{}}\PYG{p}{;}
@@ -174,7 +174,7 @@
 
 \PYG{+w}{        }\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{pass}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n+nb}{true}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}\PYGZdq{}}\PYG{p}{\PYGZcb{};}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
 \PYG{+w}{        }\PYG{n}{TestResult}\PYG{+w}{ }\PYG{n+nf}{fail}\PYG{p}{(}\PYG{n}{string}\PYG{+w}{ }\PYG{n}{msg}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
-\PYG{+w}{            }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n+nb}{false}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{std}\PYG{o}{::}\PYG{n}{move}\PYG{p}{(}\PYG{n}{msg}\PYG{p}{)\PYGZcb{};}
+\PYG{+w}{            }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n+nb}{false}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{move}\PYG{p}{(}\PYG{n}{msg}\PYG{p}{)\PYGZcb{};}
 \PYG{+w}{        }\PYG{p}{\PYGZcb{}}
 
 \PYG{+w}{        }\PYG{c+c1}{// Reference move generator: brute\PYGZhy{}force loop over all}
@@ -234,11 +234,11 @@
 \PYG{+w}{            }\PYG{n}{ostringstream}\PYG{+w}{ }\PYG{n}{oss}\PYG{p}{;}
 \PYG{+w}{            }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}move lists differ}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{n}{yolah}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s+sc}{\PYGZsq{}\PYGZbs{}n\PYGZsq{}}\PYG{p}{;}
 \PYG{+w}{            }\PYG{n}{vector}\PYG{o}{\PYGZlt{}}\PYG{n}{Move}\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{n}{only\PYGZus{}in\PYGZus{}fast}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{only\PYGZus{}in\PYGZus{}expected}\PYG{p}{;}
-\PYG{+w}{            }\PYG{n}{set\PYGZus{}difference}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}
-\PYG{+w}{                           }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}
+\PYG{+w}{            }\PYG{n}{set\PYGZus{}difference}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}
+\PYG{+w}{                           }\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}
 \PYG{+w}{                           }\PYG{n}{back\PYGZus{}inserter}\PYG{p}{(}\PYG{n}{only\PYGZus{}in\PYGZus{}fast}\PYG{p}{));}
-\PYG{+w}{            }\PYG{n}{set\PYGZus{}difference}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}
-\PYG{+w}{                           }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}
+\PYG{+w}{            }\PYG{n}{set\PYGZus{}difference}\PYG{p}{(}\PYG{n}{begin}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{expected}\PYG{p}{),}
+\PYG{+w}{                           }\PYG{n}{begin}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}\PYG{+w}{ }\PYG{n}{end}\PYG{p}{(}\PYG{n}{fast}\PYG{p}{),}
 \PYG{+w}{                           }\PYG{n}{back\PYGZus{}inserter}\PYG{p}{(}\PYG{n}{only\PYGZus{}in\PYGZus{}expected}\PYG{p}{));}
 \PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{only\PYGZus{}in\PYGZus{}expected}\PYG{p}{.}\PYG{n}{empty}\PYG{p}{())}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
 \PYG{+w}{                }\PYG{n}{oss}\PYG{+w}{ }\PYG{o}{\PYGZlt{}\PYGZlt{}}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}  Only in expected: \PYGZdq{}}\PYG{p}{;}
