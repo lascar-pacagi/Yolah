@@ -5,10 +5,16 @@
 #include "generate_games.h"
 #include <algorithm>
 #include "game.h"
+#include <set>
 #include <vector>
 
 void compare_models(const std::string& model1, const std::string& model2, const std::string& src_dir, std::ostream& os) {
     using namespace std;
+    auto get_state = [](const Yolah &yolah) {
+      return make_tuple(yolah.bitboard(Yolah::BLACK),
+                        yolah.bitboard(Yolah::WHITE), yolah.empty_bitboard(),
+                        yolah.nb_plies() & 1);
+    };
     NNUE_Quantized nnue1, nnue2;
     nnue1.load(model1);
     nnue2.load(model2);
@@ -17,6 +23,9 @@ void compare_models(const std::string& model1, const std::string& model2, const 
     double nnue1_accuracy = 0;
     double nnue2_accuracy = 0;
     size_t nb_positions = 0;
+    size_t nb_games = 0;
+    set<decltype(get_state(Yolah()))> positions;    
+    set<decltype(get_state(Yolah()))> final_positions;
     vector<Move> moves(Yolah::MAX_NB_PLIES);
     const std::filesystem::path src(src_dir);
     std::regex re_games("^games.*", std::regex_constants::ECMAScript|std::regex_constants::multiline);
@@ -53,16 +62,22 @@ void compare_models(const std::string& model1, const std::string& model2, const 
                     + (max_proba2 == white_proba2 && white_score > black_score) 
                     + (max_proba2 == draw_proba2 && black_score == white_score);
                 nb_positions++;
+                positions.insert(get_state(yolah));
             };
             update();
             for (int i = nb_random_moves; i < nb_moves; i++) {
                 yolah.play(moves[i]);
                 update();
-            }            
+            }
+            final_positions.insert(get_state(yolah));
+            nb_games++;
             n += 2 + 2 * nb_moves + 2;
         }
     }
-    os << "# of positions           : " << nb_positions << '\n';
-    os << "NNUE quantized 1 accuracy: " << nnue1_accuracy / static_cast<double>(nb_positions) << '\n';
-    os << "NNUE quantized 2 accuracy: " << nnue2_accuracy / static_cast<double>(nb_positions) << '\n';
+    os << "# of games                    : " << nb_games << '\n';
+    os << "# of different final positions: " << final_positions.size() << '\n';
+    os << "# of positions                : " << nb_positions << '\n';
+    os << "# of different positions      : " << positions.size() << '\n';
+    os << "NNUE quantized 1 accuracy     : " << nnue1_accuracy / static_cast<double>(nb_positions) << '\n';
+    os << "NNUE quantized 2 accuracy     : " << nnue2_accuracy / static_cast<double>(nb_positions) << '\n';
 }
