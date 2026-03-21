@@ -34,6 +34,7 @@
 #include <format>
 #include "logic_net_learning.h"
 #include "compare_models.h"
+#include "yolah_features.h"
 
 namespace po = boost::program_options;
 using std::cout, std::endl, std::string;
@@ -111,8 +112,27 @@ int main(int argc, char* argv[]) {
         std::cout << e << '\n';
     }
 */
-    compare_models("../nnue/nnue_quantized.txt", "../nnue/nnue_quantized_2.txt", "../nnue/test/data", cout);
+    //compare_models("../nnue/nnue_quantized.txt", "../nnue/nnue_quantized_2.txt", "../nnue/test/data", cout);
 
+    // {
+    //   Yolah::MoveList moves;
+    //   std::random_device rd;
+    //   std::mt19937 mt(rd());
+    //   std::array<uint8_t, YolahFeatures::NB_FEATURES> inputs;
+    //   for (size_t i = 0; i < 100; i++) {
+    //     Yolah yolah;
+    //     while (!yolah.game_over()) {
+    //       YolahFeatures::set_features(inputs, yolah);          
+    //       yolah.moves(moves);
+    //       std::uniform_int_distribution<int> d(0, moves.size() - 1);
+    //       Move m = moves[d(mt)];          
+    //       yolah.play(m);
+    //     }
+    //   }
+    // }
+
+    YolahFeatures::encode_data("../nnue/data", "/mnt");
+    
     //data::decode_games("../data/games/games_2025_08_31_22_09_02.335269145_0.txt", cout);
     
     // po::options_description general("General options");

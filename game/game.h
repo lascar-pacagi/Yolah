@@ -1,6 +1,7 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include <cstdint>
 #include <iostream>
 #include <vector>
 #include <utility>
@@ -8,6 +9,7 @@
 #include "move.h"
 #include "json.hpp"
 #include "misc.h"
+#include "magic.h"
 
 using json = nlohmann::json;
 
@@ -81,6 +83,19 @@ public:
     bool game_over() const;
     void play(Move m);
     void undo(Move m);
+    std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> moves_bb(uint8_t player) const {
+      uint64_t occupied = black | white | empty;
+      uint64_t bb = player == BLACK ? black : white;
+      Square from0 = pop_lsb(bb);
+      Square from1 = pop_lsb(bb);
+      Square from2 = pop_lsb(bb);
+      Square from3 = pop_lsb(bb);
+      uint64_t b0 = attacks_bb(from0, occupied) & ~occupied;
+      uint64_t b1 = attacks_bb(from1, occupied) & ~occupied;
+      uint64_t b2 = attacks_bb(from2, occupied) & ~occupied;
+      uint64_t b3 = attacks_bb(from3, occupied) & ~occupied;
+      return { b0, b1, b2, b3 };
+    }
     void moves(uint8_t player, MoveList& moves) const;
     void moves(MoveList& moves) const;
     void moves(uint64_t bb, MoveList& moves) const;
