@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
     //   }
     // }
 
-    YolahFeatures::encode_data("../nnue/data", "/mnt");
+    YolahFeatures::encode_data("/Yolah/nnue/data", "/mnt");
     
     //data::decode_games("../data/games/games_2025_08_31_22_09_02.335269145_0.txt", cout);
     
