@@ -119,19 +119,64 @@ class GameDataset(Dataset):
 
 # ── Network ────────────────────────────────────────────────────────────────────
 class ResBlock(nn.Module):
-    """Pre-activation residual block: BN→ReLU→Conv→BN→ReLU→Conv + skip."""
+    """
+    Pre-activation residual block (ResNet-v2 style).
+
+    Data flow:
+                          ┌─────────────────────────────────┐  (skip / identity)
+      x ─► BN ─► ReLU ─► Conv ─► BN ─► ReLU ─► Conv ─► (+) ─► output
+
+    Using pre-activation (normalise/activate BEFORE the convolution) instead of
+    the original post-activation (Conv→BN→ReLU) keeps the skip path as a pure
+    identity: gradients flow back through the addition without touching any
+    non-linearity, which stabilises training for deep networks.
+    """
     def __init__(self, channels: int):
         super().__init__()
+
+        # nn.BatchNorm2d(C):
+        #   Normalises each of the C feature maps to zero mean / unit variance
+        #   over the (B, H, W) dimensions, then applies a learned scale γ and
+        #   shift β per channel.  Reduces internal covariate shift and lets us
+        #   use higher learning rates.
         self.bn1   = nn.BatchNorm2d(channels)
+
+        # nn.Conv2d(in_channels, out_channels, kernel_size, padding, bias):
+        #   Slides a kernel_size×kernel_size filter over the (H, W) spatial
+        #   dimensions.  padding=1 with kernel 3×3 keeps the spatial size
+        #   unchanged (same-padding): output is still 8×8.
+        #   bias=False because BatchNorm already has a learnable shift β,
+        #   so a conv bias would be redundant.
         self.conv1 = nn.Conv2d(channels, channels, 3, padding=1, bias=False)
+
         self.bn2   = nn.BatchNorm2d(channels)
         self.conv2 = nn.Conv2d(channels, channels, 3, padding=1, bias=False)
 
     def forward(self, x):
-        residual = x
-        x = self.conv1(torch.relu(self.bn1(x)))
-        x = self.conv2(torch.relu(self.bn2(x)))
-        return x + residual
+        # x                    : (B, C, 8, 8)
+
+        # Save the input before any transformation — this is the skip connection.
+        # Because in_channels == out_channels and spatial size is preserved,
+        # no projection is needed: the identity shortcut is just x itself.
+        residual = x            # (B, C, 8, 8)  — same storage, no copy
+
+        # First sub-layer: normalise → activate → convolve
+        # bn1  : (B, C, 8, 8) → (B, C, 8, 8)  normalise each channel over (B,H,W)
+        # relu : (B, C, 8, 8) → (B, C, 8, 8)  element-wise max(0, t)
+        # conv1: (B, C, 8, 8) → (B, C, 8, 8)  3×3 same-padding, C→C filters
+        x = self.conv1(torch.relu(self.bn1(x)))   # (B, C, 8, 8)
+
+        # Second sub-layer: same pattern
+        # bn2  : (B, C, 8, 8) → (B, C, 8, 8)
+        # relu : (B, C, 8, 8) → (B, C, 8, 8)
+        # conv2: (B, C, 8, 8) → (B, C, 8, 8)
+        x = self.conv2(torch.relu(self.bn2(x)))   # (B, C, 8, 8)
+
+        # Residual addition: element-wise sum of the two (B, C, 8, 8) tensors.
+        # The network only needs to learn the *residual* (difference) from the
+        # identity, which is much easier than learning the full mapping from
+        # scratch — this is the key insight of ResNets.
+        return x + residual     # (B, C, 8, 8)
 
 
 class Net(nn.Module):
@@ -142,35 +187,72 @@ class Net(nn.Module):
     Output: (B, 3)        — logits for black-win / draw / white-win
 
     Architecture:
-      Conv(4 → channels, 3×3) → BN → ReLU
-      × nb_blocks  ResBlock(channels)
-      BN → ReLU → GlobalAvgPool → flatten
-      Linear(channels → fc_size) → ReLU
+      Conv(4 → channels, 3×3) → BN → ReLU        ← stem: project to channel depth
+      × nb_blocks  ResBlock(channels)              ← body: learn spatial features
+      BN → ReLU → GlobalAvgPool                   ← compress (B,C,8,8)→(B,C)
+      Linear(channels → fc_size) → ReLU           ← head: classify
       Linear(fc_size → 3)
 
     Default: 256 channels, 20 residual blocks → ~24 M parameters.
     """
     def __init__(self, channels: int = 256, nb_blocks: int = 20, fc_size: int = 256):
         super().__init__()
+
+        # ── Stem ──────────────────────────────────────────────────────────────
+        # nn.Sequential: chains modules so that the output of one feeds the next.
+        # This first block projects the 4-channel board representation into the
+        # 'channels'-wide feature space used throughout the residual tower.
+        #
+        # Conv2d(4→C, 3×3, padding=1):  (B, 4, 8, 8) → (B, C, 8, 8)
+        #   Expands 4 input planes to C feature maps while preserving 8×8 size.
+        # BatchNorm2d(C):                (B, C, 8, 8) → (B, C, 8, 8)
+        # ReLU(inplace=True):            (B, C, 8, 8) → (B, C, 8, 8)
+        #   inplace=True overwrites the input buffer — saves C×8×8×4 bytes/sample.
         self.input_conv = nn.Sequential(
-            nn.Conv2d(4, channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(channels),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(4, channels, kernel_size=3, padding=1, bias=False),  # (B,4,8,8)→(B,C,8,8)
+            nn.BatchNorm2d(channels),                                       # (B,C,8,8)→(B,C,8,8)
+            nn.ReLU(inplace=True),                                          # (B,C,8,8)→(B,C,8,8)
         )
+
+        # ── Residual tower ────────────────────────────────────────────────────
+        # *[...] unpacks the list of ResBlock instances as positional arguments
+        # to nn.Sequential, which registers them as numbered sub-modules.
+        # Each block: (B, C, 8, 8) → (B, C, 8, 8)  — shape never changes.
         self.res_blocks = nn.Sequential(*[ResBlock(channels) for _ in range(nb_blocks)])
+        #                                                       (B,C,8,8)→(B,C,8,8) × nb_blocks
+
+        # Final BN before pooling: normalises the last residual block's output.
+        # (B, C, 8, 8) → (B, C, 8, 8)
         self.output_bn  = nn.BatchNorm2d(channels)
+
+        # ── Classification head ───────────────────────────────────────────────
+        # After GAP the spatial dimensions are gone; inputs are flat vectors.
+        # Linear(C→fc):   (B, C)    → (B, fc)   matrix multiply W(fc×C) + b(fc)
+        # ReLU:           (B, fc)   → (B, fc)
+        # Linear(fc→3):   (B, fc)   → (B, 3)    one score per outcome class
         self.head = nn.Sequential(
-            nn.Linear(channels, fc_size),
-            nn.ReLU(inplace=True),
-            nn.Linear(fc_size, 3),
+            nn.Linear(channels, fc_size),   # (B, C)  → (B, fc_size)
+            nn.ReLU(inplace=True),          # (B, fc_size) → (B, fc_size)
+            nn.Linear(fc_size, 3),          # (B, fc_size) → (B, 3)
         )
 
     def forward(self, x):
-        x = self.input_conv(x)
-        x = self.res_blocks(x)
-        x = torch.relu(self.output_bn(x))
-        x = x.mean(dim=(2, 3))   # global average pooling → (B, channels)
-        return self.head(x)
+        # x                      : (B, 4, 8, 8)   4 board planes, batch of B positions
+
+        x = self.input_conv(x)   # (B, 4, 8, 8)  → (B, C, 8, 8)   stem: Conv+BN+ReLU
+        x = self.res_blocks(x)   # (B, C, 8, 8)  → (B, C, 8, 8)   20× ResBlock
+        x = torch.relu(
+            self.output_bn(x))   # (B, C, 8, 8)  → (B, C, 8, 8)   final BN+ReLU
+
+        # Global Average Pooling: mean over the H=8 and W=8 spatial dimensions.
+        # Tensor.mean(dim=(2,3)) reduces axes 2 (height) and 3 (width) to scalars.
+        # Each of the C channels becomes the average activation across all 64 squares
+        # → one board-level summary value per channel, with zero extra parameters.
+        x = x.mean(dim=(2, 3))   # (B, C, 8, 8)  → (B, C)         global avg pool
+
+        # Classification head: two linear layers with one ReLU between them.
+        # CrossEntropyLoss expects raw logits (no softmax applied here).
+        return self.head(x)      # (B, C)         → (B, 3)         logits
 
     def clip(self):
         pass   # no weight quantisation for this research network
@@ -206,7 +288,7 @@ def dataloader_ddp(trainset, valset, batch_size):
 
 class TrainerDDP:
     def __init__(self, gpu_id, model, train_loader, sampler_train,
-                 val_loader, sampler_val, save_every=5):
+                 val_loader, sampler_val, save_every=1):
         self.gpu_id        = gpu_id
         self.model         = model.to(gpu_id)
         self.train_loader  = train_loader
