@@ -443,7 +443,7 @@ void encode_data(const std::string &src_dir, const std::string &dst_dir) {
   using namespace std;
   const filesystem::path src(src_dir);
   const filesystem::path dst(dst_dir);
-  regex re_games("^games((?!.*symmetries.*))",
+  regex re_games("^games((?!.*features.*))",
                  regex_constants::ECMAScript | regex_constants::multiline);
   vector<filesystem::path> files_to_process;
   for (auto const &dir_entry : filesystem::directory_iterator(src_dir)) {
