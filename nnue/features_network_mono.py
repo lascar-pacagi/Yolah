@@ -14,7 +14,7 @@ RECORD_SIZE = NB_FEATURES + 1  # 45 bytes
 
 
 class FeaturesDataset(Dataset):
-    def __init__(self, data_dir, max_records=500000):
+    def __init__(self, data_dir, max_records=500000000):
         files = sorted(glob.glob(data_dir + "/*.features.txt"))
         if not files:
             raise FileNotFoundError(f"No .features.txt files found in {data_dir}")
