@@ -184,7 +184,7 @@ def dataloader_ddp(trainset, valset, batch_size):
     sampler_val   = DistributedSampler(valset, shuffle=False)
     train_loader  = DataLoader(
         trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train,
-        num_workers=2, pin_memory=True, prefetch_factor=2
+        num_workers=0, pin_memory=True#, prefetch_factor=2
     )
     val_loader = DataLoader(
         valset, batch_size=batch_size, shuffle=False, sampler=sampler_val,
@@ -195,7 +195,7 @@ def dataloader_ddp(trainset, valset, batch_size):
 
 class TrainerDDP:
     def __init__(self, gpu_id, model, train_loader, sampler_train,
-                 val_loader, sampler_val, save_every=5):
+                 val_loader, sampler_val, save_every=1):
         self.gpu_id        = gpu_id
         self.model         = model.to(gpu_id)
         self.train_loader  = train_loader
@@ -306,4 +306,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = RelationalGameDataset(GAME_DIR)
-    mp.spawn(main, args=(world_size, 512 * 4, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 256 * 1, dataset), nprocs=world_size)
