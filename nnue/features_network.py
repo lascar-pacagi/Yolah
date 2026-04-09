@@ -125,6 +125,46 @@ def export_net(net):
     return exported
 
 
+def save_quantized(net, filename, scale=64):
+    """
+    Saves the weights of a NetNoBN (BN already folded) in quantized integer form,
+    mirroring NNUE::save_quantized in nnue.cpp.
+
+    Format for each layer:
+      W\nM\nN\n<M*N values, one per line>
+      B\nN\n<N values, one per line>
+
+    Weight scale : scale (64 by default).
+    Bias scale   : scale for fc1, scale^2 for fc2 and fc3
+                   (deeper biases must match the accumulated scale after W_q * x_q).
+
+    fc1 weights are written in row-major order of (out, in), which corresponds to
+    the TRANSPOSE=true layout read by the C++ load function.
+    """
+    net.train(False)
+
+    def write_matrix(f, weight, s):
+        m, n = weight.shape
+        f.write(f"W\n{m}\n{n}\n")
+        for i in range(m):
+            for j in range(n):
+                f.write(f"{int(round(s * weight[i, j].item()))}\n")
+
+    def write_bias(f, bias, s):
+        n = bias.shape[0]
+        f.write(f"B\n{n}\n")
+        for i in range(n):
+            f.write(f"{int(round(s * bias[i].item()))}\n")
+
+    with open(filename, "w") as f:
+        write_matrix(f, net.fc1.weight, scale)
+        write_bias(f, net.fc1.bias, scale)
+        write_matrix(f, net.fc2.weight, scale)
+        write_bias(f, net.fc2.bias, scale * scale)
+        write_matrix(f, net.fc3.weight, scale)
+        write_bias(f, net.fc3.bias, scale * scale)
+
+
 NB_EPOCHS = 100
 MODEL_PATH = "/mnt/"
 MODEL_NAME = "features_128x64x3"

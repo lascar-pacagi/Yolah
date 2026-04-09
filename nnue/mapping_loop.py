@@ -58,7 +58,7 @@ DATA_DIR       = "./data"
 MAPPING_DIR    = "./mappings"
 MASTER_PORT    = "65435"
 MAX_ITERATIONS = 20
-MAX_RETRIES    = 3      # times to ask Qwen to fix a broken mapping before giving up
+MAX_RETRIES    = 10      # times to ask Qwen to fix a broken mapping before giving up
 NB_EPOCHS      = 2
 BATCH_SIZE     = 512 * 2
 

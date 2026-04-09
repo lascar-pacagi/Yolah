@@ -55,18 +55,24 @@ class FeaturesDataset(Dataset):
 
 
 class Net(nn.Module):
+    """
+    Direct-from-bytes classifier: takes features as uint8/255 and produces
+    (black, draw, white) logits. No BatchNorm — the C++ first layer in ffnn.h
+    reads raw byte/255 and any pre-fc1 normalization would need to be folded
+    into fc1's int8 weights, where low-variance features blow the ±127/64
+    clipping budget. Training directly on byte/255 keeps Net.clip() honest:
+    the clamped weights are exactly what gets quantized.
+    """
     def __init__(self):
         super().__init__()
-        self.bn = nn.BatchNorm1d(NB_FEATURES)
         self.fc1 = nn.Linear(NB_FEATURES, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 3)
 
     def forward(self, x):
-        x = self.bn(x)
         x = torch.clamp(self.fc1(x), min=0.0, max=1.0)
         x = torch.clamp(self.fc2(x), min=0.0, max=1.0)
-        return self.fc3(x)
+        return self.fc3(x) #nn.functional.softmax(self.fc3(x), dim=1)
 
     def clip(self):
         for fc in [self.fc1, self.fc2, self.fc3]:
@@ -74,58 +80,96 @@ class Net(nn.Module):
             fc.bias.data.clamp_(-127/64, 127/64)
 
 
-class NetNoBN(nn.Module):
-    """Same architecture as Net but without BatchNorm, for C++ inference."""
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(NB_FEATURES, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 3)
-
-    def forward(self, x):
-        x = torch.clamp(self.fc1(x), min=0.0, max=1.0)
-        x = torch.clamp(self.fc2(x), min=0.0, max=1.0)
-        return self.fc3(x)
-
-
-def fold_batchnorm(bn, fc):
+def save_quantized(net, filename, scale=64):
     """
-    Folds a BatchNorm1d layer that precedes a Linear layer into that Linear
-    layer in-place, using the BN's frozen running statistics.
+    Serializes a trained Net into the integer text format consumed by
+    ffnn.h's FFNN<I, H1, H2, O> class (see ffnn_detail::read_matrix/read_bias).
 
-    After calling this, fc subsumes the BN transform:
-      fc(bn(x)) == fc_new(x)
+    Quantization scheme (must match ffnn.h):
+      - weights  : int8, W_q  = round(scale * W)               clamped to [-127, 127]
+      - fc1 bias : int16, b_q = round(scale * b)               (first-layer path
+                   adds bias after the float /255, so scale is just `scale`)
+      - fc2/fc3  : int16, b_q = round(scale^2 * b)             (integer dot product
+         bias     accumulates at scale^2; bias must live at the same scale before >>6)
 
-    Must be called with the model in eval mode (model.train(False)).
-    """
-    scale = bn.weight / (bn.running_var + bn.eps).sqrt()  # gamma / sqrt(var+eps)
-    shift = bn.bias - bn.running_mean * scale              # beta - mu*scale
-    # Bias update must use the original weights, before scaling
-    fc.bias.data  += fc.weight.data @ shift
-    fc.weight.data *= scale.unsqueeze(0)
+    File layout (whitespace-separated, one section per layer in fc1→fc2→fc3 order):
+        W
+        <m> <n>
+        <m*n values>
+        B
+        <n>
+        <n values>
 
+    The file stores the *unpadded* input dimension (e.g. 44 for fc1); padding to
+    I_PADDED is done at load time by the C++ FFNN constructor.
 
-def export_net(net):
-    """
-    Returns a NetNoBN with BN folded into fc1, ready for C++ export.
-    Does not modify the original net.
+    Warns on saturation: if a weight exceeds ±127 or a bias exceeds int16 range,
+    the model was not clipped tightly enough during training (see Net.clip()).
     """
     net.train(False)
-    exported = NetNoBN()
-    for attr in ['fc1', 'fc2', 'fc3']:
-        src = getattr(net, attr)
-        dst = getattr(exported, attr)
-        dst.weight.data = src.weight.data.clone()
-        dst.bias.data   = src.bias.data.clone()
-    fold_batchnorm(net.bn, exported.fc1)
-    return exported
+
+    w_int8_max = 127
+    b_int16_max = 32767
+
+    def _quantize_weight(weight, s, layer_name):
+        q = torch.round(s * weight.detach().to(torch.float64))
+        max_abs = int(q.abs().max().item()) if q.numel() > 0 else 0
+        if max_abs > w_int8_max:
+            print(
+                f"warning: {layer_name} weights saturate int8 "
+                f"(max |W*{s}| = {max_abs} > {w_int8_max}); "
+                f"consider tightening Net.clip() or retraining",
+                flush=True,
+            )
+        return q.clamp_(-w_int8_max, w_int8_max).to(torch.int64)
+
+    def _quantize_bias(bias, s, layer_name):
+        q = torch.round(s * bias.detach().to(torch.float64))
+        max_abs = int(q.abs().max().item()) if q.numel() > 0 else 0
+        if max_abs > b_int16_max:
+            print(
+                f"warning: {layer_name} bias saturates int16 "
+                f"(max |b*{s}| = {max_abs} > {b_int16_max})",
+                flush=True,
+            )
+        return q.clamp_(-b_int16_max - 1, b_int16_max).to(torch.int64)
+
+    def _write_matrix(f, W_q):
+        m, n = W_q.shape
+        f.write(f"W\n{m} {n}\n")
+        for i in range(m):
+            f.write(" ".join(str(int(v)) for v in W_q[i].tolist()))
+            f.write("\n")
+
+    def _write_bias(f, b_q):
+        n = b_q.shape[0]
+        f.write(f"B\n{n}\n")
+        f.write(" ".join(str(int(v)) for v in b_q.tolist()))
+        f.write("\n")
+
+    fc1_w = _quantize_weight(net.fc1.weight, scale,         "fc1")
+    fc1_b = _quantize_bias  (net.fc1.bias,   scale,         "fc1")  # scale^1
+    fc2_w = _quantize_weight(net.fc2.weight, scale,         "fc2")
+    fc2_b = _quantize_bias  (net.fc2.bias,   scale * scale, "fc2")  # scale^2
+    fc3_w = _quantize_weight(net.fc3.weight, scale,         "fc3")
+    fc3_b = _quantize_bias  (net.fc3.bias,   scale * scale, "fc3")  # scale^2
+
+    with open(filename, "w") as f:
+        _write_matrix(f, fc1_w)
+        _write_bias  (f, fc1_b)
+        _write_matrix(f, fc2_w)
+        _write_bias  (f, fc2_b)
+        _write_matrix(f, fc3_w)
+        _write_bias  (f, fc3_b)
+
+    print(f"quantized model written to {filename} (scale={scale})", flush=True)
 
 
 NB_EPOCHS = 100
 MODEL_PATH = "/mnt/"
-MODEL_NAME = "features_128x64x3_2"
+MODEL_NAME = "features_128x64x3"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
-DATA_DIR = "./data"
+DATA_DIR = "/mnt"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -234,8 +278,10 @@ if __name__ == "__main__":
 
     net = Net()
     if os.path.isfile(LAST_MODEL):
-        net.load_state_dict(torch.load(LAST_MODEL))
+        net.load_state_dict(torch.load(LAST_MODEL, map_location="cpu"))
     print(net, flush=True)
+
+    # save_quantized(net, f"{MODEL_PATH}{MODEL_NAME}.quantized.txt")
 
     trainer = Trainer(net, train_loader, val_loader)
     trainer.train(NB_EPOCHS)

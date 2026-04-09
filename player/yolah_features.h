@@ -1,7 +1,7 @@
 #ifndef YOLAH_FEATURES_H
 #define YOLAH_FEATURES_H
 #include "game.h"
-#include <array>
+#include <cstdint>
 
 namespace YolahFeatures {
   enum {
@@ -51,7 +51,7 @@ namespace YolahFeatures {
     TURN,
     NB_FEATURES
   };
-  void set_features(std::array<uint8_t, NB_FEATURES> &, const Yolah &);
+  void set_features(uint8_t* features, const Yolah &);
   void encode_data(const std::string& src_dir, const std::string& dst_dir);
 }
 

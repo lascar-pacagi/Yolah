@@ -73,7 +73,7 @@ uint8_t count_groups(uint64_t player_bb, const uint64_t pieces_bb[4],
   return groups;
 }
 
-void set_features(std::array<uint8_t, NB_FEATURES> &features,
+void set_features(uint8_t* features,
                   const Yolah &yolah) {
 #define NDEBUG
   using namespace std;
@@ -427,7 +427,7 @@ void generate_features(const std::filesystem::path &input_file,
       yolah.play(moves[i]);
     }
     while (true) {
-      set_features(game_features, yolah);
+      set_features(game_features.data(), yolah);
       os.write(reinterpret_cast<const char *>(game_features.data()), NB_FEATURES);
       os << result;
       if (yolah.game_over()) break;
@@ -459,6 +459,7 @@ void encode_data(const std::string &src_dir, const std::string &dst_dir) {
         filesystem::path(path.filename()).replace_extension("features.txt");
     generate_features(path, output_filename);
     std::cout << "Done." << std::endl;
+    break;
   }
 }
 } // namespace YolahFeatures

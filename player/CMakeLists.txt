@@ -4,6 +4,7 @@ set(PLAYER_SOURCES
     heuristic.cpp basic_minmax_player.cpp transposition_table.cpp
     heuristic_weights_learner.cpp player.cpp
     minmax_player.cpp minmax_player2.cpp minmax_nnue_player.cpp minmax_nnue_quantized_player.cpp yolah_features.cpp
+    feature_net_player.cpp
 )
 
 # Add AlphaZero player if CUDA is enabled
@@ -12,6 +13,7 @@ if(ENABLE_CUDA)
 endif()
 
 add_library(player OBJECT ${PLAYER_SOURCES})
+target_compile_options(player PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
 target_include_directories(player PUBLIC .)
 
 include_directories(../misc ../game ../optimization ../nnue ../eigen ../data)
