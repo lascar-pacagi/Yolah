@@ -1,0 +1,384 @@
+black bitboard: 0x8000000810000001
+white bitboard: 0x0100001008000080
+bitboard of impassable squares: 0x0000000000000000
+turn (0: black/1: white): 0
+black score: 0
+white score: 0
+d5:c6
+black bitboard: 0x8000040010000001
+white bitboard: 0x0100001008000080
+bitboard of impassable squares: 0x0000000800000000
+turn (0: black/1: white): 1
+black score: 1
+white score: 0
+e5:f6
+black bitboard: 0x8000040010000001
+white bitboard: 0x0100200008000080
+bitboard of impassable squares: 0x0000001800000000
+turn (0: black/1: white): 0
+black score: 1
+white score: 1
+e4:f3
+black bitboard: 0x8000040000200001
+white bitboard: 0x0100200008000080
+bitboard of impassable squares: 0x0000001810000000
+turn (0: black/1: white): 1
+black score: 2
+white score: 1
+d4:c3
+black bitboard: 0x8000040000200001
+white bitboard: 0x0100200000040080
+bitboard of impassable squares: 0x0000001818000000
+turn (0: black/1: white): 0
+black score: 2
+white score: 2
+h8:d8
+black bitboard: 0x0800040000200001
+white bitboard: 0x0100200000040080
+bitboard of impassable squares: 0x8000001818000000
+turn (0: black/1: white): 1
+black score: 3
+white score: 2
+h1:b1
+black bitboard: 0x0800040000200001
+white bitboard: 0x0100200000040002
+bitboard of impassable squares: 0x8000001818000080
+turn (0: black/1: white): 0
+black score: 3
+white score: 3
+a1:b2
+black bitboard: 0x0800040000200200
+white bitboard: 0x0100200000040002
+bitboard of impassable squares: 0x8000001818000081
+turn (0: black/1: white): 1
+black score: 4
+white score: 3
+b1:c2
+black bitboard: 0x0800040000200200
+white bitboard: 0x0100200000040400
+bitboard of impassable squares: 0x8000001818000083
+turn (0: black/1: white): 0
+black score: 4
+white score: 4
+b2:c1
+black bitboard: 0x0800040000200004
+white bitboard: 0x0100200000040400
+bitboard of impassable squares: 0x8000001818000283
+turn (0: black/1: white): 1
+black score: 5
+white score: 4
+c2:e2
+black bitboard: 0x0800040000200004
+white bitboard: 0x0100200000041000
+bitboard of impassable squares: 0x8000001818000683
+turn (0: black/1: white): 0
+black score: 5
+white score: 5
+c1:g5
+black bitboard: 0x0800044000200000
+white bitboard: 0x0100200000041000
+bitboard of impassable squares: 0x8000001818000687
+turn (0: black/1: white): 1
+black score: 6
+white score: 5
+e2:f2
+black bitboard: 0x0800044000200000
+white bitboard: 0x0100200000042000
+bitboard of impassable squares: 0x8000001818001687
+turn (0: black/1: white): 0
+black score: 6
+white score: 6
+d8:b6
+black bitboard: 0x0000064000200000
+white bitboard: 0x0100200000042000
+bitboard of impassable squares: 0x8800001818001687
+turn (0: black/1: white): 1
+black score: 7
+white score: 6
+a8:c8
+black bitboard: 0x0000064000200000
+white bitboard: 0x0400200000042000
+bitboard of impassable squares: 0x8900001818001687
+turn (0: black/1: white): 0
+black score: 7
+white score: 7
+c6:d7
+black bitboard: 0x0008024000200000
+white bitboard: 0x0400200000042000
+bitboard of impassable squares: 0x8900041818001687
+turn (0: black/1: white): 1
+black score: 8
+white score: 7
+c3:b4
+black bitboard: 0x0008024000200000
+white bitboard: 0x0400200002002000
+bitboard of impassable squares: 0x8900041818041687
+turn (0: black/1: white): 0
+black score: 8
+white score: 8
+b6:a6
+black bitboard: 0x0008014000200000
+white bitboard: 0x0400200002002000
+bitboard of impassable squares: 0x8900061818041687
+turn (0: black/1: white): 1
+black score: 9
+white score: 8
+f6:e7
+black bitboard: 0x0008014000200000
+white bitboard: 0x0410000002002000
+bitboard of impassable squares: 0x8900261818041687
+turn (0: black/1: white): 0
+black score: 9
+white score: 9
+g5:h5
+black bitboard: 0x0008018000200000
+white bitboard: 0x0410000002002000
+bitboard of impassable squares: 0x8900265818041687
+turn (0: black/1: white): 1
+black score: 10
+white score: 9
+e7:f7
+black bitboard: 0x0008018000200000
+white bitboard: 0x0420000002002000
+bitboard of impassable squares: 0x8910265818041687
+turn (0: black/1: white): 0
+black score: 10
+white score: 10
+a6:c4
+black bitboard: 0x0008008004200000
+white bitboard: 0x0420000002002000
+bitboard of impassable squares: 0x8910275818041687
+turn (0: black/1: white): 1
+black score: 11
+white score: 10
+f7:g6
+black bitboard: 0x0008008004200000
+white bitboard: 0x0400400002002000
+bitboard of impassable squares: 0x8930275818041687
+turn (0: black/1: white): 0
+black score: 11
+white score: 11
+d7:c7
+black bitboard: 0x0004008004200000
+white bitboard: 0x0400400002002000
+bitboard of impassable squares: 0x8938275818041687
+turn (0: black/1: white): 1
+black score: 12
+white score: 11
+f2:g3
+black bitboard: 0x0004008004200000
+white bitboard: 0x0400400002400000
+bitboard of impassable squares: 0x8938275818043687
+turn (0: black/1: white): 0
+black score: 12
+white score: 12
+c4:b5
+black bitboard: 0x0004008200200000
+white bitboard: 0x0400400002400000
+bitboard of impassable squares: 0x893827581c043687
+turn (0: black/1: white): 1
+black score: 13
+white score: 12
+b4:a4
+black bitboard: 0x0004008200200000
+white bitboard: 0x0400400001400000
+bitboard of impassable squares: 0x893827581e043687
+turn (0: black/1: white): 0
+black score: 13
+white score: 13
+c7:b7
+black bitboard: 0x0002008200200000
+white bitboard: 0x0400400001400000
+bitboard of impassable squares: 0x893c27581e043687
+turn (0: black/1: white): 1
+black score: 14
+white score: 13
+c8:b8
+black bitboard: 0x0002008200200000
+white bitboard: 0x0200400001400000
+bitboard of impassable squares: 0x8d3c27581e043687
+turn (0: black/1: white): 0
+black score: 14
+white score: 14
+b7:a7
+black bitboard: 0x0001008200200000
+white bitboard: 0x0200400001400000
+bitboard of impassable squares: 0x8d3e27581e043687
+turn (0: black/1: white): 1
+black score: 15
+white score: 14
+g3:f4
+black bitboard: 0x0001008200200000
+white bitboard: 0x0200400021000000
+bitboard of impassable squares: 0x8d3e27581e443687
+turn (0: black/1: white): 0
+black score: 15
+white score: 15
+b5:c5
+black bitboard: 0x0001008400200000
+white bitboard: 0x0200400021000000
+bitboard of impassable squares: 0x8d3e275a1e443687
+turn (0: black/1: white): 1
+black score: 16
+white score: 15
+g6:h7
+black bitboard: 0x0001008400200000
+white bitboard: 0x0280000021000000
+bitboard of impassable squares: 0x8d3e675a1e443687
+turn (0: black/1: white): 0
+black score: 16
+white score: 16
+f3:g2
+black bitboard: 0x0001008400004000
+white bitboard: 0x0280000021000000
+bitboard of impassable squares: 0x8d3e675a1e643687
+turn (0: black/1: white): 1
+black score: 17
+white score: 16
+h7:h6
+black bitboard: 0x0001008400004000
+white bitboard: 0x0200800021000000
+bitboard of impassable squares: 0x8dbe675a1e643687
+turn (0: black/1: white): 0
+black score: 17
+white score: 17
+g2:g1
+black bitboard: 0x0001008400000040
+white bitboard: 0x0200800021000000
+bitboard of impassable squares: 0x8dbe675a1e647687
+turn (0: black/1: white): 1
+black score: 18
+white score: 17
+f4:d2
+black bitboard: 0x0001008400000040
+white bitboard: 0x0200800001000800
+bitboard of impassable squares: 0x8dbe675a3e647687
+turn (0: black/1: white): 0
+black score: 18
+white score: 18
+g1:e1
+black bitboard: 0x0001008400000010
+white bitboard: 0x0200800001000800
+bitboard of impassable squares: 0x8dbe675a3e6476c7
+turn (0: black/1: white): 1
+black score: 19
+white score: 18
+h6:g7
+black bitboard: 0x0001008400000010
+white bitboard: 0x0240000001000800
+bitboard of impassable squares: 0x8dbee75a3e6476c7
+turn (0: black/1: white): 0
+black score: 19
+white score: 19
+c5:d6
+black bitboard: 0x0001088000000010
+white bitboard: 0x0240000001000800
+bitboard of impassable squares: 0x8dbee75e3e6476c7
+turn (0: black/1: white): 1
+black score: 20
+white score: 19
+g7:g8
+black bitboard: 0x0001088000000010
+white bitboard: 0x4200000001000800
+bitboard of impassable squares: 0x8dfee75e3e6476c7
+turn (0: black/1: white): 0
+black score: 20
+white score: 20
+h5:h4
+black bitboard: 0x0001080080000010
+white bitboard: 0x4200000001000800
+bitboard of impassable squares: 0x8dfee7de3e6476c7
+turn (0: black/1: white): 1
+black score: 21
+white score: 20
+d2:e3
+black bitboard: 0x0001080080000010
+white bitboard: 0x4200000001100000
+bitboard of impassable squares: 0x8dfee7de3e647ec7
+turn (0: black/1: white): 0
+black score: 21
+white score: 21
+d6:e6
+black bitboard: 0x0001100080000010
+white bitboard: 0x4200000001100000
+bitboard of impassable squares: 0x8dfeefde3e647ec7
+turn (0: black/1: white): 1
+black score: 22
+white score: 21
+a4:a2
+black bitboard: 0x0001100080000010
+white bitboard: 0x4200000000100100
+bitboard of impassable squares: 0x8dfeefde3f647ec7
+turn (0: black/1: white): 0
+black score: 22
+white score: 22
+e6:g4
+black bitboard: 0x00010000c0000010
+white bitboard: 0x4200000000100100
+bitboard of impassable squares: 0x8dfeffde3f647ec7
+turn (0: black/1: white): 1
+black score: 23
+white score: 22
+a2:a3
+black bitboard: 0x00010000c0000010
+white bitboard: 0x4200000000110000
+bitboard of impassable squares: 0x8dfeffde3f647fc7
+turn (0: black/1: white): 0
+black score: 23
+white score: 23
+e1:d1
+black bitboard: 0x00010000c0000008
+white bitboard: 0x4200000000110000
+bitboard of impassable squares: 0x8dfeffde3f647fd7
+turn (0: black/1: white): 1
+black score: 24
+white score: 23
+a3:b3
+black bitboard: 0x00010000c0000008
+white bitboard: 0x4200000000120000
+bitboard of impassable squares: 0x8dfeffde3f657fd7
+turn (0: black/1: white): 0
+black score: 24
+white score: 24
+h4:h2
+black bitboard: 0x0001000040008008
+white bitboard: 0x4200000000120000
+bitboard of impassable squares: 0x8dfeffdebf657fd7
+turn (0: black/1: white): 1
+black score: 25
+white score: 24
+g8:e8
+black bitboard: 0x0001000040008008
+white bitboard: 0x1200000000120000
+bitboard of impassable squares: 0xcdfeffdebf657fd7
+turn (0: black/1: white): 0
+black score: 25
+white score: 25
+h2:h3
+black bitboard: 0x0001000040800008
+white bitboard: 0x1200000000120000
+bitboard of impassable squares: 0xcdfeffdebf65ffd7
+turn (0: black/1: white): 1
+black score: 26
+white score: 25
+e3:d3
+black bitboard: 0x0001000040800008
+white bitboard: 0x12000000000a0000
+bitboard of impassable squares: 0xcdfeffdebf75ffd7
+turn (0: black/1: white): 0
+black score: 26
+white score: 26
+g4:f5
+black bitboard: 0x0001002000800008
+white bitboard: 0x12000000000a0000
+bitboard of impassable squares: 0xcdfeffdeff75ffd7
+turn (0: black/1: white): 1
+black score: 27
+white score: 26
+e8:f8
+black bitboard: 0x0001002000800008
+white bitboard: 0x22000000000a0000
+bitboard of impassable squares: 0xddfeffdeff75ffd7
+turn (0: black/1: white): 0
+black score: 27
+white score: 27

@@ -12,12 +12,12 @@ Each iteration:
 Raw input layout (193 binary float32 values):
   [0:64]    black bitboard  (bit i = 1 ↔ black piece on square i)
   [64:128]  white bitboard
-  [128:192] empty bitboard
+  [128:192] impassable bitboard (squares vacated by moved pieces)
   [192]     turn  (0 = black to move, 1 = white to move)
   Square i: row = i // 8, col = i % 8  (rank-major, a1 = square 0)
 
 The NN on top of the mapping is fixed:
-  Linear(MAPPED_DIM, 64) → clamp(0,1) → Linear(64, 32) → clamp(0,1) → Linear(32, 3)
+  Linear(MAPPED_DIM, 128) → clamp(0,1) → Linear(64, 32) → clamp(0,1) → Linear(32, 3)
 """
 
 import json
@@ -101,25 +101,62 @@ def mapping(board_tensor):
         dtype=torch.float32)
 '''
 
+# ── Game example (loaded from file for Qwen context) ─────────────────────────
+GAME_EXAMPLE_PATH = "./game_example.txt"
+
+
+def _load_game_example() -> str:
+    if os.path.isfile(GAME_EXAMPLE_PATH):
+        with open(GAME_EXAMPLE_PATH) as f:
+            return f.read()
+    return ""
+
+
 # ── System prompt for Qwen ─────────────────────────────────────────────────────
 SYSTEM_PROMPT = """\
 You are a feature engineering expert. Your task is to design compact feature \
 mappings for a neural network that classifies Yolah game positions as:
   0 = black wins,  1 = draw,  2 = white wins.
 
-YOLAH (relevant rules):
-- 8×8 board, 2 players (Black, White), each with EXACTLY 4 pieces always.
-- Pieces slide along open lines; the player with no legal move loses.
+YOLAH RULES:
+- 8×8 board, 2 players (Black, White), each starting with EXACTLY 4 pieces.
+  The number of pieces per player NEVER changes throughout the game.
+- Initial position:
+    Black pieces: a1 (sq 0), e4 (sq 28), d5 (sq 35), h8 (sq 63)
+    White pieces: h1 (sq 7), d4 (sq 27), e5 (sq 36), a8 (sq 56)
+  Pieces are symmetrically placed — the starting position is balanced.
+- Black moves first, then players alternate.
+- A move consists of sliding one of your pieces along any of the 8 directions
+  (N, S, E, W, NE, NW, SE, SW — like a chess queen) to any FREE square.
+  The piece can slide over multiple free squares but CANNOT jump over any piece
+  or impassable square.
+- After a piece moves, its ORIGIN square becomes IMPASSABLE for the rest of the
+  game. The board progressively fills up with impassable squares.
+- Each move scores 1 point for the moving player (score = number of moves made).
+- The game ends when NEITHER player has any legal move (all pieces are stuck
+  because surrounding squares are occupied or impassable).
+- The player with the HIGHER SCORE wins. Equal score = draw.
+
+STRATEGIC INSIGHTS (important for feature design):
+- Mobility is critical: a player who gets boxed in early loses move-making
+  opportunities and falls behind in score.
+- The impassable-square mechanic means piece POSITIONING relative to open areas
+  is key — pieces near large open regions can keep moving longer.
+- Late game: pieces compete for the remaining free corridors. Controlling
+  connected open space matters more than raw piece positions.
+- Score difference alone does not determine the winner — what matters is the
+  REMAINING scoring potential (future mobility) plus current score.
 
 RAW INPUT (193-d float32 binary tensor):
   [0:64]    black bitboard  (bit i = 1 ↔ black piece on square i)
   [64:128]  white bitboard
-  [128:192] empty bitboard
+  [128:192] empty/impassable bitboard (bit i = 1 ↔ square i is impassable)
   [192]     turn  (0 = black to move, 1 = white to move)
   Square i → row = i // 8,  col = i % 8  (a1 = square 0, rank-major)
+  A square is FREE (piece can move there) if bits i, i+64, and i+128 are all 0.
 
 NETWORK (fixed, sits on top of your mapping):
-  Linear(MAPPED_DIM, 64) → clamp(0,1) → Linear(64, 32) → clamp(0,1) → Linear(32, 3)
+  Linear(MAPPED_DIM, 128) → clamp(0,1) → Linear(128, 64) → clamp(0,1) → Linear(64, 3)
 
 YOUR TASK:
 Write a self-contained Python module that defines:
@@ -129,12 +166,21 @@ Write a self-contained Python module that defines:
       input  shape (193,) float32
       output shape (MAPPED_DIM,) float32
 
+PERFORMANCE NOTE:
+The mapping will be translated to C++ and called millions of times per move
+inside a minmax search. The Python code is a prototype — it does not need to
+be fast. But keep in mind that the algorithm should be efficiently implementable
+in C++ using bitboard operations (popcount, shifts, AND/OR/XOR masks,
+flood-fill via bitboard expansion, etc.).
+
 RULES:
 - Import only numpy, torch, and Python stdlib.
 - Each player ALWAYS has exactly 4 pieces; np.where will return 4 indices.
 - Normalize output values to approximately [0, 1].
 - Return the complete module as a SINGLE ```python ... ``` code block.
 - Do NOT include any training or testing code.
+- The mapping function must be DETERMINISTIC (same input → same output).
+- All values in the output tensor must be finite (no NaN, no Inf).
 """
 
 # ── Qwen helpers (llama-cpp-python, in-process, no server needed) ─────────────
@@ -169,6 +215,21 @@ def _llm_call(llm: Llama, messages: list, temperature: float,
 
 def _build_user_prompt(history: list, current_code: str) -> str:
     lines = []
+
+    # Include game example so Qwen can see how a real game unfolds
+    game_example = _load_game_example()
+    if game_example:
+        lines.append("EXAMPLE GAME (showing how positions evolve, with bitboards and scores):\n")
+        # Include a meaningful excerpt (first ~30 moves) to keep prompt manageable
+        example_lines = game_example.strip().split('\n')
+        # Show about 20 moves worth of data (~ first 120 lines)
+        excerpt = '\n'.join(example_lines[:120])
+        lines.append(f"```\n{excerpt}\n```\n")
+        lines.append(
+            "Each move makes the origin square impassable. Scores increment by 1 per move.\n"
+            "Notice how the impassable bitboard grows and constrains piece movement.\n"
+        )
+
     if history:
         lines.append("History of mapping attempts (sorted by iteration):\n")
         lines.append(f"{'Iter':>4}  {'ValAcc':>7}  {'Dim':>5}  Description")
@@ -187,7 +248,13 @@ def _build_user_prompt(history: list, current_code: str) -> str:
     lines.append(
         "Design a NEW mapping that you expect to outperform the best so far.\n"
         "Think about what geometric, mobility, or structural features distinguish "
-        "winning from losing positions in Yolah.\n"
+        "winning from losing positions in Yolah. Consider:\n"
+        "- Mobility: how many free squares each piece can reach (sliding in 8 dirs)\n"
+        "- Territory: how much connected free space each player's pieces control\n"
+        "- Score difference and remaining free squares (future scoring potential)\n"
+        "- Piece clustering vs. spread (boxed-in pieces lose)\n\n"
+        "The mapping will be translated to C++ (bitboard ops) for a minmax\n"
+        "search, so keep the algorithm efficiently implementable.\n"
         "Return the complete module in a single ```python``` block."
     )
     return "\n".join(lines)
@@ -250,31 +317,83 @@ def _load_mapping_module(path: str):
     return _module_cache[path]
 
 
+def _make_test_position(black_sqs, white_sqs, impassable_sqs, turn):
+    """Build a 193-d tensor from square lists."""
+    t = torch.zeros(193)
+    for sq in black_sqs:     t[sq]       = 1.0
+    for sq in white_sqs:     t[sq + 64]  = 1.0
+    for sq in impassable_sqs: t[sq + 128] = 1.0
+    t[192] = float(turn)
+    return t
+
+
+# Test positions: (black_squares, white_squares, impassable_squares, turn)
+_TEST_POSITIONS = [
+    # Initial position (from game rules)
+    ([0, 28, 35, 63], [7, 27, 36, 56], [], 0),
+    # Early game: a few impassable squares
+    ([18, 28, 35, 63], [7, 27, 36, 56], [0], 1),
+    # Mid game: several impassable squares, pieces moved
+    ([10, 26, 40, 63], [7, 29, 45, 56], [0, 28, 35, 27, 36], 0),
+    # Late game: many impassable squares
+    ([2, 17, 33, 50], [5, 22, 41, 54],
+     [0, 7, 27, 28, 35, 36, 56, 63, 10, 14, 19, 42, 48, 60], 1),
+]
+
+
 def save_and_validate(code: str, iteration: int):
     """
-    Write code to MAPPING_DIR/mapping_vN.py, load it, smoke-test it.
+    Write code to MAPPING_DIR/mapping_vN.py, load it, smoke-test it on
+    multiple realistic positions.
     Returns (path, MAPPED_DIM, DESCRIPTION) or raises on failure.
     """
     path = os.path.join(MAPPING_DIR, f"mapping_v{iteration}.py")
     with open(path, 'w') as f:
         f.write(code)
 
+    # Clear module cache so re-validation after a fix loads fresh code
+    _module_cache.pop(path, None)
     mod = _load_mapping_module(path)
 
-    # Smoke-test: 4 black pieces on squares 0-3, 4 white pieces on squares 56-59
-    dummy = torch.zeros(193)
-    for sq in [0, 1, 2, 3]:     dummy[sq]      = 1.0
-    for sq in [56, 57, 58, 59]: dummy[sq + 64] = 1.0
-    for i in range(64):
-        if dummy[i] == 0 and dummy[i + 64] == 0:
-            dummy[i + 128] = 1.0
+    assert hasattr(mod, 'MAPPED_DIM'), "Module must define MAPPED_DIM"
+    assert hasattr(mod, 'DESCRIPTION'), "Module must define DESCRIPTION"
+    assert hasattr(mod, 'mapping'), "Module must define mapping()"
+    assert isinstance(mod.MAPPED_DIM, int) and mod.MAPPED_DIM > 0, \
+        f"MAPPED_DIM must be a positive int, got {mod.MAPPED_DIM!r}"
 
-    out = mod.mapping(dummy)
-    assert isinstance(out, torch.Tensor), "mapping() must return torch.Tensor"
-    assert out.dtype == torch.float32,    "mapping() must return float32"
-    assert out.shape == (mod.MAPPED_DIM,), \
-        f"output shape {tuple(out.shape)} ≠ MAPPED_DIM={mod.MAPPED_DIM}"
-    assert not torch.isnan(out).any(),    "mapping() returned NaN values"
+    outputs = []
+    for i, (b, w, imp, turn) in enumerate(_TEST_POSITIONS):
+        pos = _make_test_position(b, w, imp, turn)
+        out = mod.mapping(pos)
+
+        assert isinstance(out, torch.Tensor), \
+            f"Test position {i}: mapping() must return torch.Tensor, got {type(out)}"
+        assert out.dtype == torch.float32, \
+            f"Test position {i}: expected float32, got {out.dtype}"
+        assert out.shape == (mod.MAPPED_DIM,), \
+            f"Test position {i}: shape {tuple(out.shape)} ≠ ({mod.MAPPED_DIM},)"
+        assert not torch.isnan(out).any(), \
+            f"Test position {i}: mapping() returned NaN"
+        assert not torch.isinf(out).any(), \
+            f"Test position {i}: mapping() returned Inf"
+        assert (out >= -0.5).all() and (out <= 1.5).all(), \
+            f"Test position {i}: values outside [-0.5, 1.5] — " \
+            f"min={out.min().item():.3f}, max={out.max().item():.3f}. " \
+            f"Normalize to approximately [0, 1]."
+
+        # Determinism check: same input must give same output
+        out2 = mod.mapping(pos)
+        assert torch.allclose(out, out2, atol=1e-6), \
+            f"Test position {i}: mapping() is not deterministic"
+
+        outputs.append(out)
+
+    # Diversity check: different positions should produce different outputs
+    if len(outputs) >= 2:
+        all_same = all(torch.allclose(outputs[0], o, atol=1e-6) for o in outputs[1:])
+        assert not all_same, \
+            "mapping() returns identical output for all test positions — " \
+            "it ignores the input"
 
     return path, int(mod.MAPPED_DIM), str(mod.DESCRIPTION)
 
@@ -369,9 +488,9 @@ class MappedDataset(Dataset):
 class Net(nn.Module):
     def __init__(self, input_dim: int):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, 3)
+        self.fc1 = nn.Linear(input_dim, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, 3)
 
     def forward(self, x):
         x = torch.clamp(self.fc1(x), 0.0, 1.0)
@@ -471,7 +590,7 @@ def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
 if __name__ == "__main__":
     # GPU layout: QWEN_GPU runs the ollama server (started externally),
     # TRAINING_GPU is used exclusively for training.
-    print(f"Qwen GPU: {QWEN_GPU}  Training GPU: {TRAINING_GPU}", flush=True)
+    print(f"Qwen GPU: {QWEN_GPU_DEVICE}  Training GPU: {TRAINING_GPU}", flush=True)
 
     raw_data = RawGameData(DATA_DIR)
     llm      = load_llm()

@@ -43,6 +43,26 @@ int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
 
+    struct observer {
+      void operator()(const Yolah &yolah) {
+          cout << "black bitboard: 0x" << std::hex << std::setw(16) << std::setfill('0') << yolah.bitboard(Yolah::BLACK) << '\n';
+          cout << "white bitboard: 0x" << std::setw(16) << yolah.bitboard(Yolah::WHITE) << '\n';
+          cout << "bitboard of impassable squares: 0x" << std::setw(16) << yolah.empty_bitboard() << '\n';
+          cout << "turn (0: black/1: white): " << std::dec << std::setfill(' ') << (yolah.nb_plies() & 1) << '\n';
+          cout << "black score: " << std::get<Yolah::BLACK>(yolah.score()) << '\n';
+          cout << "white score: " << std::get<Yolah::WHITE>(yolah.score()) << '\n';          
+      }
+      void operator()(uint8_t player, Move m) {
+          cout << m << '\n';
+      }
+    };
+
+    test::play(Player::create(nlohmann::json::parse(
+                   std::ifstream("../config/mm_nnue_quantized_player.cfg"))),
+               Player::create(nlohmann::json::parse(
+                   std::ifstream("../config/mm_nnue_quantized_player.cfg"))),
+               observer{});
+
     // test::play(Player::create(nlohmann::json::parse(std::ifstream("../config/mm_player.cfg"))),
     //             Player::create(nlohmann::json::parse(std::ifstream("../config/mm_nnue_quantized_player.cfg"))),
     //             2, 500);
@@ -133,7 +153,7 @@ int main(int argc, char* argv[]) {
 
     //YolahFeatures::encode_data("/Yolah/nnue/data", "/mnt");
 
-    YolahFeatures::encode_data("../nnue/data", "../nnue/test");
+    //YolahFeatures::encode_data("../nnue/data", "../nnue/test");
     
     //data::decode_games("../data/games/games_2025_08_31_22_09_02.335269145_0.txt", cout);
     
