@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <cmath>
+#include <algorithm>
 
 namespace ffnn_detail {
 
@@ -307,10 +309,16 @@ struct FFNN {
         alignas(64) int32_t out[4]{};
         ffnn_detail::matvec_output<O, H2>(fc3_weight, h2, out, fc3_bias);
 
+        float out0 = out[0] / 64.0f;
+        float out1 = out[1] / 64.0f;
+        float out2 = out[2] / 64.0f;
+        
+        float m = std::max({out0, out1, out2});
+        
         // Softmax: divide by 64 to recover float logits, then exp + normalize.
-        const float e0 = std::exp(out[0] / 64.0f);
-        const float e1 = std::exp(out[1] / 64.0f);
-        const float e2 = std::exp(out[2] / 64.0f);
+        const float e0 = std::exp(out0 - m);
+        const float e1 = std::exp(out1 - m);
+        const float e2 = std::exp(out2 - m);
         const float sum = e0 + e1 + e2;
         return {e0 / sum, e1 / sum, e2 / sum};
     }

@@ -4,7 +4,7 @@ set(PLAYER_SOURCES
     heuristic.cpp basic_minmax_player.cpp transposition_table.cpp
     heuristic_weights_learner.cpp player.cpp
     minmax_player.cpp minmax_player2.cpp minmax_nnue_player.cpp minmax_nnue_quantized_player.cpp yolah_features.cpp
-    feature_net_player.cpp
+    features_net_player.cpp
 )
 
 # Add AlphaZero player if CUDA is enabled

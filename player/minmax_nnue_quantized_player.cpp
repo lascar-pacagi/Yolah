@@ -59,14 +59,14 @@ Move MinMaxNNUE_QuantizedPlayer::play(Yolah yolah) {
             nb_hits += s.nb_hits;            
         }
     }
-    // cout << "##########\n";
-    // cout << "depth  : " << int(depth) << '\n';
-    // cout << "value  : " << value << '\n';
-    // cout << "# nodes: " << nb_nodes << '\n';
-    // cout << "# hits : " << nb_hits << '\n';
-    // cout << "tt load: " << table.load() << '\n';
-    // print_pv(yolah, zobrist::hash(yolah), depth);
-    // cout << '\n';
+    cout << "##########\n";
+    cout << "depth  : " << int(depth) << '\n';
+    cout << "value  : " << value << '\n';
+    cout << "# nodes: " << nb_nodes << '\n';
+    cout << "# hits : " << nb_hits << '\n';
+    cout << "tt load: " << table.load() << '\n';
+    print_pv(yolah, zobrist::hash(yolah), depth);
+    cout << '\n';
     //cout << heuristic::eval(yolah.current_player(), yolah) << endl;
     return res;
 }

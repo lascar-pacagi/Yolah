@@ -72,7 +72,7 @@ class Net(nn.Module):
     def forward(self, x):
         x = torch.clamp(self.fc1(x), min=0.0, max=1.0)
         x = torch.clamp(self.fc2(x), min=0.0, max=1.0)
-        return self.fc3(x) #nn.functional.softmax(self.fc3(x), dim=1)
+        return nn.functional.softmax(self.fc3(x), dim=1)
 
     def clip(self):
         for fc in [self.fc1, self.fc2, self.fc3]:
@@ -165,8 +165,47 @@ def save_quantized(net, filename, scale=64):
     print(f"quantized model written to {filename} (scale={scale})", flush=True)
 
 
+def save_float(net, filename):
+    """
+    Serializes a trained Net into the float text format consumed by
+    ffnn_float.h's FFNNFloat<I, H1, H2, O> class.
+
+    Same file layout as save_quantized but with float values instead of integers:
+        W
+        <m> <n>
+        <m*n float values>
+        B
+        <n>
+        <n float values>
+    """
+    net.train(False)
+
+    def _write_matrix(f, weight):
+        m, n = weight.shape
+        f.write(f"W\n{m} {n}\n")
+        for i in range(m):
+            f.write(" ".join(f"{v:.8g}" for v in weight[i].tolist()))
+            f.write("\n")
+
+    def _write_bias(f, bias):
+        n = bias.shape[0]
+        f.write(f"B\n{n}\n")
+        f.write(" ".join(f"{v:.8g}" for v in bias.tolist()))
+        f.write("\n")
+
+    with open(filename, "w") as f:
+        _write_matrix(f, net.fc1.weight.detach())
+        _write_bias  (f, net.fc1.bias.detach())
+        _write_matrix(f, net.fc2.weight.detach())
+        _write_bias  (f, net.fc2.bias.detach())
+        _write_matrix(f, net.fc3.weight.detach())
+        _write_bias  (f, net.fc3.bias.detach())
+
+    print(f"float model written to {filename}", flush=True)
+
+
 NB_EPOCHS = 100
-MODEL_PATH = "/mnt/"
+MODEL_PATH = "./"
 MODEL_NAME = "features_128x64x3"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 DATA_DIR = "/mnt"
@@ -266,15 +305,15 @@ if __name__ == "__main__":
     print(f"CUDA available: {torch.cuda.is_available()}", flush=True)
     print(f"Device: {DEVICE}", flush=True)
 
-    dataset = FeaturesDataset(DATA_DIR)
-    print(len(dataset), flush=True)
+    # dataset = FeaturesDataset(DATA_DIR)
+    # print(len(dataset), flush=True)
 
-    train_size = int(0.95 * len(dataset))
-    val_size = len(dataset) - train_size
-    trainset, valset = random_split(dataset, [train_size, val_size])
-    print(f'Train size: {train_size}, Val size: {val_size}', flush=True)
+    # train_size = int(0.95 * len(dataset))
+    # val_size = len(dataset) - train_size
+    # trainset, valset = random_split(dataset, [train_size, val_size])
+    # print(f'Train size: {train_size}, Val size: {val_size}', flush=True)
 
-    train_loader, val_loader = dataloader(trainset, valset, batch_size=512 * 2)
+    # train_loader, val_loader = dataloader(trainset, valset, batch_size=512 * 2)
 
     net = Net()
     if os.path.isfile(LAST_MODEL):
@@ -282,6 +321,7 @@ if __name__ == "__main__":
     print(net, flush=True)
 
     # save_quantized(net, f"{MODEL_PATH}{MODEL_NAME}.quantized.txt")
+    save_float(net, f"{MODEL_PATH}{MODEL_NAME}.float.txt")
 
-    trainer = Trainer(net, train_loader, val_loader)
-    trainer.train(NB_EPOCHS)
+    # trainer = Trainer(net, train_loader, val_loader)
+    # trainer.train(NB_EPOCHS)

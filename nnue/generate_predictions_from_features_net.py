@@ -16,9 +16,9 @@ def get_prediction(features):
 
 def main():
     dataset = FeaturesDataset(sys.argv[1])
-    for i in range(len(dataset)):                        
+    for i in range(len(dataset)):
         black_proba, draw_proba, white_proba = get_prediction(dataset[i][0])
-        print(f'{black_proba:.17}\n{draw_proba:.17}\n{white_proba:.17}\n')      
+        print(f'{black_proba:.17}\n{draw_proba:.17}\n{white_proba:.17}')      
 
 if __name__ == "__main__":
     main()

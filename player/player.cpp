@@ -1,7 +1,6 @@
 #include "player.h"
 #include <functional>
 #include <map>
-#include "feature_net_player.h"
 #include "random_player.h"
 #include "MCTS_mem_player.h"
 #include "MCTS_player.h"
@@ -12,7 +11,7 @@
 #include "minmax_nnue_player.h"
 #include "minmax_nnue_quantized_player.h"
 #include "MCTS_mem_nn_player.h"
-#include "feature_net_player.h"
+#include "features_net_player.h"
 #ifdef ENABLE_CUDA
 #include "alphazero_player.h"
 #endif
@@ -333,7 +332,7 @@ unique_ptr<Player> Player::create(const json& j) {
                  nb_threads);
            }},
         {
-            "FeatureNetPlayer",
+            "FeaturesNetPlayer",
             [](const json& j) {
                 if (!j.contains("microseconds")) {
                     throw invalid_argument("microseconds key expected");
@@ -373,7 +372,7 @@ unique_ptr<Player> Player::create(const json& j) {
                 } else {
                     throw invalid_argument("hardware concurrency expected in nb threads");
                 }                
-                return make_unique<FeatureNetPlayer>(j["microseconds"].get<uint64_t>(), 
+                return make_unique<FeaturesNetPlayer>(j["microseconds"].get<uint64_t>(), 
                                                      j["tt size"].get<size_t>(),
                                                      j["nb moves at full depth"].get<size_t>(),
                                                      j["late move reduction"].get<uint8_t>(),

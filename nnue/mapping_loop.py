@@ -69,36 +69,142 @@ INITIAL_MAPPING = r'''
 import numpy as np
 import torch
 
-_REGION_HEX = [
-    0x00003C3C3C3C0000, 0x0000000000000303, 0x000000000000C0C0,
-    0xC0C0000000000000, 0x0303000000000000, 0x0000030303030000,
-    0x0000C0C0C0C00000, 0x0000000000003C3C, 0x3C3C000000000000,
-]
-REGION_MASKS = np.array(
-    [[(v >> i) & 1 for i in range(64)] for v in _REGION_HEX], dtype=np.float32
-)
-_TRIU = np.triu_indices(4, k=1)
+MAPPED_DIM  = 44
+DESCRIPTION = "mobility, flood-fill, influence, freedom, regions, groups (C++ features)"
 
-MAPPED_DIM  = 63
-DESCRIPTION = ("sorted piece coords (16) + within-color pairwise sq-dist (12)"
-               " + cross-color sq-dist (16) + regional counts (18) + turn (1)")
+_FA = 0x0101010101010101  # File A
+_FH = 0x8080808080808080  # File H
+_FF = 0xFFFFFFFFFFFFFFFF  # Full board
+
+_REGIONS = [
+    0x00003C3C3C3C0000,  # center
+    0x0000000000000303,  # lower-left corner
+    0x000000000000C0C0,  # lower-right corner
+    0xC0C0000000000000,  # upper-right corner
+    0x0303000000000000,  # upper-left corner
+    0x0000000000003C3C,  # lower middle
+    0x0000C0C0C0C00000,  # right middle
+    0x3C3C000000000000,  # upper middle
+    0x0000030303030000,  # left middle
+]
+
+def _pc(bb):
+    return bin(bb).count('1')
+
+def _arr2bb(a):
+    bb = 0
+    for i in range(64):
+        if a[i] > 0.5:
+            bb |= 1 << (63 - i)
+    return bb
+
+def _pieces(bb):
+    p = []
+    for _ in range(4):
+        lsb = bb & -bb; p.append(lsb); bb ^= lsb
+    return p
+
+def _sa(b):
+    b &= _FF; h = b & ~_FH; a = b & ~_FA
+    return ((b<<8)|(b>>8)|(h<<1)|(h<<9)|(h>>7)|(a>>1)|(a<<7)|(a>>9)) & _FF
+
+def _slide(sq, occ):
+    m = 0
+    for d, edge in [(1,lambda s:s%8==7),(-1,lambda s:s%8==0),
+                    (8,lambda s:s>=56),(-8,lambda s:s<8),
+                    (9,lambda s:s%8==7 or s>=56),(7,lambda s:s%8==0 or s>=56),
+                    (-7,lambda s:s%8==7 or s<8),(-9,lambda s:s%8==0 or s<8)]:
+        s = sq
+        while not edge(s):
+            s += d; b = 1 << s
+            if b & occ: break
+            m |= b
+    return m
+
+def _flood(pbb, free):
+    f = pbb; p = 0
+    while p != f: p = f; f |= _sa(f) & free
+    return f ^ pbb
+
+def _influence(blk, wht, free):
+    bi, wi, bf, wf, n = blk, wht, blk, wht, 0
+    while True:
+        obi, owi = bi, wi
+        bf = _sa(bf) & free & ~wi
+        wf = _sa(wf) & free & ~bi
+        n |= (_sa(n) & free) | (bf & wf)
+        bf &= ~n; wf &= ~n
+        bi |= bf; wi |= wf
+        if bi == obi and wi == owi: break
+    return bi, wi
+
+def _alone(pbb, fo, fp):
+    t = 0; r = 0
+    for f in fp:
+        r += ((f & fo) == 0) * _pc(f & ~t); t |= f
+    return r
+
+def _groups(pbb, pcs, fp):
+    g = 0
+    for i in range(4):
+        g += (pbb & pcs[i]) != 0
+        pbb &= ~(fp[i] | _sa(fp[i]) | pcs[i])
+    return g
 
 def mapping(board_tensor):
-    x    = board_tensor.numpy()
-    blk  = x[:64];  wht = x[64:128];  turn = x[192:193]
-    b_idx = np.where(blk > 0.5)[0]
-    w_idx = np.where(wht > 0.5)[0]
-    b_rc  = np.stack([b_idx // 8, b_idx % 8], 1).astype(np.float32) / 7.0
-    w_rc  = np.stack([w_idx // 8, w_idx % 8], 1).astype(np.float32) / 7.0
-    b_d2  = np.sum((b_rc[:,None]-b_rc[None,:])**2, 2)[_TRIU] / 2.0
-    w_d2  = np.sum((w_rc[:,None]-w_rc[None,:])**2, 2)[_TRIU] / 2.0
-    c_d2  = np.sum((b_rc[:,None]-w_rc[None,:])**2, 2).flatten() / 2.0
-    b_reg = REGION_MASKS @ blk / 4.0
-    w_reg = REGION_MASKS @ wht / 4.0
-    return torch.tensor(
-        np.concatenate([b_rc.flatten(), w_rc.flatten(),
-                        b_d2, w_d2, c_d2, b_reg, w_reg, turn]),
-        dtype=torch.float32)
+    x = board_tensor.numpy()
+    bk = _arr2bb(x[:64]); wh = _arr2bb(x[64:128]); em = _arr2bb(x[128:192])
+    turn = x[192]
+    occ = bk | wh | em; free = ~occ & _FF
+    bp = _pieces(bk); wp = _pieces(wh)
+    bm = [_slide(p.bit_length()-1, occ) for p in bp]
+    wm = [_slide(p.bit_length()-1, occ) for p in wp]
+    bmb = bm[0]|bm[1]|bm[2]|bm[3]
+    wmb = wm[0]|wm[1]|wm[2]|wm[3]
+    bnm = sum(_pc(m) for m in bm)
+    wnm = sum(_pc(m) for m in wm)
+    bfl = [_flood(p, free) for p in bp]
+    wfl = [_flood(p, free) for p in wp]
+    bfa = bfl[0]|bfl[1]|bfl[2]|bfl[3]
+    wfa = wfl[0]|wfl[1]|wfl[2]|wfl[3]
+    bi, wi = _influence(bk, wh, free)
+    bfr = [_pc(_sa(p)) for p in bp]
+    wfr = [_pc(_sa(p)) for p in wp]
+    f = np.zeros(44, dtype=np.float32)
+    # Black features [0..20]
+    f[0]  = float(bnm == 0)                                    # NO_MOVE
+    f[1]  = bnm / 128.0                                        # MOVE
+    f[2]  = sum(_pc(fl) for fl in bfl) / 256.0                 # CONNECTIVITY
+    f[3]  = _pc(bfa) / 64.0                                    # CONNECTIVITY_SET
+    f[4]  = _alone(bk, wfa, bfl) / 64.0                        # ALONE
+    f[5]  = _pc(bmb & ~wmb) / 64.0                             # FIRST
+    f[6]  = _pc(bi) / 64.0                                     # INFLUENCE
+    f[7]  = sum(1 for m in bm if m == 0) / 4.0                 # BLOCKED
+    f[8]  = sum(1 for v in bfr if v <= 2) / 4.0                # FREEDOM_LOW
+    f[9]  = sum(1 for v in bfr if 2 < v <= 5) / 4.0            # FREEDOM_MID
+    f[10] = sum(1 for v in bfr if v > 5) / 4.0                 # FREEDOM_HIGH
+    f[11] = _groups(bk, bp, bfl) / 4.0                         # GROUP
+    for j, reg in enumerate(_REGIONS):
+        f[12+j] = _pc(bk & reg) / 4.0                          # regions
+    # White features [21..41]
+    f[21] = float(wnm == 0)
+    f[22] = wnm / 128.0
+    f[23] = sum(_pc(fl) for fl in wfl) / 256.0
+    f[24] = _pc(wfa) / 64.0
+    f[25] = _alone(wh, bfa, wfl) / 64.0
+    f[26] = _pc(wmb & ~bmb) / 64.0
+    f[27] = _pc(wi) / 64.0
+    f[28] = sum(1 for m in wm if m == 0) / 4.0
+    f[29] = sum(1 for v in wfr if v <= 2) / 4.0
+    f[30] = sum(1 for v in wfr if 2 < v <= 5) / 4.0
+    f[31] = sum(1 for v in wfr if v > 5) / 4.0
+    f[32] = _groups(wh, wp, wfl) / 4.0
+    for j, reg in enumerate(_REGIONS):
+        f[33+j] = _pc(wh & reg) / 4.0
+    # Global features
+    f[42] = _pc(free) / 64.0                                   # FREE
+    f[43] = turn                                                # TURN
+    return torch.tensor(f, dtype=torch.float32)
 '''
 
 # ── Game example (loaded from file for Qwen context) ─────────────────────────
