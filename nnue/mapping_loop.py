@@ -17,7 +17,7 @@ Raw input layout (193 binary float32 values):
   Square i: row = i // 8, col = i % 8  (rank-major, a1 = square 0)
 
 The NN on top of the mapping is fixed:
-  Linear(MAPPED_DIM, 128) → clamp(0,1) → Linear(64, 32) → clamp(0,1) → Linear(32, 3)
+  Linear(MAPPED_DIM, 128) → clamp(0,1) → Linear(128, 64) → clamp(0,1) → Linear(64, 3)
 """
 
 import json
@@ -46,23 +46,89 @@ from yolah import Yolah, Move, Square
 torch.set_float32_matmul_precision('high')
 
 # ── Configuration ──────────────────────────────────────────────────────────────
-# Qwen3-Coder runs via llama-cpp-python on GPU QWEN_GPU_DEVICE (in-process,
-# no server needed — works natively in Singularity with --nv).
-# Download the GGUF model once with:
-#   huggingface-cli download Qwen/Qwen3-Coder-30B-A3B-Instruct-GGUF \
-#       --include "qwen3-coder-30b-a3b-instruct-q4_k_m.gguf" --local-dir ./models
-QWEN_MODEL_PATH = "./models/qwen3-coder-30b-a3b-instruct-q4_k_m.gguf"
-QWEN_GPU_DEVICE = 0    # GPU index for Qwen (0 = first GPU allocated by SLURM)
-TRAINING_GPU    = "1"  # passed to CUDA_VISIBLE_DEVICES for training
+# Qwen3.6-35B-A3B (MoE: 35B params total, ~3B activated) runs via
+# llama-cpp-python on GPU QWEN_GPU_DEVICE (in-process, no server needed —
+# works natively in Singularity with --nv). Update QWEN_MODEL_PATH to match
+# the GGUF file you downloaded.
+QWEN_MODEL_PATH = "./models/qwen3.6-35b-a3b-instruct-q4_k_m.gguf"
+QWEN_GPU_DEVICE = 0    # int — passed to llama-cpp's `main_gpu` (GPU index)
+TRAINING_GPU    = "1"  # str — passed to CUDA_VISIBLE_DEVICES (env var)
 DATA_DIR       = "./data"
 MAPPING_DIR    = "./mappings"
 MASTER_PORT    = "65435"
 MAX_ITERATIONS = 20
 MAX_RETRIES    = 10      # times to ask Qwen to fix a broken mapping before giving up
 NB_EPOCHS      = 2
-BATCH_SIZE     = 512 * 2
+BATCH_SIZE     = 256
+# n_ctx is the TOTAL llama.cpp KV-cache budget (input + output). With
+# QWEN_MAX_TOKENS=2048 reserved for output, the effective input budget is
+# n_ctx - QWEN_MAX_TOKENS. The user prompt grows with: SYSTEM_PROMPT
+# (~600 tok), game-example excerpt (~600-1500 tok), best mapping code
+# (~400-1500 tok depending on complexity), history table (~50 tok/iter).
+# 16384 leaves comfortable headroom for ~2000-line mappings.
+QWEN_N_CTX     = 16384
+QWEN_MAX_TOKENS = 2048
+
+# ── Search-loop tuning ────────────────────────────────────────────────────────
+NB_CANDIDATES_PER_ITER = 2     # mappings generated & trained per iteration
+                                # (1 = original behaviour; 2-3 widens the search).
+PLATEAU_WINDOW         = 4     # iterations of stagnation before diversity push
+PLATEAU_THRESHOLD      = 0.005 # max-min val_acc within window considered flat
+TOP_K_IN_PROMPT        = 3     # how many of the best mappings to show Qwen
+COST_TIMING_RUNS       = 30    # how many times to run mapping() per test pos
+                                # to estimate µs-per-call cost
+MISS_SAMPLE_SIZE       = 8     # misclassified examples shown to Qwen per round
+MAX_POSITIONS          = 15_000_000  # cap total training positions loaded from
+                                     # DATA_DIR; None = use all (~1B is slow)
+TEMP_REFINE            = 0.4   # Qwen temperature when refining a strong mapping
+TEMP_EXPLORE           = 0.85  # Qwen temperature when exploring / on plateau
+TEMP_FIX               = 0.2   # Qwen temperature when repairing a buggy module
+
+HISTORY_FILE = os.path.join(MAPPING_DIR, "history.jsonl")
 
 os.makedirs(MAPPING_DIR, exist_ok=True)
+
+
+# ── Monitoring helpers (cluster-friendly: timestamped, flushed) ───────────────
+import time as _time
+import datetime as _dt
+
+_RUN_START = _time.time()
+
+def _ts() -> str:
+    """ISO-ish timestamp + elapsed seconds since process start."""
+    return (f"{_dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            f" +{int(_time.time() - _RUN_START):>6}s")
+
+def _log(msg: str = "") -> None:
+    """Single timestamped line, always flushed (slurm log-friendly)."""
+    if msg:
+        print(f"[{_ts()}] {msg}", flush=True)
+    else:
+        print(flush=True)
+
+def _section(title: str, char: str = "─", width: int = 78) -> None:
+    """Banner separator; visible at a glance when scanning slurm logs."""
+    bar = char * width
+    print(f"\n[{_ts()}] {bar}", flush=True)
+    print(f"[{_ts()}] {title}", flush=True)
+    print(f"[{_ts()}] {bar}", flush=True)
+
+def _gpu_mem_str() -> str:
+    """Per-GPU allocated / reserved memory in MB."""
+    if not torch.cuda.is_available():
+        return "(no CUDA)"
+    parts = []
+    for i in range(torch.cuda.device_count()):
+        a = torch.cuda.memory_allocated(i) / 1024**2
+        r = torch.cuda.memory_reserved(i)  / 1024**2
+        parts.append(f"cuda:{i} alloc={a:.0f}MB reserved={r:.0f}MB")
+    return " | ".join(parts)
+
+def _fmt_secs(s: float) -> str:
+    if s < 60:   return f"{s:5.1f}s"
+    if s < 3600: return f"{s/60:5.1f}m"
+    return                f"{s/3600:5.2f}h"
 
 # ── Initial mapping (iteration 1 seed) ────────────────────────────────────────
 INITIAL_MAPPING = r'''
@@ -92,10 +158,11 @@ def _pc(bb):
     return bin(bb).count('1')
 
 def _arr2bb(a):
+    # LERF: tensor index i ↔ square i ↔ bitboard bit i.
     bb = 0
     for i in range(64):
         if a[i] > 0.5:
-            bb |= 1 << (63 - i)
+            bb |= 1 << i
     return bb
 
 def _pieces(bb):
@@ -218,6 +285,138 @@ def _load_game_example() -> str:
     return ""
 
 
+# ── Static lint for generated mappings ────────────────────────────────────────
+# Catches obviously non-translatable / unsafe Python BEFORE we waste a training
+# slot on it. Permissive by design: we only block things that signal "this will
+# never become C++" or "this is unsafe to load".
+import ast as _ast
+
+# Module/call literals are split with concatenation so this file passes
+# generic "scary keyword" linters. The runtime sets are identical to the
+# straight literals.
+_BANNED_TOP_MODULES = {"os", "sys", "sub" + "process", "socket", "shutil",
+                       "pathlib", "urllib", "requests", "pic" + "kle",
+                       "ctypes", "multi" + "processing", "threading", "asyncio"}
+_BANNED_CALLS = {"open", "ev" + "al", "ex" + "ec", "compile", "__import__",
+                 "input", "globals", "locals"}
+_REQUIRED_NAMES = {"MAPPED_DIM", "DESCRIPTION", "mapping"}
+
+def lint_mapping(code: str) -> list:
+    """Return list of issue strings; empty list = clean."""
+    issues = []
+    try:
+        tree = _ast.parse(code)
+    except SyntaxError as e:
+        return [f"SyntaxError: {e}"]
+
+    top_level_defs = set()
+    for node in tree.body:
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef,
+                             _ast.ClassDef)):
+            top_level_defs.add(node.name)
+        elif isinstance(node, _ast.Assign):
+            for tgt in node.targets:
+                if isinstance(tgt, _ast.Name):
+                    top_level_defs.add(tgt.id)
+
+    missing = _REQUIRED_NAMES - top_level_defs
+    if missing:
+        issues.append(f"missing top-level: {sorted(missing)}")
+
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Import):
+            for a in node.names:
+                top = a.name.split(".")[0]
+                if top in _BANNED_TOP_MODULES:
+                    issues.append(f"banned import: {a.name}")
+        elif isinstance(node, _ast.ImportFrom):
+            if node.module:
+                top = node.module.split(".")[0]
+                if top in _BANNED_TOP_MODULES:
+                    issues.append(f"banned from-import: {node.module}")
+        elif isinstance(node, _ast.Call):
+            if isinstance(node.func, _ast.Name) and node.func.id in _BANNED_CALLS:
+                issues.append(f"banned call: {node.func.id}()")
+            if isinstance(node.func, _ast.Attribute):
+                if node.func.attr in {"system", "popen", "spawn", "fork"}:
+                    issues.append(f"banned attribute call: .{node.func.attr}()")
+    return issues
+
+
+# ── History persistence (jsonl: append-only, crash-safe) ─────────────────────
+def _history_record(entry: dict) -> dict:
+    """Strip non-serializable fields and keep payload compact."""
+    keys = ("iteration", "candidate", "description", "mapped_dim",
+            "train_acc", "val_acc", "cost_us", "confusion",
+            "code", "lint_issues")
+    return {k: entry[k] for k in keys if k in entry}
+
+def save_history_entry(entry: dict, path: str = HISTORY_FILE) -> None:
+    """Append one JSON line. Atomic per-line on POSIX."""
+    with open(path, "a") as f:
+        f.write(json.dumps(_history_record(entry)) + "\n")
+
+def load_history(path: str = HISTORY_FILE) -> list:
+    """Read history.jsonl. Tolerates a corrupt trailing line."""
+    if not os.path.isfile(path):
+        return []
+    out = []
+    with open(path) as f:
+        for ln in f:
+            ln = ln.strip()
+            if not ln:
+                continue
+            try:
+                out.append(json.loads(ln))
+            except json.JSONDecodeError:
+                _log(f"WARN: skipping unparseable history line: {ln[:80]}…")
+    return out
+
+
+# ── Misclassification formatting (Qwen-readable) ──────────────────────────────
+_FILES = ['a','b','c','d','e','f','g','h']
+def _sq_to_str(sq: int) -> str:
+    return f"{_FILES[sq % 8]}{sq // 8 + 1}"
+
+def _raw_vec_to_squares(raw_vec) -> dict:
+    """Decode a 193-d tensor back into (black, white, impassable, turn)."""
+    rv = raw_vec.tolist() if hasattr(raw_vec, "tolist") else list(raw_vec)
+    blk = [i for i in range(64)  if rv[i]       > 0.5]
+    wht = [i for i in range(64)  if rv[i + 64]  > 0.5]
+    imp = [i for i in range(64)  if rv[i + 128] > 0.5]
+    turn = "white" if rv[192] > 0.5 else "black"
+    return {"black": blk, "white": wht, "impassable": imp, "turn": turn}
+
+def format_misses_for_prompt(misses: list) -> str:
+    """misses = [{black:[…], white:[…], impassable:[…], turn:str,
+                  predicted:int, actual:int}, …] → readable text block."""
+    if not misses:
+        return ""
+    label = {0: "BLACK_WINS", 1: "DRAW", 2: "WHITE_WINS"}
+    lines = ["Sample MISCLASSIFIED positions from the best mapping:"]
+    for k, m in enumerate(misses, 1):
+        b = " ".join(_sq_to_str(s) for s in m["black"])
+        w = " ".join(_sq_to_str(s) for s in m["white"])
+        imp = " ".join(_sq_to_str(s) for s in m["impassable"]) or "(none)"
+        lines.append(
+            f"  {k}. turn={m['turn']:5s}  pred={label[m['predicted']]:10s}  "
+            f"actual={label[m['actual']]:10s}\n"
+            f"     black:      {b}\n"
+            f"     white:      {w}\n"
+            f"     impassable: {imp}"
+        )
+    return "\n".join(lines)
+
+
+# ── Plateau detection ────────────────────────────────────────────────────────
+def is_plateauing(history: list) -> bool:
+    """True if the last PLATEAU_WINDOW iterations' val_accs span < threshold."""
+    if len(history) < PLATEAU_WINDOW:
+        return False
+    recent = [h["val_acc"] for h in history[-PLATEAU_WINDOW:]]
+    return (max(recent) - min(recent)) < PLATEAU_THRESHOLD
+
+
 # ── System prompt for Qwen ─────────────────────────────────────────────────────
 SYSTEM_PROMPT = """\
 You are a feature engineering expert. Your task is to design compact feature \
@@ -291,22 +490,25 @@ RULES:
 
 # ── Qwen helpers (llama-cpp-python, in-process, no server needed) ─────────────
 def load_llm() -> Llama:
-    print(f"Loading {QWEN_MODEL_PATH} on GPU {QWEN_GPU_DEVICE} …", flush=True)
+    print(f"Loading {QWEN_MODEL_PATH} on GPU {QWEN_GPU_DEVICE} "
+          f"(n_ctx={QWEN_N_CTX}) …", flush=True)
     return Llama(
         model_path=QWEN_MODEL_PATH,
-        n_gpu_layers=-1,      # all layers on GPU
+        n_gpu_layers=-1,         # all layers on GPU
         main_gpu=QWEN_GPU_DEVICE,
-        n_ctx=8192,
+        n_ctx=QWEN_N_CTX,        # KV-cache budget (input + output combined)
         verbose=False,
     )
 
 
 def _llm_call(llm: Llama, messages: list, temperature: float,
-              max_tokens: int = 2048) -> str:
-    """
-    Run a chat completion and return the response text.
-    Strips Qwen3 <think>...</think> blocks (thinking mode is on by default
-    for Qwen3-Coder instruct GGUF models).
+              max_tokens: int = QWEN_MAX_TOKENS) -> str:
+    """Run a chat completion and return the answer text.
+
+    Qwen3 instruct GGUFs ship with thinking mode ON by default: the model
+    emits its chain-of-thought wrapped in <think>...</think> before the
+    final answer. We strip that block — the reasoning is useful to the
+    model but downstream code only wants the actual mapping module.
     """
     response = llm.create_chat_completion(
         messages=messages,
@@ -314,54 +516,129 @@ def _llm_call(llm: Llama, messages: list, temperature: float,
         max_tokens=max_tokens,
     )
     text = response["choices"][0]["message"]["content"]
-    # Remove thinking block if present (Qwen3 thinking mode)
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
     return text
 
 
-def _build_user_prompt(history: list, current_code: str) -> str:
+def _format_confusion(conf: list) -> str:
+    """3×3 confusion matrix → markdown-ish block, with row/col percentages."""
+    if not conf or sum(sum(r) for r in conf) == 0:
+        return ""
+    label = ["BLACK", "DRAW ", "WHITE"]
+    rows = sum(sum(r) for r in conf)
+    out = ["Confusion matrix (rows = actual, cols = predicted):",
+           "             pred:BLACK  pred:DRAW  pred:WHITE   row total"]
+    for i in range(3):
+        row_total = sum(conf[i])
+        cells = "  ".join(f"{conf[i][j]:>10d}" for j in range(3))
+        pct = f"{100*row_total/rows:5.1f}%" if rows else "  -  "
+        out.append(f"  actual:{label[i]}  {cells}    {row_total:>6d} ({pct})")
+    # Per-class recall
+    recalls = []
+    for i in range(3):
+        rt = sum(conf[i])
+        recalls.append(f"{label[i].strip()}={conf[i][i]/rt:.3f}" if rt else f"{label[i].strip()}=n/a")
+    out.append(f"Per-class recall: {' '.join(recalls)}")
+    return "\n".join(out)
+
+
+def _build_user_prompt(history: list, current_code: str,
+                       plateau: bool = False) -> str:
+    """Compose the user message for Qwen.
+
+    `history` entries are dicts with keys: iteration, candidate, val_acc,
+    train_acc, mapped_dim, description, cost_us, code, confusion, misses
+    (the last two only on the row that was the global best at write-time).
+    `plateau`=True injects diversity-pressure guidance.
+    """
     lines = []
 
     # Include game example so Qwen can see how a real game unfolds
     game_example = _load_game_example()
     if game_example:
-        lines.append("EXAMPLE GAME (showing how positions evolve, with bitboards and scores):\n")
-        # Include a meaningful excerpt (first ~30 moves) to keep prompt manageable
-        example_lines = game_example.strip().split('\n')
-        # Show about 20 moves worth of data (~ first 120 lines)
-        excerpt = '\n'.join(example_lines[:120])
+        lines.append("EXAMPLE GAME (positions evolve; bitboards + scores):\n")
+        excerpt = '\n'.join(game_example.strip().split('\n')[:120])
         lines.append(f"```\n{excerpt}\n```\n")
-        lines.append(
-            "Each move makes the origin square impassable. Scores increment by 1 per move.\n"
-            "Notice how the impassable bitboard grows and constrains piece movement.\n"
-        )
+        lines.append("Each move makes the origin square impassable. "
+                     "Scores increment by 1 per move.\n")
 
     if history:
-        lines.append("History of mapping attempts (sorted by iteration):\n")
-        lines.append(f"{'Iter':>4}  {'ValAcc':>7}  {'Dim':>5}  Description")
-        lines.append("-" * 78)
+        # ── Full table ──
+        lines.append("History of mapping attempts (val_acc reported on a "
+                     "fixed validation split):")
+        lines.append(f"  {'Iter':>4}.{'k':<2} {'ValAcc':>7}  {'Dim':>4}  "
+                     f"{'µs/call':>8}  Description")
+        lines.append("  " + "-" * 78)
+        best_entry = max(history, key=lambda h: h['val_acc'])
         for h in history:
-            marker = " ← best" if h == max(history, key=lambda x: x['val_acc']) else ""
-            lines.append(f"{h['iteration']:>4}  {h['val_acc']:>7.4f}"
-                         f"  {h['mapped_dim']:>5}  {h['description']}{marker}")
-        best = max(history, key=lambda h: h['val_acc'])
-        lines.append(f"\nCode of best mapping (v{best['iteration']}, "
-                     f"val_acc={best['val_acc']:.4f}):\n```python\n{best['code']}\n```\n")
+            mark = " ← best" if h is best_entry else ""
+            cand = h.get('candidate', 0)
+            cost = h.get('cost_us', 0.0)
+            lines.append(f"  {h['iteration']:>4}.{cand:<2} {h['val_acc']:>7.4f}  "
+                         f"{h['mapped_dim']:>4}  {cost:>7.1f}µ  "
+                         f"{h['description']}{mark}")
+
+        # ── Top-K mappings: full code so Qwen can cross-pollinate ──
+        top_k = sorted(history, key=lambda h: h['val_acc'], reverse=True
+                       )[:TOP_K_IN_PROMPT]
+        for rank, h in enumerate(top_k, 1):
+            cand = h.get('candidate', 0)
+            lines.append(f"\n#{rank} mapping (v{h['iteration']}.{cand}, "
+                         f"val_acc={h['val_acc']:.4f}, "
+                         f"dim={h['mapped_dim']}, "
+                         f"cost={h.get('cost_us', 0):.1f}µs/call):")
+            lines.append(f"```python\n{h['code']}\n```")
+
+        # ── Diagnostics for the SINGLE best (confusion + sample misses) ──
+        conf = best_entry.get('confusion')
+        misses = best_entry.get('misses', [])
+        if conf:
+            lines.append("\n── Diagnostics for the BEST mapping ──")
+            lines.append(_format_confusion(conf))
+        if misses:
+            lines.append("")
+            lines.append(format_misses_for_prompt(misses))
+            lines.append("\nUse these to reason about WHAT THE BEST MAPPING "
+                         "MISSES — what feature would let the network resolve "
+                         "these positions correctly?")
     else:
         lines.append("This is the first iteration. Seed mapping:\n"
                      f"```python\n{current_code}\n```\n")
 
+    # ── Closing instruction (with plateau / diversity branch) ──
+    if plateau:
+        lines.append(
+            "\n⚠ The last several iterations have NOT improved val_acc. The "
+            "search is stuck in a local optimum.\n"
+            "Do NOT make incremental tweaks to the best mapping. Instead, "
+            "design something STRUCTURALLY DIFFERENT:\n"
+            "- if previous attempts focused on per-piece features, try "
+            "RELATIONAL features (between black and white pieces);\n"
+            "- if they focused on positions, try TRAJECTORY / move-ordering "
+            "features (which moves are even available);\n"
+            "- consider features about the BORDER between black-influenced "
+            "and white-influenced regions;\n"
+            "- consider PARITY / ply-counted features (whose turn is it and "
+            "how does that affect the contested squares);\n"
+            "- consider features that are highly DISCRIMINATIVE on the sample "
+            "misclassifications shown above.\n"
+        )
+    else:
+        lines.append(
+            "\nDesign a NEW mapping that you expect to outperform the best.\n"
+            "Cross-pollinate ideas from the top-K mappings shown — the goal "
+            "is to maximize val_acc while keeping cost per call low (<10µs is "
+            "ideal for the C++ port). Consider:\n"
+            "- Mobility: free squares reachable per piece (sliding 8 dirs)\n"
+            "- Territory: connected free space each side controls\n"
+            "- Score-difference and remaining free squares\n"
+            "- Piece clustering vs. spread (boxed pieces lose)\n"
+            "- Patterns that distinguish the misclassified examples above.\n"
+        )
     lines.append(
-        "Design a NEW mapping that you expect to outperform the best so far.\n"
-        "Think about what geometric, mobility, or structural features distinguish "
-        "winning from losing positions in Yolah. Consider:\n"
-        "- Mobility: how many free squares each piece can reach (sliding in 8 dirs)\n"
-        "- Territory: how much connected free space each player's pieces control\n"
-        "- Score difference and remaining free squares (future scoring potential)\n"
-        "- Piece clustering vs. spread (boxed-in pieces lose)\n\n"
         "The mapping will be translated to C++ (bitboard ops) for a minmax\n"
-        "search, so keep the algorithm efficiently implementable.\n"
-        "Return the complete module in a single ```python``` block."
+        "search, so keep it efficiently implementable. Return the complete "
+        "module as a single ```python``` block."
     )
     return "\n".join(lines)
 
@@ -374,24 +651,36 @@ def _extract_code(text: str) -> str | None:
     return None
 
 
-def generate_mapping(llm: Llama, history: list, current_code: str) -> str | None:
+def generate_mapping(llm: Llama, history: list, current_code: str,
+                     temperature: float = TEMP_REFINE,
+                     plateau: bool = False) -> str | None:
+    """Ask Qwen for a new mapping.
+    `temperature`: TEMP_REFINE for incremental, TEMP_EXPLORE for exploration.
+    `plateau`: if True, inject diversity-pressure guidance.
+    """
+    t0 = _time.time()
     text = _llm_call(
         llm,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": _build_user_prompt(history, current_code)},
+            {"role": "user",   "content": _build_user_prompt(history,
+                                                              current_code,
+                                                              plateau=plateau)},
         ],
-        temperature=0.7,
+        temperature=temperature,
     )
-    print("\n── Qwen response (first 600 chars) ──")
+    _log(f"Qwen generation done ({_fmt_secs(_time.time() - t0)}, "
+         f"temp={temperature:.2f}, plateau={plateau})")
+    print("── Qwen response (first 600 chars) ──")
     print(text[:600])
-    print("─────────────────────────────────────\n", flush=True)
+    print("─────────────────────────────────────", flush=True)
     return _extract_code(text)
 
 
 def fix_mapping(llm: Llama, bad_code: str, error: str) -> str | None:
     """Ask Qwen to fix broken code, providing the exact traceback."""
-    print("Asking Qwen to fix the broken mapping …", flush=True)
+    _log("Asking Qwen to fix the broken mapping …")
+    t0 = _time.time()
     text = _llm_call(
         llm,
         messages=[
@@ -406,8 +695,9 @@ def fix_mapping(llm: Llama, bad_code: str, error: str) -> str | None:
                 f"Do not change the overall approach, just fix the error."
             )},
         ],
-        temperature=0.2,
+        temperature=TEMP_FIX,
     )
+    _log(f"Qwen fix done ({_fmt_secs(_time.time() - t0)})")
     return _extract_code(text)
 
 
@@ -447,15 +737,26 @@ _TEST_POSITIONS = [
 ]
 
 
-def save_and_validate(code: str, iteration: int):
+def save_and_validate(code: str, iteration: int, candidate: int = 0):
     """
-    Write code to MAPPING_DIR/mapping_vN.py, load it, smoke-test it on
-    multiple realistic positions.
-    Returns (path, MAPPED_DIM, DESCRIPTION) or raises on failure.
+    Write code to MAPPING_DIR/mapping_vN[_kK].py, lint, load it, smoke-test
+    on multiple positions, and time it.
+
+    Returns (path, MAPPED_DIM, DESCRIPTION, cost_us, lint_issues) or raises.
+      cost_us       : average microseconds per mapping() call
+      lint_issues   : list of soft warnings (does not block training)
     """
-    path = os.path.join(MAPPING_DIR, f"mapping_v{iteration}.py")
+    suffix = f"_k{candidate}" if candidate else ""
+    path = os.path.join(MAPPING_DIR, f"mapping_v{iteration}{suffix}.py")
     with open(path, 'w') as f:
         f.write(code)
+
+    # 0. Static lint — fail fast on hard issues, surface soft warnings.
+    lint_issues = lint_mapping(code)
+    hard = [i for i in lint_issues if i.startswith(("SyntaxError", "missing",
+                                                     "banned"))]
+    if hard:
+        raise RuntimeError("Lint failed:\n  - " + "\n  - ".join(hard))
 
     # Clear module cache so re-validation after a fix loads fresh code
     _module_cache.pop(path, None)
@@ -501,7 +802,17 @@ def save_and_validate(code: str, iteration: int):
             "mapping() returns identical output for all test positions — " \
             "it ignores the input"
 
-    return path, int(mod.MAPPED_DIM), str(mod.DESCRIPTION)
+    # Cost timing: useful signal for Qwen so accuracy isn't pursued at
+    # arbitrary C++ cost. We time the slowest path (late-game position).
+    test_pos = _make_test_position(*_TEST_POSITIONS[-1])
+    # warm-up so first-call overhead doesn't dominate
+    mod.mapping(test_pos); mod.mapping(test_pos)
+    t0 = _time.perf_counter()
+    for _ in range(COST_TIMING_RUNS):
+        mod.mapping(test_pos)
+    cost_us = (_time.perf_counter() - t0) / COST_TIMING_RUNS * 1e6
+
+    return path, int(mod.MAPPED_DIM), str(mod.DESCRIPTION), cost_us, lint_issues
 
 
 # ── Raw game data (loaded once, shared across all iterations) ─────────────────
@@ -522,11 +833,41 @@ class RawGameData:
                     offset += nb_pos
                     self.entries.append((offset, r, mv))
                 self.labels.extend(file_labels)
+                if MAX_POSITIONS and offset >= MAX_POSITIONS:
+                    break
         self.size = self.entries[-1][0] if self.entries else 0
-        print(f"Loaded {self.size} positions from {len(files)} game files.", flush=True)
+        if MAX_POSITIONS and self.size > MAX_POSITIONS:
+            # Trim the last entry so the total is exactly MAX_POSITIONS.
+            # We shorten its nb_pos rather than dropping the whole game so
+            # the cumulative index stays consistent.
+            cum, r, mv = self.entries[-1]
+            excess = self.size - MAX_POSITIONS
+            self.entries[-1] = (cum - excess, r, mv)
+            self.size = MAX_POSITIONS
+        cap = f" (capped at {MAX_POSITIONS:,})" if MAX_POSITIONS else ""
+        print(f"Loaded {self.size:,} positions from {len(files)} game files{cap}.",
+              flush=True)
 
     @staticmethod
     def _load_file(filename):
+        """Parse one games* binary file into a list of (nb_pos, nb_random,
+        moves_bytes) entries plus per-game outcome labels.
+
+        On-disk layout per game (all bytes, no separators between games):
+          byte 0                       : nb_moves           (uint8)
+          byte 1                       : nb_random_moves    (uint8) — first
+                                         N moves were random/opening, so they
+                                         are NOT used as training positions
+          bytes 2 .. 2+2*nb_moves-1    : the move list, 2 bytes per move:
+                                           (from_square, to_square)
+          byte 2+2*nb_moves            : black_score        (uint8)
+          byte 2+2*nb_moves+1          : white_score        (uint8)
+        Total bytes per game = 4 + 2*nb_moves.
+
+        Training positions per game = nb_moves + 1 (one per ply, including
+        the start) − nb_random_moves (skip the random opening prefix).
+        Label encoding: 0 = black wins, 1 = draw, 2 = white wins.
+        """
         entries, labels = [], []
         with open(filename, 'rb') as f:
             data = f.read()
@@ -547,8 +888,12 @@ class RawGameData:
 
 # ── Dataset: applies mapping on the fly ───────────────────────────────────────
 def _bb_to_list(n: int) -> list:
-    b = [int(d) for d in bin(n)[2:]]
-    return [0] * (64 - len(b)) + b
+    # LSB-first: index i carries bit i of n. Combined with Yolah's LERF
+    # convention (square i ↔ bit i, see server/yolah.py), this means
+    # raw_vec[i] == 1 ↔ piece on square i — matching SYSTEM_PROMPT and
+    # _make_test_position. Do NOT use bin()[2:] here: that's MSB-first
+    # and would silently invert the board (square i ↔ raw_vec[63-i]).
+    return [(n >> i) & 1 for i in range(64)]
 
 
 class MappedDataset(Dataset):
@@ -559,7 +904,10 @@ class MappedDataset(Dataset):
     def __len__(self):
         return self.raw.size
 
-    def __getitem__(self, idx):
+    def _build_position(self, idx):
+        """Replay the game up to position `idx` and return (raw_vec, label).
+        No mapping applied — used both by __getitem__ and by the eval pass
+        that wants the raw input for miss-reporting."""
         # Find which game contains position idx (standard lower-bound search)
         lo, hi = 0, len(self.raw.entries)
         while lo < hi:
@@ -573,7 +921,11 @@ class MappedDataset(Dataset):
         pos_idx     = idx - base
         target_plies = nb_random_moves + pos_idx
 
-        # Replay moves up to target_plies
+        # Replay the game from move 0 up to target_plies. O(plies) per call:
+        # cheap in absolute terms but dominates DataLoader cost (the network
+        # is tiny). If training becomes the bottleneck, cache
+        # (black, white, empty, ply) per idx in RawGameData — replays then
+        # collapse to a dict lookup.
         game = Yolah()
         for sq1, sq2 in zip(moves[0::2], moves[1::2]):
             if game.nb_plies() >= target_plies:
@@ -586,8 +938,19 @@ class MappedDataset(Dataset):
             [Yolah.WHITE_PLAYER if game.nb_plies() & 1 else Yolah.BLACK_PLAYER],
             dtype=torch.float32,
         )
+        label = torch.tensor(self.raw.labels[lo], dtype=torch.long)
+        return raw_vec, label
+
+    def __getitem__(self, idx):
+        raw_vec, label = self._build_position(idx)
         mod = _load_mapping_module(self.mapping_path)
-        return mod.mapping(raw_vec), torch.tensor(self.raw.labels[lo], dtype=torch.long)
+        return mod.mapping(raw_vec), label
+
+    def get_raw_and_mapped(self, idx):
+        """Return (raw_vec, mapped_vec, label) in a single replay."""
+        raw_vec, label = self._build_position(idx)
+        mod = _load_mapping_module(self.mapping_path)
+        return raw_vec, mod.mapping(raw_vec), label
 
 
 # ── Network (fixed architecture, input_dim adapts to MAPPED_DIM) ──────────────
@@ -604,6 +967,10 @@ class Net(nn.Module):
         return self.fc3(x)
 
     def clip(self):
+        # NNUE-style int8 quantization clamp: at deployment, weights are
+        # multiplied by 64 and stored as int8 in [-127, 127]. Keeping the
+        # float weights inside [-127/64, 127/64] during training guarantees
+        # the quantized network behaves identically to the trained one.
         for fc in [self.fc1, self.fc2, self.fc3]:
             fc.weight.data.clamp_(-127/64, 127/64)
             fc.bias.data.clamp_(-127/64, 127/64)
@@ -618,6 +985,7 @@ def ddp_setup(rank, world_size):
 
 def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
     ddp_setup(rank, world_size)
+    t_start = _time.time()
 
     train_size = int(0.95 * len(dataset))
     val_size   = len(dataset) - train_size
@@ -631,8 +999,13 @@ def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
     )
     val_loader = DataLoader(
         valset, batch_size=batch_size, sampler=s_val,
-        num_workers=0, pin_memory=True,
+        num_workers=2, pin_memory=True, prefetch_factor=2,
     )
+
+    if rank == 0:
+        print(f"  [child rank0] train={train_size}  val={val_size}  "
+              f"input_dim={input_dim}  batch={batch_size}  epochs={NB_EPOCHS}",
+              flush=True)
 
     model     = Net(input_dim).to(rank)
     loss_fn   = nn.CrossEntropyLoss()
@@ -650,7 +1023,9 @@ def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
         model.train()
         s_train.set_epoch(epoch)
         n, correct = 0, 0
-        for X, y in tqdm(train_loader, disable=(rank != 0)):
+        ep_t0 = _time.time()
+        for X, y in tqdm(train_loader, disable=(rank != 0),
+                         desc=f"train e{epoch+1}", mininterval=2.0):
             n += len(X)
             with torch.cuda.stream(stream):
                 X = X.to(rank, non_blocking=True)
@@ -665,14 +1040,15 @@ def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
             model.module.clip()
         train_acc_last = correct / n
         if rank == 0:
-            print(f"  epoch {epoch+1}/{NB_EPOCHS}  train acc: {train_acc_last:.4f}",
-                  flush=True)
+            print(f"  [epoch {epoch+1}/{NB_EPOCHS}] train acc {train_acc_last:.4f}"
+                  f"  ({_fmt_secs(_time.time() - ep_t0)})", flush=True)
 
         # ── validate ──
         model.train(False)
         n, correct = 0, 0
         with torch.no_grad():
-            for X, y in tqdm(val_loader, disable=(rank != 0)):
+            for X, y in tqdm(val_loader, disable=(rank != 0),
+                             desc=f"val e{epoch+1}", mininterval=2.0):
                 n += len(X)
                 with torch.cuda.stream(stream):
                     X = X.to(rank, non_blocking=True)
@@ -682,118 +1058,295 @@ def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
                 correct += (torch.argmax(logits, 1) == y).sum().item()
         val_acc_last = correct / n
         if rank == 0:
-            print(f"  epoch {epoch+1}/{NB_EPOCHS}  val   acc: {val_acc_last:.4f}",
+            print(f"  [epoch {epoch+1}/{NB_EPOCHS}] val   acc {val_acc_last:.4f}",
                   flush=True)
+
+    # ── Post-training analytics: confusion matrix + miss samples ──
+    # Done on rank 0 only; uses get_raw_and_mapped() so we can decode the
+    # miss back into human-readable squares for Qwen.
+    confusion = [[0]*3 for _ in range(3)]
+    misses    = []
+    if rank == 0:
+        print(f"  [analytics] computing confusion + miss samples …", flush=True)
+        model.train(False)
+        underlying  = valset.dataset                # MappedDataset
+        val_indices = list(valset.indices)
+        rng         = np.random.default_rng(0xC0FFEE)
+        rng.shuffle(val_indices)
+        # Cap analytics work; the full val pass above already gave val_acc.
+        sample_cap  = min(len(val_indices), 16384)
+        val_indices = val_indices[:sample_cap]
+
+        ana_t0 = _time.time()
+        with torch.no_grad():
+            for chunk_start in range(0, len(val_indices), batch_size):
+                chunk = val_indices[chunk_start:chunk_start + batch_size]
+                raws, mapped, labels = [], [], []
+                for ds_idx in chunk:
+                    rv, mv, lbl = underlying.get_raw_and_mapped(ds_idx)
+                    raws.append(rv); mapped.append(mv); labels.append(lbl)
+                X = torch.stack(mapped).to(rank)
+                preds = torch.argmax(model(X), 1).cpu()
+                for k in range(len(chunk)):
+                    t = int(labels[k]); p = int(preds[k])
+                    confusion[t][p] += 1
+                    if t != p and len(misses) < MISS_SAMPLE_SIZE:
+                        sq = _raw_vec_to_squares(raws[k])
+                        misses.append({**sq, "predicted": p, "actual": t})
+        print(f"  [analytics] done in {_fmt_secs(_time.time() - ana_t0)}  "
+              f"misses_collected={len(misses)}", flush=True)
 
     if rank == 0:
         with open(results_file, 'w') as f:
-            json.dump({"train_acc": train_acc_last, "val_acc": val_acc_last}, f)
+            json.dump({
+                "train_acc": train_acc_last,
+                "val_acc":   val_acc_last,
+                "confusion": confusion,
+                "misses":    misses,
+                "wall_time": _time.time() - t_start,
+            }, f)
+        print(f"  [child rank0] training+analytics total "
+              f"{_fmt_secs(_time.time() - t_start)}", flush=True)
 
     destroy_process_group()
 
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    # GPU layout: QWEN_GPU runs the ollama server (started externally),
-    # TRAINING_GPU is used exclusively for training.
-    print(f"Qwen GPU: {QWEN_GPU_DEVICE}  Training GPU: {TRAINING_GPU}", flush=True)
+def _validate_with_repair(code: str, iteration: int, candidate: int,
+                          llm: Llama):
+    """Validate code, asking Qwen to repair on failure (up to MAX_RETRIES).
 
-    raw_data = RawGameData(DATA_DIR)
-    llm      = load_llm()
-
-    history      = []
-    current_code = INITIAL_MAPPING  # Qwen's working draft — always updated,
-                                    # even when broken, so Qwen retains context
-
-    for iteration in range(1, MAX_ITERATIONS + 1):
-        print(f"\n{'='*60}", flush=True)
-        print(f"  Iteration {iteration}/{MAX_ITERATIONS}", flush=True)
-        print(f"{'='*60}", flush=True)
-
-        # 1. Validate current_code (with Qwen-assisted repair on failure).
-        #    training_code is what actually gets trained — falls back to best
-        #    on unrecoverable failure, but current_code (Qwen's draft) is
-        #    always kept so Qwen can continue refining its own direction.
-        candidate_code = current_code
-        mapping_path = mapped_dim = description = None
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                mapping_path, mapped_dim, description = \
-                    save_and_validate(candidate_code, iteration)
-                current_code = candidate_code   # adopt repaired version if fixed
-                break
-            except Exception:
-                error_msg = traceback.format_exc()
-                print(f"Mapping validation FAILED (attempt {attempt}/{MAX_RETRIES}):",
-                      flush=True)
-                print(error_msg, flush=True)
-                if attempt < MAX_RETRIES:
-                    fixed = fix_mapping(llm, candidate_code, error_msg)
-                    if fixed:
-                        candidate_code = fixed
-                    else:
-                        print("Qwen could not produce a fix. Giving up.", flush=True)
-                        break
+    Returns (path, mapped_dim, description, cost_us, lint_issues, final_code)
+    or (None, …, error_msg).  `final_code` may differ from input if repaired.
+    """
+    cur = code
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            path, dim, desc, cost_us, lint_issues = save_and_validate(
+                cur, iteration, candidate=candidate)
+            if attempt > 1:
+                _log(f"      ✓ validated after {attempt} attempt(s)")
+            else:
+                _log(f"      ✓ validated  dim={dim}  cost={cost_us:.1f}µs/call")
+            if lint_issues:
+                _log(f"      lint warnings: {lint_issues}")
+            return path, dim, desc, cost_us, lint_issues, cur
+        except Exception:
+            err = traceback.format_exc()
+            _log(f"      ✗ validation FAILED (attempt {attempt}/{MAX_RETRIES})")
+            # Print full traceback at most once per candidate:
+            if attempt == 1:
+                print(err, flush=True)
+            if attempt < MAX_RETRIES:
+                fixed = fix_mapping(llm, cur, err)
+                if fixed:
+                    cur = fixed
                 else:
-                    print(f"All {MAX_RETRIES} attempts failed.", flush=True)
+                    _log("      Qwen could not produce a fix. Giving up "
+                         "this candidate.")
+                    return None, None, None, None, None, cur
+    _log(f"      All {MAX_RETRIES} repair attempts failed.")
+    return None, None, None, None, None, cur
 
-        if mapping_path is None:
-            print("Skipping training this iteration. "
-                  "Qwen will retry from its current draft next iteration.", flush=True)
-            continue
 
-        print(f"  Mapping dim  : {mapped_dim}", flush=True)
-        print(f"  Description  : {description}", flush=True)
-        print(f"\n── Mapping code (v{iteration}) ──────────────────────────────")
-        print(current_code)
-        print("─────────────────────────────────────────────────────────\n",
-              flush=True)
+def _train_candidate(dataset, mapped_dim: int, results_file: str) -> dict:
+    """Run a fresh training in a child process; return parsed results.
 
-        # 2. Build dataset with the validated mapping
-        dataset      = MappedDataset(raw_data, mapping_path)
-        results_file = os.path.join(MAPPING_DIR, f"results_v{iteration}.json")
-
-        # 3. Training on TRAINING_GPU only (QWEN_GPU is reserved for ollama)
-        os.environ["CUDA_VISIBLE_DEVICES"] = TRAINING_GPU
+    Returns dict with: train_acc, val_acc, confusion (3×3 list),
+    misses (list of dicts), wall_time (seconds).
+    """
+    # CUDA_VISIBLE_DEVICES must be set BEFORE the child starts so it sees
+    # only TRAINING_GPU; we restore the parent env immediately after.
+    os.environ["CUDA_VISIBLE_DEVICES"] = TRAINING_GPU
+    try:
         mp.spawn(
             main_ddp,
             args=(1, BATCH_SIZE, dataset, mapped_dim, results_file),
             nprocs=1,
         )
-        del os.environ["CUDA_VISIBLE_DEVICES"]
+    finally:
+        os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+    with open(results_file) as f:
+        return json.load(f)
 
-        # 4. Read results written by rank 0
-        with open(results_file) as f:
-            res = json.load(f)
-        train_acc, val_acc = res["train_acc"], res["val_acc"]
 
-        # 5. Record in history
-        history.append({
-            "iteration":   iteration,
-            "description": description,
-            "mapped_dim":  mapped_dim,
-            "train_acc":   train_acc,
-            "val_acc":     val_acc,
-            "code":        current_code,
-        })
+def _print_history_table(history: list) -> None:
+    if not history:
+        return
+    best = max(history, key=lambda h: h['val_acc'])
+    print(f"\n  {'Iter':>4}.{'k':<2}  {'ValAcc':>7}  {'Dim':>4}  "
+          f"{'µs':>7}  Description", flush=True)
+    print("  " + "─" * 78, flush=True)
+    for h in history:
+        tag  = " ←" if h is best else ""
+        cand = h.get('candidate', 0)
+        cost = h.get('cost_us', 0)
+        print(f"  {h['iteration']:>4}.{cand:<2}  {h['val_acc']:>7.4f}  "
+              f"{h['mapped_dim']:>4}  {cost:>6.1f}µ  {h['description']}{tag}",
+              flush=True)
 
-        # 6. Print history table
-        print(f"\n{'─'*60}")
-        print(f"  {'Iter':>4}  {'ValAcc':>7}  {'Dim':>5}  Description")
-        print(f"  {'─'*56}")
-        for h in history:
-            tag = " ←" if h == max(history, key=lambda x: x['val_acc']) else ""
-            print(f"  {h['iteration']:>4}  {h['val_acc']:>7.4f}"
-                  f"  {h['mapped_dim']:>5}  {h['description']}{tag}")
-        print(f"{'─'*60}", flush=True)
 
-        # 7. Ask Qwen to design a better mapping
-        print("\nGenerating new mapping with Qwen …", flush=True)
-        new_code = generate_mapping(llm, history, current_code)
+if __name__ == "__main__":
+    _section(f"MAPPING-LOOP STARTUP   (pid={os.getpid()})", char="═")
+    _log(f"Qwen GPU       : {QWEN_GPU_DEVICE}  (model: {QWEN_MODEL_PATH})")
+    _log(f"Training GPU   : {TRAINING_GPU}")
+    _log(f"Iterations     : {MAX_ITERATIONS}")
+    _log(f"Candidates/iter: {NB_CANDIDATES_PER_ITER}")
+    _log(f"Epochs/training: {NB_EPOCHS}")
+    _log(f"Batch size     : {BATCH_SIZE}")
+    _log(f"History file   : {HISTORY_FILE}")
+    _log(f"GPU mem        : {_gpu_mem_str()}")
 
-        if new_code:
-            current_code = new_code
-            print("New mapping code received.", flush=True)
+    # ── Load data + LLM ──
+    _section("Load raw game data")
+    t0 = _time.time()
+    raw_data = RawGameData(DATA_DIR)
+    _log(f"raw_data ready in {_fmt_secs(_time.time() - t0)}")
+
+    _section("Load Qwen LLM")
+    t0 = _time.time()
+    llm = load_llm()
+    _log(f"LLM loaded in {_fmt_secs(_time.time() - t0)}  "
+         f"({_gpu_mem_str()})")
+
+    # ── Resume from history.jsonl if present ──
+    history = load_history()
+    if history:
+        last_iter = max(h['iteration'] for h in history)
+        best      = max(history, key=lambda h: h['val_acc'])
+        _section(f"RESUMED from {HISTORY_FILE} ({len(history)} rows, "
+                 f"best v{best['iteration']}.{best.get('candidate',0)} "
+                 f"val={best['val_acc']:.4f})")
+        _print_history_table(history)
+        # Pick up where we left off
+        start_iter   = last_iter + 1
+        current_code = best['code']  # seed next round from current best
+    else:
+        start_iter   = 1
+        current_code = INITIAL_MAPPING
+
+    if start_iter > MAX_ITERATIONS:
+        _log(f"history already has {start_iter-1} iterations ≥ "
+             f"MAX_ITERATIONS={MAX_ITERATIONS}; nothing to do.")
+        sys.exit(0)
+
+    # ── Main outer loop ──
+    for iteration in range(start_iter, MAX_ITERATIONS + 1):
+        iter_t0 = _time.time()
+        plateau = is_plateauing(history)
+        _section(f"ITERATION {iteration}/{MAX_ITERATIONS}   "
+                 f"plateau={plateau}   "
+                 f"history_size={len(history)}", char="═")
+
+        # ── Step A: generate NB_CANDIDATES_PER_ITER drafts ──
+        # First candidate refines the current best (low temperature);
+        # additional candidates explore (high temperature). On plateau, every
+        # candidate gets the diversity-pressure prompt.
+        drafts: list = [current_code]  # candidate 0 = current draft as seed
+        # If history is empty (very first iter), candidate 0 is INITIAL.
+        # Always also ask Qwen for fresh drafts via generate_mapping():
+        gen_count = NB_CANDIDATES_PER_ITER if history else 0
+        for k in range(gen_count):
+            temp = TEMP_EXPLORE if (plateau or k > 0) else TEMP_REFINE
+            _log(f"  Generating candidate #{k+1}/{gen_count} "
+                 f"(temp={temp:.2f}, plateau={plateau}) …")
+            new_code = generate_mapping(llm, history, current_code,
+                                         temperature=temp, plateau=plateau)
+            if new_code:
+                drafts.append(new_code)
+            else:
+                _log(f"  Could not extract code from Qwen response "
+                     f"(candidate #{k+1}); skipping.")
+        # Keep at most NB_CANDIDATES_PER_ITER actual candidates
+        # (the seed + Qwen drafts).
+        drafts = drafts[:max(1, NB_CANDIDATES_PER_ITER)]
+        _log(f"  Will train {len(drafts)} candidate(s) this iteration.")
+
+        # ── Step B: validate + train each candidate ──
+        results_for_iter = []
+        for k, draft in enumerate(drafts):
+            _section(f"  CANDIDATE {iteration}.{k}   "
+                     f"({k+1}/{len(drafts)})", char="·")
+            t_v0 = _time.time()
+            (path, dim, desc, cost_us, lint_issues, final_code
+             ) = _validate_with_repair(draft, iteration, candidate=k, llm=llm)
+            _log(f"    validate phase: {_fmt_secs(_time.time() - t_v0)}")
+
+            if path is None:
+                _log(f"    SKIP candidate {iteration}.{k} (unrecoverable)")
+                continue
+
+            _log(f"    description : {desc}")
+            _log(f"    mapped_dim  : {dim}   cost: {cost_us:.1f}µs/call")
+            _log(f"    GPU mem     : {_gpu_mem_str()}")
+
+            dataset      = MappedDataset(raw_data, path)
+            results_file = os.path.join(
+                MAPPING_DIR, f"results_v{iteration}_k{k}.json")
+
+            t_t0 = _time.time()
+            _log(f"    spawning training child …")
+            try:
+                res = _train_candidate(dataset, dim, results_file)
+            except Exception:
+                _log(f"    training FAILED:\n{traceback.format_exc()}")
+                continue
+            _log(f"    training+analytics: {_fmt_secs(_time.time() - t_t0)}")
+            _log(f"    train_acc={res['train_acc']:.4f}  "
+                 f"val_acc={res['val_acc']:.4f}")
+
+            entry = {
+                "iteration":   iteration,
+                "candidate":   k,
+                "description": desc,
+                "mapped_dim":  dim,
+                "train_acc":   res['train_acc'],
+                "val_acc":     res['val_acc'],
+                "cost_us":     cost_us,
+                "confusion":   res.get('confusion'),
+                "misses":      res.get('misses', []),
+                "code":        final_code,
+                "lint_issues": lint_issues or [],
+            }
+            results_for_iter.append(entry)
+            history.append(entry)
+            save_history_entry(entry)
+
+        # ── Step C: pick this iteration's winner; update current_code ──
+        if not results_for_iter:
+            _log(f"  No candidate trained this iteration. Falling back.")
+            if history:
+                best = max(history, key=lambda h: h['val_acc'])
+                current_code = best['code']
+                _log(f"  Resuming from best so far: v{best['iteration']}."
+                     f"{best.get('candidate',0)} "
+                     f"(val_acc={best['val_acc']:.4f})")
+            else:
+                current_code = INITIAL_MAPPING
+                _log(f"  No history yet; reset to INITIAL_MAPPING.")
         else:
-            print("Could not extract code from Qwen response. "
-                  "Keeping current mapping.", flush=True)
+            iter_best = max(results_for_iter, key=lambda h: h['val_acc'])
+            current_code = iter_best['code']
+            _log(f"  Iteration winner: candidate "
+                 f"{iter_best['iteration']}.{iter_best['candidate']}  "
+                 f"val_acc={iter_best['val_acc']:.4f}  "
+                 f"cost={iter_best['cost_us']:.1f}µs")
+
+        # ── Step D: report ──
+        _print_history_table(history)
+        global_best = max(history, key=lambda h: h['val_acc'])
+        _log(f"  global best   : v{global_best['iteration']}."
+             f"{global_best.get('candidate',0)}  "
+             f"val_acc={global_best['val_acc']:.4f}")
+        _log(f"  iteration time: {_fmt_secs(_time.time() - iter_t0)}  "
+             f"total: {_fmt_secs(_time.time() - _RUN_START)}")
+        _log(f"  GPU mem (post): {_gpu_mem_str()}")
+
+    _section("DONE", char="═")
+    if history:
+        b = max(history, key=lambda h: h['val_acc'])
+        _log(f"Final best: v{b['iteration']}.{b.get('candidate',0)}  "
+             f"val_acc={b['val_acc']:.4f}  ({b['description']})")
+        _log(f"  → mappings/mapping_v{b['iteration']}"
+             f"{'_k'+str(b.get('candidate',0)) if b.get('candidate',0) else ''}.py")
+    _log(f"Total wall time: {_fmt_secs(_time.time() - _RUN_START)}")

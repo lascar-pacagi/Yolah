@@ -193,9 +193,9 @@ class Net(nn.Module):
       Linear(channels → fc_size) → ReLU           ← head: classify
       Linear(fc_size → 3)
 
-    Default: 256 channels, 20 residual blocks → ~24 M parameters.
+    Default: 256 channels, 30 residual blocks → ~32 M parameters.
     """
-    def __init__(self, channels: int = 256, nb_blocks: int = 20, fc_size: int = 256):
+    def __init__(self, channels: int = 256, nb_blocks: int = 30, fc_size: int = 256):
         super().__init__()
 
         # ── Stem ──────────────────────────────────────────────────────────────
@@ -261,7 +261,7 @@ class Net(nn.Module):
 # ── Training ───────────────────────────────────────────────────────────────────
 NB_EPOCHS  = 100
 MODEL_PATH = "/mnt/"
-MODEL_NAME = "cnn_resnet_256x20"
+MODEL_NAME = "cnn_resnet_256x30"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR   = "./data"
 
@@ -396,4 +396,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = GameDataset(GAME_DIR)
-    mp.spawn(main, args=(world_size, 256, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 64, dataset), nprocs=world_size)
