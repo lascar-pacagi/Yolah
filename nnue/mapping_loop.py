@@ -555,22 +555,49 @@ def load_llm() -> Llama:
 
 
 def _llm_call(llm: Llama, messages: list, temperature: float,
-              max_tokens: int = QWEN_MAX_TOKENS) -> str:
-    """Run a chat completion and return the answer text.
+              max_tokens: int = QWEN_MAX_TOKENS) -> tuple[str, str]:
+    """Run a chat completion and return (raw_text, stripped_text).
 
     Qwen3 instruct GGUFs ship with thinking mode ON by default: the model
     emits its chain-of-thought wrapped in <think>...</think> before the
-    final answer. We strip that block — the reasoning is useful to the
-    model but downstream code only wants the actual mapping module.
+    final answer. Downstream code-extraction only cares about the stripped
+    answer, but we also return the RAW text so _log_full_exchange can
+    persist the full reasoning trace to the log.
     """
     response = llm.create_chat_completion(
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
     )
-    text = response["choices"][0]["message"]["content"]
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
-    return text
+    raw = response["choices"][0]["message"]["content"]
+    stripped = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+    return raw, stripped
+
+
+def _log_full_exchange(attempt: int, max_attempts: int, label: str,
+                       temperature: float, messages: list,
+                       raw_response: str) -> None:
+    """Dump the complete prompt (system + user) and the raw Qwen response
+    (including <think>…</think> reasoning) to stdout, wrapped in clearly
+    marked delimiters for grep-ability. Everything lands in the SLURM
+    log file so a post-mortem has the full context of each call.
+    """
+    banner = "━" * 80
+    print(f"\n{banner}")
+    print(f"QWEN EXCHANGE  label={label}  "
+          f"attempt={attempt}/{max_attempts}  temp={temperature:.2f}")
+    print(banner, flush=True)
+    for msg in messages:
+        role = str(msg.get("role", "?")).upper()
+        content = msg.get("content", "")
+        print(f"┌─ [{role}]  ({len(content)} chars)")
+        print(content)
+        print(f"└─ [END {role}]", flush=True)
+    print(f"┌─ [ASSISTANT RAW]  ({len(raw_response)} chars, "
+          f"includes <think> if any)")
+    print(raw_response)
+    print(f"└─ [END ASSISTANT RAW]")
+    print(banner, flush=True)
 
 
 def _format_confusion(conf: list) -> str:
@@ -748,13 +775,17 @@ def _generate_extractable(llm: Llama, messages: list, temperature: float,
     """
     for attempt in range(1, max_attempts + 1):
         t0 = _time.time()
-        text = _llm_call(llm, messages=messages, temperature=temperature)
+        raw_text, text = _llm_call(llm, messages=messages,
+                                    temperature=temperature)
         elapsed = _fmt_secs(_time.time() - t0)
         _log(f"Qwen {label} attempt {attempt}/{max_attempts} done "
              f"({elapsed}, temp={temperature:.2f})")
-        print(f"── Qwen response attempt {attempt} (first 600 chars) ──")
-        print(text[:600])
-        print("─────────────────────────────────────", flush=True)
+
+        # Full transcript — prompt (every role) + raw response (including
+        # Qwen's <think>...</think> reasoning) — is emitted unconditionally
+        # so the SLURM log captures the complete exchange for every attempt.
+        _log_full_exchange(attempt, max_attempts, label, temperature,
+                           messages, raw_text)
 
         code = _extract_code(text)
         if code is None:
