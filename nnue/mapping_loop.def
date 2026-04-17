@@ -20,6 +20,11 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     ../nnue   /nnue
 
 %post
+    # Fail fast on any error — without -e a mid-build failure can still
+    # produce a .sif that silently lacks packages. (%post runs under
+    # /bin/sh / dash, which lacks `pipefail`; no pipes here anyway.)
+    set -eu
+
     # ── System packages ───────────────────────────────────────────────────────
     DEBIAN_FRONTEND=noninteractive apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -35,6 +40,9 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
         ca-certificates
     rm -rf /var/lib/apt/lists/*
 
+    # Up-to-date pip avoids resolver bugs and old wheel-format issues.
+    pip3 install --no-cache-dir --upgrade pip
+
     # ── PyTorch (CUDA 12.4) ───────────────────────────────────────────────────
     pip3 install --no-cache-dir \
         torch \
@@ -46,10 +54,45 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     # ── llama-cpp-python with CUDA backend ────────────────────────────────────
     # GGML_CUDA=on compiles the CUDA kernels so Qwen3.6-35B-A3B runs on GPU.
     # The devel base image provides nvcc + CUDA headers at build time.
-    # CUDA_HOME must point to the toolkit before the build starts.
+    # libcuda.so.1 is a driver-only library absent in the build sandbox;
+    # point the linker at the toolkit stub so the link succeeds, then let
+    # the real driver be injected at runtime via --nv.
     export CUDA_HOME=/usr/local/cuda
-    CMAKE_ARGS="-DGGML_CUDA=on" \
-        pip3 install --no-cache-dir llama-cpp-python
+    ln -sf ${CUDA_HOME}/lib64/stubs/libcuda.so \
+            ${CUDA_HOME}/lib64/stubs/libcuda.so.1
+    # Register the stubs dir so the linker can resolve transitive NEEDED
+    # entries (e.g. libggml-cuda.so -> libcuda.so.1) via ldconfig.
+    # -L only covers direct -l flags; transitive deps need the path in the
+    # dynamic linker cache or via -rpath-link.
+    echo "${CUDA_HOME}/lib64/stubs" > /etc/ld.so.conf.d/cuda-stubs.conf
+    ldconfig
+    # Make the stubs discoverable at link time via the loader env too
+    # (belt-and-suspenders alongside ldconfig + -rpath-link).
+    export LIBRARY_PATH="${CUDA_HOME}/lib64/stubs:${LIBRARY_PATH:-}"
+    export LD_LIBRARY_PATH="${CUDA_HOME}/lib64/stubs:${LD_LIBRARY_PATH:-}"
+
+    # Compute-capability list — kernels are compiled AOT for each arch.
+    # Target cluster GPUs:
+    #   RTX 8000 (Turing)       -> 75
+    #   A40      (Ampere)       -> 86
+    #   L40S     (Ada Lovelace) -> 89
+    # A missing arch gives "no kernel image is available for execution on the
+    # device" at runtime. Add more here if the cluster gains new hardware.
+    CUDA_ARCHS="75;86;89"
+
+    CMAKE_ARGS="-DGGML_CUDA=on \
+        -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHS} \
+        -DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,${CUDA_HOME}/lib64/stubs \
+        -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath-link,${CUDA_HOME}/lib64/stubs" \
+        pip3 install --no-cache-dir --verbose llama-cpp-python
+
+    # ── Build-time sanity checks ──────────────────────────────────────────────
+    # Import-check catches broken installs now, not at SLURM submit time.
+    # (libcuda.so.1 is not required for `import llama_cpp` — it only loads
+    #  when a model is instantiated on GPU.)
+    python3 -c "import torch; print('torch', torch.__version__)"
+    python3 -c "import llama_cpp; print('llama_cpp', llama_cpp.__version__)"
+    python3 -c "import numpy, tqdm; print('numpy', numpy.__version__)"
 
     # ── Create placeholder dirs (will be shadowed by bind mounts) ────────────
     mkdir -p /nnue/models /nnue/data /nnue/mappings

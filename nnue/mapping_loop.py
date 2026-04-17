@@ -20,6 +20,7 @@ The NN on top of the mapping is fixed:
   Linear(MAPPED_DIM, 128) → clamp(0,1) → Linear(128, 64) → clamp(0,1) → Linear(64, 3)
 """
 
+import ast
 import json
 import re
 import importlib.util
@@ -58,16 +59,39 @@ MAPPING_DIR    = "./mappings"
 MASTER_PORT    = "65435"
 MAX_ITERATIONS = 20
 MAX_RETRIES    = 10      # times to ask Qwen to fix a broken mapping before giving up
+GENERATION_MAX_ATTEMPTS = 8  # per-candidate re-queries to Qwen when its output
+                              # is missing the sentinels or contains un-parsable
+                              # Python. Each attempt re-samples at the same
+                              # temperature, so 8 gives the MoE plenty of
+                              # chances to comply with the output format.
 NB_EPOCHS      = 2
 BATCH_SIZE     = 256
-# n_ctx is the TOTAL llama.cpp KV-cache budget (input + output). With
-# QWEN_MAX_TOKENS=2048 reserved for output, the effective input budget is
-# n_ctx - QWEN_MAX_TOKENS. The user prompt grows with: SYSTEM_PROMPT
-# (~600 tok), game-example excerpt (~600-1500 tok), best mapping code
-# (~400-1500 tok depending on complexity), history table (~50 tok/iter).
-# 16384 leaves comfortable headroom for ~2000-line mappings.
-QWEN_N_CTX     = 16384
-QWEN_MAX_TOKENS = 2048
+# n_ctx is the TOTAL llama.cpp KV-cache budget (input + output combined).
+# 131072 (128K) gives the model a very wide canvas for thinking mode and
+# long final modules. Rough VRAM accounting on a 48 GB GPU:
+#   22 GB (Q4_K_M weights) + ~12 GB (fp16 KV at 128K) + ~2 GB (buffers)
+#   ≈ 36 GB, leaving ~12 GB free. Fits on L40S / A40 / RTX 8000.
+# Do NOT raise this to 256K without switching KV to Q8_0 — at fp16 it
+# would OOM (~24 GB KV alone).
+# QWEN_MAX_TOKENS = -1 means "no output cap" — generate until EOS or
+# until n_ctx is exhausted.
+QWEN_N_CTX      = 131072
+QWEN_MAX_TOKENS = -1     # -1 => generate until EOS or n_ctx is exhausted
+
+# KV-cache quantization as a ggml type code (passed through to llama.cpp).
+#   1 = GGML_TYPE_F16   (default, fp16 = 2 bytes/element, highest fidelity)
+#   8 = GGML_TYPE_Q8_0  (~half the memory, negligible quality loss)
+#   2 = GGML_TYPE_Q4_0  (quarter memory, noticeable quality degradation)
+# fp16 is the safe default for reasoning-heavy workloads like this one.
+QWEN_KV_CACHE_TYPE = 1   # GGML_TYPE_F16
+
+# Sentinel markers Qwen must wrap the final code in. The triple
+# angle-brackets are deliberately unusual — they will not appear inside
+# Python source, inside markdown fences, or inside Qwen's chain-of-thought
+# — so _extract_code can grab the module unambiguously even if Qwen also
+# emits commentary with backtick fences in its answer.
+CODE_BEGIN_MARKER = "<<<MAPPING_CODE_BEGIN>>>"
+CODE_END_MARKER   = "<<<MAPPING_CODE_END>>>"
 
 # ── Search-loop tuning ────────────────────────────────────────────────────────
 NB_CANDIDATES_PER_ITER = 2     # mappings generated & trained per iteration
@@ -77,7 +101,7 @@ PLATEAU_THRESHOLD      = 0.005 # max-min val_acc within window considered flat
 TOP_K_IN_PROMPT        = 3     # how many of the best mappings to show Qwen
 COST_TIMING_RUNS       = 30    # how many times to run mapping() per test pos
                                 # to estimate µs-per-call cost
-MISS_SAMPLE_SIZE       = 8     # misclassified examples shown to Qwen per round
+MISS_SAMPLE_SIZE       = 20     # misclassified examples shown to Qwen per round
 MAX_POSITIONS          = 15_000_000  # cap total training positions loaded from
                                      # DATA_DIR; None = use all (~1B is slow)
 TEMP_REFINE            = 0.4   # Qwen temperature when refining a strong mapping
@@ -482,23 +506,52 @@ RULES:
 - Import only numpy, torch, and Python stdlib.
 - Each player ALWAYS has exactly 4 pieces; np.where will return 4 indices.
 - Normalize output values to approximately [0, 1].
-- Return the complete module as a SINGLE ```python ... ``` code block.
 - Do NOT include any training or testing code.
 - The mapping function must be DETERMINISTIC (same input → same output).
 - All values in the output tensor must be finite (no NaN, no Inf).
+
+OUTPUT FORMAT (STRICT — the runner extracts your code by these markers):
+Your final answer MUST contain the complete mapping module wrapped
+between two sentinel lines, each on its own line, with NO surrounding
+markdown fences (no ``` before or after the sentinels):
+
+<<<MAPPING_CODE_BEGIN>>>
+# the complete Python module goes here — imports, constants,
+# MAPPED_DIM, DESCRIPTION, mapping(...)
+<<<MAPPING_CODE_END>>>
+
+- Use the markers EXACTLY as shown (uppercase, triple angle brackets).
+- Put the markers on their OWN lines, not indented.
+- You may explain your reasoning in prose before the first marker, and
+  you may use ```python``` fences elsewhere in your commentary, but the
+  final, complete module MUST be between the two sentinels.
+- Emit the markers exactly ONCE each. Do not wrap partial snippets in
+  additional sentinels.
 """
 
 # ── Qwen helpers (llama-cpp-python, in-process, no server needed) ─────────────
 def load_llm() -> Llama:
+    ctx_label = "model max (from GGUF)" if QWEN_N_CTX == 0 else str(QWEN_N_CTX)
     print(f"Loading {QWEN_MODEL_PATH} on GPU {QWEN_GPU_DEVICE} "
-          f"(n_ctx={QWEN_N_CTX}) …", flush=True)
-    return Llama(
+          f"(n_ctx={ctx_label}, kv_type={QWEN_KV_CACHE_TYPE}) …", flush=True)
+    llm = Llama(
         model_path=QWEN_MODEL_PATH,
         n_gpu_layers=-1,         # all layers on GPU
         main_gpu=QWEN_GPU_DEVICE,
-        n_ctx=QWEN_N_CTX,        # KV-cache budget (input + output combined)
+        n_ctx=QWEN_N_CTX,        # 0 = use model's trained max from GGUF
+        type_k=QWEN_KV_CACHE_TYPE,  # KV-cache quant, K side
+        type_v=QWEN_KV_CACHE_TYPE,  # KV-cache quant, V side
         verbose=False,
     )
+    # Report the resolved context so the user can see what the GGUF gave us.
+    # llama-cpp-python exposes n_ctx() as either a method or an int property
+    # depending on version; handle both.
+    try:
+        resolved = llm.n_ctx() if callable(getattr(llm, "n_ctx", None)) else int(llm.n_ctx)
+    except Exception:
+        resolved = "?"
+    print(f"Model loaded. Effective n_ctx = {resolved}.", flush=True)
+    return llm
 
 
 def _llm_call(llm: Llama, messages: list, temperature: float,
@@ -637,17 +690,89 @@ def _build_user_prompt(history: list, current_code: str,
         )
     lines.append(
         "The mapping will be translated to C++ (bitboard ops) for a minmax\n"
-        "search, so keep it efficiently implementable. Return the complete "
-        "module as a single ```python``` block."
+        "search, so keep it efficiently implementable.\n\n"
+        "REMINDER — OUTPUT FORMAT: wrap your final complete module between\n"
+        f"{CODE_BEGIN_MARKER} and {CODE_END_MARKER} on their own lines, with\n"
+        "no markdown fences around the sentinels. The runner extracts the\n"
+        "module purely by these markers."
     )
     return "\n".join(lines)
 
 
 def _extract_code(text: str) -> str | None:
+    # Primary path: our unambiguous sentinels. re.escape() guards against
+    # any character in the marker constants being treated as regex syntax.
+    sentinel_pat = (re.escape(CODE_BEGIN_MARKER) +
+                    r'(.*?)' +
+                    re.escape(CODE_END_MARKER))
+    m = re.search(sentinel_pat, text, re.DOTALL)
+    if m:
+        code = m.group(1).strip()
+        # Qwen sometimes still wraps the sentinel content in ```python```
+        # fences despite the instructions. Strip them if present so the
+        # extracted code is always raw Python.
+        fence = re.match(r'^```(?:python)?\s*\n(.*?)\n?```\s*$',
+                         code, re.DOTALL)
+        if fence:
+            code = fence.group(1).strip()
+        return code
+
+    # Fallback: legacy triple-backtick extraction, for the rare case Qwen
+    # ignores the sentinel instruction. Logged upstream via the "first
+    # 600 chars" print so regressions are visible.
     for pattern in [r'```python\n(.*?)```', r'```\n(.*?)```']:
         m = re.search(pattern, text, re.DOTALL)
         if m:
             return m.group(1).strip()
+    return None
+
+
+def _generate_extractable(llm: Llama, messages: list, temperature: float,
+                           label: str,
+                           max_attempts: int = GENERATION_MAX_ATTEMPTS,
+                           ) -> str | None:
+    """Call Qwen repeatedly until its response yields extractable AND
+    syntactically-valid Python. Returns the code, or None on exhaustion.
+
+    Retry triggers:
+      - _extract_code returns None (no sentinels, no fences — the model
+        produced prose only, or finished mid-answer).
+      - ast.parse raises SyntaxError (extraction succeeded but the code
+        is malformed: truncated, missing colons, stray backticks, etc.).
+
+    The same messages are re-sent each attempt; sampling stochasticity
+    provides the variation that breaks the loop. If the failure is
+    deterministic (e.g., prompt too long for n_ctx), all attempts will
+    fail identically and we give up — change the inputs, not the retry
+    count, in that case.
+    """
+    for attempt in range(1, max_attempts + 1):
+        t0 = _time.time()
+        text = _llm_call(llm, messages=messages, temperature=temperature)
+        elapsed = _fmt_secs(_time.time() - t0)
+        _log(f"Qwen {label} attempt {attempt}/{max_attempts} done "
+             f"({elapsed}, temp={temperature:.2f})")
+        print(f"── Qwen response attempt {attempt} (first 600 chars) ──")
+        print(text[:600])
+        print("─────────────────────────────────────", flush=True)
+
+        code = _extract_code(text)
+        if code is None:
+            _log(f"  attempt {attempt}: no sentinels/fences found in "
+                 f"Qwen output; retrying.")
+            continue
+        try:
+            ast.parse(code)
+        except SyntaxError as e:
+            _log(f"  attempt {attempt}: extracted code has SyntaxError "
+                 f"({e.msg} at line {e.lineno}); retrying.")
+            continue
+        if attempt > 1:
+            _log(f"  {label}: succeeded on attempt {attempt}.")
+        return code
+
+    _log(f"  {label}: exhausted {max_attempts} attempts without "
+         f"extractable+parsable code. Giving up this candidate.")
     return None
 
 
@@ -658,47 +783,38 @@ def generate_mapping(llm: Llama, history: list, current_code: str,
     `temperature`: TEMP_REFINE for incremental, TEMP_EXPLORE for exploration.
     `plateau`: if True, inject diversity-pressure guidance.
     """
-    t0 = _time.time()
-    text = _llm_call(
-        llm,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": _build_user_prompt(history,
-                                                              current_code,
-                                                              plateau=plateau)},
-        ],
-        temperature=temperature,
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user",   "content": _build_user_prompt(history,
+                                                          current_code,
+                                                          plateau=plateau)},
+    ]
+    return _generate_extractable(
+        llm, messages, temperature,
+        label=f"generation (plateau={plateau})",
     )
-    _log(f"Qwen generation done ({_fmt_secs(_time.time() - t0)}, "
-         f"temp={temperature:.2f}, plateau={plateau})")
-    print("── Qwen response (first 600 chars) ──")
-    print(text[:600])
-    print("─────────────────────────────────────", flush=True)
-    return _extract_code(text)
 
 
 def fix_mapping(llm: Llama, bad_code: str, error: str) -> str | None:
     """Ask Qwen to fix broken code, providing the exact traceback."""
     _log("Asking Qwen to fix the broken mapping …")
-    t0 = _time.time()
-    text = _llm_call(
-        llm,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": (
-                f"The following mapping module has a bug:\n"
-                f"```python\n{bad_code}\n```\n\n"
-                f"Running it produced this error:\n"
-                f"```\n{error}\n```\n\n"
-                f"Fix the bug and return the corrected complete module "
-                f"in a single ```python``` code block. "
-                f"Do not change the overall approach, just fix the error."
-            )},
-        ],
-        temperature=TEMP_FIX,
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": (
+            f"The following mapping module has a bug:\n"
+            f"```python\n{bad_code}\n```\n\n"
+            f"Running it produced this error:\n"
+            f"```\n{error}\n```\n\n"
+            f"Fix the bug and return the corrected COMPLETE module "
+            f"wrapped between {CODE_BEGIN_MARKER} and {CODE_END_MARKER} "
+            f"on their own lines (no markdown fences around the "
+            f"sentinels). Do not change the overall approach, just "
+            f"fix the error."
+        )},
+    ]
+    return _generate_extractable(
+        llm, messages, temperature=TEMP_FIX, label="fix",
     )
-    _log(f"Qwen fix done ({_fmt_secs(_time.time() - t0)})")
-    return _extract_code(text)
 
 
 # ── Dynamic mapping loading (cached per process) ───────────────────────────────
