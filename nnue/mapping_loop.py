@@ -51,7 +51,7 @@ torch.set_float32_matmul_precision('high')
 # llama-cpp-python on GPU QWEN_GPU_DEVICE (in-process, no server needed —
 # works natively in Singularity with --nv). Update QWEN_MODEL_PATH to match
 # the GGUF file you downloaded.
-QWEN_MODEL_PATH = "./models/qwen3.6-35b-a3b-instruct-q4_k_m.gguf"
+QWEN_MODEL_PATH = "./models/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf"
 QWEN_GPU_DEVICE = 0    # int — passed to llama-cpp's `main_gpu` (GPU index)
 TRAINING_GPU    = "1"  # str — passed to CUDA_VISIBLE_DEVICES (env var)
 DATA_DIR       = "./data"
@@ -67,23 +67,26 @@ GENERATION_MAX_ATTEMPTS = 8  # per-candidate re-queries to Qwen when its output
 NB_EPOCHS      = 2
 BATCH_SIZE     = 256
 # n_ctx is the TOTAL llama.cpp KV-cache budget (input + output combined).
-# 131072 (128K) gives the model a very wide canvas for thinking mode and
-# long final modules. Rough VRAM accounting on a 48 GB GPU:
-#   22 GB (Q4_K_M weights) + ~12 GB (fp16 KV at 128K) + ~2 GB (buffers)
-#   ≈ 36 GB, leaving ~12 GB free. Fits on L40S / A40 / RTX 8000.
-# Do NOT raise this to 256K without switching KV to Q8_0 — at fp16 it
-# would OOM (~24 GB KV alone).
+# 98304 (96K) keeps a wide canvas for thinking mode and long final modules
+# while leaving VRAM headroom on a 48 GB GPU with UD-Q8_K_XL weights:
+#   38.5 GB (UD-Q8_K_XL weights) + ~4.5 GB (Q8_0 KV at 96K) + ~2 GB (buffers)
+#   ≈ 45 GB, leaving ~3 GB free. Fits on L40S / A40 / RTX 8000 / L40.
+# Raising to 131072 (128K) with this variant pushes total to ~46.5 GB with
+# only ~1.5 GB headroom — one long prompt can OOM during generation.
+# With Q8_0 weights we MUST use Q8_0 KV cache — fp16 KV at this ctx would
+# push total well past 48 GB.
 # QWEN_MAX_TOKENS = -1 means "no output cap" — generate until EOS or
 # until n_ctx is exhausted.
-QWEN_N_CTX      = 131072
+QWEN_N_CTX      = 98304
 QWEN_MAX_TOKENS = -1     # -1 => generate until EOS or n_ctx is exhausted
 
 # KV-cache quantization as a ggml type code (passed through to llama.cpp).
 #   1 = GGML_TYPE_F16   (default, fp16 = 2 bytes/element, highest fidelity)
 #   8 = GGML_TYPE_Q8_0  (~half the memory, negligible quality loss)
 #   2 = GGML_TYPE_Q4_0  (quarter memory, noticeable quality degradation)
-# fp16 is the safe default for reasoning-heavy workloads like this one.
-QWEN_KV_CACHE_TYPE = 1   # GGML_TYPE_F16
+# Q8_0 is required here to fit Q8_0 weights + 128K context on a 48 GB GPU;
+# quality impact on reasoning is reported as negligible.
+QWEN_KV_CACHE_TYPE = 8   # GGML_TYPE_Q8_0
 
 # Sentinel markers Qwen must wrap the final code in. The triple
 # angle-brackets are deliberately unusual — they will not appear inside
@@ -104,9 +107,9 @@ COST_TIMING_RUNS       = 30    # how many times to run mapping() per test pos
 MISS_SAMPLE_SIZE       = 20     # misclassified examples shown to Qwen per round
 MAX_POSITIONS          = 15_000_000  # cap total training positions loaded from
                                      # DATA_DIR; None = use all (~1B is slow)
-TEMP_REFINE            = 0.4   # Qwen temperature when refining a strong mapping
-TEMP_EXPLORE           = 0.85  # Qwen temperature when exploring / on plateau
-TEMP_FIX               = 0.2   # Qwen temperature when repairing a buggy module
+TEMP_REFINE            = 0.25  # Qwen temperature when refining a strong mapping
+TEMP_EXPLORE           = 0.6   # Qwen temperature when exploring / on plateau
+TEMP_FIX               = 0.1   # Qwen temperature when repairing a buggy module
 
 HISTORY_FILE = os.path.join(MAPPING_DIR, "history.jsonl")
 
