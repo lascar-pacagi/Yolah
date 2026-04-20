@@ -49,7 +49,9 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
         --index-url https://download.pytorch.org/whl/cu124
 
     # ── General Python deps ───────────────────────────────────────────────────
-    pip3 install --no-cache-dir numpy tqdm
+    # parso is a tolerant Python parser used as a last-resort rescue when
+    # Qwen emits near-valid code that ast.parse rejects.
+    pip3 install --no-cache-dir numpy tqdm parso
 
     # ── llama-cpp-python with CUDA backend ────────────────────────────────────
     # GGML_CUDA=on compiles the CUDA kernels so Qwen3.6-35B-A3B runs on GPU.

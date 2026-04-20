@@ -23,4 +23,4 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     
 %runscript
     cd /nnue
-    python3 cnn_resnet.py
+    python3 nnue_multigpu5.py

@@ -29,6 +29,7 @@ import sys
 import glob
 import itertools
 import traceback
+import unicodedata
 
 import numpy as np
 import torch
@@ -67,17 +68,11 @@ GENERATION_MAX_ATTEMPTS = 8  # per-candidate re-queries to Qwen when its output
 NB_EPOCHS      = 2
 BATCH_SIZE     = 256
 # n_ctx is the TOTAL llama.cpp KV-cache budget (input + output combined).
-# 98304 (96K) keeps a wide canvas for thinking mode and long final modules
-# while leaving VRAM headroom on a 48 GB GPU with UD-Q8_K_XL weights:
-#   38.5 GB (UD-Q8_K_XL weights) + ~4.5 GB (Q8_0 KV at 96K) + ~2 GB (buffers)
-#   ≈ 45 GB, leaving ~3 GB free. Fits on L40S / A40 / RTX 8000 / L40.
-# Raising to 131072 (128K) with this variant pushes total to ~46.5 GB with
-# only ~1.5 GB headroom — one long prompt can OOM during generation.
-# With Q8_0 weights we MUST use Q8_0 KV cache — fp16 KV at this ctx would
-# push total well past 48 GB.
+# 32768 (32K): ~38.5 GB weights + ~1.5 GB Q8_0 KV + ~2 GB buffers ≈ 42 GB.
+# Fits GPUs with less than 48 GB (e.g. 40 GB A100). Raise to 98304 on 48 GB+.
 # QWEN_MAX_TOKENS = -1 means "no output cap" — generate until EOS or
 # until n_ctx is exhausted.
-QWEN_N_CTX      = 98304
+QWEN_N_CTX      = 0      # 0 = use the GGUF's trained max context
 QWEN_MAX_TOKENS = -1     # -1 => generate until EOS or n_ctx is exhausted
 
 # KV-cache quantization as a ggml type code (passed through to llama.cpp).
@@ -512,6 +507,16 @@ RULES:
 - Do NOT include any training or testing code.
 - The mapping function must be DETERMINISTIC (same input → same output).
 - All values in the output tensor must be finite (no NaN, no Inf).
+- The module must be syntactically valid Python. Balance every
+  parenthesis, bracket, brace, and f-string. Do not emit partial hex
+  literals (e.g. `0x00000000000000` with no trailing hex digit) or
+  half-written statements. Complete every `if`/`for`/`def` with its body.
+- Emit ONLY ASCII characters inside the code module. No smart quotes
+  (" " ' '), no em/en-dashes (- -), no non-breaking spaces, no
+  zero-width characters, no UTF-8 BOM. Use straight ASCII quotes
+  ("), apostrophes ('), and the hyphen-minus (-) only. A single stray
+  unicode character at column 0 of line 1 will break `ast.parse`
+  with "invalid syntax at line 1" even though the code looks correct.
 
 OUTPUT FORMAT (STRICT — the runner extracts your code by these markers):
 Your final answer MUST contain the complete mapping module wrapped
@@ -544,6 +549,7 @@ def load_llm() -> Llama:
         n_ctx=QWEN_N_CTX,        # 0 = use model's trained max from GGUF
         type_k=QWEN_KV_CACHE_TYPE,  # KV-cache quant, K side
         type_v=QWEN_KV_CACHE_TYPE,  # KV-cache quant, V side
+        flash_attn=True,         # required when type_k/type_v are quantized
         verbose=False,
     )
     # Report the resolved context so the user can see what the GGUF gave us.
@@ -557,22 +563,97 @@ def load_llm() -> Llama:
     return llm
 
 
+# ── Heartbeat cadence for streamed Qwen calls ──────────────────────────────
+# How often the streaming loop emits a "still generating" progress line.
+# Low enough to confirm liveness, high enough to not spam SLURM logs.
+QWEN_HEARTBEAT_SECS = 30.0
+
+
 def _llm_call(llm: Llama, messages: list, temperature: float,
               max_tokens: int = QWEN_MAX_TOKENS) -> tuple[str, str]:
-    """Run a chat completion and return (raw_text, stripped_text).
+    """Run a STREAMED chat completion and return (raw_text, stripped_text).
 
-    Qwen3 instruct GGUFs ship with thinking mode ON by default: the model
-    emits its chain-of-thought wrapped in <think>...</think> before the
-    final answer. Downstream code-extraction only cares about the stripped
-    answer, but we also return the RAW text so _log_full_exchange can
-    persist the full reasoning trace to the log.
+    The generation can take tens of minutes on a 35B MoE at 128K context
+    with thinking mode on — a blocking call gives zero feedback during
+    that time, which makes "is it stuck?" impossible to answer from the
+    SLURM log. We stream token-by-token and emit a heartbeat every
+    QWEN_HEARTBEAT_SECS seconds with:
+      - elapsed wall time
+      - output chunks seen (≈ tokens)
+      - current tok/s rate
+      - inferred phase (pre-think / thinking / answering / emitting-code)
+
+    Phase detection is a best-effort substring match on the accumulated
+    output: the moment we see `<think>` we're in reasoning, `</think>`
+    flips to answer, and seeing the begin-sentinel means the final code
+    is being written. No state machine, just a hint so the user can
+    distinguish "still reasoning" from "writing the module".
+
+    Qwen3 instruct GGUFs ship with thinking mode ON by default; we strip
+    the <think>...</think> wrapper from the stripped_text returned to the
+    extractor, but the raw text still carries it for the SLURM dump.
     """
-    response = llm.create_chat_completion(
+    # Log up-front what we're about to do — prompt size tells the user
+    # whether context is the bottleneck before the call even starts.
+    prompt_chars = sum(len(m.get("content", "")) for m in messages)
+    prompt_tokens_est = prompt_chars // 4  # rough, 4 chars/token
+    _log(f"  qwen stream start: prompt≈{prompt_chars} chars "
+         f"(~{prompt_tokens_est} tok), max_tokens={max_tokens}, "
+         f"temp={temperature:.2f}")
+
+    t0 = _time.time()
+    last_beat = t0
+    chunks_out: list[str] = []
+    n_events = 0
+    phase = "pre-think"
+
+    stream = llm.create_chat_completion(
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
+        stream=True,
     )
-    raw = response["choices"][0]["message"]["content"]
+
+    for ev in stream:
+        try:
+            delta = ev["choices"][0]["delta"].get("content", "")
+        except (KeyError, IndexError):
+            continue
+        if not delta:
+            continue
+        chunks_out.append(delta)
+        n_events += 1
+
+        # Cheap phase inference — cost is O(len(delta)) per token, fine.
+        if phase == "pre-think" and "<think>" in delta:
+            phase = "thinking"
+            _log(f"  qwen phase → thinking (after "
+                 f"{_fmt_secs(_time.time() - t0)})")
+        elif phase == "thinking" and "</think>" in delta:
+            phase = "answering"
+            _log(f"  qwen phase → answering (after "
+                 f"{_fmt_secs(_time.time() - t0)})")
+        elif phase != "emitting-code" and CODE_BEGIN_MARKER in delta:
+            phase = "emitting-code"
+            _log(f"  qwen phase → emitting-code (after "
+                 f"{_fmt_secs(_time.time() - t0)})")
+
+        now = _time.time()
+        if now - last_beat >= QWEN_HEARTBEAT_SECS:
+            elapsed = now - t0
+            rate = n_events / elapsed if elapsed > 0 else 0.0
+            _log(f"  qwen heartbeat: phase={phase}  "
+                 f"tokens≈{n_events}  rate={rate:.1f}/s  "
+                 f"elapsed={_fmt_secs(elapsed)}")
+            last_beat = now
+
+    raw = "".join(chunks_out)
+    total = _time.time() - t0
+    rate = n_events / total if total > 0 else 0.0
+    _log(f"  qwen stream done: phase={phase}  tokens≈{n_events}  "
+         f"rate={rate:.1f}/s  elapsed={_fmt_secs(total)}  "
+         f"output≈{len(raw)} chars")
+
     stripped = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
     return raw, stripped
 
@@ -661,16 +742,21 @@ def _build_user_prompt(history: list, current_code: str,
                          f"{h['mapped_dim']:>4}  {cost:>7.1f}µ  "
                          f"{h['description']}{mark}")
 
-        # ── Top-K mappings: full code so Qwen can cross-pollinate ──
+        # ── Top-K mappings: DESCRIPTIONS ONLY (no code) ──
+        # Showing the full source anchors Qwen to copy-paste-plus-aggregate,
+        # which is exactly the failure mode we're fighting. Make it re-derive
+        # structure from a short description instead.
         top_k = sorted(history, key=lambda h: h['val_acc'], reverse=True
                        )[:TOP_K_IN_PROMPT]
+        lines.append("\nTop-K previous mappings (descriptions only — you must "
+                     "RE-DERIVE any structure you want to reuse):")
         for rank, h in enumerate(top_k, 1):
             cand = h.get('candidate', 0)
-            lines.append(f"\n#{rank} mapping (v{h['iteration']}.{cand}, "
-                         f"val_acc={h['val_acc']:.4f}, "
-                         f"dim={h['mapped_dim']}, "
-                         f"cost={h.get('cost_us', 0):.1f}µs/call):")
-            lines.append(f"```python\n{h['code']}\n```")
+            lines.append(f"  #{rank}  v{h['iteration']}.{cand}  "
+                         f"val_acc={h['val_acc']:.4f}  "
+                         f"dim={h['mapped_dim']}  "
+                         f"cost={h.get('cost_us', 0):.1f}µs  "
+                         f"— {h['description']}")
 
         # ── Diagnostics for the SINGLE best (confusion + sample misses) ──
         conf = best_entry.get('confusion')
@@ -709,24 +795,156 @@ def _build_user_prompt(history: list, current_code: str,
     else:
         lines.append(
             "\nDesign a NEW mapping that you expect to outperform the best.\n"
-            "Cross-pollinate ideas from the top-K mappings shown — the goal "
-            "is to maximize val_acc while keeping cost per call low (<10µs is "
-            "ideal for the C++ port). Consider:\n"
-            "- Mobility: free squares reachable per piece (sliding 8 dirs)\n"
-            "- Territory: connected free space each side controls\n"
-            "- Score-difference and remaining free squares\n"
-            "- Piece clustering vs. spread (boxed pieces lose)\n"
-            "- Patterns that distinguish the misclassified examples above.\n"
+            "HARD RULE — the new mapping must include AT LEAST ONE feature "
+            "family that is ABSENT from every top-K description above. The "
+            "neural net can already learn sums/diffs/ratios/max/min of "
+            "features the top-K already expose; pre-computing such "
+            "aggregations adds no signal. You must add a genuinely new "
+            "SOURCE of signal, not a rearrangement.\n"
+            "\n"
+            "Families worth considering (pick ones NOT in the top-K):\n"
+            "- Parity / ply-counted features (whose turn × contested squares).\n"
+            "- The contested BORDER between black- and white-influenced regions\n"
+            "  — width, length, or squares reachable in equal ply by both.\n"
+            "- Trapped-piece detection (piece whose only escapes shrink in k plies).\n"
+            "- Symmetry signals (how the position changes under board flip /\n"
+            "  colour swap — asymmetry magnitude is informative).\n"
+            "- Distance-to-opponent, or sum of min-Chebyshev distances between\n"
+            "  opposing pieces.\n"
+            "- Moves that would IMMEDIATELY reduce the opponent's mobility\n"
+            "  (origin-square blocking effects, one ply lookahead).\n"
+            "- Discriminants for the specific misclassifications above —\n"
+            "  identify a feature that is cleanly different on those cases.\n"
+            "\n"
+            "Keep the mapping efficiently implementable in C++ with bitboard\n"
+            "ops; target <10µs/call.\n"
         )
     lines.append(
         "The mapping will be translated to C++ (bitboard ops) for a minmax\n"
         "search, so keep it efficiently implementable.\n\n"
+        "SELF-CHECK BEFORE EMITTING: for every bitboard mask you define "
+        "(centre, corner, edge, region, etc.), list the (file,rank) squares "
+        "it actually covers and confirm they match your comment. The board "
+        "layout is little-endian rank-file: bit i = file (i%8), rank (i//8). "
+        "This check catches the common mistake where 0x0F | 0xF0 | "
+        "0x0F00...00 | 0xF000...00 is labelled 'corners' but actually covers "
+        "ranks 1 and 8.\n\n"
         "REMINDER — OUTPUT FORMAT: wrap your final complete module between\n"
         f"{CODE_BEGIN_MARKER} and {CODE_END_MARKER} on their own lines, with\n"
         "no markdown fences around the sentinels. The runner extracts the\n"
         "module purely by these markers."
     )
     return "\n".join(lines)
+
+
+_UNICODE_TRANSLATIONS = {
+    # Curly / typographic quotes → ASCII equivalents.
+    '\u2018': "'", '\u2019': "'", '\u201A': "'", '\u201B': "'",
+    '\u201C': '"', '\u201D': '"', '\u201E': '"', '\u201F': '"',
+    '\u2032': "'", '\u2033': '"',
+    # Dashes → ASCII hyphen-minus. Qwen loves em-dashes in comments,
+    # which ast.parse tolerates in strings but not in identifiers — and
+    # the cost of normalizing comments/strings is zero.
+    '\u2013': '-', '\u2014': '-', '\u2015': '-', '\u2212': '-',
+    # Spaces that aren't ASCII 0x20.
+    '\u00A0': ' ', '\u2009': ' ', '\u200A': ' ', '\u202F': ' ',
+    '\u3000': ' ',
+    # Ellipsis.
+    '\u2026': '...',
+}
+_ZERO_WIDTH = ''.maketrans('', '', ''.join([
+    '\uFEFF',  # BOM
+    '\u200B', '\u200C', '\u200D', '\u200E', '\u200F',  # zero-width*
+    '\u2060', '\u2061', '\u2062', '\u2063', '\u2064',  # word-joiner & invisibles
+]))
+
+def _sanitize_code(code: str) -> str:
+    """Repair common LLM output artefacts that would trip ast.parse.
+
+    Applies, in order:
+      1. Unicode normalize (NFKC).
+      2. Strip zero-width / BOM characters that are invisible in logs
+         but make the tokenizer blow up at column 0.
+      3. Replace smart quotes, em-dashes, non-breaking spaces with their
+         ASCII equivalents.
+      4. Drop leading lines that can't be valid Python starts (stray
+         backticks, stray sentinels the regex missed, blank-but-weird
+         whitespace).
+      5. Strip trailing markdown fences the sentinel regex may have
+         preserved (` ``` ` on its own line at the end).
+      6. Auto-balance unmatched (), [], {} by appending closers.
+    """
+    # (1) NFKC folds width/compatibility variants (e.g. fullwidth ASCII).
+    code = unicodedata.normalize('NFKC', code)
+    # (2) Zero-width and BOM characters.
+    code = code.translate(_ZERO_WIDTH)
+    # (3) Typographic punctuation → ASCII.
+    for bad, good in _UNICODE_TRANSLATIONS.items():
+        if bad in code:
+            code = code.replace(bad, good)
+    # (4) Drop garbage lines at the very top. A valid Python module can
+    # begin with blanks, comments, or any statement — but NOT with stray
+    # backticks or leftover sentinel fragments.
+    lines = code.splitlines()
+    while lines and lines[0].strip().startswith(('```', '<<<', '>>>')):
+        lines.pop(0)
+    # (5) Drop a single trailing fence on its own line.
+    while lines and lines[-1].strip() in ('```', '```python'):
+        lines.pop()
+    code = '\n'.join(lines).strip()
+    # (6) Auto-balance brackets. Only append closers — never insert
+    # openers — since missing openers means the code is fundamentally
+    # corrupted and autofix would be a guess.
+    pairs = {'(': ')', '[': ']', '{': '}'}
+    stack: list[str] = []
+    in_str: str | None = None
+    esc = False
+    for ch in code:
+        if in_str:
+            if esc: esc = False
+            elif ch == '\\': esc = True
+            elif ch == in_str: in_str = None
+            continue
+        if ch in ('"', "'"):
+            in_str = ch
+        elif ch in pairs:
+            stack.append(pairs[ch])
+        elif ch in pairs.values():
+            if stack and stack[-1] == ch: stack.pop()
+            # mismatched closers are left as-is — autofixing them is a
+            # guess that can silently break the AST.
+    if stack:
+        code = code + '\n' + ''.join(reversed(stack))
+    return code
+
+
+def _hex_preview(text: str, n: int = 80) -> str:
+    """Hex dump of the first n bytes of `text` — used when ast.parse
+    fails on something that looks valid, to expose non-printing chars.
+    """
+    b = text.encode('utf-8', errors='replace')[:n]
+    return ' '.join(f'{x:02x}' for x in b)
+
+
+def _tolerant_parse(code: str) -> str | None:
+    """Last-resort: try parso (if available) to recover a well-formed
+    module from slightly-malformed source. parso can often round-trip
+    code that ast.parse rejects. Returns the repaired source, or None.
+    """
+    try:
+        import parso  # type: ignore
+    except ImportError:
+        return None
+    try:
+        tree = parso.parse(code, error_recovery=True)
+    except Exception:
+        return None
+    repaired = tree.get_code()
+    try:
+        ast.parse(repaired)
+    except SyntaxError:
+        return None
+    return repaired
 
 
 def _extract_code(text: str) -> str | None:
@@ -745,7 +963,7 @@ def _extract_code(text: str) -> str | None:
                          code, re.DOTALL)
         if fence:
             code = fence.group(1).strip()
-        return code
+        return _sanitize_code(code)
 
     # Fallback: legacy triple-backtick extraction, for the rare case Qwen
     # ignores the sentinel instruction. Logged upstream via the "first
@@ -753,7 +971,7 @@ def _extract_code(text: str) -> str | None:
     for pattern in [r'```python\n(.*?)```', r'```\n(.*?)```']:
         m = re.search(pattern, text, re.DOTALL)
         if m:
-            return m.group(1).strip()
+            return _sanitize_code(m.group(1).strip())
     return None
 
 
@@ -770,36 +988,82 @@ def _generate_extractable(llm: Llama, messages: list, temperature: float,
       - ast.parse raises SyntaxError (extraction succeeded but the code
         is malformed: truncated, missing colons, stray backticks, etc.).
 
-    The same messages are re-sent each attempt; sampling stochasticity
-    provides the variation that breaks the loop. If the failure is
-    deterministic (e.g., prompt too long for n_ctx), all attempts will
-    fail identically and we give up — change the inputs, not the retry
-    count, in that case.
+    On failure we carry the previous assistant reply AND a targeted
+    corrective user message into `messages`, so the next call is a
+    surgical repair, not a blind re-sample. Temperature is also decayed
+    each retry (×0.8, floor 0.1) since repeated sampling at the same
+    temperature tends to repeat the same mistake.
     """
+    messages = list(messages)  # local copy — we will append on failure
+    cur_temp = temperature
     for attempt in range(1, max_attempts + 1):
         t0 = _time.time()
         raw_text, text = _llm_call(llm, messages=messages,
-                                    temperature=temperature)
+                                    temperature=cur_temp)
         elapsed = _fmt_secs(_time.time() - t0)
         _log(f"Qwen {label} attempt {attempt}/{max_attempts} done "
-             f"({elapsed}, temp={temperature:.2f})")
+             f"({elapsed}, temp={cur_temp:.2f})")
 
         # Full transcript — prompt (every role) + raw response (including
         # Qwen's <think>...</think> reasoning) — is emitted unconditionally
         # so the SLURM log captures the complete exchange for every attempt.
-        _log_full_exchange(attempt, max_attempts, label, temperature,
+        _log_full_exchange(attempt, max_attempts, label, cur_temp,
                            messages, raw_text)
 
         code = _extract_code(text)
         if code is None:
+            # Expose the bytes around where the sentinel SHOULD have been so
+            # we can diagnose cases where Qwen emits a near-miss marker.
             _log(f"  attempt {attempt}: no sentinels/fences found in "
-                 f"Qwen output; retrying.")
+                 f"Qwen output (first 200 bytes of stripped text: "
+                 f"{_hex_preview(text, 200)}); retrying with corrective "
+                 f"feedback.")
+            messages.append({"role": "assistant", "content": raw_text})
+            messages.append({"role": "user", "content": (
+                f"Your previous reply did not contain the required "
+                f"sentinels {CODE_BEGIN_MARKER} and {CODE_END_MARKER} on "
+                f"their own lines. Emit the COMPLETE mapping module again, "
+                f"wrapped between those two sentinels (no markdown fences "
+                f"around the sentinels). Do not truncate."
+            )})
+            cur_temp = max(0.1, cur_temp * 0.8)
             continue
         try:
             ast.parse(code)
         except SyntaxError as e:
+            err_line = e.lineno or 0
+            # Show the offending line and a small window of context so
+            # Qwen can see exactly where the parser choked.
+            src_lines = code.splitlines()
+            lo = max(0, err_line - 3); hi = min(len(src_lines), err_line + 2)
+            window = "\n".join(f"{i+1:4d}: {src_lines[i]}"
+                               for i in range(lo, hi))
+
+            # Last-resort: parso tolerant-parse rescue. parso often recovers
+            # modules that ast.parse rejects on superficial errors.
+            rescued = _tolerant_parse(code)
+            if rescued is not None:
+                _log(f"  attempt {attempt}: ast.parse failed "
+                     f"({e.msg} at line {err_line}) but parso rescued the "
+                     f"module; accepting the rescued source.")
+                return rescued
+
             _log(f"  attempt {attempt}: extracted code has SyntaxError "
-                 f"({e.msg} at line {e.lineno}); retrying.")
+                 f"({e.msg} at line {err_line}); first 80 bytes = "
+                 f"{_hex_preview(code, 80)}; retrying with the error "
+                 f"fed back.")
+            messages.append({"role": "assistant", "content": raw_text})
+            messages.append({"role": "user", "content": (
+                f"Your previous module failed to parse with "
+                f"SyntaxError: {e.msg} at line {err_line} "
+                f"(offset {e.offset}).\n"
+                f"Context around that line:\n```\n{window}\n```\n"
+                f"Fix the syntax error and emit the COMPLETE corrected "
+                f"module between {CODE_BEGIN_MARKER} and "
+                f"{CODE_END_MARKER} on their own lines. Keep the same "
+                f"overall approach; repair the error only."
+            )})
+            cur_temp = max(0.1, cur_temp * 0.8)
             continue
         if attempt > 1:
             _log(f"  {label}: succeeded on attempt {attempt}.")

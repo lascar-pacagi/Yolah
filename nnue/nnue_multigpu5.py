@@ -18,6 +18,13 @@ from yolah import Yolah, Move, Square
 
 torch.set_float32_matmul_precision('high')
 
+# DataLoader workers default to sharing tensors through /dev/shm, which on
+# SLURM + Singularity is typically capped to ~64 MB by the cgroup and
+# triggers a SIGBUS ("Bus error") the moment the first batch is handed
+# off. Switching to the file_system strategy moves IPC to regular temp
+# files, removing the /dev/shm dependency entirely.
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 def bit_not(n, numbits=64):
     return (1 << numbits) - 1 - n
 
@@ -158,7 +165,7 @@ class Net(nn.Module):
             fc.weight.data.clamp_(-127/64, 127/64)
             fc.bias.data.clamp_(-127/64, 127/64)
 
-NB_EPOCHS=300
+NB_EPOCHS=30
 #MODEL_PATH="./"
 MODEL_PATH="/mnt/"
 MODEL_NAME="nnue_1024x64x32x3_2"
@@ -183,7 +190,7 @@ def dataloader_ddp(trainset, valset, batch_size):
     # )
     train_loader = DataLoader(
         trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train,
-        num_workers=2, pin_memory=True, prefetch_factor=2
+        num_workers=0, pin_memory=True
     )
     val_loader = DataLoader(
         valset, batch_size=batch_size, shuffle=False, sampler=sampler_val,
@@ -308,4 +315,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = GameDataset(GAME_DIR)
-    mp.spawn(main, args=(world_size, 512 * 4, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
