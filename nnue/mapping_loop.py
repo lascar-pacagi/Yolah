@@ -948,30 +948,75 @@ def _tolerant_parse(code: str) -> str | None:
 
 
 def _extract_code(text: str) -> str | None:
-    # Primary path: our unambiguous sentinels. re.escape() guards against
-    # any character in the marker constants being treated as regex syntax.
-    sentinel_pat = (re.escape(CODE_BEGIN_MARKER) +
-                    r'(.*?)' +
-                    re.escape(CODE_END_MARKER))
-    m = re.search(sentinel_pat, text, re.DOTALL)
-    if m:
-        code = m.group(1).strip()
-        # Qwen sometimes still wraps the sentinel content in ```python```
-        # fences despite the instructions. Strip them if present so the
-        # extracted code is always raw Python.
+    """Extract the mapping module from Qwen's raw output.
+
+    Qwen frequently mentions the sentinel NAMES in prose before emitting
+    the real fenced block ("...and then end with <<<MAPPING_CODE_BEGIN>>>"),
+    which means a naive first-BEGIN → first-END match captures garbage.
+    The extractor therefore:
+
+      1. Enumerates ALL begin/end positions.
+      2. Prefers the LAST begin + last end after it — this is almost
+         always the real emission, since Qwen's final sentinel pair is
+         the one wrapping the module.
+      3. If that slice doesn't ast-parse, walks every (begin_i, end_j>i)
+         pair from most-recent to oldest and returns the first slice
+         that parses. This is a small Cartesian walk but is bounded by
+         how many sentinels Qwen sprinkles (usually ≤ 3 of each).
+
+    Sanitization runs on every candidate before the parse check so that
+    unicode / balance issues don't hide a valid slice.
+    """
+    def _unwrap_fence(s: str) -> str:
         fence = re.match(r'^```(?:python)?\s*\n(.*?)\n?```\s*$',
-                         code, re.DOTALL)
-        if fence:
-            code = fence.group(1).strip()
-        return _sanitize_code(code)
+                         s, re.DOTALL)
+        return fence.group(1).strip() if fence else s
+
+    begins = [m.end() for m in re.finditer(re.escape(CODE_BEGIN_MARKER),
+                                            text)]
+    ends   = [m.start() for m in re.finditer(re.escape(CODE_END_MARKER),
+                                              text)]
+
+    if begins and ends:
+        # 1. Try last-BEGIN + last-END (the common-case fast path).
+        for b in reversed(begins):
+            valid_ends = [e for e in ends if e > b]
+            if not valid_ends:
+                continue
+            # Prefer the last end for this begin — captures the whole
+            # trailing module even if Qwen mentioned the END sentinel in
+            # prose between the preamble and the real code.
+            for e in reversed(valid_ends):
+                cand = _sanitize_code(_unwrap_fence(text[b:e].strip()))
+                try:
+                    ast.parse(cand)
+                    return cand
+                except SyntaxError:
+                    continue
+        # 2. No pair parses — return the last-BEGIN + last-END anyway
+        # so the SyntaxError path in _generate_extractable still shows
+        # Qwen the best-guess slice (rather than None → "missing
+        # sentinels", which would mislead the repair message).
+        b = begins[-1]
+        e = max(e for e in ends if e > b) if any(e > b for e in ends) \
+            else ends[-1]
+        return _sanitize_code(_unwrap_fence(text[b:e].strip()))
 
     # Fallback: legacy triple-backtick extraction, for the rare case Qwen
-    # ignores the sentinel instruction. Logged upstream via the "first
-    # 600 chars" print so regressions are visible.
+    # ignores the sentinel instruction entirely.
     for pattern in [r'```python\n(.*?)```', r'```\n(.*?)```']:
-        m = re.search(pattern, text, re.DOTALL)
-        if m:
-            return _sanitize_code(m.group(1).strip())
+        matches = list(re.finditer(pattern, text, re.DOTALL))
+        if not matches:
+            continue
+        # Prefer the last fenced block, same logic as the sentinel path.
+        for m in reversed(matches):
+            cand = _sanitize_code(m.group(1).strip())
+            try:
+                ast.parse(cand)
+                return cand
+            except SyntaxError:
+                continue
+        return _sanitize_code(matches[-1].group(1).strip())
     return None
 
 
