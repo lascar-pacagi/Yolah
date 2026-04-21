@@ -546,6 +546,11 @@ def load_llm() -> Llama:
         model_path=QWEN_MODEL_PATH,
         n_gpu_layers=-1,         # all layers on GPU
         main_gpu=QWEN_GPU_DEVICE,
+        # L40S has no NVLink — splitting weights forces activations over
+        # PCIe (~32 GB/s) per layer per token, an order of magnitude
+        # slower than single-GPU HBM (~864 GB/s). Q8_K_XL weights (~20 GB)
+        # fit easily in one L40S's 48 GB, so keep everything on main_gpu.
+        split_mode=0,            # LLAMA_SPLIT_MODE_NONE = single GPU only
         n_ctx=QWEN_N_CTX,        # 0 = use model's trained max from GGUF
         type_k=QWEN_KV_CACHE_TYPE,  # KV-cache quant, K side
         type_v=QWEN_KV_CACHE_TYPE,  # KV-cache quant, V side
@@ -611,6 +616,12 @@ def _llm_call(llm: Llama, messages: list, temperature: float,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
+        # Mild repetition penalty breaks the degenerate short-cycle loops
+        # ("and and and…", repeated block regurgitation) that Qwen3 can
+        # fall into at low temperature or after a long, noisy context.
+        # 1.1 is gentle enough to leave normal code-variable repetition
+        # intact.
+        repeat_penalty=1.1,
         stream=True,
     )
 
@@ -1698,27 +1709,39 @@ if __name__ == "__main__":
                  f"history_size={len(history)}", char="═")
 
         # ── Step A: generate NB_CANDIDATES_PER_ITER drafts ──
-        # First candidate refines the current best (low temperature);
-        # additional candidates explore (high temperature). On plateau, every
-        # candidate gets the diversity-pressure prompt.
-        drafts: list = [current_code]  # candidate 0 = current draft as seed
-        # If history is empty (very first iter), candidate 0 is INITIAL.
-        # Always also ask Qwen for fresh drafts via generate_mapping():
-        gen_count = NB_CANDIDATES_PER_ITER if history else 0
-        for k in range(gen_count):
-            temp = TEMP_EXPLORE if (plateau or k > 0) else TEMP_REFINE
-            _log(f"  Generating candidate #{k+1}/{gen_count} "
-                 f"(temp={temp:.2f}, plateau={plateau}) …")
-            new_code = generate_mapping(llm, history, current_code,
-                                         temperature=temp, plateau=plateau)
-            if new_code:
-                drafts.append(new_code)
-            else:
-                _log(f"  Could not extract code from Qwen response "
-                     f"(candidate #{k+1}); skipping.")
-        # Keep at most NB_CANDIDATES_PER_ITER actual candidates
-        # (the seed + Qwen drafts).
-        drafts = drafts[:max(1, NB_CANDIDATES_PER_ITER)]
+        # On iter 1 (empty history) the seed itself has not been scored
+        # yet, so we keep it as candidate 0 and skip Qwen generation.
+        # On iter 2+ the seed IS the current best and its val_acc is
+        # already in history — re-training it would be pure waste — so
+        # we generate NB_CANDIDATES_PER_ITER fresh drafts from Qwen and
+        # train only those.
+        drafts: list = []
+        if not history:
+            drafts.append(current_code)
+            _log(f"  Seed candidate (iter 1): training INITIAL mapping.")
+        else:
+            for k in range(NB_CANDIDATES_PER_ITER):
+                # First Qwen draft refines (low temp); later drafts explore.
+                # On plateau, every draft gets the exploration temperature.
+                temp = TEMP_EXPLORE if (plateau or k > 0) else TEMP_REFINE
+                _log(f"  Generating candidate #{k+1}/"
+                     f"{NB_CANDIDATES_PER_ITER} "
+                     f"(temp={temp:.2f}, plateau={plateau}) …")
+                new_code = generate_mapping(llm, history, current_code,
+                                             temperature=temp,
+                                             plateau=plateau)
+                if new_code:
+                    drafts.append(new_code)
+                else:
+                    _log(f"  Could not extract code from Qwen response "
+                         f"(candidate #{k+1}); skipping.")
+            if not drafts:
+                # Qwen failed every candidate — fall back to re-testing the
+                # seed so the iteration isn't a total no-op. Rare path.
+                _log(f"  WARN: Qwen produced no usable drafts; falling "
+                     f"back to re-testing the current best as a safety "
+                     f"net.")
+                drafts.append(current_code)
         _log(f"  Will train {len(drafts)} candidate(s) this iteration.")
 
         # ── Step B: validate + train each candidate ──

@@ -204,7 +204,7 @@ def save_float(net, filename):
     print(f"float model written to {filename}", flush=True)
 
 
-NB_EPOCHS = 100
+NB_EPOCHS = 15
 MODEL_PATH = "./"
 MODEL_NAME = "features_128x64x3"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
@@ -233,7 +233,7 @@ class Trainer:
         self.save_every = save_every
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, weight_decay=0)
         self.loss_fn = nn.CrossEntropyLoss()
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.99)
+        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.95)
         if self.device == "cuda":
             torch.cuda.empty_cache()
             self.model = torch.compile(self.model)
@@ -305,15 +305,15 @@ if __name__ == "__main__":
     print(f"CUDA available: {torch.cuda.is_available()}", flush=True)
     print(f"Device: {DEVICE}", flush=True)
 
-    # dataset = FeaturesDataset(DATA_DIR)
-    # print(len(dataset), flush=True)
+    dataset = FeaturesDataset(DATA_DIR)
+    print(len(dataset), flush=True)
 
-    # train_size = int(0.95 * len(dataset))
-    # val_size = len(dataset) - train_size
-    # trainset, valset = random_split(dataset, [train_size, val_size])
-    # print(f'Train size: {train_size}, Val size: {val_size}', flush=True)
+    train_size = int(0.95 * len(dataset))
+    val_size = len(dataset) - train_size
+    trainset, valset = random_split(dataset, [train_size, val_size])
+    print(f'Train size: {train_size}, Val size: {val_size}', flush=True)
 
-    # train_loader, val_loader = dataloader(trainset, valset, batch_size=512 * 2)
+    train_loader, val_loader = dataloader(trainset, valset, batch_size=512)
 
     net = Net()
     if os.path.isfile(LAST_MODEL):
@@ -321,7 +321,7 @@ if __name__ == "__main__":
     print(net, flush=True)
 
     # save_quantized(net, f"{MODEL_PATH}{MODEL_NAME}.quantized.txt")
-    save_float(net, f"{MODEL_PATH}{MODEL_NAME}.float.txt")
+    #save_float(net, f"{MODEL_PATH}{MODEL_NAME}.float.txt")
 
-    # trainer = Trainer(net, train_loader, val_loader)
-    # trainer.train(NB_EPOCHS)
+    trainer = Trainer(net, train_loader, val_loader)
+    trainer.train(NB_EPOCHS)
