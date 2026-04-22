@@ -217,7 +217,7 @@ def dataloader_ddp(trainset, valset, batch_size):
     sampler_val   = DistributedSampler(valset, shuffle=False)
     train_loader  = DataLoader(
         trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train,
-        num_workers=2, pin_memory=True, prefetch_factor=2
+        num_workers=0, pin_memory=True#, prefetch_factor=2
     )
     val_loader = DataLoader(
         valset, batch_size=batch_size, shuffle=False, sampler=sampler_val,
