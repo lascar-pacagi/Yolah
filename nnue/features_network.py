@@ -19,7 +19,7 @@ RECORD_SIZE = NB_FEATURES + 1  # 45 bytes
 
 
 class FeaturesDataset(Dataset):
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, max_records=50000000):
         files = sorted(glob.glob(data_dir + "/*.features.txt"))
         if not files:
             raise FileNotFoundError(f"No .features.txt files found in {data_dir}")
@@ -35,6 +35,7 @@ class FeaturesDataset(Dataset):
             self.cumulative.append(total)
             self.mmaps.append(mm)
             total += nb_records
+            if total > max_records: break
 
         self.size = total
         print(f"Total: {total} records across {len(files)} files", flush=True)
@@ -58,19 +59,45 @@ class FeaturesDataset(Dataset):
         return features, torch.tensor(label, dtype=torch.long)
 
 
+# class Net(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.bn = nn.BatchNorm1d(NB_FEATURES)
+#         self.fc1 = nn.Linear(NB_FEATURES, 128)
+#         self.fc2 = nn.Linear(128, 64)
+#         self.fc3 = nn.Linear(64, 3)
+
+#     def forward(self, x):
+#         x = self.bn(x)
+#         x = torch.clamp(self.fc1(x), min=0.0, max=1.0)
+#         x = torch.clamp(self.fc2(x), min=0.0, max=1.0)
+#         return self.fc3(x)
+
+#     def clip(self):
+#         for fc in [self.fc1, self.fc2, self.fc3]:
+#             fc.weight.data.clamp_(-127/64, 127/64)
+#             fc.bias.data.clamp_(-127/64, 127/64)
+
+
 class Net(nn.Module):
+    """
+    Direct-from-bytes classifier: takes features as uint8/255 and produces
+    (black, draw, white) logits. No BatchNorm — the C++ first layer in ffnn.h
+    reads raw byte/255 and any pre-fc1 normalization would need to be folded
+    into fc1's int8 weights, where low-variance features blow the ±127/64
+    clipping budget. Training directly on byte/255 keeps Net.clip() honest:
+    the clamped weights are exactly what gets quantized.
+    """
     def __init__(self):
         super().__init__()
-        self.bn = nn.BatchNorm1d(NB_FEATURES)
         self.fc1 = nn.Linear(NB_FEATURES, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 3)
 
     def forward(self, x):
-        x = self.bn(x)
         x = torch.clamp(self.fc1(x), min=0.0, max=1.0)
         x = torch.clamp(self.fc2(x), min=0.0, max=1.0)
-        return self.fc3(x)
+        return self.fc3(x)#nn.functional.softmax(self.fc3(x), dim=1)
 
     def clip(self):
         for fc in [self.fc1, self.fc2, self.fc3]:
@@ -165,11 +192,11 @@ def save_quantized(net, filename, scale=64):
         write_bias(f, net.fc3.bias, scale * scale)
 
 
-NB_EPOCHS = 100
+NB_EPOCHS = 200
 MODEL_PATH = "/mnt/"
 MODEL_NAME = "features_57x128x64x3"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
-DATA_DIR = "./data"
+DATA_DIR = "/mnt"
 
 
 def ddp_setup(rank, world_size):
@@ -183,7 +210,7 @@ def dataloader_ddp(trainset, valset, batch_size):
     sampler_val = DistributedSampler(valset, shuffle=False)
     train_loader = DataLoader(
         trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train,
-        num_workers=2, pin_memory=True, prefetch_factor=2
+        num_workers=0, pin_memory=True#, prefetch_factor=2
     )
     val_loader = DataLoader(
         valset, batch_size=batch_size, shuffle=False, sampler=sampler_val,
@@ -193,7 +220,7 @@ def dataloader_ddp(trainset, valset, batch_size):
 
 
 class TrainerDDP:
-    def __init__(self, gpu_id, model, train_loader, sampler_train, val_loader, sampler_val, save_every=5):
+    def __init__(self, gpu_id, model, train_loader, sampler_train, val_loader, sampler_val, save_every=1):
         self.gpu_id = gpu_id
         self.model = model.to(self.gpu_id)
         self.train_loader = train_loader
@@ -297,4 +324,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = FeaturesDataset(DATA_DIR)
-    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 256, dataset), nprocs=world_size)

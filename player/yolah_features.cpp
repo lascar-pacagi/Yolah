@@ -552,7 +552,6 @@ void encode_data(const std::string &src_dir, const std::string &dst_dir) {
         filesystem::path(path.filename()).replace_extension("features.txt");
     generate_features(path, output_filename);
     std::cout << "Done." << std::endl;
-    break;
   }
 }
 } // namespace YolahFeatures
