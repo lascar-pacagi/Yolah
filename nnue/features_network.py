@@ -13,8 +13,8 @@ import glob
 
 torch.set_float32_matmul_precision('high')
 
-# Each record: 44 uint8 features + 1 uint8 result (0=black wins, 1=draw, 2=white wins)
-NB_FEATURES = 44
+# Each record: 57 uint8 features + 1 uint8 result (0=black wins, 1=draw, 2=white wins)
+NB_FEATURES = 57
 RECORD_SIZE = NB_FEATURES + 1  # 45 bytes
 
 
@@ -167,7 +167,7 @@ def save_quantized(net, filename, scale=64):
 
 NB_EPOCHS = 100
 MODEL_PATH = "/mnt/"
-MODEL_NAME = "features_128x64x3"
+MODEL_NAME = "features_57x128x64x3"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 DATA_DIR = "./data"
 
@@ -297,4 +297,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     dataset = FeaturesDataset(DATA_DIR)
-    mp.spawn(main, args=(world_size, 512 * 4, dataset), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
