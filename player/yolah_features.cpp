@@ -74,7 +74,7 @@ uint8_t count_groups(uint64_t player_bb, const uint64_t pieces_bb[4],
 
 void set_features(uint8_t* features,
                   const Yolah &yolah) {
-#define NDEBUG
+#undef NDEBUG
   using namespace std;
   const auto [black_moves_bb0, black_moves_bb1, black_moves_bb2,
               black_moves_bb3] = yolah.moves_bb(Yolah::BLACK);
@@ -402,8 +402,8 @@ void set_features(uint8_t* features,
           (popcount(flood_black_pieces[i] | flood_black_pieces[j]));      
     }
   }
-  features[STRETCH_BLACK] = stretch_black;
-  features[TEAMING_BLACK] = teaming_black;
+  features[STRETCH_BLACK] = stretch_black > 255 ? 255 : stretch_black;
+  features[TEAMING_BLACK] = teaming_black > 255 ? 255 : teaming_black;
   
   int stretch_white = 0;
   int teaming_white = 0;
@@ -417,8 +417,8 @@ void set_features(uint8_t* features,
           (popcount(flood_white_pieces[i] | flood_white_pieces[j]));      
     }
   }
-  features[STRETCH_WHITE] = stretch_white;
-  features[TEAMING_WHITE] = teaming_white;
+  features[STRETCH_WHITE] = stretch_white > 255 ? 255 : stretch_white;
+  features[TEAMING_WHITE] = teaming_white > 255 ? 255 : teaming_white;
   
 #ifndef NDEBUG
   cerr << "Stretch\n";
