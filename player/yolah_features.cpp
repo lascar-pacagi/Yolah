@@ -74,7 +74,7 @@ uint8_t count_groups(uint64_t player_bb, const uint64_t pieces_bb[4],
 
 void set_features(uint8_t* features,
                   const Yolah &yolah) {
-#undef NDEBUG
+#define NDEBUG
   using namespace std;
   const auto [black_moves_bb0, black_moves_bb1, black_moves_bb2,
               black_moves_bb3] = yolah.moves_bb(Yolah::BLACK);
