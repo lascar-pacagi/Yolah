@@ -247,7 +247,7 @@ void read_bias(std::ifstream& ifs, int16_t* bias) {
 // Output: softmax over O logits -> (black_win, draw, white_win) probabilities.
 //
 // Usage:
-//   FFNN<YolahFeatures::NB_FEATURES, 128, 64, 3> net("features_quantized.txt");
+//   FFNN<YolahFeatures::NB_FEATURES, 256, 64, 3> net("features_quantized.txt");
 //   alignas(64) uint8_t features[decltype(net)::I_PADDED]{};  // zero-init once
 //   YolahFeatures::set_features(features, yolah);              // writes [0, NB_FEATURES)
 //   auto [black, draw, white] = net(features);                 // no copy, direct SIMD

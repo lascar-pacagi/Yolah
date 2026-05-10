@@ -491,6 +491,63 @@ void set_features(uint8_t* features,
   getline(cin, _);
 #endif
   features[TURN] = yolah.current_player();
+
+  uint64_t occupied = yolah.occupied_squares();
+
+  {
+      for (int i = 0, offset = 0; i < 4; i++, offset += 8) {
+          uint64_t piece = black_pieces_bb[i];
+          features[BLOCKED_N_BLACK0 + offset]  = shift<NORTH>(piece) == 0 || (occupied & shift<NORTH>(piece)) != 0;        
+          features[BLOCKED_NE_BLACK0 + offset] = shift<NORTH_EAST>(piece) == 0 || (occupied & shift<NORTH_EAST>(piece)) != 0;
+          features[BLOCKED_E_BLACK0 + offset]  = shift<EAST>(piece) == 0 || (occupied & shift<EAST>(piece)) != 0;
+          features[BLOCKED_SE_BLACK0 + offset] = shift<SOUTH_EAST>(piece) == 0 || (occupied & shift<SOUTH_EAST>(piece)) != 0;
+          features[BLOCKED_S_BLACK0 + offset]  = shift<SOUTH>(piece) == 0 || (occupied & shift<SOUTH>(piece)) != 0;
+          features[BLOCKED_SW_BLACK0 + offset] = shift<SOUTH_WEST>(piece) == 0 || (occupied & shift<SOUTH_WEST>(piece)) != 0;
+          features[BLOCKED_W_BLACK0 + offset]  = shift<WEST>(piece) == 0 || (occupied & shift<WEST>(piece)) != 0;
+          features[BLOCKED_NW_BLACK0 + offset] = shift<NORTH_WEST>(piece) == 0 || (occupied & shift<NORTH_WEST>(piece)) != 0;
+#ifndef NDEBUG
+          cerr << "Blocked occupied black\n";
+          cerr << yolah << '\n';
+          cerr << format("Piece {} blocked N:  {}\n", i, features[BLOCKED_N_BLACK0  + offset]);
+          cerr << format("Piece {} blocked NE: {}\n", i, features[BLOCKED_NE_BLACK0 + offset]);
+          cerr << format("Piece {} blocked E:  {}\n", i, features[BLOCKED_E_BLACK0  + offset]);
+          cerr << format("Piece {} blocked SE: {}\n", i, features[BLOCKED_SE_BLACK0 + offset]);
+          cerr << format("Piece {} blocked S:  {}\n", i, features[BLOCKED_S_BLACK0  + offset]);
+          cerr << format("Piece {} blocked SW: {}\n", i, features[BLOCKED_SW_BLACK0 + offset]);
+          cerr << format("Piece {} blocked W:  {}\n", i, features[BLOCKED_W_BLACK0  + offset]);
+          cerr << format("Piece {} blocked NW: {}\n", i, features[BLOCKED_NW_BLACK0 + offset]);
+          getline(cin, _);
+#endif
+
+      }
+  }
+
+  {
+      for (int i = 0, offset = 0; i < 4; i++, offset += 8) {
+          uint64_t piece = white_pieces_bb[i];
+          features[BLOCKED_N_WHITE0 + offset]  = shift<NORTH>(piece) == 0 || (occupied & shift<NORTH>(piece)) != 0;        
+          features[BLOCKED_NE_WHITE0 + offset] = shift<NORTH_EAST>(piece) == 0 || (occupied & shift<NORTH_EAST>(piece)) != 0;
+          features[BLOCKED_E_WHITE0 + offset]  = shift<EAST>(piece) == 0 || (occupied & shift<EAST>(piece)) != 0;
+          features[BLOCKED_SE_WHITE0 + offset] = shift<SOUTH_EAST>(piece) == 0 || (occupied & shift<SOUTH_EAST>(piece)) != 0;
+          features[BLOCKED_S_WHITE0 + offset]  = shift<SOUTH>(piece) == 0 || (occupied & shift<SOUTH>(piece)) != 0;
+          features[BLOCKED_SW_WHITE0 + offset] = shift<SOUTH_WEST>(piece) == 0 || (occupied & shift<SOUTH_WEST>(piece)) != 0;
+          features[BLOCKED_W_WHITE0 + offset]  = shift<WEST>(piece) == 0 || (occupied & shift<WEST>(piece)) != 0;
+          features[BLOCKED_NW_WHITE0 + offset] = shift<NORTH_WEST>(piece) == 0 || (occupied & shift<NORTH_WEST>(piece)) != 0;
+#ifndef NDEBUG
+          cerr << "Blocked around white\n";
+          cerr << yolah << '\n';
+          cerr << format("Piece {} blocked N:  {}\n", i, features[BLOCKED_N_WHITE0  + offset]);
+          cerr << format("Piece {} blocked NE: {}\n", i, features[BLOCKED_NE_WHITE0 + offset]);
+          cerr << format("Piece {} blocked E:  {}\n", i, features[BLOCKED_E_WHITE0  + offset]);
+          cerr << format("Piece {} blocked SE: {}\n", i, features[BLOCKED_SE_WHITE0 + offset]);
+          cerr << format("Piece {} blocked S:  {}\n", i, features[BLOCKED_S_WHITE0  + offset]);
+          cerr << format("Piece {} blocked SW: {}\n", i, features[BLOCKED_SW_WHITE0 + offset]);
+          cerr << format("Piece {} blocked W:  {}\n", i, features[BLOCKED_W_WHITE0  + offset]);
+          cerr << format("Piece {} blocked NW: {}\n", i, features[BLOCKED_NW_WHITE0 + offset]);
+          getline(cin, _);
+#endif
+      }
+  }
 }
 
 void generate_features(const std::filesystem::path &input_file,

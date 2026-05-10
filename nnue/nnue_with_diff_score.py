@@ -48,7 +48,7 @@ class GameDataset(Dataset):
 
         sum = 0
         for (nb_positions, r, moves) in inputs:
-            if sum > 200000000: break
+            if sum > 100000000: break
             sum += nb_positions
             self.inputs.append((sum, r, moves))            
         self.size = sum
@@ -165,7 +165,7 @@ class GameDataset(Dataset):
 INPUT_SIZE = 64 + 64 + 64 + 1 + 2
 
 class Net(nn.Module):
-    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=64, l3_size=32):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=256, l2_size=64, l3_size=32):
         super().__init__()
         self.fc1 = nn.Linear(input_size, l1_size)
         self.fc2 = nn.Linear(l1_size, l2_size)
@@ -186,10 +186,10 @@ class Net(nn.Module):
             fc.weight.data.clamp_(-127/64, 127/64)
             fc.bias.data.clamp_(-127/64, 127/64)
 
-NB_EPOCHS=30
+NB_EPOCHS=100
 #MODEL_PATH="./"
 MODEL_PATH="/mnt/"
-MODEL_NAME="nnue_195x1024x64x32x3"
+MODEL_NAME="nnue_195x256x64x32x3"
 LAST_MODEL=f"{MODEL_PATH}{MODEL_NAME}.pt"
 GAME_DIR="./data"
 

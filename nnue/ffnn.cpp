@@ -8,7 +8,7 @@
 // g++ -std=c++2a -O3 -march=native -mavx2 -ffast-math -funroll-loops -I../player -I../game -I../misc ffnn.c
 // int main(int argc, char* argv[]) {
 //     using namespace std;
-//     FFNN<YolahFeatures::NB_FEATURES, 128, 64, 3> net("features_128x64x3.quantized.txt");
+//     FFNN<YolahFeatures::NB_FEATURES, 256, 64, 3> net("features_121x256x64x3.quantized.txt");
 //     alignas(64) uint8_t features[decltype(net)::I_PADDED]{};
 //     const string path = argv[1];
 //     auto size = filesystem::file_size(path);

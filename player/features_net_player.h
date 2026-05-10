@@ -13,7 +13,7 @@ class FeaturesNetPlayer : public Player {
     size_t nb_moves_at_full_depth;
     uint8_t late_move_reduction;
     const std::string feature_net_parameters_filename;
-	FFNN<YolahFeatures::NB_FEATURES, 128, 64, 3> net;
+	FFNN<YolahFeatures::NB_FEATURES, 256, 64, 3> net;
     BS::thread_pool pool;
     std::atomic_bool stop = false;
 

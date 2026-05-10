@@ -13,13 +13,18 @@ import glob
 
 torch.set_float32_matmul_precision('high')
 
-# Each record: 57 uint8 features + 1 uint8 result (0=black wins, 1=draw, 2=white wins)
-NB_FEATURES = 57
-RECORD_SIZE = NB_FEATURES + 1  # 45 bytes
+# Each record: NB_FEATURES uint8 features + 1 uint8 result
+# (result encoding: 0=black wins, 1=draw, 2=white wins).
+# NB_FEATURES must match YolahFeatures::NB_FEATURES in player/yolah_features.h
+# — currently 121: 27 black scalars + 32 black per-piece blocked flags
+#               + 27 white scalars + 32 white per-piece blocked flags
+#               + 3 globals (CONTACT_WITH_OTHER, FREE, TURN).
+NB_FEATURES = 121
+RECORD_SIZE = NB_FEATURES + 1
 
 
 class FeaturesDataset(Dataset):
-    def __init__(self, data_dir, max_records=50000000):
+    def __init__(self, data_dir, max_records=100000000):
         files = sorted(glob.glob(data_dir + "/*.features.txt"))
         if not files:
             raise FileNotFoundError(f"No .features.txt files found in {data_dir}")
@@ -63,8 +68,8 @@ class FeaturesDataset(Dataset):
 #     def __init__(self):
 #         super().__init__()
 #         self.bn = nn.BatchNorm1d(NB_FEATURES)
-#         self.fc1 = nn.Linear(NB_FEATURES, 128)
-#         self.fc2 = nn.Linear(128, 64)
+#         self.fc1 = nn.Linear(NB_FEATURES, 256)
+#         self.fc2 = nn.Linear(256, 64)
 #         self.fc3 = nn.Linear(64, 3)
 
 #     def forward(self, x):
@@ -90,8 +95,8 @@ class Net(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(NB_FEATURES, 128)
-        self.fc2 = nn.Linear(128, 64)
+        self.fc1 = nn.Linear(NB_FEATURES, 256)
+        self.fc2 = nn.Linear(256, 64)
         self.fc3 = nn.Linear(64, 3)
 
     def forward(self, x):
@@ -109,8 +114,8 @@ class NetNoBN(nn.Module):
     """Same architecture as Net but without BatchNorm — for C++ inference."""
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(NB_FEATURES, 128)
-        self.fc2 = nn.Linear(128, 64)
+        self.fc1 = nn.Linear(NB_FEATURES, 256)
+        self.fc2 = nn.Linear(256, 64)
         self.fc3 = nn.Linear(64, 3)
 
     def forward(self, x):
@@ -194,7 +199,7 @@ def save_quantized(net, filename, scale=64):
 
 NB_EPOCHS = 200
 MODEL_PATH = "/mnt/"
-MODEL_NAME = "features_57x128x64x3"
+MODEL_NAME = "features_121x256x64x3"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 DATA_DIR = "/mnt"
 

@@ -6,8 +6,13 @@ Each iteration:
      input into a compact tensor.
   2. A fixed small NN is trained for NB_EPOCHS epochs.
   3. Train/val accuracy is recorded in MAPPING_HISTORY.
-  4. A local Qwen model reads the history and generates an improved mapping.
+  4. The Anthropic Claude API is queried with the history and asked to
+     generate an improved mapping.
   5. Repeat.
+
+Setup:
+  pip install anthropic
+  export ANTHROPIC_API_KEY=sk-ant-...   # from https://console.anthropic.com
 
 Raw input layout (195 float32 values):
   [0:64]    black bitboard  (bit i = 1 ↔ black piece on square i)  binary
@@ -45,7 +50,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
-from llama_cpp import Llama
+import anthropic
 from tqdm import tqdm
 
 sys.path.append("../server")
@@ -54,45 +59,44 @@ from yolah import Yolah, Move, Square
 torch.set_float32_matmul_precision('high')
 
 # ── Configuration ──────────────────────────────────────────────────────────────
-# Qwen3.6-35B-A3B (MoE: 35B params total, ~3B activated) runs via
-# llama-cpp-python on GPU QWEN_GPU_DEVICE (in-process, no server needed —
-# works natively in Singularity with --nv). Update QWEN_MODEL_PATH to match
-# the GGUF file you downloaded.
-QWEN_MODEL_PATH = "./models/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf"
-QWEN_GPU_DEVICE = 0    # int — passed to llama-cpp's `main_gpu` (GPU index)
-TRAINING_GPU    = "1"  # str — passed to CUDA_VISIBLE_DEVICES (env var)
+# Claude is queried via the Anthropic API over HTTPS — no GPU is consumed
+# locally for inference, so both cluster GPUs can now be used for training.
+# The API key is read from the ANTHROPIC_API_KEY environment variable
+# (export it in your shell or in the SLURM job script).
+#
+# Model choice:
+#   - "claude-opus-4-7"   : strongest reasoning, best feature engineering,
+#                           ~$15/M input + $75/M output tokens.
+#   - "claude-sonnet-4-6" : ~5× cheaper, still very strong; recommended
+#                           if cost matters or you plan many iterations.
+#   - "claude-haiku-4-5-20251001" : cheapest, fastest, weaker reasoning.
+CLAUDE_MODEL    = "claude-opus-4-7"
+TRAINING_GPU    = "0"  # str — passed to CUDA_VISIBLE_DEVICES (env var).
+                        # The training child uses a single GPU (nprocs=1
+                        # in mp.spawn). With Claude on the API, GPU 0 is
+                        # free; switch to "0,1" + nprocs=2 in main_ddp
+                        # if you ever want true multi-GPU DDP training.
 DATA_DIR       = "./data"
 MAPPING_DIR    = "./mappings"
 MASTER_PORT    = "65435"
 MAX_ITERATIONS = 20
-MAX_RETRIES    = 10      # times to ask Qwen to fix a broken mapping before giving up
-GENERATION_MAX_ATTEMPTS = 8  # per-candidate re-queries to Qwen when its output
+MAX_RETRIES    = 10      # times to ask Claude to fix a broken mapping before giving up
+GENERATION_MAX_ATTEMPTS = 8  # per-candidate re-queries to Claude when its output
                               # is missing the sentinels or contains un-parsable
-                              # Python. Each attempt re-samples at the same
-                              # temperature, so 8 gives the MoE plenty of
-                              # chances to comply with the output format.
+                              # Python.
 NB_EPOCHS      = 2
 BATCH_SIZE     = 256
-# n_ctx is the TOTAL llama.cpp KV-cache budget (input + output combined).
-# 32768 (32K): ~38.5 GB weights + ~1.5 GB Q8_0 KV + ~2 GB buffers ≈ 42 GB.
-# Fits GPUs with less than 48 GB (e.g. 40 GB A100). Raise to 98304 on 48 GB+.
-# QWEN_MAX_TOKENS = -1 means "no output cap" — generate until EOS or
-# until n_ctx is exhausted.
-QWEN_N_CTX      = 0      # 0 = use the GGUF's trained max context
-QWEN_MAX_TOKENS = -1     # -1 => generate until EOS or n_ctx is exhausted
 
-# KV-cache quantization as a ggml type code (passed through to llama.cpp).
-#   1 = GGML_TYPE_F16   (default, fp16 = 2 bytes/element, highest fidelity)
-#   8 = GGML_TYPE_Q8_0  (~half the memory, negligible quality loss)
-#   2 = GGML_TYPE_Q4_0  (quarter memory, noticeable quality degradation)
-# Q8_0 is required here to fit Q8_0 weights + 128K context on a 48 GB GPU;
-# quality impact on reasoning is reported as negligible.
-QWEN_KV_CACHE_TYPE = 8   # GGML_TYPE_Q8_0
+# Cap on Claude's generated tokens per call. The mapping module is rarely
+# more than ~2k tokens; 8192 leaves comfortable head-room. The Anthropic
+# API requires this to be set explicitly (no "until EOS" knob like
+# llama-cpp). Raise it if you see truncated modules in the SLURM log.
+CLAUDE_MAX_TOKENS = 8192
 
-# Sentinel markers Qwen must wrap the final code in. The triple
+# Sentinel markers Claude must wrap the final code in. The triple
 # angle-brackets are deliberately unusual — they will not appear inside
-# Python source, inside markdown fences, or inside Qwen's chain-of-thought
-# — so _extract_code can grab the module unambiguously even if Qwen also
+# Python source, inside markdown fences, or inside Claude's prose
+# — so _extract_code can grab the module unambiguously even if Claude also
 # emits commentary with backtick fences in its answer.
 CODE_BEGIN_MARKER = "<<<MAPPING_CODE_BEGIN>>>"
 CODE_END_MARKER   = "<<<MAPPING_CODE_END>>>"
@@ -102,15 +106,15 @@ NB_CANDIDATES_PER_ITER = 2     # mappings generated & trained per iteration
                                 # (1 = original behaviour; 2-3 widens the search).
 PLATEAU_WINDOW         = 4     # iterations of stagnation before diversity push
 PLATEAU_THRESHOLD      = 0.005 # max-min val_acc within window considered flat
-TOP_K_IN_PROMPT        = 3     # how many of the best mappings to show Qwen
+TOP_K_IN_PROMPT        = 3     # how many of the best mappings to show Claude
 COST_TIMING_RUNS       = 30    # how many times to run mapping() per test pos
                                 # to estimate µs-per-call cost
-MISS_SAMPLE_SIZE       = 20     # misclassified examples shown to Qwen per round
+MISS_SAMPLE_SIZE       = 20     # misclassified examples shown to Claude per round
 MAX_POSITIONS          = 15_000_000  # cap total training positions loaded from
                                      # DATA_DIR; None = use all (~1B is slow)
-TEMP_REFINE            = 0.25  # Qwen temperature when refining a strong mapping
-TEMP_EXPLORE           = 0.6   # Qwen temperature when exploring / on plateau
-TEMP_FIX               = 0.1   # Qwen temperature when repairing a buggy module
+TEMP_REFINE            = 0.25  # Claude temperature when refining a strong mapping
+TEMP_EXPLORE           = 0.6   # Claude temperature when exploring / on plateau
+TEMP_FIX               = 0.1   # Claude temperature when repairing a buggy module
 
 HISTORY_FILE = os.path.join(MAPPING_DIR, "history.jsonl")
 
@@ -382,7 +386,7 @@ def mapping(board_tensor):
     return torch.tensor(f, dtype=torch.float32)
 '''
 
-# ── Game example (loaded from file for Qwen context) ─────────────────────────
+# ── Game example (loaded from file for Claude context) ─────────────────────────
 GAME_EXAMPLE_PATH = "./game_example.txt"
 
 
@@ -481,7 +485,7 @@ def load_history(path: str = HISTORY_FILE) -> list:
     return out
 
 
-# ── Misclassification formatting (Qwen-readable) ──────────────────────────────
+# ── Misclassification formatting (Claude-readable) ──────────────────────────────
 _FILES = ['a','b','c','d','e','f','g','h']
 def _sq_to_str(sq: int) -> str:
     return f"{_FILES[sq % 8]}{sq // 8 + 1}"
@@ -534,7 +538,7 @@ def is_plateauing(history: list) -> bool:
     return (max(recent) - min(recent)) < PLATEAU_THRESHOLD
 
 
-# ── System prompt for Qwen ─────────────────────────────────────────────────────
+# ── System prompt for Claude ─────────────────────────────────────────────────────
 SYSTEM_PROMPT = """\
 You are a feature engineering expert. Your task is to design compact feature \
 mappings for a neural network that classifies Yolah game positions as:
@@ -641,134 +645,144 @@ markdown fences (no ``` before or after the sentinels):
   additional sentinels.
 """
 
-# ── Qwen helpers (llama-cpp-python, in-process, no server needed) ─────────────
-def load_llm() -> Llama:
-    ctx_label = "model max (from GGUF)" if QWEN_N_CTX == 0 else str(QWEN_N_CTX)
-    print(f"Loading {QWEN_MODEL_PATH} on GPU {QWEN_GPU_DEVICE} "
-          f"(n_ctx={ctx_label}, kv_type={QWEN_KV_CACHE_TYPE}) …", flush=True)
-    llm = Llama(
-        model_path=QWEN_MODEL_PATH,
-        n_gpu_layers=-1,         # all layers on GPU
-        main_gpu=QWEN_GPU_DEVICE,
-        # L40S has no NVLink — splitting weights forces activations over
-        # PCIe (~32 GB/s) per layer per token, an order of magnitude
-        # slower than single-GPU HBM (~864 GB/s). Q8_K_XL weights (~20 GB)
-        # fit easily in one L40S's 48 GB, so keep everything on main_gpu.
-        split_mode=0,            # LLAMA_SPLIT_MODE_NONE = single GPU only
-        n_ctx=QWEN_N_CTX,        # 0 = use model's trained max from GGUF
-        type_k=QWEN_KV_CACHE_TYPE,  # KV-cache quant, K side
-        type_v=QWEN_KV_CACHE_TYPE,  # KV-cache quant, V side
-        flash_attn=True,         # required when type_k/type_v are quantized
-        verbose=False,
-    )
-    # Report the resolved context so the user can see what the GGUF gave us.
-    # llama-cpp-python exposes n_ctx() as either a method or an int property
-    # depending on version; handle both.
-    try:
-        resolved = llm.n_ctx() if callable(getattr(llm, "n_ctx", None)) else int(llm.n_ctx)
-    except Exception:
-        resolved = "?"
-    print(f"Model loaded. Effective n_ctx = {resolved}.", flush=True)
-    return llm
+# ── Claude helpers (Anthropic SDK over HTTPS, no local GPU needed) ────────────
+def load_llm() -> anthropic.Anthropic:
+    """Construct an Anthropic API client.
+
+    The SDK auto-reads the API key from the ANTHROPIC_API_KEY env var.
+    We do an explicit existence check here so the failure mode is a clear
+    error message at startup rather than an opaque 401 on the first call.
+    """
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is not set. Get a key from "
+            "https://console.anthropic.com (Settings -> API Keys), then "
+            "`export ANTHROPIC_API_KEY=sk-ant-...` before launching."
+        )
+    print(f"Initializing Anthropic client (model: {CLAUDE_MODEL}) …",
+          flush=True)
+    # The default client uses 60s timeouts and retries idempotent failures
+    # twice. For an iterative loop where one slow call doesn't matter,
+    # bump the timeout so long generations on a busy backend don't abort.
+    client = anthropic.Anthropic(timeout=600.0, max_retries=3)
+    print("Anthropic client ready.", flush=True)
+    return client
 
 
-# ── Heartbeat cadence for streamed Qwen calls ──────────────────────────────
+# ── Heartbeat cadence for streamed Claude calls ───────────────────────────────
 # How often the streaming loop emits a "still generating" progress line.
 # Low enough to confirm liveness, high enough to not spam SLURM logs.
-QWEN_HEARTBEAT_SECS = 30.0
+CLAUDE_HEARTBEAT_SECS = 30.0
 
 
-def _llm_call(llm: Llama, messages: list, temperature: float,
-              max_tokens: int = QWEN_MAX_TOKENS) -> tuple[str, str]:
-    """Run a STREAMED chat completion and return (raw_text, stripped_text).
+def _split_system_and_messages(messages: list) -> tuple[str, list]:
+    """The Anthropic API takes the system prompt as a separate top-level
+    `system=` argument, NOT as the first message. The rest of the codebase
+    uses the OpenAI-style {role:"system", ...} convention, so we adapt
+    here. Multiple system messages are concatenated with blank lines.
+    """
+    system_parts: list[str] = []
+    user_assistant: list = []
+    for m in messages:
+        if m.get("role") == "system":
+            system_parts.append(m.get("content", ""))
+        else:
+            user_assistant.append({"role": m["role"],
+                                   "content": m.get("content", "")})
+    return "\n\n".join(system_parts), user_assistant
 
-    The generation can take tens of minutes on a 35B MoE at 128K context
-    with thinking mode on — a blocking call gives zero feedback during
-    that time, which makes "is it stuck?" impossible to answer from the
-    SLURM log. We stream token-by-token and emit a heartbeat every
-    QWEN_HEARTBEAT_SECS seconds with:
+
+def _llm_call(llm: anthropic.Anthropic, messages: list, temperature: float,
+              max_tokens: int = CLAUDE_MAX_TOKENS) -> tuple[str, str]:
+    """Run a STREAMED Claude completion and return (raw_text, stripped_text).
+
+    A generation of a non-trivial mapping module can take a minute or
+    more — a blocking call gives zero feedback during that time, which
+    makes "is it stuck?" impossible to answer from the SLURM log. We
+    stream token-by-token and emit a heartbeat every
+    CLAUDE_HEARTBEAT_SECS seconds with:
       - elapsed wall time
-      - output chunks seen (≈ tokens)
+      - text events seen (≈ tokens)
       - current tok/s rate
-      - inferred phase (pre-think / thinking / answering / emitting-code)
+      - inferred phase (streaming / emitting-code)
 
     Phase detection is a best-effort substring match on the accumulated
-    output: the moment we see `<think>` we're in reasoning, `</think>`
-    flips to answer, and seeing the begin-sentinel means the final code
-    is being written. No state machine, just a hint so the user can
-    distinguish "still reasoning" from "writing the module".
+    output: seeing the begin-sentinel means the final code is being
+    written. No state machine, just a hint so the user can distinguish
+    "still reasoning in prose" from "writing the module".
 
-    Qwen3 instruct GGUFs ship with thinking mode ON by default; we strip
-    the <think>...</think> wrapper from the stripped_text returned to the
-    extractor, but the raw text still carries it for the SLURM dump.
+    Both raw and stripped text are returned for parity with the previous
+    Qwen-based helper (Qwen wrapped its reasoning in <think>...</think>;
+    vanilla Claude does not, so the regex strip is a no-op — but we keep
+    it so the interface is stable if extended-thinking is enabled later).
     """
+    system_prompt, conv = _split_system_and_messages(messages)
+
     # Log up-front what we're about to do — prompt size tells the user
     # whether context is the bottleneck before the call even starts.
-    prompt_chars = sum(len(m.get("content", "")) for m in messages)
+    prompt_chars = len(system_prompt) + sum(len(m.get("content", ""))
+                                             for m in conv)
     prompt_tokens_est = prompt_chars // 4  # rough, 4 chars/token
-    _log(f"  qwen stream start: prompt≈{prompt_chars} chars "
+    _log(f"  claude stream start: prompt≈{prompt_chars} chars "
          f"(~{prompt_tokens_est} tok), max_tokens={max_tokens}, "
-         f"temp={temperature:.2f}")
+         f"temp={temperature:.2f}, model={CLAUDE_MODEL}")
 
     t0 = _time.time()
     last_beat = t0
     chunks_out: list[str] = []
     n_events = 0
-    phase = "pre-think"
+    phase = "streaming"
 
-    stream = llm.create_chat_completion(
-        messages=messages,
-        temperature=temperature,
+    # client.messages.stream() returns a context manager that yields a
+    # MessageStream. Iterating .text_stream gives clean text deltas
+    # (post-merged across content blocks) — exactly what we want here.
+    with llm.messages.stream(
+        model=CLAUDE_MODEL,
         max_tokens=max_tokens,
-        # Mild repetition penalty breaks the degenerate short-cycle loops
-        # ("and and and…", repeated block regurgitation) that Qwen3 can
-        # fall into at low temperature or after a long, noisy context.
-        # 1.1 is gentle enough to leave normal code-variable repetition
-        # intact.
-        repeat_penalty=1.1,
-        stream=True,
-    )
+        temperature=temperature,
+        system=system_prompt,
+        messages=conv,
+    ) as stream:
+        for delta in stream.text_stream:
+            if not delta:
+                continue
+            chunks_out.append(delta)
+            n_events += 1
 
-    for ev in stream:
-        try:
-            delta = ev["choices"][0]["delta"].get("content", "")
-        except (KeyError, IndexError):
-            continue
-        if not delta:
-            continue
-        chunks_out.append(delta)
-        n_events += 1
+            # Cheap phase inference — cost is O(len(delta)) per token.
+            if phase != "emitting-code" and CODE_BEGIN_MARKER in delta:
+                phase = "emitting-code"
+                _log(f"  claude phase → emitting-code (after "
+                     f"{_fmt_secs(_time.time() - t0)})")
 
-        # Cheap phase inference — cost is O(len(delta)) per token, fine.
-        if phase == "pre-think" and "<think>" in delta:
-            phase = "thinking"
-            _log(f"  qwen phase → thinking (after "
-                 f"{_fmt_secs(_time.time() - t0)})")
-        elif phase == "thinking" and "</think>" in delta:
-            phase = "answering"
-            _log(f"  qwen phase → answering (after "
-                 f"{_fmt_secs(_time.time() - t0)})")
-        elif phase != "emitting-code" and CODE_BEGIN_MARKER in delta:
-            phase = "emitting-code"
-            _log(f"  qwen phase → emitting-code (after "
-                 f"{_fmt_secs(_time.time() - t0)})")
+            now = _time.time()
+            if now - last_beat >= CLAUDE_HEARTBEAT_SECS:
+                elapsed = now - t0
+                rate = n_events / elapsed if elapsed > 0 else 0.0
+                _log(f"  claude heartbeat: phase={phase}  "
+                     f"events≈{n_events}  rate={rate:.1f}/s  "
+                     f"elapsed={_fmt_secs(elapsed)}")
+                last_beat = now
 
-        now = _time.time()
-        if now - last_beat >= QWEN_HEARTBEAT_SECS:
-            elapsed = now - t0
-            rate = n_events / elapsed if elapsed > 0 else 0.0
-            _log(f"  qwen heartbeat: phase={phase}  "
-                 f"tokens≈{n_events}  rate={rate:.1f}/s  "
-                 f"elapsed={_fmt_secs(elapsed)}")
-            last_beat = now
+        # After the stream closes, get the final accumulated message —
+        # this also has the authoritative usage counts (input + output
+        # tokens) that we surface to the SLURM log for cost tracking.
+        final = stream.get_final_message()
 
     raw = "".join(chunks_out)
     total = _time.time() - t0
     rate = n_events / total if total > 0 else 0.0
-    _log(f"  qwen stream done: phase={phase}  tokens≈{n_events}  "
+    usage = getattr(final, "usage", None)
+    in_tok = getattr(usage, "input_tokens", None)
+    out_tok = getattr(usage, "output_tokens", None)
+    _log(f"  claude stream done: phase={phase}  events≈{n_events}  "
          f"rate={rate:.1f}/s  elapsed={_fmt_secs(total)}  "
-         f"output≈{len(raw)} chars")
+         f"output≈{len(raw)} chars  "
+         f"tokens(in/out)={in_tok}/{out_tok}")
 
+    # Defensive strip in case extended-thinking is added later. With the
+    # current non-thinking call, this is a no-op (Claude never emits raw
+    # <think> tags in normal output).
     stripped = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
     return raw, stripped
 
@@ -776,7 +790,7 @@ def _llm_call(llm: Llama, messages: list, temperature: float,
 def _log_full_exchange(attempt: int, max_attempts: int, label: str,
                        temperature: float, messages: list,
                        raw_response: str) -> None:
-    """Dump the complete prompt (system + user) and the raw Qwen response
+    """Dump the complete prompt (system + user) and the raw Claude response
     (including <think>…</think> reasoning) to stdout, wrapped in clearly
     marked delimiters for grep-ability. Everything lands in the SLURM
     log file so a post-mortem has the full context of each call.
@@ -823,7 +837,7 @@ def _format_confusion(conf: list) -> str:
 
 def _build_user_prompt(history: list, current_code: str,
                        plateau: bool = False) -> str:
-    """Compose the user message for Qwen.
+    """Compose the user message for Claude.
 
     `history` entries are dicts with keys: iteration, candidate, val_acc,
     train_acc, mapped_dim, description, cost_us, code, confusion, misses
@@ -832,7 +846,7 @@ def _build_user_prompt(history: list, current_code: str,
     """
     lines = []
 
-    # Include game example so Qwen can see how a real game unfolds
+    # Include game example so Claude can see how a real game unfolds
     game_example = _load_game_example()
     if game_example:
         lines.append("EXAMPLE GAME (positions evolve; bitboards + scores):\n")
@@ -858,7 +872,7 @@ def _build_user_prompt(history: list, current_code: str,
                          f"{h['description']}{mark}")
 
         # ── Top-K mappings: DESCRIPTIONS ONLY (no code) ──
-        # Showing the full source anchors Qwen to copy-paste-plus-aggregate,
+        # Showing the full source anchors Claude to copy-paste-plus-aggregate,
         # which is exactly the failure mode we're fighting. Make it re-derive
         # structure from a short description instead.
         top_k = sorted(history, key=lambda h: h['val_acc'], reverse=True
@@ -957,7 +971,7 @@ _UNICODE_TRANSLATIONS = {
     '\u2018': "'", '\u2019': "'", '\u201A': "'", '\u201B': "'",
     '\u201C': '"', '\u201D': '"', '\u201E': '"', '\u201F': '"',
     '\u2032': "'", '\u2033': '"',
-    # Dashes → ASCII hyphen-minus. Qwen loves em-dashes in comments,
+    # Dashes → ASCII hyphen-minus. Claude loves em-dashes in comments,
     # which ast.parse tolerates in strings but not in identifiers — and
     # the cost of normalizing comments/strings is zero.
     '\u2013': '-', '\u2014': '-', '\u2015': '-', '\u2212': '-',
@@ -1063,21 +1077,21 @@ def _tolerant_parse(code: str) -> str | None:
 
 
 def _extract_code(text: str) -> str | None:
-    """Extract the mapping module from Qwen's raw output.
+    """Extract the mapping module from Claude's raw output.
 
-    Qwen frequently mentions the sentinel NAMES in prose before emitting
+    Claude frequently mentions the sentinel NAMES in prose before emitting
     the real fenced block ("...and then end with <<<MAPPING_CODE_BEGIN>>>"),
     which means a naive first-BEGIN → first-END match captures garbage.
     The extractor therefore:
 
       1. Enumerates ALL begin/end positions.
       2. Prefers the LAST begin + last end after it — this is almost
-         always the real emission, since Qwen's final sentinel pair is
+         always the real emission, since Claude's final sentinel pair is
          the one wrapping the module.
       3. If that slice doesn't ast-parse, walks every (begin_i, end_j>i)
          pair from most-recent to oldest and returns the first slice
          that parses. This is a small Cartesian walk but is bounded by
-         how many sentinels Qwen sprinkles (usually ≤ 3 of each).
+         how many sentinels Claude sprinkles (usually ≤ 3 of each).
 
     Sanitization runs on every candidate before the parse check so that
     unicode / balance issues don't hide a valid slice.
@@ -1099,7 +1113,7 @@ def _extract_code(text: str) -> str | None:
             if not valid_ends:
                 continue
             # Prefer the last end for this begin — captures the whole
-            # trailing module even if Qwen mentioned the END sentinel in
+            # trailing module even if Claude mentioned the END sentinel in
             # prose between the preamble and the real code.
             for e in reversed(valid_ends):
                 cand = _sanitize_code(_unwrap_fence(text[b:e].strip()))
@@ -1110,14 +1124,14 @@ def _extract_code(text: str) -> str | None:
                     continue
         # 2. No pair parses — return the last-BEGIN + last-END anyway
         # so the SyntaxError path in _generate_extractable still shows
-        # Qwen the best-guess slice (rather than None → "missing
+        # Claude the best-guess slice (rather than None → "missing
         # sentinels", which would mislead the repair message).
         b = begins[-1]
         e = max(e for e in ends if e > b) if any(e > b for e in ends) \
             else ends[-1]
         return _sanitize_code(_unwrap_fence(text[b:e].strip()))
 
-    # Fallback: legacy triple-backtick extraction, for the rare case Qwen
+    # Fallback: legacy triple-backtick extraction, for the rare case Claude
     # ignores the sentinel instruction entirely.
     for pattern in [r'```python\n(.*?)```', r'```\n(.*?)```']:
         matches = list(re.finditer(pattern, text, re.DOTALL))
@@ -1135,11 +1149,11 @@ def _extract_code(text: str) -> str | None:
     return None
 
 
-def _generate_extractable(llm: Llama, messages: list, temperature: float,
+def _generate_extractable(llm: anthropic.Anthropic, messages: list, temperature: float,
                            label: str,
                            max_attempts: int = GENERATION_MAX_ATTEMPTS,
                            ) -> str | None:
-    """Call Qwen repeatedly until its response yields extractable AND
+    """Call Claude repeatedly until its response yields extractable AND
     syntactically-valid Python. Returns the code, or None on exhaustion.
 
     Retry triggers:
@@ -1161,21 +1175,21 @@ def _generate_extractable(llm: Llama, messages: list, temperature: float,
         raw_text, text = _llm_call(llm, messages=messages,
                                     temperature=cur_temp)
         elapsed = _fmt_secs(_time.time() - t0)
-        _log(f"Qwen {label} attempt {attempt}/{max_attempts} done "
+        _log(f"Claude {label} attempt {attempt}/{max_attempts} done "
              f"({elapsed}, temp={cur_temp:.2f})")
 
-        # Full transcript — prompt (every role) + raw response (including
-        # Qwen's <think>...</think> reasoning) — is emitted unconditionally
-        # so the SLURM log captures the complete exchange for every attempt.
+        # Full transcript — prompt (every role) + raw response — is
+        # emitted unconditionally so the SLURM log captures the complete
+        # exchange for every attempt.
         _log_full_exchange(attempt, max_attempts, label, cur_temp,
                            messages, raw_text)
 
         code = _extract_code(text)
         if code is None:
             # Expose the bytes around where the sentinel SHOULD have been so
-            # we can diagnose cases where Qwen emits a near-miss marker.
+            # we can diagnose cases where Claude emits a near-miss marker.
             _log(f"  attempt {attempt}: no sentinels/fences found in "
-                 f"Qwen output (first 200 bytes of stripped text: "
+                 f"Claude output (first 200 bytes of stripped text: "
                  f"{_hex_preview(text, 200)}); retrying with corrective "
                  f"feedback.")
             messages.append({"role": "assistant", "content": raw_text})
@@ -1193,7 +1207,7 @@ def _generate_extractable(llm: Llama, messages: list, temperature: float,
         except SyntaxError as e:
             err_line = e.lineno or 0
             # Show the offending line and a small window of context so
-            # Qwen can see exactly where the parser choked.
+            # Claude can see exactly where the parser choked.
             src_lines = code.splitlines()
             lo = max(0, err_line - 3); hi = min(len(src_lines), err_line + 2)
             window = "\n".join(f"{i+1:4d}: {src_lines[i]}"
@@ -1234,10 +1248,10 @@ def _generate_extractable(llm: Llama, messages: list, temperature: float,
     return None
 
 
-def generate_mapping(llm: Llama, history: list, current_code: str,
+def generate_mapping(llm: anthropic.Anthropic, history: list, current_code: str,
                      temperature: float = TEMP_REFINE,
                      plateau: bool = False) -> str | None:
-    """Ask Qwen for a new mapping.
+    """Ask Claude for a new mapping.
     `temperature`: TEMP_REFINE for incremental, TEMP_EXPLORE for exploration.
     `plateau`: if True, inject diversity-pressure guidance.
     """
@@ -1253,9 +1267,9 @@ def generate_mapping(llm: Llama, history: list, current_code: str,
     )
 
 
-def fix_mapping(llm: Llama, bad_code: str, error: str) -> str | None:
-    """Ask Qwen to fix broken code, providing the exact traceback."""
-    _log("Asking Qwen to fix the broken mapping …")
+def fix_mapping(llm: anthropic.Anthropic, bad_code: str, error: str) -> str | None:
+    """Ask Claude to fix broken code, providing the exact traceback."""
+    _log("Asking Claude to fix the broken mapping …")
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": (
@@ -1384,7 +1398,7 @@ def save_and_validate(code: str, iteration: int, candidate: int = 0):
             "mapping() returns identical output for all test positions — " \
             "it ignores the input"
 
-    # Cost timing: useful signal for Qwen so accuracy isn't pursued at
+    # Cost timing: useful signal for Claude so accuracy isn't pursued at
     # arbitrary C++ cost. We time the slowest path (late-game position).
     test_pos = _make_test_position(*_TEST_POSITIONS[-1])
     # warm-up so first-call overhead doesn't dominate
@@ -1651,7 +1665,7 @@ def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
 
     # ── Post-training analytics: confusion matrix + miss samples ──
     # Done on rank 0 only; uses get_raw_and_mapped() so we can decode the
-    # miss back into human-readable squares for Qwen.
+    # miss back into human-readable squares for Claude.
     confusion = [[0]*3 for _ in range(3)]
     misses    = []
     if rank == 0:
@@ -1701,8 +1715,8 @@ def main_ddp(rank, world_size, batch_size, dataset, input_dim, results_file):
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 def _validate_with_repair(code: str, iteration: int, candidate: int,
-                          llm: Llama):
-    """Validate code, asking Qwen to repair on failure (up to MAX_RETRIES).
+                          llm: anthropic.Anthropic):
+    """Validate code, asking Claude to repair on failure (up to MAX_RETRIES).
 
     Returns (path, mapped_dim, description, cost_us, lint_issues, final_code)
     or (None, …, error_msg).  `final_code` may differ from input if repaired.
@@ -1730,7 +1744,7 @@ def _validate_with_repair(code: str, iteration: int, candidate: int,
                 if fixed:
                     cur = fixed
                 else:
-                    _log("      Qwen could not produce a fix. Giving up "
+                    _log("      Claude could not produce a fix. Giving up "
                          "this candidate.")
                     return None, None, None, None, None, cur
     _log(f"      All {MAX_RETRIES} repair attempts failed.")
@@ -1776,8 +1790,8 @@ def _print_history_table(history: list) -> None:
 
 if __name__ == "__main__":
     _section(f"MAPPING-LOOP STARTUP   (pid={os.getpid()})", char="═")
-    _log(f"Qwen GPU       : {QWEN_GPU_DEVICE}  (model: {QWEN_MODEL_PATH})")
-    _log(f"Training GPU   : {TRAINING_GPU}")
+    _log(f"Claude model   : {CLAUDE_MODEL}  (Anthropic API)")
+    _log(f"Training GPU(s): {TRAINING_GPU}")
     _log(f"Iterations     : {MAX_ITERATIONS}")
     _log(f"Candidates/iter: {NB_CANDIDATES_PER_ITER}")
     _log(f"Epochs/training: {NB_EPOCHS}")
@@ -1791,11 +1805,10 @@ if __name__ == "__main__":
     raw_data = RawGameData(DATA_DIR)
     _log(f"raw_data ready in {_fmt_secs(_time.time() - t0)}")
 
-    _section("Load Qwen LLM")
+    _section("Load Claude API client")
     t0 = _time.time()
     llm = load_llm()
-    _log(f"LLM loaded in {_fmt_secs(_time.time() - t0)}  "
-         f"({_gpu_mem_str()})")
+    _log(f"client ready in {_fmt_secs(_time.time() - t0)}")
 
     # ── Resume from history.jsonl if present ──
     history = load_history()
@@ -1828,10 +1841,10 @@ if __name__ == "__main__":
 
         # ── Step A: generate NB_CANDIDATES_PER_ITER drafts ──
         # On iter 1 (empty history) the seed itself has not been scored
-        # yet, so we keep it as candidate 0 and skip Qwen generation.
+        # yet, so we keep it as candidate 0 and skip Claude generation.
         # On iter 2+ the seed IS the current best and its val_acc is
         # already in history — re-training it would be pure waste — so
-        # we generate NB_CANDIDATES_PER_ITER fresh drafts from Qwen and
+        # we generate NB_CANDIDATES_PER_ITER fresh drafts from Claude and
         # train only those.
         drafts: list = []
         if not history:
@@ -1839,7 +1852,7 @@ if __name__ == "__main__":
             _log(f"  Seed candidate (iter 1): training INITIAL mapping.")
         else:
             for k in range(NB_CANDIDATES_PER_ITER):
-                # First Qwen draft refines (low temp); later drafts explore.
+                # First Claude draft refines (low temp); later drafts explore.
                 # On plateau, every draft gets the exploration temperature.
                 temp = TEMP_EXPLORE if (plateau or k > 0) else TEMP_REFINE
                 _log(f"  Generating candidate #{k+1}/"
@@ -1851,12 +1864,12 @@ if __name__ == "__main__":
                 if new_code:
                     drafts.append(new_code)
                 else:
-                    _log(f"  Could not extract code from Qwen response "
+                    _log(f"  Could not extract code from Claude response "
                          f"(candidate #{k+1}); skipping.")
             if not drafts:
-                # Qwen failed every candidate — fall back to re-testing the
+                # Claude failed every candidate — fall back to re-testing the
                 # seed so the iteration isn't a total no-op. Rare path.
-                _log(f"  WARN: Qwen produced no usable drafts; falling "
+                _log(f"  WARN: Claude produced no usable drafts; falling "
                      f"back to re-testing the current best as a safety "
                      f"net.")
                 drafts.append(current_code)
