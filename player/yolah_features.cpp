@@ -399,12 +399,12 @@ void set_features(uint8_t* features,
           (popcount(flood_black_pieces[i] | flood_black_pieces[j]));
       teaming_black +=
           ((flood_black_pieces[i] & flood_black_pieces[j]) != 0) *
-          (popcount(flood_black_pieces[i] | flood_black_pieces[j]));      
+          (popcount(flood_black_pieces[i] | flood_black_pieces[j]));
     }
   }
   features[STRETCH_BLACK] = stretch_black > 255 ? 255 : stretch_black;
   features[TEAMING_BLACK] = teaming_black > 255 ? 255 : teaming_black;
-  
+
   int stretch_white = 0;
   int teaming_white = 0;
   for (int i = 0; i < 4; i++) {
@@ -414,12 +414,12 @@ void set_features(uint8_t* features,
           (popcount(flood_white_pieces[i] | flood_white_pieces[j]));
       teaming_white +=
           ((flood_white_pieces[i] & flood_white_pieces[j]) != 0) *
-          (popcount(flood_white_pieces[i] | flood_white_pieces[j]));      
+          (popcount(flood_white_pieces[i] | flood_white_pieces[j]));
     }
   }
   features[STRETCH_WHITE] = stretch_white > 255 ? 255 : stretch_white;
   features[TEAMING_WHITE] = teaming_white > 255 ? 255 : teaming_white;
-  
+
 #ifndef NDEBUG
   cerr << "Stretch\n";
   cerr << yolah << '\n';
@@ -454,8 +454,8 @@ void set_features(uint8_t* features,
   features[CONTACT_WITH_FREE_BLACK] =
       popcount(black_bb_shift_all_dirs & free_bb);
   features[CONTACT_WITH_FREE_WHITE] =
-      popcount(white_bb_shift_all_dirs & free_bb);  
-  
+      popcount(white_bb_shift_all_dirs & free_bb);
+
   features[CONTACT_WITH_OTHER] = popcount(black_bb_shift_all_dirs & white_bb);
 
 #ifndef NDEBUG
@@ -474,15 +474,15 @@ void set_features(uint8_t* features,
   cerr << format("CONTACT_WITH_FREE_WHITE: {}\n",
                  features[CONTACT_WITH_FREE_WHITE]);
   cerr << format("CONTACT_WITH_OTHER: {}\n",
-                 features[CONTACT_WITH_OTHER]);  
+                 features[CONTACT_WITH_OTHER]);
   getline(cin, _);
 #endif
-
+/*
   int delta = yolah.score(Yolah::BLACK) - yolah.score(Yolah::WHITE);
   int effective_delta = delta - (yolah.current_player() == Yolah::BLACK ? 0 : 1);
   features[SURE_WIN_BLACK] = effective_delta >= 1;
   features[SURE_WIN_WHITE] = effective_delta <= -1;
-
+*/
   features[FREE] = popcount(free_bb);
 #ifndef NDEBUG
   cerr << "Free\n";
@@ -497,7 +497,7 @@ void set_features(uint8_t* features,
   {
       for (int i = 0, offset = 0; i < 4; i++, offset += 8) {
           uint64_t piece = black_pieces_bb[i];
-          features[BLOCKED_N_BLACK0 + offset]  = shift<NORTH>(piece) == 0 || (occupied & shift<NORTH>(piece)) != 0;        
+          features[BLOCKED_N_BLACK0 + offset]  = shift<NORTH>(piece) == 0 || (occupied & shift<NORTH>(piece)) != 0;
           features[BLOCKED_NE_BLACK0 + offset] = shift<NORTH_EAST>(piece) == 0 || (occupied & shift<NORTH_EAST>(piece)) != 0;
           features[BLOCKED_E_BLACK0 + offset]  = shift<EAST>(piece) == 0 || (occupied & shift<EAST>(piece)) != 0;
           features[BLOCKED_SE_BLACK0 + offset] = shift<SOUTH_EAST>(piece) == 0 || (occupied & shift<SOUTH_EAST>(piece)) != 0;
@@ -525,7 +525,7 @@ void set_features(uint8_t* features,
   {
       for (int i = 0, offset = 0; i < 4; i++, offset += 8) {
           uint64_t piece = white_pieces_bb[i];
-          features[BLOCKED_N_WHITE0 + offset]  = shift<NORTH>(piece) == 0 || (occupied & shift<NORTH>(piece)) != 0;        
+          features[BLOCKED_N_WHITE0 + offset]  = shift<NORTH>(piece) == 0 || (occupied & shift<NORTH>(piece)) != 0;
           features[BLOCKED_NE_WHITE0 + offset] = shift<NORTH_EAST>(piece) == 0 || (occupied & shift<NORTH_EAST>(piece)) != 0;
           features[BLOCKED_E_WHITE0 + offset]  = shift<EAST>(piece) == 0 || (occupied & shift<EAST>(piece)) != 0;
           features[BLOCKED_SE_WHITE0 + offset] = shift<SOUTH_EAST>(piece) == 0 || (occupied & shift<SOUTH_EAST>(piece)) != 0;

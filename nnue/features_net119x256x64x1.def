@@ -1,0 +1,68 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+# ── What gets baked into the image ───────────────────────────────────────────
+# The Yolah Python module and all nnue code (including features_net119x256x64x1.py)
+# are copied in. The .features.txt data files are NOT baked in — they live
+# outside the image and are bind-mounted at /cache at runtime. Model
+# checkpoints go to /mnt (also bind-mounted).
+#
+# Typical invocation:
+#   singularity exec --nv \
+#     --bind ./features:/cache \
+#     --bind ./models:/mnt \
+#     features_net119x256x64x1.sif python3 /nnue/features_net119x256x64x1.py
+#
+# See features_net119x256x64x1.sh for the SLURM glue.
+#
+# No preprocess step is needed: the .features.txt files are already raw
+# uint8 records (NB_FEATURES + 1 bytes each) and are memmapped directly.
+
+%files
+    ../server /server
+    ../nnue   /nnue
+
+%post
+    # Fail fast on any apt/pip error.
+    set -eu
+
+    DEBIAN_FRONTEND=noninteractive apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-setuptools \
+        build-essential \
+        git \
+        ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    pip3 install --no-cache-dir --upgrade pip
+
+    # PyTorch with CUDA 12.4 wheels (matches the base image's CUDA).
+    pip3 install --no-cache-dir \
+        torch \
+        --index-url https://download.pytorch.org/whl/cu124
+
+    pip3 install --no-cache-dir numpy tqdm
+
+    # Build-time sanity checks: fail the build if these are broken, not at
+    # SLURM submit time.
+    python3 -c "import torch; print('torch', torch.__version__)"
+    python3 -c "import numpy, tqdm; print('numpy', numpy.__version__)"
+
+    # Placeholder dirs that get shadowed by bind mounts at runtime.
+    mkdir -p /cache /mnt
+
+%environment
+    export CUDA_HOME=/usr/local/cuda
+    export PATH=$CUDA_HOME/bin:$PATH
+    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+    export TORCH_ALLOW_TF32=1
+
+%runscript
+    # Default action when running `singularity run` with no override.
+    # The .sh launcher uses `exec` with an explicit command, so this is
+    # only a convenience fallback.
+    cd /nnue
+    python3 features_net119x256x64x1.py
