@@ -25,10 +25,9 @@ torch.set_float32_matmul_precision('high')
 #   2 — empty squares (binary 8×8 map)
 #   3 — turn          (all-zeros = black to play, all-ones = white to play)
 #
-# No score-derived "certain-win" planes here — this is the ablation variant
-# meant to be compared against cnn_resnet_value_policy_with_diff_score.py.
-# The score is implicitly recoverable from piece counts (initial pieces minus
-# remaining), but the network has to learn that on its own.
+# The score difference is implicitly recoverable from piece counts (initial
+# pieces minus remaining), so the network can learn it from the trunk if it
+# turns out to matter.
 
 
 # ── Action encoding ────────────────────────────────────────────────────────────
@@ -83,9 +82,7 @@ def encode_cnn(yolah) -> torch.Tensor:
 
 
 # ── Dataset ────────────────────────────────────────────────────────────────────
-# Backed by the memory-mapped files produced by preprocess.py. The cache always
-# stores the 6-plane encoding on disk; this 4-plane training script slices off
-# the first IN_CHANNELS planes at read time — no need to re-preprocess.
+# Backed by the 4-plane memory-mapped files produced by preprocess.py.
 IN_CHANNELS = 4
 
 
@@ -94,19 +91,24 @@ class GameDataset(Dataset):
     Memory-mapped pre-encoded position dataset.
 
     Each sample returns:
-        state         : (IN_CHANNELS, 8, 8) float32 — sliced from the 6-plane cache
-        value_target  : ()                  float32 — z ∈ {-1, 0, +1} from current
-                                                      player's perspective
-        policy_target : ()                  int64   — from*64 + to, or
-                                                      POLICY_IGNORE_INDEX for
-                                                      terminal positions
+        state         : (4, 8, 8) float32 — board encoding from the cache
+        value_target  : ()        float32 — z ∈ {-1, 0, +1} from current
+                                            player's perspective
+        policy_target : ()        int64   — from*64 + to, or
+                                            POLICY_IGNORE_INDEX for terminal
+                                            positions
     """
-    def __init__(self, cache_dir: str, in_channels: int = IN_CHANNELS):
+    def __init__(self, cache_dir: str):
         meta_path = os.path.join(cache_dir, "meta.json")
         with open(meta_path) as f:
             meta = json.load(f)
 
-        self.in_channels = in_channels
+        n_planes = meta["positions"]["shape"][1]
+        if n_planes != IN_CHANNELS:
+            raise ValueError(
+                f"Cache has {n_planes} planes but training expects {IN_CHANNELS}. "
+                "Re-run preprocess.py.")
+
         # mmap mode='r' shares one OS page cache across all DataLoader workers
         self.positions = np.memmap(
             os.path.join(cache_dir, meta["positions"]["path"]),
@@ -121,8 +123,7 @@ class GameDataset(Dataset):
             dtype=np.int16, mode='r',
             shape=tuple(meta["policies"]["shape"]))
         self.size = int(meta["n_positions"])
-        print(f"Memmap dataset: {self.size:,} positions, "
-              f"{in_channels}/{meta['positions']['shape'][1]} planes used",
+        print(f"Memmap dataset: {self.size:,} positions, {IN_CHANNELS} planes",
               flush=True)
 
     def __len__(self):
@@ -131,8 +132,7 @@ class GameDataset(Dataset):
     def __getitem__(self, idx):
         # np.ascontiguousarray forces a copy out of the memmap so the tensor
         # owns its memory (safer with pin_memory + multi-worker prefetch).
-        state = np.ascontiguousarray(
-            self.positions[idx, :self.in_channels], dtype=np.float32)
+        state = np.ascontiguousarray(self.positions[idx], dtype=np.float32)
         return (
             torch.from_numpy(state),
             torch.tensor(float(self.values[idx]), dtype=torch.float32),
@@ -166,8 +166,6 @@ class ResBlock(nn.Module):
 class Net(nn.Module):
     """
     ResNet for Yolah with TWO heads (AlphaZero style).
-
-    Ablation variant: 4-plane input (no certain-win planes).
 
       Trunk : (B, 4, 8, 8) ──► input conv ──► N × ResBlock ──► BN ──► ReLU
               → shared feature map  (B, C, 8, 8)
@@ -429,5 +427,5 @@ if __name__ == "__main__":
     print(torch.cuda.is_available())
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    dataset = GameDataset(CACHE_DIR, in_channels=IN_CHANNELS)
+    dataset = GameDataset(CACHE_DIR)
     mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)

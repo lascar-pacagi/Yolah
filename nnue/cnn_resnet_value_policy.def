@@ -16,7 +16,7 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 #   singularity exec --nv \
 #     --bind ./cache:/cache \
 #     --bind ./models:/mnt \
-#     cnn_resnet_value_policy.sif python3 /nnue/cnn_resnet_value_policy_with_diff_score.py
+#     cnn_resnet_value_policy.sif python3 /nnue/cnn_resnet_value_policy.py
 #
 # See cnn_resnet_value_policy.sh for the SLURM glue.
 
@@ -63,8 +63,8 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     export TORCH_ALLOW_TF32=1
 
 %runscript
-    # Default action when running `singularity run` with no override:
-    # train the certain-win variant. The .sh launcher uses `exec` with an
-    # explicit command, so this is only a convenience fallback.
+    # Default action when running `singularity run` with no override.
+    # The .sh launcher uses `exec` with an explicit command, so this is
+    # only a convenience fallback.
     cd /nnue
     python3 cnn_resnet_value_policy.py

@@ -5,11 +5,7 @@
 # Pipeline:
 #   1. Build (or skip if already present) the encoded position cache via
 #      preprocess.py — runs CPU-only with many workers.
-#   2. Train the chosen variant via DDP over all visible GPUs.
-#
-# Override defaults at submit time, e.g.
-#   sbatch --export=ALL,TRAIN_SCRIPT=cnn_resnet_value_policy.py \
-#          cnn_resnet_value_policy.sh
+#   2. Train cnn_resnet_value_policy.py via DDP over all visible GPUs.
 #
 # Adjust the #SBATCH lines below for your cluster's partition / account.
 # ────────────────────────────────────────────────────────────────────────────
@@ -29,10 +25,6 @@ SIF="${SIF:-${SLURM_SUBMIT_DIR:-$PWD}/cnn_resnet_value_policy.sif}"
 CACHE_DIR="${CACHE_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/cache}"
 MODEL_DIR="${MODEL_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/models}"
 
-# Pick which training script to run.  Default = without certain-win.
-# For the ablation set:  TRAIN_SCRIPT=cnn_resnet_value_policy.py
-TRAIN_SCRIPT="${TRAIN_SCRIPT:-cnn_resnet_value_policy.py}"
-
 # Preprocessor uses the same CPU count SLURM allocated.
 YOLAH_PREPROC_NPROC="${YOLAH_PREPROC_NPROC:-${SLURM_CPUS_PER_TASK:-16}}"
 # DataLoader workers per DDP rank (8 is plenty for memmap reads).
@@ -45,7 +37,6 @@ echo "  Job        : ${SLURM_JOB_ID:-(local)} on $(hostname)"
 echo "  SIF        : ${SIF}"
 echo "  Cache dir  : ${CACHE_DIR}"
 echo "  Model dir  : ${MODEL_DIR}"
-echo "  Train      : ${TRAIN_SCRIPT}"
 echo "  Preproc np : ${YOLAH_PREPROC_NPROC}"
 echo "  DL workers : ${YOLAH_DATALOADER_WORKERS}"
 echo "════════════════════════════════════════════════════════════════"
@@ -69,13 +60,13 @@ print(f'  encoding planes : {m[\"encoding_planes\"]}')
 fi
 
 # ── Phase 2: train ──────────────────────────────────────────────────────────
-echo "[$(date '+%F %T')] === Training: ${TRAIN_SCRIPT} ==="
+echo "[$(date '+%F %T')] === Training: cnn_resnet_value_policy.py ==="
 singularity exec --nv \
     --bind "${CACHE_DIR}:/cache" \
     --bind "${MODEL_DIR}:/mnt" \
     --env "YOLAH_CACHE_DIR=/cache" \
     --env "YOLAH_DATALOADER_WORKERS=${YOLAH_DATALOADER_WORKERS}" \
     "${SIF}" \
-    bash -c "cd /nnue && python3 ${TRAIN_SCRIPT}"
+    bash -c "cd /nnue && python3 cnn_resnet_value_policy.py"
 
 echo "[$(date '+%F %T')] === Done ==="

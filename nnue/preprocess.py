@@ -2,10 +2,10 @@
 preprocess.py — Offline encoding of all game positions to memory-mapped files.
 
 Reads:  $YOLAH_GAME_DIR/games_*  (defaults to /nnue/data inside the .sif)
-Writes: <cache_dir>/positions_6plane.u8   shape (N, 6, 8, 8) uint8
-        <cache_dir>/values.i8              shape (N,)        int8
-        <cache_dir>/policies.i16           shape (N,)        int16
-        <cache_dir>/meta.json              metadata sidecar
+Writes: <cache_dir>/positions.u8   shape (N, 4, 8, 8) uint8
+        <cache_dir>/values.i8       shape (N,)        int8
+        <cache_dir>/policies.i16    shape (N,)        int16
+        <cache_dir>/meta.json       metadata sidecar
 
 Usage:  python3 preprocess.py [<cache_dir>]
 
@@ -27,16 +27,10 @@ the OS page cache (no RAM multiplication per worker).
 Layout
 ──────
 Stored as uint8 because every plane is binary or a small categorical:
-  plane 0 — black pieces        (0/1)
-  plane 1 — white pieces        (0/1)
-  plane 2 — empty squares       (0/1)
-  plane 3 — turn                (0 = black to play, 1 = white to play)
-  plane 4 — black certain-win   (0/1)
-  plane 5 — white certain-win   (0/1)
-
-The 4-plane ablation variant (`cnn_resnet_value_policy.py`) reads the same
-file and slices the first 4 channels at training time — no need to
-preprocess twice.
+  plane 0 — black pieces  (0/1)
+  plane 1 — white pieces  (0/1)
+  plane 2 — empty squares (0/1)
+  plane 3 — turn          (0 = black to play, 1 = white to play)
 """
 import os
 import sys
@@ -88,7 +82,7 @@ def encode_file(args):
     # Each worker mmaps the same files; writes go to disjoint regions so
     # there is no inter-process write contention.
     pos = np.memmap(pos_path, dtype=np.uint8, mode='r+',
-                    shape=(total, 6, 8, 8))
+                    shape=(total, 4, 8, 8))
     val = np.memmap(val_path, dtype=np.int8, mode='r+',
                     shape=(total,))
     pol = np.memmap(pol_path, dtype=np.int16, mode='r+',
@@ -126,11 +120,6 @@ def encode_file(args):
             pos[cursor, 1] = bb_to_plane(y.white)
             pos[cursor, 2] = bb_to_plane(y.empty)
             pos[cursor, 3] = 0 if black_to_move else 1
-
-            delta = y.black_score - y.white_score
-            eff   = delta - (0 if black_to_move else 1)
-            pos[cursor, 4] = 1 if eff >=  1 else 0
-            pos[cursor, 5] = 1 if eff <= -1 else 0
 
             # Value target from CURRENT player's perspective
             val[cursor] = z_black if black_to_move else -z_black
@@ -180,11 +169,11 @@ def main():
         starts.append(starts[-1] + n)
 
     # ── Preallocate sparse memmap files (OS fills as written) ─────────────
-    pos_path = os.path.join(out_dir, "positions_6plane.u8")
+    pos_path = os.path.join(out_dir, "positions.u8")
     val_path = os.path.join(out_dir, "values.i8")
     pol_path = os.path.join(out_dir, "policies.i16")
 
-    n_bytes_pos = total_pos * 6 * 8 * 8
+    n_bytes_pos = total_pos * 4 * 8 * 8
     n_bytes_val = total_pos
     n_bytes_pol = total_pos * 2
 
@@ -223,9 +212,9 @@ def main():
     meta = {
         "n_positions": total_pos,
         "n_games":     total_games,
-        "positions": {"path": "positions_6plane.u8",
+        "positions": {"path": "positions.u8",
                       "dtype": "uint8",
-                      "shape": [total_pos, 6, 8, 8]},
+                      "shape": [total_pos, 4, 8, 8]},
         "values":    {"path": "values.i8",
                       "dtype": "int8",
                       "shape": [total_pos]},
@@ -234,10 +223,7 @@ def main():
                       "shape": [total_pos]},
         "policy_ignore_idx": -1,
         "n_actions": 64 * 64,
-        "encoding_planes": [
-            "black", "white", "empty", "turn",
-            "black_certain_win", "white_certain_win",
-        ],
+        "encoding_planes": ["black", "white", "empty", "turn"],
     }
     meta_path = os.path.join(out_dir, "meta.json")
     with open(meta_path, "w") as f:
