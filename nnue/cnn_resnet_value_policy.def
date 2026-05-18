@@ -1,0 +1,70 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+# ── What gets baked into the image ───────────────────────────────────────────
+# The Yolah Python module and all nnue code (including preprocess.py and the
+# two training scripts) are copied in. The data/ directory is *also* copied —
+# preprocessing reads /nnue/data and writes its output to a bind-mounted cache
+# at /cache (writable). Model checkpoints go to /mnt (also bind-mounted).
+#
+# Typical invocation:
+#   singularity exec --nv \
+#     --bind ./cache:/cache \
+#     --bind ./models:/mnt \
+#     cnn_resnet_value_policy.sif python3 /nnue/preprocess.py /cache
+#
+#   singularity exec --nv \
+#     --bind ./cache:/cache \
+#     --bind ./models:/mnt \
+#     cnn_resnet_value_policy.sif python3 /nnue/cnn_resnet_value_policy_with_diff_score.py
+#
+# See cnn_resnet_value_policy.sh for the SLURM glue.
+
+%files
+    ../server /server
+    ../nnue   /nnue
+
+%post
+    # Fail fast on any apt/pip error.
+    set -eu
+
+    DEBIAN_FRONTEND=noninteractive apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-setuptools \
+        build-essential \
+        git \
+        ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    pip3 install --no-cache-dir --upgrade pip
+
+    # PyTorch with CUDA 12.4 wheels (matches the base image's CUDA).
+    pip3 install --no-cache-dir \
+        torch \
+        --index-url https://download.pytorch.org/whl/cu124
+
+    pip3 install --no-cache-dir numpy tqdm
+
+    # Build-time sanity checks: fail the build if these are broken, not at
+    # SLURM submit time.
+    python3 -c "import torch; print('torch', torch.__version__)"
+    python3 -c "import numpy, tqdm; print('numpy', numpy.__version__)"
+
+    # Placeholder dirs that get shadowed by bind mounts at runtime.
+    mkdir -p /cache /mnt
+
+%environment
+    export CUDA_HOME=/usr/local/cuda
+    export PATH=$CUDA_HOME/bin:$PATH
+    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+    export TORCH_ALLOW_TF32=1
+
+%runscript
+    # Default action when running `singularity run` with no override:
+    # train the certain-win variant. The .sh launcher uses `exec` with an
+    # explicit command, so this is only a convenience fallback.
+    cd /nnue
+    python3 cnn_resnet_value_policy.py

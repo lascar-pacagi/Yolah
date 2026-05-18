@@ -1,0 +1,39 @@
+Device: cuda
+Loading 5 game files (cap 1200/file):
+  ./data/games_2025_12_09_09_53_30.421779150_0.txt
+  ./data/games_2025_12_09_09_53_30.421779150_1.txt
+  ./data/games_2025_12_09_09_53_30.421779150_2.txt
+  ./data/games_2025_12_09_09_53_30.421779150_3.txt
+  ./data/games_2025_12_09_09_53_30.421779150_4.txt
+  6,000 games kept
+Encoding positions...
+  305,211 positions encoded in 7.1s
+Game-level split: train 289,905 positions (5,700 games)   val 15,306 positions (300 games)
+
+====== WITH certain-win: 6 input planes ======
+  Parameters: 1,207,783
+  epoch 1/6  train v_mse=0.5052 p_ce=4.0476   val v_mse=0.4854 v_sign=0.5431 p_ce=2.6967 p_top1=0.3083   (36.2s)
+  epoch 2/6  train v_mse=0.4176 p_ce=2.4278   val v_mse=0.4307 v_sign=0.5684 p_ce=2.3242 p_top1=0.3527   (35.8s)
+  epoch 3/6  train v_mse=0.3524 p_ce=2.1115   val v_mse=0.4044 v_sign=0.5759 p_ce=2.2207 p_top1=0.3692   (35.6s)
+  epoch 4/6  train v_mse=0.3122 p_ce=1.9403   val v_mse=0.4008 v_sign=0.5798 p_ce=2.1336 p_top1=0.3882   (36.0s)
+  epoch 5/6  train v_mse=0.2821 p_ce=1.8236   val v_mse=0.4352 v_sign=0.5749 p_ce=2.1265 p_top1=0.3930   (36.0s)
+  epoch 6/6  train v_mse=0.2556 p_ce=1.7360   val v_mse=0.4182 v_sign=0.5740 p_ce=2.1111 p_top1=0.3995   (36.2s)
+
+====== WITHOUT certain-win: 4 input planes ======
+  Parameters: 1,206,055
+  epoch 1/6  train v_mse=0.5200 p_ce=3.9852   val v_mse=0.4789 v_sign=0.5470 p_ce=2.7094 p_top1=0.3098   (36.2s)
+  epoch 2/6  train v_mse=0.4175 p_ce=2.4285   val v_mse=0.4199 v_sign=0.5734 p_ce=2.3439 p_top1=0.3540   (36.0s)
+  epoch 3/6  train v_mse=0.3588 p_ce=2.1104   val v_mse=0.4286 v_sign=0.5717 p_ce=2.2208 p_top1=0.3711   (36.2s)
+  epoch 4/6  train v_mse=0.3219 p_ce=1.9369   val v_mse=0.3913 v_sign=0.5855 p_ce=2.1380 p_top1=0.3874   (36.0s)
+  epoch 5/6  train v_mse=0.2936 p_ce=1.8175   val v_mse=0.4158 v_sign=0.5806 p_ce=2.1081 p_top1=0.3947   (35.9s)
+  epoch 6/6  train v_mse=0.2685 p_ce=1.7281   val v_mse=0.4200 v_sign=0.5758 p_ce=2.1145 p_top1=0.3969   (36.2s)
+
+================== COMPARISON (final epoch) ==================
+Metric                     WITH (6p)    WITHOUT (4p)   delta (4-6)
+--------------------------------------------------------------------
+val value MSE                 0.4182          0.4200       +0.0018
+val value sign acc            0.5740          0.5758       +0.0018
+val policy CE                 2.1111          2.1145       +0.0034
+val policy top-1              0.3995          0.3969       -0.0026
+--------------------------------------------------------------------
+Lower is better for MSE/CE; higher is better for sign-acc/top-1.
