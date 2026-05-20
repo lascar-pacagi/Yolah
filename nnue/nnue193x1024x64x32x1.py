@@ -252,9 +252,17 @@ class TrainerDDP:
         self._save_checkpoint(nb_epochs - 1)
 
 
-def main(rank, world_size, batch_size, dataset):
+def main(rank, world_size, batch_size, cache_dir):
     ddp_setup(rank, world_size)
     print(rank)
+
+    # Construct the dataset HERE, inside each spawned process — never pass a
+    # memmap-backed dataset through mp.spawn. mp.spawn serializes its args to
+    # ship them to the child, and a np.memmap serializes by value: the whole
+    # backing file gets copied into an in-memory array in the child. Opening
+    # the memmap per-process instead is a lazy mmap() — virtual only, with the
+    # OS page cache physically shared across ranks.
+    dataset = GameDataset(cache_dir)
     if rank == 0:
         print(len(dataset), flush=True)
 
@@ -282,5 +290,5 @@ if __name__ == "__main__":
     print(torch.cuda.is_available())
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    dataset = GameDataset(CACHE_DIR)
-    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
+    # Pass the cache directory (a string), not the dataset object — see main().
+    mp.spawn(main, args=(world_size, 512, CACHE_DIR), nprocs=world_size)

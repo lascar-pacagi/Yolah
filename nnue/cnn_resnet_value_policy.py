@@ -17,6 +17,13 @@ from yolah import Yolah, Move, Square
 
 torch.set_float32_matmul_precision('high')
 
+# DataLoader workers default to sharing tensors through /dev/shm, which on
+# SLURM + Singularity is typically capped by the job cgroup and triggers a
+# SIGBUS ("Bus error") the moment the first batch is handed off. Switching
+# to the file_system strategy moves IPC to regular temp files, removing the
+# /dev/shm dependency entirely.
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 # ── Board encoding ─────────────────────────────────────────────────────────────
 #
 # The position is encoded as a (4, 8, 8) tensor with four channels:
@@ -232,7 +239,7 @@ class Net(nn.Module):
 
 
 # ── Training ───────────────────────────────────────────────────────────────────
-NB_EPOCHS  = 3
+NB_EPOCHS  = 100
 MODEL_PATH = "/mnt/"
 MODEL_NAME = "cnn_resnet_256x30_value_policy"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
@@ -254,15 +261,18 @@ def ddp_setup(rank, world_size):
 def dataloader_ddp(trainset, valset, batch_size):
     sampler_train = DistributedSampler(trainset)
     sampler_val   = DistributedSampler(valset, shuffle=False)
+    # prefetch_factor / persistent_workers are only valid with num_workers > 0;
+    # passing them with num_workers=0 raises ValueError. Keeping them
+    # conditional makes YOLAH_DATALOADER_WORKERS=0 a usable fallback.
+    extra = (dict(persistent_workers=True, prefetch_factor=4)
+             if NUM_WORKERS > 0 else {})
     train_loader  = DataLoader(
         trainset, batch_size=batch_size, shuffle=False, sampler=sampler_train,
-        num_workers=NUM_WORKERS, pin_memory=True,
-        persistent_workers=(NUM_WORKERS > 0), prefetch_factor=4,
+        num_workers=NUM_WORKERS, pin_memory=True, **extra,
     )
     val_loader = DataLoader(
         valset, batch_size=batch_size, shuffle=False, sampler=sampler_val,
-        num_workers=NUM_WORKERS, pin_memory=True,
-        persistent_workers=(NUM_WORKERS > 0), prefetch_factor=4,
+        num_workers=NUM_WORKERS, pin_memory=True, **extra,
     )
     return train_loader, sampler_train, val_loader, sampler_val
 
@@ -394,8 +404,16 @@ class TrainerDDP:
         self._save_checkpoint(nb_epochs - 1)
 
 
-def main(rank, world_size, batch_size, dataset):
+def main(rank, world_size, batch_size, cache_dir):
     ddp_setup(rank, world_size)
+
+    # Construct the dataset HERE, inside each spawned process — never pass a
+    # memmap-backed dataset through mp.spawn. mp.spawn serializes its args to
+    # ship them to the child, and a np.memmap serializes by value: the whole
+    # 253 GB backing file gets copied into an in-memory array in the child.
+    # Opening the memmap per-process instead is a lazy mmap() — virtual only,
+    # with the OS page cache physically shared across ranks.
+    dataset = GameDataset(cache_dir)
     if rank == 0:
         print(len(dataset), flush=True)
 
@@ -427,5 +445,5 @@ if __name__ == "__main__":
     print(torch.cuda.is_available())
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    dataset = GameDataset(CACHE_DIR)
-    mp.spawn(main, args=(world_size, 512, dataset), nprocs=world_size)
+    # Pass the cache directory (a string), not the dataset object — see main().
+    mp.spawn(main, args=(world_size, 512, CACHE_DIR), nprocs=world_size)

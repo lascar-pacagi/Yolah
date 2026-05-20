@@ -41,10 +41,13 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
     pip3 install --no-cache-dir --upgrade pip
 
-    # PyTorch with CUDA 12.4 wheels (matches the base image's CUDA).
-    pip3 install --no-cache-dir \
-        torch \
-        --index-url https://download.pytorch.org/whl/cu124
+    # PyTorch from the default PyPI index, pinned to 2.6.0. That release's
+    # Linux x86_64 wheel bundles the CUDA 12.4 runtime, which matches the
+    # cluster's NVIDIA driver (it supports up to CUDA 12.4 — reported by
+    # torch as "12040"). torch 2.7+ bundles CUDA 12.6, needing a newer
+    # driver than the cluster has -> "driver too old" at CUDA init.
+    # Raise this pin only after the cluster driver is upgraded.
+    pip3 install --no-cache-dir torch==2.6.0
 
     pip3 install --no-cache-dir numpy tqdm
 
