@@ -29,7 +29,7 @@ from torch.distributed import init_process_group, destroy_process_group
 import os
 import sys
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader
 import glob
 
 torch.set_float32_matmul_precision('high')
@@ -56,49 +56,79 @@ TURN_INDEX   = NB_FEATURES - 1
 # ── Dataset ───────────────────────────────────────────────────────────────────
 class FeaturesDataset(Dataset):
     """
-    Memory-mapped features dataset that returns (features, value) per sample.
+    Memory-mapped features dataset returning (features, value) per sample,
+    optionally restricted to a contiguous [start, end) slice (train/val split).
+
+    Cheap to serialize across a process boundary: __getstate__ emits only
+    (data_dir, max_records, start, end), never the np.memmap arrays. A
+    torch.multiprocessing.spawn child inherits the 'spawn' start method, so the
+    DataLoader *spawns* its workers and serializes the dataset into each one —
+    a raw np.memmap would serialize BY VALUE (copying the backing files into
+    every worker). __setstate__ re-opens the memmaps: lazy mmap()s, shared
+    OS page cache.
 
     state : (119,) float32 — feature_byte / 255
     value : ()     float32 — z ∈ {-1, 0, +1} from CURRENT player's POV,
                               derived from the 3-class label + TURN feature.
     """
-    def __init__(self, data_dir: str, max_records: int = 10**12):
-        files = sorted(glob.glob(os.path.join(data_dir, "*.features.txt")))
+    def __init__(self, data_dir: str, max_records: int = 10**12,
+                 start: int = 0, end: int = None):
+        self.data_dir    = data_dir
+        self.max_records = max_records
+        self.start       = start
+        self._end        = end
+        self._open()
+        print(f"FeaturesDataset: {self.n_records:,} records across "
+              f"{len(self.mmaps)} files", flush=True)
+
+    def _open(self):
+        files = sorted(glob.glob(os.path.join(self.data_dir, "*.features.txt")))
         if not files:
-            raise FileNotFoundError(f"No .features.txt files in {data_dir}")
+            raise FileNotFoundError(f"No .features.txt files in {self.data_dir}")
 
         self.mmaps      = []
         self.cumulative = []  # cumulative[i] = total records before file i
         total = 0
         for path in files:
-            size = os.path.getsize(path)
-            nb_records = size // RECORD_SIZE
-            print(f"{path}: {nb_records:,} records", flush=True)
+            nb_records = os.path.getsize(path) // RECORD_SIZE
             mm = np.memmap(path, dtype=np.uint8, mode='r',
                            shape=(nb_records, RECORD_SIZE))
             self.cumulative.append(total)
             self.mmaps.append(mm)
             total += nb_records
-            if total >= max_records:
+            if total >= self.max_records:
                 break
 
-        self.size = total
-        print(f"Total: {total:,} records across {len(self.mmaps)} files",
-              flush=True)
+        self.n_records = total
+        if self._end is None:
+            self._end = total
+
+    # Serialize only the recipe — see class docstring.
+    def __getstate__(self):
+        return {"data_dir": self.data_dir, "max_records": self.max_records,
+                "start": self.start, "end": self._end}
+
+    def __setstate__(self, state):
+        self.data_dir    = state["data_dir"]
+        self.max_records = state["max_records"]
+        self.start       = state["start"]
+        self._end        = state["end"]
+        self._open()
 
     def __len__(self):
-        return self.size
+        return self._end - self.start
 
     def __getitem__(self, idx):
-        # Binary search for the right file
+        i = self.start + idx
+        # Binary search for the file containing global record i
         lo, hi = 0, len(self.cumulative)
         while lo < hi - 1:
             mid = (lo + hi) // 2
-            if self.cumulative[mid] <= idx:
+            if self.cumulative[mid] <= i:
                 lo = mid
             else:
                 hi = mid
-        local_idx = idx - self.cumulative[lo]
+        local_idx = i - self.cumulative[lo]
         record = self.mmaps[lo][local_idx]            # (RECORD_SIZE,) uint8
 
         features = torch.from_numpy(
@@ -107,9 +137,7 @@ class FeaturesDataset(Dataset):
         # 3-class label  ->  z_black  ->  z_current
         label = int(record[NB_FEATURES])
         z_black = 1 if label == 0 else (-1 if label == 2 else 0)
-        # TURN feature: 0 = black to play, 1 = white to play (raw byte 0 or 255
-        # after the /255 normalization, but on the raw record it's 0 or 1).
-        # Read directly from the raw byte to keep the comparison unambiguous.
+        # TURN feature: 0 = black to play, 1 = white to play (raw byte).
         black_to_move = (int(record[TURN_INDEX]) == 0)
         z_current = z_black if black_to_move else -z_black
 
@@ -265,22 +293,21 @@ class TrainerDDP:
 def main(rank, world_size, batch_size, data_dir):
     ddp_setup(rank, world_size)
 
-    # Construct the dataset HERE, inside each spawned process — never pass a
-    # memmap-backed dataset through mp.spawn. mp.spawn serializes its args to
-    # ship them to the child, and a np.memmap serializes by value: the whole
-    # backing file gets copied into an in-memory array in the child. Opening
-    # the memmap per-process instead is a lazy mmap() — virtual only, with the
-    # OS page cache physically shared across ranks.
-    dataset = FeaturesDataset(data_dir)
-    if rank == 0:
-        print(len(dataset), flush=True)
-
-    train_size = int(0.95 * len(dataset))
-    val_size   = len(dataset) - train_size
-    trainset, valset = random_split(dataset, [train_size, val_size])
+    # Build the dataset views HERE, inside each spawned process — never pass a
+    # dataset object through mp.spawn or into a DataLoader worker by value.
+    #
+    # Train/val is a CONTIGUOUS split, not random_split: a Subset's index list
+    # would be a large Python list serialized into every spawned DataLoader
+    # worker. Records are written game-by-game, so a contiguous cut keeps whole
+    # games on one side — less leakage than a per-record random split.
+    n_total  = FeaturesDataset(data_dir).n_records
+    n_train  = int(0.95 * n_total)
+    trainset = FeaturesDataset(data_dir, start=0, end=n_train)
+    valset   = FeaturesDataset(data_dir, start=n_train, end=n_total)
 
     if rank == 0:
-        print(f'Train size: {train_size}, Val size: {val_size}', flush=True)
+        print(f'Dataset: {n_total} records -> '
+              f'train {n_train}, val {n_total - n_train}', flush=True)
 
     train_loader, sampler_train, val_loader, sampler_val = \
         dataloader_ddp(trainset, valset, batch_size)

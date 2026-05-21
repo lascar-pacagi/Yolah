@@ -32,7 +32,7 @@ import os
 import sys
 import json
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader
 
 sys.path.append("../server")
 from yolah import Yolah, Move, Square
@@ -55,14 +55,28 @@ INPUT_SIZE = 64 + 64 + 64 + 1
 # Backed by the memory-mapped files produced by preprocess_nnue.py.
 class GameDataset(Dataset):
     """
-    Memory-mapped pre-encoded position dataset.
+    Memory-mapped pre-encoded position dataset, optionally restricted to a
+    contiguous [start, end) slice of the cache (used for the train/val split).
+
+    Cheap to serialize across a process boundary: __getstate__ emits only
+    (cache_dir, start, end), never the np.memmap arrays. A torch.mp.spawn
+    child inherits the 'spawn' start method, so the DataLoader *spawns* its
+    workers and serializes the dataset into each one — a raw np.memmap would
+    serialize BY VALUE (copying the whole backing file into every worker).
+    __setstate__ re-opens the memmap instead: a lazy mmap(), page cache shared.
 
     Each sample returns:
         state : (193,) float32 — flat NNUE input (binary + turn bit)
         value : ()     float32 — z ∈ {-1, 0, +1} from current player's POV
     """
-    def __init__(self, cache_dir: str):
-        meta_path = os.path.join(cache_dir, "meta.json")
+    def __init__(self, cache_dir: str, start: int = 0, end: int = None):
+        self.cache_dir = cache_dir
+        self.start = start
+        self._end = end
+        self._open()
+
+    def _open(self):
+        meta_path = os.path.join(self.cache_dir, "meta.json")
         with open(meta_path) as f:
             meta = json.load(f)
 
@@ -71,29 +85,40 @@ class GameDataset(Dataset):
                 f"Cache input width {meta['inputs']['shape'][1]} "
                 f"!= expected {INPUT_SIZE}")
 
-        # mmap mode='r' shares one OS page cache across all DataLoader workers
+        # mmap mode='r' shares one OS page cache across all processes
         self.inputs = np.memmap(
-            os.path.join(cache_dir, meta["inputs"]["path"]),
+            os.path.join(self.cache_dir, meta["inputs"]["path"]),
             dtype=np.uint8, mode='r',
             shape=tuple(meta["inputs"]["shape"]))
         self.values = np.memmap(
-            os.path.join(cache_dir, meta["values"]["path"]),
+            os.path.join(self.cache_dir, meta["values"]["path"]),
             dtype=np.int8, mode='r',
             shape=tuple(meta["values"]["shape"]))
-        self.size = int(meta["n_positions"])
-        print(f"Memmap dataset: {self.size:,} positions, input_size={INPUT_SIZE}",
-              flush=True)
+        self.n_positions = int(meta["n_positions"])
+        if self._end is None:
+            self._end = self.n_positions
+
+    # Serialize only the recipe — see class docstring.
+    def __getstate__(self):
+        return {"cache_dir": self.cache_dir, "start": self.start, "end": self._end}
+
+    def __setstate__(self, state):
+        self.cache_dir = state["cache_dir"]
+        self.start     = state["start"]
+        self._end      = state["end"]
+        self._open()
 
     def __len__(self):
-        return self.size
+        return self._end - self.start
 
     def __getitem__(self, idx):
+        i = self.start + idx
         # ascontiguousarray forces a copy out of the memmap so the tensor
         # owns its memory (safer with pin_memory + multi-worker prefetch).
-        state = np.ascontiguousarray(self.inputs[idx], dtype=np.float32)
+        state = np.ascontiguousarray(self.inputs[i], dtype=np.float32)
         return (
             torch.from_numpy(state),
-            torch.tensor(float(self.values[idx]), dtype=torch.float32),
+            torch.tensor(float(self.values[i]), dtype=torch.float32),
         )
 
 
@@ -256,22 +281,21 @@ def main(rank, world_size, batch_size, cache_dir):
     ddp_setup(rank, world_size)
     print(rank)
 
-    # Construct the dataset HERE, inside each spawned process — never pass a
-    # memmap-backed dataset through mp.spawn. mp.spawn serializes its args to
-    # ship them to the child, and a np.memmap serializes by value: the whole
-    # backing file gets copied into an in-memory array in the child. Opening
-    # the memmap per-process instead is a lazy mmap() — virtual only, with the
-    # OS page cache physically shared across ranks.
-    dataset = GameDataset(cache_dir)
-    if rank == 0:
-        print(len(dataset), flush=True)
-
-    train_size = int(0.95 * len(dataset))
-    val_size   = len(dataset) - train_size
-    trainset, valset = random_split(dataset, [train_size, val_size])
+    # Build the dataset views HERE, inside each spawned process — never pass a
+    # dataset object through mp.spawn or into a DataLoader worker by value.
+    #
+    # Train/val is a CONTIGUOUS split, not random_split: a Subset's index list
+    # would be a multi-GB Python list serialized into every spawned DataLoader
+    # worker. Positions are stored game-by-game, so a contiguous cut keeps
+    # whole games on one side — less leakage than a per-position random split.
+    n_total  = GameDataset(cache_dir).n_positions
+    n_train  = int(0.95 * n_total)
+    trainset = GameDataset(cache_dir, 0, n_train)
+    valset   = GameDataset(cache_dir, n_train, n_total)
 
     if rank == 0:
-        print(f'Train size: {train_size}, Val size: {val_size}', flush=True)
+        print(f'Dataset: {n_total} positions -> '
+              f'train {n_train}, val {n_total - n_train}', flush=True)
 
     train_loader, sampler_train, val_loader, sampler_val = \
         dataloader_ddp(trainset, valset, batch_size)

@@ -3,14 +3,13 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.multiprocessing as mp
-from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 import os
 import sys
 import json
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, Sampler
 
 sys.path.append("../server")
 from yolah import Yolah, Move, Square
@@ -95,7 +94,16 @@ IN_CHANNELS = 4
 
 class GameDataset(Dataset):
     """
-    Memory-mapped pre-encoded position dataset.
+    Memory-mapped pre-encoded position dataset, optionally restricted to a
+    contiguous [start, end) slice of the cache (used for the train/val split).
+
+    This object is deliberately cheap to serialize across a process boundary:
+    __getstate__ emits only (cache_dir, start, end) — never the np.memmap
+    arrays. A torch.multiprocessing.spawn child inherits the 'spawn' start
+    method, so the DataLoader *spawns* its workers and serializes the dataset
+    into each one. A raw np.memmap serializes BY VALUE (it would copy the whole
+    multi-hundred-GB backing file into every worker); re-opening it per process
+    via __setstate__ is instead a lazy mmap() — virtual only, page cache shared.
 
     Each sample returns:
         state         : (4, 8, 8) float32 — board encoding from the cache
@@ -105,8 +113,14 @@ class GameDataset(Dataset):
                                             POLICY_IGNORE_INDEX for terminal
                                             positions
     """
-    def __init__(self, cache_dir: str):
-        meta_path = os.path.join(cache_dir, "meta.json")
+    def __init__(self, cache_dir: str, start: int = 0, end: int = None):
+        self.cache_dir = cache_dir
+        self.start = start
+        self._end = end
+        self._open()
+
+    def _open(self):
+        meta_path = os.path.join(self.cache_dir, "meta.json")
         with open(meta_path) as f:
             meta = json.load(f)
 
@@ -116,34 +130,45 @@ class GameDataset(Dataset):
                 f"Cache has {n_planes} planes but training expects {IN_CHANNELS}. "
                 "Re-run preprocess.py.")
 
-        # mmap mode='r' shares one OS page cache across all DataLoader workers
+        # mmap mode='r' shares one OS page cache across all processes
         self.positions = np.memmap(
-            os.path.join(cache_dir, meta["positions"]["path"]),
+            os.path.join(self.cache_dir, meta["positions"]["path"]),
             dtype=np.uint8, mode='r',
             shape=tuple(meta["positions"]["shape"]))
         self.values = np.memmap(
-            os.path.join(cache_dir, meta["values"]["path"]),
+            os.path.join(self.cache_dir, meta["values"]["path"]),
             dtype=np.int8, mode='r',
             shape=tuple(meta["values"]["shape"]))
         self.policies = np.memmap(
-            os.path.join(cache_dir, meta["policies"]["path"]),
+            os.path.join(self.cache_dir, meta["policies"]["path"]),
             dtype=np.int16, mode='r',
             shape=tuple(meta["policies"]["shape"]))
-        self.size = int(meta["n_positions"])
-        print(f"Memmap dataset: {self.size:,} positions, {IN_CHANNELS} planes",
-              flush=True)
+        self.n_positions = int(meta["n_positions"])
+        if self._end is None:
+            self._end = self.n_positions
+
+    # Serialize only the recipe — see class docstring.
+    def __getstate__(self):
+        return {"cache_dir": self.cache_dir, "start": self.start, "end": self._end}
+
+    def __setstate__(self, state):
+        self.cache_dir = state["cache_dir"]
+        self.start     = state["start"]
+        self._end      = state["end"]
+        self._open()
 
     def __len__(self):
-        return self.size
+        return self._end - self.start
 
     def __getitem__(self, idx):
+        i = self.start + idx
         # np.ascontiguousarray forces a copy out of the memmap so the tensor
         # owns its memory (safer with pin_memory + multi-worker prefetch).
-        state = np.ascontiguousarray(self.positions[idx], dtype=np.float32)
+        state = np.ascontiguousarray(self.positions[i], dtype=np.float32)
         return (
             torch.from_numpy(state),
-            torch.tensor(float(self.values[idx]), dtype=torch.float32),
-            torch.tensor(int(self.policies[idx]), dtype=torch.long),
+            torch.tensor(float(self.values[i]), dtype=torch.float32),
+            torch.tensor(int(self.policies[i]), dtype=torch.long),
         )
 
 
@@ -239,7 +264,7 @@ class Net(nn.Module):
 
 
 # ── Training ───────────────────────────────────────────────────────────────────
-NB_EPOCHS  = 100
+NB_EPOCHS  = 1
 MODEL_PATH = "/mnt/"
 MODEL_NAME = "cnn_resnet_256x30_value_policy"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
@@ -258,9 +283,51 @@ def ddp_setup(rank, world_size):
     init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
 
-def dataloader_ddp(trainset, valset, batch_size):
-    sampler_train = DistributedSampler(trainset)
-    sampler_val   = DistributedSampler(valset, shuffle=False)
+class LeanDistributedSampler(Sampler):
+    """
+    Memory-frugal drop-in replacement for DistributedSampler.
+
+    The stock DistributedSampler does `torch.randperm(N).tolist()` — turning a
+    ~4-8 GB index tensor into a ~30 GB list of Python int objects, built once
+    PER RANK (tens to hundreds of GB across ranks → OOM). This keeps the
+    permutation as an int32 numpy array (~4 GB for 1e9 indices) and yields
+    numpy scalars, which np.memmap indexes natively. Remainder samples
+    (< num_replicas) are dropped so every rank gets an equal count, keeping
+    the DDP ranks in lockstep.
+    """
+    def __init__(self, dataset_len, num_replicas, rank, shuffle=True, seed=0):
+        self.n            = int(dataset_len)
+        self.num_replicas = num_replicas
+        self.rank         = rank
+        self.shuffle      = shuffle
+        self.seed         = seed
+        self.epoch        = 0
+        self.num_samples  = self.n // self.num_replicas
+
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
+    def __len__(self):
+        return self.num_samples
+
+    def __iter__(self):
+        if self.shuffle:
+            g = torch.Generator()
+            g.manual_seed(self.seed + self.epoch)
+            perm = torch.randperm(self.n, generator=g).to(torch.int32).numpy()
+        else:
+            perm = np.arange(self.n, dtype=np.int32)
+        # Strided shard for this rank (a view, no copy), trimmed to an equal
+        # length across ranks.
+        stop = self.num_replicas * self.num_samples
+        return iter(perm[self.rank:stop:self.num_replicas])
+
+
+def dataloader_ddp(trainset, valset, batch_size, rank, world_size):
+    sampler_train = LeanDistributedSampler(len(trainset), world_size, rank,
+                                           shuffle=True)
+    sampler_val   = LeanDistributedSampler(len(valset), world_size, rank,
+                                           shuffle=False)
     # prefetch_factor / persistent_workers are only valid with num_workers > 0;
     # passing them with num_workers=0 raises ValueError. Keeping them
     # conditional makes YOLAH_DATALOADER_WORKERS=0 a usable fallback.
@@ -281,7 +348,10 @@ class TrainerDDP:
     def __init__(self, gpu_id, model, train_loader, sampler_train,
                  val_loader, sampler_val, save_every=1):
         self.gpu_id        = gpu_id
-        self.model         = model.to(gpu_id)
+        # channels_last: cuDNN's NHWC convolution kernels are faster on
+        # tensor-core GPUs, and it makes DDP's gradient buckets match the
+        # layout torch.compile produces (silences the grad-stride warning).
+        self.model         = model.to(gpu_id).to(memory_format=torch.channels_last)
         self.train_loader  = train_loader
         self.sampler_train = sampler_train
         self.val_loader    = val_loader
@@ -295,6 +365,16 @@ class TrainerDDP:
         self.policy_loss_fn = nn.CrossEntropyLoss(ignore_index=POLICY_IGNORE_INDEX)
         self.scheduler     = torch.optim.lr_scheduler.CosineAnnealingLR(
                                  self.optimizer, T_max=NB_EPOCHS, eta_min=1e-5)
+        # Mixed precision. bf16 needs Ampere+ (compute capability major >= 8).
+        # On Turing (e.g. Quadro RTX 8000, cc 7.5) bf16 has NO hardware support
+        # and runs emulated — *slower* than fp32. torch.cuda.is_bf16_supported()
+        # wrongly returns True on Turing, so gate strictly on the capability
+        # major version. Turing DOES have fp16 tensor cores → fp16 + GradScaler;
+        # Ampere+ → bf16 (wide dynamic range, scaler disabled / pass-through).
+        major, _ = torch.cuda.get_device_capability(gpu_id)
+        self.amp_dtype = torch.bfloat16 if major >= 8 else torch.float16
+        self.scaler    = torch.amp.GradScaler(
+                             'cuda', enabled=(self.amp_dtype == torch.float16))
         torch.cuda.set_device(gpu_id)
         torch.cuda.empty_cache()
         self.model  = DDP(self.model, device_ids=[gpu_id])
@@ -335,12 +415,15 @@ class TrainerDDP:
                 v_target = v_target.to(self.gpu_id, non_blocking=True)
                 p_target = p_target.to(self.gpu_id, non_blocking=True)
             torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
+            X = X.contiguous(memory_format=torch.channels_last)
             self.optimizer.zero_grad()
-            v_pred, p_logits = self.model(X)
-            loss, v_loss, p_loss = self._compute_loss(v_pred, p_logits,
-                                                     v_target, p_target)
-            loss.backward()
-            self.optimizer.step()
+            with torch.autocast('cuda', dtype=self.amp_dtype):
+                v_pred, p_logits = self.model(X)
+                loss, v_loss, p_loss = self._compute_loss(v_pred, p_logits,
+                                                          v_target, p_target)
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
             v_running += v_loss.item() * bs
             p_running += p_loss.item() * bs
             v_correct += (torch.sign(v_pred) == torch.sign(v_target)).sum().item()
@@ -375,9 +458,11 @@ class TrainerDDP:
                     v_target = v_target.to(self.gpu_id, non_blocking=True)
                     p_target = p_target.to(self.gpu_id, non_blocking=True)
                 torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
-                v_pred, p_logits = self.model(X)
-                _, v_loss, p_loss = self._compute_loss(v_pred, p_logits,
-                                                      v_target, p_target)
+                X = X.contiguous(memory_format=torch.channels_last)
+                with torch.autocast('cuda', dtype=self.amp_dtype):
+                    v_pred, p_logits = self.model(X)
+                    _, v_loss, p_loss = self._compute_loss(v_pred, p_logits,
+                                                           v_target, p_target)
                 v_running += v_loss.item() * bs
                 p_running += p_loss.item() * bs
                 v_correct += (torch.sign(v_pred) == torch.sign(v_target)).sum().item()
@@ -407,25 +492,24 @@ class TrainerDDP:
 def main(rank, world_size, batch_size, cache_dir):
     ddp_setup(rank, world_size)
 
-    # Construct the dataset HERE, inside each spawned process — never pass a
-    # memmap-backed dataset through mp.spawn. mp.spawn serializes its args to
-    # ship them to the child, and a np.memmap serializes by value: the whole
-    # 253 GB backing file gets copied into an in-memory array in the child.
-    # Opening the memmap per-process instead is a lazy mmap() — virtual only,
-    # with the OS page cache physically shared across ranks.
-    dataset = GameDataset(cache_dir)
-    if rank == 0:
-        print(len(dataset), flush=True)
-
-    train_size = int(0.95 * len(dataset))
-    val_size   = len(dataset) - train_size
-    trainset, valset = random_split(dataset, [train_size, val_size])
+    # Build the dataset views HERE, inside each spawned process — never pass a
+    # dataset object through mp.spawn or into a DataLoader worker by value.
+    #
+    # Train/val is a CONTIGUOUS split, not random_split: a Subset's index list
+    # would be a ~30 GB Python list serialized into every spawned DataLoader
+    # worker. Positions are stored game-by-game, so a contiguous cut keeps
+    # whole games on one side — less leakage than a per-position random split.
+    n_total  = GameDataset(cache_dir).n_positions
+    n_train  = int(0.95 * n_total)
+    trainset = GameDataset(cache_dir, 0, n_train)
+    valset   = GameDataset(cache_dir, n_train, n_total)
 
     if rank == 0:
-        print(f'Train: {train_size:,}  Val: {val_size:,}', flush=True)
+        print(f'Dataset: {n_total:,} positions -> '
+              f'train {n_train:,}  val {n_total - n_train:,}', flush=True)
 
     train_loader, sampler_train, val_loader, sampler_val = \
-        dataloader_ddp(trainset, valset, batch_size)
+        dataloader_ddp(trainset, valset, batch_size, rank, world_size)
 
     net = Net()
     if os.path.isfile(LAST_MODEL):
@@ -446,4 +530,5 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
     # Pass the cache directory (a string), not the dataset object — see main().
-    mp.spawn(main, args=(world_size, 512, CACHE_DIR), nprocs=world_size)
+    # batch_size is PER GPU; effective batch = 2048 * world_size.
+    mp.spawn(main, args=(world_size, 2048, CACHE_DIR), nprocs=world_size)
