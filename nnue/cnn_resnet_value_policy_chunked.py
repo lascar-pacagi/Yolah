@@ -50,6 +50,7 @@ from torch.distributed import init_process_group, destroy_process_group
 import os
 import sys
 import json                            # the cache's meta.json sidecar
+import time                            # DIAGNOSTIC: chunk-load timing
 import random                          # epoch-level chunk-order shuffle
 import threading                       # the background producer thread
 import queue as queue_mod              # bounded hand-off queue (the buffer)
@@ -97,9 +98,20 @@ def _bitboard_to_plane(n: int) -> np.ndarray:
     """
     Expand a 64-bit Yolah bitboard into an 8×8 float32 plane.
 
-    Bit (63 - i) of `n` maps to cell i of the flattened 8×8 board, so the
-    most-significant bit is square 0. Used only by encode_cnn() for inference;
-    training reads pre-encoded planes straight from the cache.
+    The flattened plane is filled MSB-first: array cell i receives bit
+    (63 - i) of `n`, so cell 0 holds bit 63 and cell 63 holds bit 0.
+
+    Note this is the reverse of Yolah's own square numbering — in yolah.py
+    square s is bit s, i.e. square 0 is the LEAST-significant bit — so the
+    plane ends up in reverse-square order. That is harmless: a CNN does not
+    care about the absolute orientation of the 8×8 plane. What matters is
+    that this matches preprocess.py's bb_to_plane (np.unpackbits on a
+    big-endian word, which yields the same MSB-first order), so the inference
+    encoder and the cached training tensors agree. Do not "fix" the order
+    here without regenerating the cache.
+
+    Used only by encode_cnn() for inference; training reads pre-encoded
+    planes straight from the cache.
     """
     b = np.zeros(64, dtype=np.float32)
     for i in range(64):
@@ -270,14 +282,19 @@ class ChunkedShuffleLoader:
                 # --- step 1: sequential read of the chunk into RAM ----------
                 # np.array(memmap_slice) forces a contiguous copy, i.e. an
                 # actual sequential read of this region off disk.
+                # DIAGNOSTIC: time this read — it is T_load, the producer's
+                # only blocking stall (see the chunk-load timing print below).
+                _t0 = time.time()
                 pos = np.array(self.positions[start:end])   # (C, 4, 8, 8) uint8
                 val = np.array(self.values[start:end])      # (C,)         int8
                 pol = np.array(self.policies[start:end])    # (C,)         int16
+                t_load = time.time() - _t0
 
                 # --- step 2: within-chunk shuffle ---------------------------
                 # Seed depends on both epoch and chunk start, so a given chunk
                 # is permuted differently every epoch. `& 0xFFFFFFFF` keeps the
                 # seed inside the 32-bit range numpy's Generator expects.
+                _t0 = time.time()
                 if self.shuffle:
                     rng  = np.random.default_rng(
                         (self.epoch * 1_000_003 + start) & 0xFFFFFFFF)
@@ -285,6 +302,16 @@ class ChunkedShuffleLoader:
                 else:
                     # Validation: keep natural order — no need to shuffle.
                     perm = np.arange(self.chunk_size)
+                t_perm = time.time() - _t0
+
+                # DIAGNOSTIC: one line per chunk. The wall-clock stamp lets you
+                # line this up against the GPU-idle phases in nvidia-smi; the
+                # chunk read is the stall a deeper BATCH_QUEUE_DEPTH must cover
+                # (need queue depth >= t_load * GPU_iterations_per_second).
+                # Remove this print once the queue depth is tuned.
+                print(f"[{time.strftime('%F %T')}] [rank {self.rank}] "
+                      f"chunk read {t_load:6.1f}s  shuffle {t_perm:5.2f}s",
+                      flush=True)
 
                 # --- step 3: cut the chunk into batches ---------------------
                 for b in range(self.batches_per_chunk):
