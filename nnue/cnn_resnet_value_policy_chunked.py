@@ -304,16 +304,15 @@ class ChunkedShuffleLoader:
                     perm = np.arange(self.chunk_size)
                 t_perm = time.time() - _t0
 
-                # DIAGNOSTIC: one line per chunk. The wall-clock stamp lets you
-                # line this up against the GPU-idle phases in nvidia-smi; the
-                # chunk read is the stall a deeper BATCH_QUEUE_DEPTH must cover
-                # (need queue depth >= t_load * GPU_iterations_per_second).
-                # Remove this print once the queue depth is tuned.
-                print(f"[{time.strftime('%F %T')}] [rank {self.rank}] "
-                      f"chunk read {t_load:6.1f}s  shuffle {t_perm:5.2f}s",
-                      flush=True)
-
                 # --- step 3: cut the chunk into batches ---------------------
+                # DIAGNOSTIC: accumulate where the producer spends its time.
+                #   t_gather — fancy-index + dtype convert
+                #   t_pin    — pin_memory() calls
+                #   t_put    — time BLOCKED in q.put (back-pressure). If t_put
+                #              dominates the chunk, the producer is faster than
+                #              the GPU (consumer-bound); if t_gather/t_pin
+                #              dominate, the producer can't keep up.
+                t_gather = t_pin = t_put = 0.0
                 for b in range(self.batches_per_chunk):
                     # `idx` are the rows of this chunk that form batch b.
                     idx = perm[b * bs : (b + 1) * bs]
@@ -321,15 +320,30 @@ class ChunkedShuffleLoader:
                     #   X : float32 board planes
                     #   v : float32 value target
                     #   p : int64   policy target (CrossEntropyLoss needs int64)
+                    _t = time.time()
                     X = torch.from_numpy(pos[idx].astype(np.float32))
                     v = torch.from_numpy(val[idx].astype(np.float32))
                     p = torch.from_numpy(pol[idx].astype(np.int64))
+                    t_gather += time.time() - _t
                     # Pin into page-locked RAM so the later .to(gpu,
                     # non_blocking=True) can be a true asynchronous DMA copy.
                     if self.pin_memory:
+                        _t = time.time()
                         X, v, p = X.pin_memory(), v.pin_memory(), p.pin_memory()
+                        t_pin += time.time() - _t
                     # Blocks here if the consumer is behind (queue full).
+                    _t = time.time()
                     q.put((X, v, p))
+                    t_put += time.time() - _t
+
+                # DIAGNOSTIC: one consolidated line per chunk; the wall-clock
+                # stamp lets you line it up against nvidia-smi idle phases.
+                # Remove this block once the stall is located.
+                print(f"[{time.strftime('%F %T')}] [rank {self.rank}] chunk: "
+                      f"read {t_load:5.1f}s shuffle {t_perm:5.2f}s | build "
+                      f"gather {t_gather:6.1f}s pin {t_pin:6.1f}s "
+                      f"q.put(wait) {t_put:7.1f}s  "
+                      f"({self.batches_per_chunk} batches)", flush=True)
         except Exception as e:                              # pragma: no cover
             # A crash in a thread is otherwise silent; surface it.
             print(f"[ChunkedShuffleLoader] producer error: {e}", flush=True)
@@ -357,8 +371,22 @@ class ChunkedShuffleLoader:
         t.start()
 
         # Consume batches until the producer posts the None sentinel.
+        # DIAGNOSTIC: every 100 batches, log how long q.get() blocked waiting
+        # for a batch and how full the queue is. This bisects the GPU-idle
+        # cause:
+        #   queue ~0  + long q.get wait  -> producer-bound (data pipeline)
+        #   queue ~full + ~0 q.get wait  -> consumer/GPU-bound (idle elsewhere)
+        # Remove this block once the stall is located.
+        n = 0
         while True:
+            _t = time.time()
             item = q.get()
+            wait = time.time() - _t
+            n += 1
+            if n % 100 == 0:
+                print(f"[{time.strftime('%F %T')}] [rank {self.rank}] "
+                      f"batch {n}: q.get waited {wait:6.2f}s  "
+                      f"queue {q.qsize():2d}/{self.queue_depth}", flush=True)
             if item is None:
                 break
             yield item
@@ -568,8 +596,12 @@ class TrainerDDP:
         p_correct = 0                           # policy top-1 hits
         p_total   = 0                           # non-terminal positions
         v_running, p_running = 0.0, 0.0         # running loss sums
+        it = 0                                  # DIAGNOSTIC: iteration counter
+        win_sum = 0.0                           # DIAGNOSTIC: body-time sum/window
+        win_max = 0.0                           # DIAGNOSTIC: body-time max/window
 
         for X, v_target, p_target in tqdm(self.train_loader):
+            _t_body = time.time()               # DIAGNOSTIC: time the iteration
             bs = len(X)
             n += bs
 
@@ -608,6 +640,23 @@ class TrainerDDP:
             p_total   += pt
 
             self.model.module.clip()            # no-op for this CNN
+
+            # DIAGNOSTIC: per-iteration body wall-time. It includes the GPU
+            # work, because the trailing .item() calls synchronise. avg + max
+            # over a 100-iteration window: a ~50 s stall inside the training
+            # step shows up as a `max` spike; if `max` stays steady but the GPU
+            # still idles, the gap is in q.get (the loader), not the step.
+            # Remove this block once the stall is located.
+            it += 1
+            _dt = time.time() - _t_body
+            win_sum += _dt
+            win_max  = max(win_max, _dt)
+            if it % 100 == 0 and self.gpu_id == 0:
+                print(f"[{time.strftime('%F %T')}] [rank 0] iter {it}: "
+                      f"body avg {win_sum / 100:.3f}s  max {win_max:.2f}s  "
+                      f"(last 100 iters)", flush=True)
+                win_sum = 0.0
+                win_max = 0.0
 
         self.scheduler.step()                   # advance the lr schedule
 
