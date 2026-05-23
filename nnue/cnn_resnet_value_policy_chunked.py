@@ -49,6 +49,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 import os
 import sys
+import gc                              # disabled inside main() to avoid GC pauses
 import json                            # the cache's meta.json sidecar
 import time                            # DIAGNOSTIC: chunk-load timing
 import random                          # epoch-level chunk-order shuffle
@@ -371,22 +372,32 @@ class ChunkedShuffleLoader:
         t.start()
 
         # Consume batches until the producer posts the None sentinel.
-        # DIAGNOSTIC: every 100 batches, log how long q.get() blocked waiting
-        # for a batch and how full the queue is. This bisects the GPU-idle
-        # cause:
-        #   queue ~0  + long q.get wait  -> producer-bound (data pipeline)
-        #   queue ~full + ~0 q.get wait  -> consumer/GPU-bound (idle elsewhere)
+        # DIAGNOSTIC: per 100-batch window, log avg+MAX q.get wait and MIN
+        # observed queue size. Window-max catches bursty stalls that point
+        # sampling missed — a 50 s wait *anywhere* in the window now shows up.
         # Remove this block once the stall is located.
         n = 0
+        win_wait_sum = 0.0
+        win_wait_max = 0.0
+        win_q_min    = self.queue_depth
         while True:
             _t = time.time()
             item = q.get()
             wait = time.time() - _t
+            qs   = q.qsize()
             n += 1
+            win_wait_sum += wait
+            win_wait_max  = max(win_wait_max, wait)
+            win_q_min     = min(win_q_min, qs)
             if n % 100 == 0:
                 print(f"[{time.strftime('%F %T')}] [rank {self.rank}] "
-                      f"batch {n}: q.get waited {wait:6.2f}s  "
-                      f"queue {q.qsize():2d}/{self.queue_depth}", flush=True)
+                      f"batch {n}: q.get avg {win_wait_sum / 100:.3f}s  "
+                      f"max {win_wait_max:6.2f}s  "
+                      f"queue min {win_q_min:2d}/{self.queue_depth}  "
+                      f"(last 100)", flush=True)
+                win_wait_sum = 0.0
+                win_wait_max = 0.0
+                win_q_min    = self.queue_depth
             if item is None:
                 break
             yield item
@@ -657,6 +668,16 @@ class TrainerDDP:
                       f"(last 100 iters)", flush=True)
                 win_sum = 0.0
                 win_max = 0.0
+            # Manual GC every 1000 iters — auto-GC is disabled in main(). This
+            # mops up reference cycles in one controlled, infrequent pause
+            # instead of unpredictable Gen-2 pauses.
+            if it % 1000 == 0:
+                _t_gc = time.time()
+                gc.collect()
+                if self.gpu_id == 0:
+                    print(f"[{time.strftime('%F %T')}] [rank 0] "
+                          f"gc.collect() took {time.time() - _t_gc:.2f}s",
+                          flush=True)
 
         self.scheduler.step()                   # advance the lr schedule
 
@@ -759,6 +780,13 @@ def main(rank, world_size, batch_size, cache_dir):
         nb_params = sum(p.numel() for p in net.parameters())
         print(net, flush=True)
         print(f'Parameters: {nb_params:,}', flush=True)
+
+    # DIAGNOSTIC: disable Python's cyclic GC for the duration of training.
+    # Reference counting still frees everything that is not in a reference
+    # cycle; we mop up cycles ourselves with gc.collect() every 1000 iters
+    # in _run_epoch. This eliminates the unpredictable Gen-2 GC pauses that
+    # are the leading suspect for the periodic ~50 s GPU idle.
+    gc.disable()
 
     trainer = TrainerDDP(rank, net, train_loader, val_loader)
     trainer.train(NB_EPOCHS)
