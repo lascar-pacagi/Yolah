@@ -82,6 +82,9 @@ singularity exec --nv \
     --bind "${CACHE_DIR}:/cache" \
     --bind "${MODEL_DIR}:/mnt" \
     --env "YOLAH_CACHE_DIR=/cache" \
+    --env "NCCL_DEBUG=INFO" \
+    --env "NCCL_DEBUG_SUBSYS=INIT,COLL" \
+    --env "TORCH_NCCL_BLOCKING_WAIT=1" \
     "${SIF}" \
     bash -c "cd /nnue && python3 cnn_resnet_value_policy_chunked.py"
 

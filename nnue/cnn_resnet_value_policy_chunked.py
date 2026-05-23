@@ -568,7 +568,15 @@ class TrainerDDP:
         torch.cuda.set_device(gpu_id)
         torch.cuda.empty_cache()
         # Wrap in DDP: every backward pass all-reduces gradients across ranks.
-        self.model = DDP(self.model, device_ids=[gpu_id])
+        # gradient_as_bucket_view: gradients live directly in the all-reduce
+        # bucket memory → one less memcpy + one less stream sync per bucket.
+        # static_graph: tells DDP the autograd graph is identical every step
+        # (true for us — no conditionals, no unused params, no model surgery)
+        # so the reducer is built once and DDP can fuse/overlap aggressively.
+        # Both are aimed at the periodic ~50 s all-reduce stall observed on
+        # multi-GPU runs that vanishes on single-GPU.
+        self.model = DDP(self.model, device_ids=[gpu_id],
+                         gradient_as_bucket_view=True, static_graph=True)
         # torch.compile JIT-fuses the graph for extra speed (first iterations
         # are slow while it compiles, then much faster).
         self.model = torch.compile(self.model)
