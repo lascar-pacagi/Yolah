@@ -2,28 +2,36 @@ Bootstrap: docker
 From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # ── What gets baked into the image ───────────────────────────────────────────
-# The Yolah Python module and all nnue code (including features_net119x256x64x1.py)
-# are copied in. The .features.txt data files are NOT baked in — they live
-# outside the image and are bind-mounted at /cache at runtime. Model
-# checkpoints go to /mnt (also bind-mounted).
+# Two things end up inside the .sif:
+#   1. The Python training code + the yolah Python module (under /nnue, /server).
+#   2. A small native binary /usr/local/bin/encode_features. It links
+#      yolah_features.cpp + the minimal Yolah game core (game/magic/zobrist/move)
+#      so the preprocess step can produce the 119-byte feature records WITHOUT
+#      needing the full Yolah build toolchain at runtime. The shim header at
+#      nnue/encoder_shim/generate_games.h breaks yolah_features.cpp's
+#      transitive dependency on player.h.
+#
+# The games data is bind-mounted (not baked) — Yolah/nnue/data lives outside
+# the image and is exposed at /nnue/data via the SLURM launcher, alongside the
+# cache (/cache) and the model dir (/mnt).
 #
 # Typical invocation:
 #   singularity exec --nv \
-#     --bind ./features:/cache \
+#     --bind ./cache:/cache \
 #     --bind ./models:/mnt \
 #     features_net119x256x64x1.sif python3 /nnue/features_net119x256x64x1.py
 #
 # See features_net119x256x64x1.sh for the SLURM glue.
-#
-# No preprocess step is needed: the .features.txt files are already raw
-# uint8 records (NB_FEATURES + 1 bytes each) and are memmapped directly.
 
 %files
     ../server /server
     ../nnue   /nnue
+    ../player /yolah_src/player
+    ../game   /yolah_src/game
+    ../misc   /yolah_src/misc
 
 %post
-    # Fail fast on any apt/pip error.
+    # Fail fast on any apt/pip/build error.
     set -eu
 
     DEBIAN_FRONTEND=noninteractive apt-get update -y
@@ -33,6 +41,7 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
         python3-pip \
         python3-setuptools \
         build-essential \
+        g++ \
         git \
         ca-certificates
     rm -rf /var/lib/apt/lists/*
@@ -49,10 +58,33 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
     pip3 install --no-cache-dir numpy tqdm
 
+    # ── Build the encode_features CLI ────────────────────────────────────────
+    # We need C++23 for the std::format usage inside yolah_features.cpp's
+    # debug code paths. Ubuntu 22.04's default g++ (11.x) is enough for our
+    # use because all std::format references are inside `#ifndef NDEBUG`
+    # blocks and we compile with -DNDEBUG. The encoder_shim/ directory holds
+    # a stub generate_games.h that exposes only `data::decode_game`, breaking
+    # yolah_features.cpp's transitive dependency on player.h (which would
+    # otherwise drag in the entire Yolah build tree).
+    g++ -std=c++23 -O3 -DNDEBUG -march=native -fopenmp \
+        -I/nnue/encoder_shim \
+        -I/yolah_src/player \
+        -I/yolah_src/game \
+        -I/yolah_src/misc \
+        /nnue/encode_features_cli.cpp \
+        /yolah_src/player/yolah_features.cpp \
+        /yolah_src/game/game.cpp \
+        /yolah_src/game/magic.cpp \
+        /yolah_src/game/zobrist.cpp \
+        /yolah_src/game/move.cpp \
+        -o /usr/local/bin/encode_features
+    chmod +x /usr/local/bin/encode_features
+
     # Build-time sanity checks: fail the build if these are broken, not at
     # SLURM submit time.
     python3 -c "import torch; print('torch', torch.__version__)"
     python3 -c "import numpy, tqdm; print('numpy', numpy.__version__)"
+    /usr/local/bin/encode_features 2>&1 | head -3 || true   # prints usage
 
     # Placeholder dirs that get shadowed by bind mounts at runtime.
     mkdir -p /cache /mnt
@@ -62,6 +94,8 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     export PATH=$CUDA_HOME/bin:$PATH
     export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
     export TORCH_ALLOW_TF32=1
+    # preprocess_features.py looks here for the encoder by default.
+    export YOLAH_ENCODER_BIN=/usr/local/bin/encode_features
 
 %runscript
     # Default action when running `singularity run` with no override.

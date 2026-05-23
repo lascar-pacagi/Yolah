@@ -15,7 +15,7 @@
 #SBATCH --error=nnue193_%j.err
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=700G
+#SBATCH --mem=96G
 #SBATCH --time=48:00:00
 
 set -euo pipefail
@@ -27,8 +27,6 @@ MODEL_DIR="${MODEL_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/models}"
 
 # Preprocessor uses the same CPU count SLURM allocated.
 YOLAH_PREPROC_NPROC="${YOLAH_PREPROC_NPROC:-${SLURM_CPUS_PER_TASK:-16}}"
-# DataLoader workers per DDP rank (8 is plenty for memmap reads).
-YOLAH_DATALOADER_WORKERS="${YOLAH_DATALOADER_WORKERS:-8}"
 
 mkdir -p "${CACHE_DIR}" "${MODEL_DIR}"
 
@@ -38,7 +36,6 @@ echo "  SIF        : ${SIF}"
 echo "  Cache dir  : ${CACHE_DIR}"
 echo "  Model dir  : ${MODEL_DIR}"
 echo "  Preproc np : ${YOLAH_PREPROC_NPROC}"
-echo "  DL workers : ${YOLAH_DATALOADER_WORKERS}"
 echo "════════════════════════════════════════════════════════════════"
 
 # ── Phase 1: preprocess (skip if cache already exists) ──────────────────────
@@ -56,17 +53,20 @@ import json
 m = json.load(open('${CACHE_DIR}/meta.json'))
 print(f'  {m[\"n_positions\"]:,} positions across {m[\"n_games\"]:,} games')
 print(f'  input_size      : {m[\"input_size\"]}')
-print(f'  label classes   : {m[\"label_classes\"]}')
 "
 fi
 
 # ── Phase 2: train ──────────────────────────────────────────────────────────
+# The chunked loader reads the cache in large sequential reads (HDD-tolerant)
+# and uses a background producer thread — no DataLoader workers, no random
+# reads. TORCH_NCCL_BLOCKING_WAIT=1 surfaces NCCL stalls as a clean timeout
+# instead of letting them hang forever.
 echo "[$(date '+%F %T')] === Training: nnue193x1024x64x32x1.py ==="
 singularity exec --nv \
     --bind "${CACHE_DIR}:/cache" \
     --bind "${MODEL_DIR}:/mnt" \
     --env "YOLAH_CACHE_DIR=/cache" \
-    --env "YOLAH_DATALOADER_WORKERS=${YOLAH_DATALOADER_WORKERS}" \
+    --env "TORCH_NCCL_BLOCKING_WAIT=1" \
     "${SIF}" \
     bash -c "cd /nnue && python3 nnue193x1024x64x32x1.py"
 
