@@ -600,8 +600,31 @@ class TrainerDDP:
         correct = ((preds == policy_target) & mask).sum().item()
         return correct, int(mask.sum().item())
 
+    def _h2d_async(self, batch_cpu):
+        """
+        Issue an asynchronous host->GPU transfer for one (X, v, p) batch on
+        self.stream, return the GPU tensors.
+
+        PREFETCH: callers `wait_stream` on the default stream *before* using
+        these tensors. Because the H2D runs on the side stream, it can proceed
+        concurrently with the previous iteration's compute on the default
+        stream — that is the whole point of the prefetch.
+        """
+        X_cpu, v_cpu, p_cpu = batch_cpu
+        with torch.cuda.stream(self.stream):
+            X = X_cpu.to(self.gpu_id, non_blocking=True)
+            v = v_cpu.to(self.gpu_id, non_blocking=True)
+            p = p_cpu.to(self.gpu_id, non_blocking=True)
+        return (X, v, p)
+
     def _run_epoch(self, epoch):
-        """One training pass over this rank's shard of the data."""
+        """One training pass over this rank's shard of the data.
+
+        PREFETCH: while iteration N is computing on the default stream, the
+        H2D transfer for iteration N+1 is in flight on self.stream. The body's
+        wall-time therefore measures only compute, not transfer, and the
+        transfer is hidden behind compute instead of adding to the iteration.
+        """
         n = 0                                   # positions seen
         v_correct = 0                           # value sign matches (win/lose)
         p_correct = 0                           # policy top-1 hits
@@ -611,32 +634,42 @@ class TrainerDDP:
         win_sum = 0.0                           # DIAGNOSTIC: body-time sum/window
         win_max = 0.0                           # DIAGNOSTIC: body-time max/window
 
-        for X, v_target, p_target in tqdm(self.train_loader):
+        # Pre-load the first batch onto the GPU (side stream). We keep the
+        # CPU batch reference (cpu_cur) alive across the iteration so its
+        # pinned tensors are not freed before the async H2D completes.
+        loader_iter = iter(self.train_loader)
+        cpu_cur = next(loader_iter, None)
+        if cpu_cur is None:
+            return
+        gpu_cur = self._h2d_async(cpu_cur)
+
+        pbar = tqdm(total=len(self.train_loader))
+        while True:
             _t_body = time.time()               # DIAGNOSTIC: time the iteration
+
+            # Make the default stream wait until the current batch's H2D is
+            # complete on self.stream. This is just a stream dependency — the
+            # host does not block here.
+            torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
+            X, v_target, p_target = gpu_cur
             bs = len(X)
             n += bs
 
-            # Async host→GPU copy on the side stream (overlaps with whatever
-            # the default stream is still finishing), then wait for it.
-            with torch.cuda.stream(self.stream):
-                X        = X.to(self.gpu_id, non_blocking=True)
-                v_target = v_target.to(self.gpu_id, non_blocking=True)
-                p_target = p_target.to(self.gpu_id, non_blocking=True)
-            torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
+            # Issue the NEXT iteration's H2D RIGHT NOW on self.stream. It will
+            # run concurrently with this iteration's forward/backward/step on
+            # the default stream — that overlap is the whole point.
+            cpu_next = next(loader_iter, None)
+            if cpu_next is not None:
+                gpu_next = self._h2d_async(cpu_next)
 
-            # Match the model's channels-last memory format.
+            # Match the model's channels-last memory format (sub-ms reformat).
             X = X.contiguous(memory_format=torch.channels_last)
 
             self.optimizer.zero_grad()
-            # autocast runs the forward pass + loss in fp16/bf16 where it is
-            # safe, keeping a few reduction-sensitive ops in fp32.
             with torch.autocast('cuda', dtype=self.amp_dtype):
                 v_pred, p_logits = self.model(X)
                 loss, v_loss, p_loss = self._compute_loss(v_pred, p_logits,
                                                           v_target, p_target)
-            # GradScaler: scales the loss up before backward (so small fp16
-            # grads do not underflow), then unscales inside step(). With bf16
-            # the scaler is disabled and these are plain backward/step/update.
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
             self.scaler.update()
@@ -644,7 +677,6 @@ class TrainerDDP:
             # Accumulate metrics (.item() pulls scalars back to the CPU).
             v_running += v_loss.item() * bs
             p_running += p_loss.item() * bs
-            # "value sign accuracy": did we at least predict win-vs-lose right?
             v_correct += (torch.sign(v_pred) == torch.sign(v_target)).sum().item()
             pc, pt = self._policy_correct(p_logits, p_target)
             p_correct += pc
@@ -652,12 +684,8 @@ class TrainerDDP:
 
             self.model.module.clip()            # no-op for this CNN
 
-            # DIAGNOSTIC: per-iteration body wall-time. It includes the GPU
-            # work, because the trailing .item() calls synchronise. avg + max
-            # over a 100-iteration window: a ~50 s stall inside the training
-            # step shows up as a `max` spike; if `max` stays steady but the GPU
-            # still idles, the gap is in q.get (the loader), not the step.
-            # Remove this block once the stall is located.
+            # DIAGNOSTIC: per-iteration body wall-time. With prefetch the body
+            # no longer includes the H2D, so this is purely compute.
             it += 1
             _dt = time.time() - _t_body
             win_sum += _dt
@@ -668,9 +696,6 @@ class TrainerDDP:
                       f"(last 100 iters)", flush=True)
                 win_sum = 0.0
                 win_max = 0.0
-            # Manual GC every 1000 iters — auto-GC is disabled in main(). This
-            # mops up reference cycles in one controlled, infrequent pause
-            # instead of unpredictable Gen-2 pauses.
             if it % 1000 == 0:
                 _t_gc = time.time()
                 gc.collect()
@@ -679,6 +704,18 @@ class TrainerDDP:
                           f"gc.collect() took {time.time() - _t_gc:.2f}s",
                           flush=True)
 
+            pbar.update(1)
+
+            # Advance to the next batch, or stop if the loader is exhausted.
+            # Re-binding here drops the previous iter's CPU tensors — by now
+            # their H2D has long completed (we waited for it at the top of
+            # this iter), so it is safe to free them.
+            if cpu_next is None:
+                break
+            cpu_cur = cpu_next
+            gpu_cur = gpu_next
+
+        pbar.close()
         self.scheduler.step()                   # advance the lr schedule
 
         # Only rank 0 logs, so the output is not printed three times.
@@ -693,7 +730,9 @@ class TrainerDDP:
                   f'lr: {lr:.6f}', flush=True)
 
     def _validate(self, epoch):
-        """One pass over the validation shard — no gradients, no optimizer."""
+        """One pass over the validation shard — no gradients, no optimizer.
+        Uses the same prefetch pattern as _run_epoch.
+        """
         self.model.train(False)                 # eval mode (freezes BatchNorm)
         n = 0
         v_correct = 0
@@ -701,14 +740,23 @@ class TrainerDDP:
         p_total   = 0
         v_running, p_running = 0.0, 0.0
         with torch.no_grad():                   # no autograd graph → less memory
-            for X, v_target, p_target in tqdm(self.val_loader):
+            loader_iter = iter(self.val_loader)
+            cpu_cur = next(loader_iter, None)
+            if cpu_cur is None:
+                self.model.train()
+                return
+            gpu_cur = self._h2d_async(cpu_cur)
+            pbar = tqdm(total=len(self.val_loader))
+            while True:
+                torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
+                X, v_target, p_target = gpu_cur
                 bs = len(X)
                 n += bs
-                with torch.cuda.stream(self.stream):
-                    X        = X.to(self.gpu_id, non_blocking=True)
-                    v_target = v_target.to(self.gpu_id, non_blocking=True)
-                    p_target = p_target.to(self.gpu_id, non_blocking=True)
-                torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
+
+                cpu_next = next(loader_iter, None)
+                if cpu_next is not None:
+                    gpu_next = self._h2d_async(cpu_next)
+
                 X = X.contiguous(memory_format=torch.channels_last)
                 with torch.autocast('cuda', dtype=self.amp_dtype):
                     v_pred, p_logits = self.model(X)
@@ -720,6 +768,14 @@ class TrainerDDP:
                 pc, pt = self._policy_correct(p_logits, p_target)
                 p_correct += pc
                 p_total   += pt
+
+                pbar.update(1)
+
+                if cpu_next is None:
+                    break
+                cpu_cur = cpu_next
+                gpu_cur = gpu_next
+            pbar.close()
         if self.gpu_id == 0:
             p_acc = (p_correct / p_total) if p_total > 0 else 0.0
             print(f'epoch {epoch+1} '
