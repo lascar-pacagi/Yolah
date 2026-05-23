@@ -445,7 +445,7 @@ class Net(nn.Module):
 
 
 # ── Training configuration ──────────────────────────────────────────────────
-NB_EPOCHS  = 1                              # passes over the (huge) dataset
+NB_EPOCHS  = 10                             # passes over the (huge) dataset
 MODEL_PATH = "/mnt/"                        # checkpoint dir (bind-mounted)
 MODEL_NAME = "cnn_resnet_256x30_value_policy"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt" # if present, resume from it
@@ -790,7 +790,7 @@ if __name__ == "__main__":
     # One training process per visible GPU.
     world_size = torch.cuda.device_count()
     print(world_size, flush=True)
-    # mp.spawn calls main(rank, world_size, 2048, CACHE_DIR) on each GPU; it
+    # mp.spawn calls main(rank, world_size, 1024, CACHE_DIR) on each GPU; it
     # prepends `rank` itself. batch_size is PER GPU → effective batch is
-    # 2048 * world_size.
-    mp.spawn(main, args=(world_size, 2048, CACHE_DIR), nprocs=world_size)
+    # 1024 * world_size.
+    mp.spawn(main, args=(world_size, 1024, CACHE_DIR), nprocs=world_size)

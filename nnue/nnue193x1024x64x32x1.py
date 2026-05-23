@@ -238,7 +238,7 @@ class Net(nn.Module):
 
 
 # ── Training config ────────────────────────────────────────────────────────────
-NB_EPOCHS  = 30
+NB_EPOCHS  = 20
 MODEL_PATH = "/mnt/"
 MODEL_NAME = "nnue_193x1024x64x32x1"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
@@ -460,4 +460,4 @@ if __name__ == "__main__":
     print(world_size, flush=True)
     # Pass the cache directory (a string), not the dataset/loader — these are
     # built inside `main()` so the spawn-pickled args stay tiny.
-    mp.spawn(main, args=(world_size, 512, CACHE_DIR), nprocs=world_size)
+    mp.spawn(main, args=(world_size, 1024, CACHE_DIR), nprocs=world_size)
