@@ -51,7 +51,6 @@ import os
 import sys
 import gc                              # disabled inside main() to avoid GC pauses
 import json                            # the cache's meta.json sidecar
-import time                            # DIAGNOSTIC: chunk-load timing
 import random                          # epoch-level chunk-order shuffle
 import threading                       # the background producer thread
 import queue as queue_mod              # bounded hand-off queue (the buffer)
@@ -283,19 +282,14 @@ class ChunkedShuffleLoader:
                 # --- step 1: sequential read of the chunk into RAM ----------
                 # np.array(memmap_slice) forces a contiguous copy, i.e. an
                 # actual sequential read of this region off disk.
-                # DIAGNOSTIC: time this read — it is T_load, the producer's
-                # only blocking stall (see the chunk-load timing print below).
-                _t0 = time.time()
                 pos = np.array(self.positions[start:end])   # (C, 4, 8, 8) uint8
                 val = np.array(self.values[start:end])      # (C,)         int8
                 pol = np.array(self.policies[start:end])    # (C,)         int16
-                t_load = time.time() - _t0
 
                 # --- step 2: within-chunk shuffle ---------------------------
                 # Seed depends on both epoch and chunk start, so a given chunk
                 # is permuted differently every epoch. `& 0xFFFFFFFF` keeps the
                 # seed inside the 32-bit range numpy's Generator expects.
-                _t0 = time.time()
                 if self.shuffle:
                     rng  = np.random.default_rng(
                         (self.epoch * 1_000_003 + start) & 0xFFFFFFFF)
@@ -303,17 +297,8 @@ class ChunkedShuffleLoader:
                 else:
                     # Validation: keep natural order — no need to shuffle.
                     perm = np.arange(self.chunk_size)
-                t_perm = time.time() - _t0
 
                 # --- step 3: cut the chunk into batches ---------------------
-                # DIAGNOSTIC: accumulate where the producer spends its time.
-                #   t_gather — fancy-index + dtype convert
-                #   t_pin    — pin_memory() calls
-                #   t_put    — time BLOCKED in q.put (back-pressure). If t_put
-                #              dominates the chunk, the producer is faster than
-                #              the GPU (consumer-bound); if t_gather/t_pin
-                #              dominate, the producer can't keep up.
-                t_gather = t_pin = t_put = 0.0
                 for b in range(self.batches_per_chunk):
                     # `idx` are the rows of this chunk that form batch b.
                     idx = perm[b * bs : (b + 1) * bs]
@@ -321,30 +306,15 @@ class ChunkedShuffleLoader:
                     #   X : float32 board planes
                     #   v : float32 value target
                     #   p : int64   policy target (CrossEntropyLoss needs int64)
-                    _t = time.time()
                     X = torch.from_numpy(pos[idx].astype(np.float32))
                     v = torch.from_numpy(val[idx].astype(np.float32))
                     p = torch.from_numpy(pol[idx].astype(np.int64))
-                    t_gather += time.time() - _t
                     # Pin into page-locked RAM so the later .to(gpu,
                     # non_blocking=True) can be a true asynchronous DMA copy.
                     if self.pin_memory:
-                        _t = time.time()
                         X, v, p = X.pin_memory(), v.pin_memory(), p.pin_memory()
-                        t_pin += time.time() - _t
                     # Blocks here if the consumer is behind (queue full).
-                    _t = time.time()
                     q.put((X, v, p))
-                    t_put += time.time() - _t
-
-                # DIAGNOSTIC: one consolidated line per chunk; the wall-clock
-                # stamp lets you line it up against nvidia-smi idle phases.
-                # Remove this block once the stall is located.
-                print(f"[{time.strftime('%F %T')}] [rank {self.rank}] chunk: "
-                      f"read {t_load:5.1f}s shuffle {t_perm:5.2f}s | build "
-                      f"gather {t_gather:6.1f}s pin {t_pin:6.1f}s "
-                      f"q.put(wait) {t_put:7.1f}s  "
-                      f"({self.batches_per_chunk} batches)", flush=True)
         except Exception as e:                              # pragma: no cover
             # A crash in a thread is otherwise silent; surface it.
             print(f"[ChunkedShuffleLoader] producer error: {e}", flush=True)
@@ -372,32 +342,8 @@ class ChunkedShuffleLoader:
         t.start()
 
         # Consume batches until the producer posts the None sentinel.
-        # DIAGNOSTIC: per 100-batch window, log avg+MAX q.get wait and MIN
-        # observed queue size. Window-max catches bursty stalls that point
-        # sampling missed — a 50 s wait *anywhere* in the window now shows up.
-        # Remove this block once the stall is located.
-        n = 0
-        win_wait_sum = 0.0
-        win_wait_max = 0.0
-        win_q_min    = self.queue_depth
         while True:
-            _t = time.time()
             item = q.get()
-            wait = time.time() - _t
-            qs   = q.qsize()
-            n += 1
-            win_wait_sum += wait
-            win_wait_max  = max(win_wait_max, wait)
-            win_q_min     = min(win_q_min, qs)
-            if n % 100 == 0:
-                print(f"[{time.strftime('%F %T')}] [rank {self.rank}] "
-                      f"batch {n}: q.get avg {win_wait_sum / 100:.3f}s  "
-                      f"max {win_wait_max:6.2f}s  "
-                      f"queue min {win_q_min:2d}/{self.queue_depth}  "
-                      f"(last 100)", flush=True)
-                win_wait_sum = 0.0
-                win_wait_max = 0.0
-                win_q_min    = self.queue_depth
             if item is None:
                 break
             yield item
@@ -638,9 +584,7 @@ class TrainerDDP:
         p_correct = 0                           # policy top-1 hits
         p_total   = 0                           # non-terminal positions
         v_running, p_running = 0.0, 0.0         # running loss sums
-        it = 0                                  # DIAGNOSTIC: iteration counter
-        win_sum = 0.0                           # DIAGNOSTIC: body-time sum/window
-        win_max = 0.0                           # DIAGNOSTIC: body-time max/window
+        it = 0                                  # iteration counter (for periodic gc)
 
         # Pre-load the first batch onto the GPU (side stream). We keep the
         # CPU batch reference (cpu_cur) alive across the iteration so its
@@ -653,8 +597,6 @@ class TrainerDDP:
 
         pbar = tqdm(total=len(self.train_loader))
         while True:
-            _t_body = time.time()               # DIAGNOSTIC: time the iteration
-
             # Make the default stream wait until the current batch's H2D is
             # complete on self.stream. This is just a stream dependency — the
             # host does not block here.
@@ -692,25 +634,12 @@ class TrainerDDP:
 
             self.model.module.clip()            # no-op for this CNN
 
-            # DIAGNOSTIC: per-iteration body wall-time. With prefetch the body
-            # no longer includes the H2D, so this is purely compute.
+            # Manual GC every 1000 iters — auto-GC is disabled in main(), so
+            # we mop up reference cycles in one controlled pause instead of
+            # whatever the auto-collector would decide.
             it += 1
-            _dt = time.time() - _t_body
-            win_sum += _dt
-            win_max  = max(win_max, _dt)
-            if it % 100 == 0 and self.gpu_id == 0:
-                print(f"[{time.strftime('%F %T')}] [rank 0] iter {it}: "
-                      f"body avg {win_sum / 100:.3f}s  max {win_max:.2f}s  "
-                      f"(last 100 iters)", flush=True)
-                win_sum = 0.0
-                win_max = 0.0
             if it % 1000 == 0:
-                _t_gc = time.time()
                 gc.collect()
-                if self.gpu_id == 0:
-                    print(f"[{time.strftime('%F %T')}] [rank 0] "
-                          f"gc.collect() took {time.time() - _t_gc:.2f}s",
-                          flush=True)
 
             pbar.update(1)
 
@@ -845,11 +774,10 @@ def main(rank, world_size, batch_size, cache_dir):
         print(net, flush=True)
         print(f'Parameters: {nb_params:,}', flush=True)
 
-    # DIAGNOSTIC: disable Python's cyclic GC for the duration of training.
-    # Reference counting still frees everything that is not in a reference
-    # cycle; we mop up cycles ourselves with gc.collect() every 1000 iters
-    # in _run_epoch. This eliminates the unpredictable Gen-2 GC pauses that
-    # are the leading suspect for the periodic ~50 s GPU idle.
+    # Disable Python's cyclic GC for the duration of training; reference
+    # counting still frees everything that is not in a cycle, and we mop up
+    # cycles ourselves with gc.collect() every 1000 iters in _run_epoch.
+    # This trades unpredictable Gen-2 pauses for one controlled pause.
     gc.disable()
 
     trainer = TrainerDDP(rank, net, train_loader, val_loader)
