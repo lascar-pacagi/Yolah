@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Synthetic test cache — regenerates from make_fixtures.py
+fixtures/cache/
