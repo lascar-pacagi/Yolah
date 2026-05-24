@@ -296,8 +296,17 @@ class TrainerDDP:
     def _run_epoch(self, epoch):
         """One training pass with overlapping H2D + compute (see _h2d_async)."""
         n = 0
-        running_loss = 0.0
-        sign_correct = 0
+        running_loss   = 0.0
+        # Three value-accuracy variants tracked in parallel:
+        #   sign_correct   — sign(v) == sign(y); draws always count as wrong
+        #                    since sign(tanh(...)) is essentially never 0
+        #                    → ceiling = 1 - P(draw).
+        #   bucket_correct — bucket(v) ∈ {-1, 0, +1} via |v| < 0.33; fair for draws.
+        #   signed_correct / n_signed — sign-acc over non-draw rows only.
+        sign_correct   = 0
+        bucket_correct = 0
+        signed_correct = 0
+        n_signed       = 0
         it = 0
 
         loader_iter = iter(self.train_loader)
@@ -330,8 +339,17 @@ class TrainerDDP:
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-            running_loss += loss.item() * bs
-            sign_correct += (torch.sign(v_pred) == torch.sign(y)).sum().item()
+            running_loss   += loss.item() * bs
+            sign_correct   += (torch.sign(v_pred) == torch.sign(y)).sum().item()
+            # 3-way bucketed accuracy: bucket v_pred to {-1, 0, +1} via |v|<0.33.
+            bucket = torch.where(v_pred >  0.33,  1.0,
+                     torch.where(v_pred < -0.33, -1.0, 0.0))
+            bucket_correct += (bucket == y).sum().item()
+            # Sign-acc on non-draws only (mask out y == 0).
+            mask = y != 0
+            if mask.any():
+                signed_correct += (torch.sign(v_pred[mask]) == y[mask]).sum().item()
+                n_signed       += int(mask.sum().item())
             self.model.module.clip()        # int8 trunk weight clamp
 
             # Manual GC under disabled auto-GC: one controlled pause every
@@ -350,16 +368,22 @@ class TrainerDDP:
         self.scheduler.step()
         if self.gpu_id == 0:
             lr = self.optimizer.param_groups[0]['lr']
-            print('epoch {} train mse: {:.4f} train sign-acc: {:.4f} lr: {:.6f}'
-                  .format(epoch + 1, running_loss / n, sign_correct / n, lr),
+            signed_acc = signed_correct / max(n_signed, 1)
+            print('epoch {} train mse: {:.4f} sign-acc: {:.4f} bucket-acc: {:.4f} '
+                  'signed-acc: {:.4f} lr: {:.6f}'.format(
+                      epoch + 1, running_loss / n, sign_correct / n,
+                      bucket_correct / n, signed_acc, lr),
                   flush=True)
 
     def _validate(self, epoch):
         """One validation pass — no gradients, same prefetch pattern."""
         self.model.train(False)
         n = 0
-        val_loss     = 0.0
-        sign_correct = 0
+        val_loss       = 0.0
+        sign_correct   = 0
+        bucket_correct = 0
+        signed_correct = 0
+        n_signed       = 0
         with torch.no_grad():
             loader_iter = iter(self.val_loader)
             cpu_cur = next(loader_iter, None)
@@ -381,8 +405,15 @@ class TrainerDDP:
                 with torch.autocast('cuda', dtype=self.amp_dtype):
                     v_pred = self.model(X)
                     loss   = self.loss_fn(v_pred, y)
-                val_loss     += loss.item() * bs
-                sign_correct += (torch.sign(v_pred) == torch.sign(y)).sum().item()
+                val_loss       += loss.item() * bs
+                sign_correct   += (torch.sign(v_pred) == torch.sign(y)).sum().item()
+                bucket = torch.where(v_pred >  0.33,  1.0,
+                         torch.where(v_pred < -0.33, -1.0, 0.0))
+                bucket_correct += (bucket == y).sum().item()
+                mask = y != 0
+                if mask.any():
+                    signed_correct += (torch.sign(v_pred[mask]) == y[mask]).sum().item()
+                    n_signed       += int(mask.sum().item())
 
                 pbar.update(1)
                 if cpu_next is None:
@@ -391,8 +422,12 @@ class TrainerDDP:
                 gpu_cur = gpu_next
             pbar.close()
         if self.gpu_id == 0:
-            print('epoch {} val mse: {:.4f} val sign-acc: {:.4f}'.format(
-                epoch + 1, val_loss / n, sign_correct / n), flush=True)
+            signed_acc = signed_correct / max(n_signed, 1)
+            print('epoch {} val mse: {:.4f} sign-acc: {:.4f} bucket-acc: {:.4f} '
+                  'signed-acc: {:.4f}'.format(
+                      epoch + 1, val_loss / n, sign_correct / n,
+                      bucket_correct / n, signed_acc),
+                  flush=True)
         self.model.train()
 
     def train(self, nb_epochs):
@@ -447,7 +482,13 @@ def main(rank, world_size, batch_size, cache_dir):
 
 if __name__ == "__main__":
     print(torch.cuda.is_available())
-    world_size = torch.cuda.device_count()
+    # world_size honours CUDA_VISIBLE_DEVICES (the SLURM convention) when set,
+    # falling back to device_count() only for local dev. Avoids the cluster
+    # pitfall where Singularity --nv exposes all physical GPUs and mp.spawn
+    # over device_count() then races for one the job does not own → NCCL hang.
+    cvd = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    world_size = (len([x for x in cvd.split(",") if x.strip()])
+                  if cvd else torch.cuda.device_count())
     print(world_size, flush=True)
     # Pass the cache directory (a string), not the dataset/loader — these are
     # built inside `main()` so the spawn-pickled args stay tiny.

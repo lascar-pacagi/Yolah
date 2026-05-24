@@ -62,14 +62,28 @@ fi
 # The chunked loader reads the cache in large sequential reads (HDD-tolerant)
 # and uses a background producer thread — no DataLoader workers, no random
 # reads. TORCH_NCCL_BLOCKING_WAIT=1 surfaces NCCL stalls as a clean timeout
-# instead of letting them hang forever.
+# instead of letting them hang forever; NCCL_DEBUG=INFO prints what NCCL is
+# actually doing on startup so a future hang at DDP wrap is diagnosable.
+#
+# The two NCCL_*_DISABLE envs below are commented out by default. Enable
+# them if you hit a NCCL ALLGATHER timeout on the first DDP collective
+# (run 705648 symptom): they force NCCL onto plain shared-mem / TCP and
+# bypass P2P and InfiniBand — slower but very portable across cluster
+# setups where cgroups or driver versions break the fast paths.
 echo "[$(date '+%F %T')] === Training: features_net119x256x64x1.py ==="
 singularity exec --nv \
     --bind "${CACHE_DIR}:/cache" \
     --bind "${MODEL_DIR}:/mnt" \
     --env "YOLAH_FEATURES_DIR=/cache" \
     --env "TORCH_NCCL_BLOCKING_WAIT=1" \
+    --env "NCCL_DEBUG=INFO" \
+    --env "NCCL_DEBUG_SUBSYS=INIT,COLL" \
     "${SIF}" \
     bash -c "cd /nnue && python3 features_net119x256x64x1.py"
+    # Workarounds if the next run still hangs at DDP ALLGATHER — add these
+    # via --env to singularity exec just above the SIF line:
+    #   --env "NCCL_P2P_DISABLE=1"   ← bypass GPU-to-GPU peer access
+    #   --env "NCCL_IB_DISABLE=1"    ← bypass InfiniBand transport
+    #   --env "NCCL_SHM_DISABLE=1"   ← bypass shared-memory transport (force TCP)
 
 echo "[$(date '+%F %T')] === Done ==="

@@ -580,7 +580,15 @@ class TrainerDDP:
         transfer is hidden behind compute instead of adding to the iteration.
         """
         n = 0                                   # positions seen
-        v_correct = 0                           # value sign matches (win/lose)
+        # Three value-accuracy variants tracked side-by-side:
+        #   v_correct        — sign(v) == sign(y); draws always count as wrong
+        #                      (ceiling = 1 - P(draw)).
+        #   v_bucket_correct — bucket(v) ∈ {-1, 0, +1} via |v| < 0.33; fair for draws.
+        #   v_signed_correct / v_signed_n — sign-acc over non-draw rows only.
+        v_correct        = 0
+        v_bucket_correct = 0
+        v_signed_correct = 0
+        v_signed_n       = 0
         p_correct = 0                           # policy top-1 hits
         p_total   = 0                           # non-terminal positions
         v_running, p_running = 0.0, 0.0         # running loss sums
@@ -625,9 +633,18 @@ class TrainerDDP:
             self.scaler.update()
 
             # Accumulate metrics (.item() pulls scalars back to the CPU).
-            v_running += v_loss.item() * bs
-            p_running += p_loss.item() * bs
-            v_correct += (torch.sign(v_pred) == torch.sign(v_target)).sum().item()
+            v_running        += v_loss.item() * bs
+            p_running        += p_loss.item() * bs
+            v_correct        += (torch.sign(v_pred) == torch.sign(v_target)).sum().item()
+            # 3-way bucketed accuracy: bucket v_pred to {-1, 0, +1} via |v|<0.33.
+            v_bucket = torch.where(v_pred >  0.33,  1.0,
+                       torch.where(v_pred < -0.33, -1.0, 0.0))
+            v_bucket_correct += (v_bucket == v_target).sum().item()
+            # Sign-acc on non-draws only (mask out v_target == 0).
+            v_mask = v_target != 0
+            if v_mask.any():
+                v_signed_correct += (torch.sign(v_pred[v_mask]) == v_target[v_mask]).sum().item()
+                v_signed_n       += int(v_mask.sum().item())
             pc, pt = self._policy_correct(p_logits, p_target)
             p_correct += pc
             p_total   += pt
@@ -658,10 +675,13 @@ class TrainerDDP:
         # Only rank 0 logs, so the output is not printed three times.
         if self.gpu_id == 0:
             lr = self.optimizer.param_groups[0]['lr']
-            p_acc = (p_correct / p_total) if p_total > 0 else 0.0
+            p_acc        = (p_correct / p_total)       if p_total    > 0 else 0.0
+            v_signed_acc = (v_signed_correct / v_signed_n) if v_signed_n > 0 else 0.0
             print(f'epoch {epoch+1} '
                   f'train value_mse: {v_running/n:.4f} '
                   f'value_sign_acc: {v_correct/n:.4f} '
+                  f'value_bucket_acc: {v_bucket_correct/n:.4f} '
+                  f'value_signed_acc: {v_signed_acc:.4f} '
                   f'policy_ce: {p_running/n:.4f} '
                   f'policy_acc: {p_acc:.4f} '
                   f'lr: {lr:.6f}', flush=True)
@@ -672,7 +692,10 @@ class TrainerDDP:
         """
         self.model.train(False)                 # eval mode (freezes BatchNorm)
         n = 0
-        v_correct = 0
+        v_correct        = 0
+        v_bucket_correct = 0
+        v_signed_correct = 0
+        v_signed_n       = 0
         p_correct = 0
         p_total   = 0
         v_running, p_running = 0.0, 0.0
@@ -699,9 +722,16 @@ class TrainerDDP:
                     v_pred, p_logits = self.model(X)
                     _, v_loss, p_loss = self._compute_loss(v_pred, p_logits,
                                                            v_target, p_target)
-                v_running += v_loss.item() * bs
-                p_running += p_loss.item() * bs
-                v_correct += (torch.sign(v_pred) == torch.sign(v_target)).sum().item()
+                v_running        += v_loss.item() * bs
+                p_running        += p_loss.item() * bs
+                v_correct        += (torch.sign(v_pred) == torch.sign(v_target)).sum().item()
+                v_bucket = torch.where(v_pred >  0.33,  1.0,
+                           torch.where(v_pred < -0.33, -1.0, 0.0))
+                v_bucket_correct += (v_bucket == v_target).sum().item()
+                v_mask = v_target != 0
+                if v_mask.any():
+                    v_signed_correct += (torch.sign(v_pred[v_mask]) == v_target[v_mask]).sum().item()
+                    v_signed_n       += int(v_mask.sum().item())
                 pc, pt = self._policy_correct(p_logits, p_target)
                 p_correct += pc
                 p_total   += pt
@@ -714,10 +744,13 @@ class TrainerDDP:
                 gpu_cur = gpu_next
             pbar.close()
         if self.gpu_id == 0:
-            p_acc = (p_correct / p_total) if p_total > 0 else 0.0
+            p_acc        = (p_correct / p_total)       if p_total    > 0 else 0.0
+            v_signed_acc = (v_signed_correct / v_signed_n) if v_signed_n > 0 else 0.0
             print(f'epoch {epoch+1} '
                   f'val value_mse: {v_running/n:.4f} '
                   f'value_sign_acc: {v_correct/n:.4f} '
+                  f'value_bucket_acc: {v_bucket_correct/n:.4f} '
+                  f'value_signed_acc: {v_signed_acc:.4f} '
                   f'policy_ce: {p_running/n:.4f} '
                   f'policy_acc: {p_acc:.4f}', flush=True)
         self.model.train()                      # back to train mode
@@ -787,8 +820,14 @@ def main(rank, world_size, batch_size, cache_dir):
 
 if __name__ == "__main__":
     print(torch.cuda.is_available())
-    # One training process per visible GPU.
-    world_size = torch.cuda.device_count()
+    # One training process per ALLOCATED GPU. world_size honours
+    # CUDA_VISIBLE_DEVICES (the SLURM convention) when set, falling back to
+    # device_count() only for local dev. This avoids the cluster pitfall
+    # where Singularity --nv exposes all physical GPUs and mp.spawn over
+    # device_count() then races for one the job does not own → NCCL hang.
+    cvd = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    world_size = (len([x for x in cvd.split(",") if x.strip()])
+                  if cvd else torch.cuda.device_count())
     print(world_size, flush=True)
     # mp.spawn calls main(rank, world_size, 1024, CACHE_DIR) on each GPU; it
     # prepends `rank` itself. batch_size is PER GPU → effective batch is
