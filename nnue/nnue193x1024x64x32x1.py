@@ -256,7 +256,7 @@ def ddp_setup(rank, world_size):
 class TrainerDDP:
     """Owns one GPU's model replica, optimizer, and the train/validate loops."""
 
-    def __init__(self, gpu_id, model, train_loader, val_loader, save_every=5):
+    def __init__(self, gpu_id, model, train_loader, val_loader, save_every=1):
         self.gpu_id       = gpu_id
         self.model        = model.to(gpu_id)
         self.train_loader = train_loader
@@ -477,7 +477,7 @@ def main(rank, world_size, batch_size, cache_dir):
 
     net = Net()
     if os.path.isfile(LAST_MODEL):
-        net.load_state_dict(torch.load(LAST_MODEL))
+        net.load_state_dict(torch.load(LAST_MODEL, map_location='cpu'))
     if rank == 0:
         nb_params = sum(p.numel() for p in net.parameters())
         print(net, flush=True)

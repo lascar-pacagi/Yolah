@@ -801,7 +801,7 @@ def main(rank, world_size, batch_size, cache_dir):
     net = Net()
     # Resume from a previous checkpoint if one exists.
     if os.path.isfile(LAST_MODEL):
-        net.load_state_dict(torch.load(LAST_MODEL))
+        net.load_state_dict(torch.load(LAST_MODEL, map_location='cpu'))
     if rank == 0:
         nb_params = sum(p.numel() for p in net.parameters())
         print(net, flush=True)
