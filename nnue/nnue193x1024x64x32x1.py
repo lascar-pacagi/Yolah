@@ -238,7 +238,7 @@ class Net(nn.Module):
 
 
 # ── Training config ────────────────────────────────────────────────────────────
-NB_EPOCHS  = 20
+NB_EPOCHS  = 100
 MODEL_PATH = "/mnt/"
 MODEL_NAME = "nnue_193x1024x64x32x1"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
