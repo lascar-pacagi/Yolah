@@ -34,6 +34,10 @@ MODEL_DIR="${MODEL_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/models}"
 
 # Preprocessor uses the same CPU count SLURM allocated.
 YOLAH_PREPROC_NPROC="${YOLAH_PREPROC_NPROC:-${SLURM_CPUS_PER_TASK:-16}}"
+# Number of training epochs; the trainer reads YOLAH_NB_EPOCHS at runtime
+# so you can override with `sbatch --export=...,YOLAH_NB_EPOCHS=50` or by
+# editing this default — no SIF rebuild needed.
+YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-20}"
 
 mkdir -p "${CACHE_DIR}" "${MODEL_DIR}"
 
@@ -43,6 +47,7 @@ echo "  SIF        : ${SIF}"
 echo "  Cache dir  : ${CACHE_DIR}"
 echo "  Model dir  : ${MODEL_DIR}"
 echo "  Preproc np : ${YOLAH_PREPROC_NPROC}"
+echo "  Epochs     : ${YOLAH_NB_EPOCHS}"
 echo "════════════════════════════════════════════════════════════════"
 
 # ── Phase 1: preprocess (skip if cache already exists) ──────────────────────
@@ -82,6 +87,7 @@ singularity exec --nv \
     --bind "${CACHE_DIR}:/cache" \
     --bind "${MODEL_DIR}:/mnt" \
     --env "YOLAH_CACHE_DIR=/cache" \
+    --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS}" \
     --env "TORCH_NCCL_BLOCKING_WAIT=1" \
     "${SIF}" \
     bash -c "cd /nnue && python3 cnn_resnet_value_policy_chunked.py"

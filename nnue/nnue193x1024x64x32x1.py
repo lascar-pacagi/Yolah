@@ -238,7 +238,10 @@ class Net(nn.Module):
 
 
 # ── Training config ────────────────────────────────────────────────────────────
-NB_EPOCHS  = 100
+# Override at runtime with YOLAH_NB_EPOCHS — lets you change epoch count
+# without rebuilding the .sif (the .sh's `singularity exec --env ...` passes
+# it through). Default keeps the original value.
+NB_EPOCHS  = int(os.environ.get("YOLAH_NB_EPOCHS", "100"))
 MODEL_PATH = "/mnt/"
 MODEL_NAME = "nnue_193x1024x64x32x1"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"

@@ -445,7 +445,10 @@ class Net(nn.Module):
 
 
 # ── Training configuration ──────────────────────────────────────────────────
-NB_EPOCHS  = 10                             # passes over the (huge) dataset
+# Override at runtime with YOLAH_NB_EPOCHS — lets you change epoch count
+# without rebuilding the .sif (the .sh's `singularity exec --env ...` passes
+# it through). Default keeps the original value.
+NB_EPOCHS  = int(os.environ.get("YOLAH_NB_EPOCHS", "20"))
 MODEL_PATH = "/mnt/"                        # checkpoint dir (bind-mounted)
 MODEL_NAME = "cnn_resnet_256x30_value_policy"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt" # if present, resume from it

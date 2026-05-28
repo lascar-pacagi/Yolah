@@ -31,6 +31,10 @@ SIF="${SIF:-${SLURM_SUBMIT_DIR:-$PWD}/features_net119x256x64x1.sif}"
 # meta.json) and the intermediate feature_txt/ produced by the C++ encoder.
 CACHE_DIR="${CACHE_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/cache_features119}"
 MODEL_DIR="${MODEL_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/models}"
+# Number of training epochs; the trainer reads YOLAH_NB_EPOCHS at runtime
+# so you can override with `sbatch --export=...,YOLAH_NB_EPOCHS=50` or by
+# editing this default — no SIF rebuild needed.
+YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-100}"
 
 mkdir -p "${CACHE_DIR}" "${MODEL_DIR}"
 
@@ -39,6 +43,7 @@ echo "  Job        : ${SLURM_JOB_ID:-(local)} on $(hostname)"
 echo "  SIF        : ${SIF}"
 echo "  Cache dir  : ${CACHE_DIR}"
 echo "  Model dir  : ${MODEL_DIR}"
+echo "  Epochs     : ${YOLAH_NB_EPOCHS}"
 echo "════════════════════════════════════════════════════════════════"
 
 # ── Phase 1: preprocess (skip if cache already exists) ──────────────────────
@@ -75,6 +80,7 @@ singularity exec --nv \
     --bind "${CACHE_DIR}:/cache" \
     --bind "${MODEL_DIR}:/mnt" \
     --env "YOLAH_FEATURES_DIR=/cache" \
+    --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS}" \
     --env "TORCH_NCCL_BLOCKING_WAIT=1" \
     --env "NCCL_DEBUG=INFO" \
     --env "NCCL_DEBUG_SUBSYS=INIT,COLL" \
