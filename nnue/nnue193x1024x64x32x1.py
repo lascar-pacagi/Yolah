@@ -135,6 +135,11 @@ class ChunkedShuffleLoader:
         self.values = np.memmap(
             os.path.join(self.cache_dir, meta["values"]["path"]),
             dtype=np.int8, mode='r', shape=(n,))
+        # Optional distillation labels — present iff precompute_teacher.py ran.
+        teacher_path = os.path.join(self.cache_dir, "teacher_value.f16")
+        self.teacher = (np.memmap(teacher_path, dtype=np.float16, mode='r',
+                                  shape=(n,))
+                        if os.path.isfile(teacher_path) else None)
 
     def set_epoch(self, epoch):
         """Reseed shuffling for a new epoch."""
@@ -164,6 +169,8 @@ class ChunkedShuffleLoader:
                 # Sequential disk read — np.array() forces a contiguous copy.
                 inp = np.array(self.inputs[start:end])      # (C, 193) uint8
                 val = np.array(self.values[start:end])      # (C,)     int8
+                tch = (np.array(self.teacher[start:end])    # (C,) f16 or None
+                       if self.teacher is not None else None)
 
                 if self.shuffle:
                     rng  = np.random.default_rng(
@@ -175,7 +182,12 @@ class ChunkedShuffleLoader:
                 for b in range(self.batches_per_chunk):
                     idx = perm[b * bs : (b + 1) * bs]
                     X = torch.from_numpy(inp[idx].astype(np.float32))
-                    y = torch.from_numpy(val[idx].astype(np.float32))
+                    # y carries TWO columns: [ground-truth z, teacher value].
+                    # No teacher → column 1 == column 0, so the distill blend is
+                    # an exact no-op.
+                    z  = val[idx].astype(np.float32)
+                    vt = tch[idx].astype(np.float32) if tch is not None else z
+                    y = torch.from_numpy(np.stack([z, vt], axis=1))   # (bs, 2)
                     if self.pin_memory:
                         X, y = X.pin_memory(), y.pin_memory()
                     q.put((X, y))                           # blocks if full
@@ -247,6 +259,16 @@ MODEL_NAME = "nnue_193x1024x64x32x1"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 
 CACHE_DIR  = os.environ.get("YOLAH_CACHE_DIR", "/cache")
+
+# ── Knowledge distillation (optional) ───────────────────────────────────────
+# If <cache>/teacher_value.f16 exists (written by precompute_teacher.py), the
+# value loss becomes a blend of the hard outcome z and the ResNet teacher's
+# value v_teacher:
+#     loss = ALPHA · MSE(v, z) + (1 - ALPHA) · MSE(v, v_teacher)
+# ALPHA weights the (noisy) ground-truth outcome; the teacher target is a
+# denoised, graded value, so ALPHA is kept small by default. With no teacher
+# file present the loader sets v_teacher = z, making the blend an exact no-op.
+DISTILL_ALPHA = float(os.environ.get("YOLAH_DISTILL_ALPHA", "0.2"))
 
 
 def ddp_setup(rank, world_size):
@@ -335,7 +357,8 @@ class TrainerDDP:
             # complete on self.stream. Stream dependency only — host does
             # not block here.
             torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
-            X, y = gpu_cur
+            X, y2 = gpu_cur
+            y, vt = y2[:, 0], y2[:, 1]      # ground-truth z, teacher value
             bs = len(X)
             n += bs
 
@@ -348,7 +371,9 @@ class TrainerDDP:
             self.optimizer.zero_grad()
             with torch.autocast('cuda', dtype=self.amp_dtype):
                 v_pred = self.model(X)
-                loss   = self.loss_fn(v_pred, y)
+                # Distillation blend (no-op when no teacher: vt == y).
+                loss   = (DISTILL_ALPHA * self.loss_fn(v_pred, y)
+                          + (1.0 - DISTILL_ALPHA) * self.loss_fn(v_pred, vt))
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
             self.scaler.update()
@@ -409,7 +434,8 @@ class TrainerDDP:
             pbar = tqdm(total=len(self.val_loader))
             while True:
                 torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
-                X, y = gpu_cur
+                X, y2 = gpu_cur
+                y = y2[:, 0]               # report val metrics/mse vs ground-truth z
                 bs = len(X)
                 n += bs
 
@@ -477,6 +503,12 @@ def main(rank, world_size, batch_size, cache_dir):
               f'train {n_train:,}  val {n_total - n_train:,}', flush=True)
         print(f'Batches/rank/epoch: train {len(train_loader):,}  '
               f'val {len(val_loader):,}  (chunk_size={CHUNK_SIZE:,})', flush=True)
+        if train_loader.teacher is not None:
+            print(f'Distillation: ON  alpha={DISTILL_ALPHA}  '
+                  f'(loss = {DISTILL_ALPHA}*MSE(v,z) + '
+                  f'{1 - DISTILL_ALPHA:.2f}*MSE(v,teacher))', flush=True)
+        else:
+            print('Distillation: off (no teacher_value.f16 in cache)', flush=True)
 
     net = Net()
     if os.path.isfile(LAST_MODEL):

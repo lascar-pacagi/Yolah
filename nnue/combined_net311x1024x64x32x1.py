@@ -1,26 +1,59 @@
 """
-features_net119x256x64x1.py — multi-GPU training of the 119-input features
-network (119 → 256 → 64 → 1) with an AlphaZero-style scalar value head.
+combined_net311x1024x64x32x1.py — multi-GPU training of the COMBINED network
+((193 nnue board-input ⊕ 118 features, turn-deduplicated) → 1024 → 64 → 32 → 1)
+with an AlphaZero-style scalar value head.
 
-Data path (matches cnn_resnet_value_policy_chunked.py)
-─────────────────────────────────────────────────────
-The cache produced by preprocess_features.py is a flat memmap of N records:
-    features.u8 : (N, 119) uint8   — feature bytes (treated as v / 255)
+Rationale — "do the features help at EQUAL hidden width?" control
+────────────────────────────────────────────────────────────────
+This is the L1 = 1024 sibling of combined_net311x512x64x32x1.py. It holds the
+hidden width equal to the pure-nnue (193x1024x64x32x1) and only ADDS the 118
+features to the input, so comparing it against the pure-nnue isolates the feature
+contribution at MATCHED capacity:
+  • combined_311x1024  >  nnue_193x1024  → even at width 1024 the net cannot
+    synthesize these features itself → a genuine capacity-bounded info gain.
+  • combined_311x1024  ≈  nnue_193x1024  → at this width the features are
+    redundant (the body already learns them) → they were only a convergence aid.
+(The 512 sibling instead tests whether a *smaller* body can match the pure-nnue
+thanks to the features.) Param count ≈ 387k — the wider 311 input into the same
+1024 — vs the pure-nnue's ≈ 266k. NOTE: this trades away NNUE's incremental-update
+speed (the 118 features do not update cheaply per move), so it is aimed at eval
+QUALITY, not node rates.
+
+Turn deduplication
+──────────────────
+The turn appears in BOTH source representations: the nnue turn byte (input index
+192, fed as 0/1) and the feature TURN (the 119th feature = current_player()).
+They are redundant, so preprocess_combined.py drops the FEATURE turn when it
+WRITES the cache: features.u8 is 118-wide and the cache row IS the model input,
+193 + 118 = 311. (The alignment guard still uses the full 119 features from the
+.features.txt records at preprocess time, so dropping the column does not weaken
+it.) The loader here simply concatenates — no column dropping needed.
+
+Data path — the ALIGNED combined cache (preprocess_combined.py)
+──────────────────────────────────────────────────────────────
+preprocess_combined.py produces ONE row-aligned cache where row i of every
+array describes the SAME board position:
+    inputs.u8   : (N, 193) uint8   — board bitboards + turn (binary 0/1 bytes)
+    features.u8 : (N, 118) uint8   — feature bytes WITHOUT the redundant turn
+                                     (treated as v / 255)
     values.i8   : (N,)     int8    — z ∈ {-1, 0, +1} from current player's POV
     meta.json   : sidecar with shapes / counts
 
-This script uses a `ChunkedShuffleLoader`:
-  • one background producer thread per rank reads a CONTIGUOUS chunk
-    (~500 MB) sequentially into RAM, shuffles WITHIN the chunk, slices it
-    into batches, pins each batch, and pushes onto a bounded queue;
-  • the main thread pulls pre-pinned batches and overlaps the next batch's
-    H2D copy with the current batch's compute via a side CUDA stream;
-  • DDP is configured with `gradient_as_bucket_view=True` and
-    `static_graph=True` to avoid the periodic ~50 s NCCL all-reduce stall
-    that plagued the DataLoader variant on multi-GPU runs.
+The two existing per-network caches (cache_nnue193, cache_features119) are NOT
+row-aligned (different file ordering + different position sets), so they cannot
+be concatenated row-by-row — hence the dedicated aligned preprocessor.
 
-fc1 and fc2 keep NNUE-style clamp([0,1]) activations + int8 weight clipping
-(|w| ≤ 127/64) so the trunk is quantizable; fc3 (64 → 1 value head, tanh) is
+This script reuses the proven chunked-shuffle loader: one background producer
+thread per rank reads CONTIGUOUS chunks of BOTH memmaps sequentially, applies
+the SAME within-chunk permutation to each (keeping rows paired), builds the
+311-d input as concat([nnue_bits (193), features (118) / 255]), pins each batch,
+and pushes onto a bounded queue; the main thread overlaps the
+next batch's H2D copy with the current batch's compute via a side CUDA stream.
+DDP uses gradient_as_bucket_view=True + static_graph=True to avoid the periodic
+~50 s NCCL all-reduce stall seen on the DataLoader variant.
+
+fc1–fc3 keep NNUE-style clamp([0,1]) activations + int8 weight clipping
+(|w| ≤ 127/64) so the trunk stays quantizable; the value head (fc4 → tanh) is
 left unclamped to avoid tanh saturation.
 """
 from tqdm import tqdm
@@ -38,14 +71,24 @@ import threading                             # the background producer thread
 import queue as queue_mod                    # bounded hand-off queue (the buffer)
 import numpy as np
 
+sys.path.append("../server")
+from yolah import Yolah, Move, Square        # only needed for live-inference encoders
+
 torch.set_float32_matmul_precision('high')
 
 # The chunked loader does its own threaded I/O, but keep file_system sharing
 # in case any other torch IPC sneaks in (SLURM+Singularity caps /dev/shm).
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-# ── Feature layout (MUST match YolahFeatures in player/yolah_features.h) ───
-NB_FEATURES = 119
+
+# ── Input layout (the cache MUST match preprocess_combined.py) ─────────────
+# preprocess_combined.py already dropped the redundant FEATURE turn at write
+# time, so the cache stores 193 nnue inputs + 118 features and the cache row IS
+# the model input: 193 + 118 = 311. The single turn signal kept is the nnue turn
+# byte at index 192.
+INPUT_SIZE_NNUE = 64 + 64 + 64 + 1           # 193 — black | white | empty | turn
+NB_FEATURES     = 118                          # features stored in the cache (no TURN)
+INPUT_SIZE      = INPUT_SIZE_NNUE + NB_FEATURES   # 311
 
 
 # ── Chunked-shuffle double-buffered loader ──────────────────────────────────
@@ -53,32 +96,37 @@ NB_FEATURES = 119
 # CHUNK_SIZE — number of positions read per chunk.
 #   4194304 = 2048 * 2048. Two deliberate properties:
 #     • an exact multiple of any plausible batch size → no ragged tail;
-#     • at 119 bytes/position it is ~500 MB of uint8 — small enough for a
-#       few chunks to coexist in RAM, large enough that a chunk spans many
-#       games so the within-chunk shuffle decorrelates batches well.
+#     • at 193+118 = 311 bytes/position on disk it is ~1.3 GB of uint8
+#       (inputs+features) — small enough for a few chunks to coexist in RAM,
+#       large enough that a chunk spans many games so the within-chunk shuffle
+#       decorrelates batches.
 CHUNK_SIZE = 2048 * 2048
 
-# BATCH_QUEUE_DEPTH — how many fully-built, pinned batches the producer may
-# stay ahead of the GPU. Each batch (bs=256) is ~120 KB float32 X + 1 KB y
-# → 32 batches ≈ 4 MB of pinned RAM per rank: negligible.
+# BATCH_QUEUE_DEPTH — how many fully-built, pinned batches the producer may stay
+# ahead of the GPU. Each batch (bs=1024) is ~1.3 MB float32 X + 4 KB y → 32
+# batches ≈ 40 MB of pinned RAM per rank: negligible.
 BATCH_QUEUE_DEPTH = 32
 
 
 class ChunkedShuffleLoader:
     """
-    Streaming data loader over the (features.u8, values.i8) memmap pair.
+    Streaming loader over the ALIGNED (inputs.u8, features.u8, values.i8) triple.
 
     Iterating yields (X, y) batches with X pinned for async H2D copy:
-        X : (bs, 119) float32 in [0, 1]    (features divided by 255)
-        y : (bs,)     float32 ∈ {-1, 0, +1}
+        X : (bs, 311) float32   — concat([nnue_bits (193, 0/1),
+                                          features (118) / 255])
+        y : (bs,)     float32   ∈ {-1, 0, +1}
+
+    The SAME within-chunk permutation is applied to inputs and features so the
+    193-board and 118-features in each row stay paired (they already describe the
+    same position by construction of the aligned cache).
 
     Distributed training (DDP)
     --------------------------
-    With `world_size` GPUs, rank r owns chunks r, r+world_size, … so the
-    shards are disjoint. Remainder chunks and the trailing partial chunk are
-    dropped to guarantee EVERY rank yields the same number of batches —
-    essential because the per-step all-reduce would otherwise hang on a rank
-    that ran fewer steps.
+    With `world_size` GPUs, rank r owns chunks r, r+world_size, … so the shards
+    are disjoint. Remainder chunks and the trailing partial chunk are dropped to
+    guarantee EVERY rank yields the same number of batches — otherwise the
+    per-step all-reduce would hang on a rank that ran fewer steps.
     """
 
     def __init__(self, cache_dir, lo, hi, batch_size, rank, world_size,
@@ -103,6 +151,7 @@ class ChunkedShuffleLoader:
         per_rank = len(all_starts) // world_size
         self.my_chunks = all_starts[rank : per_rank * world_size : world_size]
 
+        # CHUNK_SIZE chosen so this divides cleanly for plausible batch sizes.
         self.batches_per_chunk = chunk_size // batch_size
         self.n_batches = len(self.my_chunks) * self.batches_per_chunk
 
@@ -115,24 +164,32 @@ class ChunkedShuffleLoader:
         with open(os.path.join(self.cache_dir, "meta.json")) as f:
             meta = json.load(f)
 
-        n_features_cols = meta["features"]["shape"][1]
-        if n_features_cols != NB_FEATURES:
+        n_inputs_cols = meta["inputs"]["shape"][1]
+        if n_inputs_cols != INPUT_SIZE_NNUE:
             raise ValueError(
-                f"Cache feature width {n_features_cols} != expected {NB_FEATURES}. "
-                "Re-run preprocess_features.py.")
+                f"Cache input width {n_inputs_cols} != expected {INPUT_SIZE_NNUE}. "
+                "Re-run preprocess_combined.py.")
+        n_feat_cols = meta["features"]["shape"][1]
+        if n_feat_cols != NB_FEATURES:
+            raise ValueError(
+                f"Cache feature width {n_feat_cols} != expected {NB_FEATURES}. "
+                "Re-run preprocess_combined.py.")
+        if meta["inputs"]["shape"][0] != meta["features"]["shape"][0]:
+            raise ValueError(
+                "inputs and features row counts differ "
+                f"({meta['inputs']['shape'][0]} vs {meta['features']['shape'][0]}) — "
+                "the cache is not aligned. Re-run preprocess_combined.py.")
 
         n = int(meta["n_positions"])
+        self.inputs = np.memmap(
+            os.path.join(self.cache_dir, meta["inputs"]["path"]),
+            dtype=np.uint8, mode='r', shape=tuple(meta["inputs"]["shape"]))
         self.features = np.memmap(
             os.path.join(self.cache_dir, meta["features"]["path"]),
             dtype=np.uint8, mode='r', shape=tuple(meta["features"]["shape"]))
         self.values = np.memmap(
             os.path.join(self.cache_dir, meta["values"]["path"]),
             dtype=np.int8, mode='r', shape=(n,))
-        # Optional distillation labels — present iff precompute_teacher.py ran.
-        teacher_path = os.path.join(self.cache_dir, "teacher_value.f16")
-        self.teacher = (np.memmap(teacher_path, dtype=np.float16, mode='r',
-                                  shape=(n,))
-                        if os.path.isfile(teacher_path) else None)
 
     def set_epoch(self, epoch):
         """Reseed shuffling for a new epoch."""
@@ -145,13 +202,15 @@ class ChunkedShuffleLoader:
     def _producer(self, chunk_order, q):
         """
         Background thread. For each chunk in this epoch's shuffled order:
-            1. read the whole chunk sequentially from the memmap into RAM;
-            2. permute positions within the chunk (epoch+offset-seeded);
-            3. slice into batches, cast dtypes, pin, push to `q`.
+            1. read the whole chunk of inputs AND features sequentially into RAM;
+            2. permute positions within the chunk (epoch+offset-seeded), SAME
+               permutation for both arrays so rows stay paired;
+            3. build the 311-d input concat([nnue_bits, features/255]), cast,
+               pin, push to `q`.
 
         Why a thread (not a process): numpy bulk memcpy/astype and torch's
-        pin_memory all release the Python GIL, so this thread genuinely runs
-        at the same time as the main thread's GPU calls.
+        pin_memory all release the Python GIL, so this thread genuinely runs at
+        the same time as the main thread's GPU calls.
         """
         bs = self.batch_size
         try:
@@ -159,11 +218,10 @@ class ChunkedShuffleLoader:
                 start = self.my_chunks[chunk_id]
                 end   = start + self.chunk_size
 
-                # Sequential disk read — np.array() forces a contiguous copy.
-                feat = np.array(self.features[start:end])    # (C, 119) uint8
-                val  = np.array(self.values[start:end])      # (C,)     int8
-                tch  = (np.array(self.teacher[start:end])    # (C,) f16 or None
-                        if self.teacher is not None else None)
+                # Sequential disk reads — np.array() forces a contiguous copy.
+                inp  = np.array(self.inputs[start:end])     # (C, 193) uint8 {0,1}
+                feat = np.array(self.features[start:end])   # (C, 118) uint8
+                val  = np.array(self.values[start:end])     # (C,)     int8
 
                 if self.shuffle:
                     rng  = np.random.default_rng(
@@ -174,17 +232,15 @@ class ChunkedShuffleLoader:
 
                 for b in range(self.batches_per_chunk):
                     idx = perm[b * bs : (b + 1) * bs]
-                    # Features are stored as raw uint8 bytes; the trained net
-                    # expects values in [0, 1] (see YolahFeatures encoding),
-                    # so we divide by 255 here once per batch.
+                    # nnue bits are already 0/1 → kept as-is.
+                    x_nnue = inp[idx].astype(np.float32)
+                    # Features are raw bytes the net expects in [0, 1] → /255.
+                    # The redundant TURN was dropped at preprocess time, so the
+                    # cache is already 118-wide; concatenate directly.
+                    x_feat = feat[idx].astype(np.float32) / 255.0
                     X = torch.from_numpy(
-                            feat[idx].astype(np.float32) / 255.0)
-                    # y carries TWO columns: [ground-truth z, teacher value].
-                    # No teacher → column 1 == column 0, so the distill blend is
-                    # an exact no-op.
-                    z  = val[idx].astype(np.float32)
-                    vt = tch[idx].astype(np.float32) if tch is not None else z
-                    y = torch.from_numpy(np.stack([z, vt], axis=1))   # (bs, 2)
+                            np.concatenate([x_nnue, x_feat], axis=1))   # (bs, 311)
+                    y = torch.from_numpy(val[idx].astype(np.float32))
                     if self.pin_memory:
                         X, y = X.pin_memory(), y.pin_memory()
                     q.put((X, y))                           # blocks if full
@@ -211,61 +267,58 @@ class ChunkedShuffleLoader:
         t.join()
 
 
-# ── Network ───────────────────────────────────────────────────────────────────
+# ── Network ────────────────────────────────────────────────────────────────────
 class Net(nn.Module):
     """
-    Features network with NNUE-style clamped trunk + scalar value head.
+    Combined feature transformer (fc1–fc3) + scalar value head (fc4 → tanh).
 
-    fc1, fc2 keep the [0, 1] clamp activations and int8-friendly weight
-    clipping (|w| ≤ 127/64), so the trunk stays quantizable for C++ inference.
-    fc3 is a 64 → 1 value head whose output is passed through tanh — its
-    weights are left UNCLAMPED to avoid tanh saturation (a clamped 64-d input
-    sum could otherwise reach ±127, where dtanh/dx ≈ 0 and gradients vanish).
+    The first three layers keep the NNUE-style clamp([0,1]) activations and
+    int8-friendly weight clipping (|w| ≤ 127/64) so the trained body remains
+    quantizable. The final 1-d value head is left unclamped — clamping it to
+    ±127/64 with a 32-dim input would let the pre-tanh sum reach ~63, where
+    tanh saturates and dtanh/dx ≈ 0 (no gradient).
     """
-    def __init__(self):
+    def __init__(self, input_size=INPUT_SIZE, l1_size=1024, l2_size=64, l3_size=32):
         super().__init__()
-        self.fc1 = nn.Linear(NB_FEATURES, 256)
-        self.fc2 = nn.Linear(256, 64)
-        self.fc3 = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(input_size, l1_size)
+        self.fc2 = nn.Linear(l1_size, l2_size)
+        self.fc3 = nn.Linear(l2_size, l3_size)
+        self.fc4 = nn.Linear(l3_size, 1)
 
     def forward(self, x):
-        x = torch.clamp(self.fc1(x), min=0.0, max=1.0)
-        x = torch.clamp(self.fc2(x), min=0.0, max=1.0)
-        return torch.tanh(self.fc3(x)).squeeze(-1)
+        x = self.fc1(x)
+        x = torch.clamp(x, min=0.0, max=1.0)
+        x = self.fc2(x)
+        x = torch.clamp(x, min=0.0, max=1.0)
+        x = self.fc3(x)
+        x = torch.clamp(x, min=0.0, max=1.0)
+        # Value head: single scalar squashed to (-1, +1) via tanh.
+        return torch.tanh(self.fc4(x)).squeeze(-1)
 
     def clip(self):
         # Only clamp the quantizable trunk — leave the value head free.
-        for fc in [self.fc1, self.fc2]:
+        for fc in [self.fc1, self.fc2, self.fc3]:
             fc.weight.data.clamp_(-127 / 64, 127 / 64)
             fc.bias.data.clamp_(-127 / 64, 127 / 64)
 
 
-# ── Training config ───────────────────────────────────────────────────────────
-# Override at runtime with YOLAH_NB_EPOCHS — lets you change epoch count
-# without rebuilding the .sif (the .sh's `singularity exec --env ...` passes
-# it through). Default keeps the original value.
+# ── Training config ────────────────────────────────────────────────────────────
+# Override at runtime with YOLAH_NB_EPOCHS — lets you change epoch count without
+# rebuilding the .sif (the .sh's `singularity exec --env ...` passes it through).
 NB_EPOCHS  = int(os.environ.get("YOLAH_NB_EPOCHS", "100"))
 MODEL_PATH = "/mnt/"
-MODEL_NAME = "features_119x256x64x1"
+MODEL_NAME = "combined_311x1024x64x32x1"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 
-CACHE_DIR = os.environ.get("YOLAH_FEATURES_DIR", "/cache")
-
-# ── Knowledge distillation (optional) ───────────────────────────────────────
-# If <cache>/teacher_value.f16 exists (written by precompute_teacher.py), the
-# value loss becomes a blend of the hard outcome z and the ResNet teacher's
-# value v_teacher:
-#     loss = ALPHA · MSE(v, z) + (1 - ALPHA) · MSE(v, v_teacher)
-# ALPHA weights the (noisy) ground-truth outcome; the teacher target is a
-# denoised, graded value, so ALPHA is kept small by default. With no teacher
-# file present the loader sets v_teacher = z, making the blend an exact no-op.
-DISTILL_ALPHA = float(os.environ.get("YOLAH_DISTILL_ALPHA", "0.2"))
+CACHE_DIR  = os.environ.get("YOLAH_COMBINED_DIR", "/cache")
 
 
 def ddp_setup(rank, world_size):
     """All ranks live on one node → rendezvous over localhost; NCCL is the backend."""
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "65433"
+    # Distinct port from the nnue (65432) and features (65433) trainers so a
+    # combined run can coexist with them on the same node.
+    os.environ["MASTER_PORT"] = "65435"
     init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
 
@@ -323,11 +376,13 @@ class TrainerDDP:
         n = 0
         running_loss   = 0.0
         # Three value-accuracy variants tracked in parallel:
-        #   sign_correct   — sign(v) == sign(y); draws always count as wrong
-        #                    since sign(tanh(...)) is essentially never 0
-        #                    → ceiling = 1 - P(draw).
-        #   bucket_correct — bucket(v) ∈ {-1, 0, +1} via |v| < 0.33; fair for draws.
-        #   signed_correct / n_signed — sign-acc over non-draw rows only.
+        #   sign_correct   — torch.sign(v) == torch.sign(y); draws always count
+        #                    as wrong since sign(tanh(...)) is essentially never
+        #                    0 → ceiling = 1 - P(draw).
+        #   bucket_correct — bucket(v) ∈ {-1, 0, +1} via |v| < 0.33; draws
+        #                    correctly predicted when v_pred sits near 0.
+        #   signed_correct / n_signed — sign-acc over non-draw rows only;
+        #                    excludes y=0 from both numerator and denominator.
         sign_correct   = 0
         bucket_correct = 0
         signed_correct = 0
@@ -346,8 +401,7 @@ class TrainerDDP:
             # complete on self.stream. Stream dependency only — host does
             # not block here.
             torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
-            X, y2 = gpu_cur
-            y, vt = y2[:, 0], y2[:, 1]      # ground-truth z, teacher value
+            X, y = gpu_cur
             bs = len(X)
             n += bs
 
@@ -360,9 +414,7 @@ class TrainerDDP:
             self.optimizer.zero_grad()
             with torch.autocast('cuda', dtype=self.amp_dtype):
                 v_pred = self.model(X)
-                # Distillation blend (no-op when no teacher: vt == y).
-                loss   = (DISTILL_ALPHA * self.loss_fn(v_pred, y)
-                          + (1.0 - DISTILL_ALPHA) * self.loss_fn(v_pred, vt))
+                loss   = self.loss_fn(v_pred, y)
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
             self.scaler.update()
@@ -370,6 +422,7 @@ class TrainerDDP:
             running_loss   += loss.item() * bs
             sign_correct   += (torch.sign(v_pred) == torch.sign(y)).sum().item()
             # 3-way bucketed accuracy: bucket v_pred to {-1, 0, +1} via |v|<0.33.
+            # A v_pred near 0 now correctly predicts a draw.
             bucket = torch.where(v_pred >  0.33,  1.0,
                      torch.where(v_pred < -0.33, -1.0, 0.0))
             bucket_correct += (bucket == y).sum().item()
@@ -422,8 +475,7 @@ class TrainerDDP:
             pbar = tqdm(total=len(self.val_loader))
             while True:
                 torch.cuda.current_stream(self.gpu_id).wait_stream(self.stream)
-                X, y2 = gpu_cur
-                y = y2[:, 0]               # report val metrics/mse vs ground-truth z
+                X, y = gpu_cur
                 bs = len(X)
                 n += bs
 
@@ -491,16 +543,13 @@ def main(rank, world_size, batch_size, cache_dir):
               f'train {n_train:,}  val {n_total - n_train:,}', flush=True)
         print(f'Batches/rank/epoch: train {len(train_loader):,}  '
               f'val {len(val_loader):,}  (chunk_size={CHUNK_SIZE:,})', flush=True)
-        if train_loader.teacher is not None:
-            print(f'Distillation: ON  alpha={DISTILL_ALPHA}  '
-                  f'(loss = {DISTILL_ALPHA}*MSE(v,z) + '
-                  f'{1 - DISTILL_ALPHA:.2f}*MSE(v,teacher))', flush=True)
-        else:
-            print('Distillation: off (no teacher_value.f16 in cache)', flush=True)
 
     net = Net()
     if os.path.isfile(LAST_MODEL):
-        net.load_state_dict(torch.load(LAST_MODEL, map_location='cpu'))
+        # weights_only=True: the checkpoint is a plain tensor state_dict, so
+        # refuse to unpickle arbitrary objects (also the torch>=2.6 default).
+        net.load_state_dict(
+            torch.load(LAST_MODEL, map_location='cpu', weights_only=True))
     if rank == 0:
         nb_params = sum(p.numel() for p in net.parameters())
         print(net, flush=True)
