@@ -5,3 +5,4 @@ server/__pycache__
 nnue/__pycache__
 python_binding/build
 data/__pycache__
+build-torch

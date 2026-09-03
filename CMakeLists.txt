@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.20.0)
 
 # Enable CUDA support (optional - only if CUDA is available)
 option(ENABLE_CUDA "Enable CUDA support for AlphaZero" OFF)
+# libtorch backend for the AlphaZero MCTS player's ResNet (GPU inference).
+# Point CMAKE_PREFIX_PATH at a libtorch install, e.g. the one inside a pip
+# torch package:  -DENABLE_TORCH=ON -DCMAKE_PREFIX_PATH=<site-packages>/torch
+option(ENABLE_TORCH "Enable the libtorch (GPU) network backend" OFF)
 
 if(ENABLE_CUDA)
     project(Yolah CXX CUDA)
@@ -31,6 +35,19 @@ find_package(Boost 1.71 COMPONENTS program_options REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Threads REQUIRED)
 find_package(benchmark REQUIRED)
+if(ENABLE_TORCH)
+    # TorchConfig.cmake of a CUDA-enabled libtorch probes the installed GPUs by
+    # compiling a CUDA test project, which needs a matching CUDA toolkit and
+    # trips over our C++23 dialect. Giving it the architecture list skips the
+    # probe (8.6 = RTX 30xx; 7.5 = Turing; 8.9 = RTX 40xx; 9.0 = H100).
+    if(NOT DEFINED ENV{TORCH_CUDA_ARCH_LIST} AND NOT TORCH_CUDA_ARCH_LIST)
+        set(TORCH_CUDA_ARCH_LIST "8.6" CACHE STRING "CUDA architectures for the libtorch probe")
+    endif()
+    set(CMAKE_CUDA_STANDARD 17)
+    find_package(Torch REQUIRED)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+    message(STATUS "libtorch backend enabled: ${TORCH_LIBRARIES}")
+endif()
 
 add_executable(Yolah main.cpp)
 target_compile_options(Yolah PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp -flto=auto)
@@ -59,6 +76,22 @@ add_subdirectory(data)
 target_link_libraries(Yolah PRIVATE data)
 add_subdirectory(nnue)
 target_link_libraries(Yolah PRIVATE nnue)
+
+# Self-check / benchmark of the AlphaZero MCTS player and its network backends:
+#   ./alphazero_check [--weights f.bin] [--test-vectors f.test.bin] [--backend cpu|torch] ...
+add_executable(alphazero_check test/alphazero_check_main.cpp)
+target_compile_options(alphazero_check PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+# With LTO the code is generated at link time: repeat the target flags there.
+target_link_options(alphazero_check PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(alphazero_check PRIVATE ${Boost_INCLUDE_DIR})
+target_link_libraries(alphazero_check PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(alphazero_check PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(alphazero_check PRIVATE ${TORCH_LIBRARIES})
+endif()
 
 # AlphaZero (only if CUDA is enabled)
 if(ENABLE_CUDA)

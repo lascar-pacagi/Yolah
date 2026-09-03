@@ -12,6 +12,7 @@
 #include "minmax_nnue_quantized_player.h"
 #include "MCTS_mem_nn_player.h"
 #include "features_net_player.h"
+#include "alphazero_mcts_player.h"
 #ifdef ENABLE_CUDA
 #include "alphazero_player.h"
 #endif
@@ -380,6 +381,13 @@ unique_ptr<Player> Player::create(const json& j) {
                                                      nb_threads);
             }
         },          
+        {
+            "AlphaZeroMCTSPlayer",
+            [](const json& j) {
+                // Keys are validated by the constructor (see alphazero_mcts_player.h).
+                return make_unique<AlphaZeroMCTSPlayer>(j);
+            }
+        },
 #ifdef ENABLE_CUDA
         {
             "AlphaZeroPlayer",
