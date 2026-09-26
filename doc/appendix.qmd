@@ -5932,7 +5932,7 @@ max_hours_for_job() {
 
 ### `nnue/alphazero_learn.sh` {#sec-src-nnue-alphazero-learn-sh}
 
-*120 lines.*
+*122 lines.*
 
 The main SLURM job: 3 GPUs, 32 CPUs, 128 GB, 14 days (sizing:
 @sec-learn-sizing). It compiles for the node, runs the trainer, and stops
@@ -5986,6 +5986,8 @@ cleanly on the time-limit signal.
 #SBATCH --job-name=alphazero_learn
 #SBATCH --output=alphazero_learn_%j.out
 #SBATCH --error=alphazero_learn_%j.out
+#SBATCH --partition=insa-gpu
+#SBATCH -x crn23
 #SBATCH --gres=gpu:3
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=128G
@@ -6065,7 +6067,7 @@ fi
 
 ### `nnue/alphazero_selfplay.sh` {#sec-src-nnue-alphazero-selfplay-sh}
 
-*59 lines.*
+*61 lines.*
 
 An extra self-play GPU on any node, for a run split over several jobs
 (@fig-split).
@@ -6094,6 +6096,8 @@ An extra self-play GPU on any node, for a run split over several jobs
 #SBATCH --job-name=alphazero_selfplay
 #SBATCH --output=alphazero_selfplay_%j.out
 #SBATCH --error=alphazero_selfplay_%j.out
+#SBATCH --partition=insa-gpu
+#SBATCH -x crn23
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=48G

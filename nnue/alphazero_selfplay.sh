@@ -20,6 +20,8 @@
 #SBATCH --job-name=alphazero_selfplay
 #SBATCH --output=alphazero_selfplay_%j.out
 #SBATCH --error=alphazero_selfplay_%j.out
+#SBATCH --partition=insa-gpu
+#SBATCH -x crn23
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=48G

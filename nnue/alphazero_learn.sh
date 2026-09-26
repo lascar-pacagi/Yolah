@@ -44,6 +44,8 @@
 #SBATCH --job-name=alphazero_learn
 #SBATCH --output=alphazero_learn_%j.out
 #SBATCH --error=alphazero_learn_%j.out
+#SBATCH --partition=insa-gpu
+#SBATCH -x crn23
 #SBATCH --gres=gpu:3
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=128G
