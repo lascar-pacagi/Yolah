@@ -1,0 +1,39 @@
+/* styles.css — HTML-only layout tweaks for alphazero_mcts.qmd.
+ *
+ * The annotated-source appendix lists real files: 95 % of their lines are
+ * under 95 columns and the longest is 123. Quarto's default 800 px body column
+ * wraps most of that, which makes a listing much harder to read than the file
+ * itself. So the body grid is widened (see the `grid:` block in the document's
+ * front matter) and running text is held back to a readable measure here, so
+ * that only the code, the figures and the tables actually use the extra width.
+ */
+
+main p,
+main li,
+main blockquote,
+main dl,
+main .callout p {
+  max-width: 46rem;
+}
+
+/* Code, figures and tables take the full body width. */
+main div.sourceCode,
+main pre,
+main figure,
+main table {
+  max-width: none;
+}
+
+/* An absolute size rather than an em: the theme already scales `code` inside
+ * `pre`, and compounding em factors makes the result hard to predict. At
+ * 0.8rem the widened column holds ~135 monospace columns, comfortably more
+ * than the longest line in the appendix (123). */
+main pre > code.sourceCode,
+main div.sourceCode pre code {
+  font-size: 0.8rem;
+}
+
+/* Keep the line-number gutter from crowding the code when a line does wrap. */
+main pre.numberSource code > span > a:first-child::before {
+  padding-right: 0.6em;
+}

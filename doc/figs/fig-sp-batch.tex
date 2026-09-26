@@ -1,0 +1,19 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  \foreach \i/\lbl in {0/game 1,1/game 2,2/game 3,4/game 128} {
+    \node[box,minimum width=30mm] (g\i) at (0,-\i*10) {\lbl\\\scriptsize own \texttt{az::Search}, 1 thread};
+  }
+  \node[plain] at (0,-30) {$\vdots$};
+  \node[boxa,minimum width=34mm,minimum height=46mm] (b) at (55,-20)
+    {\texttt{Batching}\\\texttt{Evaluator}\\[2mm]\scriptsize launches when all\\\scriptsize games wait, or\\\scriptsize 1024 positions, or\\\scriptsize 0.5 ms};
+  \node[boxb,minimum width=30mm,minimum height=20mm] (gpu) at (105,-20) {GPU\\\scriptsize ResNet 256$\times$30\\\scriptsize fp16};
+  \foreach \i in {0,1,2,4} { \draw[ar] (g\i.east) -- node[tiny,above,sloped]{8 leaves} (b.west |- g\i.east); }
+  \draw[ar] (b.east) -- node[tiny,above]{$\le$1024} (gpu.west);
+  \node[tiny,text=accent2,align=center] (rl) at (105,-45) {new weights:\\\texttt{reload()} when\\\texttt{latest.json} changes};
+  \draw[ar,draw=accent2] (rl.north) -- (gpu.south);
+  \node[tiny,text width=110mm,align=left] at (50,-56)
+   {each search stays almost sequential (8 leaves in flight: few virtual-loss\\collisions) while the GPU still sees batches of $\sim$1000 positions.};
+\end{tikzpicture}
+\end{document}

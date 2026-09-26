@@ -1,0 +1,23 @@
+\usepackage{tikz}
+\usepackage{amsmath,amssymb}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric,decorations.pathreplacing,patterns}
+\definecolor{ink}{HTML}{1B2430}
+\definecolor{muted}{HTML}{6B7785}
+\definecolor{accent}{HTML}{2F6FB5}
+\definecolor{accent2}{HTML}{C1611F}
+\definecolor{good}{HTML}{2E7D5B}
+\definecolor{soft}{HTML}{EDF2F7}
+\definecolor{soft2}{HTML}{FBEDE2}
+\definecolor{soft3}{HTML}{E6F0E9}
+\tikzset{
+  box/.style={draw=ink,line width=.7pt,rounded corners=2pt,fill=soft,inner sep=4pt,align=center,font=\sffamily\small},
+  boxa/.style={box,fill=soft2},
+  boxb/.style={box,fill=soft3},
+  plain/.style={align=center,font=\sffamily\small,text=ink},
+  tiny/.style={align=center,font=\sffamily\scriptsize,text=muted},
+  ar/.style={-{Stealth[length=2.4mm]},draw=ink,line width=.7pt},
+  arm/.style={-{Stealth[length=2.4mm]},draw=muted,line width=.6pt,dashed},
+  nd/.style={circle,draw=ink,line width=.7pt,fill=white,minimum size=7mm,inner sep=0pt,font=\sffamily\scriptsize},
+  ndf/.style={nd,fill=soft},
+  ndt/.style={nd,fill=soft2},
+}

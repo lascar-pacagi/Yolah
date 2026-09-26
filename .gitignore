@@ -6,3 +6,13 @@ nnue/__pycache__
 python_binding/build
 data/__pycache__
 build-torch
+
+# Singularity images (built from the .def files, several GB)
+*.sif
+# Networks over GitHub's 100 MB limit: a duplicate of nnue/…value_policy.pt,
+# and its .bin/.ts exports (regenerable with nnue/resnet_export.py)
+models/cnn_resnet_256x30_value_policy.pt
+nnue/cnn_resnet_256x30_value_policy.bin
+nnue/cnn_resnet_256x30_value_policy.ts
+# Intermediate PDFs of the TikZ figures (doc/figs/build.sh; the PNGs are kept)
+doc/figs/*.pdf

@@ -7,6 +7,10 @@
 //   ./alphazero_check --bench-only         # network throughput at several batch sizes
 //   ./alphazero_check --backend torch --fp32   # GPU in full precision (exact check)
 //   ./alphazero_check --games 4 --time 1000000 --opponent ../config/mcts_player.cfg
+//   ./alphazero_check --no-bench --set 'graph search=false'   # A/B a search parameter
+//
+// --set takes any key of the player's JSON config (see alphazero_mcts_player.h)
+// as 'key=value'; the value is parsed as JSON, so true/false/numbers work.
 #include "alphazero_mcts_player.h"
 #include "alphazero_mcts_check.h"
 #include "resnet_check.h"
@@ -15,6 +19,8 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <vector>
 
 int main(int argc, char* argv[]) {
     magic::init();
@@ -26,6 +32,7 @@ int main(int argc, char* argv[]) {
     size_t threads = 1, batch = 0, games = 0;
     uint64_t sims = 400, time_us = 1'000'000;
     bool bench_only = false, no_bench = false, verbose = false, fp32 = false;
+    std::vector<std::pair<std::string, std::string>> overrides;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto next = [&] { if (i + 1 >= argc) { std::cerr << "missing value for " << a << "\n"; std::exit(2); } return std::string(argv[++i]); };
@@ -43,6 +50,12 @@ int main(int argc, char* argv[]) {
         else if (a == "--no-bench") no_bench = true;
         else if (a == "--verbose") verbose = true;
         else if (a == "--fp32") fp32 = true;
+        else if (a == "--set") {
+            const std::string kv = next();
+            const size_t eq = kv.find('=');
+            if (eq == std::string::npos) { std::cerr << "--set expects key=value\n"; return 2; }
+            overrides.emplace_back(kv.substr(0, eq), kv.substr(eq + 1));
+        }
         else { std::cerr << "unknown option " << a << "\n"; return 2; }
     }
     if (backend == "torch" && weights.ends_with(".bin")) weights = weights.substr(0, weights.size() - 4) + ".ts";
@@ -58,6 +71,7 @@ int main(int argc, char* argv[]) {
     cfg["device"] = device;
     cfg["fp16"] = !fp32;
     cfg["verbose"] = verbose;
+    for (const auto& [key, value] : overrides) cfg[key] = json::parse(value);
     // Half precision on the GPU deviates a little from the fp32 reference.
     const float tolerance = (backend == "torch" && !fp32) ? 2e-2f : 2e-3f;
 

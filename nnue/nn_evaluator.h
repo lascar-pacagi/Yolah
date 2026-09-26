@@ -19,9 +19,9 @@
 //   nnue/batched_evaluator.h — merges the requests of several search threads
 //                          into one large batch before calling a backend.
 //
-// Future learning loop: a freshly trained network is exported with
-// resnet_export.py and swapped in with reload() — the search object and the
-// player do not need to be rebuilt.
+// Learning loop (nnue/alphazero_learn.py): a freshly trained network is
+// exported as TorchScript and swapped in with reload() while the self-play
+// games keep running — no search object needs to be rebuilt.
 #include "game.h"
 #include <cstdint>
 #include <memory>
@@ -37,9 +37,21 @@ namespace nn {
 //   plane 0 black stones, plane 1 white stones, plane 2 "empty" (vacated)
 //   squares, plane 3 the side to move (all 0 = black, all 1 = white).
 // Plane cell i (row-major, i = 8*row + col with row/col in 0..7) holds bit
-// (63 - i) of the bitboard, i.e. the planes are in *reverse* square order
-// (cell 0 = H8, cell 63 = A1). That is what the training cache contains
-// (np.unpackbits on a big-endian uint64), so it is what we must feed.
+// (63 - i) of the bitboard, i.e. square (63 - i), since bit s IS square s
+// (SQ_A1 = 0 ... SQ_H8 = 63).
+//
+// Where the (63 - i) comes from: preprocess.py builds a plane with
+//     np.unpackbits(np.array([bb], dtype='>u8').view(np.uint8)).reshape(8, 8)
+// '>u8' dumps the integer big-endian (most significant byte first) and
+// unpackbits takes the most significant bit of each byte first, so the values
+// come out in the order bit 63, 62, ..., 0 — element i is bit 63 - i.
+//
+// Geometrically, with s = 8*rank + file, that is row = 7 - rank and
+// col = 7 - file: the ranks are in the usual order (rank 8 on the top row)
+// but the FILES ARE MIRRORED, H on the left. Cell 0 is H8, cell 63 is A1.
+// The network does not care — a fixed mirror of every input is just a
+// relabelling of the board — but training and inference must agree exactly,
+// so do not "fix" this: it is what the weights were trained on.
 constexpr int PLANES        = 4;
 constexpr int PLANE_CELLS   = 64;
 constexpr int INPUT_FLOATS  = PLANES * PLANE_CELLS;

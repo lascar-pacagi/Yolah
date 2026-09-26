@@ -1,0 +1,86 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=2.6mm,y=2.6mm]
+\begin{scope}[shift={(0,0)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (4,3) rectangle ++(1,1);
+\fill[ink] (1.5,1.5) circle (.36);
+\fill[ink] (6.5,2.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (5.5,6.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (2.5,5.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (1.5,1.5) -- (1.5,5.5);
+\node[tiny,text=ink] at (4,-1.2) {identity};
+\end{scope}
+\begin{scope}[shift={(11,0)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (3,3) rectangle ++(1,1);
+\fill[ink] (6.5,1.5) circle (.36);
+\fill[ink] (1.5,2.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (2.5,6.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (5.5,5.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (6.5,1.5) -- (6.5,5.5);
+\node[tiny,text=ink] at (4,-1.2) {identity + mirror};
+\end{scope}
+\begin{scope}[shift={(22,0)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (4,4) rectangle ++(1,1);
+\fill[ink] (6.5,1.5) circle (.36);
+\fill[ink] (5.5,6.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (1.5,5.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (2.5,2.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (6.5,1.5) -- (2.5,1.5);
+\node[tiny,text=ink] at (4,-1.2) {rotation 90$^\circ$};
+\end{scope}
+\begin{scope}[shift={(33,0)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (3,4) rectangle ++(1,1);
+\fill[ink] (1.5,1.5) circle (.36);
+\fill[ink] (2.5,6.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (6.5,5.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (5.5,2.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (1.5,1.5) -- (5.5,1.5);
+\node[tiny,text=ink] at (4,-1.2) {rotation 90$^\circ$ + mirror};
+\end{scope}
+\begin{scope}[shift={(0,-13)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (3,4) rectangle ++(1,1);
+\fill[ink] (6.5,6.5) circle (.36);
+\fill[ink] (1.5,5.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (2.5,1.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (5.5,2.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (6.5,6.5) -- (6.5,2.5);
+\node[tiny,text=ink] at (4,-1.2) {rotation 180$^\circ$};
+\end{scope}
+\begin{scope}[shift={(11,-13)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (4,4) rectangle ++(1,1);
+\fill[ink] (1.5,6.5) circle (.36);
+\fill[ink] (6.5,5.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (5.5,1.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (2.5,2.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (1.5,6.5) -- (1.5,2.5);
+\node[tiny,text=ink] at (4,-1.2) {rotation 180$^\circ$ + mirror};
+\end{scope}
+\begin{scope}[shift={(22,-13)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (3,3) rectangle ++(1,1);
+\fill[ink] (1.5,6.5) circle (.36);
+\fill[ink] (2.5,1.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (6.5,2.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (5.5,5.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (1.5,6.5) -- (5.5,6.5);
+\node[tiny,text=ink] at (4,-1.2) {rotation 270$^\circ$};
+\end{scope}
+\begin{scope}[shift={(33,-13)}]
+\fill[soft] (0,0) rectangle (8,8); \draw[muted,line width=.2pt] (0,0) grid[step=1] (8,8); \draw[ink,line width=.5pt] (0,0) rectangle (8,8);
+\fill[muted!60] (4,3) rectangle ++(1,1);
+\fill[ink] (6.5,6.5) circle (.36);
+\fill[ink] (5.5,1.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (1.5,2.5) circle (.36);
+\filldraw[fill=white,draw=ink,line width=.4pt] (2.5,5.5) circle (.36);
+\draw[-{Stealth[length=1.6mm]},draw=accent2,line width=1pt] (6.5,6.5) -- (2.5,6.5);
+\node[tiny,text=ink] at (4,-1.2) {rotation 270$^\circ$ + mirror};
+\end{scope}
+\end{tikzpicture}
+\end{document}

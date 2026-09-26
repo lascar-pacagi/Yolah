@@ -93,6 +93,23 @@ if(ENABLE_TORCH)
     target_link_libraries(alphazero_check PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# The C++ half of the AlphaZero learning loop (self-play games, evaluation
+# matches); driven by nnue/alphazero_learn.py:
+#   ./alphazero_learn selfplay --config ../config/alphazero_mcts_selfplay_player.cfg --work <dir>
+#   ./alphazero_learn match --config ../config/alphazero_mcts_eval_player.cfg --a new.ts --b old.ts
+add_executable(alphazero_learn test/alphazero_learn_main.cpp)
+target_compile_options(alphazero_learn PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(alphazero_learn PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(alphazero_learn PRIVATE ${Boost_INCLUDE_DIR})
+target_link_libraries(alphazero_learn PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(alphazero_learn PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(alphazero_learn PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # AlphaZero (only if CUDA is enabled)
 if(ENABLE_CUDA)
     add_subdirectory(alphazero)

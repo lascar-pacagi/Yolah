@@ -1,0 +1,20 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=1.1mm,y=3.6mm]
+  % N in millions (0..100), window in millions; N0 = 0.25M, cap 16M
+  \draw[muted,line width=.3pt] (0,0) grid[xstep=20,ystep=4] (100,16);
+  \draw[ar] (0,0) -- (104,0) node[plain,right]{$N$ (millions of rows generated)};
+  \draw[ar] (0,0) -- (0,17.5) node[plain,above]{window (millions)};
+  \foreach \x in {0,20,...,100} \node[tiny,below] at (\x,0) {\x};
+  \foreach \y in {0,4,8,12,16} \node[tiny,left] at (0,\y) {\y};
+  \draw[accent,line width=1.2pt,domain=0.25:100,samples=150,smooth]
+     plot (\x,{0.25*(1+0.4*((\x/0.25)^0.75-1)/0.75)});
+  \draw[muted,dashed,line width=.8pt] (0,0) -- (15,15);
+  \node[tiny,right] at (15,15) {window $=N$ (keep everything)};
+  \draw[accent2,dashed,line width=.8pt] (0,16) -- (100,16) node[tiny,above left,text=accent2]{cap \texttt{--max-window} = 16M (5.4 GB)};
+  \draw[good,dashed,line width=.6pt] (17,0) -- (17,{0.25*(1+0.4*((17/0.25)^0.75-1)/0.75)}) node[tiny,pos=0.25,right,text=good]{RTX 3080, 1 month};
+  \node[plain,text=accent,fill=white] at (72,3.4) {$W(N)=N_0\left(1+\beta\,\dfrac{(N/N_0)^{\alpha}-1}{\alpha}\right)$};
+  \node[tiny,fill=white] at (72,0.9) {$N_0=2.5\cdot10^5,\ \alpha=0.75,\ \beta=0.4$ (cluster settings)};
+\end{tikzpicture}
+\end{document}

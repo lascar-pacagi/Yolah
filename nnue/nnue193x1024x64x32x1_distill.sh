@@ -29,9 +29,9 @@
 set -euo pipefail
 
 # ── Tunables (override via env / `sbatch --export=...`) ─────────────────────
-SIF="${SIF:-${SLURM_SUBMIT_DIR:-$PWD}/nnue193x1024x64x32x1_distill.sif}"
-CACHE_DIR="${CACHE_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/cache_nnue193}"
-MODEL_DIR="${MODEL_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/models}"
+SIF="${SIF:-/home/pgarcia/NNUE/DistillationNNUE/nnue193x1024x64x32x1_distill.sif}"
+CACHE_DIR="${CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache}"
+MODEL_DIR="${MODEL_DIR:-/home/pgarcia/NNUE/DistillationNNUE/models}"
 
 YOLAH_PREPROC_NPROC="${YOLAH_PREPROC_NPROC:-${SLURM_CPUS_PER_TASK:-16}}"
 YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-20}"

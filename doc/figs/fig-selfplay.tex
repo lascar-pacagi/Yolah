@@ -1,0 +1,24 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  \node[boxa,minimum width=34mm] (net) at (0,0) {current network};
+  \node[box,minimum width=34mm] (play) at (44,0) {\texttt{az::Search}\\\scriptsize plays a game against itself};
+  \node[box,minimum width=34mm] (data) at (88,0) {$(s,\pi,z)$ records};
+  \node[boxa,minimum width=34mm] (train) at (132,0) {train, export\\\scriptsize \texttt{alphazero\_learn.py}};
+  \draw[ar] (net)--(play); \draw[ar] (play)--(data); \draw[ar] (data)--(train);
+  \draw[ar,draw=accent2,rounded corners] (train.north) -- ++(0,12) -- node[tiny,above,text=accent2]{hot swap via \texttt{latest.json}} (0,12) -- (net.north);
+
+  \node[tiny,below=8mm of play,text width=52mm,text=ink,align=left] (n1)
+    {\textbf{per move}\\
+     $\bullet$ Dirichlet noise on the root priors\\
+     $\bullet$ forced playouts, $k=2$\\
+     $\bullet$ sample the move $\propto \pi^{1/\tau}$ early on\\
+     $\bullet$ playout cap: a full search only\\ \ \ \ \ on a fraction of the moves};
+  \node[tiny,below=8mm of data,text width=42mm,text=ink,align=left] (n2)
+    {\textbf{targets}\\
+     $\pi$ --- play values, forced playouts\\ \ \ \ pruned back out\\
+     $z\in\{-1,0,+1\}$ --- the game result,\\ \ \ \ for the player to move at $s$};
+  \draw[arm] (play) -- (n1); \draw[arm] (data) -- (n2);
+\end{tikzpicture}
+\end{document}

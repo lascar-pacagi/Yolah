@@ -1,0 +1,29 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  % processes
+  \node[boxa,minimum width=46mm,minimum height=16mm] (sp) at (0,0)
+    {\textbf{self-play} (C++, one per GPU)\\\scriptsize\texttt{alphazero\_learn selfplay}\\\scriptsize 128 games at once, 800/200 sims};
+  \node[boxa,minimum width=46mm,minimum height=16mm] (tr) at (100,0)
+    {\textbf{trainer} (Python, GPU 0)\\\scriptsize\texttt{alphazero\_learn.py}\\\scriptsize replay window, Adam, EMA};
+  \node[boxa,minimum width=46mm,minimum height=16mm] (ev) at (100,-42)
+    {\textbf{evaluation} (C++)\\\scriptsize\texttt{alphazero\_learn match}\\\scriptsize 10 games, 2 s/move};
+  % files
+  \node[box,minimum width=40mm] (data) at (50,12) {\texttt{selfplay/*.bin}\\\scriptsize $(s,\pi,z)$ rows};
+  \node[box,minimum width=40mm] (models) at (50,-16) {\texttt{models/az\_<step>.ts}\\\texttt{latest.json}};
+  \node[box,minimum width=40mm] (csv) at (50,-42) {\texttt{evals.csv}\\\scriptsize W/D/L, Elo};
+  \node[boxb,minimum width=40mm] (ck) at (150,-16) {\texttt{checkpoint.pt}\\\texttt{state.json}};
+  \draw[ar] (sp.north) |- (data.west);
+  \draw[ar] (data.east) -| node[tiny,pos=.25,above]{scan every 20 s} (tr.north);
+  \draw[ar] (tr.south west) ++(4,0) |- (models.east);
+  \node[tiny,anchor=west,align=left] at (82,-11) {export every\\131k samples};
+  \draw[ar,draw=accent2] (models.west) -| node[tiny,pos=.25,below,text=accent2]{hot swap (poll 30 s)} (sp.south);
+  \draw[ar] (tr.south) -- node[tiny,right]{every 4th export} (ev.north);
+  \draw[arm] (models.south) ++(8,0) -- ++(0,-4) -| ([xshift=-8mm]ev.north);
+  \draw[ar] (ev.west) -- (csv.east);
+  \draw[ar,draw=good] (tr.east) -| node[tiny,pos=.7,right,text=good]{at export and on exit} (ck.north);
+  \node[tiny,text width=60mm,align=left] at (0,-38)
+   {everything is a file in \texttt{<work>}:\\a job killed at any moment restarts\\from the last export (at most $\sim$1.3 h lost).};
+\end{tikzpicture}
+\end{document}

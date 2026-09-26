@@ -1,0 +1,22 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  \foreach \p/\x in {0/0,1/30,2/60} {
+    \pgfmathtruncatemacro{\ga}{2*\p+1}\pgfmathtruncatemacro{\gb}{2*\p+2}
+    \node[box,minimum width=24mm] (o\p) at (\x,0) {opening $o_{\p}$\\\scriptsize 4 random plies};
+    \node[boxa,minimum width=24mm,below=5mm of o\p] (a\p) {game \ga\\\scriptsize new = black};
+    \node[boxb,minimum width=24mm,below=3mm of a\p] (b\p) {game \gb\\\scriptsize new = white};
+    \draw[ar] (o\p) -- (a\p);
+  }
+  \node[plain] at (90,-12) {\Large$\cdots$};
+  \node[box,minimum width=24mm] (o9) at (120,0) {opening $o_{9}$\\\scriptsize 4 random plies};
+  \node[boxa,minimum width=24mm,below=5mm of o9] (a9) {game 19\\\scriptsize new = black};
+  \node[boxb,minimum width=24mm,below=3mm of a9] (b9) {game 20\\\scriptsize new = white};
+  \draw[ar] (o9) -- (a9);
+  \node[tiny,text width=145mm,align=left,anchor=north west] at (-14,-38)
+  {Both players search 2\,s per move, no noise, no sampling: from a given position they are (almost) deterministic.
+   Without the random openings the 10 games with the same colours would be the same game ten times. The pair of
+   games sharing an opening cancels its bias (one colour may be favoured by it). Score $s=(W+D/2)/20$.};
+\end{tikzpicture}
+\end{document}

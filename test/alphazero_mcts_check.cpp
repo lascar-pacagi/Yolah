@@ -35,8 +35,13 @@ namespace {
         for (float p : r.policy) pi += p;
         if (!r.policy.empty() && std::fabs(pi - 1.0f) > 1e-3f) fail("policy does not sum to 1");
         if (!reused && sum != r.root_visits) fail("children visits != root visits");
-        if (!reused && r.nb_simulations != nb_simulations) fail("simulation budget not honoured exactly");
-        if (r.nb_simulations < nb_simulations) fail("fewer simulations than requested");
+        // A playout-cap "fast" search deliberately runs a smaller budget.
+        if (r.full_search) {
+            if (!reused && r.nb_simulations != nb_simulations) fail("simulation budget not honoured exactly");
+            if (r.nb_simulations < nb_simulations) fail("fewer simulations than requested");
+        } else if (r.nb_simulations == 0) {
+            fail("fast search ran no simulation");
+        }
         if (!r.children.empty() && r.children[0].move != r.best_move &&
             r.children[0].visits != r.children[1].visits)
             fail("best move is not the most visited child");
@@ -94,8 +99,35 @@ bool alphazero_reuse_check(const json& player_config, uint64_t nb_simulations) {
         y.moves(moves);
         y.play(moves[reduce(prng.rand<uint32_t>(), moves.size())]);
     }
-    if (reused_plies == 0) { cout << "  FAIL: no subtree was reused\n"; ok = false; }
-    cout << "  reused subtrees on " << reused_plies << " plies  " << (ok ? "OK" : "FAILED") << std::endl;
+    // The opponent replies at random, so whether its move is one the search
+    // actually explored — and the subtree therefore reusable — is luck; the
+    // count above is informational. The two cases below must always reuse.
+    cout << "  reused subtrees on " << reused_plies << " of 5 plies (random replies)\n";
+
+    Yolah z = random_position(prng, 12);
+    if (!z.game_over()) {
+        player.game_over(z);              // drop the tree
+        player.play(z);
+        const uint64_t first = player.last_result().root_visits;
+        player.play(z);                   // same position again → the root itself
+        const az::SearchResult& again = player.last_result();
+        ok &= check_result(again, nb_simulations, true);
+        if (again.root_visits <= first) { cout << "  FAIL: the root was not reused\n"; ok = false; }
+        cout << "  same position twice: " << first << " → " << again.root_visits << " root visits\n";
+        // Same search driving both sides: the next position is a child of the root.
+        z.play(again.best_move);
+        if (!z.game_over()) {
+            player.play(z);
+            const az::SearchResult& child = player.last_result();
+            ok &= check_result(child, nb_simulations, true);
+            // More visits at the root than this search alone produced: the
+            // rest came from the previous one (the budget may differ from
+            // nb_simulations when playout cap randomization is on).
+            if (child.root_visits <= child.nb_simulations) { cout << "  FAIL: the child was not reused\n"; ok = false; }
+            cout << "  after our own move: " << child.root_visits << " root visits\n";
+        }
+    }
+    cout << "  " << (ok ? "OK" : "FAILED") << std::endl;
     return ok;
 }
 

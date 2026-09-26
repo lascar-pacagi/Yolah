@@ -1,0 +1,22 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[node distance=4.5mm]
+  \node[plain] (x) {$x$};
+  \node[boxa,right=of x] (bn1) {BN};
+  \node[boxa,right=of bn1] (r1) {ReLU};
+  \node[box,right=of r1] (c1) {$3{\times}3$ conv};
+  \node[boxa,right=of c1] (bn2) {BN};
+  \node[boxa,right=of bn2] (r2) {ReLU};
+  \node[box,right=of c1,xshift=26mm] (c2) {$3{\times}3$ conv};
+  \node[circle,draw=ink,line width=.7pt,right=of c2,inner sep=1pt,font=\small] (add) {$+$};
+  \node[plain,right=of add] (out) {out};
+  \draw[ar] (x) -- (bn1); \draw[ar] (bn1) -- (r1); \draw[ar] (r1) -- (c1);
+  \draw[ar] (c1) -- (bn2); \draw[ar] (bn2) -- (r2); \draw[ar] (r2) -- (c2);
+  \draw[ar] (c2) -- (add); \draw[ar] (add) -- (out);
+  \draw[ar] (x.north) -- ++(0,7mm) -| node[tiny,pos=.25,above]{identity} (add.north);
+  \node[tiny,below=6mm of c1,text width=95mm] {pre-activation (ResNet-v2): the BN sits \emph{before} the convolution, so it
+    cannot be folded into it at export time --- the C++ backend keeps the folded affine
+    $(s,t)$ and applies $\max(0,\,s x+t)$ while gathering the im2col patches};
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,14 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=4.5mm,y=1mm]
+  \draw[ar] (0,0) -- (29.5,0) node[plain,right]{days};
+  \foreach \d in {0,7,14,21,28} { \draw[muted] (\d,-1) -- (\d,1); \node[tiny,below] at (\d,-1) {\d}; }
+  \fill[soft2,draw=ink,rounded corners=2pt] (0,4) rectangle (14,12); \node[plain] at (7,8) {job 1 \scriptsize(\texttt{--time=14-00:00:00})};
+  \fill[soft2,draw=ink,rounded corners=2pt] (14.3,4) rectangle (28.3,12); \node[plain] at (21.3,8) {job 2 \scriptsize(same script, same \texttt{WORK\_DIR})};
+  \draw[accent2,line width=1pt,-{Stealth}] (13.5,22) node[tiny,above,text=accent2]{\texttt{SIGUSR1} 30 min before the end} -- (13.5,12.5);
+  \draw[good,line width=1pt,-{Stealth}] (14.3,-10) node[tiny,below,text=good,align=center]{\texttt{checkpoint.pt}, \texttt{state.json},\\\texttt{selfplay/}, \texttt{models/}: resume} -- (14.3,3.5);
+  \foreach \x in {0.8,1.6,...,13.2} \draw[muted] (\x,12) -- (\x,14);
+  \node[tiny,anchor=west] at (0,16.5) {a new network every \texttt{EXPORT\_EVERY} training samples, an evaluation (20 games) every 4 h};
+\end{tikzpicture}
+\end{document}
