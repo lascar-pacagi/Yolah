@@ -26,8 +26,10 @@ visible from every node). The run lives in `/data/$USER/AlphaZeroLearn/work`.
 ```bash
 # once, where you are root (or --fakeroot):
 cd nnue && sudo singularity build alphazero_learn.sif alphazero_learn.def
-# on the cluster: ~/Yolah = git checkout, the initial network in ~/Yolah/nnue/,
-# the .sif in /data/$USER/AlphaZeroLearn/ (paths: nnue/alphazero_common.sh)
+# on the cluster: ~/Yolah = git checkout, the .sif in /data/$USER/AlphaZeroLearn/
+# (paths: nnue/alphazero_common.sh). The network is in Git LFS, which the
+# cluster lacks: the clone holds a pointer, so copy the real file over it:
+#     scp nnue/cnn_resnet_256x30_value_policy.pt cluster:Yolah/nnue/
 sbatch alphazero_learn.sh       # 3 GPUs on one node, 14 days
 sbatch alphazero_learn.sh       # again, same WORK_DIR: continues where it stopped
 ```

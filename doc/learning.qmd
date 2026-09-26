@@ -530,6 +530,12 @@ scp alphazero_learn.sif cluster:/data/$USER/AlphaZeroLearn/
 scp cnn_resnet_256x30_value_policy.pt cluster:Yolah/nnue/
 ```
 
+The network is stored in the repository with Git LFS, which the cluster does
+not have: a clone there holds a 134-byte *pointer* in place of the 144 MB
+file, hence the `scp`. Both the job script and the trainer check for a
+pointer and stop with an explicit message rather than a cryptic `torch.load`
+error.
+
 ### The job script
 
 `nnue/alphazero_learn.sh` asks for **3 GPUs, 32 CPUs, 128 GB of RAM and 14

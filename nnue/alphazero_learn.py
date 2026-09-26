@@ -261,6 +261,10 @@ class BatchMaker:
 # ── model files ──────────────────────────────────────────────────────────────
 def load_state_dict(path):
     """A state_dict from a plain .pt, a DDP one ("module." prefix) or our checkpoint.pt."""
+    with open(path, "rb") as f:
+        if f.read(100).startswith(b"version https://git-lfs"):
+            sys.exit(f"{path} is a Git LFS pointer, not a network: copy the real file "
+                     f"(the repository stores it with Git LFS)")
     sd = torch.load(path, map_location="cpu")
     if isinstance(sd, dict) and "model" in sd and "optimizer" in sd:
         sd = sd["model"]

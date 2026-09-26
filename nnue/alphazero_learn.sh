@@ -75,6 +75,14 @@ EXTRA_ARGS="${EXTRA_ARGS:-}"                  # anything else for alphazero_lear
 RESUBMIT="${RESUBMIT:-0}"                     # 1 = sbatch this script again when the time is up
 
 mkdir -p "${WORK_DIR}"
+# The network is stored with Git LFS: a clone made without git-lfs (as on the
+# cluster) holds a 134-byte pointer instead. Copy the real file by hand:
+#     scp nnue/cnn_resnet_256x30_value_policy.pt cluster:Yolah/nnue/
+if [[ ! -f "${WORK_DIR}/init_model.pt" ]] && head -c 100 "${INIT_MODEL}" 2>/dev/null | grep -q "git-lfs"; then
+    echo "ERROR: ${INIT_MODEL} is a Git LFS pointer, not the network."
+    echo "       Copy the real file: scp nnue/cnn_resnet_256x30_value_policy.pt <cluster>:${INIT_MODEL}"
+    exit 1
+fi
 cp -n "${INIT_MODEL}" "${WORK_DIR}/init_model.pt" 2>/dev/null || true
 MAX_HOURS=$(max_hours_for_job 1200)           # stop 20 min before the limit
 
