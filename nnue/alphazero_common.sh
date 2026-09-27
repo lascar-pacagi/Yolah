@@ -13,6 +13,12 @@
 SIF="${SIF:-${HOME}/AlphaZeroLearn/alphazero_learn.sif}"
 WORK_DIR="${WORK_DIR:-${HOME}/AlphaZeroLearn/work}"
 
+if [[ ! -f "${SIF}" ]]; then
+    echo "ERROR: no Singularity image at ${SIF}"
+    echo "       Build it from nnue/alphazero_learn.def and put it there (or pass SIF=/path/to/image.sif)."
+    exit 1
+fi
+
 # One build per CPU model: -march=native binaries are not portable across them.
 CPU_TAG=$(grep -m1 'model name' /proc/cpuinfo | md5sum | cut -c1-8)
 BUILD_DIR="/work/build/${CPU_TAG}"          # path inside the container

@@ -5825,7 +5825,7 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 ### `nnue/alphazero_common.sh` {#sec-src-nnue-alphazero-common-sh}
 
-*86 lines.*
+*92 lines.*
 
 Sourced by the two job scripts: the paths (`~/AlphaZeroLearn`), the container launcher,
 the build step (with its lock), and the signal forwarding that makes a clean
@@ -5856,6 +5856,12 @@ stop possible.
 # network per export); the whole run takes ~60 GB over a month.
 SIF="${SIF:-${HOME}/AlphaZeroLearn/alphazero_learn.sif}"
 WORK_DIR="${WORK_DIR:-${HOME}/AlphaZeroLearn/work}"
+
+if [[ ! -f "${SIF}" ]]; then
+    echo "ERROR: no Singularity image at ${SIF}"
+    echo "       Build it from nnue/alphazero_learn.def and put it there (or pass SIF=/path/to/image.sif)."
+    exit 1
+fi
 
 # One build per CPU model: -march=native binaries are not portable across them.
 CPU_TAG=$(grep -m1 'model name' /proc/cpuinfo | md5sum | cut -c1-8)
