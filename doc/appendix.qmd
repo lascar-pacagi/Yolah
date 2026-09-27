@@ -5825,9 +5825,9 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 ### `nnue/alphazero_common.sh` {#sec-src-nnue-alphazero-common-sh}
 
-*85 lines.*
+*86 lines.*
 
-Sourced by the two job scripts: the paths (`/data`), the container launcher,
+Sourced by the two job scripts: the paths (`~/AlphaZeroLearn`), the container launcher,
 the build step (with its lock), and the signal forwarding that makes a clean
 stop possible.
 
@@ -5851,10 +5851,11 @@ stop possible.
 # ────────────────────────────────────────────────────────────────────────────
 
 # ── Paths (override via env / `sbatch --export=ALL,VAR=...`) ────────────────
-# /data is the redundant storage visible from every node: the run lives there.
-# Its I/O is light (~1.2 GB/day of self-play rows, a 141 MB network per export).
-SIF="${SIF:-/data/${USER}/AlphaZeroLearn/alphazero_learn.sif}"
-WORK_DIR="${WORK_DIR:-/data/${USER}/AlphaZeroLearn/work}"
+# The run lives in the home directory (/home/pgarcia/AlphaZeroLearn on the
+# cluster), visible from every node. The I/O is light (~1.2 GB/day of self-play rows, a 141 MB
+# network per export); the whole run takes ~60 GB over a month.
+SIF="${SIF:-${HOME}/AlphaZeroLearn/alphazero_learn.sif}"
+WORK_DIR="${WORK_DIR:-${HOME}/AlphaZeroLearn/work}"
 
 # One build per CPU model: -march=native binaries are not portable across them.
 CPU_TAG=$(grep -m1 'model name' /proc/cpuinfo | md5sum | cut -c1-8)
@@ -5946,7 +5947,7 @@ cleanly on the time-limit signal.
 #
 #     sbatch alphazero_learn.sh            # first job AND every following one
 #
-# The run lives in WORK_DIR (on /data). A job that ends (time limit,
+# The run lives in WORK_DIR (~/AlphaZeroLearn/work). A job that ends (time limit,
 # preemption, scancel) checkpoints; submitting the same script again continues
 # it: 2 weeks + 2 weeks = one month of learning. Nothing is lost but the games
 # in progress.
@@ -5963,7 +5964,7 @@ cleanly on the time-limit signal.
 # GPUs: 3 per job (the per-user maximum). The GPU nodes have 2 or 3 cards
 # (A40 or RTX 8000, 48 GB); if a 3-GPU node is long to get, run this job with
 # fewer GPUs and add the missing ones as alphazero_selfplay.sh jobs, which
-# can land on any GPU node: everything goes through WORK_DIR on /data.
+# can land on any GPU node: everything goes through WORK_DIR (shared home).
 #     sbatch --gres=gpu:1 alphazero_learn.sh
 #     sbatch alphazero_selfplay.sh ; sbatch alphazero_selfplay.sh
 # To pin a GPU model, use the cluster's gres type, e.g. --gres=gpu:a40:3
@@ -6081,7 +6082,7 @@ An extra self-play GPU on any node, for a run split over several jobs
 #
 #     sbatch alphazero_selfplay.sh         # same WORK_DIR as alphazero_learn.sh
 #
-# The learning loop only communicates through files in WORK_DIR (on /data,
+# The learning loop only communicates through files in WORK_DIR (in the home,
 # visible from every node): this job reads latest.json, hot-swaps each new
 # network, and writes its games to WORK_DIR/selfplay/, where the trainer picks
 # them up like those of its own GPUs. Use it when a node with 3 free GPUs is

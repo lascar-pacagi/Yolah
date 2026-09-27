@@ -11,7 +11,7 @@
   \node[boxb,minimum width=60mm,minimum height=26mm,anchor=north] (n3) at (132,0) {};
   \node[plain,anchor=north] at (132,-1) {\textbf{GPU node C}\ \scriptsize job \texttt{alphazero\_selfplay.sh}};
   \node[boxa,minimum width=42mm,anchor=north] at (132,-8) {1 GPU: self-play};
-  \node[box,minimum width=192mm,minimum height=12mm] (data) at (66,-44) {\texttt{/data/\$USER/AlphaZeroLearn/work}: \texttt{latest.json}, \texttt{models/}, \texttt{selfplay/}, \texttt{checkpoint.pt}, \texttt{evals.csv}};
+  \node[box,minimum width=192mm,minimum height=12mm] (data) at (66,-44) {\texttt{\textasciitilde/AlphaZeroLearn/work}: \texttt{latest.json}, \texttt{models/}, \texttt{selfplay/}, \texttt{checkpoint.pt}, \texttt{evals.csv}};
   \draw[ar] ([xshift=-6mm]n1.south) -- node[tiny,left]{rows, networks} ([xshift=-6mm]data.north -| n1.south);
   \draw[ar] ([xshift=6mm]data.north -| n1.south) -- ([xshift=6mm]n1.south);
   \foreach \n in {n2,n3} {

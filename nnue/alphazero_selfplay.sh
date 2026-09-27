@@ -5,7 +5,7 @@
 #
 #     sbatch alphazero_selfplay.sh         # same WORK_DIR as alphazero_learn.sh
 #
-# The learning loop only communicates through files in WORK_DIR (on /data,
+# The learning loop only communicates through files in WORK_DIR (in the home,
 # visible from every node): this job reads latest.json, hot-swaps each new
 # network, and writes its games to WORK_DIR/selfplay/, where the trainer picks
 # them up like those of its own GPUs. Use it when a node with 3 free GPUs is

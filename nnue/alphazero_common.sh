@@ -7,10 +7,11 @@
 # ────────────────────────────────────────────────────────────────────────────
 
 # ── Paths (override via env / `sbatch --export=ALL,VAR=...`) ────────────────
-# /data is the redundant storage visible from every node: the run lives there.
-# Its I/O is light (~1.2 GB/day of self-play rows, a 141 MB network per export).
-SIF="${SIF:-/data/${USER}/AlphaZeroLearn/alphazero_learn.sif}"
-WORK_DIR="${WORK_DIR:-/data/${USER}/AlphaZeroLearn/work}"
+# The run lives in the home directory (/home/pgarcia/AlphaZeroLearn on the
+# cluster), visible from every node. The I/O is light (~1.2 GB/day of self-play rows, a 141 MB
+# network per export); the whole run takes ~60 GB over a month.
+SIF="${SIF:-${HOME}/AlphaZeroLearn/alphazero_learn.sif}"
+WORK_DIR="${WORK_DIR:-${HOME}/AlphaZeroLearn/work}"
 
 # One build per CPU model: -march=native binaries are not portable across them.
 CPU_TAG=$(grep -m1 'model name' /proc/cpuinfo | md5sum | cut -c1-8)

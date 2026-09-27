@@ -20,13 +20,14 @@ formulas, figures, annotated sources — is chapter "Learning by self-play" of
 
 ## Cluster
 
-5 GPU nodes (7 A40 + 6 RTX 8000, 48 GB), shared storage `/data` (redundant,
-visible from every node). The run lives in `/data/$USER/AlphaZeroLearn/work`.
+5 GPU nodes (7 A40 + 6 RTX 8000, 48 GB), partition `insa-gpu`. The run lives
+in `~/AlphaZeroLearn/work` (the home is visible from every node). Plan for
+~60 GB.
 
 ```bash
 # once, where you are root (or --fakeroot):
 cd nnue && sudo singularity build alphazero_learn.sif alphazero_learn.def
-# on the cluster: ~/Yolah = git checkout, the .sif in /data/$USER/AlphaZeroLearn/
+# on the cluster: ~/Yolah = git checkout, the .sif in ~/AlphaZeroLearn/
 # (paths: nnue/alphazero_common.sh). The network is in Git LFS, which the
 # cluster lacks: the clone holds a pointer, so copy the real file over it:
 #     scp nnue/cnn_resnet_256x30_value_policy.pt cluster:Yolah/nnue/

@@ -4,7 +4,7 @@
 #
 #     sbatch alphazero_learn.sh            # first job AND every following one
 #
-# The run lives in WORK_DIR (on /data). A job that ends (time limit,
+# The run lives in WORK_DIR (~/AlphaZeroLearn/work). A job that ends (time limit,
 # preemption, scancel) checkpoints; submitting the same script again continues
 # it: 2 weeks + 2 weeks = one month of learning. Nothing is lost but the games
 # in progress.
@@ -21,7 +21,7 @@
 # GPUs: 3 per job (the per-user maximum). The GPU nodes have 2 or 3 cards
 # (A40 or RTX 8000, 48 GB); if a 3-GPU node is long to get, run this job with
 # fewer GPUs and add the missing ones as alphazero_selfplay.sh jobs, which
-# can land on any GPU node: everything goes through WORK_DIR on /data.
+# can land on any GPU node: everything goes through WORK_DIR (shared home).
 #     sbatch --gres=gpu:1 alphazero_learn.sh
 #     sbatch alphazero_selfplay.sh ; sbatch alphazero_selfplay.sh
 # To pin a GPU model, use the cluster's gres type, e.g. --gres=gpu:a40:3

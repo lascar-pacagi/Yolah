@@ -404,7 +404,7 @@ The cluster image: a toolchain only, the sources are bind-mounted (@sec-cluster)
 """, []),
 
 ("nnue/alphazero_common.sh", "bash", """
-Sourced by the two job scripts: the paths (`/data`), the container launcher,
+Sourced by the two job scripts: the paths (`~/AlphaZeroLearn`), the container launcher,
 the build step (with its lock), and the signal forwarding that makes a clean
 stop possible.
 """, [

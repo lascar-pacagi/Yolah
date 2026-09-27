@@ -499,13 +499,14 @@ fixed reference, at the cost of another 20 games per evaluation.
 |---|---|---|
 | GPU nodes | 5 nodes, 13 cards of 48 GB: 7 A40, 6 RTX 8000 | 3 cards (the per-user maximum) |
 | CPU nodes | 18 nodes, 592 cores, 8 TB of RAM | nothing (see @sec-learn-sizing) |
-| `/data` | 44 TB, redundant, visible from every node | the work directory (~60 GB) |
+| home (`/home/<user>`) | visible from every node | the work directory (~60 GB) |
 | `/calcul` | 17 TB, distributed | nothing |
 
-The run lives on `/data`: it must survive for a month and be reachable from
-whichever node the next job lands on, and its I/O is modest (about 1.2 GB of
+The run lives in the home directory, `~/AlphaZeroLearn`: it must survive for
+a month and be reachable from whichever node the next job lands on, and its
+I/O is modest (about 1.2 GB of
 self-play rows a day, a 141 MB network per export, small reads by the
-trainer), so the redundant storage is the right trade.
+trainer), so no fast scratch space is needed.
 
 ### The image
 
@@ -525,7 +526,7 @@ CPUs lack (a crash with `SIGILL`); and changing the code then requires a
 # once, on a machine where you are root (or with --fakeroot)
 cd nnue && sudo singularity build alphazero_learn.sif alphazero_learn.def
 # copy the .sif to the cluster, clone the repo there, copy the initial network
-scp alphazero_learn.sif cluster:/data/$USER/AlphaZeroLearn/
+scp alphazero_learn.sif cluster:AlphaZeroLearn/
 # on the cluster: git clone the repository into ~/Yolah, then
 scp cnn_resnet_256x30_value_policy.pt cluster:Yolah/nnue/
 ```
@@ -541,7 +542,7 @@ error.
 `nnue/alphazero_learn.sh` asks for **3 GPUs, 32 CPUs, 128 GB of RAM and 14
 days** (@fig-gpus). Its header lists every tunable as an environment variable
 (`SELFPLAY_GAMES`, `LR`, `REUSE`, `EVAL_HOURS`, …); the paths (`YOLAH_DIR`,
-default `~/Yolah`; `SIF` and `WORK_DIR`, default under `/data/$USER/AlphaZeroLearn`)
+default `~/Yolah`; `SIF` and `WORK_DIR`, default under `~/AlphaZeroLearn`)
 and the shell functions shared with the next script live in
 `nnue/alphazero_common.sh`. It does two things: compile, then run
 `alphazero_learn.py` in the container. The first lines of its output name the
@@ -553,7 +554,7 @@ GPUs it got (`nvidia-smi`).
 
 The GPU nodes have two or three cards each, and a job asking for three GPUs on
 *one* node may wait a long time for one to be completely free. Because the
-loop only communicates through files on `/data`, the three GPUs do not have to
+loop only communicates through files in the shared home, the three GPUs do not have to
 be on the same node (@fig-split):
 
 ```bash
@@ -572,7 +573,7 @@ GPU number alone would not be unique. It stops by itself when no new network
 has appeared for 6 hours (`--max-stale-hours`): when the main job is over, it
 does not keep playing with an outdated network until its own time limit.
 
-![Three 1-GPU jobs on three nodes, one run: every exchange is a file on /data.](figs/fig-split.png){#fig-split width=100%}
+![Three 1-GPU jobs on three nodes, one run: every exchange is a file in the shared home directory.](figs/fig-split.png){#fig-split width=100%}
 
 ### Stopping cleanly
 
