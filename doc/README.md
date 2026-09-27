@@ -27,6 +27,7 @@ quarto render alphazero_mcts.qmd
 |------|------|
 | `alphazero_mcts.qmd` | the document |
 | `learning.qmd` | the "Learning by self-play" chapter, included by the above |
+| `solving.qmd` | the "Solving Yolah" chapter (retrograde analysis, exact endgames, solvability) |
 | `appendix.qmd` | **generated** — the annotated source appendix, included by the above |
 | `make_appendix.py` | generates it: the file list, the orientation notes and the symbol tables live here |
 | `styles.css` | HTML-only layout: widens the code column for the appendix, holds prose to a readable measure |

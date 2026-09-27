@@ -4227,7 +4227,7 @@ two search configurations, and the cluster image and job scripts.
 
 ### `player/alphazero_selfplay.h` {#sec-src-player-alphazero-selfplay-h}
 
-*87 lines.*
+*115 lines.*
 
 The row format and the self-play entry point. `TrainingSample` is written to
 disk as is (336 bytes, no padding — the `static_assert`s guard that) and read by
@@ -4238,6 +4238,8 @@ together.
 | symbol | role |
 |---|---|
 | `TrainingSample` | one training row: the bitboards, the side to move, z, the sparse $\pi$, the search value, the network step |
+| `OwnershipCode` | future owner of a square: nobody, mine, the opponent's, or no target (already a hole) |
+| `TrainingSampleAux` | a version-2 row: `TrainingSample` + the 2-bit future ownership map (`--aux`) |
 | `SampleFileHeader` | 24-byte file header: magic, version, row size, row and game counts |
 | `ModelRef` / `read_latest_model` | parse `latest.json`, resolving a relative path against the work directory |
 | `SelfPlayOptions` | the driver's knobs: concurrency, flush policy, poll period |
@@ -4267,6 +4269,15 @@ together.
 // the fast searches exist to make games longer/cheaper, their visit counts are
 // too noisy to be a policy target). A sample is the position, the policy
 // target π over its legal moves and — once the game is over — its outcome z.
+//
+// Optional auxiliary targets (KataGo's ownership / score heads, see the doc,
+// "KataGo's auxiliary heads"): when the trainer runs with --aux it writes
+// "aux": true in latest.json, and the games then record, for every sample,
+// its FUTURE OWNERSHIP map — for each square, who will leave it between this
+// position and the end of the game (every move leaves a hole on the square
+// it comes from and scores one point, so the map sums to the rest of the
+// score). Those rows are TrainingSampleAux in files of version 2; without
+// the option nothing changes (TrainingSample, version 1).
 #include "alphazero_mcts.h"
 #include "nn_evaluator.h"
 #include <atomic>
@@ -4290,9 +4301,26 @@ struct TrainingSample {
 };
 static_assert(sizeof(TrainingSample) == 336, "keep in sync with alphazero_learn.py");
 
+// Future ownership of a square, relative to the side to move at the sample.
+enum OwnershipCode : uint8_t {
+    OWN_NONE = 0,   // nobody will leave it (stays free, or a piece ends the game there)
+    OWN_MINE = 1,   // the side to move will leave it: +1 for the side to move
+    OWN_OPP  = 2,   // the opponent will leave it: +1 for the opponent
+    OWN_PAST = 3,   // already a hole: who made it is not in the position → no target
+};
+
+// A version-2 row: the version-1 row followed by the future ownership map,
+// 2 bits per square, square q in byte q/4 at bits 2·(q%4). Mirrored by
+// SAMPLE_DTYPE_AUX in nnue/alphazero_learn.py.
+struct TrainingSampleAux {
+    TrainingSample base;
+    uint8_t        own[16];
+};
+static_assert(sizeof(TrainingSampleAux) == 352, "keep in sync with alphazero_learn.py");
+
 struct SampleFileHeader {
     char     magic[8];                   // "YOLAHSP1"
-    uint32_t version;                    // 1
+    uint32_t version;                    // 1 = TrainingSample, 2 = TrainingSampleAux
     uint32_t sample_size;                // sizeof(TrainingSample)
     uint32_t nb_samples;
     uint32_t nb_games;
@@ -4300,11 +4328,13 @@ struct SampleFileHeader {
 static_assert(sizeof(SampleFileHeader) == 24);
 
 // The network self-play must use, published by the trainer in
-// <work>/latest.json as {"step": 12000, "ts": "models/az_00012000.ts"}.
-// A relative path is relative to the work directory.
+// <work>/latest.json as {"step": 12000, "ts": "models/az_00012000.ts"}, plus
+// "aux": true when the trainer wants the auxiliary targets. A relative path
+// is relative to the work directory.
 struct ModelRef {
     uint64_t    step = 0;
     std::string path;
+    bool        aux = false;                 // record TrainingSampleAux rows
 };
 bool read_latest_model(const std::string& work_dir, ModelRef& out);
 
@@ -4337,7 +4367,7 @@ void run_selfplay(const SelfPlayOptions& options, const std::atomic<bool>& stop)
 
 ### `player/alphazero_selfplay.cpp` {#sec-src-player-alphazero-selfplay-cpp}
 
-*271 lines.*
+*328 lines.*
 
 One thread per game, all sharing one `BatchingEvaluator`; the calling thread is
 the supervisor (hot swap, periodic flush, statistics). Games stopped mid-way are
@@ -4348,6 +4378,7 @@ dropped; finished ones always reach the disk before `run_selfplay` returns.
 |---|---|
 | `SampleWriter` | collects finished games; writes ~2000-row files under a temporary name and renames them |
 | `make_sample` | a `SearchResult` → a `TrainingSample` ($\pi$ quantised to 16 bits) |
+| `with_ownership` | a sample + who left each square during the game → its future ownership map |
 | `run_selfplay` / `game_loop` | one game after another; z filled in at the end of each game |
 
 
@@ -4384,6 +4415,7 @@ bool read_latest_model(const string& work_dir, ModelRef& out) {
         fs::path p = j.at("ts").get<string>();
         if (p.is_relative()) p = fs::path(work_dir) / p;
         r.path = p.string();
+        r.aux = j.value("aux", false);
         out = r;
         return true;
     } catch (const std::exception&) {
@@ -4408,6 +4440,11 @@ string default_tag() {
 // Files are written under a temporary name and renamed, so the trainer never
 // sees a partial file. Names start with the wall-clock time in milliseconds:
 // sorting them by name is sorting them by age, across hosts and restarts.
+//
+// Rows are raw bytes of one fixed size per file: TrainingSample (version 1)
+// or TrainingSampleAux (version 2). A file never mixes the two: when the
+// format of the incoming games changes (the trainer switched --aux), what is
+// pending is written first.
 class SampleWriter {
 public:
     SampleWriter(fs::path dir, string tag, size_t flush_samples, double flush_seconds)
@@ -4416,21 +4453,27 @@ public:
         fs::create_directories(this->dir);
     }
 
-    void add_game(std::vector<TrainingSample>&& game) {
+    template <class Row>
+    void add_game(const std::vector<Row>& game, uint32_t version) {
         std::lock_guard lock(mutex);
-        pending.insert(pending.end(), game.begin(), game.end());
+        if (nb_pending && (version != pending_version || sizeof(Row) != row_size)) write_locked();
+        pending_version = version;
+        row_size = sizeof(Row);
+        const char* bytes = reinterpret_cast<const char*>(game.data());
+        pending.insert(pending.end(), bytes, bytes + game.size() * sizeof(Row));
+        nb_pending += game.size();
         ++pending_games;
-        if (pending.size() >= flush_samples) write_locked();
+        if (nb_pending >= flush_samples) write_locked();
     }
 
     void flush_if_old() {
         std::lock_guard lock(mutex);
-        if (!pending.empty() && now_seconds() - last_flush >= flush_seconds) write_locked();
+        if (nb_pending && now_seconds() - last_flush >= flush_seconds) write_locked();
     }
 
     void flush() {
         std::lock_guard lock(mutex);
-        if (!pending.empty()) write_locked();
+        if (nb_pending) write_locked();
     }
 
 private:
@@ -4443,13 +4486,12 @@ private:
             std::ofstream out(tmp, std::ios::binary);
             SampleFileHeader h{};
             std::memcpy(h.magic, "YOLAHSP1", 8);
-            h.version = 1;
-            h.sample_size = sizeof(TrainingSample);
-            h.nb_samples = static_cast<uint32_t>(pending.size());
+            h.version = pending_version;
+            h.sample_size = static_cast<uint32_t>(row_size);
+            h.nb_samples = static_cast<uint32_t>(nb_pending);
             h.nb_games = static_cast<uint32_t>(pending_games);
             out.write(reinterpret_cast<const char*>(&h), sizeof(h));
-            out.write(reinterpret_cast<const char*>(pending.data()),
-                      static_cast<std::streamsize>(pending.size() * sizeof(TrainingSample)));
+            out.write(pending.data(), static_cast<std::streamsize>(pending.size()));
             if (!out) {
                 std::cerr << "selfplay: cannot write " << tmp << ", keeping the samples in memory\n";
                 return;
@@ -4457,6 +4499,7 @@ private:
         }
         fs::rename(tmp, dir / name);
         pending.clear();
+        nb_pending = 0;
         pending_games = 0;
         last_flush = now_seconds();
     }
@@ -4466,7 +4509,10 @@ private:
     const size_t flush_samples;
     const double flush_seconds;
     std::mutex mutex;
-    std::vector<TrainingSample> pending;
+    std::vector<char> pending;           // raw rows
+    size_t nb_pending = 0;               // rows in `pending`
+    size_t row_size = sizeof(TrainingSample);
+    uint32_t pending_version = 1;
     size_t pending_games = 0;
     size_t seq = 0;
     double last_flush;
@@ -4488,6 +4534,27 @@ TrainingSample make_sample(const Yolah& y, const SearchResult& r, uint32_t model
         s.prob[i] = static_cast<uint16_t>(std::lround(p * 65535.0f));
     }
     return s;
+}
+
+// The future ownership map of one sample, from `leaver[q]`: the colour that
+// left square q during the game (0xFF = nobody). Squares that are already
+// holes in the sample's position were left BEFORE it — by whom is not visible
+// in the position, so they carry no target (OWN_PAST, masked in the loss).
+// Every other square that someone leaves later was left after the sample:
+// the map counts exactly the moves still to be played, so
+//     #OWN_MINE − #OWN_OPP = (final margin) − (margin at the sample),
+// the rest of the score, for the side to move.
+TrainingSampleAux with_ownership(const TrainingSample& s, const uint8_t leaver[64]) {
+    TrainingSampleAux a{};
+    a.base = s;
+    for (int q = 0; q < 64; q++) {
+        uint8_t code;
+        if ((s.empty >> q) & 1)      code = OWN_PAST;
+        else if (leaver[q] == 0xFF)  code = OWN_NONE;
+        else                         code = leaver[q] == s.turn ? OWN_MINE : OWN_OPP;
+        a.own[q / 4] |= static_cast<uint8_t>(code << (2 * (q % 4)));
+    }
+    return a;
 }
 
 } // namespace
@@ -4519,11 +4586,15 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
     std::atomic<size_t>   active{nb_games};
     // The games stop on `halt`: set by the caller's `stop` or by staleness.
     std::atomic<bool>     halt{false};
+    // Record the auxiliary targets (latest.json "aux"; re-read at every poll).
+    std::atomic<bool>     record_aux{model.aux};
 
     std::cout << std::format("selfplay: {} concurrent games, merged batch {}, {} sims ({} fast, p={}), model step {}\n"
-                             "selfplay: network {}\n",
+                             "selfplay: network {}\n"
+                             "selfplay: auxiliary targets (ownership) {}\n",
                              nb_games, merged, params.nb_simulations, params.nb_simulations_fast,
-                             params.playout_cap_fast_prob, model.step, evaluator.info()) << std::flush;
+                             params.playout_cap_fast_prob, model.step, evaluator.info(),
+                             model.aux ? "on" : "off") << std::flush;
 
     auto game_loop = [&] {
         std::pmr::synchronized_pool_resource memory;
@@ -4534,6 +4605,9 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                 if (opt.max_games && games_started.fetch_add(1) >= opt.max_games) break;
                 Yolah y;
                 std::vector<TrainingSample> samples;
+                // Who left each square during this game (auxiliary targets).
+                uint8_t leaver[64];
+                std::fill(std::begin(leaver), std::end(leaver), uint8_t(0xFF));
                 search.reset();
                 while (!y.game_over() && !halt.load()) {
                     // New weights: the graph's priors/values and the cached
@@ -4548,6 +4622,8 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                     evaluations.fetch_add(r.nb_evaluations, std::memory_order_relaxed);
                     if (r.full_search && !r.children.empty())
                         samples.push_back(make_sample(y, r, model_step.load()));
+                    if (r.best_move != Move::none())   // a pass leaves no hole
+                        leaver[static_cast<int>(r.best_move.from_sq())] = y.current_player();
                     y.play(r.best_move);
                 }
                 if (!y.game_over()) break;           // stopped mid-game: drop it
@@ -4563,7 +4639,14 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                 plies_done.fetch_add(y.nb_plies());
                 samples_done.fetch_add(samples.size());
                 games_done.fetch_add(1);
-                writer.add_game(std::move(samples));
+                if (record_aux.load()) {
+                    std::vector<TrainingSampleAux> rows;
+                    rows.reserve(samples.size());
+                    for (const TrainingSample& s : samples) rows.push_back(with_ownership(s, leaver));
+                    writer.add_game(rows, 2);
+                } else {
+                    writer.add_game(samples, 1);
+                }
             }
         }
         // Fewer clients: the batcher must stop waiting for this one.
@@ -4589,7 +4672,12 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
         if (t - last_poll >= opt.poll_seconds) {
             last_poll = t;
             ModelRef latest;
-            if (read_latest_model(opt.work_dir, latest) && latest.step != model.step) {
+            const bool readable = read_latest_model(opt.work_dir, latest);
+            if (readable && latest.aux != record_aux.load()) {
+                record_aux.store(latest.aux);
+                std::cout << std::format("selfplay: auxiliary targets (ownership) {}\n", latest.aux ? "on" : "off") << std::flush;
+            }
+            if (readable && latest.step != model.step) {
                 try {
                     evaluator.reload(latest.path);
                     model = latest;
@@ -4856,7 +4944,7 @@ int main(int argc, char* argv[]) {
 
 ### `nnue/alphazero_learn.py` {#sec-src-nnue-alphazero-learn-py}
 
-*799 lines.*
+*927 lines.*
 
 The trainer, which is also the orchestrator: it starts the self-play processes
 and the evaluation thread, trains, exports and checkpoints. Read `main` last:
@@ -4926,8 +5014,12 @@ python/shuffle.py and the paper "Accelerating Self-Play Learning in Go"):
   • no gating: self-play always uses the newest network. The evaluation
     matches only monitor progress.
   • the 8 symmetries of the board as data augmentation.
-Not ported: KataGo's auxiliary heads (score, ownership, opponent policy) —
-they would change the architecture the C++ backends read.
+  • optionally (--aux, alphazero_aux.py), KataGo's auxiliary heads, adapted
+    to Yolah: future ownership of each square and the rest of the score
+    margin. They exist only in training; the exported network is the plain
+    two-headed one, so the C++ side is unchanged. Without --aux, nothing of
+    this runs and the files keep their original format.
+Not ported: the opponent-policy head and KataGo's short-term value targets.
 
 Usage (from nnue/, inside the .sif or locally):
 
@@ -4967,6 +5059,11 @@ SAMPLE_DTYPE = np.dtype([
     ("action", "<u2", (MAX_NB_MOVES,)), ("prob", "<u2", (MAX_NB_MOVES,)),
 ])
 assert SAMPLE_DTYPE.itemsize == 336
+# Version-2 rows (--aux, az::TrainingSampleAux): the same fields, then the
+# future ownership map, 2 bits per square (see alphazero_aux.py).
+SAMPLE_DTYPE_AUX = np.dtype(SAMPLE_DTYPE.descr + [("own", "u1", (16,))])
+assert SAMPLE_DTYPE_AUX.itemsize == 352
+ROW_DTYPES = {1: SAMPLE_DTYPE, 2: SAMPLE_DTYPE_AUX}      # file version → row
 HEADER_DTYPE = np.dtype([("magic", "S8"), ("version", "<u4"), ("sample_size", "<u4"),
                          ("nb_samples", "<u4"), ("nb_games", "<u4")])
 assert HEADER_DTYPE.itemsize == 24
@@ -4977,15 +5074,33 @@ def log(msg):
 
 
 def read_header(path):
+    """(rows, games, version) of a self-play file; version 1 or 2 (--aux rows)."""
     h = np.fromfile(path, dtype=HEADER_DTYPE, count=1)
-    if len(h) != 1 or h[0]["magic"] != b"YOLAHSP1" or h[0]["sample_size"] != SAMPLE_DTYPE.itemsize:
+    if len(h) != 1 or h[0]["magic"] != b"YOLAHSP1":
         raise ValueError(f"{path}: not a self-play sample file")
-    return int(h[0]["nb_samples"]), int(h[0]["nb_games"])
+    version = int(h[0]["version"])
+    if version not in ROW_DTYPES or h[0]["sample_size"] != ROW_DTYPES[version].itemsize:
+        raise ValueError(f"{path}: unknown row format (version {version})")
+    return int(h[0]["nb_samples"]), int(h[0]["nb_games"]), version
 
 
-def read_samples(path):
-    n, _ = read_header(path)
-    return np.fromfile(path, dtype=SAMPLE_DTYPE, count=n, offset=HEADER_DTYPE.itemsize)
+def read_samples(path, dtype=SAMPLE_DTYPE):
+    """
+    The rows of a file, converted to `dtype`. Both formats mix freely:
+      • version-2 rows read as SAMPLE_DTYPE drop their ownership map;
+      • version-1 rows read as SAMPLE_DTYPE_AUX get a map of 0xFF bytes, i.e.
+        every square OWN_PAST: no auxiliary target, masked in the loss.
+    """
+    n, _, version = read_header(path)
+    rows = np.fromfile(path, dtype=ROW_DTYPES[version], count=n, offset=HEADER_DTYPE.itemsize)
+    if rows.dtype == dtype:
+        return rows
+    out = np.empty(n, dtype=dtype)
+    for name in SAMPLE_DTYPE.names:
+        out[name] = rows[name]
+    if "own" in dtype.names:
+        out["own"] = 0xFF
+    return out
 
 
 def atomic_write_text(path, text):
@@ -5028,12 +5143,13 @@ class ReplayWindow:
     file-name (= creation time) order. Sampling is uniform over the last
     window_size(total) rows.
     """
-    def __init__(self, directory, capacity, min_rows, alpha=0.75, beta=0.4):
+    def __init__(self, directory, capacity, min_rows, alpha=0.75, beta=0.4, dtype=SAMPLE_DTYPE):
         self.dir = directory
+        self.dtype = dtype
         self.capacity = capacity
         self.min_rows = min_rows
         self.alpha, self.beta = alpha, beta
-        self.buf = np.zeros(capacity, dtype=SAMPLE_DTYPE)
+        self.buf = np.zeros(capacity, dtype=dtype)
         self.head = 0          # next write position
         self.filled = 0
         self.total = 0         # rows generated since the beginning (all files)
@@ -5080,13 +5196,13 @@ class ReplayWindow:
             start -= 1
             need += headers[start][1]
         new_rows = 0
-        for i, (f, n, g) in enumerate(headers):
+        for i, (f, n, g, _version) in enumerate(headers):
             self.known.add(os.path.basename(f))
             self.total += n
             self.games += g
             new_rows += n
             if i >= start:
-                self._append(read_samples(f))
+                self._append(read_samples(f, self.dtype))
         return new_rows
 
     def sample(self, batch_size, rng):
@@ -5097,8 +5213,9 @@ class ReplayWindow:
 
 # ── batches ──────────────────────────────────────────────────────────────────
 class BatchMaker:
-    def __init__(self, device):
+    def __init__(self, device, aux=False):
         self.device = device
+        self.aux = aux                   # also return the ownership targets
         src, act = symmetry_tables()
         self.src = src.to(device)
         self.act = act.to(device)
@@ -5111,6 +5228,8 @@ class BatchMaker:
           z       (B,)  float — game result for the side to move
           actions (B, 75) long — policy indices of the legal moves (0-padded)
           probs   (B, 75) float — π over those moves (0 on the padding)
+        and with aux=True, a fifth element:
+          own     (B, 64) long — future ownership codes, in plane cell order
         The planes are decoded from the bitboards on the GPU (only 25 bytes
         per row cross the bus instead of 1 KB of floats).
         """
@@ -5129,14 +5248,23 @@ class BatchMaker:
         probs = torch.from_numpy(rows["prob"].astype(np.float32)).to(dev)
         probs = probs / probs.sum(1, keepdim=True).clamp_min(1.0)
         z = torch.from_numpy(rows["z"].astype(np.float32)).to(dev)
+        own = None
+        if self.aux:
+            from alphazero_aux import decode_ownership
+            own = decode_ownership(torch.from_numpy(rows["own"]).to(dev))       # (B, 64)
         if augment:
             # One random symmetry per row: permute the 64 cells of every plane
             # (one gather) and map every move index through the same symmetry
-            # (one table lookup). z is invariant.
+            # (one table lookup). z is invariant. The ownership map is a plane
+            # like the others: the same gather; the margin it sums to is invariant.
             sym = torch.randint(0, 8, (B,), device=dev)
             planes = planes.gather(2, self.src[sym].unsqueeze(1).expand(B, 4, 64))
             actions = self.act[sym.unsqueeze(1), actions]
+            if own is not None:
+                own = own.gather(1, self.src[sym])
         x = planes.view(B, 4, 8, 8).contiguous(memory_format=torch.channels_last)
+        if self.aux:
+            return x, z, actions, probs, own
         return x, z, actions, probs
 
 
@@ -5154,7 +5282,13 @@ def load_state_dict(path):
 
 
 def make_net(sd):
-    """Build a Net whose sizes (channels, blocks, heads) are read off the state_dict."""
+    """
+    Build a Net whose sizes (channels, blocks, heads) are read off the
+    state_dict. The parameters of the auxiliary heads (--aux runs) are not
+    part of a Net and are ignored.
+    """
+    from alphazero_aux import base_state_dict
+    sd = base_state_dict(sd)
     C = sd["input_conv.0.weight"].shape[0]
     B = sum(1 for k in sd if k.endswith(".conv1.weight"))
     net = Net(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
@@ -5170,7 +5304,14 @@ def model_paths(work, step):
 
 
 def export_model(net, work, step):
-    """Write az_<step>.pt (state_dict) + az_<step>.ts (TorchScript) atomically."""
+    """
+    Write az_<step>.pt (state_dict) + az_<step>.ts (TorchScript) atomically.
+    An AuxNet is exported as the plain Net it contains (value + policy only):
+    the files have the same format with or without --aux, and the C++
+    backends never see the auxiliary heads.
+    """
+    if hasattr(net, "forward_all"):
+        net = make_net(net.state_dict())
     pt, ts = model_paths(work, step)
     cpu = copy.deepcopy(net).float().cpu().eval()
     torch.save(cpu.state_dict(), pt + ".tmp")
@@ -5182,11 +5323,17 @@ def export_model(net, work, step):
     return pt, ts
 
 
-def publish_latest(work, step):
-    """Point self-play at az_<step>.ts (relative path: the work dir may be bind-mounted elsewhere)."""
+def publish_latest(work, step, aux=False):
+    """
+    Point self-play at az_<step>.ts (relative path: the work dir may be
+    bind-mounted elsewhere). With aux, also ask it to record the auxiliary
+    targets ("aux": true); without, the file is exactly as before.
+    """
     _, ts = model_paths(work, step)
-    atomic_write_text(os.path.join(work, "latest.json"),
-                      json.dumps({"step": step, "ts": os.path.relpath(ts, work)}) + "\n")
+    latest = {"step": step, "ts": os.path.relpath(ts, work)}
+    if aux:
+        latest["aux"] = True
+    atomic_write_text(os.path.join(work, "latest.json"), json.dumps(latest) + "\n")
 
 
 # ── state shared with the evaluator thread ───────────────────────────────────
@@ -5420,6 +5567,15 @@ def main():
     ap.add_argument("--allow-cpu", action="store_true", help="run even without CUDA (tests only)")
     ap.add_argument("--amp", choices=["auto", "bf16", "fp16"], default="auto",
                     help="mixed precision of the trainer (auto: bf16 on Ampere+, fp16 before)")
+    # KataGo's auxiliary heads (alphazero_aux.py). Off: everything as before.
+    ap.add_argument("--aux", action="store_true",
+                    help="train the ownership and score-margin heads (self-play records their targets)")
+    ap.add_argument("--own-weight", type=float, default=1.5,
+                    help="weight of the ownership loss (KataGo: 1.5/b² on the sum over the board)")
+    ap.add_argument("--score-weight", type=float, default=0.02, help="weight of the margin cross-entropy")
+    ap.add_argument("--score-cdf-weight", type=float, default=0.02, help="weight of the margin CDF loss")
+    ap.add_argument("--aux-ramp-steps", type=int, default=2000,
+                    help="the auxiliary weights grow linearly from 0 over this many steps")
     args = ap.parse_args()
     args.work = os.path.abspath(args.work)
     args.eval_opponents = [o.strip() for o in args.eval_opponents.split(",") if o.strip()]
@@ -5456,9 +5612,21 @@ def main():
     ckpt = torch.load(ckpt_path, map_location="cpu") if os.path.exists(ckpt_path) else None
     if ckpt is None:
         log(f"new run: initial network {args.init_model}")
-        net = make_net(load_state_dict(args.init_model))
+        src_sd = load_state_dict(args.init_model)
     else:
-        net = make_net(ckpt["model"])
+        src_sd = ckpt["model"]
+    # Variant: with --aux the network carries the auxiliary heads. A run can
+    # switch between the variants from one job to the next: the shared
+    # parameters are kept, the auxiliary heads start from scratch (or are
+    # dropped), and the optimizer — whose state is per parameter — restarts.
+    ckpt_aux = bool(ckpt.get("aux", False)) if ckpt is not None else False
+    switched = ckpt is not None and ckpt_aux != args.aux
+    if args.aux:
+        from alphazero_aux import make_aux_net, aux_losses
+        net, fresh_heads = make_aux_net(src_sd)
+        log("auxiliary heads (ownership, score margin): " + ("new" if fresh_heads else "resumed"))
+    else:
+        net = make_net(src_sd)
     net = net.to(device).to(memory_format=torch.channels_last)
     ema = None
     if args.ema_decay > 0:
@@ -5475,15 +5643,24 @@ def main():
         amp_dtype = torch.bfloat16 if args.amp == "bf16" else torch.float16
     log(f"mixed precision: {amp_dtype}")
     scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda" and amp_dtype == torch.float16))
+    if ckpt is not None and switched:
+        # Different parameter set: optimizer, EMA and scaler start afresh
+        # (the EMA from the current weights), with a new learning-rate warm-up.
+        state.d["opt_start_step"] = ckpt["step"]
+        if args.aux:
+            state.d["aux_start_step"] = ckpt["step"]
+        log(f"variant switch: {'with' if args.aux else 'without'} auxiliary heads from step {ckpt['step']} "
+            f"(optimizer and weight average restart)")
     if ckpt is not None:
-        if ema is not None and ckpt.get("ema") is not None:
-            ema.load_state_dict(ckpt["ema"])
-        opt.load_state_dict(ckpt["optimizer"])
+        if not switched:
+            if ema is not None and ckpt.get("ema") is not None:
+                ema.load_state_dict(ckpt["ema"])
+            opt.load_state_dict(ckpt["optimizer"])
         # A bf16 job saves the state of a *disabled* scaler, which is empty
         # and which an enabled scaler refuses to load: an fp16 job resuming
         # it (A40 then RTX 8000) starts with a fresh scale — harmless, the
         # scale adapts within a few steps.
-        if scaler.is_enabled() and ckpt.get("scaler"):
+        if scaler.is_enabled() and ckpt.get("scaler") and not switched:
             scaler.load_state_dict(ckpt["scaler"])
         # The checkpoint is authoritative: state.json may have been saved by
         # the evaluator after it, with counters the lost steps never kept.
@@ -5494,24 +5671,27 @@ def main():
         pt0, _ = model_paths(args.work, 0)
         if not os.path.exists(pt0):
             export_model(net, args.work, 0)
-        publish_latest(args.work, 0)
+        publish_latest(args.work, 0, args.aux)
         state.save()
-    if not os.path.exists(os.path.join(args.work, "latest.json")):
-        publish_latest(args.work, state.d["exports"][-1])
+    # Always re-published at start: a run that switches variant must tell
+    # self-play at once whether to record the auxiliary targets.
+    publish_latest(args.work, state.d["exports"][-1], args.aux)
 
     def save_checkpoint():
         torch.save({"model": net.state_dict(), "ema": ema.state_dict() if ema is not None else None,
                     "optimizer": opt.state_dict(), "scaler": scaler.state_dict(),
-                    "step": state.d["step"], "samples_trained": state.d["samples_trained"]},
+                    "step": state.d["step"], "samples_trained": state.d["samples_trained"],
+                    "aux": args.aux},
                    ckpt_path + ".tmp")
         os.replace(ckpt_path + ".tmp", ckpt_path)
         state.save()
 
     # ── data ──
-    window = ReplayWindow(os.path.join(args.work, "selfplay"), args.max_window, args.min_rows)
+    window = ReplayWindow(os.path.join(args.work, "selfplay"), args.max_window, args.min_rows,
+                          dtype=SAMPLE_DTYPE_AUX if args.aux else SAMPLE_DTYPE)
     window.scan()
     log(f"replay: {window.total:,} rows from {window.games:,} games on disk, {window.filled:,} in memory")
-    make_batch = BatchMaker(device)
+    make_batch = BatchMaker(device, aux=args.aux)
     rng = np.random.default_rng()
 
     # ── subprocesses ──
@@ -5558,6 +5738,7 @@ def main():
     # ── main loop ──
     net.train()
     acc = {"v": 0.0, "p": 0.0, "kl": 0.0, "n": 0}
+    aux_acc = {"own": 0.0, "pdf": 0.0, "cdf": 0.0, "acc": 0.0, "n": 0, "n_acc": 0}
     last_scan = last_report = time.time()
     samples_at_report = state.d["samples_trained"]
     since_export = state.d["samples_trained"] - state.d.get("samples_at_last_export", 0)
@@ -5591,12 +5772,16 @@ def main():
         # Linear warm-up: Adam's moment estimates start at zero after a fresh
         # start, so the first steps would otherwise be too large.
         step = state.d["step"]
-        lr = args.lr * min(1.0, (step + 1) / max(1, args.warmup_steps))
+        lr = args.lr * min(1.0, (step - state.d.get("opt_start_step", 0) + 1) / max(1, args.warmup_steps))
         for g in opt.param_groups:
             g["lr"] = lr
-        x, z, actions, probs = make_batch(window.sample(args.batch_size, rng))
+        batch = make_batch(window.sample(args.batch_size, rng))
+        x, z, actions, probs = batch[:4]
         with torch.autocast(device.type, dtype=amp_dtype, enabled=device.type == "cuda"):
-            v, logits = net(x)
+            if args.aux:
+                v, logits, own_logits, score_logits = net.forward_all(x)
+            else:
+                v, logits = net(x)
         v = v.float()
         # Policy: cross-entropy with the soft target π, -Σ_a π(a) log p(a|s).
         # The softmax runs over the 4096 logits; π lives on the legal moves
@@ -5606,6 +5791,19 @@ def main():
         # Value: squared error against the game result z ∈ {-1, 0, +1}.
         v_loss = F.mse_loss(v, z)
         loss = args.value_weight * v_loss + args.policy_weight * p_loss
+        if args.aux:
+            # Auxiliary heads: ownership (per-square cross-entropy) and score
+            # margin (distribution + CDF), their weights ramped up from 0 so
+            # that the random new heads do not shake a trunk that already
+            # plays well. Rows without targets (version 1) are masked.
+            l_own, l_pdf, l_cdf, own_acc = aux_losses(own_logits, score_logits, batch[4])
+            ramp = min(1.0, (step - state.d.get("aux_start_step", 0) + 1) / max(1, args.aux_ramp_steps))
+            loss = loss + ramp * (args.own_weight * l_own + args.score_weight * l_pdf
+                                  + args.score_cdf_weight * l_cdf)
+            aux_acc["own"] += l_own.item(); aux_acc["pdf"] += l_pdf.item()
+            aux_acc["cdf"] += l_cdf.item(); aux_acc["n"] += 1
+            if own_acc == own_acc:                       # not NaN (batch had targets)
+                aux_acc["acc"] += own_acc; aux_acc["n_acc"] += 1
         opt.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()
         scaler.unscale_(opt)
@@ -5637,6 +5835,24 @@ def main():
                               window.total, window.games, window.window_size(), f"{acc['v']/n:.5f}",
                               f"{acc['p']/n:.5f}", f"{acc['kl']/n:.5f}", f"{lr:.3e}", f"{sps:.0f}"])
             log_file.flush()
+            if args.aux and aux_acc["n"]:
+                # A separate file, so that train_log.csv keeps one format for
+                # every run whichever the variant.
+                m = aux_acc["n"]
+                own_accuracy = aux_acc["acc"] / aux_acc["n_acc"] if aux_acc["n_acc"] else float("nan")
+                log(f"  aux: ownership {aux_acc['own']/m:.4f} (accuracy {own_accuracy:.3f})  "
+                    f"margin pdf {aux_acc['pdf']/m:.4f}  cdf {aux_acc['cdf']/m:.4f}  weight ramp {ramp:.2f}")
+                aux_path = os.path.join(args.work, "train_log_aux.csv")
+                new_aux = not os.path.exists(aux_path)
+                with open(aux_path, "a", newline="") as f:
+                    w = csv.writer(f)
+                    if new_aux:
+                        w.writerow(["time", "step", "ownership_loss", "ownership_accuracy",
+                                    "margin_pdf_loss", "margin_cdf_loss", "ramp"])
+                    w.writerow([time.strftime("%F %T"), state.d["step"], f"{aux_acc['own']/m:.5f}",
+                                f"{own_accuracy:.4f}", f"{aux_acc['pdf']/m:.5f}", f"{aux_acc['cdf']/m:.5f}",
+                                f"{ramp:.3f}"])
+            aux_acc = {"own": 0.0, "pdf": 0.0, "cdf": 0.0, "acc": 0.0, "n": 0, "n_acc": 0}
             acc = {"v": 0.0, "p": 0.0, "kl": 0.0, "n": 0}
             last_report = time.time()
             samples_at_report = state.d["samples_trained"]
@@ -5646,7 +5862,7 @@ def main():
             since_export = 0
             s = state.d["step"]
             export_model(ema.module if ema is not None else net, args.work, s)
-            publish_latest(args.work, s)
+            publish_latest(args.work, s, args.aux)
             with state.lock:
                 state.d["exports"].append(s)
                 state.d["samples_at_last_export"] = state.d["samples_trained"]
@@ -5679,6 +5895,197 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
+
+
+### `nnue/alphazero_aux.py` {#sec-src-nnue-alphazero-aux-py}
+
+*167 lines.*
+
+KataGo's auxiliary heads, adapted to Yolah (@sec-auxiliary): only imported by
+the trainer with `--aux`. The network with the two extra heads, the decoding
+of the future ownership map, and the losses.
+
+
+| symbol | role |
+|---|---|
+| `decode_ownership` | 16 bytes, 2 bits per square → 64 codes in plane-cell order |
+| `margin_from_ownership` | the rest of the score for the side to move: #mine − #opponent's |
+| `AuxNet` | `Net` + ownership head (1×1 conv to 3 classes) + score head (pooling → 113 logits) |
+| `AuxNet.forward_all` | value, policy, ownership logits, margin logits |
+| `base_state_dict` | the `Net` part of the parameters: what is exported |
+| `make_aux_net` | an `AuxNet` from a state dict; fresh heads if it has none |
+| `aux_losses` | ownership cross-entropy, margin pdf and cdf losses, masked where there is no target |
+
+
+``` {.python .numberLines}
+"""
+alphazero_aux.py — KataGo's auxiliary heads for the Yolah ResNet (optional:
+used by alphazero_learn.py only with --aux; without it nothing here runs).
+
+Why (see the doc, "KataGo's auxiliary heads"): the value head learns from one
+noisy result per game. Two extra heads, which exist ONLY during training, ask
+the shared trunk for richer predictions, and their gradient shapes the trunk:
+
+  • ownership — for each square not yet a hole, who will LEAVE it before the
+    game ends: the side to move, the opponent, or nobody. In Yolah every move
+    leaves a hole on the square it comes from and scores one point, so the
+    map is the rest of the score, square by square.
+  • score margin — the distribution of the rest of the score,
+    d = (my future moves) − (the opponent's future moves) ∈ [−56, 56],
+    which is exactly the sum of the ownership map (so it needs no extra data).
+
+Both heads read the trunk's output (B, C, 8, 8), next to the value and policy
+heads. At export they are dropped: base_state_dict() keeps only the Net
+parameters, so the .pt/.ts written are the plain two-headed network and the
+C++ backends are unchanged.
+"""
+import torch
+from torch import nn
+import torch.nn.functional as F
+
+from cnn_resnet_value_policy_chunked import Net
+
+# ── targets: the future ownership map of a row (TrainingSampleAux::own) ──────
+OWN_NONE, OWN_MINE, OWN_OPP, OWN_PAST = 0, 1, 2, 3   # as in alphazero_selfplay.h
+OWN_BYTES = 16                                       # 64 squares × 2 bits
+MAX_MARGIN = 56                                      # 64 squares − 8 pieces
+SCORE_BINS = 2 * MAX_MARGIN + 1                      # d ∈ [−56, 56]
+
+# Parameters of the auxiliary heads: their names start with these prefixes.
+AUX_PREFIXES = ("own_", "score_")
+
+
+def decode_ownership(own_bytes):
+    """
+    (B, 16) uint8 tensor, 2 bits per square (square q in byte q//4, bits
+    2·(q%4)) → (B, 64) long tensor of OWN_* codes in PLANE CELL order, i.e.
+    aligned with the network input: cell c holds square 63 − c (see
+    nn_evaluator.h), hence the flip. The same symmetry gather as the input
+    planes then applies to it.
+    """
+    b = own_bytes.long().unsqueeze(2)                         # (B, 16, 1)
+    shifts = torch.arange(0, 8, 2, device=b.device)           # 0, 2, 4, 6
+    by_square = ((b >> shifts) & 3).reshape(b.shape[0], 64)   # square q = 4·byte + k
+    return by_square.flip(1)                                  # → cell order
+
+
+def margin_from_ownership(own):
+    """The rest of the score for the side to move: #mine − #opponent's."""
+    return (own == OWN_MINE).sum(1) - (own == OWN_OPP).sum(1)
+
+
+# ── the network ─────────────────────────────────────────────────────────────
+class AuxNet(Net):
+    """
+    Net (same trunk, same value and policy heads, same parameter names) plus:
+
+      own_conv   : 1×1 conv C → 3, one softmax per square over
+                   (nobody, the side to move, the opponent) — a per-square
+                   classification, exactly as KataGo's ownership head;
+      score_fc1/2: global pooling of the trunk (mean and max over the 64
+                   squares, 2C numbers) → FC 256 → ReLU → FC 113 logits, one
+                   per possible margin. Pooling rather than flattening: the
+                   margin is a property of the whole board.
+
+    forward() returns (value, policy) like Net, so an AuxNet can be used
+    anywhere a Net is; forward_all() adds the two auxiliary outputs.
+    """
+    def __init__(self, channels=256, nb_blocks=30, value_fc_size=256, num_actions=64 * 64):
+        super().__init__(channels=channels, nb_blocks=nb_blocks,
+                         value_fc_size=value_fc_size, num_actions=num_actions)
+        self.own_conv = nn.Conv2d(channels, 3, kernel_size=1)
+        self.score_fc1 = nn.Linear(2 * channels, 256)
+        self.score_fc2 = nn.Linear(256, SCORE_BINS)
+
+    def trunk(self, x):
+        x = self.input_conv(x)
+        x = self.res_blocks(x)
+        return torch.relu(self.output_bn(x))                  # (B, C, 8, 8)
+
+    def heads(self, h):
+        """The two heads of Net, verbatim (see Net.forward)."""
+        v = torch.relu(self.value_bn(self.value_conv(h))).flatten(1)
+        v = torch.tanh(self.value_fc2(torch.relu(self.value_fc1(v)))).squeeze(-1)
+        p = torch.relu(self.policy_bn(self.policy_conv(h))).flatten(1)
+        return v, self.policy_fc(p)
+
+    def forward(self, x):
+        return self.heads(self.trunk(x))
+
+    def forward_all(self, x):
+        h = self.trunk(x)
+        v, p = self.heads(h)
+        own = self.own_conv(h).flatten(2)                      # (B, 3, 64), cell order
+        pooled = torch.cat([h.mean(dim=(2, 3)), h.amax(dim=(2, 3))], dim=1)
+        score = self.score_fc2(torch.relu(self.score_fc1(pooled)))   # (B, 113)
+        return v, p, own, score
+
+
+def is_aux_key(k):
+    return k.startswith(AUX_PREFIXES)
+
+
+def base_state_dict(sd):
+    """The Net part of a (possibly AuxNet) state_dict: what gets exported."""
+    return {k: v for k, v in sd.items() if not is_aux_key(k)}
+
+
+def make_aux_net(sd):
+    """
+    An AuxNet sized from a state_dict. A plain Net state_dict (the initial
+    network, or a run that did not use --aux) leaves the auxiliary heads at
+    their random initialisation — the only keys allowed to be missing.
+    """
+    C = sd["input_conv.0.weight"].shape[0]
+    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
+    net = AuxNet(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
+                 num_actions=sd["policy_fc.weight"].shape[0])
+    missing, unexpected = net.load_state_dict(sd, strict=False)
+    bad = [k for k in missing if not is_aux_key(k)] + list(unexpected)
+    if bad:
+        raise KeyError(f"state_dict does not fit AuxNet: {bad[:5]}")
+    return net, bool(missing)          # True = fresh auxiliary heads
+
+
+# ── the losses ──────────────────────────────────────────────────────────────
+def aux_losses(own_logits, score_logits, own):
+    """
+    own_logits (B, 3, 64), score_logits (B, 113), own (B, 64) OWN_* codes
+    (already transformed by the batch's symmetry).
+
+    Ownership: cross-entropy per square, averaged over the 64 squares (a hole
+    — OWN_PAST — contributes 0), i.e. KataGo's (1/b²)·Σ_points. Rows without
+    auxiliary data (version-1 rows, all OWN_PAST) contribute nothing.
+
+    Score: cross-entropy of the predicted distribution against the true
+    margin d (the "pdf" term) plus the squared distance between the
+    predicted and the true cumulative distributions (the "cdf" term, which
+    makes predicting +11 for a true +12 cheaper than predicting −30).
+
+    Returns (own_loss, score_pdf_loss, score_cdf_loss, own_accuracy).
+    """
+    has_aux = (own != OWN_PAST).any(1)                         # (B,)
+    n = has_aux.sum()
+    if n.item() == 0:
+        zero = own_logits.sum() * 0.0
+        return zero, zero, zero, float("nan")
+    own_logits, score_logits, own = own_logits[has_aux], score_logits[has_aux], own[has_aux]
+
+    # ownership: classes (nobody, mine, opponent's) = codes 0, 1, 2; code 3 ignored
+    ce = F.cross_entropy(own_logits.float(), own, ignore_index=OWN_PAST, reduction="none")  # (n, 64)
+    own_loss = ce.sum(1).mean() / 64.0
+    valid = own != OWN_PAST
+    acc = ((own_logits.argmax(1) == own) & valid).sum().item() / max(1, valid.sum().item())
+
+    # score margin
+    target = (margin_from_ownership(own).clamp(-MAX_MARGIN, MAX_MARGIN) + MAX_MARGIN)   # (n,)
+    logp = F.log_softmax(score_logits.float(), dim=1)
+    pdf_loss = F.nll_loss(logp, target)
+    cdf_pred = logp.exp().cumsum(1)
+    cdf_true = (torch.arange(SCORE_BINS, device=target.device)[None, :] >= target[:, None]).float()
+    cdf_loss = ((cdf_pred - cdf_true) ** 2).sum(1).mean()
+    return own_loss, pdf_loss, cdf_loss, acc
 ```
 
 
@@ -5939,7 +6346,7 @@ max_hours_for_job() {
 
 ### `nnue/alphazero_learn.sh` {#sec-src-nnue-alphazero-learn-sh}
 
-*122 lines.*
+*129 lines.*
 
 The main SLURM job: 3 GPUs, 32 CPUs, 128 GB, 14 days (sizing:
 @sec-learn-sizing). It compiles for the node, runs the trainer, and stops
@@ -6022,6 +6429,10 @@ EVAL_HOURS="${EVAL_HOURS:-4}"                 # time between evaluations
 EVAL_GAMES="${EVAL_GAMES:-20}"
 EVAL_SECONDS="${EVAL_SECONDS:-2}"
 EVAL_OPPONENTS="${EVAL_OPPONENTS:-previous}"  # previous, initial, lag:K (comma separated)
+# 1 = train KataGo's auxiliary heads (ownership, score margin) as well; 0 =
+# the plain two-headed training. A run can switch from one job to the next;
+# the extra self-play jobs follow automatically (latest.json).
+AUX="${AUX:-0}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"                  # anything else for alphazero_learn.py
 RESUBMIT="${RESUBMIT:-0}"                     # 1 = sbatch this script again when the time is up
 
@@ -6036,6 +6447,8 @@ if [[ ! -f "${WORK_DIR}/init_model.pt" ]] && head -c 100 "${INIT_MODEL}" 2>/dev/
 fi
 cp -n "${INIT_MODEL}" "${WORK_DIR}/init_model.pt" 2>/dev/null || true
 MAX_HOURS=$(max_hours_for_job 1200)           # stop 20 min before the limit
+AUX_ARGS=""
+[[ "${AUX}" == "1" ]] && AUX_ARGS="--aux"
 
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job        : ${SLURM_JOB_ID:-(local)} on $(hostname), GPUs ${CUDA_VISIBLE_DEVICES:-?}"
@@ -6043,6 +6456,7 @@ echo "  Yolah      : ${YOLAH_DIR} ($(git -C "${YOLAH_DIR}" rev-parse --short HEA
 echo "  SIF        : ${SIF}"
 echo "  Work dir   : ${WORK_DIR}"
 echo "  Max hours  : ${MAX_HOURS}"
+echo "  Aux heads  : $([[ "${AUX}" == "1" ]] && echo "on (ownership, score margin)" || echo off)"
 echo "════════════════════════════════════════════════════════════════"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null || true
 
@@ -6059,7 +6473,7 @@ start_in_container bash -c "cd /Yolah/nnue && exec python3 -u alphazero_learn.py
     --selfplay-set 'nn cache=${SELFPLAY_NN_CACHE}' --max-window ${MAX_WINDOW} \
     --min-rows ${MIN_ROWS} --export-every ${EXPORT_EVERY} --eval-hours ${EVAL_HOURS} \
     --eval-games ${EVAL_GAMES} --eval-seconds ${EVAL_SECONDS} --eval-opponents ${EVAL_OPPONENTS} \
-    --max-hours ${MAX_HOURS} ${EXTRA_ARGS}"
+    --max-hours ${MAX_HOURS} ${AUX_ARGS} ${EXTRA_ARGS}"
 wait_forwarding_signals
 
 echo "[$(date '+%F %T')] === Stopped (exit code ${RC}) ==="
@@ -6076,8 +6490,7 @@ fi
 
 *61 lines.*
 
-An extra self-play GPU on any node, for a run split over several jobs
-(@fig-split).
+An extra self-play GPU on any node, for a run split over several jobs (@fig-split).
 
 
 ``` {.bash .numberLines}

@@ -63,7 +63,9 @@ first-play-urgency rule, LCB move selection, graph search, and the two
 self-play tricks from the KataGo paper (forced playouts and policy target
 pruning). @sec-selfplay then closes the loop: the engine plays against itself
 on a GPU cluster, learns from those games and gets stronger, for weeks, with
-its progress measured by regular matches against its former selves.
+its progress measured by regular matches against its former selves, and
+@sec-solving asks what it would take to compute exact values — endgame tables,
+an exact solver — and whether Yolah could be solved.
 
 Conventions used throughout:
 
@@ -749,6 +751,8 @@ not complete a single simulation — a time budget too small for one network cal
 
 {{< include learning.qmd >}}
 
+{{< include solving.qmd >}}
+
 # Code map
 
 | file | what lives there |
@@ -769,6 +773,7 @@ not complete a single simulation — a time budget too small for one network cal
 | `player/alphazero_selfplay.{h,cpp}` | `TrainingSample` (the row format), `run_selfplay` — many games on one batched network, hot swap |
 | `test/alphazero_learn_main.cpp` | the `alphazero_learn` CLI: `selfplay` and `match` |
 | `nnue/alphazero_learn.py` | the trainer and orchestrator: replay window, loss, symmetries, EMA, export, evaluations |
+| `nnue/alphazero_aux.py` | optional auxiliary heads (`--aux`): future ownership and rest of the margin |
 | `nnue/alphazero_learn.{def,sh}` | the cluster image and the SLURM job |
 | `config/alphazero_mcts_selfplay_player.cfg` | the search settings of self-play |
 | `config/alphazero_mcts_eval_player.cfg` | the search settings of the evaluation matches |
