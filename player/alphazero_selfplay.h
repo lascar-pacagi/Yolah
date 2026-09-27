@@ -20,6 +20,15 @@
 // the fast searches exist to make games longer/cheaper, their visit counts are
 // too noisy to be a policy target). A sample is the position, the policy
 // target π over its legal moves and — once the game is over — its outcome z.
+//
+// Optional auxiliary targets (KataGo's ownership / score heads, see the doc,
+// "KataGo's auxiliary heads"): when the trainer runs with --aux it writes
+// "aux": true in latest.json, and the games then record, for every sample,
+// its FUTURE OWNERSHIP map — for each square, who will leave it between this
+// position and the end of the game (every move leaves a hole on the square
+// it comes from and scores one point, so the map sums to the rest of the
+// score). Those rows are TrainingSampleAux in files of version 2; without
+// the option nothing changes (TrainingSample, version 1).
 #include "alphazero_mcts.h"
 #include "nn_evaluator.h"
 #include <atomic>
@@ -43,9 +52,26 @@ struct TrainingSample {
 };
 static_assert(sizeof(TrainingSample) == 336, "keep in sync with alphazero_learn.py");
 
+// Future ownership of a square, relative to the side to move at the sample.
+enum OwnershipCode : uint8_t {
+    OWN_NONE = 0,   // nobody will leave it (stays free, or a piece ends the game there)
+    OWN_MINE = 1,   // the side to move will leave it: +1 for the side to move
+    OWN_OPP  = 2,   // the opponent will leave it: +1 for the opponent
+    OWN_PAST = 3,   // already a hole: who made it is not in the position → no target
+};
+
+// A version-2 row: the version-1 row followed by the future ownership map,
+// 2 bits per square, square q in byte q/4 at bits 2·(q%4). Mirrored by
+// SAMPLE_DTYPE_AUX in nnue/alphazero_learn.py.
+struct TrainingSampleAux {
+    TrainingSample base;
+    uint8_t        own[16];
+};
+static_assert(sizeof(TrainingSampleAux) == 352, "keep in sync with alphazero_learn.py");
+
 struct SampleFileHeader {
     char     magic[8];                   // "YOLAHSP1"
-    uint32_t version;                    // 1
+    uint32_t version;                    // 1 = TrainingSample, 2 = TrainingSampleAux
     uint32_t sample_size;                // sizeof(TrainingSample)
     uint32_t nb_samples;
     uint32_t nb_games;
@@ -53,11 +79,13 @@ struct SampleFileHeader {
 static_assert(sizeof(SampleFileHeader) == 24);
 
 // The network self-play must use, published by the trainer in
-// <work>/latest.json as {"step": 12000, "ts": "models/az_00012000.ts"}.
-// A relative path is relative to the work directory.
+// <work>/latest.json as {"step": 12000, "ts": "models/az_00012000.ts"}, plus
+// "aux": true when the trainer wants the auxiliary targets. A relative path
+// is relative to the work directory.
 struct ModelRef {
     uint64_t    step = 0;
     std::string path;
+    bool        aux = false;                 // record TrainingSampleAux rows
 };
 bool read_latest_model(const std::string& work_dir, ModelRef& out);
 

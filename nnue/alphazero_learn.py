@@ -44,8 +44,12 @@ python/shuffle.py and the paper "Accelerating Self-Play Learning in Go"):
   • no gating: self-play always uses the newest network. The evaluation
     matches only monitor progress.
   • the 8 symmetries of the board as data augmentation.
-Not ported: KataGo's auxiliary heads (score, ownership, opponent policy) —
-they would change the architecture the C++ backends read.
+  • optionally (--aux, alphazero_aux.py), KataGo's auxiliary heads, adapted
+    to Yolah: future ownership of each square and the rest of the score
+    margin. They exist only in training; the exported network is the plain
+    two-headed one, so the C++ side is unchanged. Without --aux, nothing of
+    this runs and the files keep their original format.
+Not ported: the opponent-policy head and KataGo's short-term value targets.
 
 Usage (from nnue/, inside the .sif or locally):
 
@@ -85,6 +89,11 @@ SAMPLE_DTYPE = np.dtype([
     ("action", "<u2", (MAX_NB_MOVES,)), ("prob", "<u2", (MAX_NB_MOVES,)),
 ])
 assert SAMPLE_DTYPE.itemsize == 336
+# Version-2 rows (--aux, az::TrainingSampleAux): the same fields, then the
+# future ownership map, 2 bits per square (see alphazero_aux.py).
+SAMPLE_DTYPE_AUX = np.dtype(SAMPLE_DTYPE.descr + [("own", "u1", (16,))])
+assert SAMPLE_DTYPE_AUX.itemsize == 352
+ROW_DTYPES = {1: SAMPLE_DTYPE, 2: SAMPLE_DTYPE_AUX}      # file version → row
 HEADER_DTYPE = np.dtype([("magic", "S8"), ("version", "<u4"), ("sample_size", "<u4"),
                          ("nb_samples", "<u4"), ("nb_games", "<u4")])
 assert HEADER_DTYPE.itemsize == 24
@@ -95,15 +104,33 @@ def log(msg):
 
 
 def read_header(path):
+    """(rows, games, version) of a self-play file; version 1 or 2 (--aux rows)."""
     h = np.fromfile(path, dtype=HEADER_DTYPE, count=1)
-    if len(h) != 1 or h[0]["magic"] != b"YOLAHSP1" or h[0]["sample_size"] != SAMPLE_DTYPE.itemsize:
+    if len(h) != 1 or h[0]["magic"] != b"YOLAHSP1":
         raise ValueError(f"{path}: not a self-play sample file")
-    return int(h[0]["nb_samples"]), int(h[0]["nb_games"])
+    version = int(h[0]["version"])
+    if version not in ROW_DTYPES or h[0]["sample_size"] != ROW_DTYPES[version].itemsize:
+        raise ValueError(f"{path}: unknown row format (version {version})")
+    return int(h[0]["nb_samples"]), int(h[0]["nb_games"]), version
 
 
-def read_samples(path):
-    n, _ = read_header(path)
-    return np.fromfile(path, dtype=SAMPLE_DTYPE, count=n, offset=HEADER_DTYPE.itemsize)
+def read_samples(path, dtype=SAMPLE_DTYPE):
+    """
+    The rows of a file, converted to `dtype`. Both formats mix freely:
+      • version-2 rows read as SAMPLE_DTYPE drop their ownership map;
+      • version-1 rows read as SAMPLE_DTYPE_AUX get a map of 0xFF bytes, i.e.
+        every square OWN_PAST: no auxiliary target, masked in the loss.
+    """
+    n, _, version = read_header(path)
+    rows = np.fromfile(path, dtype=ROW_DTYPES[version], count=n, offset=HEADER_DTYPE.itemsize)
+    if rows.dtype == dtype:
+        return rows
+    out = np.empty(n, dtype=dtype)
+    for name in SAMPLE_DTYPE.names:
+        out[name] = rows[name]
+    if "own" in dtype.names:
+        out["own"] = 0xFF
+    return out
 
 
 def atomic_write_text(path, text):
@@ -146,12 +173,13 @@ class ReplayWindow:
     file-name (= creation time) order. Sampling is uniform over the last
     window_size(total) rows.
     """
-    def __init__(self, directory, capacity, min_rows, alpha=0.75, beta=0.4):
+    def __init__(self, directory, capacity, min_rows, alpha=0.75, beta=0.4, dtype=SAMPLE_DTYPE):
         self.dir = directory
+        self.dtype = dtype
         self.capacity = capacity
         self.min_rows = min_rows
         self.alpha, self.beta = alpha, beta
-        self.buf = np.zeros(capacity, dtype=SAMPLE_DTYPE)
+        self.buf = np.zeros(capacity, dtype=dtype)
         self.head = 0          # next write position
         self.filled = 0
         self.total = 0         # rows generated since the beginning (all files)
@@ -198,13 +226,13 @@ class ReplayWindow:
             start -= 1
             need += headers[start][1]
         new_rows = 0
-        for i, (f, n, g) in enumerate(headers):
+        for i, (f, n, g, _version) in enumerate(headers):
             self.known.add(os.path.basename(f))
             self.total += n
             self.games += g
             new_rows += n
             if i >= start:
-                self._append(read_samples(f))
+                self._append(read_samples(f, self.dtype))
         return new_rows
 
     def sample(self, batch_size, rng):
@@ -215,8 +243,9 @@ class ReplayWindow:
 
 # ── batches ──────────────────────────────────────────────────────────────────
 class BatchMaker:
-    def __init__(self, device):
+    def __init__(self, device, aux=False):
         self.device = device
+        self.aux = aux                   # also return the ownership targets
         src, act = symmetry_tables()
         self.src = src.to(device)
         self.act = act.to(device)
@@ -229,6 +258,8 @@ class BatchMaker:
           z       (B,)  float — game result for the side to move
           actions (B, 75) long — policy indices of the legal moves (0-padded)
           probs   (B, 75) float — π over those moves (0 on the padding)
+        and with aux=True, a fifth element:
+          own     (B, 64) long — future ownership codes, in plane cell order
         The planes are decoded from the bitboards on the GPU (only 25 bytes
         per row cross the bus instead of 1 KB of floats).
         """
@@ -247,14 +278,23 @@ class BatchMaker:
         probs = torch.from_numpy(rows["prob"].astype(np.float32)).to(dev)
         probs = probs / probs.sum(1, keepdim=True).clamp_min(1.0)
         z = torch.from_numpy(rows["z"].astype(np.float32)).to(dev)
+        own = None
+        if self.aux:
+            from alphazero_aux import decode_ownership
+            own = decode_ownership(torch.from_numpy(rows["own"]).to(dev))       # (B, 64)
         if augment:
             # One random symmetry per row: permute the 64 cells of every plane
             # (one gather) and map every move index through the same symmetry
-            # (one table lookup). z is invariant.
+            # (one table lookup). z is invariant. The ownership map is a plane
+            # like the others: the same gather; the margin it sums to is invariant.
             sym = torch.randint(0, 8, (B,), device=dev)
             planes = planes.gather(2, self.src[sym].unsqueeze(1).expand(B, 4, 64))
             actions = self.act[sym.unsqueeze(1), actions]
+            if own is not None:
+                own = own.gather(1, self.src[sym])
         x = planes.view(B, 4, 8, 8).contiguous(memory_format=torch.channels_last)
+        if self.aux:
+            return x, z, actions, probs, own
         return x, z, actions, probs
 
 
@@ -272,7 +312,13 @@ def load_state_dict(path):
 
 
 def make_net(sd):
-    """Build a Net whose sizes (channels, blocks, heads) are read off the state_dict."""
+    """
+    Build a Net whose sizes (channels, blocks, heads) are read off the
+    state_dict. The parameters of the auxiliary heads (--aux runs) are not
+    part of a Net and are ignored.
+    """
+    from alphazero_aux import base_state_dict
+    sd = base_state_dict(sd)
     C = sd["input_conv.0.weight"].shape[0]
     B = sum(1 for k in sd if k.endswith(".conv1.weight"))
     net = Net(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
@@ -288,7 +334,14 @@ def model_paths(work, step):
 
 
 def export_model(net, work, step):
-    """Write az_<step>.pt (state_dict) + az_<step>.ts (TorchScript) atomically."""
+    """
+    Write az_<step>.pt (state_dict) + az_<step>.ts (TorchScript) atomically.
+    An AuxNet is exported as the plain Net it contains (value + policy only):
+    the files have the same format with or without --aux, and the C++
+    backends never see the auxiliary heads.
+    """
+    if hasattr(net, "forward_all"):
+        net = make_net(net.state_dict())
     pt, ts = model_paths(work, step)
     cpu = copy.deepcopy(net).float().cpu().eval()
     torch.save(cpu.state_dict(), pt + ".tmp")
@@ -300,11 +353,17 @@ def export_model(net, work, step):
     return pt, ts
 
 
-def publish_latest(work, step):
-    """Point self-play at az_<step>.ts (relative path: the work dir may be bind-mounted elsewhere)."""
+def publish_latest(work, step, aux=False):
+    """
+    Point self-play at az_<step>.ts (relative path: the work dir may be
+    bind-mounted elsewhere). With aux, also ask it to record the auxiliary
+    targets ("aux": true); without, the file is exactly as before.
+    """
     _, ts = model_paths(work, step)
-    atomic_write_text(os.path.join(work, "latest.json"),
-                      json.dumps({"step": step, "ts": os.path.relpath(ts, work)}) + "\n")
+    latest = {"step": step, "ts": os.path.relpath(ts, work)}
+    if aux:
+        latest["aux"] = True
+    atomic_write_text(os.path.join(work, "latest.json"), json.dumps(latest) + "\n")
 
 
 # ── state shared with the evaluator thread ───────────────────────────────────
@@ -538,6 +597,15 @@ def main():
     ap.add_argument("--allow-cpu", action="store_true", help="run even without CUDA (tests only)")
     ap.add_argument("--amp", choices=["auto", "bf16", "fp16"], default="auto",
                     help="mixed precision of the trainer (auto: bf16 on Ampere+, fp16 before)")
+    # KataGo's auxiliary heads (alphazero_aux.py). Off: everything as before.
+    ap.add_argument("--aux", action="store_true",
+                    help="train the ownership and score-margin heads (self-play records their targets)")
+    ap.add_argument("--own-weight", type=float, default=1.5,
+                    help="weight of the ownership loss (KataGo: 1.5/b² on the sum over the board)")
+    ap.add_argument("--score-weight", type=float, default=0.02, help="weight of the margin cross-entropy")
+    ap.add_argument("--score-cdf-weight", type=float, default=0.02, help="weight of the margin CDF loss")
+    ap.add_argument("--aux-ramp-steps", type=int, default=2000,
+                    help="the auxiliary weights grow linearly from 0 over this many steps")
     args = ap.parse_args()
     args.work = os.path.abspath(args.work)
     args.eval_opponents = [o.strip() for o in args.eval_opponents.split(",") if o.strip()]
@@ -574,9 +642,21 @@ def main():
     ckpt = torch.load(ckpt_path, map_location="cpu") if os.path.exists(ckpt_path) else None
     if ckpt is None:
         log(f"new run: initial network {args.init_model}")
-        net = make_net(load_state_dict(args.init_model))
+        src_sd = load_state_dict(args.init_model)
     else:
-        net = make_net(ckpt["model"])
+        src_sd = ckpt["model"]
+    # Variant: with --aux the network carries the auxiliary heads. A run can
+    # switch between the variants from one job to the next: the shared
+    # parameters are kept, the auxiliary heads start from scratch (or are
+    # dropped), and the optimizer — whose state is per parameter — restarts.
+    ckpt_aux = bool(ckpt.get("aux", False)) if ckpt is not None else False
+    switched = ckpt is not None and ckpt_aux != args.aux
+    if args.aux:
+        from alphazero_aux import make_aux_net, aux_losses
+        net, fresh_heads = make_aux_net(src_sd)
+        log("auxiliary heads (ownership, score margin): " + ("new" if fresh_heads else "resumed"))
+    else:
+        net = make_net(src_sd)
     net = net.to(device).to(memory_format=torch.channels_last)
     ema = None
     if args.ema_decay > 0:
@@ -593,15 +673,24 @@ def main():
         amp_dtype = torch.bfloat16 if args.amp == "bf16" else torch.float16
     log(f"mixed precision: {amp_dtype}")
     scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda" and amp_dtype == torch.float16))
+    if ckpt is not None and switched:
+        # Different parameter set: optimizer, EMA and scaler start afresh
+        # (the EMA from the current weights), with a new learning-rate warm-up.
+        state.d["opt_start_step"] = ckpt["step"]
+        if args.aux:
+            state.d["aux_start_step"] = ckpt["step"]
+        log(f"variant switch: {'with' if args.aux else 'without'} auxiliary heads from step {ckpt['step']} "
+            f"(optimizer and weight average restart)")
     if ckpt is not None:
-        if ema is not None and ckpt.get("ema") is not None:
-            ema.load_state_dict(ckpt["ema"])
-        opt.load_state_dict(ckpt["optimizer"])
+        if not switched:
+            if ema is not None and ckpt.get("ema") is not None:
+                ema.load_state_dict(ckpt["ema"])
+            opt.load_state_dict(ckpt["optimizer"])
         # A bf16 job saves the state of a *disabled* scaler, which is empty
         # and which an enabled scaler refuses to load: an fp16 job resuming
         # it (A40 then RTX 8000) starts with a fresh scale — harmless, the
         # scale adapts within a few steps.
-        if scaler.is_enabled() and ckpt.get("scaler"):
+        if scaler.is_enabled() and ckpt.get("scaler") and not switched:
             scaler.load_state_dict(ckpt["scaler"])
         # The checkpoint is authoritative: state.json may have been saved by
         # the evaluator after it, with counters the lost steps never kept.
@@ -612,24 +701,27 @@ def main():
         pt0, _ = model_paths(args.work, 0)
         if not os.path.exists(pt0):
             export_model(net, args.work, 0)
-        publish_latest(args.work, 0)
+        publish_latest(args.work, 0, args.aux)
         state.save()
-    if not os.path.exists(os.path.join(args.work, "latest.json")):
-        publish_latest(args.work, state.d["exports"][-1])
+    # Always re-published at start: a run that switches variant must tell
+    # self-play at once whether to record the auxiliary targets.
+    publish_latest(args.work, state.d["exports"][-1], args.aux)
 
     def save_checkpoint():
         torch.save({"model": net.state_dict(), "ema": ema.state_dict() if ema is not None else None,
                     "optimizer": opt.state_dict(), "scaler": scaler.state_dict(),
-                    "step": state.d["step"], "samples_trained": state.d["samples_trained"]},
+                    "step": state.d["step"], "samples_trained": state.d["samples_trained"],
+                    "aux": args.aux},
                    ckpt_path + ".tmp")
         os.replace(ckpt_path + ".tmp", ckpt_path)
         state.save()
 
     # ── data ──
-    window = ReplayWindow(os.path.join(args.work, "selfplay"), args.max_window, args.min_rows)
+    window = ReplayWindow(os.path.join(args.work, "selfplay"), args.max_window, args.min_rows,
+                          dtype=SAMPLE_DTYPE_AUX if args.aux else SAMPLE_DTYPE)
     window.scan()
     log(f"replay: {window.total:,} rows from {window.games:,} games on disk, {window.filled:,} in memory")
-    make_batch = BatchMaker(device)
+    make_batch = BatchMaker(device, aux=args.aux)
     rng = np.random.default_rng()
 
     # ── subprocesses ──
@@ -676,6 +768,7 @@ def main():
     # ── main loop ──
     net.train()
     acc = {"v": 0.0, "p": 0.0, "kl": 0.0, "n": 0}
+    aux_acc = {"own": 0.0, "pdf": 0.0, "cdf": 0.0, "acc": 0.0, "n": 0, "n_acc": 0}
     last_scan = last_report = time.time()
     samples_at_report = state.d["samples_trained"]
     since_export = state.d["samples_trained"] - state.d.get("samples_at_last_export", 0)
@@ -709,12 +802,16 @@ def main():
         # Linear warm-up: Adam's moment estimates start at zero after a fresh
         # start, so the first steps would otherwise be too large.
         step = state.d["step"]
-        lr = args.lr * min(1.0, (step + 1) / max(1, args.warmup_steps))
+        lr = args.lr * min(1.0, (step - state.d.get("opt_start_step", 0) + 1) / max(1, args.warmup_steps))
         for g in opt.param_groups:
             g["lr"] = lr
-        x, z, actions, probs = make_batch(window.sample(args.batch_size, rng))
+        batch = make_batch(window.sample(args.batch_size, rng))
+        x, z, actions, probs = batch[:4]
         with torch.autocast(device.type, dtype=amp_dtype, enabled=device.type == "cuda"):
-            v, logits = net(x)
+            if args.aux:
+                v, logits, own_logits, score_logits = net.forward_all(x)
+            else:
+                v, logits = net(x)
         v = v.float()
         # Policy: cross-entropy with the soft target π, -Σ_a π(a) log p(a|s).
         # The softmax runs over the 4096 logits; π lives on the legal moves
@@ -724,6 +821,19 @@ def main():
         # Value: squared error against the game result z ∈ {-1, 0, +1}.
         v_loss = F.mse_loss(v, z)
         loss = args.value_weight * v_loss + args.policy_weight * p_loss
+        if args.aux:
+            # Auxiliary heads: ownership (per-square cross-entropy) and score
+            # margin (distribution + CDF), their weights ramped up from 0 so
+            # that the random new heads do not shake a trunk that already
+            # plays well. Rows without targets (version 1) are masked.
+            l_own, l_pdf, l_cdf, own_acc = aux_losses(own_logits, score_logits, batch[4])
+            ramp = min(1.0, (step - state.d.get("aux_start_step", 0) + 1) / max(1, args.aux_ramp_steps))
+            loss = loss + ramp * (args.own_weight * l_own + args.score_weight * l_pdf
+                                  + args.score_cdf_weight * l_cdf)
+            aux_acc["own"] += l_own.item(); aux_acc["pdf"] += l_pdf.item()
+            aux_acc["cdf"] += l_cdf.item(); aux_acc["n"] += 1
+            if own_acc == own_acc:                       # not NaN (batch had targets)
+                aux_acc["acc"] += own_acc; aux_acc["n_acc"] += 1
         opt.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()
         scaler.unscale_(opt)
@@ -755,6 +865,24 @@ def main():
                               window.total, window.games, window.window_size(), f"{acc['v']/n:.5f}",
                               f"{acc['p']/n:.5f}", f"{acc['kl']/n:.5f}", f"{lr:.3e}", f"{sps:.0f}"])
             log_file.flush()
+            if args.aux and aux_acc["n"]:
+                # A separate file, so that train_log.csv keeps one format for
+                # every run whichever the variant.
+                m = aux_acc["n"]
+                own_accuracy = aux_acc["acc"] / aux_acc["n_acc"] if aux_acc["n_acc"] else float("nan")
+                log(f"  aux: ownership {aux_acc['own']/m:.4f} (accuracy {own_accuracy:.3f})  "
+                    f"margin pdf {aux_acc['pdf']/m:.4f}  cdf {aux_acc['cdf']/m:.4f}  weight ramp {ramp:.2f}")
+                aux_path = os.path.join(args.work, "train_log_aux.csv")
+                new_aux = not os.path.exists(aux_path)
+                with open(aux_path, "a", newline="") as f:
+                    w = csv.writer(f)
+                    if new_aux:
+                        w.writerow(["time", "step", "ownership_loss", "ownership_accuracy",
+                                    "margin_pdf_loss", "margin_cdf_loss", "ramp"])
+                    w.writerow([time.strftime("%F %T"), state.d["step"], f"{aux_acc['own']/m:.5f}",
+                                f"{own_accuracy:.4f}", f"{aux_acc['pdf']/m:.5f}", f"{aux_acc['cdf']/m:.5f}",
+                                f"{ramp:.3f}"])
+            aux_acc = {"own": 0.0, "pdf": 0.0, "cdf": 0.0, "acc": 0.0, "n": 0, "n_acc": 0}
             acc = {"v": 0.0, "p": 0.0, "kl": 0.0, "n": 0}
             last_report = time.time()
             samples_at_report = state.d["samples_trained"]
@@ -764,7 +892,7 @@ def main():
             since_export = 0
             s = state.d["step"]
             export_model(ema.module if ema is not None else net, args.work, s)
-            publish_latest(args.work, s)
+            publish_latest(args.work, s, args.aux)
             with state.lock:
                 state.d["exports"].append(s)
                 state.d["samples_at_last_export"] = state.d["samples_trained"]

@@ -8,12 +8,11 @@ itself, learns from those games, plays better games with what it learned, and so
 on — AlphaZero's recipe, with the refinements of KataGo.
 
 The chapter follows the data. First the idea (@sec-learn-idea) and the
-processes (@sec-learn-loop); then self-play, which produces the data
-(@sec-sp-driver); the trainer, which consumes it (@sec-trainer); the
+processes (@sec-learn-loop); then self-play, which produces the data (@sec-sp-driver); the trainer, which consumes it (@sec-trainer); the
 evaluation matches, which measure the result (@sec-eval); how it all runs on
 the cluster and how the resources were sized (@sec-cluster,
 @sec-learn-sizing); and finally KataGo's auxiliary heads, the most promising
-next step (@sec-aux-heads).
+next step (@sec-auxiliary).
 
 ## The idea {#sec-learn-idea}
 
@@ -79,8 +78,7 @@ Why files rather than sockets or shared memory? Because the run must survive
 being killed. A cluster job ends after two weeks and the loop must continue in
 the next one. With every exchange being a file that is renamed into place once
 it is complete (a POSIX rename is atomic), a process that dies at any moment
-leaves only complete files behind. The next job re-reads them and continues
-(@sec-cluster).
+leaves only complete files behind. The next job re-reads them and continues (@sec-cluster).
 
 There is no *gating*. The original AlphaGo Zero only promoted a new network
 after it beat the current one by 55 %; AlphaZero and KataGo dropped this and
@@ -647,9 +645,64 @@ network and 800/200 simulations:
 | trainer, batch 1024 | ~3 400 samples/s, 4.9 GB (alone on the GPU) |
 | colour balance | black wins 61 %, white 8 %, draws 31 % |
 
-The last line is a property of Yolah, not of the loop: the first player has a
-large advantage, which is why the evaluation plays every opening with both
-colours.
+The last line is a property of Yolah, not of the loop; it is explained just
+below.
+
+### Why black wins so often {#sec-colour-balance}
+
+On the cluster the three self-play GPUs report the same balance: black wins
+~57 %, white ~8 %, the rest are draws. That is not a weakness of the network
+nor a bug in the counting: it follows from how Yolah is scored.
+
+Every move scores one point for the player who makes it, and black moves
+first. The final margin, black minus white, is therefore the sum of two parts:
+
+* **a structural bonus for black of 0 or +1.** As long as nobody has to pass,
+  black has made either as many moves as white (the game ended after a white
+  move: a draw) or one more (it ended after a black move: black wins by one).
+  On average, black gets half a point for free.
+* **the passes.** A player who is blocked while the other can still move
+  loses one point per pass. It is the only way white can win.
+
+And the margins are tiny (@fig-margins): in 84 % of the games the final
+margin is between −2 and +2. With margins that small, black's free half point
+decides a large share of the games: it turns would-be draws into black wins,
+and small white wins into draws.
+
+![Distribution of the final margin over 144 self-play games observed from the initial position (the margin is read off the future ownership map described in the section on the auxiliary heads).](figs/fig-margins.png){#fig-margins width=70%}
+
+The same balance appears in games played by entirely different engines. The
+480 000 games of the supervised training set (minimax and NNUE players) start
+with 0 to 9 random plies, and splitting them by that number is instructive:
+
+| random plies at the start | black wins | draws | white wins |
+|---|---|---|---|
+| **0 (the real initial position)** | **60.6 %** | **32.0 %** | **7.5 %** |
+| 2, 4, 6, 8 | 52–61 % | 26–34 % | 13–14 % |
+| 1, 3, 5, 7, 9 | 34–43 % | 29–38 % | 19–38 % |
+
+From the initial position, the minimax engines show exactly the imbalance of
+AlphaZero's self-play. Over the whole set white wins 20 %, but only because of
+the random openings: after an *odd* number of random plies, black has played
+one random — hence usually bad — move more than white, and the more random
+plies, the better white does. A comparison of colour balances is therefore
+only meaningful between games that start from the same kind of position. (The
+evaluation matches use 4 random plies, 2 per side, and play each opening with
+both colours.)
+
+Consequences for the learning loop:
+
+* none for the value head: the network sees whose turn it is (plane 3 of the
+  input) and learns that the same board is worth more to black;
+* none for the evaluation: every opening is played once with each colour;
+* but $z$ (win / draw / loss) says little in such a game: with a third of
+  draws and most wins by one or two points, the *exact* margin carries much
+  more information than its sign — which is what the score-margin head of
+  @sec-auxiliary learns.
+
+A game designer who wanted balanced results would give white a compensation
+(half a point, like komi in Go); that is a change of rules, not of the
+engine, and has no effect on learning.
 
 ### From the measurements to the settings
 
@@ -746,146 +799,268 @@ important ones as environment variables and sets the cluster values:
 | `--no-selfplay` | off | | train only (self-play running elsewhere) |
 | `--allow-cpu` | off | | run without CUDA (tests only) |
 | `--amp` | auto | | trainer precision: `auto` (bf16 on Ampere+, else fp16), `bf16`, `fp16` |
+| `--aux` | off | `AUX=1` | train the auxiliary heads (@sec-auxiliary) |
+| `--own-weight` | 1.5 | | weight of the ownership loss |
+| `--score-weight` / `--score-cdf-weight` | 0.02 / 0.02 | | weights of the margin losses |
+| `--aux-ramp-steps` | 2 000 | | linear ramp of the three auxiliary weights from 0 |
 
-## KataGo's auxiliary heads {#sec-aux-heads}
+
+## KataGo's auxiliary heads {#sec-auxiliary}
 
 Everything so far trains the network on two targets per position: one scalar
 $z$ and one distribution $\pi$. KataGo's most effective idea on top of AlphaZero
 is to ask the network for **more predictions than the search needs** — extra
 *heads* that exist only during training (@fig-aux-heads). This section explains
-what they are, why they help, what they would be in Yolah, and how they would
-fit into this code. They are not implemented yet.
+what they are and why they help, how the two most useful ones — ownership and
+score — translate to Yolah, and how they are implemented here, as an **option**
+(`--aux`): without it, everything described in the previous sections runs
+unchanged, file formats included.
 
-![The two heads the search uses, and the auxiliary heads that exist only to train the trunk.](figs/fig-aux-heads.png){#fig-aux-heads width=100%}
+![The two heads the search uses, and the auxiliary heads that exist only to train the trunk. Only ownership and score margin are implemented.](figs/fig-aux-heads.png){#fig-aux-heads width=100%}
 
 ### Why predicting more helps
 
-Think of the information a game gives to the value head: **one bit-and-a-half**
-— win, draw or loss — shared by 55 positions. A position early in the game
-gets the credit or blame for 50 later moves it had nothing to do with. The
-value target is extremely *noisy*, and that noise is what makes value learning
-the slow part of AlphaZero.
+Think of the information a game gives to the value head: the result, win, draw
+or loss — $\log_2 3 \approx 1.6$ bits — shared by the 55 positions of the game.
+A position early in the game gets the credit or the blame for 50 later moves
+it had nothing to do with. The value target is extremely *noisy*, and that
+noise is what makes value learning the slow part of AlphaZero. In Yolah it is
+worse than usual: with a third of draws and most wins by one or two points (@sec-colour-balance), the result hides almost everything that happened.
 
-An auxiliary target is any quantity that is (a) known at the end of the game
-for free, (b) much richer than $z$, and (c) related to what the network must
-understand. Its head is small — a 1×1 convolution and a linear layer on top of
-the shared trunk — and is thrown away at export time. What remains is its
-**gradient into the trunk**: the trunk must now compute features that also
-predict the auxiliary target, and features that explain *where* and *by how
-much* a game is won are exactly the features that make the value head accurate.
-It is regularisation by multi-task learning, and in the KataGo paper's
-ablations removing these targets slows learning down markedly, most of all
+An auxiliary target is any quantity that is (a) known for free at the end of
+the game, (b) much richer than $z$, and (c) related to what the network must
+understand. Its head is small — a 1×1 convolution, a couple of linear layers
+on top of the shared trunk — and it is thrown away at export time. What
+remains is its **gradient into the trunk**: the trunk must now compute features
+that also predict the auxiliary target, and features that explain *where* and
+*by how much* a game is won are exactly the features that make the value head
+accurate. It is regularisation by multi-task learning. In the KataGo paper's
+ablations, removing these targets slows learning down markedly, most of all
 early in a run.
 
-The total loss becomes a weighted sum; the weights are small because the
-auxiliary heads must shape the trunk without dominating the two heads that
-matter:
+Two caveats before expecting miracles: our network starts from a supervised
+model that already plays well, so the gain will be smaller than for KataGo,
+which started from scratch; and only evaluation matches can tell how much.
+
+### Ownership in Yolah
+
+In Go, KataGo predicts for each of the 361 points who owns it at the end of
+the game — 361 targets per position instead of one. Yolah has an exact
+equivalent, and a particularly clean one. Every move leaves a hole on the
+square the piece came from and scores one point for its player
+(`Yolah::play`). So at the end of a game **each square is either a hole left by
+black, a hole left by white, or neither**, and the number of holes a player
+left *is* their score (@fig-ownership, a real game of the initial network:
+29–26). The ownership map is the final score decomposed square by square.
+
+![Final ownership in a real game: every square is labelled by the player who left it. Counting the labels gives the final score.](figs/fig-ownership.png){#fig-ownership width=100%}
+
+Yolah is a cousin of the Game of the Amazons, and ownership means the same
+thing in both: as the game goes on, the board splits into regions sealed off
+by holes, and the squares of a region where I am alone are going to be
+"mine". The ownership head has to see that partition coming long before it is
+fixed — which is precisely the strategic understanding the value head needs.
+
+**The target must be predictable from the position.** The network's input
+shows the holes, but not *who* made them. The final label of a square that is
+already a hole is therefore history, not something the position determines:
+asking the network to predict it would be asking it to guess, i.e. noise. So
+the target is the **future ownership**, relative to the side to move:
+
+$$
+o_t(q) =
+\begin{cases}
+\text{no target} & \text{if } q \text{ is already a hole at } t,\\
+\text{mine} & \text{if the side to move at } t \text{ will leave } q,\\
+\text{opponent's} & \text{if the opponent will leave } q,\\
+\text{nobody's} & \text{otherwise (it stays free, or a piece ends the game there).}
+\end{cases}
+$$
+
+@fig-future-ownership shows it on the same game, after 24 plies.
+
+![The future ownership target of a mid-game position of the same game. Holes already made carry no target; the rest of the board is labelled by who will leave each square. The counts give the rest of the score: 12 + 17 = 29 for black, 12 + 14 = 26 for white.](figs/fig-future-ownership.png){#fig-future-ownership width=100%}
+
+Being relative to the side to move ("mine / the opponent's" rather than
+"black / white") makes the target independent of the colour, like the value.
+
+### The rest of the margin
+
+Summing the future ownership map gives the number of moves each side will
+still make, hence the **rest of the score margin** for the side to move:
+
+$$
+d_t = \#\{q : o_t(q) = \text{mine}\} - \#\{q : o_t(q) = \text{opponent's}\}
+\;\in [-56, 56]
+$$
+
+(64 squares minus 8 pieces). The final margin is the margin so far plus $d_t$
+(29–26 = (12–12) + (17–14) in the figure). Why predict the *rest* rather than
+the final margin, as KataGo does? Because the score so far is not in the
+input either: it can be guessed from the number of holes and whose turn it is
+— but not when there have been passes. The rest of the margin, on the other
+hand, is entirely determined by the position and the play to come.
+
+The score head predicts the whole **distribution** of $d_t$ — 113 logits, one
+per possible value — rather than a single number: whether a position is a
+sure +1 or a coin toss between −2 and +4 is exactly the kind of information the
+value lacks. It needs no extra data: $d_t$ is read off the ownership map.
+
+### The heads
+
+`AuxNet` (`nnue/alphazero_aux.py`) is `Net` — the same trunk, the same value
+and policy heads, the same parameter names — plus two heads on the trunk's
+output $h \in \mathbb{R}^{C\times 8\times 8}$:
+
+* **ownership**: a 1×1 convolution $C \to 3$, i.e. three logits per square,
+  one softmax per square over (nobody, mine, opponent's) — a per-square
+  classification;
+* **score**: global pooling of $h$ over the 64 squares, mean and max
+  ($2C = 512$ numbers), then a linear layer to 256, a ReLU, and a linear
+  layer to the 113 logits. Pooling rather than flattening, because the margin
+  is a property of the whole board.
+
+```python
+def forward_all(self, x):
+    h = self.trunk(x)                                     # (B, C, 8, 8)
+    v, p = self.heads(h)                                  # the two heads of Net
+    own = self.own_conv(h).flatten(2)                     # (B, 3, 64)
+    pooled = torch.cat([h.mean(dim=(2, 3)), h.amax(dim=(2, 3))], dim=1)
+    score = self.score_fc2(torch.relu(self.score_fc1(pooled)))   # (B, 113)
+    return v, p, own, score
+```
+
+`forward()` still returns `(v, p)`, so an `AuxNet` can be used wherever a `Net`
+is.
+
+### The losses
+
+With $\hat o_q$ the predicted distribution of square $q$, $\hat P$ the
+predicted distribution of the margin and $\hat F$ its cumulative distribution:
+
+$$
+\mathcal{L}_{\text{own}} = -\frac{1}{64}\sum_{q\,:\,o_t(q)\,\neq\,\text{no target}} \log \hat o_q\big(o_t(q)\big),
+\qquad
+\mathcal{L}_{\text{pdf}} = -\log \hat P(d_t),
+\qquad
+\mathcal{L}_{\text{cdf}} = \sum_{x=-56}^{56} \big(\hat F(x) - \mathbb{1}[x \ge d_t]\big)^2 .
+$$
+
+* The ownership loss is a cross-entropy per square, averaged over the whole
+  board (squares without target count for 0). It is KataGo's $1/b^2$ times the
+  sum over the points.
+* The pdf term is an ordinary cross-entropy against the true margin. On its
+  own it treats every wrong value alike; the cdf term adds the notion of
+  distance: predicting +11 for a true +12 moves the cumulative distribution
+  by one step, predicting −30 by many (it is the squared-error form of the
+  earth mover's distance between the two distributions).
+
+The total loss adds them to the AlphaZero loss with small weights, because
+the auxiliary heads must shape the trunk without dominating the two heads
+that matter:
 
 $$
 \mathcal{L} = \mathcal{L}_v + \mathcal{L}_p
-+ w_{\text{own}}\,\mathcal{L}_{\text{own}}
-+ w_{\text{score}}\,\mathcal{L}_{\text{score}}
-+ w_{\text{opp}}\,\mathcal{L}_{\text{opp}}
-+ w_{\text{stv}}\,\mathcal{L}_{\text{stv}} .
++ \rho(t)\,\big(w_{\text{own}}\,\mathcal{L}_{\text{own}}
++ w_{\text{pdf}}\,\mathcal{L}_{\text{pdf}}
++ w_{\text{cdf}}\,\mathcal{L}_{\text{cdf}}\big),
+\qquad w_{\text{own}} = 1.5,\ w_{\text{pdf}} = w_{\text{cdf}} = 0.02 ,
 $$
 
-### Ownership
+KataGo's weights. $\rho(t)$ is a **ramp** from 0 to 1 over the first 2 000
+steps (`--aux-ramp-steps`): the new heads start random, their first gradients
+are large and meaningless, and they must not shake a trunk that already plays
+well. Rows without auxiliary targets (see below) are masked out of the three
+terms.
 
-In Go, KataGo predicts for each of the 361 points who owns it at the end of the
-game — 361 targets per position instead of one. The loss is a per-point
-cross-entropy, scaled by the board area:
+The code, in `aux_losses`:
 
-$$
-\mathcal{L}_{\text{own}} = -\frac{1}{64}\sum_{q=1}^{64}\ \sum_{c}\ o_q(c)\,\log \hat o_q(c),
-\qquad w_{\text{own}} \approx 1.5 ,
-$$
+```python
+ce = F.cross_entropy(own_logits, own, ignore_index=OWN_PAST, reduction="none")  # (n, 64)
+own_loss = ce.sum(1).mean() / 64.0
+target = margin_from_ownership(own) + MAX_MARGIN                 # index of d_t in 0..112
+logp = F.log_softmax(score_logits, dim=1)
+pdf_loss = F.nll_loss(logp, target)
+cdf_pred = logp.exp().cumsum(1)
+cdf_true = (torch.arange(SCORE_BINS)[None, :] >= target[:, None]).float()
+cdf_loss = ((cdf_pred - cdf_true) ** 2).sum(1).mean()
+```
 
-where $o_q$ is the one-hot final owner of square $q$ and $\hat o_q$ the network's
-softmax (KataGo writes the same weight as $1.5/b^2$ on the *sum* over the
-$b\times b$ points, which is this mean times 1.5).
+The 8 symmetries apply unchanged: the ownership map is a plane like the input
+planes and goes through the same `gather`; the margin, a count, is invariant.
 
-Yolah has an exact equivalent, and a particularly clean one. Every move leaves a
-hole on the square the piece came from, and scores one point for its player
-(`Yolah::play`). So at the end of a game **each square is either a hole left by
-black, a hole left by white, or neither**, and the number of holes each player
-left *is* their score (@fig-ownership, a real game of the initial network:
-29–26). The ownership map is the final score decomposed square by square: it
-tells the trunk not only *that* black wins but *which regions* black managed to
-use.
+### Recording the targets
 
-![The ownership target in Yolah, on a real game: every square is labelled by the player who left it. Counting the labels gives the final score.](figs/fig-ownership.png){#fig-ownership width=100%}
+The target of a sample depends on the rest of its game, so it is computed when
+the game ends — like $z$. During the game, `run_selfplay` notes who leaves each
+square (`leaver[q]`); at the end, `with_ownership` turns that into the map of
+every recorded sample:
 
-The head: a 1×1 convolution from the 256 trunk channels to 3 channels (black,
-white, none) — an $8\times8\times3$ output, one softmax per square. Relative
-to the side to move ("mine / the opponent's / none"), as KataGo does, so that
-the target does not depend on the colour. Under the 8 symmetries the ownership
-map transforms exactly like the input planes (the same `gather`).
+```cpp
+for (int q = 0; q < 64; q++) {
+    uint8_t code;
+    if ((s.empty >> q) & 1)      code = OWN_PAST;      // already a hole: no target
+    else if (leaver[q] == 0xFF)  code = OWN_NONE;      // nobody leaves it
+    else                         code = leaver[q] == s.turn ? OWN_MINE : OWN_OPP;
+    a.own[q / 4] |= static_cast<uint8_t>(code << (2 * (q % 4)));
+}
+```
 
-### Score margin
+A square that is not yet a hole at the sample and is left later can only have
+been left *after* the sample — once left, a square is a hole forever — so the
+map counts exactly the moves still to come.
 
-$z$ only says who won. The margin $d = \text{score}_{\text{me}} -
-\text{score}_{\text{opp}}$ says by how much, and distinguishes a crushing win
-from a lucky one. In Yolah $|d| \le 56$ (64 squares minus 8 pieces), so the head
-can predict the whole **distribution** of the margin — 113 logits, one per
-possible value — trained with a cross-entropy against the one-hot final margin:
+Two bits per square, 16 bytes per row: the rows become `TrainingSampleAux`
+(352 bytes instead of 336), in files of **version 2**. On the Python side the
+map is unpacked on the GPU into the plane-cell order of the input (cell $c$
+holds square $63-c$) so that it lines up with the planes and their symmetries.
 
-$$
-\mathcal{L}_{\text{score}} = -\log \hat P(d_{\text{final}}),
-$$
+The targets were checked against the rules on 8 570 rows, with and without the
+random symmetry: every square already a hole is exactly a square without
+target; no square holding one of my pieces is ever labelled "the opponent
+will leave it", and vice versa; and on the 4 655 rows of early game (no pass
+possible yet), the result $z$ is the sign of margin so far + $d_t$ in 100 % of
+the cases.
 
-plus, as in KataGo, a term on the cumulative distribution so that predicting
-+11 when the truth is +12 costs less than predicting −30:
-$\sum_x \big(\hat F(x) - \mathbb{1}[x \ge d_{\text{final}}]\big)^2$ with
-$\hat F$ the predicted CDF. KataGo also uses the predicted score in the search
-(a small utility for winning by more); here it would be training-only.
+### Two variants, one code
 
-### Opponent's reply
+The option is decided by the trainer alone, and everything else follows:
 
-A second policy head predicts $\pi_{t+1}$, the search's distribution at the
-*next* position — the opponent's reply. It forces the trunk to represent the
-opponent's threats, not only one's own options. KataGo's weight is
-$w_{\text{opp}} \approx 0.15$. It needs no new data: the target is the $\pi$
-of the next row of the same game, when that move was a full search (with
-playout cap randomization, 25 % of the time; otherwise the term is masked out).
+| | without `--aux` (default) | with `--aux` (`AUX=1`) |
+|---|---|---|
+| network trained | `Net` | `AuxNet` (`Net` + 2 heads) |
+| network exported (`.pt`, `.ts`) | `Net` | `Net` — the heads are dropped |
+| C++ side | unchanged | unchanged |
+| `latest.json` | `{"step", "ts"}` | `{"step", "ts", "aux": true}` |
+| self-play rows | version 1, 336 bytes | version 2, 352 bytes |
+| logs | `train_log.csv` | `train_log.csv` + `train_log_aux.csv` |
 
-### Short-term value targets
+* **Self-play follows `latest.json`**: the key `"aux"` switches the recording
+  on or off at the next poll, in the main job and in the extra self-play jobs
+  alike. No flag has to be kept in sync by hand.
+* **The trainer reads both formats**: version-1 rows read by an `--aux`
+  trainer have no target (every square "no target", masked in the loss);
+  version-2 rows read by a plain trainer simply lose their map.
+* **A run can switch** from one job to the next, in either direction:
 
-$z$ is noisy because it is far in the future. Later versions of KataGo add
-value targets that look only a few moves ahead: exponentially weighted averages
-of the *search values* of the next positions,
+  ```bash
+  sbatch --export=ALL,AUX=1 alphazero_learn.sh    # the next two weeks with the heads
+  ```
 
-$$
-v^{(\lambda)}_t = (1-\lambda)\sum_{k \ge 0} \lambda^k\, q_{t+k}\quad(\text{sign-corrected for the side to move}),
-$$
+  The shared parameters are kept; the heads start from scratch (or are
+  dropped); the optimizer, whose state is per parameter, restarts with a new
+  warm-up, and so does the weight average. The log says so
+  (`variant switch: with auxiliary heads from step …`). This was tested in
+  both directions on a single run.
+* **The export is the plain network**: `export_model` rebuilds a `Net` from
+  the non-auxiliary parameters, so the `.pt` and `.ts` files are byte-for-byte
+  the same kind as without the option, and the traced module gives exactly
+  the value and policy of `AuxNet` (checked: difference 0).
 
-with horizons $1/(1-\lambda)$ of a few moves to a few tens of moves, each
-trained by its own small head with a squared error. They are the
-temporal-difference idea of reinforcement learning: a target that is less
-exact than $z$ (it inherits the search's errors) but far less noisy. We already
-record the search value (`root_q`) of the full-search positions; the fast
-searches' values would have to be recorded too.
-
-### How it would fit into this code
-
-The key point is that **nothing in C++ has to change**:
-
-1. **The network** gets the extra heads as extra modules; `forward` returns
-   all outputs during training.
-2. **The export** traces a small wrapper whose `forward` returns only
-   `(v, p)`; the `.ts` file has the same interface as today, and
-   `resnet_export.py` writes the `.bin` from the value and policy weights only,
-   so both C++ backends load the network unchanged.
-3. **The data** needs, per row, the final ownership map (2 bits × 64 squares =
-   16 bytes), the final margin (1 byte), and a game identifier and ply so that
-   the trainer can pair a row with the next one of the same game (the
-   opponent-policy and short-term targets). That is a version 2 of
-   `TrainingSample` — the file header already carries a version and the row
-   size precisely for this.
-4. **The starting point**: the trunk and the two existing heads load from the
-   current network; the new heads start random, with their weights ramped up
-   over the first few thousand steps so that their initially large, random
-   gradients do not disturb a trunk that already plays well.
-
-The ownership and score heads are the ones with the best ratio of expected gain
-to effort: the targets are free, exact and — in Yolah — sum to the very
-quantity the game is decided on.
+What to watch with `--aux`, in `train_log_aux.csv` (and every 2 minutes in the
+job's log): the ownership loss and its accuracy (the fraction of squares whose
+future owner is predicted right), and the two margin losses. They should fall
+quickly in the first thousands of steps — the heads are learning — and then
+slowly. The two KataGo heads not implemented here, the opponent's reply and
+the short-term values, would need rows paired with the next rows of the same
+game; the version header of the files leaves room for that.

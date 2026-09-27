@@ -10,13 +10,13 @@
   \node[boxa,minimum width=46mm] (p) at (100,15) {\textbf{policy} $p$, 4096 logits\\\scriptsize target $\pi$, cross-entropy};
   % auxiliary heads
   \tikzset{aux/.style={box,dashed,fill=white,minimum width=46mm}}
-  \node[aux] (own) at (100,-2) {\textbf{ownership} $\hat o$: $64\times3$\\\scriptsize who leaves each square};
-  \node[aux] (sc) at (100,-17) {\textbf{score margin}: 113 bins\\\scriptsize $d=\text{score}_{\text{me}}-\text{score}_{\text{opp}}\in[-56,56]$};
-  \node[aux] (op) at (100,-32) {\textbf{opponent policy} $p'$: 4096\\\scriptsize target $\pi_{t+1}$ (the reply)};
-  \node[aux] (st) at (100,-47) {\textbf{short-term values}\\\scriptsize targets: averages of future search values};
+  \node[aux] (own) at (100,-2) {\textbf{ownership} $\hat o$: $64\times3$\\\scriptsize who will leave each square};
+  \node[aux] (sc) at (100,-17) {\textbf{score margin}: 113 bins\\\scriptsize rest of the margin $d\in[-56,56]$};
+  \node[aux,draw=muted,text=muted] (op) at (100,-32) {\textbf{opponent policy} $p'$: 4096\\\scriptsize not implemented};
+  \node[aux,draw=muted,text=muted] (st) at (100,-47) {\textbf{short-term values}\\\scriptsize not implemented};
   \foreach \h in {v,p} \draw[ar] (trunk.east) -- (\h.west);
   \foreach \h in {own,sc,op,st} \draw[arm] (trunk.east) -- (\h.west);
   \draw[decorate,decoration={brace,amplitude=5pt},line width=.6pt,draw=good] (125,36) -- (125,9) node[midway,right=3mm,plain,text=good,align=left]{used by the search\\\scriptsize exported to C++};
-  \draw[decorate,decoration={brace,amplitude=5pt},line width=.6pt,draw=accent2] (125,4) -- (125,-53) node[midway,right=3mm,plain,text=accent2,align=left]{training only\\\scriptsize extra gradient\\\scriptsize into the trunk,\\\scriptsize dropped at export};
+  \draw[decorate,decoration={brace,amplitude=5pt},line width=.6pt,draw=accent2] (125,4) -- (125,-23) node[midway,right=3mm,plain,text=accent2,align=left]{training only (\texttt{-{}-aux})\\\scriptsize extra gradient into the trunk,\\\scriptsize dropped at export};
 \end{tikzpicture}
 \end{document}

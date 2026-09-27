@@ -345,6 +345,8 @@ numpy through `SAMPLE_DTYPE` in `alphazero_learn.py`: the two must change
 together.
 """, [
  ("`TrainingSample`", "one training row: the bitboards, the side to move, z, the sparse $\\pi$, the search value, the network step"),
+ ("`OwnershipCode`", "future owner of a square: nobody, mine, the opponent's, or no target (already a hole)"),
+ ("`TrainingSampleAux`", "a version-2 row: `TrainingSample` + the 2-bit future ownership map (`--aux`)"),
  ("`SampleFileHeader`", "24-byte file header: magic, version, row size, row and game counts"),
  ("`ModelRef` / `read_latest_model`", "parse `latest.json`, resolving a relative path against the work directory"),
  ("`SelfPlayOptions`", "the driver's knobs: concurrency, flush policy, poll period"),
@@ -358,6 +360,7 @@ dropped; finished ones always reach the disk before `run_selfplay` returns.
 """, [
  ("`SampleWriter`", "collects finished games; writes ~2000-row files under a temporary name and renames them"),
  ("`make_sample`", "a `SearchResult` → a `TrainingSample` ($\\pi$ quantised to 16 bits)"),
+ ("`with_ownership`", "a sample + who left each square during the game → its future ownership map"),
  ("`run_selfplay` / `game_loop`", "one game after another; z filled in at the end of each game"),
 ]),
 
@@ -388,6 +391,20 @@ it is the glue between the classes above it.
  ("`Evaluator.ensure_ts`", "re-trace a pruned `.ts` from its `.pt` when an old network is needed again"),
  ("`cleanup_models` (in `main`)", "disk budget: drop unevaluated exports, keep the `.pt` of evaluated ones"),
  ("`main`", "setup, resume, the training loop, the clean shutdown"),
+]),
+
+("nnue/alphazero_aux.py", "python", """
+KataGo's auxiliary heads, adapted to Yolah (@sec-auxiliary): only imported by
+the trainer with `--aux`. The network with the two extra heads, the decoding
+of the future ownership map, and the losses.
+""", [
+ ("`decode_ownership`", "16 bytes, 2 bits per square → 64 codes in plane-cell order"),
+ ("`margin_from_ownership`", "the rest of the score for the side to move: #mine − #opponent's"),
+ ("`AuxNet`", "`Net` + ownership head (1×1 conv to 3 classes) + score head (pooling → 113 logits)"),
+ ("`AuxNet.forward_all`", "value, policy, ownership logits, margin logits"),
+ ("`base_state_dict`", "the `Net` part of the parameters: what is exported"),
+ ("`make_aux_net`", "an `AuxNet` from a state dict; fresh heads if it has none"),
+ ("`aux_losses`", "ownership cross-entropy, margin pdf and cdf losses, masked where there is no target"),
 ]),
 
 ("config/alphazero_mcts_selfplay_player.cfg", "json", """
@@ -422,8 +439,7 @@ cleanly on the time-limit signal.
 """, []),
 
 ("nnue/alphazero_selfplay.sh", "bash", """
-An extra self-play GPU on any node, for a run split over several jobs
-(@fig-split).
+An extra self-play GPU on any node, for a run split over several jobs (@fig-split).
 """, []),
 ]),
 ]

@@ -12,6 +12,7 @@ formulas, figures, annotated sources — is chapter "Learning by self-play" of
 | `player/alphazero_selfplay.{h,cpp}` | self-play driver: 128 games on one batched GPU network, hot swap of weights, training rows |
 | `test/alphazero_learn_main.cpp` | `alphazero_learn selfplay` / `alphazero_learn match` |
 | `nnue/alphazero_learn.py` | trainer + orchestrator (starts self-play and evaluations) |
+| `nnue/alphazero_aux.py` | optional KataGo-style auxiliary heads (`--aux` / `AUX=1`) |
 | `nnue/alphazero_learn.def` / `.sh` | cluster image (toolchain only) and main SLURM job |
 | `nnue/alphazero_selfplay.sh` | optional extra self-play GPU on another node |
 | `nnue/alphazero_common.sh` | paths and shell functions shared by the two jobs |
@@ -44,6 +45,12 @@ sbatch alphazero_selfplay.sh              # + 1 more
 ```
 
 The extra self-play jobs stop by themselves 6 h after the last new network.
+
+Auxiliary heads (KataGo's ownership and score, adapted to Yolah: who will leave
+each square, and the rest of the score margin): `sbatch --export=ALL,AUX=1
+alphazero_learn.sh`. Off by default; a run can switch on or off from one job to
+the next. The exported network is the plain two-headed one either way.
+Monitoring: `WORK_DIR/train_log_aux.csv`.
 
 The main job asks for 3 GPUs, 32 CPUs, 128 GB, 14 days: one self-play process
 of 256 games per GPU, the trainer on the first GPU, the evaluation matches on

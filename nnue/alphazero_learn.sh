@@ -73,6 +73,10 @@ EVAL_HOURS="${EVAL_HOURS:-4}"                 # time between evaluations
 EVAL_GAMES="${EVAL_GAMES:-20}"
 EVAL_SECONDS="${EVAL_SECONDS:-2}"
 EVAL_OPPONENTS="${EVAL_OPPONENTS:-previous}"  # previous, initial, lag:K (comma separated)
+# 1 = train KataGo's auxiliary heads (ownership, score margin) as well; 0 =
+# the plain two-headed training. A run can switch from one job to the next;
+# the extra self-play jobs follow automatically (latest.json).
+AUX="${AUX:-0}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"                  # anything else for alphazero_learn.py
 RESUBMIT="${RESUBMIT:-0}"                     # 1 = sbatch this script again when the time is up
 
@@ -87,6 +91,8 @@ if [[ ! -f "${WORK_DIR}/init_model.pt" ]] && head -c 100 "${INIT_MODEL}" 2>/dev/
 fi
 cp -n "${INIT_MODEL}" "${WORK_DIR}/init_model.pt" 2>/dev/null || true
 MAX_HOURS=$(max_hours_for_job 1200)           # stop 20 min before the limit
+AUX_ARGS=""
+[[ "${AUX}" == "1" ]] && AUX_ARGS="--aux"
 
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job        : ${SLURM_JOB_ID:-(local)} on $(hostname), GPUs ${CUDA_VISIBLE_DEVICES:-?}"
@@ -94,6 +100,7 @@ echo "  Yolah      : ${YOLAH_DIR} ($(git -C "${YOLAH_DIR}" rev-parse --short HEA
 echo "  SIF        : ${SIF}"
 echo "  Work dir   : ${WORK_DIR}"
 echo "  Max hours  : ${MAX_HOURS}"
+echo "  Aux heads  : $([[ "${AUX}" == "1" ]] && echo "on (ownership, score margin)" || echo off)"
 echo "════════════════════════════════════════════════════════════════"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null || true
 
@@ -110,7 +117,7 @@ start_in_container bash -c "cd /Yolah/nnue && exec python3 -u alphazero_learn.py
     --selfplay-set 'nn cache=${SELFPLAY_NN_CACHE}' --max-window ${MAX_WINDOW} \
     --min-rows ${MIN_ROWS} --export-every ${EXPORT_EVERY} --eval-hours ${EVAL_HOURS} \
     --eval-games ${EVAL_GAMES} --eval-seconds ${EVAL_SECONDS} --eval-opponents ${EVAL_OPPONENTS} \
-    --max-hours ${MAX_HOURS} ${EXTRA_ARGS}"
+    --max-hours ${MAX_HOURS} ${AUX_ARGS} ${EXTRA_ARGS}"
 wait_forwarding_signals
 
 echo "[$(date '+%F %T')] === Stopped (exit code ${RC}) ==="
