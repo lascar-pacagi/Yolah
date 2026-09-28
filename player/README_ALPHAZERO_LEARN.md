@@ -15,6 +15,7 @@ formulas, figures, annotated sources — is chapter "Learning by self-play" of
 | `nnue/alphazero_aux.py` | optional KataGo-style auxiliary heads (`--aux` / `AUX=1`) |
 | `nnue/alphazero_learn.def` / `.sh` | cluster image (toolchain only) and main SLURM job |
 | `nnue/alphazero_selfplay.sh` | optional extra self-play GPU on another node |
+| `nnue/alphazero_match.sh` | long match between two networks of a run (1 GPU), with a confidence interval |
 | `nnue/alphazero_common.sh` | paths and shell functions shared by the two jobs |
 | `config/alphazero_mcts_selfplay_player.cfg` | self-play search settings |
 | `config/alphazero_mcts_eval_player.cfg` | evaluation-match settings (2 s/move comes from the command line) |
@@ -45,6 +46,15 @@ sbatch alphazero_selfplay.sh              # + 1 more
 ```
 
 The extra self-play jobs stop by themselves 6 h after the last new network.
+
+Precise measurement (the 20-game evaluations are ±78 Elo each): a long match
+on its own GPU, alongside the learning job; the result goes to
+`WORK_DIR/matches.csv` with a 95 % confidence interval.
+
+```bash
+sbatch alphazero_match.sh                                  # latest vs initial, 200 games, 0.5 s/move
+sbatch --export=ALL,A=7168,B=4096,GAMES=400 alphazero_match.sh
+```
 
 Auxiliary heads (KataGo's ownership and score, adapted to Yolah: who will leave
 each square, and the rest of the score margin): `sbatch --export=ALL,AUX=1

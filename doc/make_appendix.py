@@ -438,6 +438,12 @@ The main SLURM job: 3 GPUs, 32 CPUs, 128 GB, 14 days (sizing:
 cleanly on the time-limit signal.
 """, []),
 
+("nnue/alphazero_match.sh", "bash", """
+A long match between two networks of a run, on its own GPU, with the score's
+95 % confidence interval — the precise measurement the 20-game evaluations
+cannot give (@sec-eval).
+""", []),
+
 ("nnue/alphazero_selfplay.sh", "bash", """
 An extra self-play GPU on any node, for a run split over several jobs (@fig-split).
 """, []),

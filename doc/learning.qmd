@@ -476,12 +476,19 @@ that is **±78 Elo** for one evaluation. The chained Elo accumulates the errors
 of every link like a random walk: ±78·$\sqrt{k}$ after $k$ links. Read the
 **trend** over many evaluations, not any single one; a run that learns shows a
 chained Elo that climbs steadily. For a precise comparison of two networks at
-the end, play a few hundred games (400 games: ±17 Elo):
+the end, play a few hundred games (200 games: ±25 Elo, 400: ±17) with
+`nnue/alphazero_match.sh`, a separate 1-GPU job that can run alongside the
+learning job:
 
 ```bash
-./alphazero_learn match --config ../config/alphazero_mcts_eval_player.cfg \
-    --a work/models/az_A.ts --b work/models/az_B.ts --games 400 --time 500000
+sbatch alphazero_match.sh                              # latest vs initial, 200 games, 0.5 s/move
+sbatch --export=ALL,A=7168,B=4096,GAMES=400 alphazero_match.sh
 ```
+
+It copies the two networks first (the learning job prunes old files at every
+export), re-traces a network from its `.pt` if its `.ts` was pruned, plays the
+games in pairs like the evaluations, and appends A's result with its 95 %
+confidence interval to `WORK_DIR/matches.csv`.
 
 Adding `initial` to `--eval-opponents` gives an unchained measurement against a
 fixed reference, at the cost of another 20 games per evaluation.

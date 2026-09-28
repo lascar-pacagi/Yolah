@@ -2534,7 +2534,8 @@ padding-right: 0.6em;
   <li><a href="#sec-src-nnue-alphazero-learn-def" id="toc-sec-src-nnue-alphazero-learn-def" class="nav-link" data-scroll-target="#sec-src-nnue-alphazero-learn-def"><span class="header-section-number">12.5.8</span> <code>nnue/alphazero_learn.def</code></a></li>
   <li><a href="#sec-src-nnue-alphazero-common-sh" id="toc-sec-src-nnue-alphazero-common-sh" class="nav-link" data-scroll-target="#sec-src-nnue-alphazero-common-sh"><span class="header-section-number">12.5.9</span> <code>nnue/alphazero_common.sh</code></a></li>
   <li><a href="#sec-src-nnue-alphazero-learn-sh" id="toc-sec-src-nnue-alphazero-learn-sh" class="nav-link" data-scroll-target="#sec-src-nnue-alphazero-learn-sh"><span class="header-section-number">12.5.10</span> <code>nnue/alphazero_learn.sh</code></a></li>
-  <li><a href="#sec-src-nnue-alphazero-selfplay-sh" id="toc-sec-src-nnue-alphazero-selfplay-sh" class="nav-link" data-scroll-target="#sec-src-nnue-alphazero-selfplay-sh"><span class="header-section-number">12.5.11</span> <code>nnue/alphazero_selfplay.sh</code></a></li>
+  <li><a href="#sec-src-nnue-alphazero-match-sh" id="toc-sec-src-nnue-alphazero-match-sh" class="nav-link" data-scroll-target="#sec-src-nnue-alphazero-match-sh"><span class="header-section-number">12.5.11</span> <code>nnue/alphazero_match.sh</code></a></li>
+  <li><a href="#sec-src-nnue-alphazero-selfplay-sh" id="toc-sec-src-nnue-alphazero-selfplay-sh" class="nav-link" data-scroll-target="#sec-src-nnue-alphazero-selfplay-sh"><span class="header-section-number">12.5.12</span> <code>nnue/alphazero_selfplay.sh</code></a></li>
   </ul></li>
   </ul></li>
   </ul>
@@ -3350,9 +3351,10 @@ Figure 13: The 20 evaluation games: 10 random openings, each played once with e
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The standard error of a score over <span class="math inline">\(n\)</span> games is at most <span class="math inline">\(\sqrt{s(1-s)/n}\)</span>, i.e. 0.11 for <span class="math inline">\(n = 20\)</span> near <span class="math inline">\(s = 0.5\)</span> (less if there are many draws). Through the slope of the Elo curve at <span class="math inline">\(s = 0.5\)</span>, <span class="math inline">\(d\Delta/ds = 1600/\ln 10 \approx 695\)</span>, that is <strong>±78 Elo</strong> for one evaluation. The chained Elo accumulates the errors of every link like a random walk: ±78·<span class="math inline">\(\sqrt{k}\)</span> after <span class="math inline">\(k\)</span> links. Read the <strong>trend</strong> over many evaluations, not any single one; a run that learns shows a chained Elo that climbs steadily. For a precise comparison of two networks at the end, play a few hundred games (400 games: ±17 Elo):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./alphazero_learn</span> match <span class="at">--config</span> ../config/alphazero_mcts_eval_player.cfg <span class="dt">\</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--a</span> work/models/az_A.ts <span class="at">--b</span> work/models/az_B.ts <span class="at">--games</span> 400 <span class="at">--time</span> 500000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The standard error of a score over <span class="math inline">\(n\)</span> games is at most <span class="math inline">\(\sqrt{s(1-s)/n}\)</span>, i.e. 0.11 for <span class="math inline">\(n = 20\)</span> near <span class="math inline">\(s = 0.5\)</span> (less if there are many draws). Through the slope of the Elo curve at <span class="math inline">\(s = 0.5\)</span>, <span class="math inline">\(d\Delta/ds = 1600/\ln 10 \approx 695\)</span>, that is <strong>±78 Elo</strong> for one evaluation. The chained Elo accumulates the errors of every link like a random walk: ±78·<span class="math inline">\(\sqrt{k}\)</span> after <span class="math inline">\(k\)</span> links. Read the <strong>trend</strong> over many evaluations, not any single one; a run that learns shows a chained Elo that climbs steadily. For a precise comparison of two networks at the end, play a few hundred games (200 games: ±25 Elo, 400: ±17) with <code>nnue/alphazero_match.sh</code>, a separate 1-GPU job that can run alongside the learning job:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> alphazero_match.sh                              <span class="co"># latest vs initial, 200 games, 0.5 s/move</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--export</span><span class="op">=</span>ALL,A=7168,B=4096,GAMES=400 alphazero_match.sh</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>It copies the two networks first (the learning job prunes old files at every export), re-traces a network from its <code>.pt</code> if its <code>.ts</code> was pruned, plays the games in pairs like the evaluations, and appends A’s result with its 95 % confidence interval to <code>WORK_DIR/matches.csv</code>.</p>
 <p>Adding <code>initial</code> to <code>--eval-opponents</code> gives an unchained measurement against a fixed reference, at the cost of another 20 games per evaluation.</p>
 </div>
 </div>
@@ -9954,7 +9956,7 @@ Figure 22: Mean number of legal moves as a function of the number of holes, mea
 </section>
 <section id="sec-src-nnue-alphazero-learn-py" class="level3" data-number="12.5.4">
 <h3 data-number="12.5.4" class="anchored" data-anchor-id="sec-src-nnue-alphazero-learn-py"><span class="header-section-number">12.5.4</span> <code>nnue/alphazero_learn.py</code></h3>
-<p><em>927 lines.</em></p>
+<p><em>936 lines.</em></p>
 <p>The trainer, which is also the orchestrator: it starts the self-play processes and the evaluation thread, trains, exports and checkpoints. Read <code>main</code> last: it is the glue between the classes above it.</p>
 <table class="caption-top table">
 <colgroup>
@@ -10793,158 +10795,167 @@ Figure 22: Mean number of legal moves as a function of the number of holes, mea
 <span id="cb44-773"><a href="#cb44-773" aria-label="773"></a>    samples_at_report <span class="op">=</span> state.d[<span class="st">&quot;samples_trained&quot;</span>]</span>
 <span id="cb44-774"><a href="#cb44-774" aria-label="774"></a>    since_export <span class="op">=</span> state.d[<span class="st">&quot;samples_trained&quot;</span>] <span class="op">-</span> state.d.get(<span class="st">&quot;samples_at_last_export&quot;</span>, <span class="dv">0</span>)</span>
 <span id="cb44-775"><a href="#cb44-775" aria-label="775"></a>    waiting_logged <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb44-776"><a href="#cb44-776" aria-label="776"></a>    <span class="cf">while</span> <span class="kw">not</span> stop_event.is_set():</span>
-<span id="cb44-777"><a href="#cb44-777" aria-label="777"></a>        <span class="cf">if</span> args.max_hours <span class="kw">and</span> time.time() <span class="op">-</span> t_start <span class="op">&gt;</span> args.max_hours <span class="op">*</span> <span class="dv">3600</span>:</span>
-<span id="cb44-778"><a href="#cb44-778" aria-label="778"></a>            log(<span class="st">&quot;--max-hours reached&quot;</span>)</span>
-<span id="cb44-779"><a href="#cb44-779" aria-label="779"></a>            <span class="cf">break</span></span>
-<span id="cb44-780"><a href="#cb44-780" aria-label="780"></a>        now <span class="op">=</span> time.time()</span>
-<span id="cb44-781"><a href="#cb44-781" aria-label="781"></a>        <span class="cf">if</span> now <span class="op">-</span> last_scan <span class="op">&gt;</span> <span class="dv">20</span>:</span>
-<span id="cb44-782"><a href="#cb44-782" aria-label="782"></a>            window.scan()</span>
-<span id="cb44-783"><a href="#cb44-783" aria-label="783"></a>            <span class="cf">if</span> pool <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb44-784"><a href="#cb44-784" aria-label="784"></a>                pool.check()</span>
-<span id="cb44-785"><a href="#cb44-785" aria-label="785"></a>            last_scan <span class="op">=</span> now</span>
-<span id="cb44-786"><a href="#cb44-786" aria-label="786"></a></span>
-<span id="cb44-787"><a href="#cb44-787" aria-label="787"></a>        <span class="co"># Keep the trainer in step with self-play: at most `reuse` training</span></span>
-<span id="cb44-788"><a href="#cb44-788" aria-label="788"></a>        <span class="co"># samples per generated row (samples_trained &lt;= r·N), and nothing</span></span>
-<span id="cb44-789"><a href="#cb44-789" aria-label="789"></a>        <span class="co"># before N0 rows exist. Ahead of the data → sleep and rescan.</span></span>
-<span id="cb44-790"><a href="#cb44-790" aria-label="790"></a>        allowed <span class="op">=</span> args.reuse <span class="op">*</span> window.total</span>
-<span id="cb44-791"><a href="#cb44-791" aria-label="791"></a>        <span class="cf">if</span> window.total <span class="op">&lt;</span> args.min_rows <span class="kw">or</span> state.d[<span class="st">&quot;samples_trained&quot;</span>] <span class="op">+</span> args.batch_size <span class="op">&gt;</span> allowed:</span>
-<span id="cb44-792"><a href="#cb44-792" aria-label="792"></a>            <span class="cf">if</span> <span class="kw">not</span> waiting_logged:</span>
-<span id="cb44-793"><a href="#cb44-793" aria-label="793"></a>                log(<span class="ss">f&quot;waiting for self-play data: </span><span class="sc">{</span>window<span class="sc">.</span>total<span class="sc">:,}</span><span class="ss"> rows &quot;</span></span>
-<span id="cb44-794"><a href="#cb44-794" aria-label="794"></a>                    <span class="ss">f&quot;(training starts at </span><span class="sc">{</span>args<span class="sc">.</span>min_rows<span class="sc">:,}</span><span class="ss"> rows and trains at most </span><span class="sc">{</span>args<span class="sc">.</span>reuse<span class="sc">:g}</span><span class="ss"> samples per row)&quot;</span>)</span>
-<span id="cb44-795"><a href="#cb44-795" aria-label="795"></a>                waiting_logged <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb44-796"><a href="#cb44-796" aria-label="796"></a>            stop_event.wait(<span class="dv">10</span>)</span>
-<span id="cb44-797"><a href="#cb44-797" aria-label="797"></a>            last_scan <span class="op">=</span> <span class="dv">0</span></span>
-<span id="cb44-798"><a href="#cb44-798" aria-label="798"></a>            <span class="cf">continue</span></span>
-<span id="cb44-799"><a href="#cb44-799" aria-label="799"></a>        waiting_logged <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb44-800"><a href="#cb44-800" aria-label="800"></a></span>
-<span id="cb44-801"><a href="#cb44-801" aria-label="801"></a>        <span class="co"># ── one SGD step ──</span></span>
-<span id="cb44-802"><a href="#cb44-802" aria-label="802"></a>        <span class="co"># Linear warm-up: Adam&#39;s moment estimates start at zero after a fresh</span></span>
-<span id="cb44-803"><a href="#cb44-803" aria-label="803"></a>        <span class="co"># start, so the first steps would otherwise be too large.</span></span>
-<span id="cb44-804"><a href="#cb44-804" aria-label="804"></a>        step <span class="op">=</span> state.d[<span class="st">&quot;step&quot;</span>]</span>
-<span id="cb44-805"><a href="#cb44-805" aria-label="805"></a>        lr <span class="op">=</span> args.lr <span class="op">*</span> <span class="bu">min</span>(<span class="fl">1.0</span>, (step <span class="op">-</span> state.d.get(<span class="st">&quot;opt_start_step&quot;</span>, <span class="dv">0</span>) <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> <span class="bu">max</span>(<span class="dv">1</span>, args.warmup_steps))</span>
-<span id="cb44-806"><a href="#cb44-806" aria-label="806"></a>        <span class="cf">for</span> g <span class="kw">in</span> opt.param_groups:</span>
-<span id="cb44-807"><a href="#cb44-807" aria-label="807"></a>            g[<span class="st">&quot;lr&quot;</span>] <span class="op">=</span> lr</span>
-<span id="cb44-808"><a href="#cb44-808" aria-label="808"></a>        batch <span class="op">=</span> make_batch(window.sample(args.batch_size, rng))</span>
-<span id="cb44-809"><a href="#cb44-809" aria-label="809"></a>        x, z, actions, probs <span class="op">=</span> batch[:<span class="dv">4</span>]</span>
-<span id="cb44-810"><a href="#cb44-810" aria-label="810"></a>        <span class="cf">with</span> torch.autocast(device.<span class="bu">type</span>, dtype<span class="op">=</span>amp_dtype, enabled<span class="op">=</span>device.<span class="bu">type</span> <span class="op">==</span> <span class="st">&quot;cuda&quot;</span>):</span>
-<span id="cb44-811"><a href="#cb44-811" aria-label="811"></a>            <span class="cf">if</span> args.aux:</span>
-<span id="cb44-812"><a href="#cb44-812" aria-label="812"></a>                v, logits, own_logits, score_logits <span class="op">=</span> net.forward_all(x)</span>
-<span id="cb44-813"><a href="#cb44-813" aria-label="813"></a>            <span class="cf">else</span>:</span>
-<span id="cb44-814"><a href="#cb44-814" aria-label="814"></a>                v, logits <span class="op">=</span> net(x)</span>
-<span id="cb44-815"><a href="#cb44-815" aria-label="815"></a>        v <span class="op">=</span> v.<span class="bu">float</span>()</span>
-<span id="cb44-816"><a href="#cb44-816" aria-label="816"></a>        <span class="co"># Policy: cross-entropy with the soft target π, -Σ_a π(a) log p(a|s).</span></span>
-<span id="cb44-817"><a href="#cb44-817" aria-label="817"></a>        <span class="co"># The softmax runs over the 4096 logits; π lives on the legal moves</span></span>
-<span id="cb44-818"><a href="#cb44-818" aria-label="818"></a>        <span class="co"># only (sparse: `actions` are their indices, the padding has π = 0).</span></span>
-<span id="cb44-819"><a href="#cb44-819" aria-label="819"></a>        logp <span class="op">=</span> F.log_softmax(logits.<span class="bu">float</span>(), dim<span class="op">=</span><span class="dv">1</span>).gather(<span class="dv">1</span>, actions)</span>
-<span id="cb44-820"><a href="#cb44-820" aria-label="820"></a>        p_loss <span class="op">=</span> <span class="op">-</span>(probs <span class="op">*</span> logp).<span class="bu">sum</span>(<span class="dv">1</span>).mean()</span>
-<span id="cb44-821"><a href="#cb44-821" aria-label="821"></a>        <span class="co"># Value: squared error against the game result z ∈ {-1, 0, +1}.</span></span>
-<span id="cb44-822"><a href="#cb44-822" aria-label="822"></a>        v_loss <span class="op">=</span> F.mse_loss(v, z)</span>
-<span id="cb44-823"><a href="#cb44-823" aria-label="823"></a>        loss <span class="op">=</span> args.value_weight <span class="op">*</span> v_loss <span class="op">+</span> args.policy_weight <span class="op">*</span> p_loss</span>
-<span id="cb44-824"><a href="#cb44-824" aria-label="824"></a>        <span class="cf">if</span> args.aux:</span>
-<span id="cb44-825"><a href="#cb44-825" aria-label="825"></a>            <span class="co"># Auxiliary heads: ownership (per-square cross-entropy) and score</span></span>
-<span id="cb44-826"><a href="#cb44-826" aria-label="826"></a>            <span class="co"># margin (distribution + CDF), their weights ramped up from 0 so</span></span>
-<span id="cb44-827"><a href="#cb44-827" aria-label="827"></a>            <span class="co"># that the random new heads do not shake a trunk that already</span></span>
-<span id="cb44-828"><a href="#cb44-828" aria-label="828"></a>            <span class="co"># plays well. Rows without targets (version 1) are masked.</span></span>
-<span id="cb44-829"><a href="#cb44-829" aria-label="829"></a>            l_own, l_pdf, l_cdf, own_acc <span class="op">=</span> aux_losses(own_logits, score_logits, batch[<span class="dv">4</span>])</span>
-<span id="cb44-830"><a href="#cb44-830" aria-label="830"></a>            ramp <span class="op">=</span> <span class="bu">min</span>(<span class="fl">1.0</span>, (step <span class="op">-</span> state.d.get(<span class="st">&quot;aux_start_step&quot;</span>, <span class="dv">0</span>) <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> <span class="bu">max</span>(<span class="dv">1</span>, args.aux_ramp_steps))</span>
-<span id="cb44-831"><a href="#cb44-831" aria-label="831"></a>            loss <span class="op">=</span> loss <span class="op">+</span> ramp <span class="op">*</span> (args.own_weight <span class="op">*</span> l_own <span class="op">+</span> args.score_weight <span class="op">*</span> l_pdf</span>
-<span id="cb44-832"><a href="#cb44-832" aria-label="832"></a>                                  <span class="op">+</span> args.score_cdf_weight <span class="op">*</span> l_cdf)</span>
-<span id="cb44-833"><a href="#cb44-833" aria-label="833"></a>            aux_acc[<span class="st">&quot;own&quot;</span>] <span class="op">+=</span> l_own.item()<span class="op">;</span> aux_acc[<span class="st">&quot;pdf&quot;</span>] <span class="op">+=</span> l_pdf.item()</span>
-<span id="cb44-834"><a href="#cb44-834" aria-label="834"></a>            aux_acc[<span class="st">&quot;cdf&quot;</span>] <span class="op">+=</span> l_cdf.item()<span class="op">;</span> aux_acc[<span class="st">&quot;n&quot;</span>] <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb44-835"><a href="#cb44-835" aria-label="835"></a>            <span class="cf">if</span> own_acc <span class="op">==</span> own_acc:                       <span class="co"># not NaN (batch had targets)</span></span>
-<span id="cb44-836"><a href="#cb44-836" aria-label="836"></a>                aux_acc[<span class="st">&quot;acc&quot;</span>] <span class="op">+=</span> own_acc<span class="op">;</span> aux_acc[<span class="st">&quot;n_acc&quot;</span>] <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb44-837"><a href="#cb44-837" aria-label="837"></a>        opt.zero_grad(set_to_none<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb44-838"><a href="#cb44-838" aria-label="838"></a>        scaler.scale(loss).backward()</span>
-<span id="cb44-839"><a href="#cb44-839" aria-label="839"></a>        scaler.unscale_(opt)</span>
-<span id="cb44-840"><a href="#cb44-840" aria-label="840"></a>        torch.nn.utils.clip_grad_norm_(net.parameters(), <span class="fl">5.0</span>)</span>
-<span id="cb44-841"><a href="#cb44-841" aria-label="841"></a>        scaler.step(opt)</span>
-<span id="cb44-842"><a href="#cb44-842" aria-label="842"></a>        scaler.update()</span>
-<span id="cb44-843"><a href="#cb44-843" aria-label="843"></a>        <span class="co"># θ̄ ← μ θ̄ + (1-μ) θ: the averaged weights are the ones exported.</span></span>
-<span id="cb44-844"><a href="#cb44-844" aria-label="844"></a>        <span class="cf">if</span> ema <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb44-845"><a href="#cb44-845" aria-label="845"></a>            ema.update_parameters(net)</span>
-<span id="cb44-846"><a href="#cb44-846" aria-label="846"></a>        state.d[<span class="st">&quot;step&quot;</span>] <span class="op">=</span> step <span class="op">+</span> <span class="dv">1</span></span>
-<span id="cb44-847"><a href="#cb44-847" aria-label="847"></a>        state.d[<span class="st">&quot;samples_trained&quot;</span>] <span class="op">+=</span> args.batch_size</span>
-<span id="cb44-848"><a href="#cb44-848" aria-label="848"></a>        since_export <span class="op">+=</span> args.batch_size</span>
-<span id="cb44-849"><a href="#cb44-849" aria-label="849"></a></span>
-<span id="cb44-850"><a href="#cb44-850" aria-label="850"></a>        <span class="co"># KL(π‖p) = CE(π, p) − H(π): the part of the policy loss the network</span></span>
-<span id="cb44-851"><a href="#cb44-851" aria-label="851"></a>        <span class="co"># can still reduce (0 = it already predicts what the search finds).</span></span>
-<span id="cb44-852"><a href="#cb44-852" aria-label="852"></a>        <span class="cf">with</span> torch.no_grad():</span>
-<span id="cb44-853"><a href="#cb44-853" aria-label="853"></a>            entropy <span class="op">=</span> <span class="op">-</span>(probs <span class="op">*</span> torch.log(probs.clamp_min(<span class="fl">1e-12</span>))).<span class="bu">sum</span>(<span class="dv">1</span>).mean()</span>
-<span id="cb44-854"><a href="#cb44-854" aria-label="854"></a>        acc[<span class="st">&quot;v&quot;</span>] <span class="op">+=</span> v_loss.item()<span class="op">;</span> acc[<span class="st">&quot;p&quot;</span>] <span class="op">+=</span> p_loss.item()<span class="op">;</span> acc[<span class="st">&quot;kl&quot;</span>] <span class="op">+=</span> (p_loss <span class="op">-</span> entropy).item()<span class="op">;</span> acc[<span class="st">&quot;n&quot;</span>] <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb44-855"><a href="#cb44-855" aria-label="855"></a></span>
-<span id="cb44-856"><a href="#cb44-856" aria-label="856"></a>        <span class="cf">if</span> time.time() <span class="op">-</span> last_report <span class="op">&gt;</span> <span class="dv">120</span>:</span>
-<span id="cb44-857"><a href="#cb44-857" aria-label="857"></a>            n <span class="op">=</span> <span class="bu">max</span>(<span class="dv">1</span>, acc[<span class="st">&quot;n&quot;</span>])</span>
-<span id="cb44-858"><a href="#cb44-858" aria-label="858"></a>            dt <span class="op">=</span> time.time() <span class="op">-</span> last_report</span>
-<span id="cb44-859"><a href="#cb44-859" aria-label="859"></a>            sps <span class="op">=</span> (state.d[<span class="st">&quot;samples_trained&quot;</span>] <span class="op">-</span> samples_at_report) <span class="op">/</span> dt</span>
-<span id="cb44-860"><a href="#cb44-860" aria-label="860"></a>            hours <span class="op">=</span> (time.time() <span class="op">-</span> t_start) <span class="op">/</span> <span class="dv">3600</span></span>
-<span id="cb44-861"><a href="#cb44-861" aria-label="861"></a>            log(<span class="ss">f&quot;step </span><span class="sc">{</span>state<span class="sc">.</span>d[<span class="st">&#39;step&#39;</span>]<span class="sc">}</span><span class="ss">  trained </span><span class="sc">{</span>state<span class="sc">.</span>d[<span class="st">&#39;samples_trained&#39;</span>]<span class="sc">:,}</span><span class="ss">  rows </span><span class="sc">{</span>window<span class="sc">.</span>total<span class="sc">:,}</span><span class="ss"> &quot;</span></span>
-<span id="cb44-862"><a href="#cb44-862" aria-label="862"></a>                <span class="ss">f&quot;(</span><span class="sc">{</span>window<span class="sc">.</span>games<span class="sc">:,}</span><span class="ss"> games)  window </span><span class="sc">{</span>window<span class="sc">.</span>window_size()<span class="sc">:,}</span><span class="ss">  &quot;</span></span>
-<span id="cb44-863"><a href="#cb44-863" aria-label="863"></a>                <span class="ss">f&quot;v </span><span class="sc">{</span>acc[<span class="st">&#39;v&#39;</span>]<span class="op">/</span>n<span class="sc">:.4f}</span><span class="ss">  p </span><span class="sc">{</span>acc[<span class="st">&#39;p&#39;</span>]<span class="op">/</span>n<span class="sc">:.4f}</span><span class="ss">  kl </span><span class="sc">{</span>acc[<span class="st">&#39;kl&#39;</span>]<span class="op">/</span>n<span class="sc">:.4f}</span><span class="ss">  lr </span><span class="sc">{</span>lr<span class="sc">:.2e}</span><span class="ss">  </span><span class="sc">{</span>sps<span class="sc">:.0f}</span><span class="ss"> samples/s&quot;</span>)</span>
-<span id="cb44-864"><a href="#cb44-864" aria-label="864"></a>            log_csv.writerow([time.strftime(<span class="st">&quot;</span><span class="sc">%F</span><span class="st"> %T&quot;</span>), <span class="ss">f&quot;</span><span class="sc">{</span>hours<span class="sc">:.3f}</span><span class="ss">&quot;</span>, state.d[<span class="st">&quot;step&quot;</span>], state.d[<span class="st">&quot;samples_trained&quot;</span>],</span>
-<span id="cb44-865"><a href="#cb44-865" aria-label="865"></a>                              window.total, window.games, window.window_size(), <span class="ss">f&quot;</span><span class="sc">{</span>acc[<span class="st">&#39;v&#39;</span>]<span class="op">/</span>n<span class="sc">:.5f}</span><span class="ss">&quot;</span>,</span>
-<span id="cb44-866"><a href="#cb44-866" aria-label="866"></a>                              <span class="ss">f&quot;</span><span class="sc">{</span>acc[<span class="st">&#39;p&#39;</span>]<span class="op">/</span>n<span class="sc">:.5f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>acc[<span class="st">&#39;kl&#39;</span>]<span class="op">/</span>n<span class="sc">:.5f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>lr<span class="sc">:.3e}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>sps<span class="sc">:.0f}</span><span class="ss">&quot;</span>])</span>
-<span id="cb44-867"><a href="#cb44-867" aria-label="867"></a>            log_file.flush()</span>
-<span id="cb44-868"><a href="#cb44-868" aria-label="868"></a>            <span class="cf">if</span> args.aux <span class="kw">and</span> aux_acc[<span class="st">&quot;n&quot;</span>]:</span>
-<span id="cb44-869"><a href="#cb44-869" aria-label="869"></a>                <span class="co"># A separate file, so that train_log.csv keeps one format for</span></span>
-<span id="cb44-870"><a href="#cb44-870" aria-label="870"></a>                <span class="co"># every run whichever the variant.</span></span>
-<span id="cb44-871"><a href="#cb44-871" aria-label="871"></a>                m <span class="op">=</span> aux_acc[<span class="st">&quot;n&quot;</span>]</span>
-<span id="cb44-872"><a href="#cb44-872" aria-label="872"></a>                own_accuracy <span class="op">=</span> aux_acc[<span class="st">&quot;acc&quot;</span>] <span class="op">/</span> aux_acc[<span class="st">&quot;n_acc&quot;</span>] <span class="cf">if</span> aux_acc[<span class="st">&quot;n_acc&quot;</span>] <span class="cf">else</span> <span class="bu">float</span>(<span class="st">&quot;nan&quot;</span>)</span>
-<span id="cb44-873"><a href="#cb44-873" aria-label="873"></a>                log(<span class="ss">f&quot;  aux: ownership </span><span class="sc">{</span>aux_acc[<span class="st">&#39;own&#39;</span>]<span class="op">/</span>m<span class="sc">:.4f}</span><span class="ss"> (accuracy </span><span class="sc">{</span>own_accuracy<span class="sc">:.3f}</span><span class="ss">)  &quot;</span></span>
-<span id="cb44-874"><a href="#cb44-874" aria-label="874"></a>                    <span class="ss">f&quot;margin pdf </span><span class="sc">{</span>aux_acc[<span class="st">&#39;pdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.4f}</span><span class="ss">  cdf </span><span class="sc">{</span>aux_acc[<span class="st">&#39;cdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.4f}</span><span class="ss">  weight ramp </span><span class="sc">{</span>ramp<span class="sc">:.2f}</span><span class="ss">&quot;</span>)</span>
-<span id="cb44-875"><a href="#cb44-875" aria-label="875"></a>                aux_path <span class="op">=</span> os.path.join(args.work, <span class="st">&quot;train_log_aux.csv&quot;</span>)</span>
-<span id="cb44-876"><a href="#cb44-876" aria-label="876"></a>                new_aux <span class="op">=</span> <span class="kw">not</span> os.path.exists(aux_path)</span>
-<span id="cb44-877"><a href="#cb44-877" aria-label="877"></a>                <span class="cf">with</span> <span class="bu">open</span>(aux_path, <span class="st">&quot;a&quot;</span>, newline<span class="op">=</span><span class="st">&quot;&quot;</span>) <span class="im">as</span> f:</span>
-<span id="cb44-878"><a href="#cb44-878" aria-label="878"></a>                    w <span class="op">=</span> csv.writer(f)</span>
-<span id="cb44-879"><a href="#cb44-879" aria-label="879"></a>                    <span class="cf">if</span> new_aux:</span>
-<span id="cb44-880"><a href="#cb44-880" aria-label="880"></a>                        w.writerow([<span class="st">&quot;time&quot;</span>, <span class="st">&quot;step&quot;</span>, <span class="st">&quot;ownership_loss&quot;</span>, <span class="st">&quot;ownership_accuracy&quot;</span>,</span>
-<span id="cb44-881"><a href="#cb44-881" aria-label="881"></a>                                    <span class="st">&quot;margin_pdf_loss&quot;</span>, <span class="st">&quot;margin_cdf_loss&quot;</span>, <span class="st">&quot;ramp&quot;</span>])</span>
-<span id="cb44-882"><a href="#cb44-882" aria-label="882"></a>                    w.writerow([time.strftime(<span class="st">&quot;</span><span class="sc">%F</span><span class="st"> %T&quot;</span>), state.d[<span class="st">&quot;step&quot;</span>], <span class="ss">f&quot;</span><span class="sc">{</span>aux_acc[<span class="st">&#39;own&#39;</span>]<span class="op">/</span>m<span class="sc">:.5f}</span><span class="ss">&quot;</span>,</span>
-<span id="cb44-883"><a href="#cb44-883" aria-label="883"></a>                                <span class="ss">f&quot;</span><span class="sc">{</span>own_accuracy<span class="sc">:.4f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>aux_acc[<span class="st">&#39;pdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.5f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>aux_acc[<span class="st">&#39;cdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.5f}</span><span class="ss">&quot;</span>,</span>
-<span id="cb44-884"><a href="#cb44-884" aria-label="884"></a>                                <span class="ss">f&quot;</span><span class="sc">{</span>ramp<span class="sc">:.3f}</span><span class="ss">&quot;</span>])</span>
-<span id="cb44-885"><a href="#cb44-885" aria-label="885"></a>            aux_acc <span class="op">=</span> {<span class="st">&quot;own&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;pdf&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;cdf&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;acc&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;n&quot;</span>: <span class="dv">0</span>, <span class="st">&quot;n_acc&quot;</span>: <span class="dv">0</span>}</span>
-<span id="cb44-886"><a href="#cb44-886" aria-label="886"></a>            acc <span class="op">=</span> {<span class="st">&quot;v&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;p&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;kl&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;n&quot;</span>: <span class="dv">0</span>}</span>
-<span id="cb44-887"><a href="#cb44-887" aria-label="887"></a>            last_report <span class="op">=</span> time.time()</span>
-<span id="cb44-888"><a href="#cb44-888" aria-label="888"></a>            samples_at_report <span class="op">=</span> state.d[<span class="st">&quot;samples_trained&quot;</span>]</span>
-<span id="cb44-889"><a href="#cb44-889" aria-label="889"></a></span>
-<span id="cb44-890"><a href="#cb44-890" aria-label="890"></a>        <span class="co"># ── export: a new network for self-play (and, every eval_every, a match) ──</span></span>
-<span id="cb44-891"><a href="#cb44-891" aria-label="891"></a>        <span class="cf">if</span> since_export <span class="op">&gt;=</span> args.export_every:</span>
-<span id="cb44-892"><a href="#cb44-892" aria-label="892"></a>            since_export <span class="op">=</span> <span class="dv">0</span></span>
-<span id="cb44-893"><a href="#cb44-893" aria-label="893"></a>            s <span class="op">=</span> state.d[<span class="st">&quot;step&quot;</span>]</span>
-<span id="cb44-894"><a href="#cb44-894" aria-label="894"></a>            export_model(ema.module <span class="cf">if</span> ema <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> net, args.work, s)</span>
-<span id="cb44-895"><a href="#cb44-895" aria-label="895"></a>            publish_latest(args.work, s, args.aux)</span>
-<span id="cb44-896"><a href="#cb44-896" aria-label="896"></a>            <span class="cf">with</span> state.lock:</span>
-<span id="cb44-897"><a href="#cb44-897" aria-label="897"></a>                state.d[<span class="st">&quot;exports&quot;</span>].append(s)</span>
-<span id="cb44-898"><a href="#cb44-898" aria-label="898"></a>                state.d[<span class="st">&quot;samples_at_last_export&quot;</span>] <span class="op">=</span> state.d[<span class="st">&quot;samples_trained&quot;</span>]</span>
-<span id="cb44-899"><a href="#cb44-899" aria-label="899"></a>                <span class="co"># Evaluation schedule: every eval_every exports, or else the</span></span>
-<span id="cb44-900"><a href="#cb44-900" aria-label="900"></a>                <span class="co"># first export at least eval_hours (wall clock, across jobs)</span></span>
-<span id="cb44-901"><a href="#cb44-901" aria-label="901"></a>                <span class="co"># after the previously scheduled one.</span></span>
-<span id="cb44-902"><a href="#cb44-902" aria-label="902"></a>                <span class="cf">if</span> args.eval_every <span class="op">&gt;</span> <span class="dv">0</span>:</span>
-<span id="cb44-903"><a href="#cb44-903" aria-label="903"></a>                    due <span class="op">=</span> (<span class="bu">len</span>(state.d[<span class="st">&quot;exports&quot;</span>]) <span class="op">-</span> <span class="dv">1</span>) <span class="op">%</span> args.eval_every <span class="op">==</span> <span class="dv">0</span></span>
-<span id="cb44-904"><a href="#cb44-904" aria-label="904"></a>                <span class="cf">else</span>:</span>
-<span id="cb44-905"><a href="#cb44-905" aria-label="905"></a>                    due <span class="op">=</span> time.time() <span class="op">-</span> state.d.get(<span class="st">&quot;last_eval_time&quot;</span>, <span class="dv">0</span>) <span class="op">&gt;=</span> args.eval_hours <span class="op">*</span> <span class="dv">3600</span></span>
-<span id="cb44-906"><a href="#cb44-906" aria-label="906"></a>                <span class="cf">if</span> due <span class="kw">and</span> args.eval_games <span class="op">&gt;</span> <span class="dv">0</span>:</span>
-<span id="cb44-907"><a href="#cb44-907" aria-label="907"></a>                    state.d[<span class="st">&quot;pending_evals&quot;</span>].append(s)</span>
-<span id="cb44-908"><a href="#cb44-908" aria-label="908"></a>                    state.d[<span class="st">&quot;last_eval_time&quot;</span>] <span class="op">=</span> time.time()</span>
-<span id="cb44-909"><a href="#cb44-909" aria-label="909"></a>            save_checkpoint()</span>
-<span id="cb44-910"><a href="#cb44-910" aria-label="910"></a>            cleanup_models()</span>
-<span id="cb44-911"><a href="#cb44-911" aria-label="911"></a>            evaluator.wake.<span class="bu">set</span>()</span>
-<span id="cb44-912"><a href="#cb44-912" aria-label="912"></a>            log(<span class="ss">f&quot;exported az_</span><span class="sc">{</span>s<span class="sc">:08d}</span><span class="ss"> (self-play switches to it)&quot;</span>)</span>
-<span id="cb44-913"><a href="#cb44-913" aria-label="913"></a></span>
-<span id="cb44-914"><a href="#cb44-914" aria-label="914"></a>    <span class="co"># ── shutdown ──</span></span>
-<span id="cb44-915"><a href="#cb44-915" aria-label="915"></a>    stop_event.<span class="bu">set</span>()</span>
-<span id="cb44-916"><a href="#cb44-916" aria-label="916"></a>    log(<span class="st">&quot;saving checkpoint&quot;</span>)</span>
-<span id="cb44-917"><a href="#cb44-917" aria-label="917"></a>    save_checkpoint()</span>
-<span id="cb44-918"><a href="#cb44-918" aria-label="918"></a>    evaluator.stop()</span>
-<span id="cb44-919"><a href="#cb44-919" aria-label="919"></a>    <span class="cf">if</span> pool <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb44-920"><a href="#cb44-920" aria-label="920"></a>        pool.stop()</span>
-<span id="cb44-921"><a href="#cb44-921" aria-label="921"></a>    evaluator.join(timeout<span class="op">=</span><span class="dv">60</span>)</span>
-<span id="cb44-922"><a href="#cb44-922" aria-label="922"></a>    log_file.close()</span>
-<span id="cb44-923"><a href="#cb44-923" aria-label="923"></a>    log(<span class="st">&quot;stopped; resubmit with the same --work to continue&quot;</span>)</span>
-<span id="cb44-924"><a href="#cb44-924" aria-label="924"></a></span>
-<span id="cb44-925"><a href="#cb44-925" aria-label="925"></a></span>
-<span id="cb44-926"><a href="#cb44-926" aria-label="926"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">&quot;__main__&quot;</span>:</span>
-<span id="cb44-927"><a href="#cb44-927" aria-label="927"></a>    main()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb44-776"><a href="#cb44-776" aria-label="776"></a>    last_cap_log <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb44-777"><a href="#cb44-777" aria-label="777"></a>    <span class="cf">while</span> <span class="kw">not</span> stop_event.is_set():</span>
+<span id="cb44-778"><a href="#cb44-778" aria-label="778"></a>        <span class="cf">if</span> args.max_hours <span class="kw">and</span> time.time() <span class="op">-</span> t_start <span class="op">&gt;</span> args.max_hours <span class="op">*</span> <span class="dv">3600</span>:</span>
+<span id="cb44-779"><a href="#cb44-779" aria-label="779"></a>            log(<span class="st">&quot;--max-hours reached&quot;</span>)</span>
+<span id="cb44-780"><a href="#cb44-780" aria-label="780"></a>            <span class="cf">break</span></span>
+<span id="cb44-781"><a href="#cb44-781" aria-label="781"></a>        now <span class="op">=</span> time.time()</span>
+<span id="cb44-782"><a href="#cb44-782" aria-label="782"></a>        <span class="cf">if</span> now <span class="op">-</span> last_scan <span class="op">&gt;</span> <span class="dv">20</span>:</span>
+<span id="cb44-783"><a href="#cb44-783" aria-label="783"></a>            window.scan()</span>
+<span id="cb44-784"><a href="#cb44-784" aria-label="784"></a>            <span class="cf">if</span> pool <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb44-785"><a href="#cb44-785" aria-label="785"></a>                pool.check()</span>
+<span id="cb44-786"><a href="#cb44-786" aria-label="786"></a>            last_scan <span class="op">=</span> now</span>
+<span id="cb44-787"><a href="#cb44-787" aria-label="787"></a></span>
+<span id="cb44-788"><a href="#cb44-788" aria-label="788"></a>        <span class="co"># Keep the trainer in step with self-play: at most `reuse` training</span></span>
+<span id="cb44-789"><a href="#cb44-789" aria-label="789"></a>        <span class="co"># samples per generated row (samples_trained &lt;= r·N), and nothing</span></span>
+<span id="cb44-790"><a href="#cb44-790" aria-label="790"></a>        <span class="co"># before N0 rows exist. Ahead of the data → sleep and rescan.</span></span>
+<span id="cb44-791"><a href="#cb44-791" aria-label="791"></a>        allowed <span class="op">=</span> args.reuse <span class="op">*</span> window.total</span>
+<span id="cb44-792"><a href="#cb44-792" aria-label="792"></a>        <span class="cf">if</span> window.total <span class="op">&lt;</span> args.min_rows <span class="kw">or</span> state.d[<span class="st">&quot;samples_trained&quot;</span>] <span class="op">+</span> args.batch_size <span class="op">&gt;</span> allowed:</span>
+<span id="cb44-793"><a href="#cb44-793" aria-label="793"></a>            <span class="co"># Two different waits: before training starts (not enough rows</span></span>
+<span id="cb44-794"><a href="#cb44-794" aria-label="794"></a>            <span class="co"># yet), and during training when the trainer has caught up with</span></span>
+<span id="cb44-795"><a href="#cb44-795" aria-label="795"></a>            <span class="co"># the reuse cap — the normal steady state, logged only now and then.</span></span>
+<span id="cb44-796"><a href="#cb44-796" aria-label="796"></a>            <span class="cf">if</span> window.total <span class="op">&lt;</span> args.min_rows:</span>
+<span id="cb44-797"><a href="#cb44-797" aria-label="797"></a>                <span class="cf">if</span> <span class="kw">not</span> waiting_logged:</span>
+<span id="cb44-798"><a href="#cb44-798" aria-label="798"></a>                    log(<span class="ss">f&quot;waiting for self-play data: </span><span class="sc">{</span>window<span class="sc">.</span>total<span class="sc">:,}</span><span class="ss"> rows &quot;</span></span>
+<span id="cb44-799"><a href="#cb44-799" aria-label="799"></a>                        <span class="ss">f&quot;(training starts at </span><span class="sc">{</span>args<span class="sc">.</span>min_rows<span class="sc">:,}</span><span class="ss">)&quot;</span>)</span>
+<span id="cb44-800"><a href="#cb44-800" aria-label="800"></a>                    waiting_logged <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb44-801"><a href="#cb44-801" aria-label="801"></a>            <span class="cf">elif</span> time.time() <span class="op">-</span> last_cap_log <span class="op">&gt;</span> <span class="dv">1800</span>:</span>
+<span id="cb44-802"><a href="#cb44-802" aria-label="802"></a>                log(<span class="ss">f&quot;trainer at the reuse cap (</span><span class="sc">{</span>args<span class="sc">.</span>reuse<span class="sc">:g}</span><span class="ss"> samples per row): &quot;</span></span>
+<span id="cb44-803"><a href="#cb44-803" aria-label="803"></a>                    <span class="ss">f&quot;it trains as fast as self-play produces rows&quot;</span>)</span>
+<span id="cb44-804"><a href="#cb44-804" aria-label="804"></a>                last_cap_log <span class="op">=</span> time.time()</span>
+<span id="cb44-805"><a href="#cb44-805" aria-label="805"></a>            stop_event.wait(<span class="dv">10</span>)</span>
+<span id="cb44-806"><a href="#cb44-806" aria-label="806"></a>            last_scan <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb44-807"><a href="#cb44-807" aria-label="807"></a>            <span class="cf">continue</span></span>
+<span id="cb44-808"><a href="#cb44-808" aria-label="808"></a>        waiting_logged <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb44-809"><a href="#cb44-809" aria-label="809"></a></span>
+<span id="cb44-810"><a href="#cb44-810" aria-label="810"></a>        <span class="co"># ── one SGD step ──</span></span>
+<span id="cb44-811"><a href="#cb44-811" aria-label="811"></a>        <span class="co"># Linear warm-up: Adam&#39;s moment estimates start at zero after a fresh</span></span>
+<span id="cb44-812"><a href="#cb44-812" aria-label="812"></a>        <span class="co"># start, so the first steps would otherwise be too large.</span></span>
+<span id="cb44-813"><a href="#cb44-813" aria-label="813"></a>        step <span class="op">=</span> state.d[<span class="st">&quot;step&quot;</span>]</span>
+<span id="cb44-814"><a href="#cb44-814" aria-label="814"></a>        lr <span class="op">=</span> args.lr <span class="op">*</span> <span class="bu">min</span>(<span class="fl">1.0</span>, (step <span class="op">-</span> state.d.get(<span class="st">&quot;opt_start_step&quot;</span>, <span class="dv">0</span>) <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> <span class="bu">max</span>(<span class="dv">1</span>, args.warmup_steps))</span>
+<span id="cb44-815"><a href="#cb44-815" aria-label="815"></a>        <span class="cf">for</span> g <span class="kw">in</span> opt.param_groups:</span>
+<span id="cb44-816"><a href="#cb44-816" aria-label="816"></a>            g[<span class="st">&quot;lr&quot;</span>] <span class="op">=</span> lr</span>
+<span id="cb44-817"><a href="#cb44-817" aria-label="817"></a>        batch <span class="op">=</span> make_batch(window.sample(args.batch_size, rng))</span>
+<span id="cb44-818"><a href="#cb44-818" aria-label="818"></a>        x, z, actions, probs <span class="op">=</span> batch[:<span class="dv">4</span>]</span>
+<span id="cb44-819"><a href="#cb44-819" aria-label="819"></a>        <span class="cf">with</span> torch.autocast(device.<span class="bu">type</span>, dtype<span class="op">=</span>amp_dtype, enabled<span class="op">=</span>device.<span class="bu">type</span> <span class="op">==</span> <span class="st">&quot;cuda&quot;</span>):</span>
+<span id="cb44-820"><a href="#cb44-820" aria-label="820"></a>            <span class="cf">if</span> args.aux:</span>
+<span id="cb44-821"><a href="#cb44-821" aria-label="821"></a>                v, logits, own_logits, score_logits <span class="op">=</span> net.forward_all(x)</span>
+<span id="cb44-822"><a href="#cb44-822" aria-label="822"></a>            <span class="cf">else</span>:</span>
+<span id="cb44-823"><a href="#cb44-823" aria-label="823"></a>                v, logits <span class="op">=</span> net(x)</span>
+<span id="cb44-824"><a href="#cb44-824" aria-label="824"></a>        v <span class="op">=</span> v.<span class="bu">float</span>()</span>
+<span id="cb44-825"><a href="#cb44-825" aria-label="825"></a>        <span class="co"># Policy: cross-entropy with the soft target π, -Σ_a π(a) log p(a|s).</span></span>
+<span id="cb44-826"><a href="#cb44-826" aria-label="826"></a>        <span class="co"># The softmax runs over the 4096 logits; π lives on the legal moves</span></span>
+<span id="cb44-827"><a href="#cb44-827" aria-label="827"></a>        <span class="co"># only (sparse: `actions` are their indices, the padding has π = 0).</span></span>
+<span id="cb44-828"><a href="#cb44-828" aria-label="828"></a>        logp <span class="op">=</span> F.log_softmax(logits.<span class="bu">float</span>(), dim<span class="op">=</span><span class="dv">1</span>).gather(<span class="dv">1</span>, actions)</span>
+<span id="cb44-829"><a href="#cb44-829" aria-label="829"></a>        p_loss <span class="op">=</span> <span class="op">-</span>(probs <span class="op">*</span> logp).<span class="bu">sum</span>(<span class="dv">1</span>).mean()</span>
+<span id="cb44-830"><a href="#cb44-830" aria-label="830"></a>        <span class="co"># Value: squared error against the game result z ∈ {-1, 0, +1}.</span></span>
+<span id="cb44-831"><a href="#cb44-831" aria-label="831"></a>        v_loss <span class="op">=</span> F.mse_loss(v, z)</span>
+<span id="cb44-832"><a href="#cb44-832" aria-label="832"></a>        loss <span class="op">=</span> args.value_weight <span class="op">*</span> v_loss <span class="op">+</span> args.policy_weight <span class="op">*</span> p_loss</span>
+<span id="cb44-833"><a href="#cb44-833" aria-label="833"></a>        <span class="cf">if</span> args.aux:</span>
+<span id="cb44-834"><a href="#cb44-834" aria-label="834"></a>            <span class="co"># Auxiliary heads: ownership (per-square cross-entropy) and score</span></span>
+<span id="cb44-835"><a href="#cb44-835" aria-label="835"></a>            <span class="co"># margin (distribution + CDF), their weights ramped up from 0 so</span></span>
+<span id="cb44-836"><a href="#cb44-836" aria-label="836"></a>            <span class="co"># that the random new heads do not shake a trunk that already</span></span>
+<span id="cb44-837"><a href="#cb44-837" aria-label="837"></a>            <span class="co"># plays well. Rows without targets (version 1) are masked.</span></span>
+<span id="cb44-838"><a href="#cb44-838" aria-label="838"></a>            l_own, l_pdf, l_cdf, own_acc <span class="op">=</span> aux_losses(own_logits, score_logits, batch[<span class="dv">4</span>])</span>
+<span id="cb44-839"><a href="#cb44-839" aria-label="839"></a>            ramp <span class="op">=</span> <span class="bu">min</span>(<span class="fl">1.0</span>, (step <span class="op">-</span> state.d.get(<span class="st">&quot;aux_start_step&quot;</span>, <span class="dv">0</span>) <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> <span class="bu">max</span>(<span class="dv">1</span>, args.aux_ramp_steps))</span>
+<span id="cb44-840"><a href="#cb44-840" aria-label="840"></a>            loss <span class="op">=</span> loss <span class="op">+</span> ramp <span class="op">*</span> (args.own_weight <span class="op">*</span> l_own <span class="op">+</span> args.score_weight <span class="op">*</span> l_pdf</span>
+<span id="cb44-841"><a href="#cb44-841" aria-label="841"></a>                                  <span class="op">+</span> args.score_cdf_weight <span class="op">*</span> l_cdf)</span>
+<span id="cb44-842"><a href="#cb44-842" aria-label="842"></a>            aux_acc[<span class="st">&quot;own&quot;</span>] <span class="op">+=</span> l_own.item()<span class="op">;</span> aux_acc[<span class="st">&quot;pdf&quot;</span>] <span class="op">+=</span> l_pdf.item()</span>
+<span id="cb44-843"><a href="#cb44-843" aria-label="843"></a>            aux_acc[<span class="st">&quot;cdf&quot;</span>] <span class="op">+=</span> l_cdf.item()<span class="op">;</span> aux_acc[<span class="st">&quot;n&quot;</span>] <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb44-844"><a href="#cb44-844" aria-label="844"></a>            <span class="cf">if</span> own_acc <span class="op">==</span> own_acc:                       <span class="co"># not NaN (batch had targets)</span></span>
+<span id="cb44-845"><a href="#cb44-845" aria-label="845"></a>                aux_acc[<span class="st">&quot;acc&quot;</span>] <span class="op">+=</span> own_acc<span class="op">;</span> aux_acc[<span class="st">&quot;n_acc&quot;</span>] <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb44-846"><a href="#cb44-846" aria-label="846"></a>        opt.zero_grad(set_to_none<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb44-847"><a href="#cb44-847" aria-label="847"></a>        scaler.scale(loss).backward()</span>
+<span id="cb44-848"><a href="#cb44-848" aria-label="848"></a>        scaler.unscale_(opt)</span>
+<span id="cb44-849"><a href="#cb44-849" aria-label="849"></a>        torch.nn.utils.clip_grad_norm_(net.parameters(), <span class="fl">5.0</span>)</span>
+<span id="cb44-850"><a href="#cb44-850" aria-label="850"></a>        scaler.step(opt)</span>
+<span id="cb44-851"><a href="#cb44-851" aria-label="851"></a>        scaler.update()</span>
+<span id="cb44-852"><a href="#cb44-852" aria-label="852"></a>        <span class="co"># θ̄ ← μ θ̄ + (1-μ) θ: the averaged weights are the ones exported.</span></span>
+<span id="cb44-853"><a href="#cb44-853" aria-label="853"></a>        <span class="cf">if</span> ema <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb44-854"><a href="#cb44-854" aria-label="854"></a>            ema.update_parameters(net)</span>
+<span id="cb44-855"><a href="#cb44-855" aria-label="855"></a>        state.d[<span class="st">&quot;step&quot;</span>] <span class="op">=</span> step <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb44-856"><a href="#cb44-856" aria-label="856"></a>        state.d[<span class="st">&quot;samples_trained&quot;</span>] <span class="op">+=</span> args.batch_size</span>
+<span id="cb44-857"><a href="#cb44-857" aria-label="857"></a>        since_export <span class="op">+=</span> args.batch_size</span>
+<span id="cb44-858"><a href="#cb44-858" aria-label="858"></a></span>
+<span id="cb44-859"><a href="#cb44-859" aria-label="859"></a>        <span class="co"># KL(π‖p) = CE(π, p) − H(π): the part of the policy loss the network</span></span>
+<span id="cb44-860"><a href="#cb44-860" aria-label="860"></a>        <span class="co"># can still reduce (0 = it already predicts what the search finds).</span></span>
+<span id="cb44-861"><a href="#cb44-861" aria-label="861"></a>        <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb44-862"><a href="#cb44-862" aria-label="862"></a>            entropy <span class="op">=</span> <span class="op">-</span>(probs <span class="op">*</span> torch.log(probs.clamp_min(<span class="fl">1e-12</span>))).<span class="bu">sum</span>(<span class="dv">1</span>).mean()</span>
+<span id="cb44-863"><a href="#cb44-863" aria-label="863"></a>        acc[<span class="st">&quot;v&quot;</span>] <span class="op">+=</span> v_loss.item()<span class="op">;</span> acc[<span class="st">&quot;p&quot;</span>] <span class="op">+=</span> p_loss.item()<span class="op">;</span> acc[<span class="st">&quot;kl&quot;</span>] <span class="op">+=</span> (p_loss <span class="op">-</span> entropy).item()<span class="op">;</span> acc[<span class="st">&quot;n&quot;</span>] <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb44-864"><a href="#cb44-864" aria-label="864"></a></span>
+<span id="cb44-865"><a href="#cb44-865" aria-label="865"></a>        <span class="cf">if</span> time.time() <span class="op">-</span> last_report <span class="op">&gt;</span> <span class="dv">120</span>:</span>
+<span id="cb44-866"><a href="#cb44-866" aria-label="866"></a>            n <span class="op">=</span> <span class="bu">max</span>(<span class="dv">1</span>, acc[<span class="st">&quot;n&quot;</span>])</span>
+<span id="cb44-867"><a href="#cb44-867" aria-label="867"></a>            dt <span class="op">=</span> time.time() <span class="op">-</span> last_report</span>
+<span id="cb44-868"><a href="#cb44-868" aria-label="868"></a>            sps <span class="op">=</span> (state.d[<span class="st">&quot;samples_trained&quot;</span>] <span class="op">-</span> samples_at_report) <span class="op">/</span> dt</span>
+<span id="cb44-869"><a href="#cb44-869" aria-label="869"></a>            hours <span class="op">=</span> (time.time() <span class="op">-</span> t_start) <span class="op">/</span> <span class="dv">3600</span></span>
+<span id="cb44-870"><a href="#cb44-870" aria-label="870"></a>            log(<span class="ss">f&quot;step </span><span class="sc">{</span>state<span class="sc">.</span>d[<span class="st">&#39;step&#39;</span>]<span class="sc">}</span><span class="ss">  trained </span><span class="sc">{</span>state<span class="sc">.</span>d[<span class="st">&#39;samples_trained&#39;</span>]<span class="sc">:,}</span><span class="ss">  rows </span><span class="sc">{</span>window<span class="sc">.</span>total<span class="sc">:,}</span><span class="ss"> &quot;</span></span>
+<span id="cb44-871"><a href="#cb44-871" aria-label="871"></a>                <span class="ss">f&quot;(</span><span class="sc">{</span>window<span class="sc">.</span>games<span class="sc">:,}</span><span class="ss"> games)  window </span><span class="sc">{</span>window<span class="sc">.</span>window_size()<span class="sc">:,}</span><span class="ss">  &quot;</span></span>
+<span id="cb44-872"><a href="#cb44-872" aria-label="872"></a>                <span class="ss">f&quot;v </span><span class="sc">{</span>acc[<span class="st">&#39;v&#39;</span>]<span class="op">/</span>n<span class="sc">:.4f}</span><span class="ss">  p </span><span class="sc">{</span>acc[<span class="st">&#39;p&#39;</span>]<span class="op">/</span>n<span class="sc">:.4f}</span><span class="ss">  kl </span><span class="sc">{</span>acc[<span class="st">&#39;kl&#39;</span>]<span class="op">/</span>n<span class="sc">:.4f}</span><span class="ss">  lr </span><span class="sc">{</span>lr<span class="sc">:.2e}</span><span class="ss">  </span><span class="sc">{</span>sps<span class="sc">:.0f}</span><span class="ss"> samples/s&quot;</span>)</span>
+<span id="cb44-873"><a href="#cb44-873" aria-label="873"></a>            log_csv.writerow([time.strftime(<span class="st">&quot;</span><span class="sc">%F</span><span class="st"> %T&quot;</span>), <span class="ss">f&quot;</span><span class="sc">{</span>hours<span class="sc">:.3f}</span><span class="ss">&quot;</span>, state.d[<span class="st">&quot;step&quot;</span>], state.d[<span class="st">&quot;samples_trained&quot;</span>],</span>
+<span id="cb44-874"><a href="#cb44-874" aria-label="874"></a>                              window.total, window.games, window.window_size(), <span class="ss">f&quot;</span><span class="sc">{</span>acc[<span class="st">&#39;v&#39;</span>]<span class="op">/</span>n<span class="sc">:.5f}</span><span class="ss">&quot;</span>,</span>
+<span id="cb44-875"><a href="#cb44-875" aria-label="875"></a>                              <span class="ss">f&quot;</span><span class="sc">{</span>acc[<span class="st">&#39;p&#39;</span>]<span class="op">/</span>n<span class="sc">:.5f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>acc[<span class="st">&#39;kl&#39;</span>]<span class="op">/</span>n<span class="sc">:.5f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>lr<span class="sc">:.3e}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>sps<span class="sc">:.0f}</span><span class="ss">&quot;</span>])</span>
+<span id="cb44-876"><a href="#cb44-876" aria-label="876"></a>            log_file.flush()</span>
+<span id="cb44-877"><a href="#cb44-877" aria-label="877"></a>            <span class="cf">if</span> args.aux <span class="kw">and</span> aux_acc[<span class="st">&quot;n&quot;</span>]:</span>
+<span id="cb44-878"><a href="#cb44-878" aria-label="878"></a>                <span class="co"># A separate file, so that train_log.csv keeps one format for</span></span>
+<span id="cb44-879"><a href="#cb44-879" aria-label="879"></a>                <span class="co"># every run whichever the variant.</span></span>
+<span id="cb44-880"><a href="#cb44-880" aria-label="880"></a>                m <span class="op">=</span> aux_acc[<span class="st">&quot;n&quot;</span>]</span>
+<span id="cb44-881"><a href="#cb44-881" aria-label="881"></a>                own_accuracy <span class="op">=</span> aux_acc[<span class="st">&quot;acc&quot;</span>] <span class="op">/</span> aux_acc[<span class="st">&quot;n_acc&quot;</span>] <span class="cf">if</span> aux_acc[<span class="st">&quot;n_acc&quot;</span>] <span class="cf">else</span> <span class="bu">float</span>(<span class="st">&quot;nan&quot;</span>)</span>
+<span id="cb44-882"><a href="#cb44-882" aria-label="882"></a>                log(<span class="ss">f&quot;  aux: ownership </span><span class="sc">{</span>aux_acc[<span class="st">&#39;own&#39;</span>]<span class="op">/</span>m<span class="sc">:.4f}</span><span class="ss"> (accuracy </span><span class="sc">{</span>own_accuracy<span class="sc">:.3f}</span><span class="ss">)  &quot;</span></span>
+<span id="cb44-883"><a href="#cb44-883" aria-label="883"></a>                    <span class="ss">f&quot;margin pdf </span><span class="sc">{</span>aux_acc[<span class="st">&#39;pdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.4f}</span><span class="ss">  cdf </span><span class="sc">{</span>aux_acc[<span class="st">&#39;cdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.4f}</span><span class="ss">  weight ramp </span><span class="sc">{</span>ramp<span class="sc">:.2f}</span><span class="ss">&quot;</span>)</span>
+<span id="cb44-884"><a href="#cb44-884" aria-label="884"></a>                aux_path <span class="op">=</span> os.path.join(args.work, <span class="st">&quot;train_log_aux.csv&quot;</span>)</span>
+<span id="cb44-885"><a href="#cb44-885" aria-label="885"></a>                new_aux <span class="op">=</span> <span class="kw">not</span> os.path.exists(aux_path)</span>
+<span id="cb44-886"><a href="#cb44-886" aria-label="886"></a>                <span class="cf">with</span> <span class="bu">open</span>(aux_path, <span class="st">&quot;a&quot;</span>, newline<span class="op">=</span><span class="st">&quot;&quot;</span>) <span class="im">as</span> f:</span>
+<span id="cb44-887"><a href="#cb44-887" aria-label="887"></a>                    w <span class="op">=</span> csv.writer(f)</span>
+<span id="cb44-888"><a href="#cb44-888" aria-label="888"></a>                    <span class="cf">if</span> new_aux:</span>
+<span id="cb44-889"><a href="#cb44-889" aria-label="889"></a>                        w.writerow([<span class="st">&quot;time&quot;</span>, <span class="st">&quot;step&quot;</span>, <span class="st">&quot;ownership_loss&quot;</span>, <span class="st">&quot;ownership_accuracy&quot;</span>,</span>
+<span id="cb44-890"><a href="#cb44-890" aria-label="890"></a>                                    <span class="st">&quot;margin_pdf_loss&quot;</span>, <span class="st">&quot;margin_cdf_loss&quot;</span>, <span class="st">&quot;ramp&quot;</span>])</span>
+<span id="cb44-891"><a href="#cb44-891" aria-label="891"></a>                    w.writerow([time.strftime(<span class="st">&quot;</span><span class="sc">%F</span><span class="st"> %T&quot;</span>), state.d[<span class="st">&quot;step&quot;</span>], <span class="ss">f&quot;</span><span class="sc">{</span>aux_acc[<span class="st">&#39;own&#39;</span>]<span class="op">/</span>m<span class="sc">:.5f}</span><span class="ss">&quot;</span>,</span>
+<span id="cb44-892"><a href="#cb44-892" aria-label="892"></a>                                <span class="ss">f&quot;</span><span class="sc">{</span>own_accuracy<span class="sc">:.4f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>aux_acc[<span class="st">&#39;pdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.5f}</span><span class="ss">&quot;</span>, <span class="ss">f&quot;</span><span class="sc">{</span>aux_acc[<span class="st">&#39;cdf&#39;</span>]<span class="op">/</span>m<span class="sc">:.5f}</span><span class="ss">&quot;</span>,</span>
+<span id="cb44-893"><a href="#cb44-893" aria-label="893"></a>                                <span class="ss">f&quot;</span><span class="sc">{</span>ramp<span class="sc">:.3f}</span><span class="ss">&quot;</span>])</span>
+<span id="cb44-894"><a href="#cb44-894" aria-label="894"></a>            aux_acc <span class="op">=</span> {<span class="st">&quot;own&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;pdf&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;cdf&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;acc&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;n&quot;</span>: <span class="dv">0</span>, <span class="st">&quot;n_acc&quot;</span>: <span class="dv">0</span>}</span>
+<span id="cb44-895"><a href="#cb44-895" aria-label="895"></a>            acc <span class="op">=</span> {<span class="st">&quot;v&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;p&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;kl&quot;</span>: <span class="fl">0.0</span>, <span class="st">&quot;n&quot;</span>: <span class="dv">0</span>}</span>
+<span id="cb44-896"><a href="#cb44-896" aria-label="896"></a>            last_report <span class="op">=</span> time.time()</span>
+<span id="cb44-897"><a href="#cb44-897" aria-label="897"></a>            samples_at_report <span class="op">=</span> state.d[<span class="st">&quot;samples_trained&quot;</span>]</span>
+<span id="cb44-898"><a href="#cb44-898" aria-label="898"></a></span>
+<span id="cb44-899"><a href="#cb44-899" aria-label="899"></a>        <span class="co"># ── export: a new network for self-play (and, every eval_every, a match) ──</span></span>
+<span id="cb44-900"><a href="#cb44-900" aria-label="900"></a>        <span class="cf">if</span> since_export <span class="op">&gt;=</span> args.export_every:</span>
+<span id="cb44-901"><a href="#cb44-901" aria-label="901"></a>            since_export <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb44-902"><a href="#cb44-902" aria-label="902"></a>            s <span class="op">=</span> state.d[<span class="st">&quot;step&quot;</span>]</span>
+<span id="cb44-903"><a href="#cb44-903" aria-label="903"></a>            export_model(ema.module <span class="cf">if</span> ema <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> net, args.work, s)</span>
+<span id="cb44-904"><a href="#cb44-904" aria-label="904"></a>            publish_latest(args.work, s, args.aux)</span>
+<span id="cb44-905"><a href="#cb44-905" aria-label="905"></a>            <span class="cf">with</span> state.lock:</span>
+<span id="cb44-906"><a href="#cb44-906" aria-label="906"></a>                state.d[<span class="st">&quot;exports&quot;</span>].append(s)</span>
+<span id="cb44-907"><a href="#cb44-907" aria-label="907"></a>                state.d[<span class="st">&quot;samples_at_last_export&quot;</span>] <span class="op">=</span> state.d[<span class="st">&quot;samples_trained&quot;</span>]</span>
+<span id="cb44-908"><a href="#cb44-908" aria-label="908"></a>                <span class="co"># Evaluation schedule: every eval_every exports, or else the</span></span>
+<span id="cb44-909"><a href="#cb44-909" aria-label="909"></a>                <span class="co"># first export at least eval_hours (wall clock, across jobs)</span></span>
+<span id="cb44-910"><a href="#cb44-910" aria-label="910"></a>                <span class="co"># after the previously scheduled one.</span></span>
+<span id="cb44-911"><a href="#cb44-911" aria-label="911"></a>                <span class="cf">if</span> args.eval_every <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb44-912"><a href="#cb44-912" aria-label="912"></a>                    due <span class="op">=</span> (<span class="bu">len</span>(state.d[<span class="st">&quot;exports&quot;</span>]) <span class="op">-</span> <span class="dv">1</span>) <span class="op">%</span> args.eval_every <span class="op">==</span> <span class="dv">0</span></span>
+<span id="cb44-913"><a href="#cb44-913" aria-label="913"></a>                <span class="cf">else</span>:</span>
+<span id="cb44-914"><a href="#cb44-914" aria-label="914"></a>                    due <span class="op">=</span> time.time() <span class="op">-</span> state.d.get(<span class="st">&quot;last_eval_time&quot;</span>, <span class="dv">0</span>) <span class="op">&gt;=</span> args.eval_hours <span class="op">*</span> <span class="dv">3600</span></span>
+<span id="cb44-915"><a href="#cb44-915" aria-label="915"></a>                <span class="cf">if</span> due <span class="kw">and</span> args.eval_games <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb44-916"><a href="#cb44-916" aria-label="916"></a>                    state.d[<span class="st">&quot;pending_evals&quot;</span>].append(s)</span>
+<span id="cb44-917"><a href="#cb44-917" aria-label="917"></a>                    state.d[<span class="st">&quot;last_eval_time&quot;</span>] <span class="op">=</span> time.time()</span>
+<span id="cb44-918"><a href="#cb44-918" aria-label="918"></a>            save_checkpoint()</span>
+<span id="cb44-919"><a href="#cb44-919" aria-label="919"></a>            cleanup_models()</span>
+<span id="cb44-920"><a href="#cb44-920" aria-label="920"></a>            evaluator.wake.<span class="bu">set</span>()</span>
+<span id="cb44-921"><a href="#cb44-921" aria-label="921"></a>            log(<span class="ss">f&quot;exported az_</span><span class="sc">{</span>s<span class="sc">:08d}</span><span class="ss"> (self-play switches to it)&quot;</span>)</span>
+<span id="cb44-922"><a href="#cb44-922" aria-label="922"></a></span>
+<span id="cb44-923"><a href="#cb44-923" aria-label="923"></a>    <span class="co"># ── shutdown ──</span></span>
+<span id="cb44-924"><a href="#cb44-924" aria-label="924"></a>    stop_event.<span class="bu">set</span>()</span>
+<span id="cb44-925"><a href="#cb44-925" aria-label="925"></a>    log(<span class="st">&quot;saving checkpoint&quot;</span>)</span>
+<span id="cb44-926"><a href="#cb44-926" aria-label="926"></a>    save_checkpoint()</span>
+<span id="cb44-927"><a href="#cb44-927" aria-label="927"></a>    evaluator.stop()</span>
+<span id="cb44-928"><a href="#cb44-928" aria-label="928"></a>    <span class="cf">if</span> pool <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb44-929"><a href="#cb44-929" aria-label="929"></a>        pool.stop()</span>
+<span id="cb44-930"><a href="#cb44-930" aria-label="930"></a>    evaluator.join(timeout<span class="op">=</span><span class="dv">60</span>)</span>
+<span id="cb44-931"><a href="#cb44-931" aria-label="931"></a>    log_file.close()</span>
+<span id="cb44-932"><a href="#cb44-932" aria-label="932"></a>    log(<span class="st">&quot;stopped; resubmit with the same --work to continue&quot;</span>)</span>
+<span id="cb44-933"><a href="#cb44-933" aria-label="933"></a></span>
+<span id="cb44-934"><a href="#cb44-934" aria-label="934"></a></span>
+<span id="cb44-935"><a href="#cb44-935" aria-label="935"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">&quot;__main__&quot;</span>:</span>
+<span id="cb44-936"><a href="#cb44-936" aria-label="936"></a>    main()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="sec-src-nnue-alphazero-aux-py" class="level3" data-number="12.5.5">
 <h3 data-number="12.5.5" class="anchored" data-anchor-id="sec-src-nnue-alphazero-aux-py"><span class="header-section-number">12.5.5</span> <code>nnue/alphazero_aux.py</code></h3>
@@ -11547,71 +11558,209 @@ Figure 22: Mean number of legal moves as a function of the number of holes, mea
 <span id="cb50-128"><a href="#cb50-128" aria-label="128"></a>    <span class="bu">cd</span> <span class="st">&quot;</span><span class="va">${SLURM_SUBMIT_DIR}</span><span class="st">&quot;</span> <span class="kw">&amp;&amp;</span> <span class="ex">sbatch</span> <span class="at">--export</span><span class="op">=</span>ALL alphazero_learn.sh</span>
 <span id="cb50-129"><a href="#cb50-129" aria-label="129"></a><span class="cf">fi</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="sec-src-nnue-alphazero-selfplay-sh" class="level3" data-number="12.5.11">
-<h3 data-number="12.5.11" class="anchored" data-anchor-id="sec-src-nnue-alphazero-selfplay-sh"><span class="header-section-number">12.5.11</span> <code>nnue/alphazero_selfplay.sh</code></h3>
-<p><em>61 lines.</em></p>
-<p>An extra self-play GPU on any node, for a run split over several jobs (<a href="#fig-split" class="quarto-xref">Figure 16</a>).</p>
+<section id="sec-src-nnue-alphazero-match-sh" class="level3" data-number="12.5.11">
+<h3 data-number="12.5.11" class="anchored" data-anchor-id="sec-src-nnue-alphazero-match-sh"><span class="header-section-number">12.5.11</span> <code>nnue/alphazero_match.sh</code></h3>
+<p><em>133 lines.</em></p>
+<p>A long match between two networks of a run, on its own GPU, with the score’s 95 % confidence interval — the precise measurement the 20-game evaluations cannot give (<a href="#sec-eval" class="quarto-xref">Section 6.5</a>).</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb51"><pre class="sourceCode numberSource bash numberLines code-with-copy"><code class="sourceCode bash"><span id="cb51-1"><a href="#cb51-1" aria-label="1"></a><span class="co">#!/bin/bash</span></span>
 <span id="cb51-2"><a href="#cb51-2" aria-label="2"></a><span class="co"># ────────────────────────────────────────────────────────────────────────────</span></span>
-<span id="cb51-3"><a href="#cb51-3" aria-label="3"></a><span class="co"># alphazero_selfplay.sh — an extra self-play GPU for a running alphazero_learn</span></span>
-<span id="cb51-4"><a href="#cb51-4" aria-label="4"></a><span class="co"># job, on any GPU node.</span></span>
-<span id="cb51-5"><a href="#cb51-5" aria-label="5"></a><span class="co">#</span></span>
-<span id="cb51-6"><a href="#cb51-6" aria-label="6"></a><span class="co">#     sbatch alphazero_selfplay.sh         # same WORK_DIR as alphazero_learn.sh</span></span>
-<span id="cb51-7"><a href="#cb51-7" aria-label="7"></a><span class="co">#</span></span>
-<span id="cb51-8"><a href="#cb51-8" aria-label="8"></a><span class="co"># The learning loop only communicates through files in WORK_DIR (in the home,</span></span>
-<span id="cb51-9"><a href="#cb51-9" aria-label="9"></a><span class="co"># visible from every node): this job reads latest.json, hot-swaps each new</span></span>
-<span id="cb51-10"><a href="#cb51-10" aria-label="10"></a><span class="co"># network, and writes its games to WORK_DIR/selfplay/, where the trainer picks</span></span>
-<span id="cb51-11"><a href="#cb51-11" aria-label="11"></a><span class="co"># them up like those of its own GPUs. Use it when a node with 3 free GPUs is</span></span>
-<span id="cb51-12"><a href="#cb51-12" aria-label="12"></a><span class="co"># long to get: `sbatch --gres=gpu:1 alphazero_learn.sh` plus two of these</span></span>
-<span id="cb51-13"><a href="#cb51-13" aria-label="13"></a><span class="co"># (3 GPUs in total, the per-user maximum).</span></span>
+<span id="cb51-3"><a href="#cb51-3" aria-label="3"></a><span class="co"># alphazero_match.sh — a long match between two networks of a learning run,</span></span>
+<span id="cb51-4"><a href="#cb51-4" aria-label="4"></a><span class="co"># on its own GPU, to measure progress more precisely than the 20-game</span></span>
+<span id="cb51-5"><a href="#cb51-5" aria-label="5"></a><span class="co"># evaluations of alphazero_learn.sh (±78 Elo each).</span></span>
+<span id="cb51-6"><a href="#cb51-6" aria-label="6"></a><span class="co">#</span></span>
+<span id="cb51-7"><a href="#cb51-7" aria-label="7"></a><span class="co">#     sbatch alphazero_match.sh                          # latest vs initial, 200 games, 0.5 s/move</span></span>
+<span id="cb51-8"><a href="#cb51-8" aria-label="8"></a><span class="co">#     sbatch --export=ALL,A=7168,B=4096 alphazero_match.sh</span></span>
+<span id="cb51-9"><a href="#cb51-9" aria-label="9"></a><span class="co">#     sbatch --export=ALL,GAMES=400,MOVE_SECONDS=1 alphazero_match.sh</span></span>
+<span id="cb51-10"><a href="#cb51-10" aria-label="10"></a><span class="co">#</span></span>
+<span id="cb51-11"><a href="#cb51-11" aria-label="11"></a><span class="co"># A and B are training steps (the numbers of models/az_&lt;step&gt;), or &quot;latest&quot;</span></span>
+<span id="cb51-12"><a href="#cb51-12" aria-label="12"></a><span class="co"># (the network self-play is using) or &quot;initial&quot; (step 0). A network whose .ts</span></span>
+<span id="cb51-13"><a href="#cb51-13" aria-label="13"></a><span class="co"># was pruned by the run is re-traced from its .pt.</span></span>
 <span id="cb51-14"><a href="#cb51-14" aria-label="14"></a><span class="co">#</span></span>
-<span id="cb51-15"><a href="#cb51-15" aria-label="15"></a><span class="co"># It waits for the main job to have published a network, and stops by itself</span></span>
-<span id="cb51-16"><a href="#cb51-16" aria-label="16"></a><span class="co"># when no new network has appeared for STALE_HOURS (the main job is over), at</span></span>
-<span id="cb51-17"><a href="#cb51-17" aria-label="17"></a><span class="co"># its own time limit, or on scancel — finished games are always written.</span></span>
-<span id="cb51-18"><a href="#cb51-18" aria-label="18"></a><span class="co"># ────────────────────────────────────────────────────────────────────────────</span></span>
-<span id="cb51-19"><a href="#cb51-19" aria-label="19"></a></span>
-<span id="cb51-20"><a href="#cb51-20" aria-label="20"></a><span class="co">#SBATCH --job-name=alphazero_selfplay</span></span>
-<span id="cb51-21"><a href="#cb51-21" aria-label="21"></a><span class="co">#SBATCH --output=alphazero_selfplay_%j.out</span></span>
-<span id="cb51-22"><a href="#cb51-22" aria-label="22"></a><span class="co">#SBATCH --error=alphazero_selfplay_%j.out</span></span>
-<span id="cb51-23"><a href="#cb51-23" aria-label="23"></a><span class="co">#SBATCH --partition=insa-gpu</span></span>
-<span id="cb51-24"><a href="#cb51-24" aria-label="24"></a><span class="co">#SBATCH -x crn23</span></span>
-<span id="cb51-25"><a href="#cb51-25" aria-label="25"></a><span class="co">#SBATCH --gres=gpu:1</span></span>
-<span id="cb51-26"><a href="#cb51-26" aria-label="26"></a><span class="co">#SBATCH --cpus-per-task=12</span></span>
-<span id="cb51-27"><a href="#cb51-27" aria-label="27"></a><span class="co">#SBATCH --mem=48G</span></span>
-<span id="cb51-28"><a href="#cb51-28" aria-label="28"></a><span class="co">#SBATCH --time=14-00:00:00</span></span>
-<span id="cb51-29"><a href="#cb51-29" aria-label="29"></a><span class="co">#SBATCH --signal=B:USR1@600</span></span>
-<span id="cb51-30"><a href="#cb51-30" aria-label="30"></a></span>
-<span id="cb51-31"><a href="#cb51-31" aria-label="31"></a><span class="bu">set</span> <span class="at">-euo</span> pipefail</span>
-<span id="cb51-32"><a href="#cb51-32" aria-label="32"></a></span>
-<span id="cb51-33"><a href="#cb51-33" aria-label="33"></a><span class="va">YOLAH_DIR</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${YOLAH_DIR</span><span class="op">:-</span><span class="va">${HOME}</span>/Yolah<span class="va">}</span><span class="st">&quot;</span></span>
-<span id="cb51-34"><a href="#cb51-34" aria-label="34"></a><span class="bu">source</span> <span class="st">&quot;</span><span class="va">${YOLAH_DIR}</span><span class="st">/nnue/alphazero_common.sh&quot;</span>                       <span class="co"># SIF, WORK_DIR, run(), ...</span></span>
-<span id="cb51-35"><a href="#cb51-35" aria-label="35"></a></span>
-<span id="cb51-36"><a href="#cb51-36" aria-label="36"></a><span class="va">SELFPLAY_GAMES</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${SELFPLAY_GAMES</span><span class="op">:-</span>256<span class="va">}</span><span class="st">&quot;</span>       <span class="co"># concurrent games on this GPU</span></span>
-<span id="cb51-37"><a href="#cb51-37" aria-label="37"></a><span class="va">SELFPLAY_NN_CACHE</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${SELFPLAY_NN_CACHE</span><span class="op">:-</span>32<span class="va">}</span><span class="st">&quot;</span>  <span class="co"># MB of network cache per game</span></span>
-<span id="cb51-38"><a href="#cb51-38" aria-label="38"></a><span class="va">STALE_HOURS</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${STALE_HOURS</span><span class="op">:-</span>6<span class="va">}</span><span class="st">&quot;</span>               <span class="co"># stop after this long without a new network</span></span>
+<span id="cb51-15"><a href="#cb51-15" aria-label="15"></a><span class="co"># Both players use config/alphazero_mcts_eval_player.cfg (no noise, no</span></span>
+<span id="cb51-16"><a href="#cb51-16" aria-label="16"></a><span class="co"># sampling). Games come in pairs: a random opening of OPENING_PLIES plies,</span></span>
+<span id="cb51-17"><a href="#cb51-17" aria-label="17"></a><span class="co"># played once with each colour. The result — A&#39;s wins/draws/losses, score and</span></span>
+<span id="cb51-18"><a href="#cb51-18" aria-label="18"></a><span class="co"># Elo difference with a 95 % confidence interval — is printed and appended to</span></span>
+<span id="cb51-19"><a href="#cb51-19" aria-label="19"></a><span class="co"># WORK_DIR/matches.csv; every game is in WORK_DIR/evals/match_*.json.</span></span>
+<span id="cb51-20"><a href="#cb51-20" aria-label="20"></a><span class="co">#</span></span>
+<span id="cb51-21"><a href="#cb51-21" aria-label="21"></a><span class="co"># 200 games × ~55 plies × 0.5 s ≈ 1.5 h;  ±25 Elo (95 %: about ±50).</span></span>
+<span id="cb51-22"><a href="#cb51-22" aria-label="22"></a><span class="co"># It can run while alphazero_learn.sh is running (another GPU, same WORK_DIR).</span></span>
+<span id="cb51-23"><a href="#cb51-23" aria-label="23"></a><span class="co"># ────────────────────────────────────────────────────────────────────────────</span></span>
+<span id="cb51-24"><a href="#cb51-24" aria-label="24"></a></span>
+<span id="cb51-25"><a href="#cb51-25" aria-label="25"></a><span class="co">#SBATCH --job-name=alphazero_match</span></span>
+<span id="cb51-26"><a href="#cb51-26" aria-label="26"></a><span class="co">#SBATCH --output=alphazero_match_%j.out</span></span>
+<span id="cb51-27"><a href="#cb51-27" aria-label="27"></a><span class="co">#SBATCH --error=alphazero_match_%j.out</span></span>
+<span id="cb51-28"><a href="#cb51-28" aria-label="28"></a><span class="co">#SBATCH --partition=insa-gpu</span></span>
+<span id="cb51-29"><a href="#cb51-29" aria-label="29"></a><span class="co">#SBATCH -x crn23</span></span>
+<span id="cb51-30"><a href="#cb51-30" aria-label="30"></a><span class="co">#SBATCH --gres=gpu:1</span></span>
+<span id="cb51-31"><a href="#cb51-31" aria-label="31"></a><span class="co">#SBATCH --cpus-per-task=8</span></span>
+<span id="cb51-32"><a href="#cb51-32" aria-label="32"></a><span class="co">#SBATCH --mem=16G</span></span>
+<span id="cb51-33"><a href="#cb51-33" aria-label="33"></a><span class="co">#SBATCH --time=06:00:00</span></span>
+<span id="cb51-34"><a href="#cb51-34" aria-label="34"></a></span>
+<span id="cb51-35"><a href="#cb51-35" aria-label="35"></a><span class="bu">set</span> <span class="at">-euo</span> pipefail</span>
+<span id="cb51-36"><a href="#cb51-36" aria-label="36"></a></span>
+<span id="cb51-37"><a href="#cb51-37" aria-label="37"></a><span class="va">YOLAH_DIR</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${YOLAH_DIR</span><span class="op">:-</span><span class="va">${HOME}</span>/Yolah<span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb51-38"><a href="#cb51-38" aria-label="38"></a><span class="bu">source</span> <span class="st">&quot;</span><span class="va">${YOLAH_DIR}</span><span class="st">/nnue/alphazero_common.sh&quot;</span>                       <span class="co"># SIF, WORK_DIR, run(), ...</span></span>
 <span id="cb51-39"><a href="#cb51-39" aria-label="39"></a></span>
-<span id="cb51-40"><a href="#cb51-40" aria-label="40"></a><span class="bu">echo</span> <span class="st">&quot;════════════════════════════════════════════════════════════════&quot;</span></span>
-<span id="cb51-41"><a href="#cb51-41" aria-label="41"></a><span class="bu">echo</span> <span class="st">&quot;  Job        : </span><span class="va">${SLURM_JOB_ID</span><span class="op">:-</span>(local)<span class="va">}</span><span class="st"> on </span><span class="va">$(</span><span class="fu">hostname</span><span class="va">)</span><span class="st">, GPU </span><span class="va">${CUDA_VISIBLE_DEVICES</span><span class="op">:-</span><span class="pp">?</span><span class="va">}</span><span class="st">&quot;</span></span>
-<span id="cb51-42"><a href="#cb51-42" aria-label="42"></a><span class="bu">echo</span> <span class="st">&quot;  Work dir   : </span><span class="va">${WORK_DIR}</span><span class="st">&quot;</span></span>
-<span id="cb51-43"><a href="#cb51-43" aria-label="43"></a><span class="bu">echo</span> <span class="st">&quot;════════════════════════════════════════════════════════════════&quot;</span></span>
-<span id="cb51-44"><a href="#cb51-44" aria-label="44"></a><span class="ex">nvidia-smi</span> <span class="at">--query-gpu</span><span class="op">=</span>index,name,memory.total <span class="at">--format</span><span class="op">=</span>csv,noheader <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">||</span> <span class="fu">true</span></span>
-<span id="cb51-45"><a href="#cb51-45" aria-label="45"></a></span>
-<span id="cb51-46"><a href="#cb51-46" aria-label="46"></a><span class="co"># The main job creates latest.json when it starts a new run.</span></span>
-<span id="cb51-47"><a href="#cb51-47" aria-label="47"></a><span class="cf">until</span> <span class="kw">[[</span> <span class="ot">-f</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/latest.json&quot;</span> <span class="kw">]];</span> <span class="cf">do</span></span>
-<span id="cb51-48"><a href="#cb51-48" aria-label="48"></a>    <span class="bu">echo</span> <span class="st">&quot;[</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">] waiting for </span><span class="va">${WORK_DIR}</span><span class="st">/latest.json (is alphazero_learn.sh running?)&quot;</span></span>
-<span id="cb51-49"><a href="#cb51-49" aria-label="49"></a>    <span class="fu">sleep</span> 60</span>
-<span id="cb51-50"><a href="#cb51-50" aria-label="50"></a><span class="cf">done</span></span>
+<span id="cb51-40"><a href="#cb51-40" aria-label="40"></a><span class="va">A</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${A</span><span class="op">:-</span>latest<span class="va">}</span><span class="st">&quot;</span>                  <span class="co"># step, &quot;latest&quot; or &quot;initial&quot;</span></span>
+<span id="cb51-41"><a href="#cb51-41" aria-label="41"></a><span class="va">B</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${B</span><span class="op">:-</span>initial<span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb51-42"><a href="#cb51-42" aria-label="42"></a><span class="va">GAMES</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${GAMES</span><span class="op">:-</span>200<span class="va">}</span><span class="st">&quot;</span>             <span class="co"># even: games come in pairs (one opening, both colours)</span></span>
+<span id="cb51-43"><a href="#cb51-43" aria-label="43"></a><span class="co"># (not SECONDS: that is bash&#39;s own counter of seconds since the shell started)</span></span>
+<span id="cb51-44"><a href="#cb51-44" aria-label="44"></a><span class="va">SECONDS_PER_MOVE</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${MOVE_SECONDS</span><span class="op">:-</span>0.5<span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb51-45"><a href="#cb51-45" aria-label="45"></a><span class="va">OPENING_PLIES</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${OPENING_PLIES</span><span class="op">:-</span>4<span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb51-46"><a href="#cb51-46" aria-label="46"></a><span class="va">SEED</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${SEED</span><span class="op">:-</span><span class="va">${SLURM_JOB_ID</span><span class="op">:-</span><span class="va">$$}}</span><span class="st">&quot;</span></span>
+<span id="cb51-47"><a href="#cb51-47" aria-label="47"></a><span class="va">JOB</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${SLURM_JOB_ID</span><span class="op">:-</span><span class="va">$$}</span><span class="st">&quot;</span></span>
+<span id="cb51-48"><a href="#cb51-48" aria-label="48"></a></span>
+<span id="cb51-49"><a href="#cb51-49" aria-label="49"></a><span class="kw">((</span> <span class="va">GAMES</span> <span class="op">%</span> <span class="dv">2</span> <span class="op">==</span> <span class="dv">0</span> <span class="kw">))</span> <span class="kw">||</span> <span class="kw">{</span> <span class="bu">echo</span> <span class="st">&quot;ERROR: GAMES must be even (pairs of games)&quot;</span><span class="kw">;</span> <span class="bu">exit</span> 1<span class="kw">;</span> <span class="kw">}</span></span>
+<span id="cb51-50"><a href="#cb51-50" aria-label="50"></a><span class="kw">[[</span> <span class="ot">-f</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/latest.json&quot;</span> <span class="kw">]]</span> <span class="kw">||</span> <span class="kw">{</span> <span class="bu">echo</span> <span class="st">&quot;ERROR: no run in </span><span class="va">${WORK_DIR}</span><span class="st"> (latest.json missing)&quot;</span><span class="kw">;</span> <span class="bu">exit</span> 1<span class="kw">;</span> <span class="kw">}</span></span>
 <span id="cb51-51"><a href="#cb51-51" aria-label="51"></a></span>
-<span id="cb51-52"><a href="#cb51-52" aria-label="52"></a><span class="ex">build_alphazero_learn</span></span>
-<span id="cb51-53"><a href="#cb51-53" aria-label="53"></a></span>
-<span id="cb51-54"><a href="#cb51-54" aria-label="54"></a><span class="bu">echo</span> <span class="st">&quot;[</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">] === Self-play ===&quot;</span></span>
-<span id="cb51-55"><a href="#cb51-55" aria-label="55"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/logs&quot;</span></span>
-<span id="cb51-56"><a href="#cb51-56" aria-label="56"></a><span class="ex">start_in_container</span> <span class="va">${BUILD_DIR}</span>/alphazero_learn selfplay <span class="dt">\</span></span>
-<span id="cb51-57"><a href="#cb51-57" aria-label="57"></a>    <span class="at">--config</span> /Yolah/config/alphazero_mcts_selfplay_player.cfg <span class="at">--work</span> /work <span class="dt">\</span></span>
-<span id="cb51-58"><a href="#cb51-58" aria-label="58"></a>    <span class="at">--games</span> <span class="st">&quot;</span><span class="va">${SELFPLAY_GAMES}</span><span class="st">&quot;</span> <span class="at">--set</span> <span class="st">&quot;nn cache=</span><span class="va">${SELFPLAY_NN_CACHE}</span><span class="st">&quot;</span> <span class="dt">\</span></span>
-<span id="cb51-59"><a href="#cb51-59" aria-label="59"></a>    <span class="at">--max-stale-hours</span> <span class="st">&quot;</span><span class="va">${STALE_HOURS}</span><span class="st">&quot;</span> <span class="at">--tag</span> <span class="st">&quot;</span><span class="va">$(</span><span class="fu">hostname</span><span class="va">)</span><span class="st">_</span><span class="va">${SLURM_JOB_ID</span><span class="op">:-</span><span class="va">$$}</span><span class="st">_extra&quot;</span></span>
-<span id="cb51-60"><a href="#cb51-60" aria-label="60"></a><span class="ex">wait_forwarding_signals</span></span>
-<span id="cb51-61"><a href="#cb51-61" aria-label="61"></a><span class="bu">echo</span> <span class="st">&quot;[</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">] === Stopped (exit code </span><span class="va">${RC}</span><span class="st">) ===&quot;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb51-52"><a href="#cb51-52" aria-label="52"></a><span class="co"># &quot;latest&quot; / &quot;initial&quot; / a step → a step number.</span></span>
+<span id="cb51-53"><a href="#cb51-53" aria-label="53"></a><span class="fu">resolve()</span> <span class="kw">{</span></span>
+<span id="cb51-54"><a href="#cb51-54" aria-label="54"></a>    <span class="cf">case</span> <span class="st">&quot;</span><span class="va">$1</span><span class="st">&quot;</span> <span class="kw">in</span></span>
+<span id="cb51-55"><a href="#cb51-55" aria-label="55"></a>        <span class="ss">latest</span><span class="kw">)</span>  <span class="fu">grep</span> <span class="at">-o</span> <span class="st">&#39;&quot;step&quot;: *[0-9]*&#39;</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/latest.json&quot;</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-o</span> <span class="st">&#39;[0-9]*$&#39;</span> <span class="cf">;;</span></span>
+<span id="cb51-56"><a href="#cb51-56" aria-label="56"></a>        <span class="ss">initial</span><span class="kw">)</span> <span class="bu">echo</span> 0 <span class="cf">;;</span></span>
+<span id="cb51-57"><a href="#cb51-57" aria-label="57"></a>        <span class="pp">*</span><span class="kw">)</span>       <span class="bu">echo</span> <span class="st">&quot;</span><span class="va">$1</span><span class="st">&quot;</span> <span class="cf">;;</span></span>
+<span id="cb51-58"><a href="#cb51-58" aria-label="58"></a>    <span class="cf">esac</span></span>
+<span id="cb51-59"><a href="#cb51-59" aria-label="59"></a><span class="kw">}</span></span>
+<span id="cb51-60"><a href="#cb51-60" aria-label="60"></a><span class="va">STEP_A</span><span class="op">=</span><span class="va">$(</span><span class="ex">resolve</span> <span class="st">&quot;</span><span class="va">${A}</span><span class="st">&quot;</span><span class="va">)</span></span>
+<span id="cb51-61"><a href="#cb51-61" aria-label="61"></a><span class="va">STEP_B</span><span class="op">=</span><span class="va">$(</span><span class="ex">resolve</span> <span class="st">&quot;</span><span class="va">${B}</span><span class="st">&quot;</span><span class="va">)</span></span>
+<span id="cb51-62"><a href="#cb51-62" aria-label="62"></a><span class="va">NAME_A</span><span class="op">=</span><span class="va">$(</span><span class="bu">printf</span> <span class="st">&quot;az_%08d&quot;</span> <span class="st">&quot;</span><span class="va">${STEP_A}</span><span class="st">&quot;</span><span class="va">)</span></span>
+<span id="cb51-63"><a href="#cb51-63" aria-label="63"></a><span class="va">NAME_B</span><span class="op">=</span><span class="va">$(</span><span class="bu">printf</span> <span class="st">&quot;az_%08d&quot;</span> <span class="st">&quot;</span><span class="va">${STEP_B}</span><span class="st">&quot;</span><span class="va">)</span></span>
+<span id="cb51-64"><a href="#cb51-64" aria-label="64"></a></span>
+<span id="cb51-65"><a href="#cb51-65" aria-label="65"></a><span class="bu">echo</span> <span class="st">&quot;════════════════════════════════════════════════════════════════&quot;</span></span>
+<span id="cb51-66"><a href="#cb51-66" aria-label="66"></a><span class="bu">echo</span> <span class="st">&quot;  Job        : </span><span class="va">${JOB}</span><span class="st"> on </span><span class="va">$(</span><span class="fu">hostname</span><span class="va">)</span><span class="st">, GPU </span><span class="va">${CUDA_VISIBLE_DEVICES</span><span class="op">:-</span><span class="pp">?</span><span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb51-67"><a href="#cb51-67" aria-label="67"></a><span class="bu">echo</span> <span class="st">&quot;  Work dir   : </span><span class="va">${WORK_DIR}</span><span class="st">&quot;</span></span>
+<span id="cb51-68"><a href="#cb51-68" aria-label="68"></a><span class="bu">echo</span> <span class="st">&quot;  Match      : A = </span><span class="va">${NAME_A}</span><span class="st"> (</span><span class="va">${A}</span><span class="st">)  vs  B = </span><span class="va">${NAME_B}</span><span class="st"> (</span><span class="va">${B}</span><span class="st">)&quot;</span></span>
+<span id="cb51-69"><a href="#cb51-69" aria-label="69"></a><span class="bu">echo</span> <span class="st">&quot;  Games      : </span><span class="va">${GAMES}</span><span class="st"> (</span><span class="va">${OPENING_PLIES}</span><span class="st">-ply random openings, both colours), </span><span class="va">${SECONDS_PER_MOVE}</span><span class="st"> s/move&quot;</span></span>
+<span id="cb51-70"><a href="#cb51-70" aria-label="70"></a><span class="bu">echo</span> <span class="st">&quot;════════════════════════════════════════════════════════════════&quot;</span></span>
+<span id="cb51-71"><a href="#cb51-71" aria-label="71"></a><span class="ex">nvidia-smi</span> <span class="at">--query-gpu</span><span class="op">=</span>index,name,memory.total <span class="at">--format</span><span class="op">=</span>csv,noheader <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">||</span> <span class="fu">true</span></span>
+<span id="cb51-72"><a href="#cb51-72" aria-label="72"></a></span>
+<span id="cb51-73"><a href="#cb51-73" aria-label="73"></a><span class="ex">build_alphazero_learn</span></span>
+<span id="cb51-74"><a href="#cb51-74" aria-label="74"></a></span>
+<span id="cb51-75"><a href="#cb51-75" aria-label="75"></a><span class="co"># Private copies of the two networks: the running learning job prunes old</span></span>
+<span id="cb51-76"><a href="#cb51-76" aria-label="76"></a><span class="co"># .ts files at every export and must not remove one in the middle of the match.</span></span>
+<span id="cb51-77"><a href="#cb51-77" aria-label="77"></a><span class="va">MDIR</span><span class="op">=</span><span class="st">&quot;/work/evals/match_</span><span class="va">${JOB}</span><span class="st">&quot;</span></span>
+<span id="cb51-78"><a href="#cb51-78" aria-label="78"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/evals/match_</span><span class="va">${JOB}</span><span class="st">&quot;</span></span>
+<span id="cb51-79"><a href="#cb51-79" aria-label="79"></a><span class="ex">run</span> bash <span class="at">-c</span> <span class="st">&quot;set -e; cd /Yolah/nnue</span></span>
+<span id="cb51-80"><a href="#cb51-80" aria-label="80"></a><span class="st">    for S in </span><span class="va">${STEP_A}</span><span class="st"> </span><span class="va">${STEP_B}</span><span class="st">; do</span></span>
+<span id="cb51-81"><a href="#cb51-81" aria-label="81"></a><span class="st">        NAME=</span><span class="dt">\$</span><span class="st">(printf &#39;az_%08d&#39; </span><span class="dt">\$</span><span class="st">S)</span></span>
+<span id="cb51-82"><a href="#cb51-82" aria-label="82"></a><span class="st">        if [[ -f /work/models/</span><span class="dt">\$</span><span class="st">NAME.ts ]]; then</span></span>
+<span id="cb51-83"><a href="#cb51-83" aria-label="83"></a><span class="st">            cp /work/models/</span><span class="dt">\$</span><span class="st">NAME.ts </span><span class="va">${MDIR}</span><span class="st">/</span><span class="dt">\$</span><span class="st">NAME.ts</span></span>
+<span id="cb51-84"><a href="#cb51-84" aria-label="84"></a><span class="st">        elif [[ -f /work/models/</span><span class="dt">\$</span><span class="st">NAME.pt ]]; then</span></span>
+<span id="cb51-85"><a href="#cb51-85" aria-label="85"></a><span class="st">            echo </span><span class="dt">\&quot;</span><span class="st">re-tracing </span><span class="dt">\$</span><span class="st">NAME.ts from its .pt</span><span class="dt">\&quot;</span></span>
+<span id="cb51-86"><a href="#cb51-86" aria-label="86"></a><span class="st">            # export_model writes &lt;dir&gt;/models/az_&lt;step&gt;.{pt,ts}</span></span>
+<span id="cb51-87"><a href="#cb51-87" aria-label="87"></a><span class="st">            mkdir -p </span><span class="va">${MDIR}</span><span class="st">/models</span></span>
+<span id="cb51-88"><a href="#cb51-88" aria-label="88"></a><span class="st">            python3 -c </span><span class="dt">\&quot;</span></span>
+<span id="cb51-89"><a href="#cb51-89" aria-label="89"></a><span class="st">from alphazero_learn import export_model, make_net, load_state_dict</span></span>
+<span id="cb51-90"><a href="#cb51-90" aria-label="90"></a><span class="st">export_model(make_net(load_state_dict(&#39;/work/models/</span><span class="dt">\$</span><span class="st">NAME.pt&#39;)), &#39;</span><span class="va">${MDIR}</span><span class="st">&#39;, </span><span class="dt">\$</span><span class="st">S)</span></span>
+<span id="cb51-91"><a href="#cb51-91" aria-label="91"></a><span class="dt">\&quot;</span></span>
+<span id="cb51-92"><a href="#cb51-92" aria-label="92"></a><span class="st">            mv </span><span class="va">${MDIR}</span><span class="st">/models/</span><span class="dt">\$</span><span class="st">NAME.ts </span><span class="va">${MDIR}</span><span class="st">/</span><span class="dt">\$</span><span class="st">NAME.ts</span></span>
+<span id="cb51-93"><a href="#cb51-93" aria-label="93"></a><span class="st">            rm -rf </span><span class="va">${MDIR}</span><span class="st">/models</span></span>
+<span id="cb51-94"><a href="#cb51-94" aria-label="94"></a><span class="st">        else</span></span>
+<span id="cb51-95"><a href="#cb51-95" aria-label="95"></a><span class="st">            echo </span><span class="dt">\&quot;</span><span class="st">ERROR: neither /work/models/</span><span class="dt">\$</span><span class="st">NAME.ts nor .pt exists</span><span class="dt">\&quot;</span><span class="st">; exit 1</span></span>
+<span id="cb51-96"><a href="#cb51-96" aria-label="96"></a><span class="st">        fi</span></span>
+<span id="cb51-97"><a href="#cb51-97" aria-label="97"></a><span class="st">    done&quot;</span></span>
+<span id="cb51-98"><a href="#cb51-98" aria-label="98"></a></span>
+<span id="cb51-99"><a href="#cb51-99" aria-label="99"></a><span class="va">OUT</span><span class="op">=</span><span class="st">&quot;/work/evals/match_</span><span class="va">${NAME_A}</span><span class="st">_vs_</span><span class="va">${NAME_B}</span><span class="st">_</span><span class="va">${JOB}</span><span class="st">.json&quot;</span></span>
+<span id="cb51-100"><a href="#cb51-100" aria-label="100"></a><span class="va">TIME_US</span><span class="op">=</span><span class="va">$(</span><span class="fu">awk</span> <span class="at">-v</span> s=<span class="st">&quot;</span><span class="va">${SECONDS_PER_MOVE}</span><span class="st">&quot;</span> <span class="st">&#39;BEGIN { printf &quot;%d&quot;, s * 1000000 }&#39;</span><span class="va">)</span></span>
+<span id="cb51-101"><a href="#cb51-101" aria-label="101"></a><span class="bu">echo</span> <span class="st">&quot;[</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">] === Match ===&quot;</span></span>
+<span id="cb51-102"><a href="#cb51-102" aria-label="102"></a><span class="ex">start_in_container</span> <span class="va">${BUILD_DIR}</span>/alphazero_learn match <span class="dt">\</span></span>
+<span id="cb51-103"><a href="#cb51-103" aria-label="103"></a>    <span class="at">--config</span> /Yolah/config/alphazero_mcts_eval_player.cfg <span class="dt">\</span></span>
+<span id="cb51-104"><a href="#cb51-104" aria-label="104"></a>    <span class="at">--a</span> <span class="st">&quot;</span><span class="va">${MDIR}</span><span class="st">/</span><span class="va">${NAME_A}</span><span class="st">.ts&quot;</span> <span class="at">--b</span> <span class="st">&quot;</span><span class="va">${MDIR}</span><span class="st">/</span><span class="va">${NAME_B}</span><span class="st">.ts&quot;</span> <span class="dt">\</span></span>
+<span id="cb51-105"><a href="#cb51-105" aria-label="105"></a>    <span class="at">--games</span> <span class="st">&quot;</span><span class="va">${GAMES}</span><span class="st">&quot;</span> <span class="at">--time</span> <span class="st">&quot;</span><span class="va">${TIME_US}</span><span class="st">&quot;</span> <span class="at">--opening-plies</span> <span class="st">&quot;</span><span class="va">${OPENING_PLIES}</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb51-106"><a href="#cb51-106" aria-label="106"></a>    <span class="at">--seed</span> <span class="st">&quot;</span><span class="va">${SEED}</span><span class="st">&quot;</span> <span class="at">--out</span> <span class="st">&quot;</span><span class="va">${OUT}</span><span class="st">&quot;</span></span>
+<span id="cb51-107"><a href="#cb51-107" aria-label="107"></a><span class="ex">wait_forwarding_signals</span></span>
+<span id="cb51-108"><a href="#cb51-108" aria-label="108"></a><span class="fu">rm</span> <span class="at">-rf</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/evals/match_</span><span class="va">${JOB}</span><span class="st">&quot;</span></span>
+<span id="cb51-109"><a href="#cb51-109" aria-label="109"></a><span class="kw">[[</span> <span class="st">&quot;</span><span class="va">${RC}</span><span class="st">&quot;</span> <span class="ot">==</span> <span class="st">&quot;0&quot;</span> <span class="kw">]]</span> <span class="kw">||</span> <span class="kw">{</span> <span class="bu">echo</span> <span class="st">&quot;match failed (exit code </span><span class="va">${RC}</span><span class="st">)&quot;</span><span class="kw">;</span> <span class="bu">exit</span> <span class="st">&quot;</span><span class="va">${RC}</span><span class="st">&quot;</span><span class="kw">;</span> <span class="kw">}</span></span>
+<span id="cb51-110"><a href="#cb51-110" aria-label="110"></a></span>
+<span id="cb51-111"><a href="#cb51-111" aria-label="111"></a><span class="co"># ── Result: score, Elo difference and its 95 % confidence interval ──────────</span></span>
+<span id="cb51-112"><a href="#cb51-112" aria-label="112"></a><span class="co"># Per-game results x ∈ {1, ½, 0}: mean s, variance E[x²] − s², standard error</span></span>
+<span id="cb51-113"><a href="#cb51-113" aria-label="113"></a><span class="co"># √(var/n). The interval of s maps to Elo through Δ = 400·log10(s/(1−s)).</span></span>
+<span id="cb51-114"><a href="#cb51-114" aria-label="114"></a><span class="va">RES</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/evals/match_</span><span class="va">${NAME_A}</span><span class="st">_vs_</span><span class="va">${NAME_B}</span><span class="st">_</span><span class="va">${JOB}</span><span class="st">.json&quot;</span></span>
+<span id="cb51-115"><a href="#cb51-115" aria-label="115"></a><span class="co"># By name: the JSON keys are written in alphabetical order, not W/D/L.</span></span>
+<span id="cb51-116"><a href="#cb51-116" aria-label="116"></a><span class="fu">count()</span> <span class="kw">{</span> <span class="fu">grep</span> <span class="at">-oE</span> <span class="st">&quot;</span><span class="dt">\&quot;</span><span class="va">$1</span><span class="dt">\&quot;</span><span class="st">: *[0-9]+&quot;</span> <span class="st">&quot;</span><span class="va">${RES}</span><span class="st">&quot;</span> <span class="kw">|</span> <span class="fu">head</span> <span class="at">-1</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-oE</span> <span class="st">&#39;[0-9]+$&#39;</span><span class="kw">;</span> <span class="kw">}</span></span>
+<span id="cb51-117"><a href="#cb51-117" aria-label="117"></a><span class="va">W</span><span class="op">=</span><span class="va">$(</span><span class="ex">count</span> wins<span class="va">)</span><span class="kw">;</span> <span class="va">D</span><span class="op">=</span><span class="va">$(</span><span class="ex">count</span> draws<span class="va">)</span><span class="kw">;</span> <span class="va">L</span><span class="op">=</span><span class="va">$(</span><span class="ex">count</span> losses<span class="va">)</span></span>
+<span id="cb51-118"><a href="#cb51-118" aria-label="118"></a><span class="fu">awk</span> <span class="at">-v</span> w=<span class="st">&quot;</span><span class="va">$W</span><span class="st">&quot;</span> <span class="at">-v</span> d=<span class="st">&quot;</span><span class="va">$D</span><span class="st">&quot;</span> <span class="at">-v</span> l=<span class="st">&quot;</span><span class="va">$L</span><span class="st">&quot;</span> <span class="at">-v</span> a=<span class="st">&quot;</span><span class="va">${NAME_A}</span><span class="st">&quot;</span> <span class="at">-v</span> b=<span class="st">&quot;</span><span class="va">${NAME_B}</span><span class="st">&quot;</span> <span class="at">-v</span> t=<span class="st">&quot;</span><span class="va">${SECONDS_PER_MOVE}</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb51-119"><a href="#cb51-119" aria-label="119"></a>    <span class="at">-v</span> csv=<span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/matches.csv&quot;</span> <span class="at">-v</span> date=<span class="st">&quot;</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">&quot;</span> <span class="st">&#39;BEGIN {</span></span>
+<span id="cb51-120"><a href="#cb51-120" aria-label="120"></a><span class="st">    n = w + d + l; s = (w + d / 2) / n</span></span>
+<span id="cb51-121"><a href="#cb51-121" aria-label="121"></a><span class="st">    var = (w + d / 4) / n - s * s; se = sqrt(var / n)</span></span>
+<span id="cb51-122"><a href="#cb51-122" aria-label="122"></a><span class="st">    lo = s - 1.96 * se; hi = s + 1.96 * se</span></span>
+<span id="cb51-123"><a href="#cb51-123" aria-label="123"></a><span class="st">    if (lo &lt; 0.001) lo = 0.001; if (hi &gt; 0.999) hi = 0.999</span></span>
+<span id="cb51-124"><a href="#cb51-124" aria-label="124"></a><span class="st">    sc = s; if (sc &lt; 0.001) sc = 0.001; if (sc &gt; 0.999) sc = 0.999</span></span>
+<span id="cb51-125"><a href="#cb51-125" aria-label="125"></a><span class="st">    elo = 400 * log(sc / (1 - sc)) / log(10)</span></span>
+<span id="cb51-126"><a href="#cb51-126" aria-label="126"></a><span class="st">    elo_lo = 400 * log(lo / (1 - lo)) / log(10); elo_hi = 400 * log(hi / (1 - hi)) / log(10)</span></span>
+<span id="cb51-127"><a href="#cb51-127" aria-label="127"></a><span class="st">    printf &quot;\n%s vs %s: %dW %dD %dL over %d games (%s s/move)\n&quot;, a, b, w, d, l, n, t</span></span>
+<span id="cb51-128"><a href="#cb51-128" aria-label="128"></a><span class="st">    printf &quot;score %.3f ± %.3f  →  Elo %+.0f  (95%% interval [%+.0f, %+.0f])\n&quot;, s, 1.96 * se, elo, elo_lo, elo_hi</span></span>
+<span id="cb51-129"><a href="#cb51-129" aria-label="129"></a><span class="st">    new = (system(&quot;test -f &quot; csv) != 0)</span></span>
+<span id="cb51-130"><a href="#cb51-130" aria-label="130"></a><span class="st">    if (new) print &quot;time,a,b,games,seconds_per_move,wins,draws,losses,score,elo,elo_low95,elo_high95&quot; &gt;&gt; csv</span></span>
+<span id="cb51-131"><a href="#cb51-131" aria-label="131"></a><span class="st">    printf &quot;%s,%s,%s,%d,%s,%d,%d,%d,%.3f,%+.0f,%+.0f,%+.0f\n&quot;, date, a, b, n, t, w, d, l, s, elo, elo_lo, elo_hi &gt;&gt; csv</span></span>
+<span id="cb51-132"><a href="#cb51-132" aria-label="132"></a><span class="st">}&#39;</span></span>
+<span id="cb51-133"><a href="#cb51-133" aria-label="133"></a><span class="bu">echo</span> <span class="st">&quot;(appended to </span><span class="va">${WORK_DIR}</span><span class="st">/matches.csv; games in </span><span class="va">${RES}</span><span class="st">)&quot;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="sec-src-nnue-alphazero-selfplay-sh" class="level3" data-number="12.5.12">
+<h3 data-number="12.5.12" class="anchored" data-anchor-id="sec-src-nnue-alphazero-selfplay-sh"><span class="header-section-number">12.5.12</span> <code>nnue/alphazero_selfplay.sh</code></h3>
+<p><em>61 lines.</em></p>
+<p>An extra self-play GPU on any node, for a run split over several jobs (<a href="#fig-split" class="quarto-xref">Figure 16</a>).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb52"><pre class="sourceCode numberSource bash numberLines code-with-copy"><code class="sourceCode bash"><span id="cb52-1"><a href="#cb52-1" aria-label="1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb52-2"><a href="#cb52-2" aria-label="2"></a><span class="co"># ────────────────────────────────────────────────────────────────────────────</span></span>
+<span id="cb52-3"><a href="#cb52-3" aria-label="3"></a><span class="co"># alphazero_selfplay.sh — an extra self-play GPU for a running alphazero_learn</span></span>
+<span id="cb52-4"><a href="#cb52-4" aria-label="4"></a><span class="co"># job, on any GPU node.</span></span>
+<span id="cb52-5"><a href="#cb52-5" aria-label="5"></a><span class="co">#</span></span>
+<span id="cb52-6"><a href="#cb52-6" aria-label="6"></a><span class="co">#     sbatch alphazero_selfplay.sh         # same WORK_DIR as alphazero_learn.sh</span></span>
+<span id="cb52-7"><a href="#cb52-7" aria-label="7"></a><span class="co">#</span></span>
+<span id="cb52-8"><a href="#cb52-8" aria-label="8"></a><span class="co"># The learning loop only communicates through files in WORK_DIR (in the home,</span></span>
+<span id="cb52-9"><a href="#cb52-9" aria-label="9"></a><span class="co"># visible from every node): this job reads latest.json, hot-swaps each new</span></span>
+<span id="cb52-10"><a href="#cb52-10" aria-label="10"></a><span class="co"># network, and writes its games to WORK_DIR/selfplay/, where the trainer picks</span></span>
+<span id="cb52-11"><a href="#cb52-11" aria-label="11"></a><span class="co"># them up like those of its own GPUs. Use it when a node with 3 free GPUs is</span></span>
+<span id="cb52-12"><a href="#cb52-12" aria-label="12"></a><span class="co"># long to get: `sbatch --gres=gpu:1 alphazero_learn.sh` plus two of these</span></span>
+<span id="cb52-13"><a href="#cb52-13" aria-label="13"></a><span class="co"># (3 GPUs in total, the per-user maximum).</span></span>
+<span id="cb52-14"><a href="#cb52-14" aria-label="14"></a><span class="co">#</span></span>
+<span id="cb52-15"><a href="#cb52-15" aria-label="15"></a><span class="co"># It waits for the main job to have published a network, and stops by itself</span></span>
+<span id="cb52-16"><a href="#cb52-16" aria-label="16"></a><span class="co"># when no new network has appeared for STALE_HOURS (the main job is over), at</span></span>
+<span id="cb52-17"><a href="#cb52-17" aria-label="17"></a><span class="co"># its own time limit, or on scancel — finished games are always written.</span></span>
+<span id="cb52-18"><a href="#cb52-18" aria-label="18"></a><span class="co"># ────────────────────────────────────────────────────────────────────────────</span></span>
+<span id="cb52-19"><a href="#cb52-19" aria-label="19"></a></span>
+<span id="cb52-20"><a href="#cb52-20" aria-label="20"></a><span class="co">#SBATCH --job-name=alphazero_selfplay</span></span>
+<span id="cb52-21"><a href="#cb52-21" aria-label="21"></a><span class="co">#SBATCH --output=alphazero_selfplay_%j.out</span></span>
+<span id="cb52-22"><a href="#cb52-22" aria-label="22"></a><span class="co">#SBATCH --error=alphazero_selfplay_%j.out</span></span>
+<span id="cb52-23"><a href="#cb52-23" aria-label="23"></a><span class="co">#SBATCH --partition=insa-gpu</span></span>
+<span id="cb52-24"><a href="#cb52-24" aria-label="24"></a><span class="co">#SBATCH -x crn23</span></span>
+<span id="cb52-25"><a href="#cb52-25" aria-label="25"></a><span class="co">#SBATCH --gres=gpu:1</span></span>
+<span id="cb52-26"><a href="#cb52-26" aria-label="26"></a><span class="co">#SBATCH --cpus-per-task=12</span></span>
+<span id="cb52-27"><a href="#cb52-27" aria-label="27"></a><span class="co">#SBATCH --mem=48G</span></span>
+<span id="cb52-28"><a href="#cb52-28" aria-label="28"></a><span class="co">#SBATCH --time=14-00:00:00</span></span>
+<span id="cb52-29"><a href="#cb52-29" aria-label="29"></a><span class="co">#SBATCH --signal=B:USR1@600</span></span>
+<span id="cb52-30"><a href="#cb52-30" aria-label="30"></a></span>
+<span id="cb52-31"><a href="#cb52-31" aria-label="31"></a><span class="bu">set</span> <span class="at">-euo</span> pipefail</span>
+<span id="cb52-32"><a href="#cb52-32" aria-label="32"></a></span>
+<span id="cb52-33"><a href="#cb52-33" aria-label="33"></a><span class="va">YOLAH_DIR</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${YOLAH_DIR</span><span class="op">:-</span><span class="va">${HOME}</span>/Yolah<span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb52-34"><a href="#cb52-34" aria-label="34"></a><span class="bu">source</span> <span class="st">&quot;</span><span class="va">${YOLAH_DIR}</span><span class="st">/nnue/alphazero_common.sh&quot;</span>                       <span class="co"># SIF, WORK_DIR, run(), ...</span></span>
+<span id="cb52-35"><a href="#cb52-35" aria-label="35"></a></span>
+<span id="cb52-36"><a href="#cb52-36" aria-label="36"></a><span class="va">SELFPLAY_GAMES</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${SELFPLAY_GAMES</span><span class="op">:-</span>256<span class="va">}</span><span class="st">&quot;</span>       <span class="co"># concurrent games on this GPU</span></span>
+<span id="cb52-37"><a href="#cb52-37" aria-label="37"></a><span class="va">SELFPLAY_NN_CACHE</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${SELFPLAY_NN_CACHE</span><span class="op">:-</span>32<span class="va">}</span><span class="st">&quot;</span>  <span class="co"># MB of network cache per game</span></span>
+<span id="cb52-38"><a href="#cb52-38" aria-label="38"></a><span class="va">STALE_HOURS</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${STALE_HOURS</span><span class="op">:-</span>6<span class="va">}</span><span class="st">&quot;</span>               <span class="co"># stop after this long without a new network</span></span>
+<span id="cb52-39"><a href="#cb52-39" aria-label="39"></a></span>
+<span id="cb52-40"><a href="#cb52-40" aria-label="40"></a><span class="bu">echo</span> <span class="st">&quot;════════════════════════════════════════════════════════════════&quot;</span></span>
+<span id="cb52-41"><a href="#cb52-41" aria-label="41"></a><span class="bu">echo</span> <span class="st">&quot;  Job        : </span><span class="va">${SLURM_JOB_ID</span><span class="op">:-</span>(local)<span class="va">}</span><span class="st"> on </span><span class="va">$(</span><span class="fu">hostname</span><span class="va">)</span><span class="st">, GPU </span><span class="va">${CUDA_VISIBLE_DEVICES</span><span class="op">:-</span><span class="pp">?</span><span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb52-42"><a href="#cb52-42" aria-label="42"></a><span class="bu">echo</span> <span class="st">&quot;  Work dir   : </span><span class="va">${WORK_DIR}</span><span class="st">&quot;</span></span>
+<span id="cb52-43"><a href="#cb52-43" aria-label="43"></a><span class="bu">echo</span> <span class="st">&quot;════════════════════════════════════════════════════════════════&quot;</span></span>
+<span id="cb52-44"><a href="#cb52-44" aria-label="44"></a><span class="ex">nvidia-smi</span> <span class="at">--query-gpu</span><span class="op">=</span>index,name,memory.total <span class="at">--format</span><span class="op">=</span>csv,noheader <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">||</span> <span class="fu">true</span></span>
+<span id="cb52-45"><a href="#cb52-45" aria-label="45"></a></span>
+<span id="cb52-46"><a href="#cb52-46" aria-label="46"></a><span class="co"># The main job creates latest.json when it starts a new run.</span></span>
+<span id="cb52-47"><a href="#cb52-47" aria-label="47"></a><span class="cf">until</span> <span class="kw">[[</span> <span class="ot">-f</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/latest.json&quot;</span> <span class="kw">]];</span> <span class="cf">do</span></span>
+<span id="cb52-48"><a href="#cb52-48" aria-label="48"></a>    <span class="bu">echo</span> <span class="st">&quot;[</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">] waiting for </span><span class="va">${WORK_DIR}</span><span class="st">/latest.json (is alphazero_learn.sh running?)&quot;</span></span>
+<span id="cb52-49"><a href="#cb52-49" aria-label="49"></a>    <span class="fu">sleep</span> 60</span>
+<span id="cb52-50"><a href="#cb52-50" aria-label="50"></a><span class="cf">done</span></span>
+<span id="cb52-51"><a href="#cb52-51" aria-label="51"></a></span>
+<span id="cb52-52"><a href="#cb52-52" aria-label="52"></a><span class="ex">build_alphazero_learn</span></span>
+<span id="cb52-53"><a href="#cb52-53" aria-label="53"></a></span>
+<span id="cb52-54"><a href="#cb52-54" aria-label="54"></a><span class="bu">echo</span> <span class="st">&quot;[</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">] === Self-play ===&quot;</span></span>
+<span id="cb52-55"><a href="#cb52-55" aria-label="55"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="st">&quot;</span><span class="va">${WORK_DIR}</span><span class="st">/logs&quot;</span></span>
+<span id="cb52-56"><a href="#cb52-56" aria-label="56"></a><span class="ex">start_in_container</span> <span class="va">${BUILD_DIR}</span>/alphazero_learn selfplay <span class="dt">\</span></span>
+<span id="cb52-57"><a href="#cb52-57" aria-label="57"></a>    <span class="at">--config</span> /Yolah/config/alphazero_mcts_selfplay_player.cfg <span class="at">--work</span> /work <span class="dt">\</span></span>
+<span id="cb52-58"><a href="#cb52-58" aria-label="58"></a>    <span class="at">--games</span> <span class="st">&quot;</span><span class="va">${SELFPLAY_GAMES}</span><span class="st">&quot;</span> <span class="at">--set</span> <span class="st">&quot;nn cache=</span><span class="va">${SELFPLAY_NN_CACHE}</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb52-59"><a href="#cb52-59" aria-label="59"></a>    <span class="at">--max-stale-hours</span> <span class="st">&quot;</span><span class="va">${STALE_HOURS}</span><span class="st">&quot;</span> <span class="at">--tag</span> <span class="st">&quot;</span><span class="va">$(</span><span class="fu">hostname</span><span class="va">)</span><span class="st">_</span><span class="va">${SLURM_JOB_ID</span><span class="op">:-</span><span class="va">$$}</span><span class="st">_extra&quot;</span></span>
+<span id="cb52-60"><a href="#cb52-60" aria-label="60"></a><span class="ex">wait_forwarding_signals</span></span>
+<span id="cb52-61"><a href="#cb52-61" aria-label="61"></a><span class="bu">echo</span> <span class="st">&quot;[</span><span class="va">$(</span><span class="fu">date</span> <span class="st">&#39;+%F %T&#39;</span><span class="va">)</span><span class="st">] === Stopped (exit code </span><span class="va">${RC}</span><span class="st">) ===&quot;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 </section>
 </section>

@@ -773,6 +773,7 @@ def main():
     samples_at_report = state.d["samples_trained"]
     since_export = state.d["samples_trained"] - state.d.get("samples_at_last_export", 0)
     waiting_logged = False
+    last_cap_log = 0.0
     while not stop_event.is_set():
         if args.max_hours and time.time() - t_start > args.max_hours * 3600:
             log("--max-hours reached")
@@ -789,10 +790,18 @@ def main():
         # before N0 rows exist. Ahead of the data → sleep and rescan.
         allowed = args.reuse * window.total
         if window.total < args.min_rows or state.d["samples_trained"] + args.batch_size > allowed:
-            if not waiting_logged:
-                log(f"waiting for self-play data: {window.total:,} rows "
-                    f"(training starts at {args.min_rows:,} rows and trains at most {args.reuse:g} samples per row)")
-                waiting_logged = True
+            # Two different waits: before training starts (not enough rows
+            # yet), and during training when the trainer has caught up with
+            # the reuse cap — the normal steady state, logged only now and then.
+            if window.total < args.min_rows:
+                if not waiting_logged:
+                    log(f"waiting for self-play data: {window.total:,} rows "
+                        f"(training starts at {args.min_rows:,})")
+                    waiting_logged = True
+            elif time.time() - last_cap_log > 1800:
+                log(f"trainer at the reuse cap ({args.reuse:g} samples per row): "
+                    f"it trains as fast as self-play produces rows")
+                last_cap_log = time.time()
             stop_event.wait(10)
             last_scan = 0
             continue
