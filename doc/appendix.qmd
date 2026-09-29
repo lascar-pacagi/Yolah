@@ -6114,7 +6114,7 @@ def aux_losses(own_logits, score_logits, own):
 
 ### `config/alphazero_mcts_selfplay_player.cfg` {#sec-src-config-alphazero-mcts-selfplay-player-cfg}
 
-*25 lines.*
+*24 lines.*
 
 Self-play search settings (the `weights` key is replaced by `latest.json`).
 
@@ -6122,6 +6122,7 @@ Self-play search settings (the `weights` key is replaced by `latest.json`).
 ``` {.json .numberLines}
 {
     "name": "AlphaZeroMCTSPlayer",
+    "description": "AlphaZero/KataGo-style MCTS: PUCT with KataGo's exploration terms, graph search (transpositions), LCB move choice, guided by the value/policy ResNet 256×30 (convnet); self-play settings of the learning loop (800/200 simulations, Dirichlet noise, move sampling in the opening, forced playouts) — not meant for competitive play.",
     "microseconds": 0,
     "nb simulations": 800,
     "nb threads": 1,
@@ -6130,7 +6131,6 @@ Self-play search settings (the `weights` key is replaced by `latest.json`).
     "device": "cuda",
     "fp16": true,
     "weights": "../nnue/cnn_resnet_256x30_value_policy.ts",
-
     "dirichlet alpha": 0.3,
     "dirichlet epsilon": 0.25,
     "temperature": 1.0,
@@ -6139,7 +6139,6 @@ Self-play search settings (the `weights` key is replaced by `latest.json`).
     "playout cap fast prob": 0.75,
     "nb simulations fast": 200,
     "policy target pruning": true,
-
     "graph search": true,
     "reuse tree": true,
     "nn cache": 16,
@@ -6150,7 +6149,7 @@ Self-play search settings (the `weights` key is replaced by `latest.json`).
 
 ### `config/alphazero_mcts_eval_player.cfg` {#sec-src-config-alphazero-mcts-eval-player-cfg}
 
-*20 lines.*
+*21 lines.*
 
 Evaluation-match settings: competitive play, no noise, no sampling. The time per
 move comes from `alphazero_learn match --time`.
@@ -6159,6 +6158,7 @@ move comes from `alphazero_learn match --time`.
 ``` {.json .numberLines}
 {
     "name": "AlphaZeroMCTSPlayer",
+    "description": "AlphaZero/KataGo-style MCTS: PUCT with KataGo's exploration terms, graph search (transpositions), LCB move choice, guided by the value/policy ResNet 256×30 (convnet); settings of the evaluation matches of the self-play learning (no noise, no sampling).",
     "microseconds": 2000000,
     "nb simulations": 0,
     "nb threads": 4,
@@ -6255,7 +6255,7 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 ### `nnue/alphazero_common.sh` {#sec-src-nnue-alphazero-common-sh}
 
-*92 lines.*
+*94 lines.*
 
 Sourced by the two job scripts: the paths (`~/AlphaZeroLearn`), the container launcher,
 the build step (with its lock), and the signal forwarding that makes a clean
@@ -6312,12 +6312,14 @@ run() {
         "${SIF}" "$@"
 }
 
-# Compile alphazero_learn for this node's CPU (skipped by make when up to
-# date). flock: two jobs starting together on identical nodes share the build
-# directory and must not run CMake in it at the same time.
+# Compile the given CMake targets (default: alphazero_learn) for this node's
+# CPU (skipped by make when up to date). flock: two jobs starting together on
+# identical nodes share the build directory and must not run CMake in it at
+# the same time.
 build_alphazero_learn() {
+    local targets="${*:-alphazero_learn}"
     mkdir -p "${WORK_DIR}/build"
-    echo "[$(date '+%F %T')] === Building alphazero_learn in ${BUILD_DIR} ==="
+    echo "[$(date '+%F %T')] === Building ${targets} in ${BUILD_DIR} ==="
     run bash -c "set -e
         exec 9> /work/build/.lock_${CPU_TAG}
         flock 9
@@ -6326,7 +6328,7 @@ build_alphazero_learn() {
         cmake -S /Yolah -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Release -DENABLE_TORCH=ON \
               -DCMAKE_PREFIX_PATH=\${TORCH_PREFIX} -Wno-dev > /work/build/cmake_${CPU_TAG}.log 2>&1 \
             || { cat /work/build/cmake_${CPU_TAG}.log; exit 1; }
-        cmake --build ${BUILD_DIR} --target alphazero_learn -j ${SLURM_CPUS_PER_TASK:-16} 2>&1 | tail -3"
+        cmake --build ${BUILD_DIR} --target ${targets} -j ${SLURM_CPUS_PER_TASK:-16} 2>&1 | tail -3"
 }
 
 # Start a command in the container in the background, as a direct child:

@@ -151,60 +151,89 @@ int main(int argc, char* argv[]) {
     //   }
     // }
 
-    YolahFeatures::encode_data("/Yolah/nnue/data", "/mnt");
+    po::options_description general("General options");
+    general.add_options()
+    ("help", "produce help message")
+    ("version", "output the version number");
 
-    //YolahFeatures::encode_data("../nnue/data", "../nnue/test");
-    
-    //data::decode_games("../data/games/games_2025_08_31_22_09_02.335269145_0.txt", cout);
-    
-    // po::options_description general("General options");
-    // general.add_options()
-    // ("help", "produce help message")
-    // ("version", "output the version number");
-    
-    // po::options_description client("Client options");
-    // client.add_options()
-    // ("server,s", po::value<string>()->default_value("127.0.0.1"), "server ip adress")
-    // ("port,p", po::value<uint16_t>()->default_value(8001), "server port")
-    // ("key,k", po::value<string>(), "join key, if not present create a new game and get the join and watch keys by the server")
-    // ("player", po::value<string>(), "configuration file for player");
-    
-    // po::options_description evaluate("Evaluate AI options");
-    // evaluate.add_options()
-    // ("player1,1", po::value<string>(), "configuration file for first AI player")
-    // ("player2,2", po::value<string>(), "configuration file for second AI player")
-    // ("nb-random-moves,r", po::value<size_t>()->default_value(0), "number of random moves at the beginning of the game")
-    // ("nb-games,n", po::value<size_t>()->default_value(100), "number of games for the evaluation");
+    po::options_description client("Client options (play through the server and the web UI)");
+    client.add_options()
+    ("server,s", po::value<string>()->default_value("127.0.0.1"), "server ip adress")
+    ("port,p", po::value<uint16_t>()->default_value(8001), "server port")
+    ("key,k", po::value<string>(), "join key, if not present create a new game and get the join and watch keys by the server")
+    ("player", po::value<string>(), "configuration file for player");
 
-    // po::options_description all("Allowed options");
-    // all.add(general).add(client).add(evaluate);
-    
-    // po::variables_map vm;
-    // po::store(po::parse_command_line(argc, argv, all), vm);
-    // po::notify(vm);
-    // if (vm.count("help")) {
-    //     cout << all << "\n";
-    //     return EXIT_SUCCESS;
-    // }
-    // if (vm.count("version")) {
-    //     cout << "Yolah 1.0 by Pascal Garcia\n";
-    //     return EXIT_SUCCESS;
-    // }
-    // if (vm.count("player")) {
-    //     std::ifstream f(vm["player"].as<string>());
-    //     nlohmann::json j = nlohmann::json::parse(f);    
-    //     cout << j << '\n';
-    //     ClientPlayer player(Player::create(j),
-    //                         WebsocketClientSync::create(vm["server"].as<string>(), vm["port"].as<uint16_t>()));
-    //     player.run(vm.count("key") ? std::optional<string>(vm["key"].as<string>()) : std::nullopt);
-    // } else if (vm.count("player1") && vm.count("player2")) {
-    //     test::play(Player::create(nlohmann::json::parse(std::ifstream(vm["player1"].as<string>()))),
-    //                Player::create(nlohmann::json::parse(std::ifstream(vm["player2"].as<string>()))),
-    //                vm["nb-random-moves"].as<size_t>(),
-    //                vm["nb-games"].as<size_t>());
-    // } else {
-    //     cout << "wrong mix of options\n";
-    //     return EXIT_FAILURE;
-    // }
+    po::options_description evaluate("Evaluate AI options");
+    evaluate.add_options()
+    ("player1,1", po::value<string>(), "configuration file for first AI player")
+    ("player2,2", po::value<string>(), "configuration file for second AI player")
+    ("nb-random-moves,r", po::value<size_t>()->default_value(0), "number of random moves at the beginning of the game")
+    ("nb-games,n", po::value<size_t>()->default_value(100), "number of games for the evaluation");
+
+    po::options_description tournament("Tournament options (long, resumable round robin; see test/tournament.cpp)");
+    tournament.add_options()
+    ("tournament", po::value<string>(), "file listing the player configuration files, one per line (# comments; relative paths are relative to this file)")
+    ("results", po::value<string>()->default_value("tournament_games.csv"), "games file, one line per game (appended: a new run resumes it)")
+    ("time", po::value<uint64_t>()->default_value(1000000), "microseconds per move for every player (0 = keep each configuration's)")
+    ("threads", po::value<size_t>()->default_value(4), "search threads per player (0 = keep each configuration's)")
+    ("parallel", po::value<size_t>()->default_value(6), "CPU games played at the same time")
+    ("gpu-parallel", po::value<size_t>()->default_value(1), "games involving a GPU player played at the same time")
+    ("rounds", po::value<size_t>()->default_value(0), "rounds (every pair, both colours); 0 = until stopped")
+    ("opening-plies", po::value<size_t>()->default_value(4), "random plies before each pair of games")
+    ("hours", po::value<double>()->default_value(0), "stop after this many hours (0 = never)")
+    ("seed", po::value<uint64_t>()->default_value(1), "seed of the openings");
+
+    po::options_description tools("Tools");
+    tools.add_options()
+    ("encode-features", po::value<std::vector<string>>()->multitoken(), "SRC DST: encode the games of SRC into the features cache DST (YolahFeatures::encode_data)");
+
+    po::options_description all("Allowed options");
+    all.add(general).add(client).add(evaluate).add(tournament).add(tools);
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, all), vm);
+    po::notify(vm);
+    if (vm.count("help") || argc == 1) {
+        cout << all << "\n";
+        return EXIT_SUCCESS;
+    }
+    if (vm.count("version")) {
+        cout << "Yolah 1.0 by Pascal Garcia\n";
+        return EXIT_SUCCESS;
+    }
+    if (vm.count("player")) {
+        std::ifstream f(vm["player"].as<string>());
+        nlohmann::json j = nlohmann::json::parse(f);    
+        cout << j << '\n';
+        ClientPlayer player(Player::create(j),
+                            WebsocketClientSync::create(vm["server"].as<string>(), vm["port"].as<uint16_t>()),
+                            j.value("description", string()));
+        player.run(vm.count("key") ? std::optional<string>(vm["key"].as<string>()) : std::nullopt);
+    } else if (vm.count("player1") && vm.count("player2")) {
+        test::play(Player::create(nlohmann::json::parse(std::ifstream(vm["player1"].as<string>()))),
+                   Player::create(nlohmann::json::parse(std::ifstream(vm["player2"].as<string>()))),
+                   vm["nb-random-moves"].as<size_t>(),
+                   vm["nb-games"].as<size_t>());
+    } else if (vm.count("tournament")) {
+        test::TournamentOptions opt;
+        opt.configs = test::read_players_list(vm["tournament"].as<string>());
+        opt.results = vm["results"].as<string>();
+        opt.microseconds = vm["time"].as<uint64_t>();
+        opt.threads = vm["threads"].as<size_t>();
+        opt.parallel = vm["parallel"].as<size_t>();
+        opt.gpu_parallel = vm["gpu-parallel"].as<size_t>();
+        opt.rounds = vm["rounds"].as<size_t>();
+        opt.opening_plies = vm["opening-plies"].as<size_t>();
+        opt.hours = vm["hours"].as<double>();
+        opt.seed = vm["seed"].as<uint64_t>();
+        test::tournament(opt);
+    } else if (vm.count("encode-features")) {
+        const auto args = vm["encode-features"].as<std::vector<string>>();
+        if (args.size() != 2) { cout << "--encode-features expects SRC DST\n"; return EXIT_FAILURE; }
+        YolahFeatures::encode_data(args[0], args[1]);
+    } else {
+        cout << "wrong mix of options\n";
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

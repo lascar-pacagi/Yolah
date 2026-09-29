@@ -100,9 +100,9 @@ int16_t MinMaxNNUE_QuantizedPlayer::negamax(Yolah& yolah, Search& s, uint64_t ha
         }
     }
     if (depth <= 0) {
-        const auto [black_proba, draw_proba, white_proba] = nnue.output(s.acc);
-        float coeff = (yolah.current_player() == Yolah::BLACK ? 1 : -1); 
-        int16_t v = (coeff * black_proba - coeff * white_proba) * heuristic::MAX_VALUE; 
+        // Value for the side to move: P(win) − P(loss) for the 3-output
+        // networks, the tanh value head for the value networks.
+        int16_t v = nnue.value(s.acc, yolah.current_player()) * heuristic::MAX_VALUE;
         table.update(hash, v, BOUND_EXACT, 0);
         return v;
     }

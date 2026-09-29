@@ -36,6 +36,12 @@ struct NNUE {
         }
     };    
     float* weights_and_biases;
+    // Number of outputs of the loaded network, read from the weights file:
+    //   3 — the original networks: logits of (black wins, draw, white wins),
+    //       read with output();
+    //   1 — the value networks (nnue_193x1024x64x32x1*.pt): one logit, the
+    //       value is tanh(logit) FOR THE SIDE TO MOVE, read with value().
+    int nb_outputs = OUTPUT_SIZE;
     NNUE();
     void load(const std::string& filename);
     Accumulator make_accumulator() const;
@@ -43,6 +49,10 @@ struct NNUE {
     void play(uint8_t player, const Move& m, Accumulator& a);
     void undo(uint8_t player, const Move& m, Accumulator& a);
     std::tuple<float, float, float> output(Accumulator& a);
+    // Value in [-1, 1] for the side to move, whatever the kind of network:
+    // P(side to move wins) − P(it loses) for a 3-output network, tanh of the
+    // value head for a 1-output one.
+    float value(Accumulator& a, uint8_t side_to_move);
     ~NNUE();    
     void save_quantized(const std::string& filename, float scale = 64);
 };

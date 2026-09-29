@@ -1,0 +1,31 @@
+# Players of the grading tournament (nnue/tournament.sh, Yolah --tournament).
+# One configuration per line, relative to this file. The file name (without
+# .cfg) is the player's name in the results. Time per move and search threads
+# are set by the tournament for everyone (--time, --threads).
+
+# weak anchors and classical players
+random_player.cfg
+basic_mm_player.cfg
+mc_player.cfg
+mcts_player.cfg
+mm_player.cfg
+
+# original networks (3 outputs: black wins / draw / white wins)
+mm_nnue_float_player.cfg
+mm_nnue_quantized_models_player.cfg
+mcts_nn_models_player.cfg
+
+# new NNUE (value head), plain and distilled, float and int8
+mm_nnue193_float_player.cfg
+mm_nnue193_quantized_player.cfg
+mm_nnue193_distill_float_player.cfg
+mm_nnue193_distill_quantized_player.cfg
+
+# new features networks (value head), plain and distilled, float and int16
+mm_features119_float_player.cfg
+mm_features119_quantized_player.cfg
+mm_features119_distill_float_player.cfg
+mm_features119_distill_quantized_player.cfg
+
+# the convnet: AlphaZero-style MCTS on the GPU
+alphazero_mcts_gpu_player.cfg

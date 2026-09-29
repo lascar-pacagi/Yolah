@@ -84,8 +84,9 @@ namespace {
     };
 }
 
-ClientPlayer::ClientPlayer(std::unique_ptr<Player> player, std::unique_ptr<WebsocketClientSync> client) 
-    : player(std::move(player)), client(std::move(client)) {
+ClientPlayer::ClientPlayer(std::unique_ptr<Player> player, std::unique_ptr<WebsocketClientSync> client,
+                           std::string description) 
+    : player(std::move(player)), client(std::move(client)), description(std::move(description)) {
 }
 
 json ClientPlayer::read() {
@@ -103,8 +104,9 @@ void ClientPlayer::write(const std::string& msg) {
 
 void ClientPlayer::run(std::optional<string> join_key) {
     Yolah yolah;
-    if (!join_key) write(Message::new_(player->info()));
-    else write(Message::join(*join_key, player->info()));
+    const string info = description.empty() ? player->info() : description;
+    if (!join_key) write(Message::new_(info));
+    else write(Message::join(*join_key, info));
     for (;;) {
         json msg = read();
         cout << msg << endl;

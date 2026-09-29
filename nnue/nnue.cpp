@@ -14,6 +14,8 @@
 #include <bit>
 #include <algorithm>
 #include <immintrin.h>
+#include <cmath>
+#include <stdexcept>
 
 NNUE::NNUE() {
     constexpr int n = 1 + H1_SIZE + INPUT_SIZE * H1_SIZE + H2_SIZE + H1_SIZE * H2_SIZE + H3_SIZE + H2_SIZE * H3_SIZE + OUTPUT_SIZE + H3_SIZE * OUTPUT_SIZE;
@@ -159,6 +161,31 @@ std::tuple<float, float, float> NNUE::output(Accumulator& a) {
     return { e1 / sum, e2 / sum, e3 / sum };
 }
 
+// Value of a 1-output network: tanh of the value head, for the side to move.
+static float value_head(const float* w, const float* h3, float bias) {
+    float s = bias;
+    for (int i = 0; i < NNUE::H3_SIZE; i++) s += w[i] * h3[i];
+    return std::tanh(s);
+}
+
+float NNUE::value(Accumulator& a, uint8_t side_to_move) {
+    if (nb_outputs == 3) {
+        const auto [black_proba, draw_proba, white_proba] = output(a);
+        const float coeff = side_to_move == Yolah::BLACK ? 1.0f : -1.0f;
+        return coeff * black_proba - coeff * white_proba;
+    }
+    alignas(64) float h1[H1_SIZE];
+    alignas(64) float h2[H2_SIZE];
+    alignas(64) float h3[H3_SIZE];
+    for (int i = 0; i < H1_SIZE; i++) {
+        const float v = a.acc[i];
+        h1[i] = v <= 0 ? 0 : (v >= 1 ? 1 : v);
+    }
+    matvec<64, 1024>(weights_and_biases + H1_TO_H2, h1, h2, weights_and_biases + H2_BIAS);
+    matvec<32, 64>(weights_and_biases + H2_TO_H3, h2, h3, weights_and_biases + H3_BIAS);
+    return value_head(weights_and_biases + H3_TO_OUTPUT, h3, weights_and_biases[OUTPUT_BIAS]);
+}
+
 static constexpr bool TRANSPOSE = true; 
 
 template<int M, int N, bool transpose = false>
@@ -214,8 +241,23 @@ void NNUE::load(const std::string& filename) {
     read_bias<H2_SIZE>(ifs, weights_and_biases + H2_BIAS);
     read_matrix<H3_SIZE, H2_SIZE>(ifs, weights_and_biases + H2_TO_H3);
     read_bias<H3_SIZE>(ifs, weights_and_biases + H3_BIAS);
-    read_matrix<OUTPUT_SIZE, H3_SIZE>(ifs, weights_and_biases + H3_TO_OUTPUT);
-    read_bias<OUTPUT_SIZE>(ifs, weights_and_biases + OUTPUT_BIAS);
+    // The output layer has 3 rows (win/draw/loss logits) or 1 (value head):
+    // peek at its size, then read it with the matching dimensions.
+    const std::streampos here = ifs.tellg();
+    std::string type;
+    int m = 0;
+    ifs >> type >> m;
+    ifs.seekg(here);
+    if (m == 1) {
+        nb_outputs = 1;
+        read_matrix<1, H3_SIZE>(ifs, weights_and_biases + H3_TO_OUTPUT);
+        read_bias<1>(ifs, weights_and_biases + OUTPUT_BIAS);
+    } else {
+        nb_outputs = OUTPUT_SIZE;
+        read_matrix<OUTPUT_SIZE, H3_SIZE>(ifs, weights_and_biases + H3_TO_OUTPUT);
+        read_bias<OUTPUT_SIZE>(ifs, weights_and_biases + OUTPUT_BIAS);
+    }
+    if (!ifs) throw std::runtime_error("NNUE: cannot read " + filename);
 }
 
 template<int M, int N, bool transpose = false>
@@ -288,6 +330,17 @@ void NNUE::init(const Yolah& yolah, Accumulator& a) {
 }
 
 void NNUE::play(uint8_t player, const Move& m, Accumulator& a) {
+    if (m == Move::none()) {
+        // A pass: no piece moves and no hole appears — only the side to move
+        // changes. (Handled as a move from a1 to a1 before, it marked a1 as a
+        // hole in the accumulator: the evaluations after a pass were wrong.)
+        const float* turn = weights_and_biases + INPUT_TO_H1 + (INPUT_SIZE - 1) * H1_SIZE;
+        for (int i = 0; i < H1_SIZE; i++) {
+            if (player == Yolah::BLACK) a.acc[i] += turn[i];
+            else                        a.acc[i] -= turn[i];
+        }
+        return;
+    }
     int from = 63 - m.from_sq();
     int to = 63 - m.to_sq();
     // black positions + white positions + empty positions
@@ -315,6 +368,17 @@ void NNUE::play(uint8_t player, const Move& m, Accumulator& a) {
 }
 
 void NNUE::undo(uint8_t player, const Move& m, Accumulator& a) {
+    if (m == Move::none()) {
+        // A pass: no piece moves and no hole appears — only the side to move
+        // changes. (Handled as a move from a1 to a1 before, it marked a1 as a
+        // hole in the accumulator: the evaluations after a pass were wrong.)
+        const float* turn = weights_and_biases + INPUT_TO_H1 + (INPUT_SIZE - 1) * H1_SIZE;
+        for (int i = 0; i < H1_SIZE; i++) {
+            if (player == Yolah::BLACK) a.acc[i] -= turn[i];
+            else                        a.acc[i] += turn[i];
+        }
+        return;
+    }
     int from = 63 - m.from_sq();
     int to = 63 - m.to_sq();
     // black positions + white positions + empty positions

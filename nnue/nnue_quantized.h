@@ -24,6 +24,14 @@ struct NNUE_Quantized {
     alignas(64) int8_t h2_to_h3[H1_SIZE * H2_SIZE];
     alignas(64) int16_t output_bias[OUTPUT_SIZE + 1]{};
     alignas(64) int8_t h3_to_output[H3_SIZE * OUTPUT_SIZE];
+    // Value networks (1 output): the value head is kept in FLOAT. It is not
+    // clamped during training (weights up to ~13), so it does not fit the
+    // int8 scale-64 format of the other layers; being 32 multiplications, it
+    // costs nothing. value = tanh(Σ value_weight[i]·h3[i]/64 + value_bias),
+    // for the side to move.
+    int nb_outputs = OUTPUT_SIZE;
+    alignas(64) float value_weight[H3_SIZE]{};
+    float value_bias = 0;
     struct Accumulator {
         int16_t* acc;
         Accumulator() {
@@ -44,6 +52,8 @@ struct NNUE_Quantized {
     void play(uint8_t player, const Move& m, Accumulator& a);
     void undo(uint8_t player, const Move& m, Accumulator& a);
     std::tuple<float, float, float> output(Accumulator& a);
+    // Value in [-1, 1] for the side to move, for both kinds of network (see NNUE::value).
+    float value(Accumulator& a, uint8_t side_to_move);
 };
 
 #endif

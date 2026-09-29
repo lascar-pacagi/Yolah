@@ -97,6 +97,14 @@ class Connected:
     def players_info(self):
         return ", ".join((info for (_, info) in self.players))
 
+    def players_description(self):
+        """Who plays: the player who created the game has black (it moves first)."""
+        colours = ["black", "white"]
+        lines = [f"{colours[i]}: {info}" for i, (_, info) in enumerate(self.players[:2])]
+        if len(self.players) < 2:
+            lines.append("white: (waiting for a player)")
+        return "\n" + "\n".join(lines)
+
     def observers_info(self):
         return ", ".join((info for (_, info) in self.observers))
 
@@ -257,6 +265,9 @@ async def join(websocket, msg):
         return
     connected.add_player(websocket, Message.get_info(msg))
     try:
+        # Show both players (their descriptions) to everyone: the two players
+        # and the observers already watching.
+        websockets.broadcast(connected.connections(), Message.info(connected.players_description()))
         await websocket.send(Message.game_state(json.loads(game.to_json())))
         await connected.other_player(websocket).send(Message.your_move())
         await play(websocket, game, connected)
@@ -272,6 +283,7 @@ async def watch(websocket, msg):
         return
     connected.add_observer(websocket, Message.get_info(msg))
     try:
+        await websocket.send(Message.info(connected.players_description()))
         await websocket.send(Message.game_state(json.loads(game.to_json())))
         async for message in websocket:
             msg = json.loads(message)

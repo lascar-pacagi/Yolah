@@ -1,4 +1,6 @@
 #include "nnue_quantized.h"
+#include <cmath>
+#include <stdexcept>
 #include <fstream>
 #include <string>
 #include <regex>
@@ -173,6 +175,26 @@ std::tuple<float, float, float> NNUE_Quantized::output(Accumulator& a) {
     return { e1 / sum, e2 / sum, e3 / sum };
 }
 
+float NNUE_Quantized::value(Accumulator& a, uint8_t side_to_move) {
+    if (nb_outputs == 3) {
+        const auto [black_proba, draw_proba, white_proba] = output(a);
+        const float coeff = side_to_move == Yolah::BLACK ? 1.0f : -1.0f;
+        return coeff * black_proba - coeff * white_proba;
+    }
+    alignas(64) int8_t h1[H1_SIZE];
+    alignas(64) int8_t h2[H2_SIZE];
+    alignas(64) int8_t h3[H3_SIZE];
+    for (int i = 0; i < H1_SIZE; i++) {
+        const int16_t v = a.acc[i];
+        h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v);
+    }
+    matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);
+    matvec<32, 64>(h2_to_h3, h2, h3, h3_bias);
+    float s = 0;
+    for (int i = 0; i < H3_SIZE; i++) s += value_weight[i] * h3[i];   // h3 at scale 64
+    return std::tanh(s / FACTOR + value_bias);
+}
+
 static constexpr bool TRANSPOSE = true; 
 
 template<typename T, int M, int N, bool transpose = false>
@@ -228,8 +250,27 @@ void NNUE_Quantized::load(const std::string& filename) {
     read_bias<int16_t, H2_SIZE>(ifs, h2_bias);
     read_matrix<int8_t, H3_SIZE, H2_SIZE>(ifs, h2_to_h3);
     read_bias<int16_t, H3_SIZE>(ifs, h3_bias);
-    read_matrix<int8_t, OUTPUT_SIZE, H3_SIZE>(ifs, h3_to_output);
-    read_bias<int16_t, OUTPUT_SIZE>(ifs, output_bias);
+    // 3 rows: the win/draw/loss output layer, int8 like the others.
+    // 1 row : a value head, written in float (see value_weight).
+    const std::streampos here = ifs.tellg();
+    std::string type;
+    int m = 0;
+    ifs >> type >> m;
+    ifs.seekg(here);
+    if (m == 1) {
+        nb_outputs = 1;
+        int n = 0;
+        ifs >> type >> m >> n;
+        if (type != "W" || n != H3_SIZE) throw std::runtime_error("NNUE_Quantized: bad value head in " + filename);
+        for (int i = 0; i < H3_SIZE; i++) ifs >> value_weight[i];
+        ifs >> type >> n >> value_bias;
+        if (type != "B" || n != 1) throw std::runtime_error("NNUE_Quantized: bad value bias in " + filename);
+    } else {
+        nb_outputs = OUTPUT_SIZE;
+        read_matrix<int8_t, OUTPUT_SIZE, H3_SIZE>(ifs, h3_to_output);
+        read_bias<int16_t, OUTPUT_SIZE>(ifs, output_bias);
+    }
+    if (!ifs) throw std::runtime_error("NNUE_Quantized: cannot read " + filename);
 }
 
 static inline std::tuple<uint64_t, uint64_t, uint64_t> encode_yolah(const Yolah& yolah) {
@@ -266,6 +307,17 @@ void NNUE_Quantized::init(const Yolah& yolah, Accumulator& a) {
 }
 
 void NNUE_Quantized::play(uint8_t player, const Move& m, Accumulator& a) {
+    if (m == Move::none()) {
+        // A pass: no piece moves and no hole appears — only the side to move
+        // changes. (Handled as a move from a1 to a1 before, it marked a1 as a
+        // hole in the accumulator: the evaluations after a pass were wrong.)
+        const int8_t* turn = input_to_h1 + (INPUT_SIZE - 1) * H1_SIZE;
+        for (int i = 0; i < H1_SIZE; i++) {
+            if (player == Yolah::BLACK) a.acc[i] += turn[i];
+            else                        a.acc[i] -= turn[i];
+        }
+        return;
+    }
     int from = 63 - m.from_sq();
     int to = 63 - m.to_sq();
     // black positions + white positions + empty positions
@@ -292,6 +344,17 @@ void NNUE_Quantized::play(uint8_t player, const Move& m, Accumulator& a) {
 }
 
 void NNUE_Quantized::undo(uint8_t player, const Move& m, Accumulator& a) {
+    if (m == Move::none()) {
+        // A pass: no piece moves and no hole appears — only the side to move
+        // changes. (Handled as a move from a1 to a1 before, it marked a1 as a
+        // hole in the accumulator: the evaluations after a pass were wrong.)
+        const int8_t* turn = input_to_h1 + (INPUT_SIZE - 1) * H1_SIZE;
+        for (int i = 0; i < H1_SIZE; i++) {
+            if (player == Yolah::BLACK) a.acc[i] -= turn[i];
+            else                        a.acc[i] += turn[i];
+        }
+        return;
+    }
     int from = 63 - m.from_sq();
     int to = 63 - m.to_sq();
     // black positions + white positions + empty positions

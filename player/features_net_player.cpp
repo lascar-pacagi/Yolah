@@ -4,18 +4,64 @@
 #include "zobrist.h"
 #include <utility>
 #include "heuristic.h"
+#include "ffnn.h"
+#include "ffnn_float.h"
+#include "ffnn_value.h"
+#include <stdexcept>
+
+namespace {
+    constexpr int NB_FEATURES = YolahFeatures::NB_FEATURES;
+    static_assert(FFNN<NB_FEATURES, 256, 64, 3>::I_PADDED <= 128 && FFNNValue<NB_FEATURES, 256, 64>::I_PADDED <= 128,
+                  "Search::features must hold the padded features");
+
+    struct WdlQuantized : FeaturesEvaluator {
+        FFNN<NB_FEATURES, 256, 64, 3> net;
+        explicit WdlQuantized(const std::string& f) : net(f) {}
+        float value(const uint8_t* x, uint8_t stm) const override {
+            const auto [black_proba, draw_proba, white_proba] = net(x);
+            const float coeff = stm == Yolah::BLACK ? 1 : -1;
+            return coeff * black_proba - coeff * white_proba;
+        }
+    };
+    struct WdlFloat : FeaturesEvaluator {
+        FFNNFloat<NB_FEATURES, 256, 64, 3> net;
+        explicit WdlFloat(const std::string& f) : net(f) {}
+        float value(const uint8_t* x, uint8_t stm) const override {
+            const auto [black_proba, draw_proba, white_proba] = net(x);
+            const float coeff = stm == Yolah::BLACK ? 1 : -1;
+            return coeff * black_proba - coeff * white_proba;
+        }
+    };
+    template <class Net>
+    struct Value : FeaturesEvaluator {               // already for the side to move
+        Net net;
+        explicit Value(const std::string& f) : net(f) {}
+        float value(const uint8_t* x, uint8_t) const override { return net.value(x); }
+    };
+}
+
+std::unique_ptr<FeaturesEvaluator> make_features_evaluator(const std::string& network, const std::string& weights) {
+    if (network == "wdl quantized") return std::make_unique<WdlQuantized>(weights);
+    if (network == "wdl float")     return std::make_unique<WdlFloat>(weights);
+    if (network == "value quantized") return std::make_unique<Value<FFNNValue<NB_FEATURES, 256, 64>>>(weights);
+    if (network == "value float")     return std::make_unique<Value<FFNNValueFloat<NB_FEATURES, 256, 64>>>(weights);
+    throw std::invalid_argument("network: \"wdl quantized\", \"wdl float\", \"value quantized\" or \"value float\" "
+                                "expected, got \"" + network + "\"");
+}
 
 using std::cout, std::endl;
 
 FeaturesNetPlayer::FeaturesNetPlayer(
     uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth,
     uint8_t late_move_reduction,
-    const std::string &feature_net_parameters_filename, size_t nb_threads)
+    const std::string &feature_net_parameters_filename, size_t nb_threads,
+    const std::string &network)
     : thinking_time(microseconds), table(tt_size_mb),
       nb_moves_at_full_depth(nb_moves_at_full_depth),
       late_move_reduction(late_move_reduction),
       feature_net_parameters_filename(feature_net_parameters_filename),
-      net(feature_net_parameters_filename),
+      network(network),
+      net(make_features_evaluator(network, feature_net_parameters_filename)),
       pool(static_cast<BS::concurrency_t>(nb_threads)) {}
 
 Move FeaturesNetPlayer::play(Yolah yolah) {
@@ -57,7 +103,7 @@ Move FeaturesNetPlayer::play(Yolah yolah) {
 }
 
 std::string FeaturesNetPlayer::info() {
-    return "features net player (transposition table + late move reduction + killer + lazy SMP)";
+    return "features net player, " + network + " (transposition table + late move reduction + killer + lazy SMP)";
 }
 
 int16_t FeaturesNetPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16_t alpha, int16_t beta, int8_t depth) {
@@ -86,9 +132,7 @@ int16_t FeaturesNetPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int16
     }
     if (depth <= 0) {
         YolahFeatures::set_features(s.features, yolah);
-        const auto [black_proba, draw_proba, white_proba] = net(s.features);
-        float coeff = (yolah.current_player() == Yolah::BLACK ? 1 : -1); 
-        int16_t v = (coeff * black_proba - coeff * white_proba) * heuristic::MAX_VALUE; 
+        int16_t v = net->value(s.features, yolah.current_player()) * heuristic::MAX_VALUE;
         table.update(hash, v, BOUND_EXACT, 0);
         return v;
     }
@@ -231,5 +275,6 @@ json FeaturesNetPlayer::config() {
         j["nb threads"] = pool.get_thread_count();
     }
     j["weights"] = feature_net_parameters_filename;
+    j["network"] = network;
     return j;
 }

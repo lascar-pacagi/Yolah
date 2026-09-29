@@ -373,12 +373,15 @@ unique_ptr<Player> Player::create(const json& j) {
                 } else {
                     throw invalid_argument("hardware concurrency expected in nb threads");
                 }                
+                // "network": "wdl quantized" (default, the original networks),
+                // "wdl float", "value quantized" or "value float" (see FeaturesEvaluator).
                 return make_unique<FeaturesNetPlayer>(j["microseconds"].get<uint64_t>(), 
                                                      j["tt size"].get<size_t>(),
                                                      j["nb moves at full depth"].get<size_t>(),
                                                      j["late move reduction"].get<uint8_t>(),
                                                      j["weights"],
-                                                     nb_threads);
+                                                     nb_threads,
+                                                     j.value("network", std::string("wdl quantized")));
             }
         },          
         {

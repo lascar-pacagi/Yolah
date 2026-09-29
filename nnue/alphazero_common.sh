@@ -38,12 +38,14 @@ run() {
         "${SIF}" "$@"
 }
 
-# Compile alphazero_learn for this node's CPU (skipped by make when up to
-# date). flock: two jobs starting together on identical nodes share the build
-# directory and must not run CMake in it at the same time.
+# Compile the given CMake targets (default: alphazero_learn) for this node's
+# CPU (skipped by make when up to date). flock: two jobs starting together on
+# identical nodes share the build directory and must not run CMake in it at
+# the same time.
 build_alphazero_learn() {
+    local targets="${*:-alphazero_learn}"
     mkdir -p "${WORK_DIR}/build"
-    echo "[$(date '+%F %T')] === Building alphazero_learn in ${BUILD_DIR} ==="
+    echo "[$(date '+%F %T')] === Building ${targets} in ${BUILD_DIR} ==="
     run bash -c "set -e
         exec 9> /work/build/.lock_${CPU_TAG}
         flock 9
@@ -52,7 +54,7 @@ build_alphazero_learn() {
         cmake -S /Yolah -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Release -DENABLE_TORCH=ON \
               -DCMAKE_PREFIX_PATH=\${TORCH_PREFIX} -Wno-dev > /work/build/cmake_${CPU_TAG}.log 2>&1 \
             || { cat /work/build/cmake_${CPU_TAG}.log; exit 1; }
-        cmake --build ${BUILD_DIR} --target alphazero_learn -j ${SLURM_CPUS_PER_TASK:-16} 2>&1 | tail -3"
+        cmake --build ${BUILD_DIR} --target ${targets} -j ${SLURM_CPUS_PER_TASK:-16} 2>&1 | tail -3"
 }
 
 # Start a command in the container in the background, as a direct child:
