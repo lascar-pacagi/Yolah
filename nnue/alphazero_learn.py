@@ -243,9 +243,12 @@ class ReplayWindow:
 
 # ── batches ──────────────────────────────────────────────────────────────────
 class BatchMaker:
-    def __init__(self, device, aux=False):
+    def __init__(self, device, aux=False, q_weight=0.0):
         self.device = device
         self.aux = aux                   # also return the ownership targets
+        # Value target = (1 − w)·z + w·q: the game result blended with the
+        # search's own value of the position (root_q). 0 = the result alone.
+        self.q_weight = q_weight
         src, act = symmetry_tables()
         self.src = src.to(device)
         self.act = act.to(device)
@@ -255,7 +258,8 @@ class BatchMaker:
         """
         rows (numpy, SAMPLE_DTYPE) → (x, z, actions, probs) on the device:
           x       (B, 4, 8, 8) float, channels-last — the network input
-          z       (B,)  float — game result for the side to move
+          z       (B,)  float — value target for the side to move: the game
+                  result, blended with the search value root_q if q_weight > 0
           actions (B, 75) long — policy indices of the legal moves (0-padded)
           probs   (B, 75) float — π over those moves (0 on the padding)
         and with aux=True, a fifth element:
@@ -278,6 +282,12 @@ class BatchMaker:
         probs = torch.from_numpy(rows["prob"].astype(np.float32)).to(dev)
         probs = probs / probs.sum(1, keepdim=True).clamp_min(1.0)
         z = torch.from_numpy(rows["z"].astype(np.float32)).to(dev)
+        if self.q_weight > 0:
+            # root_q is the value the full search found for this position,
+            # for the side to move — the same convention as z and as the
+            # value head. It is invariant under the board symmetries.
+            q = torch.from_numpy(rows["root_q"].astype(np.float32)).to(dev).clamp(-1.0, 1.0)
+            z = (1.0 - self.q_weight) * z + self.q_weight * q
         own = None
         if self.aux:
             from alphazero_aux import decode_ownership
@@ -575,6 +585,8 @@ def main():
     ap.add_argument("--value-weight", type=float, default=1.0)
     ap.add_argument("--policy-weight", type=float, default=1.0)
     ap.add_argument("--reuse", type=float, default=4.0, help="training samples per generated row")
+    ap.add_argument("--q-weight", type=float, default=0.0,
+                    help="value target = (1-w)·z + w·q, q = the search value of the position (0 = z alone)")
     # data
     ap.add_argument("--min-rows", type=int, default=100_000, help="rows before training starts (window N0)")
     ap.add_argument("--max-window", type=int, default=4_000_000)
@@ -721,7 +733,9 @@ def main():
                           dtype=SAMPLE_DTYPE_AUX if args.aux else SAMPLE_DTYPE)
     window.scan()
     log(f"replay: {window.total:,} rows from {window.games:,} games on disk, {window.filled:,} in memory")
-    make_batch = BatchMaker(device, aux=args.aux)
+    make_batch = BatchMaker(device, aux=args.aux, q_weight=args.q_weight)
+    if args.q_weight > 0:
+        log(f"value target: {1 - args.q_weight:g}·z + {args.q_weight:g}·q (game result blended with the search value)")
     rng = np.random.default_rng()
 
     # ── subprocesses ──

@@ -62,6 +62,10 @@ alphazero_learn.sh`. Off by default; a run can switch on or off from one job to
 the next. The exported network is the plain two-headed one either way.
 Monitoring: `WORK_DIR/train_log_aux.csv`.
 
+Value target blended with the search value, (1 − w)·z + w·q (q = `root_q`,
+recorded in every row): `sbatch --export=ALL,Q_WEIGHT=0.5 alphazero_learn.sh`.
+0 (default) = the game result alone. No C++ change.
+
 The main job asks for 3 GPUs, 32 CPUs, 128 GB, 14 days: one self-play process
 of 256 games per GPU, the trainer on the first GPU, the evaluation matches on
 the last. The C++ is compiled on the compute node at the start of each job (the

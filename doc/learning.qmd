@@ -323,6 +323,50 @@ v_loss = F.mse_loss(v.float(), z)
 loss   = args.value_weight * v_loss + args.policy_weight * p_loss
 ```
 
+### Blending the result with the search value {#sec-qmix}
+
+The value head learns to predict $z$, the result of the game. For a given
+position that target is **exact but noisy**: everything played afterwards
+counts in it, and in Yolah — a third of draws, most wins by one or two points (@sec-colour-balance) — a position ends up labelled 0 or +1 by the accidents
+of the rest of the game as much as by its own merit.
+
+Every row also carries a second estimate of the same quantity: $q$, the value
+the full search (800 simulations) found for the position when it was played
+(`root_q`, for the side to move, the convention of $z$ and of the value head).
+$q$ summarises hundreds of continuations, so it is **much less noisy — but
+biased**: it comes from the current network, and inherits its errors. The
+option `--q-weight` $w$ trains the value on a blend of the two:
+
+$$
+\text{target} = (1 - w)\,z + w\,q, \qquad \mathcal{L}_v = \big(v_\theta(s) - \text{target}\big)^2 .
+$$
+
+It is the classic bias–variance trade-off of reinforcement learning: $z$ is
+the Monte-Carlo return, $q$ a bootstrapped estimate — the temporal-difference
+side, which KataGo's short-term value targets (@sec-auxiliary) develop
+further. Some AlphaZero re-implementations report a gain from averaging the
+two. $w$ must stay well below 1: with $q$ alone, the network would learn only
+from itself and could lock into its own mistakes; the share of $z$ keeps it
+anchored to real results.
+
+On local test games, $q$ and $z$ are correlated at 0.82, the blend
+($w = 0.5$) lowers the variance of the target from 0.69 to 0.49, and the
+positions of the drawn games are far from being all "draws" in the eyes of
+the search ($q$ has a standard deviation of 0.27 on them). The option costs
+nothing: the C++ side does not change — `root_q` has been recorded in every
+row since the first version of the format — and it applies at once to the
+rows already generated.
+
+```python
+z = torch.from_numpy(rows["z"].astype(np.float32)).to(dev)
+if self.q_weight > 0:
+    q = torch.from_numpy(rows["root_q"].astype(np.float32)).to(dev).clamp(-1.0, 1.0)
+    z = (1.0 - self.q_weight) * z + self.q_weight * q
+```
+
+On the cluster: `sbatch --export=ALL,Q_WEIGHT=0.5 alphazero_learn.sh`; the
+job's header and log print the target in use.
+
 ### Optimiser and numerics
 
 * **Adam**, learning rate $10^{-4}$ (the supervised run ended its cosine schedule
@@ -792,6 +836,7 @@ important ones as environment variables and sets the cluster values:
 | `--weight-decay` | 1e-4 | 1e-4 | L2 |
 | `--ema-decay` | 0.995 | 0.995 | weight averaging for export; 0 = raw weights |
 | `--reuse` | 4 | 4 | training samples per generated row |
+| `--q-weight` | 0 | `Q_WEIGHT` | value target $(1-w)\,z + w\,q$ (@sec-qmix); 0 = the result alone |
 | `--min-rows` | 100 000 | 250 000 | $N_0$: rows before training starts, window base |
 | `--max-window` | 4 M | 16 M | ring buffer capacity |
 | `--export-every` | 131 072 | 524 288 | training samples between two networks |

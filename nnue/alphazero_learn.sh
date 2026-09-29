@@ -77,6 +77,9 @@ EVAL_OPPONENTS="${EVAL_OPPONENTS:-previous}"  # previous, initial, lag:K (comma 
 # the plain two-headed training. A run can switch from one job to the next;
 # the extra self-play jobs follow automatically (latest.json).
 AUX="${AUX:-0}"
+# Value target = (1 − Q_WEIGHT)·z + Q_WEIGHT·q, q = the search value of the
+# position (already recorded in every row). 0 = the game result alone.
+Q_WEIGHT="${Q_WEIGHT:-0}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"                  # anything else for alphazero_learn.py
 RESUBMIT="${RESUBMIT:-0}"                     # 1 = sbatch this script again when the time is up
 
@@ -101,6 +104,7 @@ echo "  SIF        : ${SIF}"
 echo "  Work dir   : ${WORK_DIR}"
 echo "  Max hours  : ${MAX_HOURS}"
 echo "  Aux heads  : $([[ "${AUX}" == "1" ]] && echo "on (ownership, score margin)" || echo off)"
+echo "  Value      : $(awk -v w="${Q_WEIGHT}" 'BEGIN { if (w > 0) printf "%g·z + %g·q", 1 - w, w; else print "z (game result)" }')"
 echo "════════════════════════════════════════════════════════════════"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null || true
 
@@ -117,7 +121,7 @@ start_in_container bash -c "cd /Yolah/nnue && exec python3 -u alphazero_learn.py
     --selfplay-set 'nn cache=${SELFPLAY_NN_CACHE}' --max-window ${MAX_WINDOW} \
     --min-rows ${MIN_ROWS} --export-every ${EXPORT_EVERY} --eval-hours ${EVAL_HOURS} \
     --eval-games ${EVAL_GAMES} --eval-seconds ${EVAL_SECONDS} --eval-opponents ${EVAL_OPPONENTS} \
-    --max-hours ${MAX_HOURS} ${AUX_ARGS} ${EXTRA_ARGS}"
+    --q-weight ${Q_WEIGHT} --max-hours ${MAX_HOURS} ${AUX_ARGS} ${EXTRA_ARGS}"
 wait_forwarding_signals
 
 echo "[$(date '+%F %T')] === Stopped (exit code ${RC}) ==="
