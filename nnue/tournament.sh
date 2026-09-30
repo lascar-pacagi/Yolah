@@ -42,7 +42,7 @@ WORK_DIR="${TOURNAMENT_DIR:-${HOME}/Tournament}"      # games.csv, builds, ratin
 source "${YOLAH_DIR}/nnue/alphazero_common.sh"         # SIF, run(), build, signals
 
 PLAYERS="${PLAYERS:-/Yolah/config/tournament_players.txt}"   # path inside the container
-TIME_US="${TIME_US:-1000000}"                  # 1 s per move
+TIME_US="${TIME_US:-2000000}"                  # 2 s per move
 THREADS="${THREADS:-4}"                        # search threads per player
 OPENING_PLIES="${OPENING_PLIES:-4}"
 # CPU games at a time: one game uses THREADS cores (players move in turn); the
