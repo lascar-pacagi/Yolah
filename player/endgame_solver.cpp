@@ -93,6 +93,24 @@ int EndgameSolver::search(Yolah& yolah, uint64_t hash, int alpha, int beta) {
     const int alpha_orig = alpha;
     Yolah::MoveList moves;
     yolah.moves(moves);
+    // The pass rule. A blocked player stays blocked (a free square never comes
+    // back: a piece leaves a hole, and only moves to free squares), so after a
+    // pass the opponent plays alone until the end. And when a player must pass
+    // while the game is not over, they have lost:
+    //   • white to move: black has made one move more and white will make no
+    //     other: black wins;
+    //   • black to move: the scores are equal and white can still move (the
+    //     game is not over), so white will make at least one move more.
+    // (The only draw, both blocked at black's turn, is a finished game.) So the
+    // final difference of the side to move is ≤ −1, i.e. remaining ≤ −1 −
+    // current: an upper bound, enough to fail low whenever it is ≤ alpha —
+    // always the case in a win/draw/loss search. No need to search the
+    // opponent's solo moves, which is what the exact score would require.
+    // (Tested on the move list, generated anyway: free.)
+    if (options.pass_rule && moves[0] == Move::none()) {
+        const int upper = -1 - yolah.score(yolah.current_player());
+        if (upper <= alpha) return upper;
+    }
     if (!brute) order_moves(yolah, tt_move, moves);
     const uint8_t player = yolah.current_player();
     int best = -127;

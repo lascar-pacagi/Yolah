@@ -40,6 +40,7 @@ struct EndgameSolverOptions {
     EndgameOrdering ordering = EndgameOrdering::Fastest;
     int brute_force_free = 6;   // at most this many free squares: no table, no ordering
     int tt_bits = 21;           // 2^bits table entries (16 bytes each)
+    bool pass_rule = true;      // a player who must pass has lost (see EndgameSolver::search)
 };
 
 class EndgameSolver {

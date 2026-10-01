@@ -5,7 +5,7 @@
 //       keeps every `every`-th position: realistic positions, one JSON per line.
 //
 //   search_bench solve --positions bench_positions.txt --max-free 24 [--ordering none|tt|fastest]
-//                      [--wld 1] [--brute 6] [--time MICROSECONDS] [--csv out.csv]
+//                      [--wld 1] [--brute 6] [--pass-rule 0|1] [--time MICROSECONDS] [--csv out.csv]
 //       The exact endgame solver (player/endgame_solver.h) on the positions
 //       with at most --max-free free squares: value, move, nodes, time.
 //       --wld 1: win / draw / loss only. Positions not solved within --time
@@ -168,6 +168,7 @@ namespace {
                    : ord == "tt"   ? EndgameSolver::Ordering::TT : EndgameSolver::Ordering::Fastest;
         o.brute_force_free = std::stoi(a.get("brute", "6"));
         o.tt_bits = std::stoi(a.get("tt-bits", "21"));
+        o.pass_rule = a.get("pass-rule", "1") == "1";
         const bool wld = a.get("wld", "0") == "1";
         const uint64_t us = std::stoull(a.get("time", "0"));
         EndgameSolver solver(o);

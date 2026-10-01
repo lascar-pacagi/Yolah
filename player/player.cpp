@@ -364,6 +364,13 @@ unique_ptr<Player> Player::create(const json& j) {
              options.lmr = j.value("lmr", options.lmr);
              options.lmr_base = j.value("lmr base", options.lmr_base);
              options.lmr_divisor = j.value("lmr divisor", options.lmr_divisor);
+             options.rfp_depth = j.value("rfp depth", options.rfp_depth);
+             options.rfp_margin = j.value("rfp margin", options.rfp_margin);
+             options.null_move = j.value("null move", options.null_move);
+             options.null_move_reduction = j.value("null move reduction", options.null_move_reduction);
+             options.lmp_depth = j.value("lmp depth", options.lmp_depth);
+             options.lmp_moves = j.value("lmp moves", options.lmp_moves);
+             options.pass_rule = j.value("pass rule", options.pass_rule);
              options.endgame_root = j.value("endgame root", options.endgame_root);
              options.endgame_root_time = j.value("endgame root time", options.endgame_root_time);
              options.endgame_tree = j.value("endgame tree", options.endgame_tree);

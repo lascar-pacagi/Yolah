@@ -29,6 +29,12 @@
 //      for PV nodes, killers / countermoves and moves with a good history
 //      ("lmr", "lmr base", "lmr divisor"); the reference's fixed reduction
 //      ("nb moves at full depth", "late move reduction") when "lmr" is false.
+//   F. pruning at non-PV nodes, from the static evaluation (the network's
+//      value of the node itself): reverse futility pruning ("rfp depth",
+//      "rfp margin"), null move pruning ("null move", "null move reduction"),
+//      late move pruning ("lmp depth", "lmp moves"). Measured: reverse
+//      futility +76 Elo, late move pruning +35, both +95; null move −81
+//      (Yolah is full of zugzwangs: every move spoils one's own space), off.
 //   G. exact endgame solver (player/endgame_solver.h): at the root, a win /
 //      draw / loss proof when few free squares remain ("endgame root",
 //      "endgame root time"); in the tree, exact values instead of the
@@ -47,8 +53,15 @@ struct MinMaxNNUE_DevOptions {
     bool lazy_accumulator = true;    // ["lazy accumulator"] NNUE accumulators updated only when needed
     int  eval_cache_bits = 20;       // ["eval cache"] 2^bits cached leaf values (8 bytes each), 0 = none
     bool lmr = true;                 // ["lmr"] logarithmic late move reductions (false: the reference's)
-    double lmr_base = 1.0;           // ["lmr base"]    reduction = base + log(depth)·log(move number) / divisor
-    double lmr_divisor = 1.75;       // ["lmr divisor"]
+    double lmr_base = 1.25;          // ["lmr base"]    reduction = base + log(depth)·log(move number) / divisor
+    double lmr_divisor = 1.5;        // ["lmr divisor"]
+    int  rfp_depth = 4;              // ["rfp depth"] reverse futility pruning up to this depth (0 = never)
+    int  rfp_margin = 3000;          // ["rfp margin"] per ply of depth (values: ±30000 = tanh ±1)
+    bool null_move = false;          // ["null move"] null move pruning (−81 Elo in a match: off)
+    int  null_move_reduction = 3;    // ["null move reduction"] R at depth 4; R = this + depth / 4 − 1
+    int  lmp_depth = 3;              // ["lmp depth"] late move pruning up to this depth (0 = never)
+    int  lmp_moves = 4;              // ["lmp moves"] moves searched before pruning: this + depth²
+    bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
     int  endgame_root = 0;           // ["endgame root"] try to prove the result at the root with at most
                                      //   this many free squares (0 = never)
     double endgame_root_time = 0.5;  // ["endgame root time"] share of the thinking time given to that proof

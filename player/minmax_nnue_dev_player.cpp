@@ -143,6 +143,9 @@ std::string MinMaxNNUE_DevPlayer::info() {
          + (options.lazy_accumulator ? " + lazy accumulators" : "")
          + (options.eval_cache_bits ? " + evaluation cache" : "")
          + (options.lmr ? " + logarithmic LMR" : "")
+         + (options.rfp_depth ? " + reverse futility pruning" : "")
+         + (options.null_move ? " + null move pruning" : "")
+         + (options.lmp_depth ? " + late move pruning" : "")
          + (options.endgame_root || options.endgame_tree ? " + endgame solver" : "") + ")";
 }
 
@@ -161,10 +164,10 @@ std::string MinMaxNNUE_DevPlayer::info() {
 //                           moves that usually fail are reduced more
 // The first move (the table's move) and the nodes of depth < 3 are never
 // reduced, and the reduced search keeps at least one ply.
-// Example (base 1.0, divisor 1.75, the defaults: they beat 0.75 / 2.25 in a
-// match), quiet move with a neutral history:
-//     depth 4, move 4: 1.0 + 1.39·1.39/1.75 = 2.1 → 2 plies
-//     depth 10, move 20: 1.0 + 2.30·3.00/1.75 = 4.9 → 4 plies
+// Example (base 1.25, divisor 1.5, the defaults: in matches, 1.0 / 1.75 beat
+// 0.75 / 2.25 and 1.25 / 1.5 beat 1.0 / 1.75), quiet move, neutral history:
+//     depth 4, move 4: 1.25 + 1.39·1.39/1.5 = 2.5 → 2 plies
+//     depth 10, move 20: 1.25 + 2.30·3.00/1.5 = 5.9 → 5 plies
 // The reference reduces by a fixed late_move_reduction − 1 = 2 plies every move
 // after the first nb_moves_at_full_depth = 2, at every depth (kept when "lmr"
 // is false).
@@ -287,17 +290,73 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     if (depth <= 0) {
         return evaluate(yolah, s, hash);
     }
+    // F. Pruning, at non-PV nodes only (null window: the question is only
+    //    "is this node ≥ beta?", an approximate answer costs little; at PV
+    //    nodes we want the exact value). It relies on the STATIC evaluation:
+    //    the network's value of this node, before any search below it (cheap
+    //    now: lazy accumulators and evaluation cache, see evaluate). Never
+    //    near game results (|beta| ≥ WIN): a proven win must stay proven.
+    const bool pv_node = beta - alpha > 1;
+    const bool prunable = !pv_node && std::abs(beta) < WIN;
+    int static_eval = 0;
+    if (prunable && ((options.rfp_depth > 0 && depth <= options.rfp_depth) || (options.null_move && depth >= 3))) {
+        static_eval = evaluate(yolah, s, hash);
+    }
+    // F1. Reverse futility pruning ("static null move"): if the static value
+    //     is above beta by a margin that a shallow search will hardly lose,
+    //     trust it and cut. The margin grows with the depth: the deeper the
+    //     search, the more the value may still change.
+    if (prunable && depth <= options.rfp_depth && static_eval - options.rfp_margin * depth >= beta) {
+        return static_eval;
+    }
+    Yolah::MoveList moves;
+    yolah.moves(moves);
+    // The pass rule (see EndgameSolver::search for the proof): a player who
+    // must pass while the game is not over has lost — their final score
+    // difference is ≤ −1, so the value is ≤ −(WIN + 1). An upper bound,
+    // returned when it is enough to fail low.
+    if (options.pass_rule && moves[0] == Move::none() && -(WIN + 1) <= alpha) {
+        return -(WIN + 1);
+    }
+    // F2. Null move pruning: let the opponent play twice (we pass). If even
+    //     with that handicap a reduced search still says ≥ beta, the position
+    //     is so good that a real move would cut too: cut now. In Yolah a pass
+    //     costs a point (every move scores one), so the handicap is real —
+    //     the idea's assumption "moving is better than passing" mostly holds.
+    //     Exceptions (zugzwang: every move spoils our own region) exist but
+    //     should be rare. Not twice in a row, and not when we must pass anyway.
+    //     MEASURED: −81 Elo. In Yolah, zugzwangs are the rule rather than the
+    //     exception (every move leaves a hole in one's own space): off by default.
+    if (prunable && options.null_move && depth >= 3 && static_eval >= beta
+        && moves[0] != Move::none() && yolah.nb_plies() > 0 && s.played[yolah.nb_plies() - 1] != Move::none()) {
+        const int R = options.null_move_reduction + depth / 4 - 1;
+        const uint8_t player = yolah.current_player();
+        s.played[yolah.nb_plies()] = Move::none();
+        if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+        else nnue.play(player, Move::none(), s.acc);
+        yolah.play(Move::none());
+        const int v = -negamax(yolah, s, zobrist::update(hash, player, Move::none()), -beta, -beta + 1, depth - 1 - R);
+        yolah.undo(Move::none());
+        if (!options.lazy_accumulator) nnue.undo(player, Move::none(), s.acc);
+        if (stopped()) return 0;
+        if (v >= beta) return v >= WIN ? beta : v;   // no unproven "win" from a null move
+    }
     // 4. The moves, the most promising first. They are scored once, then
     //    picked one at a time (the best remaining one): most nodes cut after
     //    one or two moves, so a full sort would be wasted work.
-    Yolah::MoveList moves;
-    yolah.moves(moves);
     int scores[Yolah::MAX_NB_MOVES];
     score_moves(yolah, s, tt_move, moves, scores);
     const int alpha_orig = alpha;
     int best = -INFINITE;
     Move best_move = Move::none();
     for (size_t i = 0; i < moves.size(); i++) {
+        // F3. Late move pruning: at shallow non-PV nodes, after lmp_moves +
+        //     depth² moves, the others (the worst ordered: bad history, never
+        //     cut anywhere) are not searched at all — once a move that does not
+        //     lose has been found.
+        if (prunable && depth <= options.lmp_depth && i >= size_t(options.lmp_moves + depth * depth) && best > -WIN) {
+            break;
+        }
         const Move m = pick_move(moves, scores, i);
         // scores[i] is now m's score: special move (killer, countermove) or history
         const int r = late_move_reduction_of(depth, i, beta - alpha > 1, scores[i] >= SCORE_COUNTER,
@@ -629,6 +688,13 @@ json MinMaxNNUE_DevPlayer::config() {
     j["lmr"] = options.lmr;
     j["lmr base"] = options.lmr_base;
     j["lmr divisor"] = options.lmr_divisor;
+    j["rfp depth"] = options.rfp_depth;
+    j["rfp margin"] = options.rfp_margin;
+    j["null move"] = options.null_move;
+    j["null move reduction"] = options.null_move_reduction;
+    j["lmp depth"] = options.lmp_depth;
+    j["lmp moves"] = options.lmp_moves;
+    j["pass rule"] = options.pass_rule;
     j["endgame root"] = options.endgame_root;
     j["endgame root time"] = options.endgame_root_time;
     j["endgame tree"] = options.endgame_tree;
