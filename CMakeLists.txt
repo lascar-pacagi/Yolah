@@ -139,6 +139,20 @@ if(ENABLE_TORCH)
     target_link_libraries(yolah_tournament PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# Search benchmarks on fixed positions (test/search_bench_main.cpp):
+#   ./search_bench run --player ../config/mm_nnue_dev_player.cfg --depth 7 --positions ...
+add_executable(search_bench test/search_bench_main.cpp)
+target_compile_options(search_bench PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(search_bench PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_link_libraries(search_bench PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(search_bench PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(search_bench PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # AlphaZero (only if CUDA is enabled)
 if(ENABLE_CUDA)
     add_subdirectory(alphazero)

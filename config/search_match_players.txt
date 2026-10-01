@@ -1,0 +1,3 @@
+# Search experiments: the reference against the version being improved
+mm_nnue_baseline_player.cfg
+mm_nnue_dev_player.cfg

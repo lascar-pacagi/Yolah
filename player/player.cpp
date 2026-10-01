@@ -10,6 +10,8 @@
 #include "monte_carlo_player.h"
 #include "minmax_nnue_player.h"
 #include "minmax_nnue_quantized_player.h"
+#include "minmax_nnue_baseline_player.h"
+#include "minmax_nnue_dev_player.h"
 #include "MCTS_mem_nn_player.h"
 #include "features_net_player.h"
 #include "alphazero_mcts_player.h"
@@ -331,6 +333,34 @@ unique_ptr<Player> Player::create(const json& j) {
                  j["nb moves at full depth"].get<size_t>(),
                  j["late move reduction"].get<uint8_t>(), j["weights"],
                  nb_threads);
+           }},
+          // The search experiments: the reference and the version being
+          // improved (one thread; "nb threads" is ignored).
+          {"MinMaxNNUE_BaselinePlayer",
+           [](const json &j) {
+             for (const char* k : {"microseconds", "tt size", "nb moves at full depth", "late move reduction", "weights"}) {
+               if (!j.contains(k)) throw invalid_argument(string(k) + " key expected");
+             }
+             return make_unique<MinMaxNNUE_BaselinePlayer>(
+                 j["microseconds"].get<uint64_t>(), j["tt size"].get<size_t>(),
+                 j["nb moves at full depth"].get<size_t>(),
+                 j["late move reduction"].get<uint8_t>(), j["weights"].get<string>(),
+                 j.value("verbose", false));
+           }},
+          {"MinMaxNNUE_DevPlayer",
+           [](const json &j) {
+             for (const char* k : {"microseconds", "tt size", "nb moves at full depth", "late move reduction", "weights"}) {
+               if (!j.contains(k)) throw invalid_argument(string(k) + " key expected");
+             }
+             // The improvements can be switched off one by one (defaults: on).
+             MinMaxNNUE_DevPlayer::Options options;
+             options.pvs = j.value("pvs", options.pvs);
+             options.aspiration_window = j.value("aspiration window", options.aspiration_window);
+             return make_unique<MinMaxNNUE_DevPlayer>(
+                 j["microseconds"].get<uint64_t>(), j["tt size"].get<size_t>(),
+                 j["nb moves at full depth"].get<size_t>(),
+                 j["late move reduction"].get<uint8_t>(), j["weights"].get<string>(),
+                 j.value("verbose", false), options);
            }},
         {
             "FeaturesNetPlayer",
