@@ -4,6 +4,7 @@
 #include "heuristic.h"
 #include "transposition_table.h"
 #include <atomic>
+#include <vector>
 #include "nnue_quantized.h"
 
 // The search being improved, step by step. It started as an exact copy of
@@ -16,7 +17,11 @@
 //      stopped the search; the best move of an interrupted iteration is kept;
 //      killer moves only come from beta cutoffs; fail-soft values.
 //   B. principal variation search ("pvs") and aspiration windows at the root
-//      ("aspiration window"), each one can be switched off in the config.
+//      ("aspiration window").
+//   C. move ordering: history heuristic ("history"), countermoves
+//      ("countermove"), root moves ordered by the previous iteration
+//      ("root ordering").
+// Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
 // one can be measured on its own. (Outside the class: a nested struct with
@@ -24,6 +29,9 @@
 struct MinMaxNNUE_DevOptions {
     bool pvs = true;                 // ["pvs"] null windows for all moves but the first
     int  aspiration_window = 300;    // ["aspiration window"] half width at the root, 0 = full window
+    bool history = true;             // ["history"] quiet moves ordered by their history of cutoffs
+    bool countermove = true;         // ["countermove"] the move that refuted the opponent's last move
+    bool root_ordering = true;       // ["root ordering"] root moves: best first, then by subtree size
 };
 
 class MinMaxNNUE_DevPlayer : public Player {
@@ -55,6 +63,23 @@ private:
     bool verbose;
     std::atomic_bool stop = false;
 
+    // ── Move ordering (C) ──
+    // History: for each colour and each (from, to), a score that goes up when
+    // the move causes a beta cutoff and down when it was tried before the
+    // move that did. It is kept between the moves of a game (halved at each
+    // new search: old knowledge fades). Bounded in [−HISTORY_MAX, HISTORY_MAX]
+    // by the "gravity" update of update_history.
+    static constexpr int HISTORY_MAX = 16384;
+    int16_t history[2][SQUARE_NB][SQUARE_NB]{};
+    // Countermove: for each opponent move (from, to), the last move that
+    // refuted it (caused a cutoff right after it).
+    Move countermoves[SQUARE_NB][SQUARE_NB]{};
+
+    struct RootMove {
+        Move     move;
+        uint64_t nodes = 0;       // size of its subtree in the last iteration
+    };
+
     struct Search {
         uint8_t depth   = 0;
         int16_t value   = 0;
@@ -63,6 +88,8 @@ private:
         Move killer2[Yolah::MAX_NB_PLIES]{};
         size_t nb_nodes = 0;
         size_t nb_hits  = 0;
+        Move played[Yolah::MAX_NB_PLIES + 1]{};   // played[p]: the move played at ply p (to find the countermove)
+        std::vector<RootMove> root_moves;
         NNUE_Quantized::Accumulator acc;
     };
 
@@ -70,7 +97,9 @@ private:
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int alpha, int beta, int depth);
-    void sort_moves(Yolah&, const Search& s, Move tt_move, Yolah::MoveList&);
+    void score_moves(const Yolah&, const Search& s, Move tt_move, const Yolah::MoveList&, int* scores) const;
+    static Move pick_move(Yolah::MoveList&, int* scores, size_t i);
+    void update_history(uint8_t player, Move m, int bonus);
     void iterative_deepening(Yolah, Search&, uint8_t max_depth);
     void print_pv(Yolah, uint64_t hash, int8_t depth);
 
@@ -81,7 +110,7 @@ public:
     // Iterative deepening up to max_depth, stopped after `microseconds`
     // (0 = no time limit). For the benchmarks (test/search_bench_main.cpp).
     Result search(const Yolah&, uint8_t max_depth, uint64_t microseconds);
-    void clear_table();            // forget everything (reproducible benchmarks)
+    void clear_table();            // forget everything: table, history, countermoves (reproducible benchmarks)
     std::string info() override;
     json config() override;
 };

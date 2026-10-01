@@ -5,6 +5,7 @@
 #include <mutex>
 #include "zobrist.h"
 #include <utility>
+#include <algorithm>
 
 using std::cout, std::endl;
 
@@ -34,6 +35,11 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
         });
     }
     table.new_search();
+    // History aging: what was learnt during the previous moves still helps
+    // (the positions are close), but less and less.
+    for (auto& by_from : history)
+        for (auto& by_to : by_from)
+            for (int16_t& h : by_to) h /= 2;
     Search s;
     nnue.init(yolah, s.acc);
     iterative_deepening(yolah, s, max_depth);
@@ -53,6 +59,9 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
 
 void MinMaxNNUE_DevPlayer::clear_table() {
     table.clear(1);
+    // the move ordering statistics too: each benchmark position from scratch
+    std::fill(&history[0][0][0], &history[0][0][0] + sizeof(history) / sizeof(int16_t), int16_t(0));
+    std::fill(&countermoves[0][0], &countermoves[0][0] + SQUARE_NB * SQUARE_NB, Move::none());
 }
 
 Move MinMaxNNUE_DevPlayer::play(Yolah yolah) {
@@ -73,7 +82,10 @@ Move MinMaxNNUE_DevPlayer::play(Yolah yolah) {
 std::string MinMaxNNUE_DevPlayer::info() {
     return std::string("minmax nnue dev player (one thread; transposition table + late move reduction + killer")
          + (options.pvs ? " + PVS" : "")
-         + (options.aspiration_window ? " + aspiration windows" : "") + ")";
+         + (options.aspiration_window ? " + aspiration windows" : "")
+         + (options.history ? " + history" : "")
+         + (options.countermove ? " + countermove" : "")
+         + (options.root_ordering ? " + root ordering" : "") + ")";
 }
 
 // ─── One move of a node ──────────────────────────────────────────────────────
@@ -98,6 +110,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
                                       int alpha, int beta, int depth) {
     const uint8_t player = yolah.current_player();
     const uint64_t child = zobrist::update(hash, player, m);
+    s.played[yolah.nb_plies()] = m;       // for the countermove of the child
     nnue.play(player, m, s.acc);
     yolah.play(m);
     int v = alpha + 1;                    // "might beat alpha" until a search says otherwise
@@ -164,15 +177,18 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     if (depth <= 0) {
         return int(nnue.value(s.acc, yolah.current_player()) * WIN);
     }
-    // 4. The moves, the most promising first.
+    // 4. The moves, the most promising first. They are scored once, then
+    //    picked one at a time (the best remaining one): most nodes cut after
+    //    one or two moves, so a full sort would be wasted work.
     Yolah::MoveList moves;
     yolah.moves(moves);
-    sort_moves(yolah, s, tt_move, moves);
+    int scores[Yolah::MAX_NB_MOVES];
+    score_moves(yolah, s, tt_move, moves, scores);
     const int alpha_orig = alpha;
     int best = -INFINITE;
     Move best_move = Move::none();
     for (size_t i = 0; i < moves.size(); i++) {
-        const Move m = moves[i];
+        const Move m = pick_move(moves, scores, i);
         const int v = search_move(yolah, s, hash, m, i, alpha, beta, depth);
         // FIX (A): once the clock has stopped the search, the values coming up
         // are meaningless: return before storing anything (the reference stored
@@ -194,6 +210,21 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                         s.killer2[ply] = s.killer1[ply];
                         s.killer1[ply] = m;
                     }
+                    // History (C): the cutting move gets a bonus, the moves
+                    // tried before it (moves[0..i-1], they did not cut) a
+                    // malus of the same size. Deeper cutoffs say more about a
+                    // move, hence a bonus growing with the depth.
+                    if (options.history) {
+                        const uint8_t player = yolah.current_player();
+                        const int bonus = std::min(16 * depth * depth + 32 * depth, 2000);
+                        update_history(player, m, bonus);
+                        for (size_t k = 0; k < i; k++) update_history(player, moves[k], -bonus);
+                    }
+                    // Countermove (C): m refuted the opponent's last move.
+                    if (options.countermove && ply > 0) {
+                        const Move prev = s.played[ply - 1];
+                        countermoves[prev.from_sq()][prev.to_sq()] = m;
+                    }
                     return v;
                 }
                 alpha = v;
@@ -211,57 +242,100 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
 // whose search was COMPLETED (not interrupted by the clock) can become `res`:
 // so even an interrupted iteration gives a usable move (see
 // iterative_deepening).
+//
+// Root ordering (C): the root moves are kept from one iteration to the next
+// (s.root_moves). After each search of the root, the best move goes first and
+// the others are sorted by the size of their subtree: a move that took many
+// nodes to refute is a move that came close, a good candidate to become the
+// best at the next depth. (Their values cannot be used for this: with PVS,
+// all moves but the best only have upper bounds from null windows.)
 int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, int alpha, int beta, int depth, Move& res) {
     res = Move::none();
-    Yolah::MoveList moves;
-    yolah.moves(moves);
-    sort_moves(yolah, s, table.get_move(hash), moves);
     const int alpha_orig = alpha;
     int best = -INFINITE;
-    for (size_t i = 0; i < moves.size(); i++) {
-        const Move m = moves[i];
-        const int v = search_move(yolah, s, hash, m, i, alpha, beta, depth);
+    if (!options.root_ordering) {
+        // The reference's way: ordered like an inner node, at each iteration.
+        s.root_moves.clear();
+        Yolah::MoveList moves;
+        yolah.moves(moves);
+        int scores[Yolah::MAX_NB_MOVES];
+        score_moves(yolah, s, table.get_move(hash), moves, scores);
+        for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i)});
+    }
+    for (size_t i = 0; i < s.root_moves.size(); i++) {
+        RootMove& rm = s.root_moves[i];
+        const uint64_t nodes_before = s.nb_nodes;
+        const int v = search_move(yolah, s, hash, rm.move, i, alpha, beta, depth);
+        rm.nodes = s.nb_nodes - nodes_before;
         if (stopped()) return best;
         if (v > best) {
             best = v;
             if (v > alpha) {
-                res = m;
+                res = rm.move;
                 alpha = v;
                 if (v >= beta) break;     // aspiration fail high: the caller widens the window
             }
         }
+    }
+    if (options.root_ordering) {
+        std::stable_sort(s.root_moves.begin(), s.root_moves.end(),
+                         [&](const RootMove& a, const RootMove& b) {
+                             if ((a.move == res) != (b.move == res)) return a.move == res;
+                             return a.nodes > b.nodes;
+                         });
     }
     const Bound b = best >= beta ? BOUND_LOWER : best > alpha_orig ? BOUND_EXACT : BOUND_UPPER;
     table.update(hash, int16_t(best), b, depth, res);
     return best;
 }
 
-// Order: the table's move (the best move of an earlier, shallower search of
-// this position), the two killer moves of the ply, then the others in the
-// generator's order.
-void MinMaxNNUE_DevPlayer::sort_moves(Yolah& yolah, const Search& s, Move tt_move, Yolah::MoveList& moves) {
-    Move tmp[Yolah::MAX_NB_MOVES];
-    size_t nb_moves = moves.size();
-    Move killer_move1 = s.killer1[yolah.nb_plies()];
-    Move killer_move2 = s.killer2[yolah.nb_plies()];
-    Move b = Move::none();
-    Move k1 = Move::none();
-    Move k2 = Move::none();
-    size_t n = 0;
-    for (size_t i = 0; i < nb_moves; i++) {
-        Move m = moves[i];
-        if (m == tt_move) b = m;
-        else if (m == killer_move1) k1 = m;
-        else if (m == killer_move2) k2 = m;
-        else tmp[n++] = m;
+// ─── Move ordering ───────────────────────────────────────────────────────────
+// Scores, the highest searched first:
+//   1. the table's move (the best move of an earlier search of this position),
+//   2. the two killer moves of the ply (moves that cut in sibling nodes),
+//   3. the countermove of the opponent's last move,
+//   4. the others by history (C) — or, without history, in the generator's
+//      order (the reference's way).
+// All Yolah moves are "quiet" (no captures), so there is no static way to
+// recognise a good move: the ordering only learns from the search itself.
+void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
+                                       const Yolah::MoveList& moves, int* scores) const {
+    constexpr int TT = 1 << 30, KILLER1 = 1 << 29, KILLER2 = KILLER1 - 1, COUNTER = KILLER1 - 2;
+    const uint16_t ply = yolah.nb_plies();
+    const uint8_t player = yolah.current_player();
+    Move counter = Move::none();
+    if (options.countermove && ply > 0) {
+        const Move prev = s.played[ply - 1];
+        counter = countermoves[prev.from_sq()][prev.to_sq()];
     }
-    size_t i = 0;
-    if (b != Move::none())  moves[i++] = b;
-    if (k1 != Move::none()) moves[i++] = k1;
-    if (k2 != Move::none()) moves[i++] = k2;
-    for (size_t j = 0; j < n; j++) {
-        moves[i++] = tmp[j];
+    for (size_t i = 0; i < moves.size(); i++) {
+        const Move m = moves[i];
+        if (m == tt_move)                 scores[i] = TT;
+        else if (m == s.killer1[ply])     scores[i] = KILLER1;
+        else if (m == s.killer2[ply])     scores[i] = KILLER2;
+        else if (m == counter && counter != Move::none()) scores[i] = COUNTER;
+        else if (options.history)         scores[i] = history[player][m.from_sq()][m.to_sq()];
+        else                              scores[i] = -int(i);
     }
+}
+
+// Selection step: brings the best-scored move of moves[i..] to position i.
+Move MinMaxNNUE_DevPlayer::pick_move(Yolah::MoveList& moves, int* scores, size_t i) {
+    size_t best = i;
+    for (size_t j = i + 1; j < moves.size(); j++) {
+        if (scores[j] > scores[best]) best = j;
+    }
+    std::swap(moves[i], moves[best]);
+    std::swap(scores[i], scores[best]);
+    return moves[i];
+}
+
+// "Gravity" update: h += bonus − h·|bonus| / HISTORY_MAX. The closer h is to
+// ±HISTORY_MAX, the smaller its moves in that direction: h stays bounded, and
+// recent cutoffs weigh more than old ones.
+void MinMaxNNUE_DevPlayer::update_history(uint8_t player, Move m, int bonus) {
+    int16_t& h = history[player][m.from_sq()][m.to_sq()];
+    h = int16_t(h + bonus - h * std::abs(bonus) / HISTORY_MAX);
 }
 
 void MinMaxNNUE_DevPlayer::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
@@ -296,6 +370,16 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
     Move res = Move::none();
     uint8_t depth = 0;
     int value = 0;
+    // The root moves, first ordered like an inner node (table's move, history…);
+    // root_search reorders them after each iteration.
+    {
+        Yolah::MoveList moves;
+        yolah.moves(moves);
+        int scores[Yolah::MAX_NB_MOVES];
+        score_moves(yolah, s, table.get_move(hash), moves, scores);
+        s.root_moves.clear();
+        for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i)});
+    }
     for (int d = 1; d <= max_depth && d < 64; d++) {
         int delta = options.aspiration_window;
         int alpha = -INFINITE, beta = INFINITE;
@@ -343,6 +427,9 @@ json MinMaxNNUE_DevPlayer::config() {
     j["weights"] = nnue_q_parameters_filename;
     j["pvs"] = options.pvs;
     j["aspiration window"] = options.aspiration_window;
+    j["history"] = options.history;
+    j["countermove"] = options.countermove;
+    j["root ordering"] = options.root_ordering;
     j["verbose"] = verbose;
     return j;
 }

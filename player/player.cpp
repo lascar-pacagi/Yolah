@@ -356,6 +356,9 @@ unique_ptr<Player> Player::create(const json& j) {
              MinMaxNNUE_DevPlayer::Options options;
              options.pvs = j.value("pvs", options.pvs);
              options.aspiration_window = j.value("aspiration window", options.aspiration_window);
+             options.history = j.value("history", options.history);
+             options.countermove = j.value("countermove", options.countermove);
+             options.root_ordering = j.value("root ordering", options.root_ordering);
              return make_unique<MinMaxNNUE_DevPlayer>(
                  j["microseconds"].get<uint64_t>(), j["tt size"].get<size_t>(),
                  j["nb moves at full depth"].get<size_t>(),
