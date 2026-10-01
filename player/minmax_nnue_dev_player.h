@@ -21,6 +21,9 @@
 //   C. move ordering: history heuristic ("history"), countermoves
 //      ("countermove"), root moves ordered by the previous iteration
 //      ("root ordering").
+//   D. lazy NNUE accumulators ("lazy accumulator"): a stack of accumulators,
+//      one per ply, computed only when a leaf is evaluated; no undo.
+//      Evaluation cache ("eval cache"): leaf values by position hash.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -32,6 +35,8 @@ struct MinMaxNNUE_DevOptions {
     bool history = true;             // ["history"] quiet moves ordered by their history of cutoffs
     bool countermove = true;         // ["countermove"] the move that refuted the opponent's last move
     bool root_ordering = true;       // ["root ordering"] root moves: best first, then by subtree size
+    bool lazy_accumulator = true;    // ["lazy accumulator"] NNUE accumulators updated only when needed
+    int  eval_cache_bits = 20;       // ["eval cache"] 2^bits cached leaf values (8 bytes each), 0 = none
 };
 
 class MinMaxNNUE_DevPlayer : public Player {
@@ -90,10 +95,30 @@ private:
         size_t nb_hits  = 0;
         Move played[Yolah::MAX_NB_PLIES + 1]{};   // played[p]: the move played at ply p (to find the countermove)
         std::vector<RootMove> root_moves;
+        // Without the lazy accumulators: ONE accumulator, updated by
+        // nnue.play / nnue.undo around every move (the reference's way).
         NNUE_Quantized::Accumulator acc;
+        // With them (D): accs[p] is the accumulator of the position at ply p
+        // of the current line, valid only if acc_ok[p]. played[p] (above)
+        // tells how to get accs[p + 1] from accs[p].
+        NNUE_Quantized::Accumulator accs[Yolah::MAX_NB_PLIES + 1];
+        bool acc_ok[Yolah::MAX_NB_PLIES + 1]{};
     };
 
+    // Evaluation cache (D): one entry per slot, the newest wins. 32 bits of
+    // the hash check the position (the other bits choose the slot).
+    struct EvalEntry {
+        uint32_t key = 0;
+        int16_t  value = 0;
+        bool     used = false;
+    };
+    std::vector<EvalEntry> eval_cache;
+    uint64_t nb_evals = 0, nb_eval_hits = 0;
+
     bool stopped() const { return stop.load(std::memory_order_relaxed); }
+    int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
+    int  network_value(const Yolah& yolah, Search& s);
+    void update_accumulator(const int16_t* in, int16_t* out, uint8_t player, Move m) const;
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int alpha, int beta, int depth);
@@ -110,6 +135,8 @@ public:
     // Iterative deepening up to max_depth, stopped after `microseconds`
     // (0 = no time limit). For the benchmarks (test/search_bench_main.cpp).
     Result search(const Yolah&, uint8_t max_depth, uint64_t microseconds);
+    // Leaf evaluations and how many came from the cache, since the start.
+    std::pair<uint64_t, uint64_t> eval_stats() const { return {nb_evals, nb_eval_hits}; }
     void clear_table();            // forget everything: table, history, countermoves (reproducible benchmarks)
     std::string info() override;
     json config() override;

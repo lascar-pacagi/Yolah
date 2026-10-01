@@ -359,6 +359,8 @@ unique_ptr<Player> Player::create(const json& j) {
              options.history = j.value("history", options.history);
              options.countermove = j.value("countermove", options.countermove);
              options.root_ordering = j.value("root ordering", options.root_ordering);
+             options.lazy_accumulator = j.value("lazy accumulator", options.lazy_accumulator);
+             options.eval_cache_bits = j.value("eval cache", options.eval_cache_bits);
              return make_unique<MinMaxNNUE_DevPlayer>(
                  j["microseconds"].get<uint64_t>(), j["tt size"].get<size_t>(),
                  j["nb moves at full depth"].get<size_t>(),

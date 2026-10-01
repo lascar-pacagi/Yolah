@@ -194,6 +194,11 @@ namespace {
                                 r.seconds > 0 ? r.nb_nodes / r.seconds / 1000 : 0.0, cmp) << std::flush;
         }
         const size_t n = positions.size();
+        if (s.dev) {
+            const auto [evals, hits] = s.dev->eval_stats();
+            if (evals) cout << std::format("leaf evaluations: {}, from the evaluation cache: {} ({:.1f}%)\n",
+                                           evals, hits, 100.0 * hits / evals);
+        }
         cout << std::format("total: {} positions, {} nodes, {:.2f} s, {:.0f} knodes/s, mean depth {:.2f}\n",
                             n, total_nodes, total_time, total_nodes / std::max(total_time, 1e-9) / 1000, total_depth / n);
         if (compared) {

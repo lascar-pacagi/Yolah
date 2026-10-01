@@ -16,6 +16,7 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
       nb_moves_at_full_depth(nb_moves_at_full_depth), late_move_reduction(late_move_reduction),
       nnue_q_parameters_filename(nnue_q_parameters_filename), options(options), verbose(verbose) {
     nnue.load(nnue_q_parameters_filename);
+    if (options.eval_cache_bits > 0) eval_cache.resize(size_t(1) << options.eval_cache_bits);
 }
 
 MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, uint8_t max_depth, uint64_t microseconds) {
@@ -41,7 +42,13 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
         for (auto& by_to : by_from)
             for (int16_t& h : by_to) h /= 2;
     Search s;
-    nnue.init(yolah, s.acc);
+    // The root's accumulator: computed from scratch, the only one that is.
+    if (options.lazy_accumulator) {
+        nnue.init(yolah, s.accs[yolah.nb_plies()]);
+        s.acc_ok[yolah.nb_plies()] = true;
+    } else {
+        nnue.init(yolah, s.acc);
+    }
     iterative_deepening(yolah, s, max_depth);
     if (clock.joinable()) {
         clock.request_stop();
@@ -62,6 +69,7 @@ void MinMaxNNUE_DevPlayer::clear_table() {
     // the move ordering statistics too: each benchmark position from scratch
     std::fill(&history[0][0][0], &history[0][0][0] + sizeof(history) / sizeof(int16_t), int16_t(0));
     std::fill(&countermoves[0][0], &countermoves[0][0] + SQUARE_NB * SQUARE_NB, Move::none());
+    std::fill(eval_cache.begin(), eval_cache.end(), EvalEntry{});
 }
 
 Move MinMaxNNUE_DevPlayer::play(Yolah yolah) {
@@ -85,7 +93,9 @@ std::string MinMaxNNUE_DevPlayer::info() {
          + (options.aspiration_window ? " + aspiration windows" : "")
          + (options.history ? " + history" : "")
          + (options.countermove ? " + countermove" : "")
-         + (options.root_ordering ? " + root ordering" : "") + ")";
+         + (options.root_ordering ? " + root ordering" : "")
+         + (options.lazy_accumulator ? " + lazy accumulators" : "")
+         + (options.eval_cache_bits ? " + evaluation cache" : "") + ")";
 }
 
 // ─── One move of a node ──────────────────────────────────────────────────────
@@ -110,8 +120,12 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
                                       int alpha, int beta, int depth) {
     const uint8_t player = yolah.current_player();
     const uint64_t child = zobrist::update(hash, player, m);
-    s.played[yolah.nb_plies()] = m;       // for the countermove of the child
-    nnue.play(player, m, s.acc);
+    s.played[yolah.nb_plies()] = m;       // for the countermove and the accumulator of the child
+    if (options.lazy_accumulator) {
+        s.acc_ok[yolah.nb_plies() + 1] = false;   // the child's accumulator: computed if needed
+    } else {
+        nnue.play(player, m, s.acc);
+    }
     yolah.play(m);
     int v = alpha + 1;                    // "might beat alpha" until a search says otherwise
     if (i >= nb_moves_at_full_depth) {    // late move: reduced search first
@@ -129,7 +143,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
         }
     }
     yolah.undo(m);
-    nnue.undo(player, m, s.acc);
+    if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
     return v;
 }
 
@@ -175,7 +189,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    never found again, and when a cluster was full they evicted a real
     //    entry of an inner node.
     if (depth <= 0) {
-        return int(nnue.value(s.acc, yolah.current_player()) * WIN);
+        return evaluate(yolah, s, hash);
     }
     // 4. The moves, the most promising first. They are scored once, then
     //    picked one at a time (the best remaining one): most nodes cut after
@@ -235,6 +249,85 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     // bound (all the moves failed low against the window we were given).
     table.update(hash, int16_t(best), best > alpha_orig ? BOUND_EXACT : BOUND_UPPER, depth, best_move);
     return best;
+}
+
+// ─── Evaluation and lazy accumulators (D) ───────────────────────────────────
+// The network's value for the side to move, scaled to ±WIN.
+//
+// The NNUE's first layer is a sum of weight rows, one per feature of the
+// position (black pieces, white pieces, holes, side to move): the
+// "accumulator". A move changes four features (the piece leaves `from`, arrives
+// on `to`, `from` becomes a hole, the side to move flips), so the accumulator
+// of a child is the parent's plus four rows — much cheaper than from scratch.
+//
+// The reference applies these four rows at EVERY move searched (nnue.play)
+// and takes them off again after (nnue.undo), even for children that never
+// need an evaluation: answered by the transposition table, finished games,
+// inner nodes. Here, an accumulator is only computed when a leaf asks for it:
+// we go up the current line to the last valid accumulator, then down again,
+// one fused pass per ply (out = in − from + to + hole ± turn). The parent's
+// accumulator is never modified, so there is nothing to undo.
+//
+// The result is bit for bit the reference's: int16 additions wrap around, so
+// their order does not matter.
+//
+// Evaluation cache: a leaf reached again by another move order (very common:
+// the same moves in a different order give the same position) takes its value
+// from the cache, without network nor accumulators. The transposition table
+// cannot hold these values (its depth-0 entries count as empty slots).
+int MinMaxNNUE_DevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash) {
+    nb_evals++;
+    EvalEntry* e = nullptr;
+    if (!eval_cache.empty()) {
+        e = &eval_cache[hash & (eval_cache.size() - 1)];
+        if (e->used && e->key == uint32_t(hash >> 32)) {
+            nb_eval_hits++;
+            return e->value;
+        }
+    }
+    const int v = network_value(yolah, s);
+    if (e) *e = {uint32_t(hash >> 32), int16_t(v), true};
+    return v;
+}
+
+int MinMaxNNUE_DevPlayer::network_value(const Yolah& yolah, Search& s) {
+    if (!options.lazy_accumulator) {
+        return int(nnue.value(s.acc, yolah.current_player()) * WIN);
+    }
+    const int ply = yolah.nb_plies();
+    int k = ply;
+    while (!s.acc_ok[k]) k--;                 // the root's is always valid
+    for (; k < ply; k++) {
+        // Player at ply k: ply parity (a pass also counts as a ply).
+        update_accumulator(s.accs[k].acc, s.accs[k + 1].acc, uint8_t(k & 1), s.played[k]);
+        s.acc_ok[k + 1] = true;
+    }
+    return int(nnue.value(s.accs[ply], yolah.current_player()) * WIN);
+}
+
+// out = in + the change of features of move m by `player` (see NNUE_Quantized::play,
+// whose arithmetic it reproduces, in one pass and without modifying `in`).
+void MinMaxNNUE_DevPlayer::update_accumulator(const int16_t* __restrict in, int16_t* __restrict out,
+                                              uint8_t player, Move m) const {
+    constexpr int H = NNUE_Quantized::H1_SIZE;
+    // Row of the "white to move" feature: added when black moves (white is to
+    // move after), taken off when white moves.
+    const int8_t* __restrict turn = nnue.input_to_h1 + (NNUE_Quantized::INPUT_SIZE - 1) * H;
+    const int16_t sign = player == Yolah::BLACK ? 1 : -1;
+    if (m == Move::none()) {                  // a pass: only the side to move changes
+        for (int j = 0; j < H; j++) out[j] = int16_t(in[j] + sign * turn[j]);
+        return;
+    }
+    // Feature rows: black pieces 0..63, white pieces 64..127, holes 128..191,
+    // squares numbered 63 − square (the encoding of the training scripts).
+    const int from = 63 - m.from_sq(), to = 63 - m.to_sq();
+    const int pieces = player == Yolah::BLACK ? 0 : 64;
+    const int8_t* __restrict w_from = nnue.input_to_h1 + (pieces + from) * H;
+    const int8_t* __restrict w_to   = nnue.input_to_h1 + (pieces + to) * H;
+    const int8_t* __restrict w_hole = nnue.input_to_h1 + (128 + from) * H;
+    for (int j = 0; j < H; j++) {
+        out[j] = int16_t(in[j] - w_from[j] + w_to[j] + w_hole[j] + sign * turn[j]);
+    }
 }
 
 // ─── Root ────────────────────────────────────────────────────────────────────
@@ -430,6 +523,8 @@ json MinMaxNNUE_DevPlayer::config() {
     j["history"] = options.history;
     j["countermove"] = options.countermove;
     j["root ordering"] = options.root_ordering;
+    j["lazy accumulator"] = options.lazy_accumulator;
+    j["eval cache"] = options.eval_cache_bits;
     j["verbose"] = verbose;
     return j;
 }
