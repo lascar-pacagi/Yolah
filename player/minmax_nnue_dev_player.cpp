@@ -8,16 +8,19 @@
 #include <algorithm>
 #include <cmath>
 #include <bit>
+#include <immintrin.h>
 
 using std::cout, std::endl;
 
 MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth,
                                            uint8_t late_move_reduction, const std::string& nnue_q_parameters_filename,
                                            bool verbose, Options options)
-    : thinking_time(microseconds), table(tt_size_mb),
+    : thinking_time(microseconds), tt_size_mb(tt_size_mb),
       nb_moves_at_full_depth(nb_moves_at_full_depth), late_move_reduction(late_move_reduction),
       nnue_q_parameters_filename(nnue_q_parameters_filename), options(options), verbose(verbose) {
     nnue.load(nnue_q_parameters_filename);
+    if (options.yolah_table) yolah_table = std::make_unique<SearchTable>(tt_size_mb);
+    else table = std::make_unique<TranspositionTable>(tt_size_mb);
     if (options.eval_cache_bits > 0) eval_cache.resize(size_t(1) << options.eval_cache_bits);
     // r(d, n) = base + ln(d)·ln(n) / divisor plies (n = move number, from 1).
     for (int d = 1; d < 64; d++) {
@@ -80,7 +83,8 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
             return r;
         }
     }
-    table.new_search();
+    if (table) table->new_search();
+    else yolah_table->new_search(std::popcount(yolah.free_squares()));
     // History aging: what was learnt during the previous moves still helps
     // (the positions are close), but less and less.
     for (auto& by_from : history)
@@ -110,7 +114,8 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
 }
 
 void MinMaxNNUE_DevPlayer::clear_table() {
-    table.clear(1);
+    if (table) table->clear(1);
+    else yolah_table->clear();
     endgame.clear();
     // the move ordering statistics too: each benchmark position from scratch
     std::fill(&history[0][0][0], &history[0][0][0] + sizeof(history) / sizeof(int16_t), int16_t(0));
@@ -126,7 +131,7 @@ Move MinMaxNNUE_DevPlayer::play(Yolah yolah) {
         cout << "value  : " << r.value << '\n';
         cout << "# nodes: " << r.nb_nodes << '\n';
         cout << "# hits : " << r.nb_hits << '\n';
-        cout << "tt load: " << table.load() << '\n';
+        cout << "tt load: " << (table ? table->load() : yolah_table->load()) << '\n';
         print_pv(yolah, zobrist::hash(yolah), r.depth);
         cout << '\n';
     }
@@ -207,6 +212,9 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
                                       int alpha, int beta, int depth) {
     const uint8_t player = yolah.current_player();
     const uint64_t child = zobrist::update(hash, player, m);
+    // H: start loading the child's table entry now; it is needed as soon as
+    // the child's search starts.
+    if (yolah_table) yolah_table->prefetch(child);
     s.played[yolah.nb_plies()] = m;       // for the countermove and the accumulator of the child
     if (options.lazy_accumulator) {
         s.acc_ok[yolah.nb_plies() + 1] = false;   // the child's accumulator: computed if needed
@@ -257,18 +265,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    one asked can answer at once, if its bound is good enough. Yolah has
     //    no cycles (every move leaves a hole), so a position's value never
     //    depends on the path to it: the table can be trusted everywhere.
-    bool found;
-    TranspositionTableEntry* entry = table.probe(hash, found);
-    Move tt_move = Move::none();
-    if (found) {
+    const TTView tt = tt_probe(hash);
+    const Move tt_move = tt.move;
+    if (tt.found) {
         s.nb_hits++;
-        tt_move = entry->move();
-        if (entry->depth() >= depth) {
-            const int v = entry->value();
-            const Bound b = entry->bound();
-            if (b == BOUND_EXACT || (b == BOUND_LOWER && v >= beta) || (b == BOUND_UPPER && v <= alpha)) {
-                return v;
-            }
+        if (tt.depth >= depth) {
+            if (tt.lower >= beta) return tt.lower;
+            if (tt.upper <= alpha) return tt.upper;
+            if (tt.lower == tt.upper) return tt.lower;
         }
     }
     // G. Very few free squares: the exact result from the endgame solver
@@ -279,7 +283,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         const auto proof = endgame.solve(yolah, true, &stop);
         if (!proof.complete) return 0;          // stopped: the caller ignores it
         const int v = proof.value > 0 ? WIN + proof.value : proof.value < 0 ? -WIN + proof.value : 0;
-        table.update(hash, int16_t(v), BOUND_EXACT, 63, proof.move);
+        tt_store(hash, yolah, 63, -INFINITE, INFINITE, v, proof.move);
         return v;
     }
     // 3. Horizon: the network's value for the side to move, scaled to ±WIN.
@@ -349,18 +353,35 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     const int alpha_orig = alpha;
     int best = -INFINITE;
     Move best_move = Move::none();
-    for (size_t i = 0; i < moves.size(); i++) {
+    size_t n = moves.size();
+    bool pruned = false;
+    for (size_t i = 0; i < n; i++) {
         // F3. Late move pruning: at shallow non-PV nodes, after lmp_moves +
         //     depth² moves, the others (the worst ordered: bad history, never
         //     cut anywhere) are not searched at all — once a move that does not
-        //     lose has been found.
-        if (prunable && depth <= options.lmp_depth && i >= size_t(options.lmp_moves + depth * depth) && best > -WIN) {
-            break;
+        //     lose has been found. I: except the articulation moves, which are
+        //     kept (moved to the front of what is left).
+        if (!pruned && prunable && depth <= options.lmp_depth && i >= size_t(options.lmp_moves + depth * depth)
+            && best > -WIN) {
+            if (!options.articulation_lmr) break;
+            size_t k = i;
+            for (size_t j = i; j < n; j++) {
+                if (is_articulation_move(yolah, moves[j])) {
+                    std::swap(moves[k], moves[j]);
+                    std::swap(scores[k], scores[j]);
+                    k++;
+                }
+            }
+            n = k;
+            pruned = true;
+            if (i >= n) break;
         }
-        const Move m = pick_move(moves, scores, i);
-        // scores[i] is now m's score: special move (killer, countermove) or history
-        const int r = late_move_reduction_of(depth, i, beta - alpha > 1, scores[i] >= SCORE_COUNTER,
-                                             scores[i] >= SCORE_COUNTER ? 0 : scores[i]);
+        const Move m = pick_move(moves, scores, i, n);
+        // scores[i] is now m's score: special move (killer, countermove), articulation or history
+        const bool tactical = options.articulation_lmr && is_articulation_move(yolah, m);
+        const int r = tactical ? 0
+                    : late_move_reduction_of(depth, i, beta - alpha > 1, scores[i] >= SCORE_COUNTER,
+                                             scores[i] >= SCORE_ARTICULATION ? 0 : scores[i]);
         const int v = search_move(yolah, s, hash, m, i, r, alpha, beta, depth);
         // FIX (A): once the clock has stopped the search, the values coming up
         // are meaningless: return before storing anything (the reference stored
@@ -372,7 +393,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 best_move = m;
                 if (v >= beta) {
                     // Beta cutoff: the opponent will not allow this position.
-                    table.update(hash, int16_t(v), BOUND_LOWER, depth, m);
+                    tt_store(hash, yolah, depth, alpha_orig, beta, v, m);
                     // Killer moves: quiet moves that cut at the same ply in a
                     // sibling node, tried early. FIX (A): only cutting moves
                     // (the reference also stored the best move of nodes without
@@ -405,8 +426,148 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     }
     // No cutoff: exact value if a move raised alpha, otherwise only an upper
     // bound (all the moves failed low against the window we were given).
-    table.update(hash, int16_t(best), best > alpha_orig ? BOUND_EXACT : BOUND_UPPER, depth, best_move);
+    tt_store(hash, yolah, depth, alpha_orig, beta, best, best_move);
     return best;
+}
+
+// ─── Articulation moves (I) ──────────────────────────────────────────────────
+// The free squares form regions (8-connectivity: a queen also slides
+// diagonally, so two free squares touching by a corner are connected). A move
+// fills its destination (the origin, already occupied, becomes a hole): if
+// the destination is an ARTICULATION POINT of its region, the move cuts the
+// region in two — it creates territory. These are the "tactical" moves of
+// Yolah, like captures in chess.
+//
+// Exact articulation points need a depth-first search of the whole region
+// (Tarjan). The local test below is O(1): a square can only disconnect its
+// region if its free neighbours fall into at least two groups that do not
+// touch each other inside the 3×3 neighbourhood. (If they all touch, any path
+// through the square can go around it.) So every true articulation point
+// passes the test; a few other squares too (their groups meet again further
+// away). The answer depends only on which of the ≤ 8 neighbours are free:
+// articulation_lut[s][pext(free, neighbours of s)], built once.
+//
+// Diagrams: `.` free square, `#` hole or piece, `X` the destination of the
+// move, `1` / `2` its free neighbours, numbered by group (neighbours of the
+// same group touch each other, corners included).
+//
+//   (a) an articulation point: X is the only passage between the top and
+//       the bottom region. Its free neighbours form two groups that do not
+//       touch (1 and 2 are two rows apart): the test says yes, and filling X
+//       does cut the region in two.
+//
+//         . . . . # . . .
+//         . . . # 1 1 . .
+//         # # # # X # # #
+//         . . . 2 2 # . .
+//         . . . . . # . .
+//
+//   (b) not an articulation point: the free neighbours of X all touch each
+//       other around it (a single group 1), so any path through X can go
+//       around it. The test says no.
+//
+//         . . . . .
+//         . 1 1 # .
+//         . 1 X # .
+//         . 1 1 # .
+//         . . . . .
+//
+//   (c) a false positive: two groups around X (1 above, 2 below: not
+//       touching), but they meet again by the outer ring. The test says yes,
+//       although filling X disconnects nothing. A detour longer than the 3×3
+//       neighbourhood is invisible to a local test; the exact answer would
+//       need a search of the whole region (Tarjan).
+//
+//         . . . . .
+//         . # 1 # .
+//         . # X # .
+//         . # 2 # .
+//         . . . . .
+namespace {
+    struct ArticulationTables {
+        uint64_t neighbours[64];
+        uint8_t lut[64][256];
+        ArticulationTables() {
+            for (int s = 0; s < 64; s++) {
+                const int f = s & 7, r = s >> 3;
+                int cells[8], n = 0;          // the neighbours of s, by increasing square (pext order)
+                neighbours[s] = 0;
+                for (int t = 0; t < 64; t++) {
+                    const int df = (t & 7) - f, dr = (t >> 3) - r;
+                    if (t != s && std::abs(df) <= 1 && std::abs(dr) <= 1) {
+                        neighbours[s] |= uint64_t(1) << t;
+                        cells[n++] = t;
+                    }
+                }
+                for (int pattern = 0; pattern < (1 << n); pattern++) {
+                    // groups of free neighbours, by union-find on king adjacency
+                    int parent[8];
+                    for (int a = 0; a < n; a++) parent[a] = a;
+                    auto find = [&](int a) { while (parent[a] != a) a = parent[a]; return a; };
+                    for (int a = 0; a < n; a++) {
+                        for (int b = a + 1; b < n; b++) {
+                            if (!((pattern >> a) & 1) || !((pattern >> b) & 1)) continue;
+                            const int ta = cells[a], tb = cells[b];
+                            if (std::abs((ta & 7) - (tb & 7)) <= 1 && std::abs((ta >> 3) - (tb >> 3)) <= 1) {
+                                parent[find(a)] = find(b);
+                            }
+                        }
+                    }
+                    int groups = 0;
+                    for (int a = 0; a < n; a++) groups += ((pattern >> a) & 1) && find(a) == a;
+                    lut[s][pattern] = groups >= 2;
+                }
+            }
+        }
+    };
+    const ArticulationTables articulation_tables;
+}
+
+bool MinMaxNNUE_DevPlayer::is_articulation_move(const Yolah& yolah, Move m) const {
+    if (m == Move::none()) return false;
+    const int to = m.to_sq();
+    const uint64_t pattern = _pext_u64(yolah.free_squares(), articulation_tables.neighbours[to]);
+    return articulation_tables.lut[to][pattern];
+}
+
+// ─── Transposition table access (H) ──────────────────────────────────────────
+// Both tables seen the same way: a value interval [lower, upper] proven at
+// some depth. The reference's table keeps one value and a bound type:
+// exact → [v, v], lower bound → [v, +∞], upper bound → [−∞, v].
+MinMaxNNUE_DevPlayer::TTView MinMaxNNUE_DevPlayer::tt_probe(uint64_t hash) const {
+    TTView view;
+    if (yolah_table) {
+        if (const SearchTable::Entry* e = yolah_table->probe(hash)) {
+            view = {true, e->move, e->depth, e->lower, e->upper};
+        }
+        return view;
+    }
+    bool found;
+    const TranspositionTableEntry* e = table->probe(hash, found);
+    if (found) {
+        view.found = true;
+        view.move = e->move();
+        view.depth = e->depth();
+        const int v = e->value();
+        if (e->bound() & BOUND_LOWER) view.lower = v;
+        if (e->bound() & BOUND_UPPER) view.upper = v;
+    }
+    return view;
+}
+
+// The result of a search of `depth` with the window (alpha, beta): fail-soft
+// `value` (≤ alpha: upper bound, ≥ beta: lower bound, between: exact).
+void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move) {
+    if (yolah_table) {
+        yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move);
+        return;
+    }
+    const Bound b = value >= beta ? BOUND_LOWER : value > alpha ? BOUND_EXACT : BOUND_UPPER;
+    table->update(hash, int16_t(value), b, uint8_t(depth), move);
+}
+
+Move MinMaxNNUE_DevPlayer::tt_move(uint64_t hash) const {
+    return yolah_table ? yolah_table->get_move(hash) : table->get_move(hash);
 }
 
 // ─── Evaluation and lazy accumulators (D) ───────────────────────────────────
@@ -510,14 +671,15 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         Yolah::MoveList moves;
         yolah.moves(moves);
         int scores[Yolah::MAX_NB_MOVES];
-        score_moves(yolah, s, table.get_move(hash), moves, scores);
-        for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i)});
+        score_moves(yolah, s, tt_move(hash), moves, scores);
+        for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
     for (size_t i = 0; i < s.root_moves.size(); i++) {
         RootMove& rm = s.root_moves[i];
         const uint64_t nodes_before = s.nb_nodes;
         // The root is a PV node; no killers there, the history still speaks.
-        const int r = late_move_reduction_of(depth, i, true, false,
+        const int r = options.articulation_lmr && is_articulation_move(yolah, rm.move) ? 0
+                    : late_move_reduction_of(depth, i, true, false,
                                              history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()]);
         const int v = search_move(yolah, s, hash, rm.move, i, r, alpha, beta, depth);
         rm.nodes = s.nb_nodes - nodes_before;
@@ -538,8 +700,7 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
                              return a.nodes > b.nodes;
                          });
     }
-    const Bound b = best >= beta ? BOUND_LOWER : best > alpha_orig ? BOUND_EXACT : BOUND_UPPER;
-    table.update(hash, int16_t(best), b, depth, res);
+    tt_store(hash, yolah, depth, alpha_orig, beta, best, res);
     return best;
 }
 
@@ -567,15 +728,17 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         else if (m == s.killer1[ply])     scores[i] = SCORE_KILLER1;
         else if (m == s.killer2[ply])     scores[i] = SCORE_KILLER2;
         else if (m == counter && counter != Move::none()) scores[i] = SCORE_COUNTER;
+        else if (options.articulation_ordering && is_articulation_move(yolah, m))
+            scores[i] = SCORE_ARTICULATION + (options.history ? history[player][m.from_sq()][m.to_sq()] : 0);
         else if (options.history)         scores[i] = history[player][m.from_sq()][m.to_sq()];
         else                              scores[i] = -int(i);
     }
 }
 
 // Selection step: brings the best-scored move of moves[i..] to position i.
-Move MinMaxNNUE_DevPlayer::pick_move(Yolah::MoveList& moves, int* scores, size_t i) {
+Move MinMaxNNUE_DevPlayer::pick_move(Yolah::MoveList& moves, int* scores, size_t i, size_t n) {
     size_t best = i;
-    for (size_t j = i + 1; j < moves.size(); j++) {
+    for (size_t j = i + 1; j < n; j++) {
         if (scores[j] > scores[best]) best = j;
     }
     std::swap(moves[i], moves[best]);
@@ -593,13 +756,12 @@ void MinMaxNNUE_DevPlayer::update_history(uint8_t player, Move m, int bonus) {
 
 void MinMaxNNUE_DevPlayer::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     if (yolah.game_over() || depth == 0) return;
-    bool found;
-    TranspositionTableEntry* entry = table.probe(hash, found);
-    if (!found) return;
+    const Move m = tt_move(hash);
+    if (m == Move::none()) return;
     auto player = yolah.current_player();
-    cout << entry->move() << ' ';
-    yolah.play(entry->move());
-    print_pv(yolah, zobrist::update(hash, player, entry->move()), depth - 1);
+    cout << m << ' ';
+    yolah.play(m);
+    print_pv(yolah, zobrist::update(hash, player, m), depth - 1);
 }
 
 // ─── Iterative deepening with aspiration windows ─────────────────────────────
@@ -629,9 +791,9 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         Yolah::MoveList moves;
         yolah.moves(moves);
         int scores[Yolah::MAX_NB_MOVES];
-        score_moves(yolah, s, table.get_move(hash), moves, scores);
+        score_moves(yolah, s, tt_move(hash), moves, scores);
         s.root_moves.clear();
-        for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i)});
+        for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
     for (int d = 1; d <= max_depth && d < 64; d++) {
         int delta = options.aspiration_window;
@@ -674,7 +836,10 @@ json MinMaxNNUE_DevPlayer::config() {
     json j;
     j["name"] = "MinMaxNNUE_DevPlayer";
     j["microseconds"] = thinking_time;
-    j["tt size"] = table.size();
+    j["tt size"] = tt_size_mb;
+    j["yolah table"] = options.yolah_table;
+    j["articulation ordering"] = options.articulation_ordering;
+    j["articulation lmr"] = options.articulation_lmr;
     j["nb moves at full depth"] = nb_moves_at_full_depth;
     j["late move reduction"] = late_move_reduction;
     j["weights"] = nnue_q_parameters_filename;

@@ -3,6 +3,8 @@
 #include "player.h"
 #include "heuristic.h"
 #include "transposition_table.h"
+#include "search_table.h"
+#include <memory>
 #include <atomic>
 #include <vector>
 #include "nnue_quantized.h"
@@ -35,6 +37,17 @@
 //      late move pruning ("lmp depth", "lmp moves"). Measured: reverse
 //      futility +76 Elo, late move pruning +35, both +95; null move −81
 //      (Yolah is full of zugzwangs: every move spoils one's own space), off.
+//   H. a transposition table designed for Yolah (player/search_table.h):
+//      both bounds per entry, replacement of the positions that can no longer
+//      be reached, 64-byte clusters, prefetch ("yolah table"). Off: no gain
+//      measured at 0.2 s/move (−15 ± 23 Elo), to try again at longer times.
+//   I. articulation moves: a move whose destination cuts its region of free
+//      squares in two (local test, see is_articulation_move) is treated like
+//      a capture in chess: ordered early ("articulation ordering"), never
+//      reduced nor pruned ("articulation lmr"). Off: −80 to −110 Elo — the
+//      local test flags up to 40 % of the free squares, and even the exact
+//      articulation points are a third of them in the middle game (mostly
+//      cutting off small pockets): too many "tactical" moves.
 //   G. exact endgame solver (player/endgame_solver.h): at the root, a win /
 //      draw / loss proof when few free squares remain ("endgame root",
 //      "endgame root time"); in the tree, exact values instead of the
@@ -62,6 +75,10 @@ struct MinMaxNNUE_DevOptions {
     int  lmp_depth = 3;              // ["lmp depth"] late move pruning up to this depth (0 = never)
     int  lmp_moves = 4;              // ["lmp moves"] moves searched before pruning: this + depth²
     bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
+    bool articulation_ordering = false;   // ["articulation ordering"] articulation moves after the killers
+    bool articulation_lmr = false;   // ["articulation lmr"] articulation moves never reduced nor pruned
+    bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table
+                                     //   (−15 ± 23 Elo at 0.2 s/move: the table is hardly loaded there)
     int  endgame_root = 0;           // ["endgame root"] try to prove the result at the root with at most
                                      //   this many free squares (0 = never)
     double endgame_root_time = 0.5;  // ["endgame root time"] share of the thinking time given to that proof
@@ -89,7 +106,20 @@ private:
     static constexpr int WIN = heuristic::MAX_VALUE; // a finished game is worth ±(WIN + score)
 
     const uint64_t thinking_time;
-    TranspositionTable table;
+    // The transposition table: the reference's, or the one of step H. Only one
+    // is allocated; tt_probe / tt_store / tt_move hide which.
+    std::unique_ptr<TranspositionTable> table;
+    std::unique_ptr<SearchTable> yolah_table;
+    const size_t tt_size_mb;
+    struct TTView {
+        bool found = false;
+        Move move = Move::none();
+        int  depth = 0;
+        int  lower = -32767, upper = 32767;   // value ∈ [lower, upper]
+    };
+    TTView tt_probe(uint64_t hash) const;
+    void   tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move);
+    Move   tt_move(uint64_t hash) const;
     size_t nb_moves_at_full_depth;
     uint8_t late_move_reduction;
     const std::string nnue_q_parameters_filename;
@@ -107,7 +137,8 @@ private:
     static constexpr int HISTORY_MAX = 16384;
     // Move scores of score_moves: the special moves above any history score.
     static constexpr int SCORE_TT = 1 << 30, SCORE_KILLER1 = 1 << 29,
-                         SCORE_KILLER2 = SCORE_KILLER1 - 1, SCORE_COUNTER = SCORE_KILLER1 - 2;
+                         SCORE_KILLER2 = SCORE_KILLER1 - 1, SCORE_COUNTER = SCORE_KILLER1 - 2,
+                         SCORE_ARTICULATION = 1 << 28;   // + history: between the special moves and the others
     // Late move reductions (E): base reduction for (depth, move number), in
     // 1/1024 of a ply so that the adjustments can be fractional.
     int lmr_table[64][Yolah::MAX_NB_MOVES]{};
@@ -162,7 +193,8 @@ private:
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const;
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int reduction, int alpha, int beta, int depth);
     void score_moves(const Yolah&, const Search& s, Move tt_move, const Yolah::MoveList&, int* scores) const;
-    static Move pick_move(Yolah::MoveList&, int* scores, size_t i);
+    static Move pick_move(Yolah::MoveList&, int* scores, size_t i, size_t n);
+    bool is_articulation_move(const Yolah&, Move) const;
     void update_history(uint8_t player, Move m, int bonus);
     void iterative_deepening(Yolah, Search&, uint8_t max_depth);
     void print_pv(Yolah, uint64_t hash, int8_t depth);

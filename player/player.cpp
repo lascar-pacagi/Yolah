@@ -371,6 +371,9 @@ unique_ptr<Player> Player::create(const json& j) {
              options.lmp_depth = j.value("lmp depth", options.lmp_depth);
              options.lmp_moves = j.value("lmp moves", options.lmp_moves);
              options.pass_rule = j.value("pass rule", options.pass_rule);
+             options.yolah_table = j.value("yolah table", options.yolah_table);
+             options.articulation_ordering = j.value("articulation ordering", options.articulation_ordering);
+             options.articulation_lmr = j.value("articulation lmr", options.articulation_lmr);
              options.endgame_root = j.value("endgame root", options.endgame_root);
              options.endgame_root_time = j.value("endgame root time", options.endgame_root_time);
              options.endgame_tree = j.value("endgame tree", options.endgame_tree);
