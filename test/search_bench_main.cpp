@@ -4,6 +4,20 @@
 //       Plays games (4 random plies, then the reference player at depth 5) and
 //       keeps every `every`-th position: realistic positions, one JSON per line.
 //
+//   search_bench solve --positions bench_positions.txt --max-free 24 [--ordering none|tt|fastest]
+//                      [--wld 1] [--brute 6] [--time MICROSECONDS] [--csv out.csv]
+//       The exact endgame solver (player/endgame_solver.h) on the positions
+//       with at most --max-free free squares: value, move, nodes, time.
+//       --wld 1: win / draw / loss only. Positions not solved within --time
+//       are reported as such.
+//
+//   search_bench blunders --player CFG --positions bench_positions.txt --max-free 26 --time US
+//       For each position (with at most --max-free free squares): the player's
+//       move in --time, and the solver's verdict (win / draw / loss) of the
+//       position and of the position after that move. A blunder: the move
+//       loses the best result (a won game drawn or lost, a drawn game lost).
+//       Positions the solver cannot prove within 30 s are skipped.
+//
 //   search_bench run --player ../config/mm_nnue_dev_player.cfg --positions bench_positions.txt
 //                    (--depth D | --time MICROSECONDS) [--csv out.csv] [--compare ref.csv] [--limit N]
 //       Searches every position from an empty transposition table and prints,
@@ -20,6 +34,8 @@
 #include "player.h"
 #include "minmax_nnue_baseline_player.h"
 #include "minmax_nnue_dev_player.h"
+#include "endgame_solver.h"
+#include <bit>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
@@ -30,6 +46,10 @@
 #include <string>
 #include <vector>
 #include <format>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 using std::cout, std::cerr, std::string, std::vector;
 
@@ -90,6 +110,17 @@ namespace {
         return os.str();
     }
 
+    // --max-free F: only the positions with at most F free squares; the
+    // indices stay those of the file.
+    vector<std::pair<size_t, Yolah>> select_positions(const vector<Yolah>& all, const Args& a) {
+        const int max_free = std::stoi(a.get("max-free", "64"));
+        vector<std::pair<size_t, Yolah>> res;
+        for (size_t i = 0; i < all.size(); i++) {
+            if (std::popcount(all[i].free_squares()) <= max_free) res.push_back({i, all[i]});
+        }
+        return res;
+    }
+
     vector<Yolah> read_positions(const string& path) {
         std::ifstream f(path);
         if (!f) { cerr << "cannot open " << path << '\n'; std::exit(1); }
@@ -129,6 +160,98 @@ namespace {
         return 0;
     }
 
+    int solve(const Args& a) {
+        auto positions = select_positions(read_positions(a.get("positions", "bench_positions.txt")), a);
+        EndgameSolver::Options o;
+        const string ord = a.get("ordering", "fastest");
+        o.ordering = ord == "none" ? EndgameSolver::Ordering::None
+                   : ord == "tt"   ? EndgameSolver::Ordering::TT : EndgameSolver::Ordering::Fastest;
+        o.brute_force_free = std::stoi(a.get("brute", "6"));
+        o.tt_bits = std::stoi(a.get("tt-bits", "21"));
+        const bool wld = a.get("wld", "0") == "1";
+        const uint64_t us = std::stoull(a.get("time", "0"));
+        EndgameSolver solver(o);
+        std::ofstream csv;
+        if (a.has("csv")) {
+            csv.open(a.get("csv"));
+            csv << "idx,ply,free,complete,value,move,nodes,seconds\n";
+        }
+        cout << std::format("{:>4} {:>4} {:>4} {:>6} {:>6} {:>12} {:>9} {:>10}\n",
+                            "pos", "ply", "free", "value", "move", "nodes", "seconds", "knodes/s");
+        uint64_t total_nodes = 0;
+        double total_time = 0;
+        int solved = 0;
+        for (const auto& [i, position] : positions) {
+            solver.clear();
+            std::atomic_bool stop = false;
+            std::jthread clock;
+            std::mutex mtx;
+            std::condition_variable_any cv;
+            if (us) {
+                clock = std::jthread([&](std::stop_token st) {
+                    std::unique_lock lock(mtx);
+                    if (!cv.wait_for(lock, st, std::chrono::microseconds(us), [] { return false; })) stop = true;
+                });
+            }
+            const auto t0 = std::chrono::steady_clock::now();
+            const auto r = solver.solve(position, wld, &stop);
+            const double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            if (clock.joinable()) { clock.request_stop(); clock.join(); }
+            total_nodes += r.nodes; total_time += sec; solved += r.complete;
+            const int nb_free = std::popcount(position.free_squares());
+            const string value = r.complete ? std::to_string(r.value) : "-";
+            cout << std::format("{:>4} {:>4} {:>4} {:>6} {:>6} {:>12} {:>9.3f} {:>10.0f}\n", i, position.nb_plies(), nb_free,
+                                value, r.complete ? move_str(r.move) : "-", r.nodes, sec,
+                                sec > 0 ? r.nodes / sec / 1000 : 0.0) << std::flush;
+            if (csv.is_open()) {
+                csv << i << ',' << position.nb_plies() << ',' << nb_free << ',' << r.complete << ',' << r.value << ','
+                    << move_str(r.move) << ',' << r.nodes << ',' << sec << '\n' << std::flush;
+            }
+        }
+        cout << std::format("total: {} positions, {} solved, {} nodes, {:.2f} s, {:.0f} knodes/s\n", positions.size(), solved,
+                            total_nodes, total_time, total_nodes / std::max(total_time, 1e-9) / 1000);
+        return 0;
+    }
+
+    int blunders(const Args& a) {
+        Searcher s(a.get("player"));
+        auto positions = select_positions(read_positions(a.get("positions", "bench_positions.txt")), a);
+        const uint64_t us = std::stoull(a.get("time", "200000"));
+        EndgameSolver solver;
+        const auto sign = [](int v) { return (v > 0) - (v < 0); };
+        int checked = 0, nb_blunders = 0;
+        std::map<int, std::pair<int, int>> by_free;      // free → (checked, blunders)
+        for (const auto& [i, position] : positions) {
+            std::atomic_bool stop = false;
+            std::jthread clock([&](std::stop_token st) {
+                std::mutex mtx; std::condition_variable_any cv;
+                std::unique_lock lock(mtx);
+                if (!cv.wait_for(lock, st, std::chrono::seconds(30), [] { return false; })) stop = true;
+            });
+            solver.clear();
+            const auto best = solver.solve(position, true, &stop);
+            if (!best.complete) continue;
+            s.clear();
+            const Move m = s.search(position, 63, us).move;
+            Yolah after = position;
+            after.play(m);
+            const auto reply = solver.solve(after, true, &stop);
+            if (!reply.complete) continue;
+            // the opponent's result after m, seen from the side to move
+            const int got = after.game_over() ? sign(position.score(position.current_player()) + (m != Move::none()))
+                                              : -sign(reply.value);
+            const bool blunder = got < sign(best.value);
+            const int nb_free = std::popcount(position.free_squares());
+            checked++; nb_blunders += blunder;
+            by_free[nb_free].first++; by_free[nb_free].second += blunder;
+            if (blunder) cout << std::format("pos {:>4} (ply {}, {} free): best {:+d}, played {} → {:+d}\n",
+                                             i, position.nb_plies(), nb_free, sign(best.value), move_str(m), got);
+        }
+        for (auto [f, cb] : by_free) cout << std::format("{:>3} free: {} blunders / {}\n", f, cb.second, cb.first);
+        cout << std::format("total: {} blunders / {} positions\n", nb_blunders, checked);
+        return 0;
+    }
+
     struct Row { int idx, ply, depth, value; string move; uint64_t nodes; double seconds; };
 
     std::map<int, Row> read_csv(const string& path) {
@@ -154,7 +277,7 @@ namespace {
 
     int run(const Args& a) {
         Searcher s(a.get("player"));
-        vector<Yolah> positions = read_positions(a.get("positions", "bench_positions.txt"));
+        auto positions = select_positions(read_positions(a.get("positions", "bench_positions.txt")), a);
         if (a.has("limit")) positions.resize(std::min(positions.size(), size_t(std::stoul(a.get("limit")))));
         const uint8_t depth = uint8_t(std::stoi(a.get("depth", "63")));
         const uint64_t us = std::stoull(a.get("time", "0"));
@@ -171,13 +294,13 @@ namespace {
         int same_value = 0, same_move = 0, compared = 0;
         cout << std::format("{:>4} {:>4} {:>5} {:>7} {:>6} {:>12} {:>9} {:>10}{}\n", "pos", "ply", "depth", "value", "move",
                             "nodes", "seconds", "knodes/s", ref.empty() ? "" : "   ref nodes  ref s  same");
-        for (size_t i = 0; i < positions.size(); i++) {
+        for (const auto& [i, position] : positions) {
             s.clear();
-            auto r = s.search(positions[i], depth, us);
+            auto r = s.search(position, depth, us);
             const string mv = move_str(r.move);
             total_nodes += r.nb_nodes; total_time += r.seconds; total_depth += r.depth;
             if (csv.is_open()) {
-                csv << i << ',' << positions[i].nb_plies() << ',' << int(r.depth) << ',' << r.value << ','
+                csv << i << ',' << position.nb_plies() << ',' << int(r.depth) << ',' << r.value << ','
                     << mv << ',' << r.nb_nodes << ',' << r.seconds << '\n' << std::flush;
             }
             string cmp;
@@ -189,7 +312,7 @@ namespace {
                 same_value += sv; same_move += sm;
                 cmp = std::format(" {:>12} {:>6.2f}  {}{}", q.nodes, q.seconds, sv ? "v" : "-", sm ? "m" : "-");
             }
-            cout << std::format("{:>4} {:>4} {:>5} {:>7} {:>6} {:>12} {:>9.3f} {:>10.0f}{}\n", i, positions[i].nb_plies(),
+            cout << std::format("{:>4} {:>4} {:>5} {:>7} {:>6} {:>12} {:>9.3f} {:>10.0f}{}\n", i, position.nb_plies(),
                                 int(r.depth), r.value, mv, r.nb_nodes, r.seconds,
                                 r.seconds > 0 ? r.nb_nodes / r.seconds / 1000 : 0.0, cmp) << std::flush;
         }
@@ -223,6 +346,8 @@ int main(int argc, char* argv[]) {
     Args a = parse(argc, argv, 2);
     if (mode == "positions") return make_positions(a);
     if (mode == "run") return run(a);
+    if (mode == "solve") return solve(a);
+    if (mode == "blunders") return blunders(a);
     cerr << "unknown mode " << mode << '\n';
     return 1;
 }

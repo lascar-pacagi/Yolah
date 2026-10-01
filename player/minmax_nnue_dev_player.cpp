@@ -6,6 +6,8 @@
 #include "zobrist.h"
 #include <utility>
 #include <algorithm>
+#include <cmath>
+#include <bit>
 
 using std::cout, std::endl;
 
@@ -17,6 +19,12 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
       nnue_q_parameters_filename(nnue_q_parameters_filename), options(options), verbose(verbose) {
     nnue.load(nnue_q_parameters_filename);
     if (options.eval_cache_bits > 0) eval_cache.resize(size_t(1) << options.eval_cache_bits);
+    // r(d, n) = base + ln(d)·ln(n) / divisor plies (n = move number, from 1).
+    for (int d = 1; d < 64; d++) {
+        for (int n = 1; n < Yolah::MAX_NB_MOVES; n++) {
+            lmr_table[d][n] = int(1024 * (options.lmr_base + std::log(d) * std::log(n) / options.lmr_divisor));
+        }
+    }
 }
 
 MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, uint8_t max_depth, uint64_t microseconds) {
@@ -34,6 +42,43 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
                 stop = true;
             }
         });
+    }
+    // G. Few free squares left: try to PROVE the result first (win / draw /
+    // loss, see endgame_solver.h), with a share of the thinking time. A win or
+    // a draw proven: its move is played, no search needed. A loss, or no proof
+    // in time: the normal search below, with the time left — against a fallible
+    // opponent, the move that "looks best" keeps more chances than any losing
+    // move of the proof.
+    if (options.endgame_root > 0 && std::popcount(yolah.free_squares()) <= options.endgame_root) {
+        std::atomic_bool solver_stop = false;
+        std::mutex sm;
+        std::condition_variable_any scv;
+        std::jthread solver_clock;
+        if (microseconds > 0) {
+            const auto budget = std::chrono::microseconds(uint64_t(microseconds * options.endgame_root_time));
+            solver_clock = std::jthread([&, budget](std::stop_token st) {
+                std::unique_lock lock(sm);
+                if (!scv.wait_for(lock, st, budget, [] { return false; })) solver_stop = true;
+            });
+        }
+        const auto proof = endgame.solve(yolah, true, &solver_stop);
+        if (solver_clock.joinable()) {
+            solver_clock.request_stop();
+            solver_clock.join();
+        }
+        if (proof.complete && proof.value >= 0) {
+            if (clock.joinable()) {
+                clock.request_stop();
+                clock.join();
+            }
+            Result r;
+            r.move = proof.move;
+            r.value = int16_t(proof.value > 0 ? WIN + proof.value : 0);
+            r.depth = 63;
+            r.nb_nodes = proof.nodes;
+            r.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            return r;
+        }
     }
     table.new_search();
     // History aging: what was learnt during the previous moves still helps
@@ -66,6 +111,7 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
 
 void MinMaxNNUE_DevPlayer::clear_table() {
     table.clear(1);
+    endgame.clear();
     // the move ordering statistics too: each benchmark position from scratch
     std::fill(&history[0][0][0], &history[0][0][0] + sizeof(history) / sizeof(int16_t), int16_t(0));
     std::fill(&countermoves[0][0], &countermoves[0][0] + SQUARE_NB * SQUARE_NB, Move::none());
@@ -95,7 +141,45 @@ std::string MinMaxNNUE_DevPlayer::info() {
          + (options.countermove ? " + countermove" : "")
          + (options.root_ordering ? " + root ordering" : "")
          + (options.lazy_accumulator ? " + lazy accumulators" : "")
-         + (options.eval_cache_bits ? " + evaluation cache" : "") + ")";
+         + (options.eval_cache_bits ? " + evaluation cache" : "")
+         + (options.lmr ? " + logarithmic LMR" : "")
+         + (options.endgame_root || options.endgame_tree ? " + endgame solver" : "") + ")";
+}
+
+// ─── Late move reductions (E) ────────────────────────────────────────────────
+// With a good move ordering, the best move is almost always among the first
+// ones: the later a move comes, the less likely it is to matter, and the
+// deeper the search, the more a full-depth search of it costs. So late moves
+// are first searched at a reduced depth, and only searched again at full depth
+// if that shallow search says they might beat alpha (see search_move).
+//
+// Reduction, in plies, of move number i (from 0) at a node of depth `depth`:
+//     r = base + ln(depth)·ln(i + 1) / divisor          (lmr_table)
+//         − 1   at a PV node (beta − alpha > 1): its value is the one we want
+//         − 1   for a killer or a countermove: they cut elsewhere
+//         − history / 8192  (−2 … +2): moves that usually cut are reduced less,
+//                           moves that usually fail are reduced more
+// The first move (the table's move) and the nodes of depth < 3 are never
+// reduced, and the reduced search keeps at least one ply.
+// Example (base 1.0, divisor 1.75, the defaults: they beat 0.75 / 2.25 in a
+// match), quiet move with a neutral history:
+//     depth 4, move 4: 1.0 + 1.39·1.39/1.75 = 2.1 → 2 plies
+//     depth 10, move 20: 1.0 + 2.30·3.00/1.75 = 4.9 → 4 plies
+// The reference reduces by a fixed late_move_reduction − 1 = 2 plies every move
+// after the first nb_moves_at_full_depth = 2, at every depth (kept when "lmr"
+// is false).
+//
+// Returns the number of plies to take off the normal depth − 1 (0 = none).
+int MinMaxNNUE_DevPlayer::late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const {
+    if (!options.lmr) {
+        return i >= nb_moves_at_full_depth ? std::max(0, late_move_reduction - 1) : 0;
+    }
+    if (depth < 3 || i == 0) return 0;
+    int r = lmr_table[std::min(depth, 63)][std::min<size_t>(i + 1, Yolah::MAX_NB_MOVES - 1)];
+    if (pv_node) r -= 1024;
+    if (special) r -= 1024;
+    if (options.history) r -= hist * 1024 / 8192;
+    return std::clamp(r / 1024, 0, depth - 2);
 }
 
 // ─── One move of a node ──────────────────────────────────────────────────────
@@ -104,9 +188,9 @@ std::string MinMaxNNUE_DevPlayer::info() {
 // an interrupted child returns a meaningless 0.
 //
 // Three ways of searching a child, from the cheapest:
-//   • a late move (i ≥ nb_moves_at_full_depth) is first searched at a REDUCED
-//     depth (depth − late_move_reduction instead of depth − 1). If it does not
-//     beat alpha, the move is believed bad and we stop there (LMR);
+//   • a late move (reduction > 0, see late_move_reduction_of) is first
+//     searched at a REDUCED depth, depth − 1 − reduction. If it does not beat
+//     alpha, the move is believed bad and we stop there (LMR);
 //   • with PVS, every move after the first one is then searched with a NULL
 //     WINDOW (alpha, alpha + 1): the search only answers "is this move better
 //     than alpha?", which cuts much more than a full window. The first move is
@@ -116,7 +200,7 @@ std::string MinMaxNNUE_DevPlayer::info() {
 //     again with the full window, to get its exact value.
 // Without PVS, every move that is not cut by LMR gets the full window (the
 // reference's way).
-int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Move m, size_t i,
+int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Move m, size_t i, int reduction,
                                       int alpha, int beta, int depth) {
     const uint8_t player = yolah.current_player();
     const uint64_t child = zobrist::update(hash, player, m);
@@ -128,9 +212,10 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
     }
     yolah.play(m);
     int v = alpha + 1;                    // "might beat alpha" until a search says otherwise
-    if (i >= nb_moves_at_full_depth) {    // late move: reduced search first
-        v = options.pvs ? -negamax(yolah, s, child, -(alpha + 1), -alpha, depth - late_move_reduction)
-                        : -negamax(yolah, s, child, -beta, -alpha, depth - late_move_reduction);
+    if (reduction > 0) {                  // late move: reduced search first
+        const int d = depth - 1 - reduction;
+        v = options.pvs ? -negamax(yolah, s, child, -(alpha + 1), -alpha, d)
+                        : -negamax(yolah, s, child, -beta, -alpha, d);
     }
     if (v > alpha && !stopped()) {
         if (options.pvs && i > 0) {
@@ -183,6 +268,17 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             }
         }
     }
+    // G. Very few free squares: the exact result from the endgame solver
+    //    (win / draw / loss — only the sign matters for the outcome), instead
+    //    of a search with the network. Stored in the table at the largest
+    //    depth: it never needs to be searched again.
+    if (options.endgame_tree > 0 && std::popcount(yolah.free_squares()) <= options.endgame_tree) {
+        const auto proof = endgame.solve(yolah, true, &stop);
+        if (!proof.complete) return 0;          // stopped: the caller ignores it
+        const int v = proof.value > 0 ? WIN + proof.value : proof.value < 0 ? -WIN + proof.value : 0;
+        table.update(hash, int16_t(v), BOUND_EXACT, 63, proof.move);
+        return v;
+    }
     // 3. Horizon: the network's value for the side to move, scaled to ±WIN.
     //    FIX (A): not stored in the table. The table treats depth 0 as "empty
     //    slot" (TranspositionTable::probe), so the reference's leaf entries were
@@ -203,7 +299,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     Move best_move = Move::none();
     for (size_t i = 0; i < moves.size(); i++) {
         const Move m = pick_move(moves, scores, i);
-        const int v = search_move(yolah, s, hash, m, i, alpha, beta, depth);
+        // scores[i] is now m's score: special move (killer, countermove) or history
+        const int r = late_move_reduction_of(depth, i, beta - alpha > 1, scores[i] >= SCORE_COUNTER,
+                                             scores[i] >= SCORE_COUNTER ? 0 : scores[i]);
+        const int v = search_move(yolah, s, hash, m, i, r, alpha, beta, depth);
         // FIX (A): once the clock has stopped the search, the values coming up
         // are meaningless: return before storing anything (the reference stored
         // them, and the table is kept for the next moves of the game).
@@ -358,7 +457,10 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
     for (size_t i = 0; i < s.root_moves.size(); i++) {
         RootMove& rm = s.root_moves[i];
         const uint64_t nodes_before = s.nb_nodes;
-        const int v = search_move(yolah, s, hash, rm.move, i, alpha, beta, depth);
+        // The root is a PV node; no killers there, the history still speaks.
+        const int r = late_move_reduction_of(depth, i, true, false,
+                                             history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()]);
+        const int v = search_move(yolah, s, hash, rm.move, i, r, alpha, beta, depth);
         rm.nodes = s.nb_nodes - nodes_before;
         if (stopped()) return best;
         if (v > best) {
@@ -393,7 +495,6 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
 // recognise a good move: the ordering only learns from the search itself.
 void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
                                        const Yolah::MoveList& moves, int* scores) const {
-    constexpr int TT = 1 << 30, KILLER1 = 1 << 29, KILLER2 = KILLER1 - 1, COUNTER = KILLER1 - 2;
     const uint16_t ply = yolah.nb_plies();
     const uint8_t player = yolah.current_player();
     Move counter = Move::none();
@@ -403,10 +504,10 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     }
     for (size_t i = 0; i < moves.size(); i++) {
         const Move m = moves[i];
-        if (m == tt_move)                 scores[i] = TT;
-        else if (m == s.killer1[ply])     scores[i] = KILLER1;
-        else if (m == s.killer2[ply])     scores[i] = KILLER2;
-        else if (m == counter && counter != Move::none()) scores[i] = COUNTER;
+        if (m == tt_move)                 scores[i] = SCORE_TT;
+        else if (m == s.killer1[ply])     scores[i] = SCORE_KILLER1;
+        else if (m == s.killer2[ply])     scores[i] = SCORE_KILLER2;
+        else if (m == counter && counter != Move::none()) scores[i] = SCORE_COUNTER;
         else if (options.history)         scores[i] = history[player][m.from_sq()][m.to_sq()];
         else                              scores[i] = -int(i);
     }
@@ -525,6 +626,12 @@ json MinMaxNNUE_DevPlayer::config() {
     j["root ordering"] = options.root_ordering;
     j["lazy accumulator"] = options.lazy_accumulator;
     j["eval cache"] = options.eval_cache_bits;
+    j["lmr"] = options.lmr;
+    j["lmr base"] = options.lmr_base;
+    j["lmr divisor"] = options.lmr_divisor;
+    j["endgame root"] = options.endgame_root;
+    j["endgame root time"] = options.endgame_root_time;
+    j["endgame tree"] = options.endgame_tree;
     j["verbose"] = verbose;
     return j;
 }

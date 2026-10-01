@@ -361,6 +361,12 @@ unique_ptr<Player> Player::create(const json& j) {
              options.root_ordering = j.value("root ordering", options.root_ordering);
              options.lazy_accumulator = j.value("lazy accumulator", options.lazy_accumulator);
              options.eval_cache_bits = j.value("eval cache", options.eval_cache_bits);
+             options.lmr = j.value("lmr", options.lmr);
+             options.lmr_base = j.value("lmr base", options.lmr_base);
+             options.lmr_divisor = j.value("lmr divisor", options.lmr_divisor);
+             options.endgame_root = j.value("endgame root", options.endgame_root);
+             options.endgame_root_time = j.value("endgame root time", options.endgame_root_time);
+             options.endgame_tree = j.value("endgame tree", options.endgame_tree);
              return make_unique<MinMaxNNUE_DevPlayer>(
                  j["microseconds"].get<uint64_t>(), j["tt size"].get<size_t>(),
                  j["nb moves at full depth"].get<size_t>(),
