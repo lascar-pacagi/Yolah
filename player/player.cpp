@@ -373,6 +373,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.pass_rule = j.value("pass rule", options.pass_rule);
              options.yolah_table = j.value("yolah table", options.yolah_table);
              options.staged = j.value("staged", options.staged);
+             options.eval_grain = j.value("eval grain", options.eval_grain);
              options.territory_ordering = j.value("territory ordering", options.territory_ordering);
              options.territory_depth = j.value("territory depth", options.territory_depth);
              options.territory_weight = j.value("territory weight", options.territory_weight);

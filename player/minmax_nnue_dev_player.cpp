@@ -698,7 +698,30 @@ int MinMaxNNUE_DevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash)
     return v;
 }
 
+// M. Evaluation grain. Alpha-beta only compares values, and a comparison
+// that ends in a tie with beta (v ≥ beta) is a cutoff: with a coarser
+// evaluation, more siblings tie, more nodes cut, and aspiration windows and
+// null-window searches settle faster. The price: differences smaller than the
+// grain become invisible. (Old chess programs rounded their evaluation on
+// purpose for this.) Values: ±30000 = tanh ±1; a grain of 1024 leaves about
+// 60 levels.
+//
+//     value:   …  −1024     0    1024  2048 …       (grain 1024)
+//     network:  −700 → −1024, 400 → 0, 600 → 1024
+//
+// Symmetric rounding to the nearest multiple; finished games (|v| > WIN) are
+// never rounded — only the network's values pass here.
+static int round_to_grain(int v, int grain) {
+    if (grain <= 1) return v;
+    const int q = v >= 0 ? (v + grain / 2) / grain : -((-v + grain / 2) / grain);
+    return std::clamp(q * grain, -heuristic::MAX_VALUE, int(heuristic::MAX_VALUE));
+}
+
 int MinMaxNNUE_DevPlayer::network_value(const Yolah& yolah, Search& s) {
+    return round_to_grain(raw_network_value(yolah, s), options.eval_grain);
+}
+
+int MinMaxNNUE_DevPlayer::raw_network_value(const Yolah& yolah, Search& s) {
     if (!options.lazy_accumulator) {
         return int(nnue.value(s.acc, yolah.current_player()) * WIN);
     }
@@ -1038,6 +1061,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["tt size"] = tt_size_mb;
     j["yolah table"] = options.yolah_table;
     j["staged"] = options.staged;
+    j["eval grain"] = options.eval_grain;
     j["nb threads"] = nb_threads;
     j["territory ordering"] = options.territory_ordering;
     j["territory depth"] = options.territory_depth;

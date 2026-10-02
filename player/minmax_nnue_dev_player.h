@@ -65,6 +65,10 @@
 //   L. lazy SMP ("nb threads"): several threads search the same root with a
 //      shared transposition table and evaluation cache; each has its own
 //      history, killers, accumulators and root ordering (see search()).
+//   M. evaluation grain ("eval grain"): the network's value rounded to a
+//      multiple of G, to see whether a coarser evaluation cuts more. It does
+//      (depth 13: −34 % nodes at G = 2048), but it loses (2000 games, 0.2 s):
+//      G 512 +3, 1024 −5, 2048 −32, 4096 −108 Elo. Off (G = 1).
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -94,6 +98,7 @@ struct MinMaxNNUE_DevOptions {
                                      //   2 = queen distance, 3 = mobility
     int  territory_depth = 4;        // ["territory depth"] only at nodes of at least this depth
     int  territory_weight = 512;     // ["territory weight"] score = history + weight · territory
+    int  eval_grain = 1;             // ["eval grain"] network values rounded to a multiple of this (1 = exact)
     bool staged = true;              // ["staged"] table's move first, the others generated only if needed
     bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table
                                      //   (−15 ± 23 Elo at 0.2 s/move: the table is hardly loaded there)
@@ -218,6 +223,7 @@ private:
     bool stopped() const { return stop.load(std::memory_order_relaxed); }
     int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
     int  network_value(const Yolah& yolah, Search& s);
+    int  raw_network_value(const Yolah& yolah, Search& s);
     void update_accumulator(const int16_t* in, int16_t* out, uint8_t player, Move m) const;
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
