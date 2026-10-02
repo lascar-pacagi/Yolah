@@ -15,14 +15,16 @@ using std::cout, std::endl;
 
 MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth,
                                            uint8_t late_move_reduction, const std::string& nnue_q_parameters_filename,
-                                           bool verbose, Options options)
+                                           bool verbose, Options options, size_t nb_threads)
     : thinking_time(microseconds), tt_size_mb(tt_size_mb),
       nb_moves_at_full_depth(nb_moves_at_full_depth), late_move_reduction(late_move_reduction),
-      nnue_q_parameters_filename(nnue_q_parameters_filename), options(options), verbose(verbose) {
+      nnue_q_parameters_filename(nnue_q_parameters_filename), options(options), verbose(verbose),
+      nb_threads(std::max<size_t>(1, nb_threads)) {
+    for (size_t i = 0; i < this->nb_threads; i++) workers.push_back(std::make_unique<Worker>());
     nnue.load(nnue_q_parameters_filename);
     if (options.yolah_table) yolah_table = std::make_unique<SearchTable>(tt_size_mb);
     else table = std::make_unique<TranspositionTable>(tt_size_mb);
-    if (options.eval_cache_bits > 0) eval_cache.resize(size_t(1) << options.eval_cache_bits);
+    if (options.eval_cache_bits > 0) eval_cache = std::vector<std::atomic<uint64_t>>(size_t(1) << options.eval_cache_bits);
     // r(d, n) = base + ln(d)·ln(n) / divisor plies (n = move number, from 1).
     for (int d = 1; d < 64; d++) {
         for (int n = 1; n < Yolah::MAX_NB_MOVES; n++) {
@@ -88,28 +90,67 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
     else yolah_table->new_search(std::popcount(yolah.free_squares()));
     // History aging: what was learnt during the previous moves still helps
     // (the positions are close), but less and less.
-    for (auto& by_from : history)
-        for (auto& by_to : by_from)
-            for (int16_t& h : by_to) h /= 2;
-    Search s;
-    // The root's accumulator: computed from scratch, the only one that is.
-    if (options.lazy_accumulator) {
-        nnue.init(yolah, s.accs[yolah.nb_plies()]);
-        s.acc_ok[yolah.nb_plies()] = true;
-    } else {
-        nnue.init(yolah, s.acc);
+    for (auto& w : workers)
+        for (auto& by_from : w->history)
+            for (auto& by_to : by_from)
+                for (int16_t& h : by_to) h /= 2;
+    // ── L. Lazy SMP ──
+    // nb_threads threads run the SAME iterative deepening on the same root.
+    // They share the transposition table (and the evaluation cache): what one
+    // thread proves, the others find in the table and skip. They do not share
+    // their move ordering (history, killers, root order): their trees differ,
+    // so together they cover more of it than one thread would.
+    //
+    //     thread 0 (main) : depth 1 2 3 4 5 6 7 8 …   ← its result is played
+    //     thread 1        : depth 1   3   5   7 …     (skips some depths,
+    //     thread 2        : depth   2 3     6 7 …      see iterative_deepening)
+    //            ╲   │   ╱
+    //       shared transposition table
+    //
+    // No locks: a table entry written by one thread while another reads it can
+    // be torn (half old, half new). Rare, and harmless enough: the key check
+    // rejects most of them, and a table move is checked (is_legal / matched
+    // against the generated moves) before being played.
+    std::vector<std::unique_ptr<Search>> searches;
+    for (size_t i = 0; i < nb_threads; i++) {
+        auto s = std::make_unique<Search>();
+        s->id = int(i);
+        s->w = workers[i].get();
+        // The root's accumulator: computed from scratch, the only one that is.
+        if (options.lazy_accumulator) {
+            nnue.init(yolah, s->accs[yolah.nb_plies()]);
+            s->acc_ok[yolah.nb_plies()] = true;
+        } else {
+            nnue.init(yolah, s->acc);
+        }
+        searches.push_back(std::move(s));
     }
-    iterative_deepening(yolah, s, max_depth);
+    {
+        std::vector<std::jthread> helpers;
+        for (size_t i = 1; i < nb_threads; i++) {
+            helpers.emplace_back([&, i] { iterative_deepening(yolah, *searches[i], max_depth); });
+        }
+        iterative_deepening(yolah, *searches[0], max_depth);
+        stop = true;            // the main thread is done (time or depth): the helpers stop too
+    }                           // (joined here)
     if (clock.joinable()) {
         clock.request_stop();
         clock.join();
     }
+    // The move played: the one of the thread that completed the deepest
+    // iteration (the main thread on ties).
+    const Search* best = searches[0].get();
     Result r;
-    r.move = s.move;
-    r.value = s.value;
-    r.depth = s.depth;
-    r.nb_nodes = s.nb_nodes;
-    r.nb_hits = s.nb_hits;
+    for (const auto& s : searches) {
+        if (s->depth > best->depth && s->move != Move::none()) best = s.get();
+        r.nb_nodes += s->nb_nodes;
+        r.nb_hits += s->nb_hits;
+        nb_evals += s->nb_evals;
+        nb_eval_hits += s->nb_eval_hits;
+    }
+    r.move = best->move;
+    r.value = best->value;
+    r.depth = best->depth;
     r.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     return r;
 }
@@ -119,9 +160,8 @@ void MinMaxNNUE_DevPlayer::clear_table() {
     else yolah_table->clear();
     endgame.clear();
     // the move ordering statistics too: each benchmark position from scratch
-    std::fill(&history[0][0][0], &history[0][0][0] + sizeof(history) / sizeof(int16_t), int16_t(0));
-    std::fill(&countermoves[0][0], &countermoves[0][0] + SQUARE_NB * SQUARE_NB, Move::none());
-    std::fill(eval_cache.begin(), eval_cache.end(), EvalEntry{});
+    for (auto& w : workers) *w = Worker{};
+    for (auto& e : eval_cache) e.store(0, std::memory_order_relaxed);
 }
 
 Move MinMaxNNUE_DevPlayer::play(Yolah yolah) {
@@ -140,7 +180,8 @@ Move MinMaxNNUE_DevPlayer::play(Yolah yolah) {
 }
 
 std::string MinMaxNNUE_DevPlayer::info() {
-    return std::string("minmax nnue dev player (one thread; transposition table + late move reduction + killer")
+    return "minmax nnue dev player (" + std::to_string(nb_threads) + " thread" + (nb_threads > 1 ? "s, lazy SMP" : "")
+         + "; transposition table + late move reduction + killer"
          + (options.pvs ? " + PVS" : "")
          + (options.aspiration_window ? " + aspiration windows" : "")
          + (options.history ? " + history" : "")
@@ -280,7 +321,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    (win / draw / loss — only the sign matters for the outcome), instead
     //    of a search with the network. Stored in the table at the largest
     //    depth: it never needs to be searched again.
-    if (options.endgame_tree > 0 && std::popcount(yolah.free_squares()) <= options.endgame_tree) {
+    // (Main thread only: the solver and its table are not shared.)
+    if (options.endgame_tree > 0 && s.id == 0 && std::popcount(yolah.free_squares()) <= options.endgame_tree) {
         const auto proof = endgame.solve(yolah, true, &stop);
         if (!proof.complete) return 0;          // stopped: the caller ignores it
         const int v = proof.value > 0 ? WIN + proof.value : proof.value < 0 ? -WIN + proof.value : 0;
@@ -455,13 +497,13 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     if (options.history) {
                         const uint8_t player = yolah.current_player();
                         const int bonus = std::min(16 * depth * depth + 32 * depth, 2000);
-                        update_history(player, m, bonus);
-                        for (size_t k = 0; k < i; k++) update_history(player, moves[k], -bonus);
+                        update_history(s, player, m, bonus);
+                        for (size_t k = 0; k < i; k++) update_history(s, player, moves[k], -bonus);
                     }
                     // Countermove (C): m refuted the opponent's last move.
                     if (options.countermove && ply > 0) {
                         const Move prev = s.played[ply - 1];
-                        countermoves[prev.from_sq()][prev.to_sq()] = m;
+                        s.w->countermoves[prev.from_sq()][prev.to_sq()] = m;
                     }
                     return v;
                 }
@@ -640,17 +682,19 @@ Move MinMaxNNUE_DevPlayer::tt_move(uint64_t hash) const {
 // from the cache, without network nor accumulators. The transposition table
 // cannot hold these values (its depth-0 entries count as empty slots).
 int MinMaxNNUE_DevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash) {
-    nb_evals++;
-    EvalEntry* e = nullptr;
+    s.nb_evals++;
+    std::atomic<uint64_t>* e = nullptr;
+    const uint64_t key = hash & 0xFFFFFFFF00000000ULL;
     if (!eval_cache.empty()) {
         e = &eval_cache[hash & (eval_cache.size() - 1)];
-        if (e->used && e->key == uint32_t(hash >> 32)) {
-            nb_eval_hits++;
-            return e->value;
+        const uint64_t word = e->load(std::memory_order_relaxed);
+        if ((word & 1) && (word & 0xFFFFFFFF00000000ULL) == key) {
+            s.nb_eval_hits++;
+            return int16_t(uint16_t(word >> 16));
         }
     }
     const int v = network_value(yolah, s);
-    if (e) *e = {uint32_t(hash >> 32), int16_t(v), true};
+    if (e) e->store(key | (uint64_t(uint16_t(int16_t(v))) << 16) | 1, std::memory_order_relaxed);
     return v;
 }
 
@@ -725,7 +769,7 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         // The root is a PV node; no killers there, the history still speaks.
         const int r = options.articulation_lmr && is_articulation_move(yolah, rm.move) ? 0
                     : late_move_reduction_of(depth, i, true, false,
-                                             history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()]);
+                                             s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()]);
         const int v = search_move(yolah, s, hash, rm.move, i, r, alpha, beta, depth);
         rm.nodes = s.nb_nodes - nodes_before;
         if (stopped()) return best;
@@ -768,7 +812,7 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     Move counter = Move::none();
     if (options.countermove && ply > 0) {
         const Move prev = s.played[ply - 1];
-        counter = countermoves[prev.from_sq()][prev.to_sq()];
+        counter = s.w->countermoves[prev.from_sq()][prev.to_sq()];
     }
     for (size_t i = 0; i < moves.size(); i++) {
         const Move m = moves[i];
@@ -777,8 +821,8 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         else if (m == s.killer2[ply])     scores[i] = SCORE_KILLER2;
         else if (m == counter && counter != Move::none()) scores[i] = SCORE_COUNTER;
         else if (options.articulation_ordering && is_articulation_move(yolah, m))
-            scores[i] = SCORE_ARTICULATION + (options.history ? history[player][m.from_sq()][m.to_sq()] : 0);
-        else if (options.history)         scores[i] = history[player][m.from_sq()][m.to_sq()];
+            scores[i] = SCORE_ARTICULATION + (options.history ? s.w->history[player][m.from_sq()][m.to_sq()] : 0);
+        else if (options.history)         scores[i] = s.w->history[player][m.from_sq()][m.to_sq()];
         else                              scores[i] = -int(i);
         if (territory && scores[i] < SCORE_ARTICULATION) {
             scores[i] += options.territory_weight * territory_after(yolah, m);
@@ -895,8 +939,8 @@ Move MinMaxNNUE_DevPlayer::pick_move(Yolah::MoveList& moves, int* scores, size_t
 // "Gravity" update: h += bonus − h·|bonus| / HISTORY_MAX. The closer h is to
 // ±HISTORY_MAX, the smaller its moves in that direction: h stays bounded, and
 // recent cutoffs weigh more than old ones.
-void MinMaxNNUE_DevPlayer::update_history(uint8_t player, Move m, int bonus) {
-    int16_t& h = history[player][m.from_sq()][m.to_sq()];
+void MinMaxNNUE_DevPlayer::update_history(Search& s, uint8_t player, Move m, int bonus) {
+    int16_t& h = s.w->history[player][m.from_sq()][m.to_sq()];
     h = int16_t(h + bonus - h * std::abs(bonus) / HISTORY_MAX);
 }
 
@@ -941,7 +985,16 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         s.root_moves.clear();
         for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
+    // L. Helper threads skip some depths, each with its own pattern, so that
+    // they are not all searching the same depth at the same time: thread i
+    // skips depth d when ((d + SKIP_PHASE[i]) / SKIP_SIZE[i]) is odd (the
+    // pattern of Stockfish's lazy SMP before 2018). The main thread (i = 0)
+    // never skips.
+    static constexpr int SKIP_SIZE[]  = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
+    static constexpr int SKIP_PHASE[] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
+    const int k = s.id % 20;
     for (int d = 1; d <= max_depth && d < 64; d++) {
+        if (s.id > 0 && ((d + SKIP_PHASE[k]) / SKIP_SIZE[k]) % 2 == 1 && d < max_depth) continue;
         int delta = options.aspiration_window;
         int alpha = -INFINITE, beta = INFINITE;
         if (delta > 0 && d >= 4 && std::abs(value) < WIN) {
@@ -985,6 +1038,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["tt size"] = tt_size_mb;
     j["yolah table"] = options.yolah_table;
     j["staged"] = options.staged;
+    j["nb threads"] = nb_threads;
     j["territory ordering"] = options.territory_ordering;
     j["territory depth"] = options.territory_depth;
     j["territory weight"] = options.territory_weight;

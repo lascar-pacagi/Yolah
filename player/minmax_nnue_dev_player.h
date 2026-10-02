@@ -62,6 +62,9 @@
 //      draw / loss proof when few free squares remain ("endgame root",
 //      "endgame root time"); in the tree, exact values instead of the
 //      network's for the nodes with very few free squares ("endgame tree").
+//   L. lazy SMP ("nb threads"): several threads search the same root with a
+//      shared transposition table and evaluation cache; each has its own
+//      history, killers, accumulators and root ordering (see search()).
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -157,17 +160,29 @@ private:
     // Late move reductions (E): base reduction for (depth, move number), in
     // 1/1024 of a ply so that the adjustments can be fractional.
     int lmr_table[64][Yolah::MAX_NB_MOVES]{};
-    int16_t history[2][SQUARE_NB][SQUARE_NB]{};
-    // Countermove: for each opponent move (from, to), the last move that
-    // refuted it (caused a cutoff right after it).
-    Move countermoves[SQUARE_NB][SQUARE_NB]{};
+    // What each thread learns about the moves and keeps between the moves of
+    // the game (L: one per thread — sharing them would need locks, and
+    // different orderings make the threads explore different trees, which is
+    // what lazy SMP relies on).
+    struct Worker {
+        int16_t history[2][SQUARE_NB][SQUARE_NB]{};
+        // Countermove: for each opponent move (from, to), the last move that
+        // refuted it (caused a cutoff right after it).
+        Move countermoves[SQUARE_NB][SQUARE_NB]{};
+    };
+    const size_t nb_threads;
+    std::vector<std::unique_ptr<Worker>> workers;
 
     struct RootMove {
         Move     move;
         uint64_t nodes = 0;       // size of its subtree in the last iteration
     };
 
+    // Everything one thread needs during one search (L: one per thread).
     struct Search {
+        int     id      = 0;      // thread number, 0 = the main thread
+        Worker* w       = nullptr;
+        uint64_t nb_evals = 0, nb_eval_hits = 0;
         uint8_t depth   = 0;
         int16_t value   = 0;
         Move move       = Move::none();
@@ -188,13 +203,14 @@ private:
     };
 
     // Evaluation cache (D): one entry per slot, the newest wins. 32 bits of
-    // the hash check the position (the other bits choose the slot).
-    struct EvalEntry {
-        uint32_t key = 0;
-        int16_t  value = 0;
-        bool     used = false;
-    };
-    std::vector<EvalEntry> eval_cache;
+    // the hash check the position (the other bits choose the slot). Each entry
+    // is ONE 64-bit word, read and written atomically (L: the threads share
+    // the cache; a torn entry — the key of one position with the value of
+    // another — is impossible):
+    //     bits 63..32: key (high 32 bits of the hash)
+    //     bits 31..16: value (int16)
+    //     bit  0     : used
+    std::vector<std::atomic<uint64_t>> eval_cache;
     // The exact endgame solver (G), with its own table, kept between moves.
     EndgameSolver endgame;
     uint64_t nb_evals = 0, nb_eval_hits = 0;
@@ -213,13 +229,14 @@ private:
     static bool is_legal(const Yolah&, Move);
     static Move pick_move(Yolah::MoveList&, int* scores, size_t i, size_t n);
     bool is_articulation_move(const Yolah&, Move) const;
-    void update_history(uint8_t player, Move m, int bonus);
+    void update_history(Search&, uint8_t player, Move m, int bonus);
     void iterative_deepening(Yolah, Search&, uint8_t max_depth);
     void print_pv(Yolah, uint64_t hash, int8_t depth);
 
 public:
     MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, uint8_t late_move_reduction,
-                         const std::string& nnue_q_parameters_filename, bool verbose = false, Options options = {});
+                         const std::string& nnue_q_parameters_filename, bool verbose = false, Options options = {},
+                         size_t nb_threads = 1);
     Move play(Yolah) override;
     // Iterative deepening up to max_depth, stopped after `microseconds`
     // (0 = no time limit). For the benchmarks (test/search_bench_main.cpp).

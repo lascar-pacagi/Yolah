@@ -381,11 +381,19 @@ unique_ptr<Player> Player::create(const json& j) {
              options.endgame_root = j.value("endgame root", options.endgame_root);
              options.endgame_root_time = j.value("endgame root time", options.endgame_root_time);
              options.endgame_tree = j.value("endgame tree", options.endgame_tree);
+             // L. Lazy SMP: "nb threads" (a number or "hardware concurrency", default 1).
+             size_t nb_threads = 1;
+             if (j.contains("nb threads")) {
+               if (j["nb threads"].is_number()) nb_threads = j["nb threads"].get<size_t>();
+               else if (j["nb threads"].get<string>() == "hardware concurrency")
+                 nb_threads = std::thread::hardware_concurrency();
+               else throw invalid_argument("number or hardware concurrency expected in nb threads");
+             }
              return make_unique<MinMaxNNUE_DevPlayer>(
                  j["microseconds"].get<uint64_t>(), j["tt size"].get<size_t>(),
                  j["nb moves at full depth"].get<size_t>(),
                  j["late move reduction"].get<uint8_t>(), j["weights"].get<string>(),
-                 j.value("verbose", false), options);
+                 j.value("verbose", false), options, nb_threads);
            }},
         {
             "FeaturesNetPlayer",
