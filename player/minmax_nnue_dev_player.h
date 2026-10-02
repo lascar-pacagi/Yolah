@@ -48,6 +48,16 @@
 //      local test flags up to 40 % of the free squares, and even the exact
 //      articulation points are a third of them in the middle game (mostly
 //      cutting off small pockets): too many "tactical" moves.
+//   J. territory ordering: at deep nodes, the quiet moves are also ordered by
+//      the territory they leave (influence = king-step Voronoi, or queen
+//      distance), see territory_after ("territory ordering", "territory
+//      depth", "territory weight"). Measured (2000 games, 0.2 s/move):
+//      influence weight 512 +36 Elo [+9, +59] (the default), influence 2048
+//      +21, mobility 512 +12, queen distance 128 +1.
+//   K. staged move generation ("staged"): the table's move is searched before
+//      the other moves are even generated (see negamax, step 4). Same tree in
+//      pure alpha-beta (209/209 values); with reductions −4 % nodes, −6 % time
+//      (the other moves are then scored with fresher killers / history).
 //   G. exact endgame solver (player/endgame_solver.h): at the root, a win /
 //      draw / loss proof when few free squares remain ("endgame root",
 //      "endgame root time"); in the tree, exact values instead of the
@@ -77,6 +87,11 @@ struct MinMaxNNUE_DevOptions {
     bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
     bool articulation_ordering = false;   // ["articulation ordering"] articulation moves after the killers
     bool articulation_lmr = false;   // ["articulation lmr"] articulation moves never reduced nor pruned
+    int  territory_ordering = 1;     // ["territory ordering"] 0 = off, 1 = influence (king steps),
+                                     //   2 = queen distance, 3 = mobility
+    int  territory_depth = 4;        // ["territory depth"] only at nodes of at least this depth
+    int  territory_weight = 512;     // ["territory weight"] score = history + weight · territory
+    bool staged = true;              // ["staged"] table's move first, the others generated only if needed
     bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table
                                      //   (−15 ± 23 Elo at 0.2 s/move: the table is hardly loaded there)
     int  endgame_root = 0;           // ["endgame root"] try to prove the result at the root with at most
@@ -192,7 +207,10 @@ private:
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const;
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int reduction, int alpha, int beta, int depth);
-    void score_moves(const Yolah&, const Search& s, Move tt_move, const Yolah::MoveList&, int* scores) const;
+    void score_moves(const Yolah&, const Search& s, Move tt_move, const Yolah::MoveList&, int* scores,
+                     int depth = 0) const;
+    int  territory_after(const Yolah&, Move) const;
+    static bool is_legal(const Yolah&, Move);
     static Move pick_move(Yolah::MoveList&, int* scores, size_t i, size_t n);
     bool is_articulation_move(const Yolah&, Move) const;
     void update_history(uint8_t player, Move m, int bonus);

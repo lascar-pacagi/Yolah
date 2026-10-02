@@ -9,6 +9,7 @@
 #include <cmath>
 #include <bit>
 #include <immintrin.h>
+#include "magic.h"
 
 using std::cout, std::endl;
 
@@ -313,13 +314,37 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     if (prunable && depth <= options.rfp_depth && static_eval - options.rfp_margin * depth >= beta) {
         return static_eval;
     }
+    // K. Staged move generation. The table's move is the best move of an
+    //    earlier search of this position: it often cuts at once, and then the
+    //    other moves are never needed. So it is searched FIRST, before the
+    //    other moves are generated and scored; they are generated only if it
+    //    does not cut (stage 2, at i = 1 in the loop below):
+    //
+    //        stage 1: table's move ──cut──→ return       (no generation at all)
+    //                      │ no cut
+    //        stage 2: generate all moves, put the table's move at index 0,
+    //                 score the others (killers, countermove, history), and
+    //                 pick them one at a time as before.
+    //
+    //    In pure alpha-beta the tree is exactly the same as without stages
+    //    (checked: same nodes and values on the bench positions). With
+    //    reductions it differs slightly: the other moves are scored AFTER the
+    //    table's move was searched, so with killers and history updated by
+    //    its subtree — fresher information (−4 % nodes, −6 % time).
+    //    A table move can be illegal here (two positions with the same hash
+    //    bits, or the entry of another position): is_legal checks it.
     Yolah::MoveList moves;
-    yolah.moves(moves);
+    const bool tt_first = options.staged && tt_move != Move::none() && is_legal(yolah, tt_move);
+    bool generated = false;
+    if (!tt_first) {
+        yolah.moves(moves);
+        generated = true;
+    }
     // The pass rule (see EndgameSolver::search for the proof): a player who
     // must pass while the game is not over has lost — their final score
     // difference is ≤ −1, so the value is ≤ −(WIN + 1). An upper bound,
-    // returned when it is enough to fail low.
-    if (options.pass_rule && moves[0] == Move::none() && -(WIN + 1) <= alpha) {
+    // returned when it is enough to fail low. (A legal table move: not a pass.)
+    if (options.pass_rule && !tt_first && moves[0] == Move::none() && -(WIN + 1) <= alpha) {
         return -(WIN + 1);
     }
     // F2. Null move pruning: let the opponent play twice (we pass). If even
@@ -332,7 +357,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //     MEASURED: −81 Elo. In Yolah, zugzwangs are the rule rather than the
     //     exception (every move leaves a hole in one's own space): off by default.
     if (prunable && options.null_move && depth >= 3 && static_eval >= beta
-        && moves[0] != Move::none() && yolah.nb_plies() > 0 && s.played[yolah.nb_plies() - 1] != Move::none()) {
+        && (tt_first || moves[0] != Move::none()) && yolah.nb_plies() > 0
+        && s.played[yolah.nb_plies() - 1] != Move::none()) {
         const int R = options.null_move_reduction + depth / 4 - 1;
         const uint8_t player = yolah.current_player();
         s.played[yolah.nb_plies()] = Move::none();
@@ -349,13 +375,32 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    picked one at a time (the best remaining one): most nodes cut after
     //    one or two moves, so a full sort would be wasted work.
     int scores[Yolah::MAX_NB_MOVES];
-    score_moves(yolah, s, tt_move, moves, scores);
+    size_t n = 1;                         // stage 1: only the table's move
+    if (generated) {
+        score_moves(yolah, s, tt_move, moves, scores, depth);
+        n = moves.size();
+    }
     const int alpha_orig = alpha;
     int best = -INFINITE;
     Move best_move = Move::none();
-    size_t n = moves.size();
     bool pruned = false;
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = 0; i < n || !generated; i++) {
+        if (!generated && i == 1) {
+            // Stage 2: the table's move did not cut. Generate everything, put
+            // the table's move where the selection would have put it (index
+            // 0, swapped with what was there), score the others.
+            yolah.moves(moves);
+            generated = true;
+            for (size_t j = 0; j < moves.size(); j++) {
+                if (moves[j] == tt_move) {
+                    std::swap(moves[0], moves[j]);
+                    break;
+                }
+            }
+            score_moves(yolah, s, tt_move, moves, scores, depth);
+            n = moves.size();
+            if (i >= n) break;
+        }
         // F3. Late move pruning: at shallow non-PV nodes, after lmp_moves +
         //     depth² moves, the others (the worst ordered: bad history, never
         //     cut anywhere) are not searched at all — once a move that does not
@@ -376,10 +421,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             pruned = true;
             if (i >= n) break;
         }
-        const Move m = pick_move(moves, scores, i, n);
+        const Move m = generated ? pick_move(moves, scores, i, n) : tt_move;   // stage 1: no list yet
         // scores[i] is now m's score: special move (killer, countermove), articulation or history
         const bool tactical = options.articulation_lmr && is_articulation_move(yolah, m);
-        const int r = tactical ? 0
+        const int r = tactical || !generated ? 0          // (the first move is never reduced anyway)
                     : late_move_reduction_of(depth, i, beta - alpha > 1, scores[i] >= SCORE_COUNTER,
                                              scores[i] >= SCORE_ARTICULATION ? 0 : scores[i]);
         const int v = search_move(yolah, s, hash, m, i, r, alpha, beta, depth);
@@ -671,7 +716,7 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         Yolah::MoveList moves;
         yolah.moves(moves);
         int scores[Yolah::MAX_NB_MOVES];
-        score_moves(yolah, s, tt_move(hash), moves, scores);
+        score_moves(yolah, s, tt_move(hash), moves, scores, 63);
         for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
     for (size_t i = 0; i < s.root_moves.size(); i++) {
@@ -714,7 +759,10 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
 // All Yolah moves are "quiet" (no captures), so there is no static way to
 // recognise a good move: the ordering only learns from the search itself.
 void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
-                                       const Yolah::MoveList& moves, int* scores) const {
+                                       const Yolah::MoveList& moves, int* scores, int depth) const {
+    // J: territory ordering only where it pays (deep nodes: few, and a good
+    // order there saves the most).
+    const bool territory = options.territory_ordering > 0 && depth >= options.territory_depth;
     const uint16_t ply = yolah.nb_plies();
     const uint8_t player = yolah.current_player();
     Move counter = Move::none();
@@ -732,7 +780,105 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
             scores[i] = SCORE_ARTICULATION + (options.history ? history[player][m.from_sq()][m.to_sq()] : 0);
         else if (options.history)         scores[i] = history[player][m.from_sq()][m.to_sq()];
         else                              scores[i] = -int(i);
+        if (territory && scores[i] < SCORE_ARTICULATION) {
+            scores[i] += options.territory_weight * territory_after(yolah, m);
+        }
     }
+}
+
+// A move of the side to move is legal if its piece is on the origin and the
+// destination is free and reachable in a straight line through free squares
+// (the queen attacks of the origin, with the occupied squares as blockers).
+// Yolah::valid only checks the first two.
+bool MinMaxNNUE_DevPlayer::is_legal(const Yolah& yolah, Move m) {
+    if (m == Move::none()) return false;
+    const uint64_t from = uint64_t(1) << m.from_sq(), to = uint64_t(1) << m.to_sq();
+    if (!(yolah.bitboard(yolah.current_player()) & from)) return false;
+    return attacks_bb(m.from_sq(), yolah.occupied_squares()) & yolah.free_squares() & to;
+}
+
+// ─── Territory after a move (J) ──────────────────────────────────────────────
+// Who controls which free squares, after move m, for the player making it:
+// (squares closer to their pieces) − (squares closer to the opponent's). Ties
+// are neutral. Two distances (see the study nnue/move_features.py and the
+// comparison with the convnet's choices: both predict its move 4–6× better
+// than chance):
+//
+//   1. influence — heuristic::influence: both sides flood the free squares
+//      one KING step at a time, simultaneously; a square reached by both at
+//      the same step is neutral, and neutrality spreads to the free squares
+//      next to it. (Amazons' "t2".)
+//   2. queen distance — the minimum number of QUEEN moves (sliding through
+//      free squares) to reach the square: a breadth-first search, level by
+//      level, with the magic attack tables. A long open line is one move
+//      away, not seven steps. (Amazons' "t1": the better one while the board
+//      is open.)
+//   3. mobility — not a territory but the immediate version: (number of
+//      legal moves of the player) − (number of the opponent's), the squares
+//      at queen distance 1 counted once per piece that reaches them. The
+//      cheapest of the three (8 attack lookups).
+//
+// Example (B black, W white, # hole), the owner of each free square by queen
+// distance (b, w, = for a tie):
+//
+//      4 | . . . W            4 | = w w W
+//      3 | . # . .            3 | b # = w
+//      2 | . . # .     →      2 | b = # w      territory 4 − 4 = 0
+//      1 | B . . .            1 | B b b =
+//          a b c d                a b c d
+int MinMaxNNUE_DevPlayer::territory_after(const Yolah& yolah, Move m) const {
+    if (m == Move::none()) return 0;
+    const uint8_t player = yolah.current_player();
+    const uint64_t from = uint64_t(1) << m.from_sq(), to = uint64_t(1) << m.to_sq();
+    const uint64_t me = (yolah.bitboard(player) & ~from) | to;
+    const uint64_t opp = yolah.bitboard(Yolah::other_player(player));
+    const uint64_t free = yolah.free_squares() & ~to;     // the origin becomes a hole: not free
+    const uint64_t occupied = ~free;
+    if (options.territory_ordering == 3) {
+        int n = 0;
+        for (uint64_t b = me; b;)  n += std::popcount(attacks_bb(pop_lsb(b), occupied) & free);
+        for (uint64_t b = opp; b;) n -= std::popcount(attacks_bb(pop_lsb(b), occupied) & free);
+        return n;
+    }
+    if (options.territory_ordering == 1) {
+        auto one_step = [&](uint64_t b) {
+            return (shift<NORTH>(b) | shift<SOUTH>(b) | shift<EAST>(b) | shift<WEST>(b) |
+                    shift<NORTH_EAST>(b) | shift<SOUTH_EAST>(b) | shift<NORTH_WEST>(b) | shift<SOUTH_WEST>(b)) & free;
+        };
+        uint64_t mi = me, oi = opp, mf = me, of = opp, neutral = 0;
+        for (;;) {
+            const uint64_t omi = mi, ooi = oi;
+            mf = one_step(mf) & ~oi;
+            of = one_step(of) & ~mi;
+            neutral |= one_step(neutral) | (mf & of);
+            mf &= ~neutral;
+            of &= ~neutral;
+            mi |= mf;
+            oi |= of;
+            if (mi == omi && oi == ooi) break;
+        }
+        return std::popcount(mi & free) - std::popcount(oi & free);
+    }
+    // Queen distance, both sides level by level: at level k, the squares first
+    // reached by one side only are theirs, those reached by both are ties.
+    auto expand = [&](uint64_t frontier) {
+        uint64_t r = 0;
+        while (frontier) r |= attacks_bb(pop_lsb(frontier), occupied);
+        return r & free;
+    };
+    uint64_t seen_me = 0, seen_opp = 0, fm = me, fo = opp;
+    int mine = 0, theirs = 0;
+    while (fm | fo) {
+        const uint64_t nm = expand(fm) & ~seen_me & ~seen_opp;   // not reached yet by anyone
+        const uint64_t no = expand(fo) & ~seen_me & ~seen_opp;
+        mine += std::popcount(nm & ~no);
+        theirs += std::popcount(no & ~nm);
+        seen_me |= nm;
+        seen_opp |= no;
+        fm = nm;
+        fo = no;
+    }
+    return mine - theirs;
 }
 
 // Selection step: brings the best-scored move of moves[i..] to position i.
@@ -791,7 +937,7 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         Yolah::MoveList moves;
         yolah.moves(moves);
         int scores[Yolah::MAX_NB_MOVES];
-        score_moves(yolah, s, tt_move(hash), moves, scores);
+        score_moves(yolah, s, tt_move(hash), moves, scores, 63);
         s.root_moves.clear();
         for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
@@ -838,6 +984,10 @@ json MinMaxNNUE_DevPlayer::config() {
     j["microseconds"] = thinking_time;
     j["tt size"] = tt_size_mb;
     j["yolah table"] = options.yolah_table;
+    j["staged"] = options.staged;
+    j["territory ordering"] = options.territory_ordering;
+    j["territory depth"] = options.territory_depth;
+    j["territory weight"] = options.territory_weight;
     j["articulation ordering"] = options.articulation_ordering;
     j["articulation lmr"] = options.articulation_lmr;
     j["nb moves at full depth"] = nb_moves_at_full_depth;

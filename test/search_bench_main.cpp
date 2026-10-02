@@ -18,6 +18,12 @@
 //       loses the best result (a won game drawn or lost, a drawn game lost).
 //       Positions the solver cannot prove within 30 s are skipped.
 //
+//   search_bench bestmove --player CFG --positions FILE --time US --out moves.csv [--offset K --count N]
+//       Any player (minimax, convnet MCTS…): its move in each position, with
+//       --time per move (overrides the config). For offline studies of the
+//       moves (nnue/move_features.py). --offset/--count: a slice of the
+//       positions, to run several processes in parallel.
+//
 //   search_bench run --player ../config/mm_nnue_dev_player.cfg --positions bench_positions.txt
 //                    (--depth D | --time MICROSECONDS) [--csv out.csv] [--compare ref.csv] [--limit N]
 //       Searches every position from an empty transposition table and prints,
@@ -253,6 +259,26 @@ namespace {
         return 0;
     }
 
+    int bestmove(const Args& a) {
+        std::ifstream f(a.get("player"));
+        if (!f) { cerr << "cannot open " << a.get("player") << '\n'; return 1; }
+        json j = json::parse(f);
+        j["microseconds"] = std::stoull(a.get("time", "1000000"));
+        j["verbose"] = false;
+        auto player = Player::create(j);
+        const vector<Yolah> all = read_positions(a.get("positions", "bench_positions.txt"));
+        const size_t offset = std::stoul(a.get("offset", "0"));
+        const size_t count = std::stoul(a.get("count", std::to_string(all.size())));
+        std::ofstream out(a.get("out", "moves.csv"));
+        out << "idx,move\n";
+        for (size_t i = offset; i < std::min(all.size(), offset + count); i++) {
+            if (all[i].game_over()) continue;
+            const Move m = player->play(all[i]);
+            out << i << ',' << move_str(m) << '\n' << std::flush;
+        }
+        return 0;
+    }
+
     struct Row { int idx, ply, depth, value; string move; uint64_t nodes; double seconds; };
 
     std::map<int, Row> read_csv(const string& path) {
@@ -349,6 +375,7 @@ int main(int argc, char* argv[]) {
     if (mode == "run") return run(a);
     if (mode == "solve") return solve(a);
     if (mode == "blunders") return blunders(a);
+    if (mode == "bestmove") return bestmove(a);
     cerr << "unknown mode " << mode << '\n';
     return 1;
 }
