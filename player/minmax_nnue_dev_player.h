@@ -76,6 +76,8 @@
 //      "proxy reduction". Measured (2000 games, 0.2 s/move): variant 1 with
 //      the best ordinary move +47 Elo [+20, +71] (on by default; −29 % nodes
 //      at depth 13), with the 4th ordinary move ±0, ProbCut −45 / −54.
+//      At 1 s/move (1200 games): +59 [+30, +94] over no proxy cut; depth ≥ 3
+//      (+51), R = 2 (+48) or R = 4 (+60): no difference, defaults kept.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
