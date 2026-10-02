@@ -69,6 +69,13 @@
 //      multiple of G, to see whether a coarser evaluation cuts more. It does
 //      (depth 13: −34 % nodes at G = 2048), but it loses (2000 games, 0.2 s):
 //      G 512 +3, 1024 −5, 2048 −32, 4096 −108 Elo. Off (G = 1).
+//   N. "proxy cut", a null move without the zugzwang problem: a REAL but
+//      ordinary move searched at reduced depth; if even it reaches beta, cut
+//      ("proxy cut" 1, "proxy rank"). Variant 2: ProbCut (the table's move
+//      against beta + a margin, "probcut margin"). "proxy depth",
+//      "proxy reduction". Measured (2000 games, 0.2 s/move): variant 1 with
+//      the best ordinary move +47 Elo [+20, +71] (on by default; −29 % nodes
+//      at depth 13), with the 4th ordinary move ±0, ProbCut −45 / −54.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -98,6 +105,11 @@ struct MinMaxNNUE_DevOptions {
                                      //   2 = queen distance, 3 = mobility
     int  territory_depth = 4;        // ["territory depth"] only at nodes of at least this depth
     int  territory_weight = 512;     // ["territory weight"] score = history + weight · territory
+    int  proxy_cut = 1;              // ["proxy cut"] 0 = off, 1 = ordinary move vs beta, 2 = ProbCut
+    int  proxy_rank = 0;             // ["proxy rank"] 1: which ordinary move (0 = the best-ordered one)
+    int  probcut_margin = 3000;      // ["probcut margin"] 2: searched against beta + this
+    int  proxy_depth = 4;            // ["proxy depth"] only at nodes of at least this depth
+    int  proxy_reduction = 3;        // ["proxy reduction"] searched at depth − 1 − (this + depth / 4 − 1)
     int  eval_grain = 1;             // ["eval grain"] network values rounded to a multiple of this (1 = exact)
     bool staged = true;              // ["staged"] table's move first, the others generated only if needed
     bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table

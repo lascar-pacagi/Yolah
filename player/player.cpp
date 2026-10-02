@@ -374,6 +374,11 @@ unique_ptr<Player> Player::create(const json& j) {
              options.yolah_table = j.value("yolah table", options.yolah_table);
              options.staged = j.value("staged", options.staged);
              options.eval_grain = j.value("eval grain", options.eval_grain);
+             options.proxy_cut = j.value("proxy cut", options.proxy_cut);
+             options.proxy_rank = j.value("proxy rank", options.proxy_rank);
+             options.probcut_margin = j.value("probcut margin", options.probcut_margin);
+             options.proxy_depth = j.value("proxy depth", options.proxy_depth);
+             options.proxy_reduction = j.value("proxy reduction", options.proxy_reduction);
              options.territory_ordering = j.value("territory ordering", options.territory_ordering);
              options.territory_depth = j.value("territory depth", options.territory_depth);
              options.territory_weight = j.value("territory weight", options.territory_weight);

@@ -346,7 +346,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     const bool pv_node = beta - alpha > 1;
     const bool prunable = !pv_node && std::abs(beta) < WIN;
     int static_eval = 0;
-    if (prunable && ((options.rfp_depth > 0 && depth <= options.rfp_depth) || (options.null_move && depth >= 3))) {
+    if (prunable && ((options.rfp_depth > 0 && depth <= options.rfp_depth) || (options.null_move && depth >= 3)
+                     || (options.proxy_cut == 1 && depth >= options.proxy_depth))) {
         static_eval = evaluate(yolah, s, hash);
     }
     // F1. Reverse futility pruning ("static null move"): if the static value
@@ -421,6 +422,72 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     if (generated) {
         score_moves(yolah, s, tt_move, moves, scores, depth);
         n = moves.size();
+    }
+    // N. Proxy cut — the idea of the null move without its flaw in Yolah.
+    //    The null move asks "even if I pass, am I still ≥ beta?", which
+    //    assumes that passing is worse than the best move: false in a
+    //    zugzwang, and Yolah is full of them (−81 Elo, F2). A REAL move m
+    //    has no such problem: the best move is at least as good as any move,
+    //
+    //        value(best) ≥ value(m)   so   value(m) ≥ beta  ⇒  value(best) ≥ beta,
+    //
+    //    and in a zugzwang every move is bad: the test fails, no wrong cut.
+    //    Like the null move, m is searched at a REDUCED depth (depth − 1 − R)
+    //    to be cheap — the only approximation. Which m?
+    //      1 = an ORDINARY move: the proxy_rank-th after the special ones
+    //          (table's move, killers, countermove), by history. Demanding:
+    //          if even a run-of-the-mill move reaches beta, the node is good.
+    //      2 = ProbCut (Stockfish): the table's move (the likely best),
+    //          against beta + probcut_margin instead — the margin makes the
+    //          test demanding.
+    //    Tried at non-PV nodes of depth ≥ proxy_depth whose static value is
+    //    already ≥ beta (variant 1) — elsewhere it would rarely succeed and
+    //    its cost would be wasted.
+    if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth
+        && (options.proxy_cut == 2 || static_eval >= beta)) {
+        if (!generated) {                       // the test needs the move list
+            yolah.moves(moves);
+            generated = true;
+            score_moves(yolah, s, tt_move, moves, scores, depth);
+            n = moves.size();
+        }
+        Move m = Move::none();
+        int bound = beta;
+        if (options.proxy_cut == 1) {
+            // the proxy_rank-th best-scored ordinary move
+            bool taken[Yolah::MAX_NB_MOVES]{};
+            for (int r = 0; r <= options.proxy_rank; r++) {
+                int pick = -1;
+                for (size_t j = 0; j < n; j++) {
+                    if (!taken[j] && scores[j] < SCORE_COUNTER && (pick < 0 || scores[j] > scores[pick])) pick = int(j);
+                }
+                if (pick < 0) { m = Move::none(); break; }
+                taken[pick] = true;
+                m = moves[pick];
+            }
+        } else {
+            m = tt_first ? tt_move : moves[0];
+            if (!tt_first) {                    // no table move: the best-scored one
+                size_t b = 0;
+                for (size_t j = 1; j < n; j++) if (scores[j] > scores[b]) b = j;
+                m = moves[b];
+            }
+            bound = std::min(beta + options.probcut_margin, WIN);
+        }
+        if (m != Move::none()) {
+            const int R = options.proxy_reduction + depth / 4 - 1;
+            const uint8_t player = yolah.current_player();
+            const uint64_t child = zobrist::update(hash, player, m);
+            s.played[yolah.nb_plies()] = m;
+            if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+            else nnue.play(player, m, s.acc);
+            yolah.play(m);
+            const int v = -negamax(yolah, s, child, -bound, -bound + 1, depth - 1 - R);
+            yolah.undo(m);
+            if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+            if (stopped()) return 0;
+            if (v >= bound) return v >= WIN ? beta : v;   // no unproven win from a reduced search
+        }
     }
     const int alpha_orig = alpha;
     int best = -INFINITE;
@@ -1062,6 +1129,11 @@ json MinMaxNNUE_DevPlayer::config() {
     j["yolah table"] = options.yolah_table;
     j["staged"] = options.staged;
     j["eval grain"] = options.eval_grain;
+    j["proxy cut"] = options.proxy_cut;
+    j["proxy rank"] = options.proxy_rank;
+    j["probcut margin"] = options.probcut_margin;
+    j["proxy depth"] = options.proxy_depth;
+    j["proxy reduction"] = options.proxy_reduction;
     j["nb threads"] = nb_threads;
     j["territory ordering"] = options.territory_ordering;
     j["territory depth"] = options.territory_depth;
