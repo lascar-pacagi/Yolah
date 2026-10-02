@@ -710,6 +710,15 @@ def main():
         state.d["samples_trained"] = ckpt["samples_trained"]
         log(f"resumed at step {state.d['step']}, {state.d['samples_trained']:,} samples trained")
     else:
+        # A new run. A state.json without a checkpoint is a leftover of an
+        # earlier run (e.g. a work directory emptied while its job was still
+        # stopping, which then saved its state): its counters and its list of
+        # exported networks would point self-play at networks that no longer
+        # exist. Start from fresh counters.
+        if os.path.exists(state.path):
+            log(f"new run: ignoring the leftover {state.path} (no checkpoint.pt)")
+            os.replace(state.path, state.path + ".stale")
+            state = State(args.work)
         pt0, _ = model_paths(args.work, 0)
         if not os.path.exists(pt0):
             export_model(net, args.work, 0)
