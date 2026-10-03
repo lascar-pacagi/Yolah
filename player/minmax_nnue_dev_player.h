@@ -107,6 +107,7 @@ struct MinMaxNNUE_DevOptions {
                                      //   2 = queen distance, 3 = mobility
     int  territory_depth = 4;        // ["territory depth"] only at nodes of at least this depth
     int  territory_weight = 512;     // ["territory weight"] score = history + weight · territory
+    bool fast_influence = true;      // ["fast influence"] influence_fast (same values, less work)
     int  proxy_cut = 1;              // ["proxy cut"] 0 = off, 1 = ordinary move vs beta, 2 = ProbCut
     int  proxy_rank = 0;             // ["proxy rank"] 1: which ordinary move (0 = the best-ordered one)
     int  probcut_margin = 3000;      // ["probcut margin"] 2: searched against beta + this

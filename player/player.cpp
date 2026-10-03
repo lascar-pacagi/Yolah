@@ -382,6 +382,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.territory_ordering = j.value("territory ordering", options.territory_ordering);
              options.territory_depth = j.value("territory depth", options.territory_depth);
              options.territory_weight = j.value("territory weight", options.territory_weight);
+             options.fast_influence = j.value("fast influence", options.fast_influence);
              options.articulation_ordering = j.value("articulation ordering", options.articulation_ordering);
              options.articulation_lmr = j.value("articulation lmr", options.articulation_lmr);
              options.endgame_root = j.value("endgame root", options.endgame_root);
