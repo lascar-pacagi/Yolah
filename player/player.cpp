@@ -379,6 +379,15 @@ unique_ptr<Player> Player::create(const json& j) {
              options.probcut_margin = j.value("probcut margin", options.probcut_margin);
              options.proxy_depth = j.value("proxy depth", options.proxy_depth);
              options.proxy_reduction = j.value("proxy reduction", options.proxy_reduction);
+             options.proxy_delta = j.value("proxy delta", options.proxy_delta);
+             options.proxy_witness = j.value("proxy witness", options.proxy_witness);
+             options.proxy_multi_c = j.value("proxy multi c", options.proxy_multi_c);
+             options.proxy_multi_m = j.value("proxy multi m", options.proxy_multi_m);
+             options.proxy_diverse = j.value("proxy diverse", options.proxy_diverse);
+             options.proxy_second = j.value("proxy second", options.proxy_second);
+             options.proxy_prefilter = j.value("proxy prefilter", options.proxy_prefilter);
+             options.proxy_weval = j.value("proxy weval", options.proxy_weval);
+             options.proxy_verify = j.value("proxy verify", options.proxy_verify);
              options.mpc = j.value("mpc", options.mpc);
              options.mpc_depth = j.value("mpc depth", options.mpc_depth);
              options.mpc_ratio = j.value("mpc ratio", options.mpc_ratio);

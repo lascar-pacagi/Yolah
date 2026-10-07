@@ -121,6 +121,19 @@ struct MinMaxNNUE_DevOptions {
     int  probcut_margin = 3000;      // ["probcut margin"] 2: searched against beta + this
     int  proxy_depth = 4;            // ["proxy depth"] only at nodes of at least this depth
     int  proxy_reduction = 3;        // ["proxy reduction"] searched at depth − 1 − (this + depth / 4 − 1)
+    int  proxy_delta = 0;            // ["proxy delta"] 1: the witness must reach beta + this (0: the proxy cut)
+    int  proxy_witness = 0;          // ["proxy witness"] 1: 0 = best-ordered ordinary move, 1 = killer 1,
+                                     //   2 = countermove (no ordering needed: the cheapest witnesses)
+    int  proxy_multi_c = 1;          // ["proxy multi c"] 1: cut if >= c of the first m witnesses reach the bound
+    int  proxy_multi_m = 1;          // ["proxy multi m"]
+    bool proxy_diverse = false;      // ["proxy diverse"] 1: successive witnesses move different pieces
+    int  proxy_second = -1;          // ["proxy second"] 1: >= 0: after a failure with v >= bound − this,
+                                     //   a second witness gets a chance (fail soft values)
+    int  proxy_prefilter = 0;        // ["proxy prefilter"] 1: a probe at depth − this first; if it fails, no cut
+    int  proxy_weval = 0;            // ["proxy weval"] 1: > 1: among the first K ordinary moves, the witness is
+                                     //   the one with the best static value after it
+    int  proxy_verify = 0;           // ["proxy verify"] 1: cuts at nodes of at least this depth verified by a
+                                     //   search of the node itself at the probe depth (0 = never)
     int  mpc = 0;                    // ["mpc"] O. Multi-ProbCut without regression: 0 off, 1 fail high only,
                                      //   2 both directions (see negamax)
     int  mpc_depth = 5;              // ["mpc depth"] only at nodes of at least this depth
@@ -240,6 +253,7 @@ private:
         // tells how to get accs[p + 1] from accs[p].
         NNUE_Quantized::Accumulator accs[Yolah::MAX_NB_PLIES + 1];
         bool acc_ok[Yolah::MAX_NB_PLIES + 1]{};
+        bool proxy_off = false;                    // during a proxy cut verification: no proxy cut inside
     };
 
     // Evaluation cache (D): one entry per slot, the newest wins. 32 bits of

@@ -467,7 +467,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    Tried at non-PV nodes of depth ≥ proxy_depth whose static value is
     //    already ≥ beta (variant 1) — elsewhere it would rarely succeed and
     //    its cost would be wasted.
-    if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth
+    if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth && !s.proxy_off
         && (options.proxy_cut == 2 || static_eval >= beta)) {
         if (!generated) {                       // the test needs the move list
             yolah.moves(moves);
@@ -475,42 +475,134 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             score_moves(yolah, s, tt_move, moves, scores, depth);
             n = moves.size();
         }
-        Move m = Move::none();
-        int bound = beta;
-        if (options.proxy_cut == 1) {
-            // the proxy_rank-th best-scored ordinary move
-            bool taken[Yolah::MAX_NB_MOVES]{};
-            for (int r = 0; r <= options.proxy_rank; r++) {
-                int pick = -1;
-                for (size_t j = 0; j < n; j++) {
-                    if (!taken[j] && scores[j] < SCORE_COUNTER && (pick < 0 || scores[j] > scores[pick])) pick = int(j);
-                }
-                if (pick < 0) { m = Move::none(); break; }
-                taken[pick] = true;
-                m = moves[pick];
-            }
-        } else {
-            m = tt_first ? tt_move : moves[0];
-            if (!tt_first) {                    // no table move: the best-scored one
-                size_t b = 0;
-                for (size_t j = 1; j < n; j++) if (scores[j] > scores[b]) b = j;
-                m = moves[b];
-            }
-            bound = std::min(beta + options.probcut_margin, WIN);
-        }
-        if (m != Move::none()) {
-            const int R = options.proxy_reduction + depth / 4 - 1;
+        // Search move m at depth d against `bound` (null window); the value for us.
+        auto probe = [&](Move m, int bound, int d) {
             const uint8_t player = yolah.current_player();
             const uint64_t child = zobrist::update(hash, player, m);
             s.played[yolah.nb_plies()] = m;
             if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
             else nnue.play(player, m, s.acc);
             yolah.play(m);
-            const int v = -negamax(yolah, s, child, -bound, -bound + 1, depth - 1 - R);
+            const int v = -negamax(yolah, s, child, -bound, -bound + 1, d);
             yolah.undo(m);
             if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+            return v;
+        };
+        const int R = options.proxy_reduction + depth / 4 - 1;
+        const int d = depth - 1 - R;
+        if (options.proxy_cut == 2) {
+            // ProbCut (Stockfish): the table's move, against beta + probcut_margin
+            Move m = tt_first ? tt_move : moves[0];
+            if (!tt_first) {                    // no table move: the best-scored one
+                size_t b = 0;
+                for (size_t j = 1; j < n; j++) if (scores[j] > scores[b]) b = j;
+                m = moves[b];
+            }
+            const int bound = std::min(beta + options.probcut_margin, WIN);
+            if (m != Move::none()) {
+                const int v = probe(m, bound, d);
+                if (stopped()) return 0;
+                if (v >= bound) return v >= WIN ? beta : v;   // no unproven win from a reduced search
+            }
+        } else if (beta + options.proxy_delta < WIN) {
+            const int bound = beta + options.proxy_delta;
+            // The candidates: the ordinary moves (not the table's move, a killer
+            // or the countermove), best-ordered first (ties: generation order),
+            // from rank proxy_rank on. Witness 1/2: the killer / the countermove.
+            int cand[Yolah::MAX_NB_MOVES];
+            int nc = 0;
+            if (options.proxy_witness == 0) {
+                for (size_t j = 0; j < n; j++) if (scores[j] < SCORE_COUNTER) cand[nc++] = int(j);
+                std::stable_sort(cand, cand + nc, [&](int a, int b) { return scores[a] > scores[b]; });
+                const int r = std::min(nc, options.proxy_rank);
+                std::copy(cand + r, cand + nc, cand);
+                nc -= r;
+            } else {
+                const int want = options.proxy_witness == 1 ? SCORE_KILLER1 : SCORE_COUNTER;
+                for (size_t j = 0; j < n; j++) if (scores[j] == want && moves[j] != tt_move) cand[nc++] = int(j);
+            }
+            // weval: the first K candidates reordered by their static value after the move
+            if (options.proxy_weval > 1 && nc > 1) {
+                const int K = std::min(nc, options.proxy_weval);
+                int val[Yolah::MAX_NB_MOVES];
+                for (int k = 0; k < K; k++) {
+                    const Move m = moves[cand[k]];
+                    const uint8_t player = yolah.current_player();
+                    const uint64_t child = zobrist::update(hash, player, m);
+                    s.played[yolah.nb_plies()] = m;
+                    if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+                    else nnue.play(player, m, s.acc);
+                    yolah.play(m);
+                    val[cand[k]] = -evaluate(yolah, s, child);
+                    yolah.undo(m);
+                    if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+                }
+                std::stable_sort(cand, cand + K, [&](int a, int b) { return val[a] > val[b]; });
+            }
+            // The witnesses; diverse: each moves a piece not used yet when possible.
+            const int want = std::max(options.proxy_multi_m, options.proxy_second >= 0 ? 2 : 1);
+            int wit[Yolah::MAX_NB_MOVES];
+            int nw = 0;
+            bool used[Yolah::MAX_NB_MOVES]{};
+            for (int pass = 0; pass < 2 && nw < want; pass++) {
+                for (int k = 0; k < nc && nw < want; k++) {
+                    if (used[k]) continue;
+                    if (options.proxy_diverse && pass == 0) {
+                        bool seen = false;
+                        for (int i2 = 0; i2 < nw; i2++) seen |= moves[wit[i2]].from_sq() == moves[cand[k]].from_sq();
+                        if (seen) continue;
+                    }
+                    used[k] = true;
+                    wit[nw++] = cand[k];
+                }
+                if (!options.proxy_diverse) break;
+            }
+            // One witness: a shallow probe first (prefilter), then the probe.
+            auto run = [&](int idx) {
+                if (options.proxy_prefilter > 0 && d - options.proxy_prefilter >= 1) {
+                    const int v0 = probe(moves[idx], bound, d - options.proxy_prefilter);
+                    if (v0 < bound) return v0;
+                }
+                return probe(moves[idx], bound, d);
+            };
+            // A cut at a deep node, verified by a search of this node at the probe depth.
+            auto verified = [&]() {
+                if (options.proxy_verify <= 0 || depth < options.proxy_verify) return true;
+                s.proxy_off = true;
+                const int v = negamax(yolah, s, hash, bound - 1, bound, d);
+                s.proxy_off = false;
+                return v >= bound;
+            };
+            int cut_value = -INFINITE;
+            if (options.proxy_second >= 0 && options.proxy_multi_m == 1) {
+                if (nw >= 1) {
+                    int v = run(wit[0]);
+                    if (stopped()) return 0;
+                    if (v < bound && nw >= 2 && v >= bound - options.proxy_second) {
+                        v = run(wit[1]);
+                        if (stopped()) return 0;
+                    }
+                    if (v >= bound && verified()) cut_value = v;
+                }
+            } else if (nw >= options.proxy_multi_c) {
+                const int m = std::min(nw, options.proxy_multi_m);
+                int cuts = 0, lowest = INFINITE;
+                for (int k = 0; k < m; k++) {
+                    const int v = run(wit[k]);
+                    if (stopped()) return 0;
+                    if (v >= bound) {
+                        lowest = std::min(lowest, v);
+                        if (++cuts >= options.proxy_multi_c) {
+                            if (verified()) cut_value = lowest;
+                            break;
+                        }
+                    } else if (cuts + (m - 1 - k) < options.proxy_multi_c) {
+                        break;
+                    }
+                }
+            }
             if (stopped()) return 0;
-            if (v >= bound) return v >= WIN ? beta : v;   // no unproven win from a reduced search
+            if (cut_value >= bound) return cut_value >= WIN ? beta : cut_value;   // no unproven win
         }
     }
     // P. Stockfish's ProbCut, generalized to a game without captures: the
@@ -1243,6 +1335,15 @@ json MinMaxNNUE_DevPlayer::config() {
     j["probcut margin"] = options.probcut_margin;
     j["proxy depth"] = options.proxy_depth;
     j["proxy reduction"] = options.proxy_reduction;
+    j["proxy delta"] = options.proxy_delta;
+    j["proxy witness"] = options.proxy_witness;
+    j["proxy multi c"] = options.proxy_multi_c;
+    j["proxy multi m"] = options.proxy_multi_m;
+    j["proxy diverse"] = options.proxy_diverse;
+    j["proxy second"] = options.proxy_second;
+    j["proxy prefilter"] = options.proxy_prefilter;
+    j["proxy weval"] = options.proxy_weval;
+    j["proxy verify"] = options.proxy_verify;
     j["mpc"] = options.mpc;
     j["mpc depth"] = options.mpc_depth;
     j["mpc ratio"] = options.mpc_ratio;

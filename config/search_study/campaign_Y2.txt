@@ -1,0 +1,39 @@
+# Campaign Y2 (search study): CANDIDATE REFERENCE TIME_US ROUNDS (a round = one opening, both colours).
+# 0.2 s/move vs "none": proxy cut extensions without margin (killer/countermove/static-value witness,
+# multi-depth prefilter, diversified witnesses, second chance, verification), with a margin delta, the
+# best move + margin (best_dX, same R) vs ordinary move + margin (pc_dX), the rest of the MPC grid, ProbCut.
+# 1 s/move: MPC 6000 vs none, the proxy cut vs MPC 6000 (direct), proxy cut + MPC 6000 / 8000 vs none.
+pc_d500 none 200000 1000
+pc_d1000 none 200000 1000
+pc_d2000 none 200000 1000
+pc_red4_d1000 none 200000 1000
+pc_wkiller none 200000 1000
+pc_wcounter none 200000 1000
+pc_weval4 none 200000 1000
+pc_pref1 none 200000 1000
+pc_pref2 none 200000 1000
+pc_div22 none 200000 1000
+pc_div12 none 200000 1000
+pc_second1000 none 200000 1000
+pc_second2000_div none 200000 1000
+pc_verify8 none 200000 1000
+pc_verify11 none 200000 1000
+mpc_m6000_r50 none 200000 1000
+mpc_m8000 none 200000 1000
+mpc_m8000_r50 none 200000 1000
+mpc_m10000 none 200000 1000
+mpc_m12000 none 200000 1000
+mpc_m6000_r60 none 200000 1000
+mpc_m6000_fh none 200000 1000
+mpc_m4000_pp500 none 200000 1000
+probcut_k1_m2000 none 200000 1000
+probcut_k5_m2000 none 200000 1000
+probcut_m2000_red3 none 200000 1000
+best_d0 none 200000 1000
+best_d500 none 200000 1000
+best_d1000 none 200000 1000
+best_d2000 none 200000 1000
+mpc_m6000 none 1000000 500
+pc mpc_m6000 1000000 500
+pc_mpc_m6000 none 1000000 500
+pc_mpc_m8000 none 1000000 500
