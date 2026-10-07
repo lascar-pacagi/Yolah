@@ -379,6 +379,15 @@ unique_ptr<Player> Player::create(const json& j) {
              options.probcut_margin = j.value("probcut margin", options.probcut_margin);
              options.proxy_depth = j.value("proxy depth", options.proxy_depth);
              options.proxy_reduction = j.value("proxy reduction", options.proxy_reduction);
+             options.mpc = j.value("mpc", options.mpc);
+             options.mpc_depth = j.value("mpc depth", options.mpc_depth);
+             options.mpc_ratio = j.value("mpc ratio", options.mpc_ratio);
+             options.mpc_margin = j.value("mpc margin", options.mpc_margin);
+             options.mpc_margin_per_ply = j.value("mpc margin per ply", options.mpc_margin_per_ply);
+             options.probcut = j.value("probcut", options.probcut);
+             options.probcut_depth = j.value("probcut depth", options.probcut_depth);
+             options.probcut_reduction = j.value("probcut reduction", options.probcut_reduction);
+             options.probcut_filter = j.value("probcut filter", options.probcut_filter);
              options.territory_ordering = j.value("territory ordering", options.territory_ordering);
              options.territory_depth = j.value("territory depth", options.territory_depth);
              options.territory_weight = j.value("territory weight", options.territory_weight);

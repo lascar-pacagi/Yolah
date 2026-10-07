@@ -347,7 +347,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     const bool prunable = !pv_node && std::abs(beta) < WIN;
     int static_eval = 0;
     if (prunable && ((options.rfp_depth > 0 && depth <= options.rfp_depth) || (options.null_move && depth >= 3)
-                     || (options.proxy_cut == 1 && depth >= options.proxy_depth))) {
+                     || (options.proxy_cut == 1 && depth >= options.proxy_depth)
+                     || (options.mpc > 0 && depth >= options.mpc_depth))) {
         static_eval = evaluate(yolah, s, hash);
     }
     // F1. Reverse futility pruning ("static null move"): if the static value
@@ -356,6 +357,29 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //     search, the more the value may still change.
     if (prunable && depth <= options.rfp_depth && static_eval - options.rfp_margin * depth >= beta) {
         return static_eval;
+    }
+    // O. Multi-ProbCut (Buro) without its regression, tuned by hand as
+    //    Stockfish tunes its margins: search THIS position at a shallow depth
+    //    d' and, if the result clears beta (alpha) by a margin, trust it for
+    //    depth d. Buro fits v_d ≈ a·v_d' + b + N(0, σ²) per (d', d) and per
+    //    phase and takes margin = t·σ; here the margin is
+    //    mpc_margin + mpc_margin_per_ply · (d − d'), set by matches. As in
+    //    Egaroucid, tried only when the static value is already on that side.
+    if (prunable && options.mpc > 0 && depth >= options.mpc_depth) {
+        const int d2 = std::max(1, depth * options.mpc_ratio / 100);
+        const int margin = options.mpc_margin + options.mpc_margin_per_ply * (depth - d2);
+        if (static_eval >= beta && beta + margin < WIN) {
+            const int bound = beta + margin;
+            const int v = negamax(yolah, s, hash, bound - 1, bound, d2);
+            if (stopped()) return 0;
+            if (v >= bound) return beta;
+        }
+        if (options.mpc == 2 && static_eval <= alpha && alpha - margin > -WIN) {
+            const int bound = alpha - margin;
+            const int v = negamax(yolah, s, hash, bound, bound + 1, d2);
+            if (stopped()) return 0;
+            if (v <= bound) return alpha;
+        }
     }
     // K. Staged move generation. The table's move is the best move of an
     //    earlier search of this position: it often cuts at once, and then the
@@ -487,6 +511,45 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
             if (stopped()) return 0;
             if (v >= bound) return v >= WIN ? beta : v;   // no unproven win from a reduced search
+        }
+    }
+    // P. Stockfish's ProbCut, generalized to a game without captures: the
+    //    best-ordered moves (table's move first), at most "probcut" of them,
+    //    each searched at depth − probcut_reduction against beta + margin; the
+    //    first that reaches it cuts. Stockfish first checks the move with a
+    //    quiescence search; Yolah has none: the static value after the move
+    //    plays that role ("probcut filter").
+    if (options.probcut > 0 && prunable && depth >= options.probcut_depth && beta + options.probcut_margin < WIN) {
+        if (!generated) {
+            yolah.moves(moves);
+            generated = true;
+            score_moves(yolah, s, tt_move, moves, scores, depth);
+            n = moves.size();
+        }
+        const int bound = beta + options.probcut_margin;
+        bool taken[Yolah::MAX_NB_MOVES]{};
+        for (int k = 0; k < options.probcut; k++) {
+            int pick = -1;
+            for (size_t j = 0; j < n; j++) {
+                if (!taken[j] && moves[j] != Move::none() && (pick < 0 || scores[j] > scores[pick])) pick = int(j);
+            }
+            if (pick < 0) break;
+            taken[pick] = true;
+            const Move m = moves[pick];
+            const uint8_t player = yolah.current_player();
+            const uint64_t child = zobrist::update(hash, player, m);
+            s.played[yolah.nb_plies()] = m;
+            if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+            else nnue.play(player, m, s.acc);
+            yolah.play(m);
+            int v = -INFINITE;
+            if (!options.probcut_filter || -evaluate(yolah, s, child) >= bound) {
+                v = -negamax(yolah, s, child, -bound, -bound + 1, depth - options.probcut_reduction);
+            }
+            yolah.undo(m);
+            if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+            if (stopped()) return 0;
+            if (v >= bound) return v >= WIN ? beta : v;
         }
     }
     const int alpha_orig = alpha;
@@ -1180,6 +1243,15 @@ json MinMaxNNUE_DevPlayer::config() {
     j["probcut margin"] = options.probcut_margin;
     j["proxy depth"] = options.proxy_depth;
     j["proxy reduction"] = options.proxy_reduction;
+    j["mpc"] = options.mpc;
+    j["mpc depth"] = options.mpc_depth;
+    j["mpc ratio"] = options.mpc_ratio;
+    j["mpc margin"] = options.mpc_margin;
+    j["mpc margin per ply"] = options.mpc_margin_per_ply;
+    j["probcut"] = options.probcut;
+    j["probcut depth"] = options.probcut_depth;
+    j["probcut reduction"] = options.probcut_reduction;
+    j["probcut filter"] = options.probcut_filter;
     j["nb threads"] = nb_threads;
     j["territory ordering"] = options.territory_ordering;
     j["territory depth"] = options.territory_depth;

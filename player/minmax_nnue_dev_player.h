@@ -78,6 +78,14 @@
 //      at depth 13), with the 4th ordinary move ±0, ProbCut −45 / −54.
 //      At 1 s/move (1200 games): +59 [+30, +94] over no proxy cut; depth ≥ 3
 //      (+51), R = 2 (+48) or R = 4 (+60): no difference, defaults kept.
+//   O. Multi-ProbCut (Buro) without its regression ("mpc", "mpc ratio",
+//      "mpc margin", "mpc margin per ply"): this position searched at a
+//      shallow depth d' against beta + margin (and alpha − margin), the
+//      margin set by matches as Stockfish sets its own. Off by default.
+//   P. Stockfish's ProbCut generalized ("probcut" moves, "probcut margin",
+//      "probcut reduction", "probcut filter"): the best-ordered moves at
+//      depth − 4 against beta + margin. Off by default. O and P are the
+//      references for the proxy cut study (config/search_study/).
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -113,6 +121,18 @@ struct MinMaxNNUE_DevOptions {
     int  probcut_margin = 3000;      // ["probcut margin"] 2: searched against beta + this
     int  proxy_depth = 4;            // ["proxy depth"] only at nodes of at least this depth
     int  proxy_reduction = 3;        // ["proxy reduction"] searched at depth − 1 − (this + depth / 4 − 1)
+    int  mpc = 0;                    // ["mpc"] O. Multi-ProbCut without regression: 0 off, 1 fail high only,
+                                     //   2 both directions (see negamax)
+    int  mpc_depth = 5;              // ["mpc depth"] only at nodes of at least this depth
+    int  mpc_ratio = 40;             // ["mpc ratio"] shallow depth d' = max(1, depth · ratio / 100)
+    int  mpc_margin = 3000;          // ["mpc margin"] margin = this + per ply · (depth − d')
+    int  mpc_margin_per_ply = 0;     // ["mpc margin per ply"]
+    int  probcut = 0;                // ["probcut"] P. Stockfish's ProbCut generalized: number of moves tried
+                                     //   (0 = off), each against beta + "probcut margin"
+    int  probcut_depth = 5;          // ["probcut depth"] only at nodes of at least this depth (SF: > 4)
+    int  probcut_reduction = 4;      // ["probcut reduction"] the moves are searched at depth − this (SF: 4)
+    bool probcut_filter = true;      // ["probcut filter"] only if the static value after the move already
+                                     //   reaches the bound (stands for Stockfish's qsearch test)
     int  eval_grain = 1;             // ["eval grain"] network values rounded to a multiple of this (1 = exact)
     bool staged = true;              // ["staged"] table's move first, the others generated only if needed
     bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table

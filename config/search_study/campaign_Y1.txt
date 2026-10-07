@@ -1,0 +1,22 @@
+# Campaign Y1 (search study, cluster CPU nodes): every line = one match CANDIDATE REFERENCE TIME_US ROUNDS
+# (a round = one random opening played twice, colours swapped). Yolah dev player, 1 thread each.
+# 0.2 s/move: the whole grid against "none"; 1 s/move: the main ones.
+pc none 200000 1000
+mpc_m1500 none 200000 1000
+mpc_m2000 none 200000 1000
+mpc_m3000 none 200000 1000
+mpc_m4000 none 200000 1000
+mpc_m6000 none 200000 1000
+mpc_m3000_r50 none 200000 1000
+mpc_m2000_fh none 200000 1000
+probcut_m1000 none 200000 1000
+probcut_m2000 none 200000 1000
+probcut_m3000 none 200000 1000
+probcut_m2000_nofilter none 200000 1000
+pc_mpc_m3000 none 200000 1000
+pc_mpc_m4000 none 200000 1000
+pc none 1000000 500
+mpc_m2000 none 1000000 500
+mpc_m3000 none 1000000 500
+probcut_m2000 none 1000000 500
+pc_mpc_m3000 none 1000000 500
