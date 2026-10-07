@@ -392,6 +392,8 @@ unique_ptr<Player> Player::create(const json& j) {
              options.proxy_tail_keep = j.value("proxy tail keep", options.proxy_tail_keep);
              options.proxy_tail_margin = j.value("proxy tail margin", options.proxy_tail_margin);
              options.proxy_tail_reduction = j.value("proxy tail reduction", options.proxy_tail_reduction);
+             options.proxy_tail_step = j.value("proxy tail step", options.proxy_tail_step);
+             options.proxy_tail_cap = j.value("proxy tail cap", options.proxy_tail_cap);
              options.mpc = j.value("mpc", options.mpc);
              options.mpc_depth = j.value("mpc depth", options.mpc_depth);
              options.mpc_ratio = j.value("mpc ratio", options.mpc_ratio);

@@ -469,7 +469,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    its cost would be wasted.
     // Q. "Proxy tail": what a FAILED proxy test says about the moves ordered
     //    after the witness (see options.proxy_tail).
-    bool tail = false;
+    bool tail = false, tail_clear = false;
     Move witness = Move::none();
     if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth && !s.proxy_off
         && (options.proxy_cut == 2 || static_eval >= beta)) {
@@ -612,7 +612,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (cut_value >= bound) return cut_value >= WIN ? beta : cut_value;   // no unproven win
             if (options.proxy_tail > 0 && nw >= 1 && first_v < bound) {
                 witness = moves[wit[0]];
-                tail = options.proxy_tail != 2 || first_v < bound - options.proxy_tail_margin;
+                tail_clear = first_v < bound - options.proxy_tail_margin;
+                tail = options.proxy_tail != 2 || tail_clear;
             }
         }
     }
@@ -701,10 +702,15 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         // Q. Proxy tail: an ordinary move ordered after the failed witness.
         int tail_r = 0;
         if (tail && after_witness >= 0 && scores[i] < SCORE_COUNTER && after_witness++ >= options.proxy_tail_keep) {
-            if (options.proxy_tail != 3) {
+            const int k = after_witness - 1 - options.proxy_tail_keep;   // 0 for the first move concerned
+            if (options.proxy_tail <= 2) {
                 if (best > -WIN) break;      // pruned (once a move that does not lose was found)
-            } else {
+            } else if (options.proxy_tail == 3) {
                 tail_r = options.proxy_tail_reduction;
+            } else {                         // 4: an LMR anchored on the witness that failed
+                tail_r = std::min(options.proxy_tail_cap,
+                                  options.proxy_tail_reduction + k / std::max(1, options.proxy_tail_step))
+                       + (tail_clear ? 1 : 0);
             }
         }
         // scores[i] is now m's score: special move (killer, countermove), articulation or history
@@ -1370,6 +1376,8 @@ json MinMaxNNUE_DevPlayer::config() {
     j["proxy tail keep"] = options.proxy_tail_keep;
     j["proxy tail margin"] = options.proxy_tail_margin;
     j["proxy tail reduction"] = options.proxy_tail_reduction;
+    j["proxy tail step"] = options.proxy_tail_step;
+    j["proxy tail cap"] = options.proxy_tail_cap;
     j["mpc"] = options.mpc;
     j["mpc depth"] = options.mpc_depth;
     j["mpc ratio"] = options.mpc_ratio;

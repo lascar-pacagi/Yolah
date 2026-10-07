@@ -137,11 +137,15 @@ struct MinMaxNNUE_DevOptions {
     int  proxy_tail = 0;             // ["proxy tail"] 1: after a FAILED proxy test, the ordinary moves ordered
                                      //   after the witness: 0 searched as usual, 1 pruned, 2 pruned only if the
                                      //   witness failed by more than "proxy tail margin", 3 reduced by
-                                     //   "proxy tail reduction" more (a heuristic: unlike the cut, value(witness)
-                                     //   >= value(later moves) is only likely, from the move ordering)
+                                     //   "proxy tail reduction" more, 4 reduced progressively (a heuristic:
+                                     //   unlike the cut, value(witness) >= value(later moves) is only likely,
+                                     //   from the move ordering)
     int  proxy_tail_keep = 0;        // ["proxy tail keep"] ordinary moves after the witness still searched as usual
     int  proxy_tail_margin = 2000;   // ["proxy tail margin"] mode 2
-    int  proxy_tail_reduction = 1;   // ["proxy tail reduction"] mode 3
+    int  proxy_tail_reduction = 1;   // ["proxy tail reduction"] modes 3 and 4
+    int  proxy_tail_step = 4;        // ["proxy tail step"] mode 4, progressive: the k-th move after the witness
+    int  proxy_tail_cap = 3;         // ["proxy tail cap"]   is reduced by min(cap, reduction + k / step) more,
+                                     //   one more after a clear failure (by more than "proxy tail margin")
     int  mpc = 0;                    // ["mpc"] O. Multi-ProbCut without regression: 0 off, 1 fail high only,
                                      //   2 both directions (see negamax)
     int  mpc_depth = 5;              // ["mpc depth"] only at nodes of at least this depth
