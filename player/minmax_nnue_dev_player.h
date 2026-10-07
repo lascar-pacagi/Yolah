@@ -134,6 +134,14 @@ struct MinMaxNNUE_DevOptions {
                                      //   the one with the best static value after it
     int  proxy_verify = 0;           // ["proxy verify"] 1: cuts at nodes of at least this depth verified by a
                                      //   search of the node itself at the probe depth (0 = never)
+    int  proxy_tail = 0;             // ["proxy tail"] 1: after a FAILED proxy test, the ordinary moves ordered
+                                     //   after the witness: 0 searched as usual, 1 pruned, 2 pruned only if the
+                                     //   witness failed by more than "proxy tail margin", 3 reduced by
+                                     //   "proxy tail reduction" more (a heuristic: unlike the cut, value(witness)
+                                     //   >= value(later moves) is only likely, from the move ordering)
+    int  proxy_tail_keep = 0;        // ["proxy tail keep"] ordinary moves after the witness still searched as usual
+    int  proxy_tail_margin = 2000;   // ["proxy tail margin"] mode 2
+    int  proxy_tail_reduction = 1;   // ["proxy tail reduction"] mode 3
     int  mpc = 0;                    // ["mpc"] O. Multi-ProbCut without regression: 0 off, 1 fail high only,
                                      //   2 both directions (see negamax)
     int  mpc_depth = 5;              // ["mpc depth"] only at nodes of at least this depth

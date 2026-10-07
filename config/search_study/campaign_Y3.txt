@@ -1,0 +1,9 @@
+# Campaign Y3 (search study): "proxy tail" — after a FAILED proxy test, the ordinary moves ordered after the
+# witness pruned (tail1, tail1_keep2), pruned after a clear failure (tail2), or reduced (tail3). Direct matches
+# against the proxy cut alone ("pc"), 0.2 s/move.
+pc_tail1 pc 200000 1000
+pc_tail1_keep2 pc 200000 1000
+pc_tail2_m2000 pc 200000 1000
+pc_tail2_m4000 pc 200000 1000
+pc_tail3_r1 pc 200000 1000
+pc_tail3_r2 pc 200000 1000

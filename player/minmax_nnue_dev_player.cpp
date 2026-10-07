@@ -467,6 +467,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    Tried at non-PV nodes of depth ≥ proxy_depth whose static value is
     //    already ≥ beta (variant 1) — elsewhere it would rarely succeed and
     //    its cost would be wasted.
+    // Q. "Proxy tail": what a FAILED proxy test says about the moves ordered
+    //    after the witness (see options.proxy_tail).
+    bool tail = false;
+    Move witness = Move::none();
     if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth && !s.proxy_off
         && (options.proxy_cut == 2 || static_eval >= beta)) {
         if (!generated) {                       // the test needs the move list
@@ -574,9 +578,11 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 return v >= bound;
             };
             int cut_value = -INFINITE;
+            int first_v = INFINITE;          // the first witness's (fail soft) value
             if (options.proxy_second >= 0 && options.proxy_multi_m == 1) {
                 if (nw >= 1) {
                     int v = run(wit[0]);
+                    first_v = v;
                     if (stopped()) return 0;
                     if (v < bound && nw >= 2 && v >= bound - options.proxy_second) {
                         v = run(wit[1]);
@@ -589,6 +595,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 int cuts = 0, lowest = INFINITE;
                 for (int k = 0; k < m; k++) {
                     const int v = run(wit[k]);
+                    if (k == 0) first_v = v;
                     if (stopped()) return 0;
                     if (v >= bound) {
                         lowest = std::min(lowest, v);
@@ -603,6 +610,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             }
             if (stopped()) return 0;
             if (cut_value >= bound) return cut_value >= WIN ? beta : cut_value;   // no unproven win
+            if (options.proxy_tail > 0 && nw >= 1 && first_v < bound) {
+                witness = moves[wit[0]];
+                tail = options.proxy_tail != 2 || first_v < bound - options.proxy_tail_margin;
+            }
         }
     }
     // P. Stockfish's ProbCut, generalized to a game without captures: the
@@ -648,6 +659,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     int best = -INFINITE;
     Move best_move = Move::none();
     bool pruned = false;
+    int after_witness = -1;                  // Q: ordinary moves searched after the witness (-1: not yet)
     for (size_t i = 0; i < n || !generated; i++) {
         if (!generated && i == 1) {
             // Stage 2: the table's move did not cut. Generate everything, put
@@ -686,12 +698,22 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (i >= n) break;
         }
         const Move m = generated ? pick_move(moves, scores, i, n) : tt_move;   // stage 1: no list yet
+        // Q. Proxy tail: an ordinary move ordered after the failed witness.
+        int tail_r = 0;
+        if (tail && after_witness >= 0 && scores[i] < SCORE_COUNTER && after_witness++ >= options.proxy_tail_keep) {
+            if (options.proxy_tail != 3) {
+                if (best > -WIN) break;      // pruned (once a move that does not lose was found)
+            } else {
+                tail_r = options.proxy_tail_reduction;
+            }
+        }
         // scores[i] is now m's score: special move (killer, countermove), articulation or history
         const bool tactical = options.articulation_lmr && is_articulation_move(yolah, m);
         const int r = tactical || !generated ? 0          // (the first move is never reduced anyway)
                     : late_move_reduction_of(depth, i, beta - alpha > 1, scores[i] >= SCORE_COUNTER,
                                              scores[i] >= SCORE_ARTICULATION ? 0 : scores[i]);
-        const int v = search_move(yolah, s, hash, m, i, r, alpha, beta, depth);
+        const int v = search_move(yolah, s, hash, m, i, r + tail_r, alpha, beta, depth);
+        if (tail && m == witness) after_witness = 0;
         // FIX (A): once the clock has stopped the search, the values coming up
         // are meaningless: return before storing anything (the reference stored
         // them, and the table is kept for the next moves of the game).
@@ -1344,6 +1366,10 @@ json MinMaxNNUE_DevPlayer::config() {
     j["proxy prefilter"] = options.proxy_prefilter;
     j["proxy weval"] = options.proxy_weval;
     j["proxy verify"] = options.proxy_verify;
+    j["proxy tail"] = options.proxy_tail;
+    j["proxy tail keep"] = options.proxy_tail_keep;
+    j["proxy tail margin"] = options.proxy_tail_margin;
+    j["proxy tail reduction"] = options.proxy_tail_reduction;
     j["mpc"] = options.mpc;
     j["mpc depth"] = options.mpc_depth;
     j["mpc ratio"] = options.mpc_ratio;
