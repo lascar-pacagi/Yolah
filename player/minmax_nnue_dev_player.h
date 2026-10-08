@@ -123,7 +123,8 @@ struct MinMaxNNUE_DevOptions {
     int  proxy_reduction = 3;        // ["proxy reduction"] searched at depth − 1 − (this + depth / 4 − 1)
     int  proxy_delta = 0;            // ["proxy delta"] 1: the witness must reach beta + this (0: the proxy cut)
     int  proxy_witness = 0;          // ["proxy witness"] 1: 0 = best-ordered ordinary move, 1 = killer 1,
-                                     //   2 = countermove (no ordering needed: the cheapest witnesses)
+                                     //   2 = countermove, 3 = best ordinary move by history ONLY (no scoring
+                                     //   of the moves: the territory term is the costly part)
     int  proxy_multi_c = 1;          // ["proxy multi c"] 1: cut if >= c of the first m witnesses reach the bound
     int  proxy_multi_m = 1;          // ["proxy multi m"]
     bool proxy_diverse = false;      // ["proxy diverse"] 1: successive witnesses move different pieces
@@ -134,6 +135,9 @@ struct MinMaxNNUE_DevOptions {
                                      //   the one with the best static value after it
     int  proxy_verify = 0;           // ["proxy verify"] 1: cuts at nodes of at least this depth verified by a
                                      //   search of the node itself at the probe depth (0 = never)
+    int  proxy_lazy = 0;             // ["proxy lazy"] 1: a CHEAP witness, probed before any move generation:
+                                     //   1 = killer 1 if legal (else the usual witness), 2 = killer 1 only
+    bool proxy_first = false;        // ["proxy first"] the proxy cut before MPC (O) instead of after it
     int  proxy_tail = 0;             // ["proxy tail"] 1: after a FAILED proxy test, the ordinary moves ordered
                                      //   after the witness: 0 searched as usual, 1 pruned, 2 pruned only if the
                                      //   witness failed by more than "proxy tail margin", 3 reduced by

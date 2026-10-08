@@ -1,0 +1,8 @@
+# Campaign Y6 (search study): a really cheap witness (killer probed before any move generation; history
+# only) at 0.2 s against the proxy cut alone, and the order (proxy cut before MPC 8000) at 1 s against
+# proxy cut + MPC 8000 in the usual order.
+pc_lazy1 pc 200000 1000
+pc_lazy2 pc 200000 1000
+pc_whist pc 200000 1000
+pc_mpc_m8000_first pc_mpc_m8000 1000000 1000
+pc_mpc_m8000_first_lazy1 pc_mpc_m8000 1000000 1000

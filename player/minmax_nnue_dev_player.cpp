@@ -1,4 +1,5 @@
 #include "minmax_nnue_dev_player.h"
+#include <limits>
 #include <thread>
 #include <chrono>
 #include <condition_variable>
@@ -6,6 +7,7 @@
 #include "zobrist.h"
 #include <utility>
 #include <algorithm>
+#include <limits>
 #include <cmath>
 #include <bit>
 #include <immintrin.h>
@@ -365,20 +367,53 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    phase and takes margin = t·σ; here the margin is
     //    mpc_margin + mpc_margin_per_ply · (d − d'), set by matches. As in
     //    Egaroucid, tried only when the static value is already on that side.
-    if (prunable && options.mpc > 0 && depth >= options.mpc_depth) {
-        const int d2 = std::max(1, depth * options.mpc_ratio / 100);
-        const int margin = options.mpc_margin + options.mpc_margin_per_ply * (depth - d2);
-        if (static_eval >= beta && beta + margin < WIN) {
-            const int bound = beta + margin;
-            const int v = negamax(yolah, s, hash, bound - 1, bound, d2);
-            if (stopped()) return 0;
-            if (v >= bound) return beta;
+    constexpr int NO_CUT = std::numeric_limits<int>::min();
+    auto mpc_cut = [&]() -> int {
+        if (prunable && options.mpc > 0 && depth >= options.mpc_depth) {
+            const int d2 = std::max(1, depth * options.mpc_ratio / 100);
+            const int margin = options.mpc_margin + options.mpc_margin_per_ply * (depth - d2);
+            if (static_eval >= beta && beta + margin < WIN) {
+                const int bound = beta + margin;
+                const int v = negamax(yolah, s, hash, bound - 1, bound, d2);
+                if (stopped()) return 0;
+                if (v >= bound) return beta;
+            }
+            if (options.mpc == 2 && static_eval <= alpha && alpha - margin > -WIN) {
+                const int bound = alpha - margin;
+                const int v = negamax(yolah, s, hash, bound, bound + 1, d2);
+                if (stopped()) return 0;
+                if (v <= bound) return alpha;
+            }
         }
-        if (options.mpc == 2 && static_eval <= alpha && alpha - margin > -WIN) {
-            const int bound = alpha - margin;
-            const int v = negamax(yolah, s, hash, bound, bound + 1, d2);
+        return NO_CUT;
+    };
+    if (!options.proxy_first) {
+        const int v = mpc_cut();
+        if (v != NO_CUT) return v;
+    }
+    // N, lazy: a cheap witness (killer 1), probed before any move generation —
+    // a proxy cut at about the cost of a null move. Same conditions as N below.
+    bool proxy_done = false;
+    if (options.proxy_cut == 1 && options.proxy_lazy > 0 && prunable && depth >= options.proxy_depth
+        && !s.proxy_off && static_eval >= beta && beta + options.proxy_delta < WIN) {
+        const Move k = s.killer1[yolah.nb_plies()];
+        if (k != Move::none() && k != tt_move && is_legal(yolah, k)) {
+            const int bound = beta + options.proxy_delta;
+            const int d = depth - 1 - (options.proxy_reduction + depth / 4 - 1);
+            const uint8_t player = yolah.current_player();
+            const uint64_t child = zobrist::update(hash, player, k);
+            s.played[yolah.nb_plies()] = k;
+            if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+            else nnue.play(player, k, s.acc);
+            yolah.play(k);
+            const int v = -negamax(yolah, s, child, -bound, -bound + 1, d);
+            yolah.undo(k);
+            if (!options.lazy_accumulator) nnue.undo(player, k, s.acc);
             if (stopped()) return 0;
-            if (v <= bound) return alpha;
+            if (v >= bound) return v >= WIN ? beta : v;
+            proxy_done = true;               // one witness per node, as usual
+        } else if (options.proxy_lazy == 2) {
+            proxy_done = true;               // killer only: no witness here
         }
     }
     // K. Staged move generation. The table's move is the best move of an
@@ -471,12 +506,17 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    after the witness (see options.proxy_tail).
     bool tail = false, tail_clear = false;
     Move witness = Move::none();
-    if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth && !s.proxy_off
+    bool scores_pending = false;             // witness 3: the moves are scored only if the loop needs them
+    if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth && !s.proxy_off && !proxy_done
         && (options.proxy_cut == 2 || static_eval >= beta)) {
         if (!generated) {                       // the test needs the move list
             yolah.moves(moves);
             generated = true;
-            score_moves(yolah, s, tt_move, moves, scores, depth);
+            if (options.proxy_cut == 1 && options.proxy_witness == 3) {
+                scores_pending = true;
+            } else {
+                score_moves(yolah, s, tt_move, moves, scores, depth);
+            }
             n = moves.size();
         }
         // Search move m at depth d against `bound` (null window); the value for us.
@@ -515,7 +555,29 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             // from rank proxy_rank on. Witness 1/2: the killer / the countermove.
             int cand[Yolah::MAX_NB_MOVES];
             int nc = 0;
-            if (options.proxy_witness == 0) {
+            if (options.proxy_witness == 3) {
+                // by history only, among the non-special moves (no territory term)
+                const uint16_t ply = yolah.nb_plies();
+                const uint8_t player = yolah.current_player();
+                Move counter = Move::none();
+                if (options.countermove && ply > 0) {
+                    const Move prev = s.played[ply - 1];
+                    counter = s.w->countermoves[prev.from_sq()][prev.to_sq()];
+                }
+                for (size_t j = 0; j < n; j++) {
+                    const Move m = moves[j];
+                    if (m == tt_move || m == s.killer1[ply] || m == s.killer2[ply] || (m == counter && counter != Move::none()))
+                        continue;
+                    cand[nc++] = int(j);
+                }
+                std::stable_sort(cand, cand + nc, [&](int a, int b) {
+                    return s.w->history[player][moves[a].from_sq()][moves[a].to_sq()]
+                         > s.w->history[player][moves[b].from_sq()][moves[b].to_sq()];
+                });
+                const int r = std::min(nc, options.proxy_rank);
+                std::copy(cand + r, cand + nc, cand);
+                nc -= r;
+            } else if (options.proxy_witness == 0) {
                 for (size_t j = 0; j < n; j++) if (scores[j] < SCORE_COUNTER) cand[nc++] = int(j);
                 std::stable_sort(cand, cand + nc, [&](int a, int b) { return scores[a] > scores[b]; });
                 const int r = std::min(nc, options.proxy_rank);
@@ -617,6 +679,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             }
         }
     }
+    if (options.proxy_first) {
+        const int v = mpc_cut();
+        if (v != NO_CUT) return v;
+    }
     // P. Stockfish's ProbCut, generalized to a game without captures: the
     //    best-ordered moves (table's move first), at most "probcut" of them,
     //    each searched at depth − probcut_reduction against beta + margin; the
@@ -629,6 +695,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             generated = true;
             score_moves(yolah, s, tt_move, moves, scores, depth);
             n = moves.size();
+        }
+        if (scores_pending) {
+            score_moves(yolah, s, tt_move, moves, scores, depth);
+            scores_pending = false;
         }
         const int bound = beta + options.probcut_margin;
         bool taken[Yolah::MAX_NB_MOVES]{};
@@ -655,6 +725,9 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (stopped()) return 0;
             if (v >= bound) return v >= WIN ? beta : v;
         }
+    }
+    if (scores_pending) {
+        score_moves(yolah, s, tt_move, moves, scores, depth);
     }
     const int alpha_orig = alpha;
     int best = -INFINITE;
@@ -1372,6 +1445,8 @@ json MinMaxNNUE_DevPlayer::config() {
     j["proxy prefilter"] = options.proxy_prefilter;
     j["proxy weval"] = options.proxy_weval;
     j["proxy verify"] = options.proxy_verify;
+    j["proxy lazy"] = options.proxy_lazy;
+    j["proxy first"] = options.proxy_first;
     j["proxy tail"] = options.proxy_tail;
     j["proxy tail keep"] = options.proxy_tail_keep;
     j["proxy tail margin"] = options.proxy_tail_margin;

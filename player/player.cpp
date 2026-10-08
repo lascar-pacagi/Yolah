@@ -388,6 +388,8 @@ unique_ptr<Player> Player::create(const json& j) {
              options.proxy_prefilter = j.value("proxy prefilter", options.proxy_prefilter);
              options.proxy_weval = j.value("proxy weval", options.proxy_weval);
              options.proxy_verify = j.value("proxy verify", options.proxy_verify);
+             options.proxy_lazy = j.value("proxy lazy", options.proxy_lazy);
+             options.proxy_first = j.value("proxy first", options.proxy_first);
              options.proxy_tail = j.value("proxy tail", options.proxy_tail);
              options.proxy_tail_keep = j.value("proxy tail keep", options.proxy_tail_keep);
              options.proxy_tail_margin = j.value("proxy tail margin", options.proxy_tail_margin);
