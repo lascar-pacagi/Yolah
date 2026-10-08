@@ -1,0 +1,7 @@
+# Campaign Y5 (search study, 1 s/move): what the proxy cut adds to a well-tuned MPC (direct matches, 1000
+# rounds), the best MPCs against "none", and the proxy cut against the best MPC.
+pc_mpc_m8000 mpc_m8000 1000000 1000
+pc_mpc_m4000_pp500 mpc_m4000_pp500 1000000 1000
+mpc_m8000 none 1000000 500
+mpc_m4000_pp500 none 1000000 500
+pc mpc_m4000_pp500 1000000 500
