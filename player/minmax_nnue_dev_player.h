@@ -81,7 +81,11 @@
 //   O. Multi-ProbCut (Buro) without its regression ("mpc", "mpc ratio",
 //      "mpc margin", "mpc margin per ply"): this position searched at a
 //      shallow depth d' against beta + margin (and alpha − margin), the
-//      margin set by matches as Stockfish sets its own. Off by default.
+//      margin set by matches as Stockfish sets its own. On by default since
+//      the study (Y1–Y6, 2026-10): both directions, margin 4000 + 500 per ply
+//      of depth − d', +57 over none at 1 s/move; the proxy cut kept after it
+//      (+8 [−2, +19]), in Yolah as in Edax and NTest a tuned MPC leaves the
+//      proxy cut little to add.
 //   P. Stockfish's ProbCut generalized ("probcut" moves, "probcut margin",
 //      "probcut reduction", "probcut filter"): the best-ordered moves at
 //      depth − 4 against beta + margin. Off by default. O and P are the
@@ -150,12 +154,13 @@ struct MinMaxNNUE_DevOptions {
     int  proxy_tail_step = 4;        // ["proxy tail step"] mode 4, progressive: the k-th move after the witness
     int  proxy_tail_cap = 3;         // ["proxy tail cap"]   is reduced by min(cap, reduction + k / step) more,
                                      //   one more after a clear failure (by more than "proxy tail margin")
-    int  mpc = 0;                    // ["mpc"] O. Multi-ProbCut without regression: 0 off, 1 fail high only,
+    int  mpc = 2;                    // ["mpc"] O. Multi-ProbCut without regression: 0 off, 1 fail high only,
                                      //   2 both directions (see negamax)
     int  mpc_depth = 5;              // ["mpc depth"] only at nodes of at least this depth
     int  mpc_ratio = 40;             // ["mpc ratio"] shallow depth d' = max(1, depth · ratio / 100)
-    int  mpc_margin = 3000;          // ["mpc margin"] margin = this + per ply · (depth − d')
-    int  mpc_margin_per_ply = 0;     // ["mpc margin per ply"]
+    int  mpc_margin = 4000;          // ["mpc margin"] margin = this + per ply · (depth − d')
+    int  mpc_margin_per_ply = 500;   // ["mpc margin per ply"] (defaults: best of the study, Y2/Y5: +57 vs none at 1 s;
+                                     //   the proxy cut after it +8 [−2, +19], before it −27)
     int  probcut = 0;                // ["probcut"] P. Stockfish's ProbCut generalized: number of moves tried
                                      //   (0 = off), each against beta + "probcut margin"
     int  probcut_depth = 5;          // ["probcut depth"] only at nodes of at least this depth (SF: > 4)

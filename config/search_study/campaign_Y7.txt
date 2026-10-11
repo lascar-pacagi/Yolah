@@ -1,0 +1,11 @@
+# Campaign Y7 (validation of the new dev defaults, 2026-10-11): dev_y7 = proxy cut + MPC 4000 + 500/ply (the dev
+# player's defaults now) against the previous dev (pc = proxy cut only) and against the frozen baseline (the search
+# of MinMaxNNUE_QuantizedPlayer on 1 thread), at 0.2 s, 1 s and 3 s per move; previous dev vs baseline at 1 s.
+# Total Elo of the search work = dev_y7 vs baseline.
+dev_y7 pc 200000 2000
+dev_y7 pc 1000000 2000
+dev_y7 pc 3000000 1000
+dev_y7 baseline 200000 1000
+dev_y7 baseline 1000000 1000
+dev_y7 baseline 3000000 500
+pc baseline 1000000 1000
