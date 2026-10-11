@@ -1,0 +1,598 @@
+---
+title: "Améliorer le NNUE de Yolah"
+subtitle: "Ce que fait le réseau aujourd'hui, ce qui le limite, et les transformations proposées"
+date: today
+lang: fr
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: true
+    theme: cosmo
+    css: styles.css
+    grid:
+      body-width: 1050px
+      sidebar-width: 260px
+      margin-width: 150px
+    fig-align: center
+    code-overflow: wrap
+    html-math-method: mathjax
+    embed-resources: true
+---
+
+# Où en est-on
+
+La recherche du joueur minimax a été améliorée pas à pas, toujours avec le même réseau
+(`nnue_193x1024x64x32x1_distill`, int8). Mesuré contre l'étalon figé (la recherche de
+`MinMaxNNUE_QuantizedPlayer` sur un thread), le joueur dev gagne :
+
+| Cadence | 0,2 s | 1 s | 3 s |
+|---|---|---|---|
+| dev contre étalon (campagne Y7, 2000 / 2000 / 1000 parties) | +280 | +295 | +308 |
+
+Les derniers réglages de la recherche (proxy cut, MPC, ordre des coups, LMR, élagages) sont sur un plateau :
+les variantes testées restent à ±5 Elo les unes des autres. Deux mesures disent où se trouve la marge suivante :
+
+- **le réseau coûte cher** : `NNUE_Quantized::value()` représente à lui seul environ 51 % des instructions
+  exécutées pendant la recherche (profil callgrind) ; la logique de la recherche, moins de 3 % ;
+- **le réseau est loin de son maître** : dans le tournoi de classement (2 s/coup, avant le travail sur la
+  recherche), le joueur MCTS avec le ResNet était environ 400 Elo au-dessus du meilleur minimax NNUE. La
+  recherche en a rattrapé une partie ; l'écart restant est à remesurer, mais il vient de l'évaluation.
+
+L'étape suivante est donc l'évaluation. Ce document décrit le réseau actuel en partant du code, puis cinq
+transformations, de la moins coûteuse à la plus coûteuse, avec à chaque fois ce qui change dans le code.
+
+# Le NNUE d'aujourd'hui
+
+![Le réseau actuel : 193 entrées binaires, un accumulateur de 1024 neurones mis à jour à chaque coup, puis trois petites couches recalculées à chaque évaluation.](figs/fig-nnue-now.png){#fig-now width=95%}
+
+## Les entrées
+
+La position est codée en 193 bits : trois plans de 64 cases (pièces noires, pièces blanches, trous) et un bit
+pour le joueur au trait. C'est `preprocess_nnue.py` qui fabrique le cache d'entraînement :
+
+```python
+# nnue/preprocess_nnue.py
+inputs[cursor, 0:64]    = bb_to_bits(y.black)      # pièces noires
+inputs[cursor, 64:128]  = bb_to_bits(y.white)      # pièces blanches
+inputs[cursor, 128:192] = bb_to_bits(y.empty)      # trous (cases déjà jouées)
+inputs[cursor, 192]     = 0 if black_to_move else 1
+values[cursor] = z_black if black_to_move else -z_black   # résultat, pour le joueur au trait
+```
+
+## Le réseau
+
+Quatre couches linéaires. Les trois premières utilisent une activation « ReLU écrêtée » à $[0,1]$ et des poids
+bornés à $\pm 127/64$, pour pouvoir être quantifiées en int8. La dernière, la tête de valeur, reste libre et
+passe par une tanh :
+
+```python
+# nnue/nnue193x1024x64x32x1.py
+def forward(self, x):
+    x = self.fc1(x);  x = torch.clamp(x, min=0.0, max=1.0)   # accumulateur (1024)
+    x = self.fc2(x);  x = torch.clamp(x, min=0.0, max=1.0)   # 64
+    x = self.fc3(x);  x = torch.clamp(x, min=0.0, max=1.0)   # 32
+    return torch.tanh(self.fc4(x)).squeeze(-1)               # valeur dans (-1, 1)
+```
+
+## L'inférence en C++ : la mise à jour incrémentale
+
+Tout l'intérêt d'un NNUE est dans la première couche. Un coup de Yolah ne touche que trois entrées : la pièce
+quitte la case $a$, arrive sur la case $b$, et $a$ devient un trou. On ne recalcule donc pas le produit
+$W_1 x$ : on ajoute ou retranche trois lignes de $W_1$ (et celle du trait) aux 1024 sommes de l'accumulateur :
+
+```cpp
+// nnue/nnue_quantized.cpp — NNUE_Quantized::play
+int pos = (player == Yolah::BLACK) ? 0 : 64;            // plan des pièces du joueur
+int from_offset  = (pos + from) * H1_SIZE;
+int to_offset    = (pos + to)   * H1_SIZE;
+int empty_offset = (128 + from) * H1_SIZE;              // la case quittée devient un trou
+for (int j = 0; j < H1_SIZE; j++)
+    a.acc[j] += -input_to_h1[from_offset + j] + input_to_h1[to_offset + j] + input_to_h1[empty_offset + j];
+```
+
+Le reste du réseau (1024 → 64 → 32 → 1) est recalculé à chaque évaluation. C'est là que part le temps :
+
+```cpp
+// nnue/nnue_quantized.cpp — NNUE_Quantized::value (réseau de valeur)
+for (int i = 0; i < H1_SIZE; i++) h1[i] = clamp(a.acc[i], 0, FACTOR);   // ReLU écrêtée, int8
+matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);                           // 64 Ki multiplications
+matvec<32, 64>(h2_to_h3, h2, h3, h3_bias);
+float s = 0;
+for (int i = 0; i < H3_SIZE; i++) s += value_weight[i] * h3[i];        // tête en float
+return std::tanh(s / FACTOR + value_bias);
+```
+
+La recherche multiplie ensuite cette valeur par `WIN` = 30000 pour obtenir un entier
+(`MinMaxNNUE_DevPlayer::raw_network_value`).
+
+## L'entraînement : distillation du ResNet
+
+Le réseau est entraîné par distillation (`distill_common.py`). Le maître est le ResNet valeur/politique du
+joueur MCTS. Pour chaque position d'une partie, la perte mélange la valeur du maître $v_t$ et le résultat de
+la partie $z$ :
+
+$$
+L = \alpha\,\mathrm{MSE}(v_s, v_t) + (1-\alpha)\,\mathrm{MSE}(v_s, z), \qquad \alpha = 0{,}8 .
+$$
+
+# Ce qui limite le réseau actuel
+
+**Chaque motif est appris deux fois.** Les entrées disent « noir / blanc » plus un bit de trait. Or la
+position de départ est symétrique : le miroir a$\leftrightarrow$h envoie exactement les pièces noires
+(a1, h8, d5, e4) sur les pièces blanches (h1, a8, e5, d4). « Ma pièce enfermée dans un coin » doit donc être
+appris une fois pour Noir et une fois pour Blanc, et le bit de trait, qui n'agit qu'en ajoutant une seule ligne à
+l'accumulateur, peut difficilement retourner le sens de tout le reste.
+
+**Une seule tête pour toute la partie.** En début de partie, tout le plateau est connecté. Vers 24 cases
+libres apparaissent des territoires privés, et en dessous de 15 le plateau est découpé en régions séparées.
+Ce sont presque des jeux différents, et les 64 + 32 neurones doivent tous les couvrir.
+
+**La cible est grossière.** Le résultat $z \in \{-1, 0, 1\}$ est un seul tirage d'une variable aléatoire, et la
+tanh comprime les positions nettement gagnantes vers $\pm 1$. Or la recherche a besoin de nuances. L'étude M
+(arrondir la valeur du réseau à un multiple de $G$) a montré qu'il faut au moins 60 à 120 niveaux distincts :
+
+![Elo du dev quand la valeur du réseau est arrondie à un multiple de $G$ (valeurs entre −30000 et +30000) : en dessous d'une soixantaine de niveaux, la force s'effondre ; à G = 2048, la recherche fait pourtant 34 % de nœuds en moins.](figs/fig-nnue-grain.png){#fig-grain width=60%}
+
+**Les données ne ressemblent pas aux positions évaluées.** Le réseau apprend sur des positions de parties,
+c'est-à-dire des positions où les deux joueurs ont joué de bons coups. La recherche, elle, évalue surtout des
+positions issues de mauvais coups (les lignes réfutées des arbres alpha-bêta), qu'il n'a presque jamais vues.
+
+**Il ne voit que des cases, pas des structures.** Mobilité, territoire et régions sont des propriétés globales
+qu'un réseau à une couche cachée large reconstruit mal. L'étude J l'a montré à sa façon : l'influence
+(le Voronoi en pas de roi) prédit 4 à 6 fois mieux que le hasard le coup du ResNet. La recherche la calcule
+déjà pour ordonner les coups.
+
+# Les transformations proposées
+
+![Le réseau proposé : deux accumulateurs (un par point de vue), quelques entrées globales ajoutées après l'accumulateur, une tête par phase de jeu, et une sortie plus fine que gagné / nul / perdu.](figs/fig-nnue-target.png){#fig-target width=100%}
+
+## Coder du point de vue du joueur au trait
+
+On remplace « noires / blanches / trait » par « mes pièces / ses pièces / trous », vus par le joueur au trait,
+avec le plateau en miroir a$\leftrightarrow$h quand c'est Blanc (le miroir qui échange exactement les positions de
+départ). Le bit de trait disparaît : 192 entrées.
+
+À l'entraînement, c'est une transformation du cache :
+
+```python
+# esquisse : nouvel encodage (preprocess)
+def mirror_files(bb: int) -> int:            # a<->h sur chaque rangée
+    return int.from_bytes(bytes(int(f'{b:08b}'[::-1], 2) for b in bb.to_bytes(8, 'big')), 'big')
+
+mine, theirs = (y.black, y.white) if black_to_move else (y.white, y.black)
+holes = y.empty
+if not black_to_move:
+    mine, theirs, holes = map(mirror_files, (mine, theirs, holes))
+inputs[cursor, 0:64], inputs[cursor, 64:128], inputs[cursor, 128:192] = map(bb_to_bits, (mine, theirs, holes))
+```
+
+### Les entrées : trois blocs de 64
+
+Le réseau ne connaît plus les couleurs. Ses 192 entrées, et donc les 192 lignes de la matrice de poids de la
+première couche, sont rangées en trois blocs :
+
+| Lignes | Contenu |
+|---|---|
+| 0–63 | **mes pièces** : celles du propriétaire de l'accumulateur |
+| 64–127 | **ses pièces** : celles de l'adversaire |
+| 128–191 | les **trous** |
+
+Une pièce sur la case `sq` active la ligne `plane + sq`, avec `plane` = 0 si elle est « à moi », 64 si elle
+est « à lui ». Il n'y a **qu'une seule matrice**, partagée par les deux points de vue.
+
+### Deux accumulateurs, un par couleur
+
+Chaque accumulateur appartient à une **couleur fixe**, pas au joueur au trait :
+
+| Accumulateur | Lignes 0–63 | Lignes 64–127 | Cases |
+|---|---|---|---|
+| `acc[BLACK_VIEW]` | pièces noires | pièces blanches | telles quelles : `sq` |
+| `acc[WHITE_VIEW]` | pièces blanches | pièces noires | miroir a$\leftrightarrow$h : `sq ^ 7` |
+
+Le miroir s'applique **toujours** à l'accumulateur blanc, quel que soit le joueur qui joue, et à toutes ses
+entrées (pièces des deux couleurs et trous). Avec `sq = 8 × rangée + colonne` (`SQ_A1` = 0, `SQ_H1` = 7),
+`sq ^ 7` change la colonne $c$ en $7 - c$ sans toucher à la rangée. Les blancs, qui partent de h1, a8, e5, d4,
+se voient ainsi partir de a1, h8, d5, e4, comme les noirs : un seul jeu de poids sert aux deux camps.
+
+`value()` lit l'accumulateur du joueur au trait. Le réseau voit donc toujours « mes pièces dans le bloc 0, sur
+un plateau orienté comme pour les noirs ». Mais l'accumulateur lu change à chaque demi-coup.
+
+### Un coup met à jour les deux accumulateurs
+
+La pièce qui bouge est « à moi » dans l'accumulateur de sa couleur et « à lui » dans l'autre. Dans chacun, on la
+déplace dans son bloc et on ajoute le trou :
+
+```cpp
+// esquisse : NNUE_Quantized::play avec deux points de vue
+// Le point de vue noir garde les cases telles quelles ; le point de vue blanc les voit
+// dans le miroir a<->h. Avec sq = 8 * rangée + colonne, sq ^ 7 change la colonne c en 7 - c.
+constexpr int view_square(int v, int sq) { return v == BLACK_VIEW ? sq : sq ^ 7; }
+
+for (int v : {BLACK_VIEW, WHITE_VIEW}) {
+    const bool own = (v == BLACK_VIEW) == (player == Yolah::BLACK);  // la pièce est-elle « à moi » ?
+    const int f = view_square(v, from), t = view_square(v, to);
+    const int plane = own ? 0 : 64;
+    sub_row(a.acc[v], plane + f);   // la pièce quitte f (dans son bloc)
+    add_row(a.acc[v], plane + t);   // elle arrive en t (même bloc)
+    add_row(a.acc[v], 128 + f);     // f devient un trou
+}
+```
+
+Exemple, **les noirs jouent d5 → d6** :
+
+| Accumulateur | `own` | `plane` | Cases | Mises à jour |
+|---|---|---|---|---|
+| `acc[BLACK_VIEW]` | oui | 0 | d5, d6 | `sub(0 + d5)`, `add(0 + d6)`, `add(128 + d5)` |
+| `acc[WHITE_VIEW]` | non | 64 | e5, e6 (miroir) | `sub(64 + e5)`, `add(64 + e6)`, `add(128 + e5)` |
+
+Quand l'adversaire joue, notre accumulateur reçoit donc son coup dans le bloc 64.
+
+**Pourquoi tenir les deux à jour à chaque coup.** Un accumulateur doit toujours représenter la position actuelle
+complète, vue depuis sa couleur. Or chacun n'est lu qu'un demi-coup sur deux :
+
+| Instant | Trait | Accumulateur lu |
+|---|---|---|
+| position P | noirs | `acc[BLACK_VIEW]` |
+| les noirs jouent d5→d6 → P' | blancs | `acc[WHITE_VIEW]` (le coup noir y est dans le bloc 64) |
+| les blancs jouent → P'' | noirs | `acc[BLACK_VIEW]` |
+
+Si `acc[WHITE_VIEW]` ne recevait que les coups blancs, il évaluerait P' sur un plateau où la pièce noire est
+encore en d5. Il faudrait alors le reconstruire à chaque lecture, en sommant 30 à 50 lignes (8 pièces plus les
+trous), au lieu de 3 lignes par accumulateur et par coup. Dans la recherche, `value()` est appelée aux
+profondeurs paires comme impaires, et `undo` dépile l'état du parent : les deux accumulateurs doivent être
+justes à chaque nœud de la pile.
+
+### La couche suivante
+
+Deux variantes, à mesurer toutes les deux à l'étape 1 :
+
+```cpp
+// esquisse : NNUE_Quantized::value, entrée de la couche 64
+const auto& us   = a.acc[side_to_move == BLACK ? BLACK_VIEW : WHITE_VIEW];
+const auto& them = a.acc[side_to_move == BLACK ? WHITE_VIEW : BLACK_VIEW];
+// (a) h1 = clamp(us)          → 1024 entrées, couche 64 inchangée
+// (b) h1 = clamp([us, them])  → 2048 entrées (comme Stockfish)
+```
+
+- **(a) `us` seul** : `value()` ne change pas de coût. L'accumulateur de l'adversaire ne sert qu'à préparer
+  le demi-coup suivant.
+- **(b) `[us, them]`** : on concatène les deux, **toujours dans l'ordre [joueur au trait, adversaire]**.
+  La première moitié des poids de la couche 64 s'applique toujours à l'accumulateur du joueur au trait, la
+  seconde à celui de l'adversaire. Il n'y a rien à copier : on choisit deux pointeurs selon le trait. Le réseau
+  voit aussi la position du point de vue adverse, mais la couche 64 double.
+
+Le coût de `play()` est faible dans les deux cas : 6 additions de lignes de 1024 int16 au lieu de 3. C'est la
+règle de tous les NNUE d'échecs depuis Stockfish 12.
+
+## Une tête par phase de jeu
+
+On garde le ou les accumulateurs, mais $K$ jeux de couches 1024 → 64 → 32 → 1. On choisit lequel utiliser
+d'après le nombre de cases libres (Stockfish fait la même chose avec le nombre de pièces, $K = 8$). À
+l'entraînement, on calcule toutes les têtes et on garde la bonne :
+
+```python
+# esquisse : têtes par phase (PyTorch)
+class Net(nn.Module):
+    def __init__(self, K=8):
+        self.fc1  = nn.Linear(192, 1024)
+        self.fc2  = nn.Linear(1024, 64 * K)          # les K têtes en un seul produit
+        self.fc3  = nn.ModuleList(nn.Linear(64, 32) for _ in range(K))
+        self.head = nn.ModuleList(nn.Linear(32, 1) for _ in range(K))
+
+    def forward(self, x, bucket):                    # bucket = f(nombre de cases libres)
+        h1 = torch.clamp(self.fc1(x), 0, 1)
+        h2 = torch.clamp(self.fc2(h1).view(-1, K, 64), 0, 1)
+        h2 = h2[torch.arange(len(x)), bucket]        # la tête de la phase
+        ...
+```
+
+En C++, `value()` fait le même travail qu'aujourd'hui, seulement avec les matrices de la tête choisie : le
+coût ne change pas, la taille du fichier de poids est multipliée par environ $K$ pour les petites couches.
+
+```cpp
+// esquisse
+const int free_squares = 56 - std::popcount(yolah.empty);   // 8 pièces, un trou par coup
+const int k = std::min(K - 1, free_squares * K / 57);
+matvec<64, 1024>(h1_to_h2[k], h1, h2, h2_bias[k]);
+```
+
+## Des entrées globales après l'accumulateur
+
+Mobilité, comptes d'influence, taille des régions : ces valeurs ne se mettent pas à jour incrémentalement, mais
+elles n'ont pas besoin d'entrer dans l'accumulateur. On les concatène à la sortie de l'accumulateur, à l'entrée
+de la couche 64 : quelques colonnes de plus dans une petite matrice. La recherche calcule déjà l'influence
+(`territory_ordering`, l'ordre des coups par territoire, +36 Elo dans l'étude J), et le cache d'évaluation
+évite de la recalculer.
+
+```python
+# esquisse : k entrées globales, normalisées dans [0, 1]
+h1 = torch.clamp(self.fc1(x), 0, 1)
+h1 = torch.cat([h1, globals_], dim=1)            # (B, 1024 + k)
+h2 = torch.clamp(self.fc2(h1), 0, 1)
+```
+
+Ce point est le plus incertain : il coûte un calcul global par évaluation, à mettre en balance avec le gain.
+
+## Une cible plus fine : l'écart de score
+
+Le score de Yolah donne une cible naturellement graduée : l'écart de points entre les joueurs. Deux formes
+possibles :
+
+- **régression** de l'écart final (ou de l'écart prédit par le maître), sans tanh, la valeur entière de la
+  recherche étant directement proportionnelle à l'écart prévu ;
+- **classes** d'écart (par exemple $-10\ldots+10$ et deux classes « au-delà ») avec une entropie croisée à
+  l'entraînement, et l'espérance de l'écart utilisée en jeu. C'est l'idée « des classes pour apprendre, un
+  scalaire pour jouer » tirée de l'étude M.
+
+```python
+# esquisse : la perte avec des classes d'écart
+logits = model(x, bucket)                         # (B, C)
+loss   = F.cross_entropy(logits, target_class)    # cible : classe de l'écart (du maître ou de la partie)
+value  = (logits.softmax(-1) * class_centres).sum(-1)   # en jeu : l'espérance, un nombre gradué
+```
+
+Le maître actuel ne prédit qu'une valeur dans $(-1, 1)$. Un script d'entraînement de ResNet avec l'écart de
+score existe déjà (`nnue/cnn_resnet_with_diff_score.py`) : c'est le point de départ naturel pour un maître qui
+prédit l'écart.
+
+## Apprendre sur les positions que la recherche évalue
+
+![Le circuit des données, aujourd'hui et proposé.](figs/fig-nnue-data.png){#fig-data width=90%}
+
+On fait jouer le joueur dev, et pendant ses recherches on tire au hasard des positions **évaluées** (feuilles et
+nœuds internes, y compris les lignes réfutées). Le maître les étiquette, sur le cluster, à environ $10^9$
+positions par jour sur une RTX 3080. On peut améliorer l'étiquette en la faisant précéder d'une petite
+recherche (quelques centaines de visites MCTS), plus coûteuse mais plus juste que le réseau seul. Cette
+transformation demande le plus de travail et de calcul, et c'est probablement elle qui rapporte le plus.
+
+## Taille et vitesse
+
+`value()` représente à elle seule environ 51 % des instructions du joueur. Un réseau plus petit ou plus rapide
+peut donc battre un réseau plus juste : chaque nanoseconde gagnée par évaluation se transforme en nœuds, donc en
+profondeur. Cette section regarde où part le temps aujourd'hui, puis ce qu'on peut changer.
+
+### Où part le temps aujourd'hui
+
+`value()` écrête l'accumulateur en int8 sur $[0, 64]$, puis enchaîne deux produits matrice–vecteur AVX2 et un
+petit produit scalaire en float :
+
+```cpp
+// nnue/nnue_quantized.cpp : NNUE_Quantized::value (sortie scalaire)
+for (int i = 0; i < H1_SIZE; i++) {
+    const int16_t v = a.acc[i];
+    h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v);        // FACTOR = 64
+}
+matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);                  // 65 536 multiplications
+matvec<32, 64>(h2_to_h3, h2, h3, h3_bias);                    //  2 048
+for (int i = 0; i < H3_SIZE; i++) s += value_weight[i] * h3[i];  // 32
+return std::tanh(s / FACTOR + value_bias);
+```
+
+Le produit de `matvec` est `_mm256_maddubs_epi16` suivi de `_mm256_madd_epi16`, ou une seule instruction
+`_mm256_dpbusd_epi32` quand VNNI est disponible (`USE_VNNI`). Le décompte par évaluation :
+
+| Étape | Travail | Octets de poids lus | Part des multiplications |
+|---|---|---|---|
+| écrêtage de l'accumulateur | 1024 int16 → int8 | 2 Ko (l'accumulateur) | — |
+| `h1_to_h2` (1024 → 64) | 65 536 mult. int8 | **64 Ko** | **97 %** |
+| `h2_to_h3` (64 → 32) | 2 048 mult. int8 | 2 Ko | 3 % |
+| tête (32 → 1) | 32 mult. float + `tanh` | 128 o | ≈ 0 |
+
+Et pour `play()`, à chaque coup : 3 lignes de `input_to_h1` (départ, arrivée, trou) plus la ligne du trait, soit
+4 lignes de 1024 int8 ajoutées à l'accumulateur int16. Avec le point de vue du joueur au trait, la ligne du
+trait disparaît, mais il y a deux accumulateurs : 6 lignes au lieu de 4.
+
+**La couche 1024 → 64 est donc presque tout le coût.** Toutes les pistes ci-dessous la visent.
+
+### La taille de l'accumulateur
+
+Le coût de `h1_to_h2` et celui de `play()` sont proportionnels à la taille $H_1$ de l'accumulateur :
+
+| $H_1$ | Mult. `h1_to_h2` | Poids `h1_to_h2` | Octets lus par `play()` (2 points de vue) |
+|---|---|---|---|
+| 512 | 32 768 | 32 Ko (tient dans le L1) | 6 Ko |
+| 1024 (aujourd'hui) | 65 536 | 64 Ko | 12 Ko |
+| 2048 | 131 072 | 128 Ko | 24 Ko |
+
+À 512, `h1_to_h2` tient dans le cache L1 (32 à 48 Ko) : le gain peut dépasser le facteur 2 du nombre de
+multiplications. À 2048, il faut que la précision gagnée compense une évaluation près de deux fois plus lente.
+Seule une mesure en jeu tranche, et elle ne vaut que **une fois le point de vue et les têtes en place**,
+parce que ces deux changements modifient ce que le réseau arrive à apprendre à taille donnée.
+
+### Sauter les zéros de l'accumulateur
+
+Après l'écrêtage, une partie des 1024 valeurs de `h1` vaut 0. Une colonne de `h1_to_h2` multipliée par 0 ne
+sert à rien. Stockfish exploite ça : il repère les blocs non nuls de `h1`, puis n'accumule que les colonnes
+correspondantes. Il faut pour ça ranger `h1_to_h2` par entrée (colonne) plutôt que par sortie (ligne) :
+
+```cpp
+// esquisse : produit creux, h1_to_h2 rangé par blocs de 4 entrées (64 sorties × 4 int8 = 256 o)
+int nz[H1_SIZE / 4], n = 0;
+for (int j = 0; j < H1_SIZE / 4; j++)                        // en pratique : masque SIMD + table
+    if (reinterpret_cast<const int32_t*>(h1)[j] != 0) nz[n++] = j;
+
+__m256i sum[8] = {};                                         // 64 sorties int32
+for (int k = 0; k < n; k++) {
+    const int j = nz[k];
+    const __m256i in = _mm256_set1_epi32(reinterpret_cast<const int32_t*>(h1)[j]);  // 4 entrées
+    const int8_t* w = h1_to_h2_by_input + j * 256;
+    for (int o = 0; o < 8; o++)
+        mm256_dpwssds_avx_epi32(sum[o], in, _mm256_load_si256((const __m256i*)(w + 32 * o)));
+}
+```
+
+Le gain dépend directement de la proportion de zéros. **Avant d'écrire ce code, il faut la mesurer** sur les
+positions de `search_bench`, avec un simple compteur dans `value()`. Avec 50 % de blocs nuls, `h1_to_h2` coûte
+deux fois moins ; avec 10 %, ça ne vaut pas la complexité. À l'entraînement, une petite pénalité L1 sur `h1`
+augmente la proportion de zéros.
+
+### Le produit par paires
+
+Stockfish coupe l'accumulateur en deux moitiés et multiplie les deux, terme à terme, après écrêtage. La couche
+suivante reçoit 2 fois moins d'entrées, donc coûte 2 fois moins. Le produit apporte en plus une non-linéarité
+que la ReLU écrêtée seule n'a pas :
+
+```python
+# esquisse : produit par paires (PyTorch), accumulateur de 1024
+h1 = torch.clamp(self.fc1(x), 0, 1)
+h1 = h1[:, :512] * h1[:, 512:]          # 512 entrées pour fc2 au lieu de 1024
+h2 = torch.clamp(self.fc2(h1), 0, 1)    # nn.Linear(512, 64)
+```
+
+```cpp
+// esquisse : en C++, le produit de deux valeurs dans [0, 64] ramené dans [0, 64]
+for (int i = 0; i < H1_SIZE / 2; i++) {
+    const int x = std::clamp<int>(a.acc[i], 0, FACTOR);
+    const int y = std::clamp<int>(a.acc[i + H1_SIZE / 2], 0, FACTOR);
+    h1[i] = (x * y) >> 6;                  // / FACTOR
+}
+matvec<64, H1_SIZE / 2>(h1_to_h2, h1, h2, h2_bias);
+```
+
+Le produit retombe dans $[0, 64]$, donc la suite de `value()` ne change pas. Le produit par paires produit
+aussi beaucoup de zéros (il suffit qu'une des deux moitiés soit nulle), ce qui se combine bien avec le produit
+creux.
+
+### La SCReLU
+
+C'est l'alternative au produit par paires : on garde toutes les entrées, mais on élève au carré la valeur
+écrêtée, `SCReLU(a) = clamp(a, 0, 1)²`. Elle n'allège pas la couche suivante ; elle donne plus de capacité pour
+le même coût. En C++, c'est le même calcul que ci-dessus avec `y = x`. Il faut choisir entre les deux par la
+mesure, pas les cumuler.
+
+### Pourquoi le carré ou le produit donnent plus de capacité
+
+**Aujourd'hui, avec la CReLU.** Un neurone de l'accumulateur est une somme, où `x[...]` vaut 1 si l'entrée est
+active (une pièce ou un trou sur cette case), 0 sinon :
+
+```
+a = b + w[d5]·x[d5] + w[e5]·x[e5] + w[c3]·x[c3] + ...
+```
+
+Si `a` reste entre 0 et 1, la CReLU le laisse passer tel quel. Une pièce en d5 ajoute alors toujours `w[d5]` à
+`a`, que e5 soit un trou ou non : **l'effet de d5 ne dépend pas du reste du plateau**. La couche suivante fait
+elle aussi des sommes, donc tant que tous les neurones restent entre 0 et 1, le réseau entier n'est qu'une somme
+de contributions, une par case. Il ne peut pas dire « d5 vaut plus *si* e5 est un trou ».
+
+La seule façon d'y arriver passe par les coupures en 0 et en 1. Exemple, avec un neurone réglé pour cela :
+
+```
+a = −1 + 0,8·x[d5] + 0,8·x[e5]
+
+d5 seul       : a = −0,2  → CReLU → 0      (éteint)
+e5 seul       : a = −0,2  → CReLU → 0      (éteint)
+d5 et e5      : a = +0,6  → CReLU → 0,6    (allumé)
+```
+
+Le biais −1 tient le neurone sous 0 ; il ne s'allume que si d5 **et** e5 sont présents : c'est un « ET » obtenu
+par le seuil. Mais il faut un neurone entier pour cette paire, et dans une vraie position les autres cases
+ajoutent aussi leurs poids à `a`, ce qui déplace le seuil. Pour couvrir beaucoup de paires de cases, et de façon
+fiable, il faut beaucoup de neurones.
+
+**Avec la SCReLU**, on élève au carré. Avec seulement deux entrées, pour voir ce qui se passe :
+
+```
+a  = b + p·x[d5] + q·x[e5]
+
+a² = b²
+   + 2b·p·x[d5] + 2b·q·x[e5]      ← partie additive, comme avant
+   + p²·x[d5] + q²·x[e5]          ← idem (x² = x quand x vaut 0 ou 1)
+   + 2·p·q · x[d5]·x[e5]          ← NOUVEAU : vaut 1 seulement si d5 ET e5 sont actifs
+```
+
+Le terme `x[d5]·x[e5]` est une **interaction entre deux cases**. Avec toutes les entrées, et pas seulement
+deux, le carré d'un neurone `n` contient un terme pour **chaque paire** de cases `(f, g)`, de poids
+`w_n[f]·w_n[g]`. Un seul neurone porte donc toutes les paires à la fois, mais leurs poids ne sont pas libres :
+ils sont tous fabriqués à partir des mêmes 192 nombres `w_n[·]`. Un neurone ne peut pas, par exemple, renforcer
+la paire (d5, e5) sans toucher aussi aux paires (d5, c3), (e5, c3), etc.
+
+C'est la couche suivante qui donne la liberté. Une de ses sorties additionne les 1024 carrés avec ses propres
+poids `c[n]` ; le poids final de la paire (f, g) devient :
+
+```
+poids(f, g) = c[1]·w_1[f]·w_1[g] + c[2]·w_2[f]·w_2[g] + ... + c[1024]·w_1024[f]·w_1024[g]
+```
+
+Chaque neurone ajoute un « motif de paires » de forme imposée, et la somme de 1024 motifs pondérés peut
+approcher presque n'importe quel tableau de poids de paires. Il n'y a que 192 entrées, donc 192 × 192 paires,
+et en algèbre linéaire 192 motifs bien choisis suffisent déjà à reproduire n'importe quel tableau symétrique de
+cette taille. Avec 1024 neurones, le réseau peut donc, en principe, donner à chaque paire de cases le poids qu'il
+veut. En pratique, les mêmes poids servent aussi à la partie additive et aux coupures en 0 et 1, donc tout
+n'est pas libre, mais l'idée est là.
+
+« Plus de capacité » veut donc dire :
+
+- **autant de poids** qu'avant ;
+- **presque le même coût** : 1024 multiplications de plus, contre 65 536 dans `h1_to_h2` ;
+- **des fonctions plus riches** : des produits de cases, et pas seulement des sommes.
+
+**Le produit par paires** fait la même chose en plus souple, parce qu'il multiplie deux neurones *différents* :
+
+```
+a1 = b1 + p1·x[d5] + q1·x[e5] + ...
+a2 = b2 + p2·x[d5] + q2·x[e5] + ...
+
+a1·a2 contient (p1·q2 + q1·p2) · x[d5]·x[e5]
+```
+
+Le poids de l'interaction vient de deux jeux de poids indépendants : il a plus de liberté. En plus, la couche
+suivante reçoit deux fois moins d'entrées.
+
+**Les réserves.** Le gain n'est pas garanti et se mesure en jeu. En int8, `a` va de 0 à 64, donc `a²` va
+jusqu'à 4096 : il faut diviser par 64 (`>> 6`) pour revenir entre 0 et 64, et on perd de la précision sur les
+petites valeurs, là où le carré écrase déjà tout.
+
+### La place dans les caches du processeur
+
+Une évaluation lit toute la matrice `h1_to_h2` : elle doit rester dans le cache L2. Les têtes par phase
+multiplient le nombre de ces matrices par $K$, mais une évaluation n'en lit qu'une. Une tête couvre environ
+57 / 8 ≈ 7 demi-coups, et les feuilles d'une même recherche sont à quelques demi-coups les unes des autres :
+une ou deux têtes alternent pendant une recherche. Ce qui compte, c'est donc ces une ou deux matrices, selon
+les machines :
+
+| Machine | L2 par cœur | 1024 → 64, 1 à 2 têtes (64–128 Ko) | `[us, them]` 2048 → 64, 1 à 2 têtes (128–256 Ko) |
+|---|---|---|---|
+| i7-12700K (poste) | 1,25 Mo | dans le L2 | dans le L2 |
+| Xeon Silver 4214R (crn20–24) | 1 Mo | dans le L2 | dans le L2 |
+| EPYC 7662 (crn12, crn13) | 512 Ko | dans le L2 | dans le L2, serré |
+| Xeon E5-2650 v4 (crn01–07) | **256 Ko** | limite avec deux têtes | **déborde vers le L3** |
+
+La table de transposition et le cache d'évaluation partagent ce L2. Le produit par paires divise ces
+tailles par deux et redonne de la marge partout.
+
+### Comment mesurer
+
+1. **La vitesse d'abord.** Nœuds par seconde avec `search_bench`, à profondeur fixe sur les mêmes positions,
+   pour chaque variante : $H_1$ = 512, 1024, 2048 ; produit par paires ou non ; $K$ = 1, 4, 8. Ces mesures se
+   font avec des poids aléatoires, sans entraînement, sauf pour le produit creux : sa vitesse dépend de la
+   proportion de zéros, donc des poids appris. Les faire sur votre machine **et** sur un E5-2650 v4,
+   la machine où les caches sont les plus petits.
+2. **La précision ensuite.** Erreur de validation de chaque variante entraînée, avec les mêmes données.
+3. **L'Elo enfin**, en jeu à 1 s/coup, pour les deux ou trois variantes qui offrent le meilleur compromis.
+
+Au passage, dans `nnue/nnue_quantized.h:24`, `h2_to_h3` est déclaré avec `H1_SIZE * H2_SIZE` (64 Ko) alors que
+seuls 64 × 32 = 2 Ko servent. Ces octets ne sont jamais lus, donc ils ne coûtent rien en cache, mais la taille
+est fausse et sera à corriger en même temps.
+
+# Plan et mesure
+
+| Étape | Ce qui change | Code | Calcul | Gain attendu |
+|---|---|---|---|---|
+| 1. Point de vue + têtes par phase | encodage, `Net`, `play`/`value` ; variantes `us` / `[us, them]` | moyen | un réentraînement | élevé, sûr |
+| 2. Écart de score | cible, perte, maître à tête de score | faible | un réentraînement | moyen à élevé |
+| 3. Positions des arbres | générateur + étiquetage | important | $10^9$ étiquettes | élevé |
+| 4. Entrées globales | `Net`, `value` | moyen | un réentraînement | incertain |
+| 5. Taille / vitesse | `Net`, SIMD | faible | plusieurs entraînements | moyen |
+
+**Une transformation à la fois**, avec les mêmes données et la même distillation, pour savoir ce que chacune
+apporte. Chaque réseau est exporté par `export_value_nets.py` et vérifié par `nets_check`. On le mesure
+ensuite **en jeu** : joueur dev + nouveau réseau contre joueur dev + réseau actuel, à 1 s/coup, sur le cluster
+(comme la campagne Y7). L'erreur de validation guide l'entraînement, mais ne suffit pas à juger : un réseau
+plus juste mais deux fois plus lent peut perdre.
+
+Les ouvertures de mesure doivent être **équilibrées**. Noir est avantagé (61 % de victoires dans les parties
+d'auto-apprentissage), et après 4 coups aléatoires la plupart des paires de parties finissent à 1–1, ce qui
+gaspille des parties. Un petit livre
+d'ouvertures dont l'évaluation est proche de 0 (par le ResNet) rendrait chaque mesure moins chère.

@@ -1,0 +1,14 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=13mm,y=0.32mm]
+  \draw[muted,line width=.4pt] (0,0) -- (4.6,0);
+  \foreach \y in {-100,-50,0} {\draw[muted!50,line width=.3pt] (0,\y) -- (4.6,\y); \node[tiny,left] at (0,\y) {\y};}
+  \node[tiny,rotate=90] at (-0.75,-50) {Elo contre $G=1$};
+  \foreach \i/\g/\e/\lv in {1/512/3/{$\approx$ 117 niveaux},2/1024/-5/{$\approx$ 59},3/2048/-32/{$\approx$ 29},4/4096/-108/{$\approx$ 15}} {
+    \fill[accent] (\i-0.3,0) rectangle (\i+0.3,\e);
+    \node[tiny,text=ink] at (\i,{\e<0 ? \e-8 : \e+8}) {$\e$};
+    \node[tiny] at (\i,22) {$G=\g$\\\lv};
+  }
+\end{tikzpicture}
+\end{document}

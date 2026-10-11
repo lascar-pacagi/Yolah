@@ -23,7 +23,10 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
       nnue_q_parameters_filename(nnue_q_parameters_filename), options(options), verbose(verbose),
       nb_threads(std::max<size_t>(1, nb_threads)) {
     for (size_t i = 0; i < this->nb_threads; i++) workers.push_back(std::make_unique<Worker>());
-    nnue.load(nnue_q_parameters_filename);
+    if (NNUE_Persp::is_persp_file(nnue_q_parameters_filename))
+        persp = std::make_unique<NNUE_Persp>(nnue_q_parameters_filename);
+    else
+        nnue.load(nnue_q_parameters_filename);
     if (options.yolah_table) yolah_table = std::make_unique<SearchTable>(tt_size_mb);
     else table = std::make_unique<TranspositionTable>(tt_size_mb);
     if (options.eval_cache_bits > 0) eval_cache = std::vector<std::atomic<uint64_t>>(size_t(1) << options.eval_cache_bits);
@@ -120,10 +123,10 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
         s->w = workers[i].get();
         // The root's accumulator: computed from scratch, the only one that is.
         if (options.lazy_accumulator) {
-            nnue.init(yolah, s->accs[yolah.nb_plies()]);
+            net_init(yolah, s->accs[yolah.nb_plies()]);
             s->acc_ok[yolah.nb_plies()] = true;
         } else {
-            nnue.init(yolah, s->acc);
+            net_init(yolah, s->acc);
         }
         searches.push_back(std::move(s));
     }
@@ -263,7 +266,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
     if (options.lazy_accumulator) {
         s.acc_ok[yolah.nb_plies() + 1] = false;   // the child's accumulator: computed if needed
     } else {
-        nnue.play(player, m, s.acc);
+        net_play(player, m, s.acc);
     }
     yolah.play(m);
     int v = alpha + 1;                    // "might beat alpha" until a search says otherwise
@@ -283,7 +286,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
         }
     }
     yolah.undo(m);
-    if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+    if (!options.lazy_accumulator) net_undo(player, m, s.acc);
     return v;
 }
 
@@ -404,11 +407,11 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             const uint64_t child = zobrist::update(hash, player, k);
             s.played[yolah.nb_plies()] = k;
             if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-            else nnue.play(player, k, s.acc);
+            else net_play(player, k, s.acc);
             yolah.play(k);
             const int v = -negamax(yolah, s, child, -bound, -bound + 1, d);
             yolah.undo(k);
-            if (!options.lazy_accumulator) nnue.undo(player, k, s.acc);
+            if (!options.lazy_accumulator) net_undo(player, k, s.acc);
             if (stopped()) return 0;
             if (v >= bound) return v >= WIN ? beta : v;
             proxy_done = true;               // one witness per node, as usual
@@ -465,11 +468,11 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         const uint8_t player = yolah.current_player();
         s.played[yolah.nb_plies()] = Move::none();
         if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-        else nnue.play(player, Move::none(), s.acc);
+        else net_play(player, Move::none(), s.acc);
         yolah.play(Move::none());
         const int v = -negamax(yolah, s, zobrist::update(hash, player, Move::none()), -beta, -beta + 1, depth - 1 - R);
         yolah.undo(Move::none());
-        if (!options.lazy_accumulator) nnue.undo(player, Move::none(), s.acc);
+        if (!options.lazy_accumulator) net_undo(player, Move::none(), s.acc);
         if (stopped()) return 0;
         if (v >= beta) return v >= WIN ? beta : v;   // no unproven "win" from a null move
     }
@@ -525,11 +528,11 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             const uint64_t child = zobrist::update(hash, player, m);
             s.played[yolah.nb_plies()] = m;
             if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-            else nnue.play(player, m, s.acc);
+            else net_play(player, m, s.acc);
             yolah.play(m);
             const int v = -negamax(yolah, s, child, -bound, -bound + 1, d);
             yolah.undo(m);
-            if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+            if (!options.lazy_accumulator) net_undo(player, m, s.acc);
             return v;
         };
         const int R = options.proxy_reduction + depth / 4 - 1;
@@ -597,11 +600,11 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     const uint64_t child = zobrist::update(hash, player, m);
                     s.played[yolah.nb_plies()] = m;
                     if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-                    else nnue.play(player, m, s.acc);
+                    else net_play(player, m, s.acc);
                     yolah.play(m);
                     val[cand[k]] = -evaluate(yolah, s, child);
                     yolah.undo(m);
-                    if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+                    if (!options.lazy_accumulator) net_undo(player, m, s.acc);
                 }
                 std::stable_sort(cand, cand + K, [&](int a, int b) { return val[a] > val[b]; });
             }
@@ -714,14 +717,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             const uint64_t child = zobrist::update(hash, player, m);
             s.played[yolah.nb_plies()] = m;
             if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-            else nnue.play(player, m, s.acc);
+            else net_play(player, m, s.acc);
             yolah.play(m);
             int v = -INFINITE;
             if (!options.probcut_filter || -evaluate(yolah, s, child) >= bound) {
                 v = -negamax(yolah, s, child, -bound, -bound + 1, depth - options.probcut_reduction);
             }
             yolah.undo(m);
-            if (!options.lazy_accumulator) nnue.undo(player, m, s.acc);
+            if (!options.lazy_accumulator) net_undo(player, m, s.acc);
             if (stopped()) return 0;
             if (v >= bound) return v >= WIN ? beta : v;
         }
@@ -1046,7 +1049,7 @@ int MinMaxNNUE_DevPlayer::network_value(const Yolah& yolah, Search& s) {
 
 int MinMaxNNUE_DevPlayer::raw_network_value(const Yolah& yolah, Search& s) {
     if (!options.lazy_accumulator) {
-        return int(nnue.value(s.acc, yolah.current_player()) * WIN);
+        return int(net_value(s.acc, yolah) * WIN);
     }
     const int ply = yolah.nb_plies();
     int k = ply;
@@ -1056,13 +1059,38 @@ int MinMaxNNUE_DevPlayer::raw_network_value(const Yolah& yolah, Search& s) {
         update_accumulator(s.accs[k].acc, s.accs[k + 1].acc, uint8_t(k & 1), s.played[k]);
         s.acc_ok[k + 1] = true;
     }
-    return int(nnue.value(s.accs[ply], yolah.current_player()) * WIN);
+    return int(net_value(s.accs[ply], yolah) * WIN);
+}
+
+// The network calls, for either network (see `persp` in the header).
+void MinMaxNNUE_DevPlayer::net_init(const Yolah& yolah, Accumulator& a) {
+    if (persp) persp->init(yolah, a.acc);
+    else nnue.init(yolah, a.acc);
+}
+
+void MinMaxNNUE_DevPlayer::net_play(uint8_t player, Move m, Accumulator& a) {
+    if (persp) persp->play(player, m, a.acc);
+    else nnue.play(player, m, a.acc);
+}
+
+void MinMaxNNUE_DevPlayer::net_undo(uint8_t player, Move m, Accumulator& a) {
+    if (persp) persp->undo(player, m, a.acc);
+    else nnue.undo(player, m, a.acc);
+}
+
+float MinMaxNNUE_DevPlayer::net_value(const Accumulator& a, const Yolah& yolah) {
+    if (persp) return persp->value(a.acc, yolah);
+    return nnue.value(a.acc, yolah.current_player());
 }
 
 // out = in + the change of features of move m by `player` (see NNUE_Quantized::play,
 // whose arithmetic it reproduces, in one pass and without modifying `in`).
 void MinMaxNNUE_DevPlayer::update_accumulator(const int16_t* __restrict in, int16_t* __restrict out,
                                               uint8_t player, Move m) const {
+    if (persp) {                              // two views, three rows each (see NNUE_Persp::update)
+        persp->update(in, out, player, m);
+        return;
+    }
     constexpr int H = NNUE_Quantized::H1_SIZE;
     // Row of the "white to move" feature: added when black moves (white is to
     // move after), taken off when white moves.

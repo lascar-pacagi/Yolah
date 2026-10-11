@@ -1,4 +1,4 @@
-set(NNUE_SOURCES nnue.cpp nnue_quantized.cpp logic_net.cpp logic_net_learning.cpp compare_models.cpp ffnn.cpp ffnn_float.cpp
+set(NNUE_SOURCES nnue.cpp nnue_quantized.cpp nnue_persp.cpp logic_net.cpp logic_net_learning.cpp compare_models.cpp ffnn.cpp ffnn_float.cpp
     nn_evaluator.cpp resnet.cpp batched_evaluator.cpp)
 # libtorch backend of the value/policy ResNet (see resnet_torch.h)
 if(ENABLE_TORCH)

@@ -9,6 +9,8 @@ For every known .pt found in the directory:
   nnue.pt                              → nnue.float.txt, nnue.quantized.txt
   nnue_193x1024x64x32x1[_distill].pt   → <name>.float.txt, <name>.quantized.txt
   features_119x256x64x1[_distill].pt   → <name>.float.txt, <name>.quantized.txt
+  nnue_193x1024x64x32x1_distill_*.pt   → <name>.float.txt, <name>.quantized.txt (other runs)
+  nnue_persp_*.pt                      → <name>.quantized.txt   (NetPersp, nnue_persp.py)
 
 Formats (read by nnue.cpp / nnue_quantized.cpp / ffnn_value.h):
   every layer as "W\\n<rows>\\n<cols>\\n" + the weights row by row (one value
@@ -28,7 +30,14 @@ Formats (read by nnue.cpp / nnue_quantized.cpp / ffnn_value.h):
               • the features value networks are quantized in INT16 at scale
                 1024 (biases ×1024 and ×1024²) instead of int8 ×64: at int8
                 their value is off by ~0.1 on average (see ffnn_value.h).
+  NetPersp (read by nnue_persp.cpp), quantized only:
+      "PERSP\n<K>\n<them>\n<l1>\n<l2>\n<l3>\n"
+      fc1 (l1 × 192) int8 ×64, biases ×64
+      fc2 (K·l2 × l1 or 2·l1) int8 ×64, biases ×64²   (head k = rows k·l2 …)
+      K × [ w3[k] (l3 × l2) int8 ×64, b3[k] ×64² ]
+      w4 (K × l3) and b4 (K) in float               (the value heads)
 """
+import glob
 import os
 import sys
 import torch
@@ -103,6 +112,27 @@ def export(path, out_dir):
           f" → {name}.float.txt, {name}.quantized.txt")
 
 
+def export_persp(path, out_dir):
+    from nnue_persp import load_persp
+    name = os.path.splitext(os.path.basename(path))[0]
+    net = load_persp(path)
+    w8 = lambda what: quantizer(SCALE, -127, 127, f"{name} {what}")                    # int8 weights
+    b16 = lambda what, scale: quantizer(scale, -32768, 32767, f"{name} {what}")        # int16 biases
+    with open(os.path.join(out_dir, name + ".quantized.txt"), "w") as f:
+        f.write(f"PERSP\n{net.k}\n{int(net.them)}\n{net.l1_size}\n{net.l2_size}\n{net.l3_size}\n")
+        write_matrix(f, net.fc1.weight.data, w8("fc1 weight"))
+        write_bias(f, net.fc1.bias.data, b16("fc1 bias", SCALE))
+        write_matrix(f, net.fc2.weight.data, w8("fc2 weight"))
+        write_bias(f, net.fc2.bias.data, b16("fc2 bias", SCALE * SCALE))
+        for k in range(net.k):
+            write_matrix(f, net.w3.data[k], w8(f"w3[{k}]"))
+            write_bias(f, net.b3.data[k], b16(f"b3[{k}]", SCALE * SCALE))
+        write_matrix(f, net.w4.data, as_float)
+        write_bias(f, net.b4.data, as_float)
+    print(f"{name}: 192 → {net.l1_size}{' ×2 views' if net.them else ''} → {net.k} heads "
+          f"{net.l2_size} → {net.l3_size} → 1 (value heads in float, trunk int8 ×64) → {name}.quantized.txt")
+
+
 def main():
     out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "../models")
     names = ["nnue", "nnue_193x1024x64x32x1", "nnue_193x1024x64x32x1_distill",
@@ -113,6 +143,10 @@ def main():
             export(p, out_dir)
         else:
             print(f"(skipped: no {p})")
+    for p in sorted(glob.glob(os.path.join(out_dir, "nnue_193x1024x64x32x1_distill_*.pt"))):
+        export(p, out_dir)                    # other runs of the 193 network (e.g. _control)
+    for p in sorted(glob.glob(os.path.join(out_dir, "nnue_persp_*.pt"))):
+        export_persp(p, out_dir)
 
 
 if __name__ == "__main__":

@@ -48,12 +48,18 @@ struct NNUE_Quantized {
     }
     void load(const std::string& filename);
     Accumulator make_accumulator() const;
-    void init(const Yolah& yolah, Accumulator& a);
-    void play(uint8_t player, const Move& m, Accumulator& a);
-    void undo(uint8_t player, const Move& m, Accumulator& a);
-    std::tuple<float, float, float> output(Accumulator& a);
+    void init(const Yolah& yolah, Accumulator& a) { init(yolah, a.acc); }
+    void play(uint8_t player, const Move& m, Accumulator& a) { play(player, m, a.acc); }
+    void undo(uint8_t player, const Move& m, Accumulator& a) { undo(player, m, a.acc); }
+    std::tuple<float, float, float> output(Accumulator& a) { return output(a.acc); }
     // Value in [-1, 1] for the side to move, for both kinds of network (see NNUE::value).
-    float value(Accumulator& a, uint8_t side_to_move);
+    float value(Accumulator& a, uint8_t side_to_move) { return value(a.acc, side_to_move); }
+    // The same on a bare accumulator (H1_SIZE int16), for players that own their storage.
+    void init(const Yolah& yolah, int16_t* acc);
+    void play(uint8_t player, const Move& m, int16_t* acc);
+    void undo(uint8_t player, const Move& m, int16_t* acc);
+    std::tuple<float, float, float> output(const int16_t* acc);
+    float value(const int16_t* acc, uint8_t side_to_move);
 };
 
 #endif

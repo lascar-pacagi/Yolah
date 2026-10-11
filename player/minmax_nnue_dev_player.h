@@ -8,6 +8,7 @@
 #include <atomic>
 #include <vector>
 #include "nnue_quantized.h"
+#include "nnue_persp.h"
 #include "endgame_solver.h"
 
 // The search being improved, step by step. It started as an exact copy of
@@ -215,7 +216,17 @@ private:
     size_t nb_moves_at_full_depth;
     uint8_t late_move_reduction;
     const std::string nnue_q_parameters_filename;
+    // The network, chosen by the weights file: the 193 NNUE (NNUE_Quantized)
+    // or, for a "PERSP" file, the NNUE seen from the side to move with one
+    // head per phase (NNUE_Persp, doc/nnue_roadmap.qmd step 1). The
+    // accumulators below are sized for the larger of the two (2 views).
     NNUE_Quantized nnue;
+    std::unique_ptr<NNUE_Persp> persp;
+    using Accumulator = NNUE_Persp::Accumulator;
+    void net_init(const Yolah& yolah, Accumulator& a);
+    void net_play(uint8_t player, Move m, Accumulator& a);
+    void net_undo(uint8_t player, Move m, Accumulator& a);
+    float net_value(const Accumulator& a, const Yolah& yolah);
     Options options;
     bool verbose;
     std::atomic_bool stop = false;
@@ -268,11 +279,11 @@ private:
         std::vector<RootMove> root_moves;
         // Without the lazy accumulators: ONE accumulator, updated by
         // nnue.play / nnue.undo around every move (the reference's way).
-        NNUE_Quantized::Accumulator acc;
+        Accumulator acc;
         // With them (D): accs[p] is the accumulator of the position at ply p
         // of the current line, valid only if acc_ok[p]. played[p] (above)
         // tells how to get accs[p + 1] from accs[p].
-        NNUE_Quantized::Accumulator accs[Yolah::MAX_NB_PLIES + 1];
+        Accumulator accs[Yolah::MAX_NB_PLIES + 1];
         bool acc_ok[Yolah::MAX_NB_PLIES + 1]{};
         bool proxy_off = false;                    // during a proxy cut verification: no proxy cut inside
     };

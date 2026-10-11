@@ -3,6 +3,8 @@
 //   ./nets_check dump positions.bin [N]      random positions + their features
 //   python3 ../nnue/check_value_nets.py positions.bin refs.bin   (PyTorch values)
 //   ./nets_check check positions.bin refs.bin ../models
+//   python3 ../nnue/check_persp_net.py positions.bin refs.bin model.pt   (a NetPersp)
+//   ./nets_check check_persp positions.bin refs.bin model.quantized.txt [old.quantized.txt]
 //
 // For every position and every network — the old NNUE (3 outputs) and the
 // value networks (NNUE and features, plain and distilled), each in float and
@@ -18,6 +20,7 @@
 //   N float32 values for the side to move.
 #include "nnue.h"
 #include "nnue_quantized.h"
+#include "nnue_persp.h"
 #include "ffnn.h"
 #include "ffnn_value.h"
 #include <array>
@@ -221,6 +224,75 @@ int check(const string& positions, const string& refs_path, const string& models
     return ok ? 0 : 1;
 }
 
+// NNUE_Persp (nnue_persp.h) against PyTorch. The accumulators are built three
+// ways — play() move by move, update() move by move (the lazy search's way)
+// and init() on the final position — and must be identical. Then the cost of
+// value() and of one update, compared with NNUE_Quantized if a 193 network is given.
+int check_persp(const string& positions, const string& refs_path, const string& weights, const string& old_weights) {
+    const vector<Record> rs = read_records(positions);
+    const size_t n = rs.size();
+    vector<float> ref(n);
+    std::ifstream(refs_path, std::ios::binary).read((char*)ref.data(), n * sizeof(float));
+    auto net = std::make_unique<NNUE_Persp>(weights);
+    std::printf("%zu positions, %s: K = %d, them = %d\n", n, weights.c_str(), net->k, int(net->them));
+    double max_err = 0, sum_err = 0, acc_drift = 0;
+    size_t sign_flips = 0;
+    vector<Yolah> finals;
+    for (const Record& r : rs) {
+        Yolah y;
+        NNUE_Persp::Accumulator played, fresh;
+        vector<std::unique_ptr<NNUE_Persp::Accumulator>> lazy;
+        lazy.push_back(std::make_unique<NNUE_Persp::Accumulator>());
+        net->init(y, played);
+        net->init(y, *lazy.back());
+        for (Move m : r.moves) {
+            net->play(y.current_player(), m, played);
+            lazy.push_back(std::make_unique<NNUE_Persp::Accumulator>());
+            net->update(lazy[lazy.size() - 2]->acc, lazy.back()->acc, y.current_player(), m);
+            y.play(m);
+        }
+        net->init(y, fresh);
+        for (int i = 0; i < NNUE_Persp::ACC_SIZE; i++) {
+            acc_drift = std::max(acc_drift, (double)std::abs(played.acc[i] - fresh.acc[i]));
+            acc_drift = std::max(acc_drift, (double)std::abs(lazy.back()->acc[i] - fresh.acc[i]));
+        }
+        const float v = net->value(played, y);
+        const size_t i = finals.size();
+        const double e = std::abs(v - ref[i]);
+        max_err = std::max(max_err, e); sum_err += e;
+        if ((v > 0.05 && ref[i] < -0.05) || (v < -0.05 && ref[i] > 0.05)) sign_flips++;
+        finals.push_back(y);
+    }
+    const bool ok = sum_err / n <= 0.08 && acc_drift == 0;
+    std::printf("  value vs PyTorch: max |err| %.5f  mean %.5f  sign flips %zu  acc drift %g  %s\n",
+                max_err, sum_err / n, sign_flips, acc_drift, ok ? "OK" : "FAIL");
+    // Speed, on the final positions.
+    const int reps = 200;
+    auto timed = [&](const char* label, auto&& body) {
+        const auto t0 = std::chrono::steady_clock::now();
+        float sink = 0;
+        for (int r = 0; r < reps; r++)
+            for (size_t i = 0; i < n; i++) sink += body(i);
+        const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        std::printf("  %-34s %7.1f ns%s\n", label, 1e9 * dt / (double(reps) * n), sink == 1.2345f ? " " : "");
+    };
+    vector<std::unique_ptr<NNUE_Persp::Accumulator>> accs;
+    for (const Yolah& y : finals) { accs.push_back(std::make_unique<NNUE_Persp::Accumulator>()); net->init(y, *accs.back()); }
+    NNUE_Persp::Accumulator out;
+    const Move probe(SQ_A1, SQ_B2);
+    timed("NNUE_Persp value()", [&](size_t i) { return net->value(*accs[i], finals[i]); });
+    timed("NNUE_Persp update() (2 views)", [&](size_t i) { net->update(accs[i]->acc, out.acc, uint8_t(i & 1), probe); return float(out.acc[i & 1023]); });
+    if (!old_weights.empty()) {
+        auto old = std::make_unique<NNUE_Quantized>();
+        old->load(old_weights);
+        vector<std::unique_ptr<NNUE_Quantized::Accumulator>> oaccs;
+        for (const Yolah& y : finals) { oaccs.push_back(std::make_unique<NNUE_Quantized::Accumulator>()); old->init(y, *oaccs.back()); }
+        timed("NNUE_Quantized value()", [&](size_t i) { return old->value(*oaccs[i], finals[i].current_player()); });
+        timed("NNUE_Quantized play()+undo()", [&](size_t i) { old->play(uint8_t(i & 1), probe, *oaccs[i]); old->undo(uint8_t(i & 1), probe, *oaccs[i]); return float(oaccs[i]->acc[i & 1023]); });
+    }
+    return ok ? 0 : 1;
+}
+
 // Cost of one leaf evaluation of the features players: the features, then
 // each kind of network (int8 = FFNN of ffnn.h, the format of the original
 // networks; its weights file only needs the right sizes).
@@ -268,6 +340,7 @@ int main(int argc, char* argv[]) {
     const string cmd = argc > 1 ? argv[1] : "";
     if (cmd == "dump" && argc >= 3) return dump(argv[2], argc > 3 ? std::stoul(argv[3]) : 2000);
     if (cmd == "check" && argc >= 5) return check(argv[2], argv[3], argv[4]);
+    if (cmd == "check_persp" && argc >= 5) return check_persp(argv[2], argv[3], argv[4], argc > 5 ? argv[5] : "");
     if (cmd == "bench" && argc >= 5) return bench(argv[2], argv[3], argv[4]);
     std::cerr << "usage: nets_check dump positions.bin [N] | check positions.bin refs.bin models_dir\n";
     return 2;

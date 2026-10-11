@@ -156,13 +156,13 @@ NNUE_Quantized::Accumulator NNUE_Quantized::make_accumulator() const {
     return a;
 }
 
-std::tuple<float, float, float> NNUE_Quantized::output(Accumulator& a) {        
+std::tuple<float, float, float> NNUE_Quantized::output(const int16_t* acc) {        
     alignas(64) int32_t output[OUTPUT_SIZE + 1]{};
     alignas(64) int8_t h1[H1_SIZE];
     alignas(64) int8_t h2[H2_SIZE];
     alignas(64) int8_t h3[H3_SIZE];
     for (int i = 0; i < H1_SIZE; i++) {
-        const int16_t v = a.acc[i];        
+        const int16_t v = acc[i];        
         h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v);
     }
     matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);
@@ -175,9 +175,9 @@ std::tuple<float, float, float> NNUE_Quantized::output(Accumulator& a) {
     return { e1 / sum, e2 / sum, e3 / sum };
 }
 
-float NNUE_Quantized::value(Accumulator& a, uint8_t side_to_move) {
+float NNUE_Quantized::value(const int16_t* acc, uint8_t side_to_move) {
     if (nb_outputs == 3) {
-        const auto [black_proba, draw_proba, white_proba] = output(a);
+        const auto [black_proba, draw_proba, white_proba] = output(acc);
         const float coeff = side_to_move == Yolah::BLACK ? 1.0f : -1.0f;
         return coeff * black_proba - coeff * white_proba;
     }
@@ -185,7 +185,7 @@ float NNUE_Quantized::value(Accumulator& a, uint8_t side_to_move) {
     alignas(64) int8_t h2[H2_SIZE];
     alignas(64) int8_t h3[H3_SIZE];
     for (int i = 0; i < H1_SIZE; i++) {
-        const int16_t v = a.acc[i];
+        const int16_t v = acc[i];
         h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v);
     }
     matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);
@@ -281,9 +281,9 @@ static inline std::tuple<uint64_t, uint64_t, uint64_t> encode_yolah(const Yolah&
     return { black, white, empty };
 }
 
-void NNUE_Quantized::init(const Yolah& yolah, Accumulator& a) {
+void NNUE_Quantized::init(const Yolah& yolah, int16_t* acc) {
     for (int i = 0; i < H1_SIZE; i++) {
-        a.acc[i] = h1_bias[i];       
+        acc[i] = h1_bias[i];       
     }
     const auto [black, white, empty] = encode_yolah(yolah);
     int delta = 0;
@@ -292,7 +292,7 @@ void NNUE_Quantized::init(const Yolah& yolah, Accumulator& a) {
             uint64_t pos = std::countr_zero(bitboard & -bitboard);
             int row = (delta + 63 - pos) * H1_SIZE;
             for (int j = 0; j < H1_SIZE; j++) {
-                a.acc[j] += input_to_h1[row + j];
+                acc[j] += input_to_h1[row + j];
             }
             bitboard &= bitboard - 1;
         }
@@ -301,20 +301,20 @@ void NNUE_Quantized::init(const Yolah& yolah, Accumulator& a) {
     if (yolah.current_player() == Yolah::WHITE) {
         const int8_t* turn = input_to_h1 + (INPUT_SIZE - 1) * H1_SIZE;
         for (int i = 0; i < H1_SIZE; i++) {
-            a.acc[i] += turn[i];
+            acc[i] += turn[i];
         }
     }
 }
 
-void NNUE_Quantized::play(uint8_t player, const Move& m, Accumulator& a) {
+void NNUE_Quantized::play(uint8_t player, const Move& m, int16_t* acc) {
     if (m == Move::none()) {
         // A pass: no piece moves and no hole appears — only the side to move
         // changes. (Handled as a move from a1 to a1 before, it marked a1 as a
         // hole in the accumulator: the evaluations after a pass were wrong.)
         const int8_t* turn = input_to_h1 + (INPUT_SIZE - 1) * H1_SIZE;
         for (int i = 0; i < H1_SIZE; i++) {
-            if (player == Yolah::BLACK) a.acc[i] += turn[i];
-            else                        a.acc[i] -= turn[i];
+            if (player == Yolah::BLACK) acc[i] += turn[i];
+            else                        acc[i] -= turn[i];
         }
         return;
     }
@@ -329,29 +329,29 @@ void NNUE_Quantized::play(uint8_t player, const Move& m, Accumulator& a) {
         int16_t v1 = -input_to_h1[from_offset + j];
         int16_t v2 = input_to_h1[to_offset + j];
         int16_t v3 = input_to_h1[empty_offset + j];
-        a.acc[j] += v1 + v2 + v3;
+        acc[j] += v1 + v2 + v3;
     }
     const int8_t* turn = input_to_h1 + (INPUT_SIZE - 1) * H1_SIZE;
     if (player == Yolah::BLACK) {
         for (int i = 0; i < H1_SIZE; i++) {
-            a.acc[i] += turn[i];
+            acc[i] += turn[i];
         }
     } else {
         for (int i = 0; i < H1_SIZE; i++) {
-            a.acc[i] -= turn[i];
+            acc[i] -= turn[i];
         }
     }
 }
 
-void NNUE_Quantized::undo(uint8_t player, const Move& m, Accumulator& a) {
+void NNUE_Quantized::undo(uint8_t player, const Move& m, int16_t* acc) {
     if (m == Move::none()) {
         // A pass: no piece moves and no hole appears — only the side to move
         // changes. (Handled as a move from a1 to a1 before, it marked a1 as a
         // hole in the accumulator: the evaluations after a pass were wrong.)
         const int8_t* turn = input_to_h1 + (INPUT_SIZE - 1) * H1_SIZE;
         for (int i = 0; i < H1_SIZE; i++) {
-            if (player == Yolah::BLACK) a.acc[i] -= turn[i];
-            else                        a.acc[i] += turn[i];
+            if (player == Yolah::BLACK) acc[i] -= turn[i];
+            else                        acc[i] += turn[i];
         }
         return;
     }
@@ -366,16 +366,16 @@ void NNUE_Quantized::undo(uint8_t player, const Move& m, Accumulator& a) {
         int16_t v1 = input_to_h1[from_offset + j];
         int16_t v2 = -input_to_h1[to_offset + j];
         int16_t v3 = -input_to_h1[empty_offset + j];
-        a.acc[j] += v1 + v2 + v3;
+        acc[j] += v1 + v2 + v3;
     }
     const int8_t* turn = input_to_h1 + (INPUT_SIZE - 1) * H1_SIZE;
     if (player == Yolah::BLACK) {
         for (int i = 0; i < H1_SIZE; i++) {
-            a.acc[i] -= turn[i];
+            acc[i] -= turn[i];
         }
     } else {
         for (int i = 0; i < H1_SIZE; i++) {
-            a.acc[i] += turn[i];
+            acc[i] += turn[i];
         }
     }
 }
