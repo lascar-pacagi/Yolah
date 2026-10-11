@@ -25,6 +25,7 @@
 #SBATCH --job-name=nnue_persp
 #SBATCH --output=nnue_persp_%j.out
 #SBATCH --error=nnue_persp_%j.err
+#SBATCH --partition=insa-gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G
