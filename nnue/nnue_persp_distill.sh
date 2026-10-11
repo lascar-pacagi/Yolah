@@ -62,7 +62,7 @@ for f in "${SIF}" "${CACHE_DIR}/meta.json" "${CACHE_DIR}/teacher_meta.json" "${I
     [[ -e "$f" ]] || { echo "missing: $f" >&2; exit 1; }
 done
 # The starting weights, copied into the variant's directory (/mnt in the container).
-cp -n "${INIT_MODEL}" "${MODEL_DIR}/init_193_distill.pt"
+[[ -e "${MODEL_DIR}/init_193_distill.pt" ]] || cp "${INIT_MODEL}" "${MODEL_DIR}/init_193_distill.pt"
 
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job      : ${SLURM_JOB_ID:-(local)} on $(hostname)"

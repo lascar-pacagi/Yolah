@@ -63,7 +63,9 @@ CACHE_DIR  = os.environ.get("YOLAH_CACHE_DIR", "/cache")
 def ddp_setup(rank, world_size):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = os.environ.get("YOLAH_DDP_PORT", "65434")
-    init_process_group(backend="nccl", rank=rank, world_size=world_size)
+    # One GPU: gloo (NCCL needs NVML, which fails on nodes with a driver/library mismatch).
+    backend = os.environ.get("YOLAH_DDP_BACKEND", "nccl" if world_size > 1 else "gloo")
+    init_process_group(backend=backend, rank=rank, world_size=world_size)
 
 
 def open_cache(cache_dir):
