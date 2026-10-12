@@ -51,7 +51,10 @@ if [[ "${CONTROL}" == "1" ]]; then
     VARIANT="control193"
     SCRIPT="nnue193x1024x64x32x1_distill.py"
 else
-    VARIANT="k${YOLAH_PERSP_K}$([[ "${YOLAH_PERSP_THEM}" == "1" ]] && echo _them)"
+    # (not "$([[ … ]] && echo _them)": false when THEM=0, and set -e then stops
+    # the script silently, with empty .out and .err)
+    VARIANT="k${YOLAH_PERSP_K}"
+    if [[ "${YOLAH_PERSP_THEM}" == "1" ]]; then VARIANT="${VARIANT}_them"; fi
     SCRIPT="nnue_persp_distill.py"
 fi
 MODEL_DIR="${MODEL_ROOT}/${VARIANT}"
