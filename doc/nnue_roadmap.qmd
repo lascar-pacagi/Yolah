@@ -144,6 +144,69 @@ qu'un réseau à une couche cachée large reconstruit mal. L'étude J l'a montr�
 (le Voronoi en pas de roi) prédit 4 à 6 fois mieux que le hasard le coup du ResNet. La recherche la calcule
 déjà pour ordonner les coups.
 
+Les mesures de fin de partie le confirment (positions du cache résolues exactement par `endgame_solver`, outil
+`endgame_truth`). On compte les **erreurs de résultat** : la valeur annonce une victoire, une défaite ou une
+partie nulle, et le solveur dit autre chose.
+
+| cases libres | maître | NNUE | issue de la partie |
+|---:|---:|---:|---:|
+| 10 | 0,4 % | 8,0 % | 0 % |
+| 14 | 1,8 % | 9,5 % | 0 % |
+| 18 | 5,3 % | 12,9 % | 0,1 % |
+| 22 | 14,4 % | 18,3 % | 0,1 % |
+| 24 | 16,1 % | 16,1 % | 1,2 % |
+| 26 | 11,9 % | 15,8 % | 2,5 % |
+
+Entre 10 et 14 cases libres, le maître ne se trompe presque jamais, mais le NNUE se trompe une fois sur dix.
+Ce n'est donc pas la cible qui manque : le réseau n'arrive pas à reproduire ce qu'on lui montre. Or ce sont
+justement des positions de régions : la moitié des plateaux à 12–15 cases libres sont entièrement séparés
+(outil `private_moves`). Deux autres essais vont dans le même sens. Une simple combinaison linéaire des
+caractéristiques de territoire de `heuristic_features`, ajustée phase par phase, fait mieux que le réseau à
+7 cases libres ou moins, et s'en rapproche entre 8 et 21 (`phase_fit.py`). À l'inverse, des tables de valeurs
+par case ou par ligne, qui ne voient pas la connexité, n'apprennent presque rien en fin de partie
+(`pattern_fit.py`).
+
+**Au-delà de 28 cases libres, le réseau suit bien le maître.** Le solveur ne suit plus, mais on peut comparer
+le NNUE au maître et à l'issue de la partie (616 000 positions du cache) :
+
+| cases libres | NNUE vs maître (mse) | erreurs de résultat vs issue : maître | NNUE |
+|---:|---:|---:|---:|
+| 12–15 | 0,180 | 1,2 % | 10,3 % |
+| 16–19 | **0,226** | 4,6 % | 13,7 % |
+| 20–23 | **0,220** | 11,2 % | 17,6 % |
+| 24–27 | 0,187 | 16,7 % | 20,9 % |
+| 28–31 | 0,149 | 20,6 % | 23,0 % |
+| 32–35 | 0,102 | 23,2 % | 24,7 % |
+| 36–39 | 0,062 | 24,3 % | 24,6 % |
+| 40–43 | 0,035 | 23,4 % | 23,9 % |
+| 44–47 | 0,021 | 21,4 % | 22,2 % |
+| 48–55 | 0,003 à 0,010 | ~20 % | ~21 % |
+
+L'écart entre le réseau et son maître culmine entre 16 et 23 cases libres, puis se referme : en ouverture, le
+réseau reproduit presque exactement le maître. Loin de la fin, les 20 à 25 % d'erreurs contre l'issue ne sont
+pas vraiment des erreurs : la partie n'est pas encore décidée, et elle n'est pas jouée parfaitement. À partir de
+36 cases libres, le NNUE fait jeu égal avec le maître. En milieu de partie, la limite est donc le maître (ou les
+positions d'entraînement), pas le réseau.
+
+**Jusqu'où la recherche voit.** Chaque coup remplit exactement une case libre : la recherche voit la fin de la
+partie dès que sa profondeur atteint le nombre de cases libres. Mesuré avec `search_bench` (joueur dev, produit
+creux, un cœur de i7-12700K, 209 positions) :
+
+| cases libres | profondeur médiane, 0,2 s | voit la fin | profondeur médiane, 1 s | voit la fin |
+|---:|---:|---:|---:|---:|
+| 0–23 | jusqu'au bout | 100 % | jusqu'au bout | 100 % |
+| 24–27 | 21 | 8 % | 24 | 16 % |
+| 32–35 | 19 | 0 % | 22 | 0 % |
+| 36–39 | 18 | 0 % | 22 | 0 % |
+| 44–47 | 15 | 0 % | 19 | 0 % |
+| 48–51 | 13 | 0 % | 16 | 0 % |
+
+Ces profondeurs sont nominales : les lignes réduites (LMR, LMP, MPC, proxy cut) vont moins loin. À 23 cases
+libres ou moins à la racine, la recherche n'a plus besoin du réseau. Mais une recherche lancée entre 32 et 40
+cases libres atteint une profondeur de 18 à 22 : ses feuilles tombent vers 12 à 25 cases libres, exactement là
+où le réseau se trompe le plus. **Améliorer le réseau en fin de partie améliore donc les feuilles de toutes les
+recherches du milieu de partie**, là où la partie se décide.
+
 # Les transformations proposées
 
 ![Le réseau proposé : deux accumulateurs (un par point de vue), quelques entrées globales ajoutées après l'accumulateur, une tête par phase de jeu, et une sortie plus fine que gagné / nul / perdu.](figs/fig-nnue-target.png){#fig-target width=100%}
@@ -313,7 +376,37 @@ h1 = torch.cat([h1, globals_], dim=1)            # (B, 1024 + k)
 h2 = torch.clamp(self.fc2(h1), 0, 1)
 ```
 
-Ce point est le plus incertain : il coûte un calcul global par évaluation, à mettre en balance avec le gain.
+**Les régions, exactement et pour presque rien.** Une dame glisse case par case à travers des cases libres :
+une pièce ne pourra jamais atteindre que les composantes connexes de cases libres (en 8-connexité) qu'elle
+touche. Et le départ d'un coup devient un **trou**, jamais une case libre : une frontière ne se rouvre jamais.
+Une composante que seules mes pièces touchent est donc **privée pour toujours**. Un remplissage par bitboards
+(`shift_all_directions` répété) donne les composantes ; il suffit ensuite de regarder quelles pièces touchent
+chacune. Des entrées possibles, du point de vue du joueur au trait :
+
+- le nombre de cases libres dans mes régions privées, dans les siennes, et dans les régions disputées ;
+- le nombre de mes pièces enfermées (qui ne touchent que des régions privées), et des siennes ;
+- un bit « plateau entièrement séparé » : il n'y a plus de région disputée, et le résultat ne dépend plus que
+  du nombre de coups que chacun peut jouer dans ses territoires.
+
+**Le calcul ne sert qu'en fin de partie.** Mesuré sur 1,85 million de positions du cache :
+
+| cases libres | positions avec une pièce enfermée | plateau entièrement séparé |
+|---:|---:|---:|
+| 8–11 | 97 % | 86 % |
+| 12–15 | 93 % | 55 % |
+| 16–19 | 82 % | 19 % |
+| 20–23 | 56 % | 3 % |
+| 24–27 | 26 % | 0,2 % |
+| 28–31 | 8 % | 0 |
+| 32 et plus | < 2 % | 0 |
+
+Au-dessus d'environ 28 cases libres, ces entrées valent presque toujours zéro : on peut ne pas les calculer.
+Elles ne coûtent donc qu'en fin de partie, là où le réseau se trompe le plus (tableau de « Ce qui limite le
+réseau actuel »). Elles se combinent naturellement avec les têtes par phase : la tête de fin de partie reçoit
+l'information dont elle a besoin.
+
+Il reste à savoir si le gain en précision compense le coût du calcul, et seul un match le dira. Mais on sait
+maintenant que le défaut est réel et où il se trouve.
 
 ## Une cible plus fine : l'écart de score
 
@@ -382,6 +475,16 @@ gain serré ou large) ; en jeu, la recherche reçoit un nombre gradué.
 négligeable devant les 65 536 de la couche 1024 → 64), plus $C$ exponentielles pour la softmax : quelques
 dizaines de nanosecondes. L'espérance est ensuite multipliée par une échelle fixe pour donner la valeur entière
 de la recherche (par exemple 1 point d'écart = 1000).
+
+**En fin de partie, l'issue de la partie est une meilleure cible que le maître.** La distillation donne 80 %
+du poids au maître et 20 % à l'issue réelle de la partie. Or les parties du cache sont jouées parfaitement en
+finale : à 22 cases libres ou moins, l'issue est exacte dans 99,9 % des cas, alors que le maître se trompe dans
+5 à 14 % des cas entre 18 et 22 cases libres (tableau de « Ce qui limite le réseau actuel »). Il suffit de
+faire dépendre ce poids de la phase de jeu : l'issue seule à 22 cases libres ou moins, le mélange actuel
+au-dessus. On obtient ainsi des étiquettes exactes de fin de partie sans rien résoudre. Plus tard, une remontée
+phase par phase pourrait étendre cette zone exacte : étiqueter les positions à 24 cases libres par une
+recherche courte dont les feuilles tombent dans la zone déjà fiable, réentraîner, puis passer à 28 cases
+libres, et ainsi de suite.
 
 Le maître actuel ne prédit qu'une valeur dans $(-1, 1)$. Un script d'entraînement de ResNet avec l'écart de
 score existe déjà (`nnue/cnn_resnet_with_diff_score.py`) : c'est le point de départ naturel pour un maître qui
@@ -729,9 +832,9 @@ est fausse et sera à corriger en même temps.
 | Étape | Ce qui change | Code | Calcul | Gain attendu |
 |---|---|---|---|---|
 | 1. Point de vue + têtes par phase | encodage, `Net`, `play`/`value` ; variantes `us` / `[us, them]` | moyen | un réentraînement | élevé, sûr |
-| 2. Écart de score | cible, perte, maître à tête de score | faible | un réentraînement | moyen à élevé |
+| 2. Écart de score | cible, perte, maître à tête de score ; issue seule en fin de partie | faible | un réentraînement | moyen à élevé |
 | 3. Positions des arbres | générateur + étiquetage | important | $10^9$ étiquettes | élevé |
-| 4. Entrées globales | `Net`, `value` | moyen | un réentraînement | incertain |
+| 4. Entrées globales | `Net`, `value` ; régions privées et disputées, en fin de partie seulement | moyen | un réentraînement | moyen ; défaut mesuré en fin de partie |
 | 5. Taille / vitesse | `Net`, SIMD | faible | plusieurs entraînements | moyen |
 
 **Une transformation à la fois**, avec les mêmes données et la même distillation, pour savoir ce que chacune

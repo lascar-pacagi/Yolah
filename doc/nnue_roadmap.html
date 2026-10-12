@@ -2537,6 +2537,200 @@ Figure 2: Elo du dev quand la valeur du réseau est arrondie à un multiple de 
 </div>
 <p><strong>Les données ne ressemblent pas aux positions évaluées.</strong> Le réseau apprend sur des positions de parties, c’est-à-dire des positions où les deux joueurs ont joué de bons coups. La recherche, elle, évalue surtout des positions issues de mauvais coups (les lignes réfutées des arbres alpha-bêta), qu’il n’a presque jamais vues.</p>
 <p><strong>Il ne voit que des cases, pas des structures.</strong> Mobilité, territoire et régions sont des propriétés globales qu’un réseau à une couche cachée large reconstruit mal. L’étude J l’a montré à sa façon : l’influence (le Voronoi en pas de roi) prédit 4 à 6 fois mieux que le hasard le coup du ResNet. La recherche la calcule déjà pour ordonner les coups.</p>
+<p>Les mesures de fin de partie le confirment (positions du cache résolues exactement par <code>endgame_solver</code>, outil <code>endgame_truth</code>). On compte les <strong>erreurs de résultat</strong> : la valeur annonce une victoire, une défaite ou une partie nulle, et le solveur dit autre chose.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: right;">cases libres</th>
+<th style="text-align: right;">maître</th>
+<th style="text-align: right;">NNUE</th>
+<th style="text-align: right;">issue de la partie</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0,4 %</td>
+<td style="text-align: right;">8,0 %</td>
+<td style="text-align: right;">0 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">1,8 %</td>
+<td style="text-align: right;">9,5 %</td>
+<td style="text-align: right;">0 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">5,3 %</td>
+<td style="text-align: right;">12,9 %</td>
+<td style="text-align: right;">0,1 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">14,4 %</td>
+<td style="text-align: right;">18,3 %</td>
+<td style="text-align: right;">0,1 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">16,1 %</td>
+<td style="text-align: right;">16,1 %</td>
+<td style="text-align: right;">1,2 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">11,9 %</td>
+<td style="text-align: right;">15,8 %</td>
+<td style="text-align: right;">2,5 %</td>
+</tr>
+</tbody>
+</table>
+<p>Entre 10 et 14 cases libres, le maître ne se trompe presque jamais, mais le NNUE se trompe une fois sur dix. Ce n’est donc pas la cible qui manque : le réseau n’arrive pas à reproduire ce qu’on lui montre. Or ce sont justement des positions de régions : la moitié des plateaux à 12–15 cases libres sont entièrement séparés (outil <code>private_moves</code>). Deux autres essais vont dans le même sens. Une simple combinaison linéaire des caractéristiques de territoire de <code>heuristic_features</code>, ajustée phase par phase, fait mieux que le réseau à 7 cases libres ou moins, et s’en rapproche entre 8 et 21 (<code>phase_fit.py</code>). À l’inverse, des tables de valeurs par case ou par ligne, qui ne voient pas la connexité, n’apprennent presque rien en fin de partie (<code>pattern_fit.py</code>).</p>
+<p><strong>Au-delà de 28 cases libres, le réseau suit bien le maître.</strong> Le solveur ne suit plus, mais on peut comparer le NNUE au maître et à l’issue de la partie (616 000 positions du cache) :</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">cases libres</th>
+<th style="text-align: right;">NNUE vs maître (mse)</th>
+<th style="text-align: right;">erreurs de résultat vs issue : maître</th>
+<th style="text-align: right;">NNUE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">12–15</td>
+<td style="text-align: right;">0,180</td>
+<td style="text-align: right;">1,2 %</td>
+<td style="text-align: right;">10,3 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">16–19</td>
+<td style="text-align: right;"><strong>0,226</strong></td>
+<td style="text-align: right;">4,6 %</td>
+<td style="text-align: right;">13,7 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">20–23</td>
+<td style="text-align: right;"><strong>0,220</strong></td>
+<td style="text-align: right;">11,2 %</td>
+<td style="text-align: right;">17,6 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">24–27</td>
+<td style="text-align: right;">0,187</td>
+<td style="text-align: right;">16,7 %</td>
+<td style="text-align: right;">20,9 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">28–31</td>
+<td style="text-align: right;">0,149</td>
+<td style="text-align: right;">20,6 %</td>
+<td style="text-align: right;">23,0 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">32–35</td>
+<td style="text-align: right;">0,102</td>
+<td style="text-align: right;">23,2 %</td>
+<td style="text-align: right;">24,7 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">36–39</td>
+<td style="text-align: right;">0,062</td>
+<td style="text-align: right;">24,3 %</td>
+<td style="text-align: right;">24,6 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">40–43</td>
+<td style="text-align: right;">0,035</td>
+<td style="text-align: right;">23,4 %</td>
+<td style="text-align: right;">23,9 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">44–47</td>
+<td style="text-align: right;">0,021</td>
+<td style="text-align: right;">21,4 %</td>
+<td style="text-align: right;">22,2 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">48–55</td>
+<td style="text-align: right;">0,003 à 0,010</td>
+<td style="text-align: right;">~20 %</td>
+<td style="text-align: right;">~21 %</td>
+</tr>
+</tbody>
+</table>
+<p>L’écart entre le réseau et son maître culmine entre 16 et 23 cases libres, puis se referme : en ouverture, le réseau reproduit presque exactement le maître. Loin de la fin, les 20 à 25 % d’erreurs contre l’issue ne sont pas vraiment des erreurs : la partie n’est pas encore décidée, et elle n’est pas jouée parfaitement. À partir de 36 cases libres, le NNUE fait jeu égal avec le maître. En milieu de partie, la limite est donc le maître (ou les positions d’entraînement), pas le réseau.</p>
+<p><strong>Jusqu’où la recherche voit.</strong> Chaque coup remplit exactement une case libre : la recherche voit la fin de la partie dès que sa profondeur atteint le nombre de cases libres. Mesuré avec <code>search_bench</code> (joueur dev, produit creux, un cœur de i7-12700K, 209 positions) :</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">cases libres</th>
+<th style="text-align: right;">profondeur médiane, 0,2 s</th>
+<th style="text-align: right;">voit la fin</th>
+<th style="text-align: right;">profondeur médiane, 1 s</th>
+<th style="text-align: right;">voit la fin</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0–23</td>
+<td style="text-align: right;">jusqu’au bout</td>
+<td style="text-align: right;">100 %</td>
+<td style="text-align: right;">jusqu’au bout</td>
+<td style="text-align: right;">100 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">24–27</td>
+<td style="text-align: right;">21</td>
+<td style="text-align: right;">8 %</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">16 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">32–35</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">0 %</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">0 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">36–39</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">0 %</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">0 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">44–47</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0 %</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">0 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">48–51</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">0 %</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">0 %</td>
+</tr>
+</tbody>
+</table>
+<p>Ces profondeurs sont nominales : les lignes réduites (LMR, LMP, MPC, proxy cut) vont moins loin. À 23 cases libres ou moins à la racine, la recherche n’a plus besoin du réseau. Mais une recherche lancée entre 32 et 40 cases libres atteint une profondeur de 18 à 22 : ses feuilles tombent vers 12 à 25 cases libres, exactement là où le réseau se trompe le plus. <strong>Améliorer le réseau en fin de partie améliore donc les feuilles de toutes les recherches du milieu de partie</strong>, là où la partie se décide.</p>
 </section>
 <section id="les-transformations-proposées" class="level1" data-number="4">
 <h1 data-number="4"><span class="header-section-number">4</span> Les transformations proposées</h1>
@@ -2756,7 +2950,66 @@ Figure 3: Le réseau proposé : deux accumulateurs (un par point de vue), quelq
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>h1 <span class="op">=</span> torch.clamp(<span class="va">self</span>.fc1(x), <span class="dv">0</span>, <span class="dv">1</span>)</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>h1 <span class="op">=</span> torch.cat([h1, globals_], dim<span class="op">=</span><span class="dv">1</span>)            <span class="co"># (B, 1024 + k)</span></span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>h2 <span class="op">=</span> torch.clamp(<span class="va">self</span>.fc2(h1), <span class="dv">0</span>, <span class="dv">1</span>)</span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Ce point est le plus incertain : il coûte un calcul global par évaluation, à mettre en balance avec le gain.</p>
+<p><strong>Les régions, exactement et pour presque rien.</strong> Une dame glisse case par case à travers des cases libres : une pièce ne pourra jamais atteindre que les composantes connexes de cases libres (en 8-connexité) qu’elle touche. Et le départ d’un coup devient un <strong>trou</strong>, jamais une case libre : une frontière ne se rouvre jamais. Une composante que seules mes pièces touchent est donc <strong>privée pour toujours</strong>. Un remplissage par bitboards (<code>shift_all_directions</code> répété) donne les composantes ; il suffit ensuite de regarder quelles pièces touchent chacune. Des entrées possibles, du point de vue du joueur au trait :</p>
+<ul>
+<li>le nombre de cases libres dans mes régions privées, dans les siennes, et dans les régions disputées ;</li>
+<li>le nombre de mes pièces enfermées (qui ne touchent que des régions privées), et des siennes ;</li>
+<li>un bit « plateau entièrement séparé » : il n’y a plus de région disputée, et le résultat ne dépend plus que du nombre de coups que chacun peut jouer dans ses territoires.</li>
+</ul>
+<p><strong>Le calcul ne sert qu’en fin de partie.</strong> Mesuré sur 1,85 million de positions du cache :</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">cases libres</th>
+<th style="text-align: right;">positions avec une pièce enfermée</th>
+<th style="text-align: right;">plateau entièrement séparé</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">8–11</td>
+<td style="text-align: right;">97 %</td>
+<td style="text-align: right;">86 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">12–15</td>
+<td style="text-align: right;">93 %</td>
+<td style="text-align: right;">55 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">16–19</td>
+<td style="text-align: right;">82 %</td>
+<td style="text-align: right;">19 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">20–23</td>
+<td style="text-align: right;">56 %</td>
+<td style="text-align: right;">3 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">24–27</td>
+<td style="text-align: right;">26 %</td>
+<td style="text-align: right;">0,2 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">28–31</td>
+<td style="text-align: right;">8 %</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">32 et plus</td>
+<td style="text-align: right;">&lt; 2 %</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+<p>Au-dessus d’environ 28 cases libres, ces entrées valent presque toujours zéro : on peut ne pas les calculer. Elles ne coûtent donc qu’en fin de partie, là où le réseau se trompe le plus (tableau de « Ce qui limite le réseau actuel »). Elles se combinent naturellement avec les têtes par phase : la tête de fin de partie reçoit l’information dont elle a besoin.</p>
+<p>Il reste à savoir si le gain en précision compense le coût du calcul, et seul un match le dira. Mais on sait maintenant que le défaut est réel et où il se trouve.</p>
 </section>
 <section id="une-cible-plus-fine-lécart-de-score" class="level2" data-number="4.4">
 <h2 data-number="4.4" class="anchored" data-anchor-id="une-cible-plus-fine-lécart-de-score"><span class="header-section-number">4.4</span> Une cible plus fine : l’écart de score</h2>
@@ -2787,6 +3040,7 @@ probabilités :  0.05   0.10  0.20   0.40   0.25</code></pre></li>
 </ol>
 <p><strong>Pourquoi l’espérance et pas la classe la plus probable.</strong> La classe la plus probable (+2 ici) ne prend que 23 valeurs ; or l’étude M a montré qu’avec si peu de niveaux la recherche perd beaucoup (−108 Elo avec environ 15 niveaux, −32 avec environ 29). L’espérance varie de façon continue : deux positions dont la classe la plus probable est +2 se distinguent encore (+1,4 contre +1,9). D’où « des classes pour apprendre, un nombre pour jouer » : à l’entraînement, l’entropie croisée apprend toute la distribution (position sûre ou incertaine, gain serré ou large) ; en jeu, la recherche reçoit un nombre gradué.</p>
 <p><strong>Le coût en C++.</strong> La dernière couche passe de 32 → 1 à 32 → <span class="math inline">\(C\)</span> (23 × 32 multiplications au lieu de 32, négligeable devant les 65 536 de la couche 1024 → 64), plus <span class="math inline">\(C\)</span> exponentielles pour la softmax : quelques dizaines de nanosecondes. L’espérance est ensuite multipliée par une échelle fixe pour donner la valeur entière de la recherche (par exemple 1 point d’écart = 1000).</p>
+<p><strong>En fin de partie, l’issue de la partie est une meilleure cible que le maître.</strong> La distillation donne 80 % du poids au maître et 20 % à l’issue réelle de la partie. Or les parties du cache sont jouées parfaitement en finale : à 22 cases libres ou moins, l’issue est exacte dans 99,9 % des cas, alors que le maître se trompe dans 5 à 14 % des cas entre 18 et 22 cases libres (tableau de « Ce qui limite le réseau actuel »). Il suffit de faire dépendre ce poids de la phase de jeu : l’issue seule à 22 cases libres ou moins, le mélange actuel au-dessus. On obtient ainsi des étiquettes exactes de fin de partie sans rien résoudre. Plus tard, une remontée phase par phase pourrait étendre cette zone exacte : étiqueter les positions à 24 cases libres par une recherche courte dont les feuilles tombent dans la zone déjà fiable, réentraîner, puis passer à 28 cases libres, et ainsi de suite.</p>
 <p>Le maître actuel ne prédit qu’une valeur dans <span class="math inline">\((-1, 1)\)</span>. Un script d’entraînement de ResNet avec l’écart de score existe déjà (<code>nnue/cnn_resnet_with_diff_score.py</code>) : c’est le point de départ naturel pour un maître qui prédit l’écart.</p>
 </section>
 <section id="apprendre-sur-les-positions-que-la-recherche-évalue" class="level2" data-number="4.5">
@@ -3175,7 +3429,7 @@ a1·a2 contient (p1·q2 + q1·p2) · x[d5]·x[e5]</code></pre>
 </tr>
 <tr class="even">
 <td>2. Écart de score</td>
-<td>cible, perte, maître à tête de score</td>
+<td>cible, perte, maître à tête de score ; issue seule en fin de partie</td>
 <td>faible</td>
 <td>un réentraînement</td>
 <td>moyen à élevé</td>
@@ -3189,10 +3443,10 @@ a1·a2 contient (p1·q2 + q1·p2) · x[d5]·x[e5]</code></pre>
 </tr>
 <tr class="even">
 <td>4. Entrées globales</td>
-<td><code>Net</code>, <code>value</code></td>
+<td><code>Net</code>, <code>value</code> ; régions privées et disputées, en fin de partie seulement</td>
 <td>moyen</td>
 <td>un réentraînement</td>
-<td>incertain</td>
+<td>moyen ; défaut mesuré en fin de partie</td>
 </tr>
 <tr class="odd">
 <td>5. Taille / vitesse</td>
