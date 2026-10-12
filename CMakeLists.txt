@@ -140,6 +140,36 @@ if(ENABLE_TORCH)
     target_link_libraries(phase_fit_dump PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# Teacher and NNUE against the exact endgame solver (nnue/endgame_truth.py):
+# ./endgame_truth CACHE_DIR nnue.quantized.txt OUT.bin [--free 14,16,...] [--per N]
+add_executable(endgame_truth test/endgame_truth_main.cpp)
+target_compile_options(endgame_truth PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(endgame_truth PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(endgame_truth PRIVATE ${Boost_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/eigen)
+target_link_libraries(endgame_truth PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(endgame_truth PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(endgame_truth PRIVATE ${TORCH_LIBRARIES})
+endif()
+
+# Moves of the pieces enclosed in private regions (pruning study):
+# ./private_moves CACHE_DIR [--stride S]
+add_executable(private_moves test/private_moves_main.cpp)
+target_compile_options(private_moves PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(private_moves PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(private_moves PRIVATE ${Boost_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/eigen)
+target_link_libraries(private_moves PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(private_moves PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(private_moves PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # The grading tournament on its own (no boost::program_options, see
 # test/tournament_main.cpp): ./yolah_tournament --players ../config/tournament_players.txt
 add_executable(yolah_tournament test/tournament_main.cpp)
