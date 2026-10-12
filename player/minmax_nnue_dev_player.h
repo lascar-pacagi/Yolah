@@ -94,7 +94,9 @@
 //   S. The sparse product of the network's 1024 → 64 layer ("sparse h1",
 //      nnue/sparse_matvec.h): only the groups of 4 inputs of h1 with a
 //      non-zero value are multiplied. Same values, same tree (search_bench
-//      209/209), value() −34 %, −21 % time at depth 9. Campaign S1.
+//      209/209), value() −34 %, −21 % time at depth 9. Campaign S1 (cluster,
+//      E5-2650 v4): +61 [+53, +69] at 0.2 s/move (4000 games), +33 [+21, +46]
+//      at 1 s (1334 games). On by default since 2026-10-12.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -172,8 +174,9 @@ struct MinMaxNNUE_DevOptions {
     int  probcut_reduction = 4;      // ["probcut reduction"] the moves are searched at depth − this (SF: 4)
     bool probcut_filter = true;      // ["probcut filter"] only if the static value after the move already
                                      //   reaches the bound (stands for Stockfish's qsearch test)
-    bool sparse_h1 = false;          // ["sparse h1"] the network's 1024 → 64 layer as a sparse product (only
-                                     //   the groups of 4 inputs with a non-zero value; same values, faster)
+    bool sparse_h1 = true;           // ["sparse h1"] the network's 1024 → 64 layer as a sparse product (only
+                                     //   the groups of 4 inputs with a non-zero value; same values, faster;
+                                     //   S1: +61 Elo at 0.2 s, +33 at 1 s)
     int  eval_grain = 1;             // ["eval grain"] network values rounded to a multiple of this (1 = exact)
     bool staged = true;              // ["staged"] table's move first, the others generated only if needed
     bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table

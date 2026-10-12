@@ -125,6 +125,21 @@ if(ENABLE_TORCH)
     target_link_libraries(nets_check PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# Data of the fast evaluation per phase study (nnue/phase_fit.py):
+# ./phase_fit_dump CACHE_DIR nnue.quantized.txt OUT_DIR [--stride S]
+add_executable(phase_fit_dump test/phase_fit_dump_main.cpp player/heuristic_features.cpp)
+target_compile_options(phase_fit_dump PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(phase_fit_dump PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(phase_fit_dump PRIVATE ${Boost_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/eigen)
+target_link_libraries(phase_fit_dump PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(phase_fit_dump PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(phase_fit_dump PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # The grading tournament on its own (no boost::program_options, see
 # test/tournament_main.cpp): ./yolah_tournament --players ../config/tournament_players.txt
 add_executable(yolah_tournament test/tournament_main.cpp)
