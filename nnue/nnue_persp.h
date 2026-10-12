@@ -38,10 +38,12 @@ struct NNUE_Persp {
     int k = 1;                // number of phase heads
     bool them = false;        // fc2 reads [us, them] (2 · H1_SIZE inputs) instead of us
     int h2_inputs = H1_SIZE;
+    bool sparse = false;      // value(): sparse product of fc2 (same results, zero groups of h1 skipped)
 
     alignas(64) int16_t h1_bias[H1_SIZE];
     alignas(64) int8_t input_to_h1[INPUT_SIZE * H1_SIZE];   // one row of H1_SIZE per input
     int8_t* h1_to_h2 = nullptr;     // k × (H2_SIZE × h2_inputs)
+    int8_t* h1_to_h2_sparse = nullptr;  // the same by groups of 4 inputs (nnue/sparse_matvec.h)
     int16_t* h2_bias = nullptr;     // k × H2_SIZE
     int8_t* h2_to_h3 = nullptr;     // k × (H3_SIZE × H2_SIZE)
     int16_t* h3_bias = nullptr;     // k × H3_SIZE

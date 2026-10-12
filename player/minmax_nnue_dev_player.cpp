@@ -27,6 +27,8 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
         persp = std::make_unique<NNUE_Persp>(nnue_q_parameters_filename);
     else
         nnue.load(nnue_q_parameters_filename);
+    if (persp) persp->sparse = options.sparse_h1;
+    else nnue.sparse = options.sparse_h1;
     if (options.yolah_table) yolah_table = std::make_unique<SearchTable>(tt_size_mb);
     else table = std::make_unique<TranspositionTable>(tt_size_mb);
     if (options.eval_cache_bits > 0) eval_cache = std::vector<std::atomic<uint64_t>>(size_t(1) << options.eval_cache_bits);
@@ -194,6 +196,7 @@ std::string MinMaxNNUE_DevPlayer::info() {
          + (options.root_ordering ? " + root ordering" : "")
          + (options.lazy_accumulator ? " + lazy accumulators" : "")
          + (options.eval_cache_bits ? " + evaluation cache" : "")
+         + (options.sparse_h1 ? " + sparse h1" : "")
          + (options.lmr ? " + logarithmic LMR" : "")
          + (options.rfp_depth ? " + reverse futility pruning" : "")
          + (options.null_move ? " + null move pruning" : "")
@@ -1459,6 +1462,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["yolah table"] = options.yolah_table;
     j["staged"] = options.staged;
     j["eval grain"] = options.eval_grain;
+    j["sparse h1"] = options.sparse_h1;
     j["proxy cut"] = options.proxy_cut;
     j["proxy rank"] = options.proxy_rank;
     j["probcut margin"] = options.probcut_margin;

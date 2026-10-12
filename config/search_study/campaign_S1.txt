@@ -1,0 +1,5 @@
+# Campaign S1 (doc/nnue_roadmap.qmd, "Sauter les zéros de l'accumulateur"): the sparse product of the network's
+# 1024 → 64 layer ("sparse h1"). Same values and same tree as dev_y7 at a fixed depth (search_bench 209/209), value()
+# −34 %, search −21 % time at depth 9 (i7-12700K, no VNNI): what the speed alone is worth, at 0.2 s and 1 s per move.
+dev_y7_sparse dev_y7 200000 2000
+dev_y7_sparse dev_y7 1000000 2000

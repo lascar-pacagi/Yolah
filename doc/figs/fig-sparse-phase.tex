@@ -1,0 +1,28 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=0.4mm]
+  % groups of 4 entirely zero (skipped) and values zero, by number of holes (measured, current network)
+  \foreach \i/\lab/\g/\z in {0/{0–9}/34.8/77.5, 1/{10–19}/42.0/80.8, 2/{20–29}/53.7/85.7, 3/{30–39}/65.5/89.9, 4/{40–56}/78.0/94.0} {
+    \pgfmathsetmacro{\x}{20*\i}
+    \fill[soft] (\x,0) rectangle ++(7,\z);
+    \draw[ink,line width=.4pt] (\x,0) rectangle ++(7,\z);
+    \fill[soft2] (\x+7.5,0) rectangle ++(7,\g);
+    \draw[accent2,line width=.6pt] (\x+7.5,0) rectangle ++(7,\g);
+    \node[font=\sffamily\tiny,text=muted,above] at (\x+3.5,\z) {\z};
+    \node[font=\sffamily\tiny,text=accent2,above] at (\x+11,\g) {\g};
+    \node[tiny,below] at (\x+7.25,0) {\lab};
+  }
+  \draw[ink,line width=.6pt] (-3,0) -- (100,0);
+  \draw[ink,line width=.6pt] (-3,0) -- (-3,105);
+  \foreach \v in {0,25,50,75,100} {
+    \draw[ink] (-4,\v) -- (-3,\v);
+    \node[tiny,anchor=east] at (-4.5,\v) {\v\,\%};
+  }
+  \node[tiny] at (48,-14) {nombre de trous (= coups joués)};
+  \fill[soft] (62,110) rectangle ++(5,6); \draw[ink,line width=.4pt] (62,110) rectangle ++(5,6);
+  \node[tiny,anchor=west] at (68,113) {valeurs nulles};
+  \fill[soft2] (62,100) rectangle ++(5,6); \draw[accent2,line width=.6pt] (62,100) rectangle ++(5,6);
+  \node[tiny,anchor=west] at (68,103) {groupes de 4 sautés};
+\end{tikzpicture}
+\end{document}

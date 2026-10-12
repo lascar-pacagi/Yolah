@@ -5,6 +5,7 @@
 //   ./nets_check check positions.bin refs.bin ../models
 //   python3 ../nnue/check_persp_net.py positions.bin refs.bin model.pt   (a NetPersp)
 //   ./nets_check check_persp positions.bin refs.bin model.quantized.txt [old.quantized.txt]
+//   ./nets_check check_sparse positions.bin model.quantized.txt   (sparse product = dense, and speed)
 //
 // For every position and every network — the old NNUE (3 outputs) and the
 // value networks (NNUE and features, plain and distilled), each in float and
@@ -293,6 +294,56 @@ int check_persp(const string& positions, const string& refs_path, const string& 
     return ok ? 0 : 1;
 }
 
+// The sparse product (nnue/sparse_matvec.h) against the dense one, for a 193
+// network (NNUE_Quantized) or a PERSP one: at every position of the games of
+// positions.bin, the two values must be EXACTLY equal; then the cost of each.
+int check_sparse(const string& positions, const string& weights) {
+    const vector<Record> rs = read_records(positions);
+    vector<Yolah> ys;
+    for (const Record& r : rs) {
+        Yolah y;
+        for (Move m : r.moves) { if (!y.game_over()) ys.push_back(y); y.play(m); }
+        if (!y.game_over()) ys.push_back(y);
+    }
+    const size_t n = ys.size();
+    const bool is_persp = NNUE_Persp::is_persp_file(weights);
+    std::unique_ptr<NNUE_Persp> persp;
+    std::unique_ptr<NNUE_Quantized> old;
+    vector<std::unique_ptr<NNUE_Persp::Accumulator>> paccs;
+    vector<std::unique_ptr<NNUE_Quantized::Accumulator>> oaccs;
+    if (is_persp) {
+        persp = std::make_unique<NNUE_Persp>(weights);
+        for (const Yolah& y : ys) { paccs.push_back(std::make_unique<NNUE_Persp::Accumulator>()); persp->init(y, *paccs.back()); }
+    } else {
+        old = std::make_unique<NNUE_Quantized>();
+        old->load(weights);
+        for (const Yolah& y : ys) { oaccs.push_back(std::make_unique<NNUE_Quantized::Accumulator>()); old->init(y, *oaccs.back()); }
+    }
+    auto set_sparse = [&](bool s) { if (is_persp) persp->sparse = s; else old->sparse = s; };
+    auto value = [&](size_t i) { return is_persp ? persp->value(*paccs[i], ys[i]) : old->value(*oaccs[i], ys[i].current_player()); };
+    std::printf("%zu positions (all the positions of %zu games), %s\n", n, rs.size(), weights.c_str());
+    size_t diff = 0;
+    for (size_t i = 0; i < n; i++) {
+        set_sparse(false);
+        const float d = value(i);
+        set_sparse(true);
+        const float s = value(i);
+        if (d != s) diff++;
+    }
+    std::printf("  sparse vs dense: %zu different values  %s\n", diff, diff == 0 ? "OK" : "FAIL");
+    const int reps = 50;
+    for (bool s : {false, true}) {
+        set_sparse(s);
+        const auto t0 = std::chrono::steady_clock::now();
+        float sink = 0;
+        for (int r = 0; r < reps; r++)
+            for (size_t i = 0; i < n; i++) sink += value(i);
+        const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        std::printf("  value() %-6s %7.1f ns%s\n", s ? "sparse" : "dense", 1e9 * dt / (double(reps) * n), sink == 1.2345f ? " " : "");
+    }
+    return diff == 0 ? 0 : 1;
+}
+
 // Cost of one leaf evaluation of the features players: the features, then
 // each kind of network (int8 = FFNN of ffnn.h, the format of the original
 // networks; its weights file only needs the right sizes).
@@ -341,6 +392,7 @@ int main(int argc, char* argv[]) {
     if (cmd == "dump" && argc >= 3) return dump(argv[2], argc > 3 ? std::stoul(argv[3]) : 2000);
     if (cmd == "check" && argc >= 5) return check(argv[2], argv[3], argv[4]);
     if (cmd == "check_persp" && argc >= 5) return check_persp(argv[2], argv[3], argv[4], argc > 5 ? argv[5] : "");
+    if (cmd == "check_sparse" && argc >= 4) return check_sparse(argv[2], argv[3]);
     if (cmd == "bench" && argc >= 5) return bench(argv[2], argv[3], argv[4]);
     std::cerr << "usage: nets_check dump positions.bin [N] | check positions.bin refs.bin models_dir\n";
     return 2;

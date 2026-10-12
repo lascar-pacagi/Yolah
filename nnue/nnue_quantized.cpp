@@ -16,6 +16,7 @@
 #include <bit>
 #include <algorithm>
 #include <immintrin.h>
+#include "sparse_matvec.h"
 
 static constexpr int16_t FACTOR = 64;
 static constexpr int SHIFT = 6;
@@ -165,7 +166,8 @@ std::tuple<float, float, float> NNUE_Quantized::output(const int16_t* acc) {
         const int16_t v = acc[i];        
         h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v);
     }
-    matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);
+    if (sparse) sparse_nnue::matvec<64, 1024>(h1_to_h2_sparse, h1, h2, h2_bias);
+    else matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);
     matvec<32, 64>(h2_to_h3, h2, h3, h3_bias);
     matvec_3x32(h3_to_output, h3, output, output_bias);
     float e1 = std::exp(output[0] / ((float)FACTOR));
@@ -188,7 +190,8 @@ float NNUE_Quantized::value(const int16_t* acc, uint8_t side_to_move) {
         const int16_t v = acc[i];
         h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v);
     }
-    matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);
+    if (sparse) sparse_nnue::matvec<64, 1024>(h1_to_h2_sparse, h1, h2, h2_bias);
+    else matvec<64, 1024>(h1_to_h2, h1, h2, h2_bias);
     matvec<32, 64>(h2_to_h3, h2, h3, h3_bias);
     float s = 0;
     for (int i = 0; i < H3_SIZE; i++) s += value_weight[i] * h3[i];   // h3 at scale 64
@@ -247,6 +250,7 @@ void NNUE_Quantized::load(const std::string& filename) {
     read_matrix<int8_t, H1_SIZE, INPUT_SIZE, TRANSPOSE>(ifs, input_to_h1);
     read_bias<int16_t, H1_SIZE>(ifs, h1_bias);
     read_matrix<int8_t, H2_SIZE, H1_SIZE>(ifs, h1_to_h2);
+    sparse_nnue::layout(h1_to_h2, H2_SIZE, H1_SIZE, h1_to_h2_sparse);
     read_bias<int16_t, H2_SIZE>(ifs, h2_bias);
     read_matrix<int8_t, H3_SIZE, H2_SIZE>(ifs, h2_to_h3);
     read_bias<int16_t, H3_SIZE>(ifs, h3_bias);

@@ -20,6 +20,11 @@ struct NNUE_Quantized {
     alignas(64) int8_t input_to_h1[INPUT_SIZE * H1_SIZE];
     alignas(64) int16_t h2_bias[H2_SIZE];
     alignas(64) int8_t h1_to_h2[H1_SIZE * H2_SIZE];
+    // The same weights laid out by groups of 4 inputs, for the sparse product
+    // (nnue/sparse_matvec.h), used by output() and value() when `sparse` is set:
+    // same results, only the groups of h1 with a non-zero value are multiplied.
+    alignas(64) int8_t h1_to_h2_sparse[H1_SIZE * H2_SIZE];
+    bool sparse = false;
     alignas(64) int16_t h3_bias[H3_SIZE];
     alignas(64) int8_t h2_to_h3[H1_SIZE * H2_SIZE];
     alignas(64) int16_t output_bias[OUTPUT_SIZE + 1]{};

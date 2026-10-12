@@ -3,6 +3,7 @@
 #include <fstream>
 #include <immintrin.h>
 #include <stdexcept>
+#include "sparse_matvec.h"
 
 // The int8 kernels are those of nnue_quantized.cpp: activations in [0, 64]
 // (scale 64), int8 weights, int32 sums shifted back by 6 and clamped.
@@ -78,7 +79,7 @@ static T* aligned_array(size_t n) {
 }
 
 NNUE_Persp::~NNUE_Persp() {
-    free(h1_to_h2); free(h2_bias); free(h2_to_h3); free(h3_bias); free(value_weight); free(value_bias);
+    free(h1_to_h2); free(h1_to_h2_sparse); free(h2_bias); free(h2_to_h3); free(h3_bias); free(value_weight); free(value_bias);
 }
 
 bool NNUE_Persp::is_persp_file(const std::string& filename) {
@@ -136,6 +137,10 @@ void NNUE_Persp::load(const std::string& filename) {
     value_bias = aligned_array<float>(k);
     read_matrix(ifs, k * H2_SIZE, h2_inputs, h1_to_h2, false, "fc2");
     read_bias(ifs, k * H2_SIZE, h2_bias, "fc2");
+    h1_to_h2_sparse = aligned_array<int8_t>(size_t(k) * H2_SIZE * h2_inputs);
+    for (int b = 0; b < k; b++)
+        sparse_nnue::layout(h1_to_h2 + size_t(b) * H2_SIZE * h2_inputs, H2_SIZE, h2_inputs,
+                            h1_to_h2_sparse + size_t(b) * H2_SIZE * h2_inputs);
     for (int b = 0; b < k; b++) {
         read_matrix(ifs, H3_SIZE, H2_SIZE, h2_to_h3 + b * H3_SIZE * H2_SIZE, false, "w3");
         read_bias(ifs, H3_SIZE, h3_bias + b * H3_SIZE, "b3");
@@ -217,9 +222,13 @@ float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     if (them) {
         const int16_t* other = acc + (1 - stm) * H1_SIZE;
         for (int i = 0; i < H1_SIZE; i++) { const int16_t v = other[i]; h1[H1_SIZE + i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
-        matvec<H2_SIZE, 2 * H1_SIZE>(h1_to_h2 + size_t(b) * H2_SIZE * 2 * H1_SIZE, h1, h2, h2_bias + b * H2_SIZE);
+        const size_t off = size_t(b) * H2_SIZE * 2 * H1_SIZE;
+        if (sparse) sparse_nnue::matvec<H2_SIZE, 2 * H1_SIZE>(h1_to_h2_sparse + off, h1, h2, h2_bias + b * H2_SIZE);
+        else matvec<H2_SIZE, 2 * H1_SIZE>(h1_to_h2 + off, h1, h2, h2_bias + b * H2_SIZE);
     } else {
-        matvec<H2_SIZE, H1_SIZE>(h1_to_h2 + size_t(b) * H2_SIZE * H1_SIZE, h1, h2, h2_bias + b * H2_SIZE);
+        const size_t off = size_t(b) * H2_SIZE * H1_SIZE;
+        if (sparse) sparse_nnue::matvec<H2_SIZE, H1_SIZE>(h1_to_h2_sparse + off, h1, h2, h2_bias + b * H2_SIZE);
+        else matvec<H2_SIZE, H1_SIZE>(h1_to_h2 + off, h1, h2, h2_bias + b * H2_SIZE);
     }
     matvec<H3_SIZE, H2_SIZE>(h2_to_h3 + b * H3_SIZE * H2_SIZE, h2, h3, h3_bias + b * H3_SIZE);
     const float* w = value_weight + b * H3_SIZE;

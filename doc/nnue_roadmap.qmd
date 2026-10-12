@@ -333,6 +333,56 @@ loss   = F.cross_entropy(logits, target_class)    # cible : classe de l'écart (
 value  = (logits.softmax(-1) * class_centres).sum(-1)   # en jeu : l'espérance, un nombre gradué
 ```
 
+**La dernière ligne, pas à pas.** Elle transforme la sortie du réseau, une liste de probabilités sur des
+écarts, en un seul nombre : l'écart attendu, que la recherche utilise comme évaluation.
+
+1. **Les classes.** On découpe les écarts possibles en $C$ classes, par exemple $C = 23$ :
+
+    ```
+    classe :   0      1     2   ...   11  ...   21     22
+    écart  :  ≤−11   −10   −9   ...    0  ...  +10    ≥+11
+    ```
+
+2. **`logits`**, de forme `(B, C)` : pour chacune des $B$ positions du lot, $C$ nombres bruts, un par classe ;
+   ce ne sont pas encore des probabilités.
+3. **`logits.softmax(-1)`** les transforme en probabilités (positives, de somme 1), sur la dernière dimension,
+   celle des classes. Exemple simplifié à 5 classes :
+
+    ```
+    écarts       :  −4     −2     0     +2     +4
+    probabilités :  0.05   0.10  0.20   0.40   0.25
+    ```
+
+4. **`class_centres`** : un tenseur fixe de $C$ nombres, l'écart que représente chaque classe, ici
+   `[−4, −2, 0, +2, +4]`. Pour une classe ouverte comme « ≥ +11 », on prend une valeur typique, au mieux l'écart
+   moyen observé dans cette classe sur les données.
+5. **`* class_centres`** multiplie chaque probabilité par l'écart de sa classe ; PyTorch applique ce vecteur à
+   chacune des $B$ lignes :
+
+    ```
+    0.05·(−4) = −0.2    0.10·(−2) = −0.2    0.20·0 = 0    0.40·(+2) = 0.8    0.25·(+4) = 1.0
+    ```
+
+6. **`.sum(-1)`** additionne sur les classes, un nombre par position, de forme `(B,)` :
+
+    ```
+    value = −0.2 − 0.2 + 0 + 0.8 + 1.0 = +1.4
+    ```
+
+    C'est l'**espérance** de l'écart : « en moyenne, je m'attends à gagner de 1,4 point ».
+
+**Pourquoi l'espérance et pas la classe la plus probable.** La classe la plus probable (+2 ici) ne prend que
+23 valeurs ; or l'étude M a montré qu'avec si peu de niveaux la recherche perd beaucoup (−108 Elo avec
+environ 15 niveaux, −32 avec environ 29). L'espérance varie de façon continue : deux positions dont la classe la
+plus probable est +2 se distinguent encore (+1,4 contre +1,9). D'où « des classes pour apprendre, un nombre
+pour jouer » : à l'entraînement, l'entropie croisée apprend toute la distribution (position sûre ou incertaine,
+gain serré ou large) ; en jeu, la recherche reçoit un nombre gradué.
+
+**Le coût en C++.** La dernière couche passe de 32 → 1 à 32 → $C$ (23 × 32 multiplications au lieu de 32,
+négligeable devant les 65 536 de la couche 1024 → 64), plus $C$ exponentielles pour la softmax : quelques
+dizaines de nanosecondes. L'espérance est ensuite multipliée par une échelle fixe pour donner la valeur entière
+de la recherche (par exemple 1 point d'écart = 1000).
+
 Le maître actuel ne prédit qu'une valeur dans $(-1, 1)$. Un script d'entraînement de ResNet avec l'écart de
 score existe déjà (`nnue/cnn_resnet_with_diff_score.py`) : c'est le point de départ naturel pour un maître qui
 prédit l'écart.
@@ -403,30 +453,128 @@ parce que ces deux changements modifient ce que le réseau arrive à apprendre �
 
 ### Sauter les zéros de l'accumulateur
 
-Après l'écrêtage, une partie des 1024 valeurs de `h1` vaut 0. Une colonne de `h1_to_h2` multipliée par 0 ne
-sert à rien. Stockfish exploite ça : il repère les blocs non nuls de `h1`, puis n'accumule que les colonnes
-correspondantes. Il faut pour ça ranger `h1_to_h2` par entrée (colonne) plutôt que par sortie (ligne) :
+**D'où viennent les zéros.** Avant la couche 1024 → 64, `value()` écrête l'accumulateur : toute valeur négative
+devient 0, toute valeur au-dessus de 64 devient 64. Avec le réseau actuel, mesuré sur 200 000 positions du cache
+d'entraînement (poids quantifiés comme en C++), **87 % des 1024 valeurs de `h1` sont nulles**. Seule une
+centaine de neurones est « allumée » dans une position donnée, mais pas toujours les mêmes : aucun neurone n'est
+éteint sur toutes les positions.
 
-```cpp
-// esquisse : produit creux, h1_to_h2 rangé par blocs de 4 entrées (64 sorties × 4 int8 = 256 o)
-int nz[H1_SIZE / 4], n = 0;
-for (int j = 0; j < H1_SIZE / 4; j++)                        // en pratique : masque SIMD + table
-    if (reinterpret_cast<const int32_t*>(h1)[j] != 0) nz[n++] = j;
+**Ce que fait `matvec` aujourd'hui.** Il calcule chaque sortie comme un produit scalaire de sa ligne de
+poids avec les 1024 valeurs de `h1`, zéros compris : 65 536 multiplications à chaque évaluation, dont 87 %
+multiplient par 0.
 
-__m256i sum[8] = {};                                         // 64 sorties int32
-for (int k = 0; k < n; k++) {
-    const int j = nz[k];
-    const __m256i in = _mm256_set1_epi32(reinterpret_cast<const int32_t*>(h1)[j]);  // 4 entrées
-    const int8_t* w = h1_to_h2_by_input + j * 256;
-    for (int o = 0; o < 8; o++)
-        mm256_dpwssds_avx_epi32(sum[o], in, _mm256_load_si256((const __m256i*)(w + 32 * o)));
-}
+**L'idée : lire la matrice par colonnes.** Le même produit s'écrit aussi comme une somme de colonnes :
+
+```
+h2 = h1[0] · colonne 0  +  h1[1] · colonne 1  +  ...  +  h1[1023] · colonne 1023  +  biais
 ```
 
-Le gain dépend directement de la proportion de zéros. **Avant d'écrire ce code, il faut la mesurer** sur les
-positions de `search_bench`, avec un simple compteur dans `value()`. Avec 50 % de blocs nuls, `h1_to_h2` coûte
-deux fois moins ; avec 10 %, ça ne vaut pas la complexité. À l'entraînement, une petite pénalité L1 sur `h1`
-augmente la proportion de zéros.
+Chaque terme où `h1[i]` vaut 0 n'ajoute rien : on peut le sauter, et ne lire que les colonnes des valeurs non
+nulles. Le résultat est **exactement** le même, au bit près : ce sont des sommes d'entiers, et l'ordre des
+additions n'y change rien.
+
+![Le principe : `h1` est découpé en groupes de 4 valeurs ; un groupe entièrement nul est sauté, et les colonnes correspondantes de `h1_to_h2` ne sont pas lues.](figs/fig-sparse-principle.png){#fig-sparse-principle width=100%}
+
+**Pourquoi des groupes de 4.** L'instruction qui fait le travail, `_mm256_dpbusd_epi32` (ou `maddubs` + `madd`
+sans VNNI, comme dans `matvec`), multiplie **4 octets consécutifs** par 4 poids et additionne les 4 produits dans
+une case de 32 bits. L'unité naturelle est donc le groupe de 4 entrées : on saute un groupe quand ses 4 valeurs
+sont nulles, et on le calcule entièrement sinon. Sur le réseau actuel, **59 % des 256 groupes sont entièrement
+nuls** : il reste 41 % des multiplications, soit environ 27 000 au lieu de 65 536.
+
+**Ranger les poids autrement.** Aujourd'hui, `h1_to_h2` est rangé par sortie : 64 lignes de 1024 octets. Pour
+lire « les 4 colonnes d'un groupe » d'un seul bloc, on le range par groupe d'entrées : 256 blocs de 256 octets,
+chaque bloc contenant, pour les 64 sorties, leurs 4 poids du groupe. C'est une simple permutation des mêmes poids,
+faite une fois dans `load()` : rien ne change à l'entraînement ni au fichier de poids.
+
+![En haut, le rangement actuel ; au milieu, le rangement par groupe de 4 entrées ; en bas, une étape du calcul : les 4 valeurs du groupe, recopiées 8 fois dans un registre, multipliées par 32 octets de poids, ajoutent leur contribution à 8 sorties d'un coup.](figs/fig-sparse-layout.png){#fig-sparse-layout width=100%}
+
+Une étape traite un groupe non nul : ses 4 valeurs, recopiées 8 fois dans un registre de 32 octets, sont
+multipliées par les 32 premiers octets du bloc (les poids des sorties 0 à 7), ce qui ajoute leur contribution aux
+8 sorties d'un coup ; 8 instructions couvrent les 64 sorties. Contrairement au calcul actuel, il n'y a pas de
+somme horizontale à la fin (`m256_haddx8`) : chaque case du registre est déjà une sortie.
+
+```cpp
+// esquisse : produit creux pour la couche 1024 → 64
+// h1_to_h2_by_group[j * 256 + o * 32 + l * 4 + t] = poids de l'entrée 4j+t vers la sortie 8o+l
+const int32_t* groups = reinterpret_cast<const int32_t*>(h1);   // 256 groupes de 4 octets
+
+// 1. La liste des groupes non nuls (8 groupes par registre, un masque de bits, puis ses bits à 1)
+//    lut[mask] = les positions des bits à 1 de mask (table de 256 × 8 entiers de 16 bits)
+alignas(16) uint16_t nz[256 + 8];
+int n = 0;
+__m128i base = _mm_setzero_si128();
+for (int j = 0; j < 256; j += 8) {
+    const __m256i g = _mm256_load_si256((const __m256i*)(groups + j));
+    unsigned mask = _mm256_movemask_ps(_mm256_castsi256_ps(
+                        _mm256_cmpgt_epi32(g, _mm256_setzero_si256())));   // bit k : groupe j+k non nul
+    _mm_storeu_si128((__m128i*)(nz + n), _mm_add_epi16(_mm_load_si128((const __m128i*)lut[mask]), base));
+    n += std::popcount(mask);                                // 8 indices écrits, n avance du bon nombre
+    base = _mm_add_epi16(base, _mm_set1_epi16(8));
+}
+
+// 2. La somme des colonnes des seuls groupes non nuls
+__m256i sum[8];                                              // les 64 sorties, en int32
+for (int o = 0; o < 8; o++) sum[o] = _mm256_setzero_si256();
+for (int k = 0; k < n; k++) {
+    const int j = nz[k];
+    const __m256i in = _mm256_set1_epi32(groups[j]);          // les 4 valeurs, recopiées 8 fois
+    const int8_t* w = h1_to_h2_by_group + j * 256;
+    for (int o = 0; o < 8; o++)
+        dot_accumulate(sum[o], in, _mm256_load_si256((const __m256i*)(w + 32 * o)));
+}
+// 3. Biais, décalage de 6 bits et écrêtage dans [0, 64], comme aujourd'hui (sans m256_haddx8)
+```
+
+(Un groupe de 4 octets dans $[0, 64]$ vu comme un entier de 32 bits est strictement positif dès qu'un des
+octets est non nul : la comparaison `> 0` suffit.)
+
+Pour l'étape 1, la première version faisait une boucle sur les bits du masque (`while (mask) { nz[n++] = j +
+countr_zero(mask); mask &= mask - 1; }`). Le nombre de tours change à chaque registre, le processeur se trompe
+de branche environ une fois sur 32 octets de `h1`, et cela coûtait plus que les multiplications économisées : le
+produit creux était **plus lent** que le produit plein (723 ns contre 689). La table `lut`, reprise de
+Stockfish, écrit les 8 indices d'un coup sans aucun branchement.
+
+**Le gain dépend de la phase de la partie.** En début de partie, le plateau est plein et beaucoup de neurones
+s'allument ; en fin de partie, la plupart restent éteints :
+
+![Proportion de valeurs nulles et de groupes de 4 entièrement nuls dans `h1`, selon le nombre de trous (réseau actuel, 200 000 positions du cache d'entraînement).](figs/fig-sparse-phase.png){#fig-sparse-phase width=80%}
+
+Il reste donc 65 % des multiplications en ouverture et 22 % en fin de partie. Comme la recherche passe beaucoup
+de temps en milieu et fin de partie, on peut espérer une couche 1024 → 64 environ deux fois plus rapide en
+moyenne, donc un `value()` nettement moins cher. La recherche de groupes non nuls coûte peu : 32 comparaisons
+de registres.
+
+**Ce qu'il faut vérifier, et ce qui peut aider.**
+
+- **L'exactitude** : la valeur doit être identique au bit près à celle de `matvec`. `nets_check` peut le
+  vérifier directement.
+- **Le vrai gain** : moins de multiplications, mais des accès mémoire par blocs dispersés au lieu d'une lecture
+  continue, et une boucle de longueur variable. Seule une mesure de `value()` puis des nœuds par seconde
+  (`search_bench`) le dira (mesures ci-dessous).
+- **Regrouper les neurones qui s'allument ensemble.** Permuter les 1024 neurones (lignes de `fc1` et colonnes de
+  `fc2` dans le même ordre) ne change pas le réseau, mais si des neurones souvent allumés ensemble se retrouvent
+  dans les mêmes groupes, il y a plus de groupes entièrement nuls : on passe de « 87 % de valeurs nulles » vers
+  « 87 % de groupes nuls ». Stockfish fait cette permutation à partir de statistiques sur des positions.
+- **Encourager les zéros à l'entraînement** : une petite pénalité sur `h1` (L1) pousse plus de neurones à rester
+  éteints. À doser : trop forte, elle coûte en précision.
+- **Avec le produit par paires** (ci-dessous), le produit est nul dès qu'une des deux moitiés l'est : encore plus
+  de zéros à sauter.
+
+**Implémentation et mesures.** Le produit creux est dans `nnue/sparse_matvec.h`, utilisé par `NNUE_Quantized`
+(le réseau 193) et `NNUE_Persp` ; le joueur dev l'active par l'option `"sparse h1": true` (désactivé par défaut,
+le temps du match). Sans VNNI, deux groupes partagent un même `madd` : leurs deux `maddubs` s'ajoutent en 16
+bits sans saturer, car `h1` ≤ 64 (2 × 64 × 127 × 2 = 32 512 < 32 767). Mesures sur i7-12700K, un cœur :
+
+| | produit plein | produit creux | |
+|---|---:|---:|---:|
+| `value()`, réseau 193 | 685 ns | 453 ns | −34 % |
+| `value()`, NetPersp K = 8 (essai) | 758 ns | 515 ns | −32 % |
+| `value()`, NetPersp K = 8 + THEM (essai) | 1342 ns | 931 ns | −31 % |
+| `search_bench`, profondeur 9, 209 positions | 1,60 s | 1,27 s | −21 % |
+
+`nets_check check_sparse` : 0 valeur différente sur les 83 332 positions de 3000 parties, pour les trois
+réseaux. `search_bench` : même arbre, même valeur et même coup sur 209/209 positions. Ce que vaut ce gain de
+vitesse en Elo se mesure par la campagne S1 (`dev_y7_sparse` contre `dev_y7`, à 0,2 s et 1 s par coup).
 
 ### Le produit par paires
 
