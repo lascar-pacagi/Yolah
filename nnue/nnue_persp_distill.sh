@@ -55,6 +55,9 @@ else
     SCRIPT="nnue_persp_distill.py"
 fi
 MODEL_DIR="${MODEL_ROOT}/${VARIANT}"
+# The rendezvous port of torch.distributed, one per job: several jobs can share a
+# node (with one fixed port, the second one fails with EADDRINUSE).
+YOLAH_DDP_PORT="${YOLAH_DDP_PORT:-$(( 20000 + ${SLURM_JOB_ID:-$$} % 40000 ))}"
 mkdir -p "${MODEL_DIR}"
 
 for f in "${SIF}" "${CACHE_DIR}/meta.json" "${CACHE_DIR}/teacher_meta.json" "${INIT_MODEL}" \
@@ -70,7 +73,7 @@ echo "  Variant  : ${VARIANT} (${SCRIPT})"
 echo "  Cache    : ${CACHE_DIR}"
 echo "  Models   : ${MODEL_DIR}"
 echo "  Init     : ${INIT_MODEL}"
-echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}"
+echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
 echo "════════════════════════════════════════════════════════════════"
 
 singularity exec --nv \
@@ -85,6 +88,7 @@ singularity exec --nv \
     --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS}" \
     --env "YOLAH_DISTILL_ALPHA=${YOLAH_DISTILL_ALPHA}" \
     --env "YOLAH_LR=${YOLAH_LR}" \
+    --env "YOLAH_DDP_PORT=${YOLAH_DDP_PORT}" \
     --env "TORCH_NCCL_BLOCKING_WAIT=1" \
     "${SIF}" \
     bash -c "cd /work && python3 ${SCRIPT}"
