@@ -2414,7 +2414,7 @@ padding-right: 0.6em;
     <div>
     <div class="quarto-title-meta-heading">Date de publication</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">12 octobre 2026</p>
+      <p class="date">13 octobre 2026</p>
     </div>
   </div>
   
@@ -3283,7 +3283,32 @@ Figure 7: Proportion de valeurs nulles et de groupes de 4 entièrement nuls dan
 </tr>
 </tbody>
 </table>
-<p><code>nets_check check_sparse</code> : 0 valeur différente sur les 83 332 positions de 3000 parties, pour les trois réseaux. <code>search_bench</code> : même arbre, même valeur et même coup sur 209/209 positions. Ce que vaut ce gain de vitesse en Elo se mesure par la campagne S1 (<code>dev_y7_sparse</code> contre <code>dev_y7</code>, à 0,2 s et 1 s par coup).</p>
+<p><code>nets_check check_sparse</code> : 0 valeur différente sur les 83 332 positions de 3000 parties, pour les trois réseaux. <code>search_bench</code> : même arbre, même valeur et même coup sur 209/209 positions. Ce que vaut ce gain de vitesse en Elo se mesure par la campagne S1 (<code>dev_y7_sparse</code> contre <code>dev_y7</code>, 4000 parties à chaque cadence) :</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>cadence</th>
+<th style="text-align: right;">score</th>
+<th style="text-align: right;">Elo</th>
+<th>intervalle à 95 %</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0,2 s par coup</td>
+<td style="text-align: right;">58,7 %</td>
+<td style="text-align: right;">+60,7</td>
+<td>[+52,8 ; +68,7]</td>
+</tr>
+<tr class="even">
+<td>1 s par coup</td>
+<td style="text-align: right;">55,0 %</td>
+<td style="text-align: right;">+34,9</td>
+<td>[+27,7 ; +42,3]</td>
+</tr>
+</tbody>
+</table>
+<p>Le gain baisse quand le temps augmente, comme pour tout gain de vitesse : 21 % de nœuds en plus valent moins quand la recherche est déjà profonde. Le produit creux est activé par défaut (option <code>sparse h1</code>).</p>
 </section>
 <section id="le-produit-par-paires" class="level3" data-number="4.6.4">
 <h3 data-number="4.6.4" class="anchored" data-anchor-id="le-produit-par-paires"><span class="header-section-number">4.6.4</span> Le produit par paires</h3>

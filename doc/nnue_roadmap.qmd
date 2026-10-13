@@ -677,7 +677,15 @@ bits sans saturer, car `h1` ≤ 64 (2 × 64 × 127 × 2 = 32 512 < 32 767). Mesu
 
 `nets_check check_sparse` : 0 valeur différente sur les 83 332 positions de 3000 parties, pour les trois
 réseaux. `search_bench` : même arbre, même valeur et même coup sur 209/209 positions. Ce que vaut ce gain de
-vitesse en Elo se mesure par la campagne S1 (`dev_y7_sparse` contre `dev_y7`, à 0,2 s et 1 s par coup).
+vitesse en Elo se mesure par la campagne S1 (`dev_y7_sparse` contre `dev_y7`, 4000 parties à chaque cadence) :
+
+| cadence | score | Elo | intervalle à 95 % |
+|---|---:|---:|---|
+| 0,2 s par coup | 58,7 % | +60,7 | [+52,8 ; +68,7] |
+| 1 s par coup | 55,0 % | +34,9 | [+27,7 ; +42,3] |
+
+Le gain baisse quand le temps augmente, comme pour tout gain de vitesse : 21 % de nœuds en plus valent moins
+quand la recherche est déjà profonde. Le produit creux est activé par défaut (option `sparse h1`).
 
 ### Le produit par paires
 
