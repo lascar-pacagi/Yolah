@@ -33,6 +33,15 @@
 //       positions searched by another player (its --csv): identical values
 //       and moves, and the ratio of nodes and times.
 //
+//   search_bench cutstats --player CFG --cache DIR --depth D --out stats.bin [--stride S] [--offset K]
+//       The cutoff statistics of the dev player's searches (step T, the
+//       history prior): every --stride-th position of a training cache
+//       (inputs.u8, 193 bytes per position), starting at --offset, searched
+//       to depth D from an empty table; per phase, colour, from and to, the
+//       times the move was tried and the times it cut (uint32, all the
+//       `tried` then all the `cut`). nnue/history_prior.py turns them into
+//       the prior.
+//
 // Players: MinMaxNNUE_BaselinePlayer and MinMaxNNUE_DevPlayer (they expose
 // search() and clear_table()).
 #include "magic.h"
@@ -163,6 +172,47 @@ namespace {
             }
         }
         cout << n << " positions written to " << out << '\n';
+        return 0;
+    }
+
+    int cutstats(const Args& a) {
+        Searcher searcher(a.get("player"));
+        if (!searcher.dev) { cerr << "cutstats: needs a MinMaxNNUE_DevPlayer\n"; return 1; }
+        auto stats = std::make_unique<MinMaxNNUE_DevPlayer::CutStats>();
+        searcher.dev->cut_stats = stats.get();
+        const string cache = a.get("cache");
+        const size_t stride = std::stoul(a.get("stride", "37")), offset = std::stoul(a.get("offset", "0"));
+        const int depth = std::stoi(a.get("depth", "8"));
+        std::ifstream in(cache + "/inputs.u8", std::ios::binary | std::ios::ate);
+        if (!in) { cerr << "cannot open " << cache << "/inputs.u8\n"; return 1; }
+        const size_t n_all = size_t(in.tellg()) / 193;
+        auto bits = [](const uint8_t* row) {
+            uint64_t b = 0;
+            for (int i = 0; i < 64; i++) b = (b << 1) | (row[i] & 1);
+            return b;
+        };
+        vector<uint8_t> row(193);
+        size_t searched = 0;
+        const auto t0 = std::chrono::steady_clock::now();
+        for (size_t i = offset; i < n_all; i += stride) {
+            in.seekg(std::streamoff(i * 193));
+            in.read((char*)row.data(), 193);
+            const uint64_t black = bits(&row[0]), white = bits(&row[64]), empty = bits(&row[128]);
+            const int holes = std::popcount(empty), turn = row[192];
+            if ((holes & 1) != turn) continue;                  // a pass happened: scores unknown
+            Yolah y;
+            y.set_state(black, white, empty, uint16_t((holes + 1) / 2), uint16_t(holes / 2), uint16_t(holes));
+            if (y.game_over()) continue;
+            searcher.clear();
+            searcher.search(y, uint8_t(depth), 0);
+            if (++searched % 1000 == 0)
+                cerr << searched << " positions, "
+                     << std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s\n";
+        }
+        std::ofstream out(a.get("out", "cutstats.bin"), std::ios::binary);
+        out.write((const char*)stats->tried, sizeof(stats->tried));
+        out.write((const char*)stats->cut, sizeof(stats->cut));
+        cout << searched << " positions searched to depth " << depth << ", statistics in " << a.get("out", "cutstats.bin") << '\n';
         return 0;
     }
 
@@ -374,6 +424,7 @@ int main(int argc, char* argv[]) {
     if (mode == "positions") return make_positions(a);
     if (mode == "run") return run(a);
     if (mode == "solve") return solve(a);
+    if (mode == "cutstats") return cutstats(a);
     if (mode == "blunders") return blunders(a);
     if (mode == "bestmove") return bestmove(a);
     cerr << "unknown mode " << mode << '\n';

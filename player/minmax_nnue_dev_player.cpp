@@ -10,6 +10,8 @@
 #include <limits>
 #include <cmath>
 #include <bit>
+#include <fstream>
+#include <iostream>
 #include <immintrin.h>
 #include "magic.h"
 
@@ -29,6 +31,16 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
         nnue.load(nnue_q_parameters_filename);
     if (persp) persp->sparse = options.sparse_h1;
     else nnue.sparse = options.sparse_h1;
+    if (!options.history_prior.empty()) {
+        // T. int16 scores, phase-major (see prior_of), scaled by the weight.
+        std::ifstream f(options.history_prior, std::ios::binary);
+        prior.resize(size_t(PRIOR_PHASES) * 2 * SQUARE_NB * SQUARE_NB);
+        if (!f.read(reinterpret_cast<char*>(prior.data()), prior.size() * sizeof(int16_t))) {
+            std::cerr << "cannot read the history prior " << options.history_prior << '\n';
+            std::exit(1);
+        }
+        for (int16_t& v : prior) v = int16_t(std::clamp(int(v) * options.history_prior_weight / 100, -HISTORY_MAX, HISTORY_MAX));
+    }
     if (options.yolah_table) yolah_table = std::make_unique<SearchTable>(tt_size_mb);
     else table = std::make_unique<TranspositionTable>(tt_size_mb);
     if (options.eval_cache_bits > 0) eval_cache = std::vector<std::atomic<uint64_t>>(size_t(1) << options.eval_cache_bits);
@@ -97,10 +109,22 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
     else yolah_table->new_search(std::popcount(yolah.free_squares()));
     // History aging: what was learnt during the previous moves still helps
     // (the positions are close), but less and less.
-    for (auto& w : workers)
-        for (auto& by_from : w->history)
-            for (auto& by_to : by_from)
-                for (int16_t& h : by_to) h /= 2;
+    // T. With a prior (mode 1): pulled halfway toward the prior of the root's phase instead.
+    if (!prior.empty() && options.history_prior_mode == 1) {
+        const int ph = prior_phase(yolah);
+        for (auto& w : workers)
+            for (int p = 0; p < 2; p++)
+                for (int from = 0; from < SQUARE_NB; from++)
+                    for (int to = 0; to < SQUARE_NB; to++) {
+                        int16_t& h = w->history[p][from][to];
+                        h = int16_t((h + prior_of(ph, uint8_t(p), Move(Square(from), Square(to)))) / 2);
+                    }
+    } else {
+        for (auto& w : workers)
+            for (auto& by_from : w->history)
+                for (auto& by_to : by_from)
+                    for (int16_t& h : by_to) h /= 2;
+    }
     // ── L. Lazy SMP ──
     // nb_threads threads run the SAME iterative deepening on the same root.
     // They share the transposition table (and the evaluation cache): what one
@@ -197,6 +221,8 @@ std::string MinMaxNNUE_DevPlayer::info() {
          + (options.lazy_accumulator ? " + lazy accumulators" : "")
          + (options.eval_cache_bits ? " + evaluation cache" : "")
          + (options.sparse_h1 ? " + sparse h1" : "")
+         + (prior.empty() ? "" : " + history prior (mode " + std::to_string(options.history_prior_mode) + ", "
+                                 + std::to_string(options.history_prior_weight) + " %)")
          + (options.lmr ? " + logarithmic LMR" : "")
          + (options.rfp_depth ? " + reverse futility pruning" : "")
          + (options.null_move ? " + null move pruning" : "")
@@ -803,6 +829,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         // are meaningless: return before storing anything (the reference stored
         // them, and the table is kept for the next moves of the game).
         if (stopped()) return 0;
+        if (cut_stats) [[unlikely]] cut_stats->count(yolah, m, v >= beta);   // T: statistics for the prior
         if (v > best) {
             best = v;
             if (v > alpha) {
@@ -1191,6 +1218,12 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         const Move prev = s.played[ply - 1];
         counter = s.w->countermoves[prev.from_sq()][prev.to_sq()];
     }
+    // T. Mode 2: the prior of the node's phase added to the history.
+    const bool add_prior = !prior.empty() && options.history_prior_mode == 2;
+    const int ph = add_prior ? prior_phase(yolah) : 0;
+    auto hist = [&](Move m) {
+        return s.w->history[player][m.from_sq()][m.to_sq()] + (add_prior ? prior_of(ph, player, m) : 0);
+    };
     for (size_t i = 0; i < moves.size(); i++) {
         const Move m = moves[i];
         if (m == tt_move)                 scores[i] = SCORE_TT;
@@ -1198,8 +1231,8 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         else if (m == s.killer2[ply])     scores[i] = SCORE_KILLER2;
         else if (m == counter && counter != Move::none()) scores[i] = SCORE_COUNTER;
         else if (options.articulation_ordering && is_articulation_move(yolah, m))
-            scores[i] = SCORE_ARTICULATION + (options.history ? s.w->history[player][m.from_sq()][m.to_sq()] : 0);
-        else if (options.history)         scores[i] = s.w->history[player][m.from_sq()][m.to_sq()];
+            scores[i] = SCORE_ARTICULATION + (options.history ? hist(m) : 0);
+        else if (options.history)         scores[i] = hist(m);
         else                              scores[i] = -int(i);
         if (territory && scores[i] < SCORE_ARTICULATION) {
             scores[i] += options.territory_weight * territory_after(yolah, m);
@@ -1463,6 +1496,9 @@ json MinMaxNNUE_DevPlayer::config() {
     j["staged"] = options.staged;
     j["eval grain"] = options.eval_grain;
     j["sparse h1"] = options.sparse_h1;
+    j["history prior"] = options.history_prior;
+    j["history prior mode"] = options.history_prior_mode;
+    j["history prior weight"] = options.history_prior_weight;
     j["proxy cut"] = options.proxy_cut;
     j["proxy rank"] = options.proxy_rank;
     j["probcut margin"] = options.probcut_margin;

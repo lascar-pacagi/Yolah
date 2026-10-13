@@ -7,6 +7,8 @@
 #include <memory>
 #include <atomic>
 #include <vector>
+#include <bit>
+#include <string>
 #include "nnue_quantized.h"
 #include "nnue_persp.h"
 #include "endgame_solver.h"
@@ -95,8 +97,14 @@
 //      nnue/sparse_matvec.h): only the groups of 4 inputs of h1 with a
 //      non-zero value are multiplied. Same values, same tree (search_bench
 //      209/209), value() −34 %, −21 % time at depth 9. Campaign S1 (cluster,
-//      E5-2650 v4): +61 [+53, +69] at 0.2 s/move (4000 games), +33 [+21, +46]
-//      at 1 s (1334 games). On by default since 2026-10-12.
+//      E5-2650 v4): +61 [+53, +69] at 0.2 s/move, +35 [+28, +42] at 1 s
+//      (4000 games each). On by default since 2026-10-12.
+//   T. history prior ("history prior", "history prior mode", "history prior
+//      weight"): what the history learns during a search, learnt beforehand
+//      from the cutoffs of many searches (search_bench cutstats, then
+//      nnue/history_prior.py), one table per phase (free squares) and colour.
+//      Only 71 % of the cut nodes cut on their first move (search_bench,
+//      depth 9): the ordering has room. Off by default.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -176,7 +184,13 @@ struct MinMaxNNUE_DevOptions {
                                      //   reaches the bound (stands for Stockfish's qsearch test)
     bool sparse_h1 = true;           // ["sparse h1"] the network's 1024 → 64 layer as a sparse product (only
                                      //   the groups of 4 inputs with a non-zero value; same values, faster;
-                                     //   S1: +61 Elo at 0.2 s, +33 at 1 s)
+                                     //   S1: +61 Elo at 0.2 s, +35 at 1 s)
+    std::string history_prior;       // ["history prior"] T: the prior's file (int16 move scores per phase,
+                                     //   colour, from, to), "" = none
+    int  history_prior_mode = 1;     // ["history prior mode"] 1: at each new search the history is pulled
+                                     //   halfway toward the prior of the root's phase (instead of halved);
+                                     //   2: the prior of the node's phase added to every history score
+    int  history_prior_weight = 100; // ["history prior weight"] percent of the prior's scores
     int  eval_grain = 1;             // ["eval grain"] network values rounded to a multiple of this (1 = exact)
     bool staged = true;              // ["staged"] table's move first, the others generated only if needed
     bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table
@@ -247,6 +261,11 @@ private:
     // new search: old knowledge fades). Bounded in [−HISTORY_MAX, HISTORY_MAX]
     // by the "gravity" update of update_history.
     static constexpr int HISTORY_MAX = 16384;
+    // T. The history prior: prior[phase][colour][from][to] (empty = none).
+    std::vector<int16_t> prior;
+    int prior_of(int phase, uint8_t player, Move m) const {
+        return prior[((size_t(phase) * 2 + player) * SQUARE_NB + m.from_sq()) * SQUARE_NB + m.to_sq()];
+    }
     // Move scores of score_moves: the special moves above any history score.
     static constexpr int SCORE_TT = 1 << 30, SCORE_KILLER1 = 1 << 29,
                          SCORE_KILLER2 = SCORE_KILLER1 - 1, SCORE_COUNTER = SCORE_KILLER1 - 2,
@@ -330,6 +349,22 @@ private:
     void print_pv(Yolah, uint64_t hash, int8_t depth);
 
 public:
+    // T. Cutoff statistics for the history prior (search_bench cutstats):
+    // for each move searched in the main loop of a node, per phase, colour,
+    // from and to: how often it was tried and how often it cut.
+    static constexpr int PRIOR_PHASES = 8;
+    static int prior_phase(const Yolah& y) { return std::popcount(y.free_squares()) * PRIOR_PHASES / 57; }
+    struct CutStats {
+        uint32_t tried[PRIOR_PHASES][2][SQUARE_NB][SQUARE_NB]{};
+        uint32_t cut[PRIOR_PHASES][2][SQUARE_NB][SQUARE_NB]{};
+        void count(const Yolah& y, Move m, bool cutoff) {
+            const int ph = prior_phase(y);
+            const uint8_t p = y.current_player();
+            tried[ph][p][m.from_sq()][m.to_sq()]++;
+            cut[ph][p][m.from_sq()][m.to_sq()] += cutoff;
+        }
+    };
+    CutStats* cut_stats = nullptr;   // when set, every search counts its cutoffs there
     MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, uint8_t late_move_reduction,
                          const std::string& nnue_q_parameters_filename, bool verbose = false, Options options = {},
                          size_t nb_threads = 1);

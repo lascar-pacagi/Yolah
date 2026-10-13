@@ -1,0 +1,10 @@
+# Campaign T1 (search, step T): the history prior — what the history learns, learnt beforehand from the cutoffs of
+# 48 101 searches to depth 8 (cache_small positions, search_bench cutstats + nnue/history_prior.py, scale 1500,
+# smooth 50) → models/history_prior_d8.bin. search_bench depth 9 (empty history per position): nodes −12 % (mode 1
+# weight 50), −11 % (mode 2 weight 100), −13 % (mode 2 weight 200). Against dev_y7_sparse (the current defaults).
+dev_y7_prior_m1_w50 dev_y7_sparse 200000 2000
+dev_y7_prior_m2_w100 dev_y7_sparse 200000 2000
+dev_y7_prior_m2_w200 dev_y7_sparse 200000 2000
+dev_y7_prior_m1_w50 dev_y7_sparse 1000000 2000
+dev_y7_prior_m2_w100 dev_y7_sparse 1000000 2000
+dev_y7_prior_m2_w200 dev_y7_sparse 1000000 2000

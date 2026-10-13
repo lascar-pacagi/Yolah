@@ -362,6 +362,9 @@ unique_ptr<Player> Player::create(const json& j) {
              options.lazy_accumulator = j.value("lazy accumulator", options.lazy_accumulator);
              options.eval_cache_bits = j.value("eval cache", options.eval_cache_bits);
              options.sparse_h1 = j.value("sparse h1", options.sparse_h1);
+             options.history_prior = j.value("history prior", options.history_prior);
+             options.history_prior_mode = j.value("history prior mode", options.history_prior_mode);
+             options.history_prior_weight = j.value("history prior weight", options.history_prior_weight);
              options.lmr = j.value("lmr", options.lmr);
              options.lmr_base = j.value("lmr base", options.lmr_base);
              options.lmr_divisor = j.value("lmr divisor", options.lmr_divisor);
