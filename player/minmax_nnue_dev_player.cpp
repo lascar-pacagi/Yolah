@@ -186,12 +186,13 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
     return r;
 }
 
-void MinMaxNNUE_DevPlayer::clear_table() {
+void MinMaxNNUE_DevPlayer::clear_table(bool keep_ordering) {
     if (table) table->clear(1);
     else yolah_table->clear();
     endgame.clear();
     // the move ordering statistics too: each benchmark position from scratch
-    for (auto& w : workers) *w = Worker{};
+    // (unless keep_ordering: as in a game, what the previous searches learnt)
+    if (!keep_ordering) for (auto& w : workers) *w = Worker{};
     for (auto& e : eval_cache) e.store(0, std::memory_order_relaxed);
 }
 
@@ -1220,7 +1221,8 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     }
     // T. Mode 2: the prior of the node's phase added to the history.
     const bool add_prior = !prior.empty() && options.history_prior_mode == 2;
-    const int ph = add_prior ? prior_phase(yolah) : 0;
+    const bool tier_prior = !prior.empty() && options.history_prior_mode == 3;
+    const int ph = add_prior || tier_prior ? prior_phase(yolah) : 0;
     auto hist = [&](Move m) {
         return s.w->history[player][m.from_sq()][m.to_sq()] + (add_prior ? prior_of(ph, player, m) : 0);
     };
@@ -1232,10 +1234,28 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         else if (m == counter && counter != Move::none()) scores[i] = SCORE_COUNTER;
         else if (options.articulation_ordering && is_articulation_move(yolah, m))
             scores[i] = SCORE_ARTICULATION + (options.history ? hist(m) : 0);
+        else if (tier_prior && prior_of(ph, player, m) >= options.history_prior_threshold)
+            scores[i] = SCORE_ARTICULATION + prior_of(ph, player, m);   // T, mode 3: above the history
         else if (options.history)         scores[i] = hist(m);
         else                              scores[i] = -int(i);
         if (territory && scores[i] < SCORE_ARTICULATION) {
             scores[i] += options.territory_weight * territory_after(yolah, m);
+        }
+    }
+    // T, mode 4: the "history prior top" moves of the node with the highest
+    // prior (the moves the players choose most in this phase), among the
+    // ordinary ones, placed right after the special moves, before the history.
+    if (!prior.empty() && options.history_prior_mode == 4) {
+        const int ph = prior_phase(yolah);
+        for (int k = 0; k < options.history_prior_top; k++) {
+            int pick = -1, best = std::numeric_limits<int>::min();
+            for (size_t i = 0; i < moves.size(); i++) {
+                if (scores[i] >= SCORE_ARTICULATION || moves[i] == Move::none()) continue;
+                const int p = prior_of(ph, player, moves[i]);
+                if (p > best) { best = p; pick = int(i); }
+            }
+            if (pick < 0) break;
+            scores[pick] = SCORE_ARTICULATION + options.history_prior_top - k;
         }
     }
 }
@@ -1499,6 +1519,8 @@ json MinMaxNNUE_DevPlayer::config() {
     j["history prior"] = options.history_prior;
     j["history prior mode"] = options.history_prior_mode;
     j["history prior weight"] = options.history_prior_weight;
+    j["history prior threshold"] = options.history_prior_threshold;
+    j["history prior top"] = options.history_prior_top;
     j["proxy cut"] = options.proxy_cut;
     j["proxy rank"] = options.proxy_rank;
     j["probcut margin"] = options.probcut_margin;

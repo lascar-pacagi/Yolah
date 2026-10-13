@@ -1,0 +1,9 @@
+# Campaign T2 (search, step T, the user's version): in each node, the 1 or 2 moves the players choose most often in
+# this phase (test/played_moves_main.cpp on data/games: 4.8 M games, rate chosen / available per phase, colour,
+# from, to → models/played_moves_prior.bin) ordered right after the special moves (table's move, killers,
+# countermove), before the history-ordered moves. search_bench depth 9: nodes top 1 −2.0 % (empty history) /
+# +2.9 % (warm history), top 2 −4.3 % / +4.8 %. Against dev_y7_sparse (the current defaults).
+dev_y7_played_top1 dev_y7_sparse 200000 2000
+dev_y7_played_top2 dev_y7_sparse 200000 2000
+dev_y7_played_top1 dev_y7_sparse 1000000 2000
+dev_y7_played_top2 dev_y7_sparse 1000000 2000

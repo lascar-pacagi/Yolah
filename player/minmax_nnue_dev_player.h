@@ -104,7 +104,11 @@
 //      from the cutoffs of many searches (search_bench cutstats, then
 //      nnue/history_prior.py), one table per phase (free squares) and colour.
 //      Only 71 % of the cut nodes cut on their first move (search_bench,
-//      depth 9): the ordering has room. Off by default.
+//      depth 9): the ordering has room. search_bench depth 9 (empty history
+//      per position): nodes −11 to −13 %. Campaign T1 (vs dev_y7_sparse, 4000
+//      games each): mode 1 50 % +4.3 [−3.5, +12.2] (0.2 s), +3.6 [−3.7, +10.8]
+//      (1 s); mode 2 100 % −7.6 / −3.3; mode 2 200 % +2.6 / +0.3. No gain: in
+//      a game the history is already warm from the previous moves. Off.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -189,7 +193,13 @@ struct MinMaxNNUE_DevOptions {
                                      //   colour, from, to), "" = none
     int  history_prior_mode = 1;     // ["history prior mode"] 1: at each new search the history is pulled
                                      //   halfway toward the prior of the root's phase (instead of halved);
-                                     //   2: the prior of the node's phase added to every history score
+                                     //   2: the prior of the node's phase added to every history score;
+                                     //   3: the moves whose prior is ≥ "history prior threshold" ordered
+                                     //   before the history-ordered moves (by their prior)
+                                     //   4: the "history prior top" moves with the highest prior, before the
+                                     //   history-ordered moves (only the ranking of the prior counts)
+    int  history_prior_threshold = 3000; // ["history prior threshold"] mode 3 (after the weight)
+    int  history_prior_top = 1;      // ["history prior top"] mode 4: how many moves
     int  history_prior_weight = 100; // ["history prior weight"] percent of the prior's scores
     int  eval_grain = 1;             // ["eval grain"] network values rounded to a multiple of this (1 = exact)
     bool staged = true;              // ["staged"] table's move first, the others generated only if needed
@@ -374,7 +384,8 @@ public:
     Result search(const Yolah&, uint8_t max_depth, uint64_t microseconds);
     // Leaf evaluations and how many came from the cache, since the start.
     std::pair<uint64_t, uint64_t> eval_stats() const { return {nb_evals, nb_eval_hits}; }
-    void clear_table();            // forget everything: table, history, countermoves (reproducible benchmarks)
+    void clear_table(bool keep_ordering = false);   // forget everything: table, history, countermoves (reproducible
+                                                    // benchmarks); keep_ordering: keep history and countermoves
     std::string info() override;
     json config() override;
 };

@@ -365,6 +365,8 @@ unique_ptr<Player> Player::create(const json& j) {
              options.history_prior = j.value("history prior", options.history_prior);
              options.history_prior_mode = j.value("history prior mode", options.history_prior_mode);
              options.history_prior_weight = j.value("history prior weight", options.history_prior_weight);
+             options.history_prior_threshold = j.value("history prior threshold", options.history_prior_threshold);
+             options.history_prior_top = j.value("history prior top", options.history_prior_top);
              options.lmr = j.value("lmr", options.lmr);
              options.lmr_base = j.value("lmr base", options.lmr_base);
              options.lmr_divisor = j.value("lmr divisor", options.lmr_divisor);

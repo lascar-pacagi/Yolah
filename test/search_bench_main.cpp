@@ -25,13 +25,15 @@
 //       positions, to run several processes in parallel.
 //
 //   search_bench run --player ../config/mm_nnue_dev_player.cfg --positions bench_positions.txt
-//                    (--depth D | --time MICROSECONDS) [--csv out.csv] [--compare ref.csv] [--limit N]
+//                    (--depth D | --time MICROSECONDS) [--csv out.csv] [--compare ref.csv] [--limit N] [--warm 1]
 //       Searches every position from an empty transposition table and prints,
 //       per position, the depth reached, the value, the move, the nodes and the
 //       time; then the totals. --depth: time to depth (the work to reach the
 //       same depth); --time: depth reached in a given time. --compare: the same
 //       positions searched by another player (its --csv): identical values
-//       and moves, and the ratio of nodes and times.
+//       and moves, and the ratio of nodes and times. --warm 1 (dev player):
+//       the history and countermoves are kept from one position to the next
+//       (the positions follow the games: as in a game, not from scratch).
 //
 //   search_bench cutstats --player CFG --cache DIR --depth D --out stats.bin [--stride S] [--offset K]
 //       The cutoff statistics of the dev player's searches (step T, the
@@ -110,7 +112,7 @@ namespace {
                 std::exit(1);
             }
         }
-        void clear() { baseline ? baseline->clear_table() : dev->clear_table(); }
+        void clear(bool keep_ordering = false) { baseline ? baseline->clear_table() : dev->clear_table(keep_ordering); }
         // the same fields for both players
         MinMaxNNUE_BaselinePlayer::Result search(const Yolah& y, uint8_t depth, uint64_t us) {
             if (baseline) return baseline->search(y, depth, us);
@@ -371,8 +373,9 @@ namespace {
         int same_value = 0, same_move = 0, compared = 0;
         cout << std::format("{:>4} {:>4} {:>5} {:>7} {:>6} {:>12} {:>9} {:>10}{}\n", "pos", "ply", "depth", "value", "move",
                             "nodes", "seconds", "knodes/s", ref.empty() ? "" : "   ref nodes  ref s  same");
+        const bool warm = a.get("warm", "0") == "1";
         for (const auto& [i, position] : positions) {
-            s.clear();
+            s.clear(warm);
             auto r = s.search(position, depth, us);
             const string mv = move_str(r.move);
             total_nodes += r.nb_nodes; total_time += r.seconds; total_depth += r.depth;
