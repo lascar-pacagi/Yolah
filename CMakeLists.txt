@@ -183,6 +183,32 @@ if(ENABLE_TORCH)
     target_link_libraries(played_moves PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+add_executable(pattern_stats test/pattern_stats_main.cpp)
+target_compile_options(pattern_stats PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(pattern_stats PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(pattern_stats PRIVATE ${Boost_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/eigen)
+target_link_libraries(pattern_stats PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(pattern_stats PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(pattern_stats PRIVATE ${TORCH_LIBRARIES})
+endif()
+
+add_executable(pattern5 test/pattern5_main.cpp)
+target_compile_options(pattern5 PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(pattern5 PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(pattern5 PRIVATE ${Boost_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/eigen)
+target_link_libraries(pattern5 PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(pattern5 PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(pattern5 PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # The grading tournament on its own (no boost::program_options, see
 # test/tournament_main.cpp): ./yolah_tournament --players ../config/tournament_players.txt
 add_executable(yolah_tournament test/tournament_main.cpp)
