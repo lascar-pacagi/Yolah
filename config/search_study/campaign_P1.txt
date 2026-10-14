@@ -1,9 +1,12 @@
 # Campaign P1 (NNUE step 1, doc/nnue_roadmap.qmd): the dev_y7 search with the networks of nnue_persp_distill.sh.
 # nnue_control = the 193 network trained 20 more epochs from the same start: the fair reference (same data,
 # same number of epochs). nnue_k1 = point of view only; nnue_k8 = + 8 phase heads; nnue_k8_them = + fc2 reads
-# both views. Last line: what the 20 extra epochs alone give (control vs the current network).
+# both views. Line 5: what the 20 extra epochs alone give (control vs the current network; against dev_y7_sparse,
+# since the nnue_*.cfg use the sparse product by default). Line 6: k8_them at 0.2 s, where its slower value()
+# (856 vs 430 ns, sparse) weighs most.
 nnue_k8 nnue_control 1000000 2000
 nnue_k1 nnue_control 1000000 2000
 nnue_k8_them nnue_control 1000000 2000
 nnue_k8 nnue_control 200000 2000
-nnue_control dev_y7 1000000 1000
+nnue_control dev_y7_sparse 1000000 1000
+nnue_k8_them nnue_control 200000 2000

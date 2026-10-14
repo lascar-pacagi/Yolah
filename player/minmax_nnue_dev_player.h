@@ -109,6 +109,11 @@
 //      games each): mode 1 50 % +4.3 [−3.5, +12.2] (0.2 s), +3.6 [−3.7, +10.8]
 //      (1 s); mode 2 100 % −7.6 / −3.3; mode 2 200 % +2.6 / +0.3. No gain: in
 //      a game the history is already warm from the previous moves. Off.
+//      Mode 4 (the 1 or 2 moves the players choose most in the phase, from
+//      data/games, before the history; campaign T2, 4000 games each): top 1
+//      −25.0 [−32.8, −17.2] (0.2 s), −16.2 [−23.5, −8.9] (1 s); top 2 −24.0,
+//      −25.2. The history's best moves pushed back (and reduced more by LMR,
+//      which grows with the move's rank). Step T closed: off.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
