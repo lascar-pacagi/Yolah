@@ -1314,6 +1314,58 @@ static int influence_fast(uint64_t me, uint64_t opp, uint64_t free) {
     return std::popcount(mi & free) - std::popcount(oi & free);
 }
 
+// ─── Queen distance by occluded fill (modes 4–6) ────────────────────────────
+// A whole level of squares slides in each of the 8 directions at once
+// (Kogge-Stone: 3 doubling steps), whatever its number of squares; checked
+// equal to the square-by-square search with the magic tables
+// (test/territory_study_main.cpp, CHECK_QUEEN=1).
+template <Direction D> static inline uint64_t queen_slide(uint64_t gen, uint64_t free) {
+    uint64_t pro = free;
+    gen |= pro & shift<D>(gen);
+    pro &= shift<D>(pro);
+    gen |= pro & shift<D>(shift<D>(gen));
+    pro &= shift<D>(shift<D>(pro));
+    gen |= pro & shift<D>(shift<D>(shift<D>(shift<D>(gen))));
+    return shift<D>(gen) & free;
+}
+
+static inline uint64_t queen_reach(uint64_t from, uint64_t free) {
+    return queen_slide<NORTH>(from, free) | queen_slide<SOUTH>(from, free) | queen_slide<EAST>(from, free) |
+           queen_slide<WEST>(from, free) | queen_slide<NORTH_EAST>(from, free) | queen_slide<NORTH_WEST>(from, free) |
+           queen_slide<SOUTH_EAST>(from, free) | queen_slide<SOUTH_WEST>(from, free);
+}
+
+// The 5 queen measures of each side (territory_study's Q1, Q2, Q3, QFIRST, QW):
+// squares within 1, 2, 3 moves, squares reached strictly first, 64 · Σ 2^−d.
+static void queen_measures(uint64_t me, uint64_t opp, uint64_t free, int qm[5], int qo[5]) {
+    uint64_t seen_m = 0, seen_o = 0, fm = me, fo = opp;
+    for (int i = 0; i < 5; i++) qm[i] = qo[i] = 0;
+    for (int k = 0; fm | fo; k++) {
+        const uint64_t nm = fm ? queen_reach(fm, free) & ~seen_m : 0;
+        const uint64_t no = fo ? queen_reach(fo, free) & ~seen_o : 0;
+        qm[3] += std::popcount(nm & ~no & ~seen_o);
+        qo[3] += std::popcount(no & ~nm & ~seen_m);
+        if (k < 6) { qm[4] += std::popcount(nm) << (5 - k); qo[4] += std::popcount(no) << (5 - k); }
+        seen_m |= nm;
+        seen_o |= no;
+        if (k < 3) { qm[k] = std::popcount(seen_m); qo[k] = std::popcount(seen_o); }
+        fm = nm;
+        fo = no;
+    }
+    for (int k = 1; k < 3; k++) { qm[k] = std::max(qm[k], qm[k - 1]); qo[k] = std::max(qo[k], qo[k - 1]); }
+}
+
+// Mode 5–6 weights (× 1/16), for the player who made the move and for the
+// opponent: a least-squares fit of the points still to score on the 10
+// measures (nnue/territory_study.py data, 24.5 M positions of data/games),
+// divided by the influence's own coefficient, so that the score is in
+// "influence squares" and "territory weight" keeps its meaning.
+static constexpr int QUEEN_W[3][2][5] = {
+    { {  -6,  39, -36,   6,  3 }, { -348, -209, -78,   3, 21 } },   // opening, 40–56 free
+    { {  13,  12,   8,  18, -1 }, {  -10,  -12,  -6, -18,  1 } },   // middle, 20–39
+    { {   0,  -1,  -2,  17,  0 }, {    3,    2,   2, -16,  0 } },   // endgame, 0–19
+};
+
 // ─── Territory after a move (J) ──────────────────────────────────────────────
 // Who controls which free squares, after move m, for the player making it:
 // (squares closer to their pieces) − (squares closer to the opponent's). Ties
@@ -1356,6 +1408,20 @@ int MinMaxNNUE_DevPlayer::territory_after(const Yolah& yolah, Move m) const {
         for (uint64_t b = me; b;)  n += std::popcount(attacks_bb(pop_lsb(b), occupied) & free);
         for (uint64_t b = opp; b;) n -= std::popcount(attacks_bb(pop_lsb(b), occupied) & free);
         return n;
+    }
+    if (options.territory_ordering == 4) {
+        int qm[5], qo[5];
+        queen_measures(me, opp, free, qm, qo);
+        return qm[3] - qo[3];
+    }
+    if (options.territory_ordering >= 5) {
+        int qm[5], qo[5];
+        queen_measures(me, opp, free, qm, qo);
+        const int nfree = std::popcount(free);
+        const int ph = options.territory_ordering == 6 ? 1 : nfree >= 40 ? 0 : nfree >= 20 ? 1 : 2;
+        int sc = 0;
+        for (int i = 0; i < 5; i++) sc += QUEEN_W[ph][0][i] * qm[i] + QUEEN_W[ph][1][i] * qo[i];
+        return sc / 16;
     }
     if (options.territory_ordering == 1 && options.fast_influence) {
         return influence_fast(me, opp, free);

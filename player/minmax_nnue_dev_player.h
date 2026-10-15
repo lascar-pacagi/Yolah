@@ -56,7 +56,13 @@
 //      distance), see territory_after ("territory ordering", "territory
 //      depth", "territory weight"). Measured (2000 games, 0.2 s/move):
 //      influence weight 512 +36 Elo [+9, +59] (the default), influence 2048
-//      +21, mobility 512 +12, queen distance 128 +1.
+//      +21, mobility 512 +12, queen distance 128 +1. Modes 4–6 (2026-10-15,
+//      after test/territory_study_main.cpp): the queen distance by occluded
+//      fill, ~80 ns for both sides, and a linear score of the 5 queen measures.
+//      search_bench depth 9 (209 positions): influence 2.67 M nodes 1.36 s,
+//      mode 2 2.76 M 1.59 s, mode 4 the same nodes 1.48 s, mode 5 8.05 M
+//      (the opening weights swamp the history: dropped), mode 6 2.84 M 1.53 s.
+//      Campaign Q1.
 //   K. staged move generation ("staged"): the table's move is searched before
 //      the other moves are even generated (see negamax, step 4). Same tree in
 //      pure alpha-beta (209/209 values); with reductions −4 % nodes, −6 % time
@@ -140,7 +146,10 @@ struct MinMaxNNUE_DevOptions {
     bool articulation_ordering = false;   // ["articulation ordering"] articulation moves after the killers
     bool articulation_lmr = false;   // ["articulation lmr"] articulation moves never reduced nor pruned
     int  territory_ordering = 1;     // ["territory ordering"] 0 = off, 1 = influence (king steps),
-                                     //   2 = queen distance, 3 = mobility
+                                     //   2 = queen distance, 3 = mobility, 4 = queen distance by
+                                     //   occluded fill (same values as 2), 5 = the 5 queen measures
+                                     //   of each side, weights per phase, 6 = the same with the
+                                     //   middle game's weights everywhere (see territory_after)
     int  territory_depth = 4;        // ["territory depth"] only at nodes of at least this depth
     int  territory_weight = 512;     // ["territory weight"] score = history + weight · territory
     bool fast_influence = true;      // ["fast influence"] influence_fast (same values, less work)

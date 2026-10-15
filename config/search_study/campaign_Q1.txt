@@ -1,0 +1,10 @@
+# Campaign Q1: ordering the moves by queen distance instead of influence (territory ordering, step J).
+# test/territory_study_main.cpp: queen distance predicts the rest of the game better than influence (middle
+# game: squares reached first 18.1 % of the variance of the points still to score vs 16.6 %), and the occluded
+# fill computes it in ~80 ns for both sides. Mode 4 = squares reached first (= mode 2, faster); mode 6 = the 5
+# queen measures of each side, weights fitted on data/games (middle game). Reference: the same player with the
+# influence (default), weight 512.
+dev_y7_sparse_q4 dev_y7_sparse 200000 1000
+dev_y7_sparse_q4w1024 dev_y7_sparse 200000 1000
+dev_y7_sparse_q6 dev_y7_sparse 200000 1000
+dev_y7_sparse_q6w1024 dev_y7_sparse 200000 1000
