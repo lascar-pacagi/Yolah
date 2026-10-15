@@ -15,14 +15,24 @@ measure adds to "Black to move with 30 free squares".
 Printed per phase: the share of the target's variance each measure explains
 alone (R², %), then combinations (least squares), then how often the corrected
 flood fill differs from the plain one and, on those positions only, which of
-the two predicts better. The plain flood fill and its private part give the
+the two predicts better.
+
+With --weights in territory_study (NNUE column), two more tables:
+- what each measure ADDS to the network's own value (the base is a cubic in
+  the NNUE value, so that its non-linear scale is not held against it):
+  R² base + measure − R² base, in points of %; a large gain = something the
+  network does not compute by itself;
+- my side and his side separately (not their difference): the weight of each,
+  in target units per standard deviation of the measure, alone and on top of
+  the network. |his| > |mine| = what I take from him counts more than what I
+  keep. The plain flood fill and its private part give the
 same difference: the squares both sides reach cancel out.
 """
 import sys
 import numpy as np
 
 NAMES = "FREE COLOUR RESULT FUTURE CURRENT MOB DIRS TRAPPED FF PRIV CORR CORRPRIV INFL " \
-        "H_MOB H_DIRS H_TRAPPED H_FF H_PRIV H_CORR H_CORRPRIV H_INFL".split()
+        "H_MOB H_DIRS H_TRAPPED H_FF H_PRIV H_CORR H_CORRPRIV H_INFL NNUE".split()
 F = {n: i for i, n in enumerate(NAMES)}
 MEASURES = [("mobility", "MOB"), ("open directions", "DIRS"), ("trapped pieces", "TRAPPED"),
             ("flood fill", "FF"), ("flood fill, private", "PRIV"), ("corrected flood fill", "CORR"),
@@ -58,6 +68,7 @@ def r2(x, y):
 
 def main():
     a = np.fromfile(sys.argv[1], "<i2").reshape(-1, len(NAMES))
+    has_nnue = (a[:, F["NNUE"]] != 0).any()
     print(f"{len(a):,} positions")
     for name, lo, hi in PHASES:
         s = a[(a[:, F["FREE"]] >= lo) & (a[:, F["FREE"]] < hi)]
@@ -82,6 +93,27 @@ def main():
         print(f"  corrected ≠ plain for at least one side: {100 * differs.mean():.1f} % of positions; "
               f"when a side is corrected, the plain flood fill overcounts by {over[over > 0].mean():.1f} squares "
               f"(max {over.max()})")
+        if has_nnue:
+            v = centred(s, [F["NNUE"]], group)[:, 0] / 10000
+            raw = s[:, F["NNUE"]].astype(np.float64) / 10000
+            base = centred(np.stack([raw, raw ** 2, raw ** 3], 1), [0, 1, 2], group)
+            b_fut, b_res = r2(base, y_fut), r2(base, y_res)
+            print(f"  NNUE value alone (cubic): R² points {b_fut:.1f} %, result {b_res:.1f} %. Gain when adding:")
+            for label, ms in [(l, [m]) for l, m in MEASURES] + COMBOS:
+                xx = np.concatenate([base, np.stack([col[m] for m in ms], 1)], 1)
+                print(f"    + {label:30s} {r2(xx, y_fut) - b_fut:+6.1f} {r2(xx, y_res) - b_res:+6.1f}")
+            print("  my side vs his side, weight per standard deviation (points | result), alone / on top of NNUE:")
+            for label, m in [("mobility", "MOB"), ("open directions", "DIRS"), ("corrected flood fill", "CORR"),
+                             ("influence", "INFL")]:
+                xs = centred(s, [F[m], F["H_" + m]], group)
+                xs /= xs.std(0) + 1e-9
+                out = []
+                for extra in (None, base):
+                    xx = xs if extra is None else np.concatenate([xs, extra], 1)
+                    cf, *_ = np.linalg.lstsq(xx, y_fut, rcond=None)
+                    cr, *_ = np.linalg.lstsq(xx, y_res, rcond=None)
+                    out.append(f"mine {cf[0]:+.3f} his {cf[1]:+.3f} | mine {cr[0]:+.3f} his {cr[1]:+.3f}")
+                print(f"    {label:22s} {out[0]}   /   {out[1]}")
         if differs.sum() > 1000:
             k = differs
             print(f"    on those {k.sum():,} positions: R² points  plain {r2(col['FF'][k], y_fut[k]):.1f} %, "

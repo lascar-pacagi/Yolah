@@ -3,7 +3,7 @@
 // keeping one's own seems strong; a flood fill can be misleading when a piece
 // must choose between two blocks of free squares)
 //
-//   ./territory_study GAMES_DIR OUT.bin [--stride 50] [--threads 16]
+//   ./territory_study GAMES_DIR OUT.bin [--stride 50] [--threads 16] [--weights NNUE.quantized.txt]
 //   python3 ../nnue/territory_study.py OUT.bin
 //
 // For every --stride-th position of every game of data/games (after the random
@@ -26,21 +26,26 @@
 //   corrpriv  the same, counting only the blocks the other side cannot reach
 //   infl      the engine's influence (heuristic::influence, king-step Voronoi
 //             with neutral squares)
-// and the targets: the result of the game for me (+1 / 0 / −1) and the points
+// NNUE (with --weights, a 193 network): its value for the side to move × 10000,
+// to measure what each quantity adds to what the network already sees.
+// And the targets: the result of the game for me (+1 / 0 / −1) and the points
 // I score from here to the end minus his (final margin − current margin).
 //
 // OUT.bin: one record per position, NF int16 (see the Field enum).
 #include "game.h"
 #include "heuristic.h"
 #include "magic.h"
+#include "nnue_quantized.h"
 #include "zobrist.h"
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -52,7 +57,7 @@ namespace fs = std::filesystem;
 enum Field { FREE, COLOUR, RESULT, FUTURE, CURRENT,
              MOB, DIRS, TRAPPED, FF, PRIV, CORR, CORRPRIV, INFL,                   // me
              H_MOB, H_DIRS, H_TRAPPED, H_FF, H_PRIV, H_CORR, H_CORRPRIV, H_INFL,   // him
-             NF };
+             NNUE, NF };
 
 struct Side { int mob, dirs, trapped, ff, priv, corr, corrpriv; };
 
@@ -115,7 +120,7 @@ static Side side(const Yolah& y, uint8_t c, uint64_t free, const uint64_t* comps
     return s;
 }
 
-template <class F> static uint64_t for_each_game(const string& path, size_t stride, F&& f) {
+template <class F> static uint64_t for_each_game(const string& path, size_t stride, NNUE_Quantized* net, F&& f) {
     std::ifstream in(path, std::ios::binary);
     vector<uint8_t> e((std::istreambuf_iterator<char>(in)), {});
     size_t game = 0;
@@ -154,6 +159,11 @@ template <class F> static uint64_t for_each_game(const string& path, size_t stri
                 // influence includes the pieces themselves: count free squares only
                 r[INFL] = int16_t(std::popcount((me == Yolah::BLACK ? bi : wi) & free));
                 r[H_INFL] = int16_t(std::popcount((me == Yolah::BLACK ? wi : bi) & free));
+                if (net) {
+                    NNUE_Quantized::Accumulator acc;
+                    net->init(y, acc);
+                    r[NNUE] = int16_t(std::lround(10000 * net->value(acc, me)));
+                }
                 recs.push_back(r);
             }
             if (k == n) break;
@@ -175,8 +185,10 @@ int main(int argc, char* argv[]) {
     zobrist::init();
     size_t stride = 50;
     int threads = 16;
+    string weights;
     for (int i = 3; i + 1 < argc; i += 2) {
         if (string(argv[i]) == "--stride") stride = std::stoul(argv[i + 1]);
+        else if (string(argv[i]) == "--weights") weights = argv[i + 1];
         else if (string(argv[i]) == "--threads") threads = std::stoi(argv[i + 1]);
     }
     vector<string> files;
@@ -190,9 +202,11 @@ int main(int argc, char* argv[]) {
     for (int t = 0; t < threads; t++)
         pool.emplace_back([&] {
             vector<std::array<int16_t, NF>> buf;
+            std::unique_ptr<NNUE_Quantized> net;
+            if (!weights.empty()) { net = std::make_unique<NNUE_Quantized>(); net->load(weights); }
             for (size_t j; (j = next++) < files.size();) {
                 buf.clear();
-                games += for_each_game(files[j], stride, [&](const std::array<int16_t, NF>& r) { buf.push_back(r); });
+                games += for_each_game(files[j], stride, net.get(), [&](const std::array<int16_t, NF>& r) { buf.push_back(r); });
                 positions += buf.size();
                 std::lock_guard lk(mtx);
                 out.write((const char*)buf.data(), buf.size() * sizeof(buf[0]));
