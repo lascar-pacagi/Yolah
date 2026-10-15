@@ -6,6 +6,7 @@
 //   python3 ../nnue/check_persp_net.py positions.bin refs.bin model.pt   (a NetPersp)
 //   ./nets_check check_persp positions.bin refs.bin model.quantized.txt [old.quantized.txt]
 //   ./nets_check check_sparse positions.bin model.quantized.txt   (sparse product = dense, and speed)
+//   ./nets_check values positions.bin first.quantized.txt other.quantized.txt...   (value scale per phase)
 //
 // For every position and every network — the old NNUE (3 outputs) and the
 // value networks (NNUE and features, plain and distilled), each in float and
@@ -344,6 +345,99 @@ int check_sparse(const string& positions, const string& weights) {
     return diff == 0 ? 0 : 1;
 }
 
+// Value scale of several networks (193 or PERSP, quantized), for the side to
+// move, at every position of the games of positions.bin, per phase (free
+// squares 40–56 / 20–39 / 0–19): spread of the values (the search's margins,
+// MPC 4000 + 500/ply and RFP 4500/ply, are in units of value × 30000), and how
+// far each network is from the FIRST one (mean |difference|, correlation).
+int values(const string& positions, const vector<string>& weights) {
+    const vector<Record> rs = read_records(positions);
+    vector<Yolah> ys;
+    // VALUES_OUT=prefix: also writes every position (prefix.pos, positions.bin
+    // format, for check_persp_net.py) and each network's values (prefix.<k>.bin).
+    const char* out_prefix = std::getenv("VALUES_OUT");
+    std::ofstream pos_out;
+    if (out_prefix) pos_out.open(string(out_prefix) + ".pos", std::ios::binary);
+    for (const Record& r : rs) {
+        Yolah y;
+        vector<Move> prefix;
+        for (Move m : r.moves) {
+            if (!y.game_over()) { ys.push_back(y); if (out_prefix) write_record(pos_out, y, prefix); }
+            y.play(m); prefix.push_back(m);
+        }
+        if (!y.game_over()) { ys.push_back(y); if (out_prefix) write_record(pos_out, y, prefix); }
+    }
+    const size_t n = ys.size();
+    vector<vector<float>> v(weights.size(), vector<float>(n));
+    for (size_t k = 0; k < weights.size(); k++) {
+        if (NNUE_Persp::is_persp_file(weights[k])) {
+            auto net = std::make_unique<NNUE_Persp>(weights[k]);
+            NNUE_Persp::Accumulator a;
+            for (size_t i = 0; i < n; i++) { net->init(ys[i], a); v[k][i] = net->value(a, ys[i]); }
+        } else {
+            auto net = std::make_unique<NNUE_Quantized>();
+            net->load(weights[k]);
+            NNUE_Quantized::Accumulator a;
+            for (size_t i = 0; i < n; i++) { net->init(ys[i], a); v[k][i] = net->value(a, ys[i].current_player()); }
+        }
+    }
+    if (out_prefix)
+        for (size_t k = 0; k < weights.size(); k++)
+            std::ofstream(string(out_prefix) + "." + std::to_string(k) + ".bin", std::ios::binary)
+                .write((const char*)v[k].data(), n * sizeof(float));
+    auto phase = [](const Yolah& y) { const int f = std::popcount(y.free_squares()); return f >= 40 ? 0 : f >= 20 ? 1 : 2; };
+    const char* names[] = {"opening 40-56", "middle 20-39", "endgame 0-19"};
+    std::printf("%zu positions (all the positions of %zu games); values × 30000\n", n, rs.size());
+    for (int p = 0; p < 3; p++) {
+        vector<size_t> idx;
+        for (size_t i = 0; i < n; i++) if (phase(ys[i]) == p) idx.push_back(i);
+        std::printf("\n%s (%zu positions)\n  %-48s %7s %7s %7s %7s %9s %6s\n", names[p], idx.size(),
+                    "network", "mean", "std", "|v|", "p90|v|", "|v-first|", "corr");
+        for (size_t k = 0; k < weights.size(); k++) {
+            double s = 0, s2 = 0, sa = 0, sd = 0, s0 = 0, s02 = 0, s0k = 0;
+            vector<float> a;
+            for (size_t i : idx) {
+                const double x = v[k][i], x0 = v[0][i];
+                s += x; s2 += x * x; sa += std::abs(x); sd += std::abs(x - x0);
+                s0 += x0; s02 += x0 * x0; s0k += x0 * x;
+                a.push_back(std::abs(v[k][i]));
+            }
+            const double m = idx.size(), mean = s / m, var = s2 / m - mean * mean, mean0 = s0 / m, var0 = s02 / m - mean0 * mean0;
+            const double corr = (s0k / m - mean * mean0) / std::sqrt(var * var0);
+            std::nth_element(a.begin(), a.begin() + a.size() * 9 / 10, a.end());
+            string name = weights[k].substr(weights[k].find_last_of('/') + 1);
+            std::printf("  %-48s %+7.0f %7.0f %7.0f %7.0f %9.0f %6.3f\n", name.c_str(), 30000 * mean,
+                        30000 * std::sqrt(var), 30000 * sa / m, 30000 * a[a.size() * 9 / 10], 30000 * sd / m, corr);
+        }
+    }
+    // Consistency along the games: a move adds one hole, so |v(parent) + v(child)|
+    // (the side to move changes) when the 8-head bucket holes · 8 / 57 changes
+    // between them, against when it does not (positions in the middle game only).
+    std::printf("\nmean |v(parent) + v(child)| × 30000, middle game, child's head bucket (holes·8/57) changed or not\n");
+    for (size_t k = 0; k < weights.size(); k++) {
+        double s[2]{}; size_t c[2]{};
+        for (size_t i = 0; i + 1 < n; i++) {
+            const int h0 = std::popcount(ys[i].empty_bitboard()), h1 = std::popcount(ys[i + 1].empty_bitboard());
+            if (h1 != h0 + 1 || phase(ys[i]) != 1) continue;   // not parent → child (next game)
+            const int changed = h0 * 8 / 57 != h1 * 8 / 57;
+            s[changed] += std::abs(v[k][i] + v[k][i + 1]); c[changed]++;
+        }
+        // Signed, per side to move of the parent: a network that misjudges whose
+        // turn it is shows a bias here (Black wins ~63 % of the games).
+        double b[2]{}; size_t cb[2]{};
+        for (size_t i = 0; i + 1 < n; i++) {
+            const int h0 = std::popcount(ys[i].empty_bitboard()), h1 = std::popcount(ys[i + 1].empty_bitboard());
+            if (h1 != h0 + 1 || phase(ys[i]) != 1) continue;
+            const int t = ys[i].current_player();
+            b[t] += v[k][i] + v[k][i + 1]; cb[t]++;
+        }
+        string name = weights[k].substr(weights[k].find_last_of('/') + 1);
+        std::printf("  %-48s same %6.0f (%zu)  changed %6.0f (%zu)  signed: black to move %+6.0f, white %+6.0f\n", name.c_str(),
+                    30000 * s[0] / c[0], c[0], 30000 * s[1] / c[1], c[1], 30000 * b[0] / cb[0], 30000 * b[1] / cb[1]);
+    }
+    return 0;
+}
+
 // Cost of one leaf evaluation of the features players: the features, then
 // each kind of network (int8 = FFNN of ffnn.h, the format of the original
 // networks; its weights file only needs the right sizes).
@@ -393,6 +487,7 @@ int main(int argc, char* argv[]) {
     if (cmd == "check" && argc >= 5) return check(argv[2], argv[3], argv[4]);
     if (cmd == "check_persp" && argc >= 5) return check_persp(argv[2], argv[3], argv[4], argc > 5 ? argv[5] : "");
     if (cmd == "check_sparse" && argc >= 4) return check_sparse(argv[2], argv[3]);
+    if (cmd == "values" && argc >= 4) return values(argv[2], vector<string>(argv + 3, argv + argc));
     if (cmd == "bench" && argc >= 5) return bench(argv[2], argv[3], argv[4]);
     std::cerr << "usage: nets_check dump positions.bin [N] | check positions.bin refs.bin models_dir\n";
     return 2;
