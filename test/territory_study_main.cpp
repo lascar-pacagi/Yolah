@@ -36,6 +36,16 @@
 // and qtie: free squares both sides reach in the same number of moves (the
 // races). Computed with an occluded fill (Kogge-Stone): a whole level slides
 // in each of the 8 directions at once, whatever its number of squares.
+// Per-piece zones (the user's "concentration of one's pieces relative to the
+// zone", which the eye sees on open boards too): the queen distance of EACH of
+// the 8 pieces separately; a free square belongs to the piece reaching it in
+// the fewest moves, if it is the only one (ties: nobody). Per side:
+//   waste    free squares my side reaches first (him farther) where at least
+//            two of MY pieces arrive in the same, smallest number of moves:
+//            pieces doing the same job
+//   under    my pieces owning fewer than 3 squares
+//   ownmin   the squares owned by my least-employed piece
+//   spread   most − fewest squares owned among my pieces
 // NNUE (with --weights, a 193 network): its value for the side to move × 10000,
 // to measure what each quantity adds to what the network already sees.
 // And the targets: the result of the game for me (+1 / 0 / −1) and the points
@@ -70,7 +80,9 @@ enum Field { FREE, COLOUR, RESULT, FUTURE, CURRENT,
              NNUE,
              Q1, Q2, Q3, QFIRST, QW,                                             // me, queen distance
              H_Q1, H_Q2, H_Q3, H_QFIRST, H_QW,                                   // him
-             QTIE, NF };
+             QTIE,
+             WASTE, UNDER, OWNMIN, SPREAD, H_WASTE, H_UNDER, H_OWNMIN, H_SPREAD,  // per-piece zones
+             NF };
 
 struct Side { int mob, dirs, trapped, ff, priv, corr, corrpriv; };
 
@@ -251,6 +263,42 @@ template <class F> static uint64_t for_each_game(const string& path, size_t stri
                         seen_m |= a; seen_h |= b;
                     }
                     r[QFIRST] = int16_t(first_m); r[H_QFIRST] = int16_t(first_h); r[QTIE] = int16_t(tie);
+                }
+                {   // per-piece zones
+                    uint64_t lv[8][64];
+                    int nl[8], owner_side[8], np = 0, maxl = 0;
+                    for (int side = 0; side < 2; side++)
+                        for (uint64_t b = y.bitboard(side == 0 ? me : him); b; b &= b - 1) {
+                            nl[np] = queen_levels(b & -b, free, lv[np]);
+                            maxl = std::max(maxl, nl[np]);
+                            owner_side[np++] = side;
+                        }
+                    int owned[8]{}, waste[2]{};
+                    uint64_t seen = 0;
+                    for (int k = 0; k < maxl; k++) {
+                        uint64_t once = 0, twice = 0, once_s[2]{}, twice_s[2]{};
+                        for (int i = 0; i < np; i++) {
+                            const uint64_t l = k < nl[i] ? lv[i][k] & ~seen : 0;
+                            twice |= once & l; once |= l;
+                            const int sd = owner_side[i];
+                            twice_s[sd] |= once_s[sd] & l; once_s[sd] |= l;
+                        }
+                        const uint64_t unique = once & ~twice;
+                        for (int i = 0; i < np; i++)
+                            if (k < nl[i]) owned[i] += std::popcount(lv[i][k] & ~seen & unique);
+                        waste[0] += std::popcount(twice_s[0] & ~once_s[1]);
+                        waste[1] += std::popcount(twice_s[1] & ~once_s[0]);
+                        seen |= once;
+                    }
+                    for (int sd = 0; sd < 2; sd++) {
+                        int under = 0, mn = 99, mx = 0;
+                        for (int i = 0; i < np; i++) if (owner_side[i] == sd) {
+                            under += owned[i] < 3; mn = std::min(mn, owned[i]); mx = std::max(mx, owned[i]);
+                        }
+                        const int base = sd == 0 ? WASTE : H_WASTE;
+                        r[base] = int16_t(waste[sd]); r[base + 1] = int16_t(under);
+                        r[base + 2] = int16_t(mn); r[base + 3] = int16_t(mx - mn);
+                    }
                 }
                 if (net) {
                     NNUE_Quantized::Accumulator acc;
