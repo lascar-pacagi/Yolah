@@ -3,8 +3,12 @@
 # current network itself (dev_y7_sparse = same search, old 193 distill net, sparse product).
 # Lines 3-5: P1 again WITHOUT proxy cut and MPC (*_nompc.cfg), whose settings (margins, reduced depth) were tuned
 # on the old network: if k1 / k8 still lose, the loss is in the networks, not in the pruning.
+# Lines 6-8: with the proxy cut (no margin, robust so far) but without MPC (*_pc.cfg).
 nnue_k8_them dev_y7_sparse 1000000 2000
 nnue_k8_them dev_y7_sparse 200000 2000
 nnue_k8_nompc nnue_control_nompc 1000000 1000
 nnue_k1_nompc nnue_control_nompc 1000000 1000
 nnue_k8_them_nompc nnue_control_nompc 1000000 1000
+nnue_k8_pc nnue_control_pc 1000000 1000
+nnue_k1_pc nnue_control_pc 1000000 1000
+nnue_k8_them_pc nnue_control_pc 1000000 1000
