@@ -34,7 +34,8 @@ import numpy as np
 NAMES = "FREE COLOUR RESULT FUTURE CURRENT MOB DIRS TRAPPED FF PRIV CORR CORRPRIV INFL " \
         "H_MOB H_DIRS H_TRAPPED H_FF H_PRIV H_CORR H_CORRPRIV H_INFL NNUE " \
         "Q1 Q2 Q3 QFIRST QW H_Q1 H_Q2 H_Q3 H_QFIRST H_QW QTIE " \
-        "WASTE UNDER OWNMIN SPREAD H_WASTE H_UNDER H_OWNMIN H_SPREAD".split()
+        "WASTE UNDER OWNMIN SPREAD H_WASTE H_UNDER H_OWNMIN H_SPREAD " \
+        "KMEAN KMAX QMEAN LATE4 LATE9 GEO H_KMEAN H_KMAX H_QMEAN H_LATE4 H_LATE9 H_GEO".split()
 F = {n: i for i, n in enumerate(NAMES)}
 MEASURES = [("mobility", "MOB"), ("open directions", "DIRS"), ("trapped pieces", "TRAPPED"),
             ("flood fill", "FF"), ("flood fill, private", "PRIV"), ("corrected flood fill", "CORR"),
@@ -43,7 +44,10 @@ MEASURES = [("mobility", "MOB"), ("open directions", "DIRS"), ("trapped pieces",
             ("queen: squares in 3 moves", "Q3"), ("queen: reached first", "QFIRST"),
             ("queen: weighted 2^-d", "QW"),
             ("zones: wasted squares", "WASTE"), ("zones: pieces under 3", "UNDER"),
-            ("zones: least piece", "OWNMIN"), ("zones: spread", "SPREAD")]
+            ("zones: least piece", "OWNMIN"), ("zones: spread", "SPREAD"),
+            ("cover: mean king distance", "KMEAN"), ("cover: worst square", "KMAX"),
+            ("cover: mean queen distance", "QMEAN"), ("cover: late, 4 zones", "LATE4"),
+            ("cover: late, 9 zones", "LATE9"), ("cover: piece spread (geom.)", "GEO")]
 COMBOS = [("mobility + directions", ["MOB", "DIRS"]),
                     ("corrected + corrected private", ["CORR", "CORRPRIV"]),
           ("both flood fills (4)", ["FF", "PRIV", "CORR", "CORRPRIV"]),
@@ -58,6 +62,9 @@ COMBOS = [("mobility + directions", ["MOB", "DIRS"]),
           ("zones, all 4", ["WASTE", "UNDER", "OWNMIN", "SPREAD"]),
           ("queen all + zones", ["Q1", "Q2", "Q3", "QFIRST", "QW", "WASTE", "UNDER", "OWNMIN", "SPREAD"]),
           ("corrected + queen all + zones", ["CORR", "Q1", "Q2", "Q3", "QFIRST", "QW", "WASTE", "UNDER", "OWNMIN", "SPREAD"]),
+          ("cover, all 6", ["KMEAN", "KMAX", "QMEAN", "LATE4", "LATE9", "GEO"]),
+          ("queen all + cover", ["Q1", "Q2", "Q3", "QFIRST", "QW", "KMEAN", "KMAX", "QMEAN", "LATE4", "LATE9", "GEO"]),
+          ("corrected + queen all + cover", ["CORR", "Q1", "Q2", "Q3", "QFIRST", "QW", "KMEAN", "KMAX", "QMEAN", "LATE4", "LATE9", "GEO"]),
           ("everything", [m for _, m in MEASURES])]
 PHASES = [("opening 40-56", 40, 57), ("middle 20-39", 20, 40), ("endgame 10-19", 10, 20), ("endgame 0-9", 0, 10)]
 
@@ -120,7 +127,9 @@ def main():
             print("  my side vs his side, weight per standard deviation (points | result), alone / on top of NNUE:")
             for label, m in [("mobility", "MOB"), ("open directions", "DIRS"), ("corrected flood fill", "CORR"),
                              ("influence", "INFL"), ("queen: squares in 2 moves", "Q2"), ("queen: reached first", "QFIRST"),
-                             ("zones: wasted squares", "WASTE"), ("zones: least piece", "OWNMIN")]:
+                             ("zones: wasted squares", "WASTE"), ("zones: least piece", "OWNMIN"),
+                             ("cover: mean king distance", "KMEAN"), ("cover: late, 9 zones", "LATE9"),
+                             ("cover: piece spread (geom.)", "GEO")]:
                 xs = centred(s, [F[m], F["H_" + m]], group)
                 xs /= xs.std(0) + 1e-9
                 out = []

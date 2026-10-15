@@ -46,6 +46,17 @@
 //   under    my pieces owning fewer than 3 squares
 //   ownmin   the squares owned by my least-employed piece
 //   spread   most − fewest squares owned among my pieces
+// Coverage (the user: "I am late to come back into a zone; his pieces are well
+// spread, mine too concentrated, I do not cover the different zones"): per side,
+//   kmean    10 × mean king-step distance (through free squares) from the
+//            nearest piece to the free squares it can reach
+//   kmax     the largest such distance: the worst-covered square
+//   qmean    10 × mean queen distance to the reachable free squares
+//   late4    free squares of the quarters of the board (4 × 4) that the other
+//            side reaches in strictly fewer queen moves (first square of the
+//            zone reached) — my zones lost to his speed
+//   late9    the same with 9 zones (3 × 3 grid: 3, 2, 3 files and ranks)
+//   geo      10 × mean Chebyshev distance between my pieces (no obstacles)
 // NNUE (with --weights, a 193 network): its value for the side to move × 10000,
 // to measure what each quantity adds to what the network already sees.
 // And the targets: the result of the game for me (+1 / 0 / −1) and the points
@@ -58,6 +69,7 @@
 #include "nnue_quantized.h"
 #include "zobrist.h"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <cmath>
@@ -82,6 +94,8 @@ enum Field { FREE, COLOUR, RESULT, FUTURE, CURRENT,
              H_Q1, H_Q2, H_Q3, H_QFIRST, H_QW,                                   // him
              QTIE,
              WASTE, UNDER, OWNMIN, SPREAD, H_WASTE, H_UNDER, H_OWNMIN, H_SPREAD,  // per-piece zones
+             KMEAN, KMAX, QMEAN, LATE4, LATE9, GEO,                              // coverage, me
+             H_KMEAN, H_KMAX, H_QMEAN, H_LATE4, H_LATE9, H_GEO,                  // him
              NF };
 
 struct Side { int mob, dirs, trapped, ff, priv, corr, corrpriv; };
@@ -299,6 +313,60 @@ template <class F> static uint64_t for_each_game(const string& path, size_t stri
                         r[base] = int16_t(waste[sd]); r[base + 1] = int16_t(under);
                         r[base + 2] = int16_t(mn); r[base + 3] = int16_t(mx - mn);
                     }
+                }
+                {   // coverage
+                    static const uint64_t Z4[4] = { 0x0F0F0F0FULL, 0xF0F0F0F0ULL, 0x0F0F0F0FULL << 32, 0xF0F0F0F0ULL << 32 };
+                    auto zones9 = [] {
+                        std::array<uint64_t, 9> z{};
+                        const int cut[4] = {0, 3, 5, 8};
+                        for (int zr = 0; zr < 3; zr++) for (int zc = 0; zc < 3; zc++)
+                            for (int rr = cut[zr]; rr < cut[zr + 1]; rr++) for (int cc = cut[zc]; cc < cut[zc + 1]; cc++)
+                                z[zr * 3 + zc] |= uint64_t(1) << (rr * 8 + cc);
+                        return z;
+                    };
+                    static const std::array<uint64_t, 9> Z9 = zones9();
+                    const uint64_t pcs[2] = { y.bitboard(me), y.bitboard(him) };
+                    uint64_t lq[2][64];
+                    int nq[2];
+                    for (int sd = 0; sd < 2; sd++) {
+                        // king steps through free squares
+                        uint64_t seen = 0, fr = pcs[sd];
+                        int sum = 0, n = 0, d = 0;
+                        for (;;) {
+                            const uint64_t nx = shift_all_directions(fr) & free & ~seen;
+                            if (!nx) break;
+                            d++; sum += d * std::popcount(nx); n += std::popcount(nx);
+                            seen |= nx; fr = nx;
+                        }
+                        const int base = sd == 0 ? KMEAN : H_KMEAN;
+                        r[base] = int16_t(n ? 10 * sum / n : 0);
+                        r[base + 1] = int16_t(d);
+                        nq[sd] = queen_levels(pcs[sd], free, lq[sd]);
+                        int qs = 0, qn = 0;
+                        for (int k = 0; k < nq[sd]; k++) { qs += (k + 1) * std::popcount(lq[sd][k]); qn += std::popcount(lq[sd][k]); }
+                        r[base + 2] = int16_t(qn ? 10 * qs / qn : 0);
+                        int gs = 0, gn = 0;
+                        for (uint64_t a = pcs[sd]; a; a &= a - 1)
+                            for (uint64_t b = a & (a - 1); b; b &= b - 1) {
+                                const int x = std::countr_zero(a), z = std::countr_zero(b);
+                                gs += std::max(std::abs(x / 8 - z / 8), std::abs(x % 8 - z % 8)); gn++;
+                            }
+                        r[base + 5] = int16_t(gn ? 10 * gs / gn : 0);
+                    }
+                    auto first_level = [&](int sd, uint64_t zone) {
+                        for (int k = 0; k < nq[sd]; k++) if (lq[sd][k] & zone) return k;
+                        return 99;
+                    };
+                    auto late = [&](const uint64_t* zs, int nz, int sd) {
+                        int lost = 0;
+                        for (int i = 0; i < nz; i++) {
+                            const uint64_t z = zs[i] & free;
+                            if (z && first_level(1 - sd, z) < first_level(sd, z)) lost += std::popcount(z);
+                        }
+                        return lost;
+                    };
+                    r[LATE4] = int16_t(late(Z4, 4, 0)); r[H_LATE4] = int16_t(late(Z4, 4, 1));
+                    r[LATE9] = int16_t(late(Z9.data(), 9, 0)); r[H_LATE9] = int16_t(late(Z9.data(), 9, 1));
                 }
                 if (net) {
                     NNUE_Quantized::Accumulator acc;
