@@ -32,17 +32,26 @@ import sys
 import numpy as np
 
 NAMES = "FREE COLOUR RESULT FUTURE CURRENT MOB DIRS TRAPPED FF PRIV CORR CORRPRIV INFL " \
-        "H_MOB H_DIRS H_TRAPPED H_FF H_PRIV H_CORR H_CORRPRIV H_INFL NNUE".split()
+        "H_MOB H_DIRS H_TRAPPED H_FF H_PRIV H_CORR H_CORRPRIV H_INFL NNUE " \
+        "Q1 Q2 Q3 QFIRST QW H_Q1 H_Q2 H_Q3 H_QFIRST H_QW QTIE".split()
 F = {n: i for i, n in enumerate(NAMES)}
 MEASURES = [("mobility", "MOB"), ("open directions", "DIRS"), ("trapped pieces", "TRAPPED"),
             ("flood fill", "FF"), ("flood fill, private", "PRIV"), ("corrected flood fill", "CORR"),
-            ("corrected, private", "CORRPRIV"), ("influence", "INFL")]
+            ("corrected, private", "CORRPRIV"), ("influence", "INFL"),
+            ("queen: squares in 1 move", "Q1"), ("queen: squares in 2 moves", "Q2"),
+            ("queen: squares in 3 moves", "Q3"), ("queen: reached first", "QFIRST"),
+            ("queen: weighted 2^-d", "QW")]
 COMBOS = [("mobility + directions", ["MOB", "DIRS"]),
                     ("corrected + corrected private", ["CORR", "CORRPRIV"]),
           ("both flood fills (4)", ["FF", "PRIV", "CORR", "CORRPRIV"]),
           ("influence + mobility", ["INFL", "MOB"]),
           ("influence + corrected", ["INFL", "CORR"]),
           ("influence + corrected + mobility", ["INFL", "CORR", "MOB"]),
+          ("queen curve (1, 2, 3 moves)", ["Q1", "Q2", "Q3"]),
+          ("queen, all 5", ["Q1", "Q2", "Q3", "QFIRST", "QW"]),
+          ("influence + queen all", ["INFL", "Q1", "Q2", "Q3", "QFIRST", "QW"]),
+          ("corrected + queen all", ["CORR", "Q1", "Q2", "Q3", "QFIRST", "QW"]),
+          ("corrected + influence + queen all + mobility", ["CORR", "INFL", "Q1", "Q2", "Q3", "QFIRST", "QW", "MOB"]),
           ("everything", [m for _, m in MEASURES])]
 PHASES = [("opening 40-56", 40, 57), ("middle 20-39", 20, 40), ("endgame 10-19", 10, 20), ("endgame 0-9", 0, 10)]
 
@@ -104,7 +113,7 @@ def main():
                 print(f"    + {label:30s} {r2(xx, y_fut) - b_fut:+6.1f} {r2(xx, y_res) - b_res:+6.1f}")
             print("  my side vs his side, weight per standard deviation (points | result), alone / on top of NNUE:")
             for label, m in [("mobility", "MOB"), ("open directions", "DIRS"), ("corrected flood fill", "CORR"),
-                             ("influence", "INFL")]:
+                             ("influence", "INFL"), ("queen: squares in 2 moves", "Q2"), ("queen: reached first", "QFIRST")]:
                 xs = centred(s, [F[m], F["H_" + m]], group)
                 xs /= xs.std(0) + 1e-9
                 out = []

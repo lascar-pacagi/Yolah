@@ -26,6 +26,16 @@
 //   corrpriv  the same, counting only the blocks the other side cannot reach
 //   infl      the engine's influence (heuristic::influence, king-step Voronoi
 //             with neutral squares)
+// Queen distance (the user's idea: "I need fewer moves than him to cover as
+// many squares"): for each free square, the minimum number of queen moves
+// (sliding through free squares; the holes the moves leave are ignored) to
+// reach it, for each side separately. Per side:
+//   q1, q2, q3  free squares within 1, 2, 3 moves (the coverage curve)
+//   qfirst      free squares the side reaches in strictly fewer moves
+//   qw          64 · Σ 2^−distance over the free squares (close squares weigh more)
+// and qtie: free squares both sides reach in the same number of moves (the
+// races). Computed with an occluded fill (Kogge-Stone): a whole level slides
+// in each of the 8 directions at once, whatever its number of squares.
 // NNUE (with --weights, a 193 network): its value for the side to move × 10000,
 // to measure what each quantity adds to what the network already sees.
 // And the targets: the result of the game for me (+1 / 0 / −1) and the points
@@ -57,9 +67,58 @@ namespace fs = std::filesystem;
 enum Field { FREE, COLOUR, RESULT, FUTURE, CURRENT,
              MOB, DIRS, TRAPPED, FF, PRIV, CORR, CORRPRIV, INFL,                   // me
              H_MOB, H_DIRS, H_TRAPPED, H_FF, H_PRIV, H_CORR, H_CORRPRIV, H_INFL,   // him
-             NNUE, NF };
+             NNUE,
+             Q1, Q2, Q3, QFIRST, QW,                                             // me, queen distance
+             H_Q1, H_Q2, H_Q3, H_QFIRST, H_QW,                                   // him
+             QTIE, NF };
 
 struct Side { int mob, dirs, trapped, ff, priv, corr, corrpriv; };
+
+// Every free square one queen move away from a square of gen, in direction D:
+// fill through the free squares (3 doubling steps), then one step more.
+template <Direction D> static inline uint64_t slide(uint64_t gen, uint64_t free) {
+    uint64_t pro = free;
+    gen |= pro & shift<D>(gen);
+    pro &= shift<D>(pro);
+    gen |= pro & shift<D>(shift<D>(gen));
+    pro &= shift<D>(shift<D>(pro));
+    gen |= pro & shift<D>(shift<D>(shift<D>(shift<D>(gen))));
+    return shift<D>(gen) & free;
+}
+
+static inline uint64_t queen_reach(uint64_t from, uint64_t free) {
+    return slide<NORTH>(from, free) | slide<SOUTH>(from, free) | slide<EAST>(from, free) |
+           slide<WEST>(from, free) | slide<NORTH_EAST>(from, free) | slide<NORTH_WEST>(from, free) |
+           slide<SOUTH_EAST>(from, free) | slide<SOUTH_WEST>(from, free);
+}
+
+// levels[k] = the free squares at queen distance k + 1; returns the number of levels.
+static int queen_levels(uint64_t pieces, uint64_t free, uint64_t levels[64]) {
+    int n = 0;
+    uint64_t seen = 0, frontier = pieces;
+    for (;;) {
+        const uint64_t next = queen_reach(frontier, free) & ~seen;
+        if (!next) return n;
+        levels[n++] = next;
+        seen |= next;
+        frontier = next;
+    }
+}
+
+// The same with the magic attack tables, square by square (checks queen_levels).
+static int queen_levels_slow(uint64_t pieces, uint64_t free, uint64_t levels[64]) {
+    int n = 0;
+    uint64_t seen = 0, frontier = pieces;
+    for (;;) {
+        uint64_t next = 0;
+        for (uint64_t b = frontier; b; b &= b - 1) next |= attacks_bb(Square(std::countr_zero(b)), ~free);
+        next &= free & ~seen;
+        if (!next) return n;
+        levels[n++] = next;
+        seen |= next;
+        frontier = next;
+    }
+}
 
 // Blocks of free squares: connected components by king steps.
 static int components(uint64_t free, uint64_t comps[64]) {
@@ -159,6 +218,40 @@ template <class F> static uint64_t for_each_game(const string& path, size_t stri
                 // influence includes the pieces themselves: count free squares only
                 r[INFL] = int16_t(std::popcount((me == Yolah::BLACK ? bi : wi) & free));
                 r[H_INFL] = int16_t(std::popcount((me == Yolah::BLACK ? wi : bi) & free));
+                {
+                    uint64_t lm[64], lh[64];
+                    const int nm = queen_levels(y.bitboard(me), free, lm), nh = queen_levels(y.bitboard(him), free, lh);
+                    if (std::getenv("CHECK_QUEEN")) {
+                        uint64_t sm[64], sh[64];
+                        if (queen_levels_slow(y.bitboard(me), free, sm) != nm || queen_levels_slow(y.bitboard(him), free, sh) != nh
+                            || !std::equal(lm, lm + nm, sm) || !std::equal(lh, lh + nh, sh)) { std::cerr << "queen levels differ\n"; std::exit(1); }
+                    }
+                    int16_t* q[2] = { &r[Q1], &r[H_Q1] };
+                    const uint64_t* lv[2] = { lm, lh };
+                    const int nl[2] = { nm, nh };
+                    for (int side = 0; side < 2; side++) {
+                        uint64_t cover = 0;
+                        int w = 0;
+                        for (int k = 0; k < nl[side]; k++) {
+                            cover |= lv[side][k];
+                            if (k < 3) q[side][k] = int16_t(std::popcount(cover));
+                            if (k < 6) w += std::popcount(lv[side][k]) << (5 - k);   // 64 · 2^−(k+1)
+                        }
+                        for (int k = nl[side]; k < 3; k++) q[side][k] = int16_t(std::popcount(cover));
+                        q[side][4] = int16_t(w);                                    // QW (Q1 + 4)
+                    }
+                    // distances square by square: first / tie
+                    uint64_t seen_m = 0, seen_h = 0;
+                    int first_m = 0, first_h = 0, tie = 0;
+                    for (int k = 0; k < std::max(nm, nh); k++) {
+                        const uint64_t a = k < nm ? lm[k] : 0, b = k < nh ? lh[k] : 0;
+                        first_m += std::popcount(a & ~b & ~seen_h);
+                        first_h += std::popcount(b & ~a & ~seen_m);
+                        tie += std::popcount(a & b);
+                        seen_m |= a; seen_h |= b;
+                    }
+                    r[QFIRST] = int16_t(first_m); r[H_QFIRST] = int16_t(first_h); r[QTIE] = int16_t(tie);
+                }
                 if (net) {
                     NNUE_Quantized::Accumulator acc;
                     net->init(y, acc);
