@@ -181,14 +181,17 @@ class DistillLoader:
 
     `inputs` is the memmap of the student inputs (uint8), `scale` the factor
     applied to them (1.0 for the NNUE bits, 1/255 for the feature bytes).
+    `extra` (optional): a second uint8 memmap with one row per position (the
+    space features, space.u8), appended to the columns of X unscaled.
     Only chunks whose teacher labels are complete are used (`ranges`), so a
     partially labelled cache trains on the labelled part.
     """
 
     def __init__(self, cache_dir, inputs, values, teacher, ranges, lo, hi, batch_size,
                  rank, world_size, scale=1.0, chunk_size=CHUNK_SIZE, shuffle=True,
-                 pin_memory=True, queue_depth=BATCH_QUEUE_DEPTH):
+                 pin_memory=True, queue_depth=BATCH_QUEUE_DEPTH, extra=None):
         self.inputs, self.values, self.teacher = inputs, values, teacher
+        self.extra = extra
         self.batch_size, self.rank, self.world_size = batch_size, rank, world_size
         self.scale, self.chunk_size, self.shuffle = scale, chunk_size, shuffle
         self.pin_memory, self.queue_depth = pin_memory, queue_depth
@@ -220,6 +223,7 @@ class DistillLoader:
                 inp = np.array(self.inputs[start:end])
                 val = np.array(self.values[start:end])
                 tea = np.array(self.teacher[start:end])
+                ext = np.array(self.extra[start:end]) if self.extra is not None else None
                 if self.shuffle:
                     rng = np.random.default_rng((self.epoch * 1_000_003 + start) & 0xFFFFFFFF)
                     perm = rng.permutation(self.chunk_size)
@@ -230,6 +234,8 @@ class DistillLoader:
                     X = torch.from_numpy(inp[idx].astype(np.float32))
                     if self.scale != 1.0:
                         X *= self.scale
+                    if ext is not None:
+                        X = torch.cat([X, torch.from_numpy(ext[idx].astype(np.float32))], dim=1)
                     z = torch.from_numpy(val[idx].astype(np.float32))
                     vt = torch.from_numpy(tea[idx].astype(np.float32))
                     if self.pin_memory:

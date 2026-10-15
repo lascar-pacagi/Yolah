@@ -26,6 +26,10 @@
 // layer also reads the other view, always in the order [us, them]. The head
 // is chosen by the number of holes: bucket = holes · K / 57.
 //
+// Space features (step 2, weights file tag "PERSPS" + mask): the next layer
+// also reads up to 16 numbers computed from the position by value()
+// (nnue/space_features.h), stored after the h1 values, padded to 32 columns.
+//
 // Accumulator: 2 × H1_SIZE int16, view v at acc + v · H1_SIZE (v = the colour).
 struct NNUE_Persp {
     static constexpr int INPUT_SIZE = 192;
@@ -37,12 +41,16 @@ struct NNUE_Persp {
 
     int k = 1;                // number of phase heads
     bool them = false;        // fc2 reads [us, them] (2 · H1_SIZE inputs) instead of us
-    int h2_inputs = H1_SIZE;
+    int h2_inputs = H1_SIZE;  // h1 values read by fc2 (H1_SIZE or 2 · H1_SIZE)
+    uint32_t space_mask = 0;  // space features read by fc2 (bit = id in space_features.h)
+    int n_space = 0;
+    int space_ids[16]{};
+    int h2_stride = H1_SIZE;  // columns of fc2 in memory: h2_inputs (+ 32 with space features)
     bool sparse = false;      // value(): sparse product of fc2 (same results, zero groups of h1 skipped)
 
     alignas(64) int16_t h1_bias[H1_SIZE];
     alignas(64) int8_t input_to_h1[INPUT_SIZE * H1_SIZE];   // one row of H1_SIZE per input
-    int8_t* h1_to_h2 = nullptr;     // k × (H2_SIZE × h2_inputs)
+    int8_t* h1_to_h2 = nullptr;     // k × (H2_SIZE × h2_stride)
     int8_t* h1_to_h2_sparse = nullptr;  // the same by groups of 4 inputs (nnue/sparse_matvec.h)
     int16_t* h2_bias = nullptr;     // k × H2_SIZE
     int8_t* h2_to_h3 = nullptr;     // k × (H3_SIZE × H2_SIZE)

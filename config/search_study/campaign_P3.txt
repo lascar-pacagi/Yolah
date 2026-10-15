@@ -1,0 +1,12 @@
+# Campaign P3 (NNUE step 2: space features in the second layer). nnue/territory_study.py chose them: what each
+# measure adds to the network's own value (endgame 10-19 free: corrected flood fill + queen distance +27 % of
+# the points still to score, +3.2 % of the result; middle game +2.6 % / +0.7 %). All three networks start from
+# the trained k8_them and get the same 10 more epochs (nnue_persp_distill.sh, lr 1e-4):
+#   k8_them_space      all 16 features            value() ~1130 ns sparse (k8_them 856)
+#   k8_them_spacelite  without the corrected flood fill (its costliest part, ~185 of ~336 ns)
+#   k8_them_cont       no feature: the fair reference (what the 10 epochs alone give)
+nnue_k8_them_space nnue_k8_them_cont 1000000 2000
+nnue_k8_them_space nnue_k8_them_cont 200000 2000
+nnue_k8_them_spacelite nnue_k8_them_cont 1000000 2000
+nnue_k8_them_spacelite nnue_k8_them_cont 200000 2000
+nnue_k8_them_cont nnue_k8_them 1000000 1000

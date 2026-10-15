@@ -36,6 +36,9 @@ Formats (read by nnue.cpp / nnue_quantized.cpp / ffnn_value.h):
       fc2 (K·l2 × l1 or 2·l1) int8 ×64, biases ×64²   (head k = rows k·l2 …)
       K × [ w3[k] (l3 × l2) int8 ×64, b3[k] ×64² ]
       w4 (K × l3) and b4 (K) in float               (the value heads)
+  NetPersp with space features (step 2): the tag is "PERSPS" and the space
+  mask follows l3 ("PERSPS\n<K>\n<them>\n<l1>\n<l2>\n<l3>\n<mask>\n"); fc2
+  then has l1 (or 2·l1) + popcount(mask) columns, the space ones last.
 """
 import glob
 import os
@@ -119,7 +122,11 @@ def export_persp(path, out_dir):
     w8 = lambda what: quantizer(SCALE, -127, 127, f"{name} {what}")                    # int8 weights
     b16 = lambda what, scale: quantizer(scale, -32768, 32767, f"{name} {what}")        # int16 biases
     with open(os.path.join(out_dir, name + ".quantized.txt"), "w") as f:
-        f.write(f"PERSP\n{net.k}\n{int(net.them)}\n{net.l1_size}\n{net.l2_size}\n{net.l3_size}\n")
+        if net.space_mask:
+            f.write(f"PERSPS\n{net.k}\n{int(net.them)}\n{net.l1_size}\n{net.l2_size}\n{net.l3_size}\n"
+                    f"{net.space_mask}\n")
+        else:
+            f.write(f"PERSP\n{net.k}\n{int(net.them)}\n{net.l1_size}\n{net.l2_size}\n{net.l3_size}\n")
         write_matrix(f, net.fc1.weight.data, w8("fc1 weight"))
         write_bias(f, net.fc1.bias.data, b16("fc1 bias", SCALE))
         write_matrix(f, net.fc2.weight.data, w8("fc2 weight"))
@@ -129,11 +136,15 @@ def export_persp(path, out_dir):
             write_bias(f, net.b3.data[k], b16(f"b3[{k}]", SCALE * SCALE))
         write_matrix(f, net.w4.data, as_float)
         write_bias(f, net.b4.data, as_float)
-    print(f"{name}: 192 → {net.l1_size}{' ×2 views' if net.them else ''} → {net.k} heads "
+    space = f" + {net.n_space} space features (mask {net.space_mask:#06x})" if net.n_space else ""
+    print(f"{name}: 192 → {net.l1_size}{' ×2 views' if net.them else ''}{space} → {net.k} heads "
           f"{net.l2_size} → {net.l3_size} → 1 (value heads in float, trunk int8 ×64) → {name}.quantized.txt")
 
 
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--persp":       # one NetPersp file: export_value_nets.py --persp X.pt [out_dir]
+        export_persp(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else os.path.dirname(sys.argv[2]) or ".")
+        return
     out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "../models")
     names = ["nnue", "nnue_193x1024x64x32x1", "nnue_193x1024x64x32x1_distill",
              "features_119x256x64x1", "features_119x256x64x1_distill"]

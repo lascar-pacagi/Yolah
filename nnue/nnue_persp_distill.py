@@ -19,8 +19,15 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
     YOLAH_PERSP_THEM      1: fc2 also reads the other view (default 0)
     YOLAH_INIT_MODEL      starting weights, a 193 network OR a NetPersp
                           (default /mnt/nnue_193x1024x64x32x1_distill.pt)
-The model is saved as /mnt/nnue_persp_k<K>[_them]_distill.<epoch>.pt; a
-/mnt/nnue_persp_k<K>[_them]_distill.pt takes precedence (resume).
+    YOLAH_SPACE_MASK      step 2: the space features fc2 reads (bit i = feature i of
+                          nnue/space_features.h; 65535 = all 16, 65278 = without the
+                          corrected flood fill); needs CACHE/space.u8 (space_features
+                          compute). Default 0: none.
+    YOLAH_NAME_SUFFIX     appended to the model name (default "_space" with a mask)
+A NetPersp start with fewer space features keeps its values (init_from_persp:
+the new fc2 columns start at 0).
+The model is saved as /mnt/nnue_persp_k<K>[_them]<suffix>_distill.<epoch>.pt; a
+/mnt/nnue_persp_k<K>[_them]<suffix>_distill.pt takes precedence (resume).
 """
 from tqdm import tqdm
 import torch
@@ -30,11 +37,12 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 import os
 import gc
+import json
 import numpy as np
 
 from distill_common import (DistillLoader, Metrics, labelled_ranges, open_teacher_labels,
                             read_meta, TEACHER_META)
-from nnue_persp import NetPersp, CACHE_INPUT_SIZE as INPUT_SIZE
+from nnue_persp import NetPersp, CACHE_INPUT_SIZE as INPUT_SIZE, SPACE_SIZE
 
 torch.set_float32_matmul_precision('high')
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -48,7 +56,9 @@ CHUNK_SIZE = int(os.environ.get("YOLAH_CHUNK_SIZE", str(2048 * 2048)))
 MODEL_PATH = os.environ.get("YOLAH_MODEL_DIR", "/mnt/")
 PERSP_K    = int(os.environ.get("YOLAH_PERSP_K", "8"))
 PERSP_THEM = os.environ.get("YOLAH_PERSP_THEM", "0") == "1"
-MODEL_NAME = f"nnue_persp_k{PERSP_K}{'_them' if PERSP_THEM else ''}_distill"
+SPACE_MASK = int(os.environ.get("YOLAH_SPACE_MASK", "0"), 0)
+NAME_SUFFIX = os.environ.get("YOLAH_NAME_SUFFIX", "_space" if SPACE_MASK else "")
+MODEL_NAME = f"nnue_persp_k{PERSP_K}{'_them' if PERSP_THEM else ''}{NAME_SUFFIX}_distill"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 INIT_MODEL = os.environ.get("YOLAH_INIT_MODEL", f"{MODEL_PATH}nnue_193x1024x64x32x1_distill.pt")
 CACHE_DIR  = os.environ.get("YOLAH_CACHE_DIR", "/cache")
@@ -74,7 +84,14 @@ def open_cache(cache_dir):
                        shape=tuple(meta["inputs"]["shape"]))
     values = np.memmap(os.path.join(cache_dir, meta["values"]["path"]), dtype=np.int8, mode='r', shape=(n,))
     teacher, _ = open_teacher_labels(cache_dir, n, mode='r')
-    return inputs, values, teacher, labelled_ranges(cache_dir, n), n
+    space = None
+    if SPACE_MASK:
+        with open(os.path.join(cache_dir, "space_meta.json")) as f:
+            sm = json.load(f)
+        if sm["n_positions"] != n or sm["shape"][1] != SPACE_SIZE:
+            raise ValueError(f"space.u8: {sm['shape']} does not match the cache ({n} positions × {SPACE_SIZE})")
+        space = np.memmap(os.path.join(cache_dir, sm["path"]), dtype=np.uint8, mode='r', shape=(n, SPACE_SIZE))
+    return inputs, values, teacher, labelled_ranges(cache_dir, n), n, space
 
 
 class TrainerDDP:
@@ -171,12 +188,12 @@ class TrainerDDP:
 
 def main(rank, world_size, batch_size, cache_dir):
     ddp_setup(rank, world_size)
-    inputs, values, teacher, ranges, n_total = open_cache(cache_dir)
+    inputs, values, teacher, ranges, n_total, space = open_cache(cache_dir)
     n_train = int(0.95 * n_total)
     train_loader = DistillLoader(cache_dir, inputs, values, teacher, ranges, 0, n_train, batch_size,
-                                 rank, world_size, chunk_size=CHUNK_SIZE, shuffle=True)
+                                 rank, world_size, chunk_size=CHUNK_SIZE, shuffle=True, extra=space)
     val_loader = DistillLoader(cache_dir, inputs, values, teacher, ranges, n_train, n_total, batch_size,
-                               rank, world_size, chunk_size=CHUNK_SIZE, shuffle=False)
+                               rank, world_size, chunk_size=CHUNK_SIZE, shuffle=False, extra=space)
     if rank == 0:
         labelled = sum(hi - lo for lo, hi in ranges)
         print(f'Dataset: {n_total:,} positions, {labelled:,} labelled by the teacher '
@@ -188,21 +205,22 @@ def main(rank, world_size, batch_size, cache_dir):
             print('WARNING: no complete labelled training chunk — label more positions or lower '
                   'YOLAH_CHUNK_SIZE', flush=True)
 
-    net = NetPersp(PERSP_K, PERSP_THEM)
+    net = NetPersp(PERSP_K, PERSP_THEM, space_mask=SPACE_MASK)
     if os.path.isfile(LAST_MODEL):
-        net.load_state_dict(torch.load(LAST_MODEL, map_location='cpu'))
+        net.init_from_persp(torch.load(LAST_MODEL, map_location='cpu'))
         src = LAST_MODEL
     elif os.path.isfile(INIT_MODEL):
         sd = torch.load(INIT_MODEL, map_location='cpu')
         if "w3" in sd:
-            net.load_state_dict(sd)
+            net.init_from_persp(sd)
         else:
             net.init_from_nnue193(sd)
         src = INIT_MODEL
     else:
         src = 'random init'
     if rank == 0:
-        print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM})', flush=True)
+        print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, '
+              f'space mask={SPACE_MASK:#06x}, {net.n_space} space features)', flush=True)
         print(net, flush=True)
         print(f'Parameters: {sum(p.numel() for p in net.parameters()):,}', flush=True)
 

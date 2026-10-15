@@ -6,6 +6,8 @@
 //   python3 ../nnue/check_persp_net.py positions.bin refs.bin model.pt   (a NetPersp)
 //   ./nets_check check_persp positions.bin refs.bin model.quantized.txt [old.quantized.txt]
 //   ./nets_check check_sparse positions.bin model.quantized.txt   (sparse product = dense, and speed)
+//   ./nets_check space positions.bin space.u8   (the 16 space features of each record, for
+//                                                check_persp_net.py with a space network)
 //   ./nets_check values positions.bin first.quantized.txt other.quantized.txt...   (value scale per phase)
 //
 // For every position and every network — the old NNUE (3 outputs) and the
@@ -23,6 +25,7 @@
 #include "nnue.h"
 #include "nnue_quantized.h"
 #include "nnue_persp.h"
+#include "space_features.h"
 #include "ffnn.h"
 #include "ffnn_value.h"
 #include <array>
@@ -438,6 +441,23 @@ int values(const string& positions, const vector<string>& weights) {
     return 0;
 }
 
+// The space features (nnue/space_features.h) of the final position of each
+// record, side to move first: 16 bytes per record, for check_persp_net.py.
+int space_of(const string& positions, const string& out_path) {
+    const vector<Record> rs = read_records(positions);
+    std::ofstream out(out_path, std::ios::binary);
+    for (const Record& r : rs) {
+        Yolah y;
+        for (Move m : r.moves) y.play(m);
+        uint8_t f[space::NB];
+        const int stm = y.current_player();
+        space::compute(y.bitboard(stm), y.bitboard(1 - stm), y.free_squares(), f);
+        out.write((const char*)f, space::NB);
+    }
+    std::printf("%zu records → %s\n", rs.size(), out_path.c_str());
+    return 0;
+}
+
 // Cost of one leaf evaluation of the features players: the features, then
 // each kind of network (int8 = FFNN of ffnn.h, the format of the original
 // networks; its weights file only needs the right sizes).
@@ -487,6 +507,7 @@ int main(int argc, char* argv[]) {
     if (cmd == "check" && argc >= 5) return check(argv[2], argv[3], argv[4]);
     if (cmd == "check_persp" && argc >= 5) return check_persp(argv[2], argv[3], argv[4], argc > 5 ? argv[5] : "");
     if (cmd == "check_sparse" && argc >= 4) return check_sparse(argv[2], argv[3]);
+    if (cmd == "space" && argc >= 4) return space_of(argv[2], argv[3]);
     if (cmd == "values" && argc >= 4) return values(argv[2], vector<string>(argv + 3, argv + argc));
     if (cmd == "bench" && argc >= 5) return bench(argv[2], argv[3], argv[4]);
     std::cerr << "usage: nets_check dump positions.bin [N] | check positions.bin refs.bin models_dir\n";

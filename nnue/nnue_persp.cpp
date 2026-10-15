@@ -4,6 +4,8 @@
 #include <immintrin.h>
 #include <stdexcept>
 #include "sparse_matvec.h"
+#include "space_features.h"
+#include <vector>
 
 // The int8 kernels are those of nnue_quantized.cpp: activations in [0, 64]
 // (scale 64), int8 weights, int32 sums shifted back by 6 and clamped.
@@ -85,7 +87,7 @@ NNUE_Persp::~NNUE_Persp() {
 bool NNUE_Persp::is_persp_file(const std::string& filename) {
     std::ifstream ifs(filename);
     std::string tag;
-    return (ifs >> tag) && tag == "PERSP";
+    return (ifs >> tag) && (tag == "PERSP" || tag == "PERSPS");
 }
 
 // "W\n<rows>\n<cols>\n" + the values row by row, as written by export_value_nets.py.
@@ -120,27 +122,38 @@ void NNUE_Persp::load(const std::string& filename) {
     std::ifstream ifs(filename);
     std::string tag;
     int l1, l2, l3, t;
-    if (!(ifs >> tag >> k >> t >> l1 >> l2 >> l3) || tag != "PERSP")
+    if (!(ifs >> tag >> k >> t >> l1 >> l2 >> l3) || (tag != "PERSP" && tag != "PERSPS"))
         throw std::runtime_error("NNUE_Persp: " + filename + " is not a PERSP weights file");
     if (l1 != H1_SIZE || l2 != H2_SIZE || l3 != H3_SIZE || k < 1)
         throw std::runtime_error("NNUE_Persp: unsupported sizes in " + filename);
+    space_mask = 0;
+    if (tag == "PERSPS" && !(ifs >> space_mask)) throw std::runtime_error("NNUE_Persp: no space mask in " + filename);
+    n_space = 0;
+    for (int i = 0; i < space::NB; i++) if (space_mask >> i & 1) space_ids[n_space++] = i;
     them = t != 0;
     h2_inputs = them ? 2 * H1_SIZE : H1_SIZE;
+    h2_stride = h2_inputs + (n_space ? 32 : 0);
     // fc1 is stored (out, in) by PyTorch: transposed into one row per input.
     read_matrix(ifs, H1_SIZE, INPUT_SIZE, input_to_h1, true, "fc1");
     read_bias(ifs, H1_SIZE, h1_bias, "fc1");
-    h1_to_h2 = aligned_array<int8_t>(size_t(k) * H2_SIZE * h2_inputs);
+    h1_to_h2 = aligned_array<int8_t>(size_t(k) * H2_SIZE * h2_stride);
     h2_bias = aligned_array<int16_t>(size_t(k) * H2_SIZE);
     h2_to_h3 = aligned_array<int8_t>(size_t(k) * H3_SIZE * H2_SIZE);
     h3_bias = aligned_array<int16_t>(size_t(k) * H3_SIZE);
     value_weight = aligned_array<float>(size_t(k) * H3_SIZE);
     value_bias = aligned_array<float>(k);
-    read_matrix(ifs, k * H2_SIZE, h2_inputs, h1_to_h2, false, "fc2");
+    {   // fc2: h2_inputs + n_space columns in the file, h2_stride in memory (zero padding)
+        const int cols = h2_inputs + n_space;
+        std::vector<int8_t> tmp(size_t(k) * H2_SIZE * cols);
+        read_matrix(ifs, k * H2_SIZE, cols, tmp.data(), false, "fc2");
+        for (int r = 0; r < k * H2_SIZE; r++)
+            std::memcpy(h1_to_h2 + size_t(r) * h2_stride, tmp.data() + size_t(r) * cols, cols);
+    }
     read_bias(ifs, k * H2_SIZE, h2_bias, "fc2");
-    h1_to_h2_sparse = aligned_array<int8_t>(size_t(k) * H2_SIZE * h2_inputs);
+    h1_to_h2_sparse = aligned_array<int8_t>(size_t(k) * H2_SIZE * h2_stride);
     for (int b = 0; b < k; b++)
-        sparse_nnue::layout(h1_to_h2 + size_t(b) * H2_SIZE * h2_inputs, H2_SIZE, h2_inputs,
-                            h1_to_h2_sparse + size_t(b) * H2_SIZE * h2_inputs);
+        sparse_nnue::layout(h1_to_h2 + size_t(b) * H2_SIZE * h2_stride, H2_SIZE, h2_stride,
+                            h1_to_h2_sparse + size_t(b) * H2_SIZE * h2_stride);
     for (int b = 0; b < k; b++) {
         read_matrix(ifs, H3_SIZE, H2_SIZE, h2_to_h3 + b * H3_SIZE * H2_SIZE, false, "w3");
         read_bias(ifs, H3_SIZE, h3_bias + b * H3_SIZE, "b3");
@@ -214,7 +227,7 @@ void NNUE_Persp::undo(uint8_t player, Move m, int16_t* acc) const {
 float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     const int stm = yolah.current_player();
     const int b = bucket(yolah);
-    alignas(64) int8_t h1[2 * H1_SIZE];
+    alignas(64) int8_t h1[2 * H1_SIZE + 32];
     alignas(64) int8_t h2[H2_SIZE];
     alignas(64) int8_t h3[H3_SIZE];
     const int16_t* us = acc + stm * H1_SIZE;
@@ -222,13 +235,25 @@ float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     if (them) {
         const int16_t* other = acc + (1 - stm) * H1_SIZE;
         for (int i = 0; i < H1_SIZE; i++) { const int16_t v = other[i]; h1[H1_SIZE + i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
-        const size_t off = size_t(b) * H2_SIZE * 2 * H1_SIZE;
-        if (sparse) sparse_nnue::matvec<H2_SIZE, 2 * H1_SIZE>(h1_to_h2_sparse + off, h1, h2, h2_bias + b * H2_SIZE);
-        else matvec<H2_SIZE, 2 * H1_SIZE>(h1_to_h2 + off, h1, h2, h2_bias + b * H2_SIZE);
-    } else {
-        const size_t off = size_t(b) * H2_SIZE * H1_SIZE;
-        if (sparse) sparse_nnue::matvec<H2_SIZE, H1_SIZE>(h1_to_h2_sparse + off, h1, h2, h2_bias + b * H2_SIZE);
-        else matvec<H2_SIZE, H1_SIZE>(h1_to_h2 + off, h1, h2, h2_bias + b * H2_SIZE);
+    }
+    if (n_space) {
+        // the space features, at scale 64 = their integer value (0..64)
+        uint8_t f[space::NB];
+        space::compute(yolah.bitboard(stm), yolah.bitboard(1 - stm), yolah.free_squares(), f, space_mask);
+        int8_t* s = h1 + h2_inputs;
+        for (int j = 0; j < 32; j++) s[j] = j < n_space ? int8_t(f[space_ids[j]]) : 0;
+    }
+    const size_t off = size_t(b) * H2_SIZE * h2_stride;
+    const int16_t* bias2 = h2_bias + b * H2_SIZE;
+    auto fc2 = [&]<int N>() {
+        if (sparse) sparse_nnue::matvec<H2_SIZE, N>(h1_to_h2_sparse + off, h1, h2, bias2);
+        else matvec<H2_SIZE, N>(h1_to_h2 + off, h1, h2, bias2);
+    };
+    switch (h2_stride) {
+        case H1_SIZE:          fc2.template operator()<H1_SIZE>(); break;
+        case H1_SIZE + 32:     fc2.template operator()<H1_SIZE + 32>(); break;
+        case 2 * H1_SIZE:      fc2.template operator()<2 * H1_SIZE>(); break;
+        default:               fc2.template operator()<2 * H1_SIZE + 32>(); break;
     }
     matvec<H3_SIZE, H2_SIZE>(h2_to_h3 + b * H3_SIZE * H2_SIZE, h2, h3, h3_bias + b * H3_SIZE);
     const float* w = value_weight + b * H3_SIZE;

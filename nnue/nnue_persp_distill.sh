@@ -18,6 +18,15 @@
 #   CONTROL=1                          the 193 network trained the same number of
 #                                      epochs more (nnue193x1024x64x32x1_distill.py),
 #                                      the fair reference for the matches
+# Step 2, space features (YOLAH_PERSP_K=8 YOLAH_PERSP_THEM=1, starting from the
+# trained k8_them network, models/nnue_persp_k8_them_distill.pt of the repo;
+# needs CACHE_DIR/space.u8 from nnue/space_features.sh):
+#   YOLAH_SPACE_MASK=65535             all 16 space features          → k8_them_space
+#   YOLAH_SPACE_MASK=65278             without the corrected flood    → k8_them_spacelite
+#                                      fill (its costliest, ~185 ns of ~336)
+#   CONTINUE=1                         no space feature, k8_them trained the same
+#                                      epochs more: the fair reference → k8_them_cont
+# (defaults for these three: 10 epochs, lr 1e-4)
 # Each variant writes to its own directory under MODEL_ROOT (the outputs of
 # a variant never overwrite those of another, nor the original models).
 # ────────────────────────────────────────────────────────────────────────────
@@ -43,9 +52,25 @@ SRC_DIR="${SRC_DIR:-${SLURM_SUBMIT_DIR:-$PWD}}"
 YOLAH_PERSP_K="${YOLAH_PERSP_K:-8}"
 YOLAH_PERSP_THEM="${YOLAH_PERSP_THEM:-0}"
 CONTROL="${CONTROL:-0}"
+CONTINUE="${CONTINUE:-0}"
+YOLAH_SPACE_MASK="${YOLAH_SPACE_MASK:-0}"
+STEP2=0
+if [[ "${YOLAH_SPACE_MASK}" != "0" || "${CONTINUE}" == "1" ]]; then STEP2=1; fi
+if [[ "${STEP2}" == "1" ]]; then
+    # step 2 fine-tunes the trained k8_them network
+    INIT_MODEL="${INIT_MODEL_STEP2:-${SRC_DIR}/../models/nnue_persp_k${YOLAH_PERSP_K}$([[ "${YOLAH_PERSP_THEM}" == "1" ]] && echo _them || true)_distill.pt}"
+    YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-10}"
+    YOLAH_LR="${YOLAH_LR:-1e-4}"
+fi
 YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-20}"
 YOLAH_DISTILL_ALPHA="${YOLAH_DISTILL_ALPHA:-0.8}"
 YOLAH_LR="${YOLAH_LR:-3e-4}"
+case "${YOLAH_SPACE_MASK}" in
+    0)             YOLAH_NAME_SUFFIX="$([[ "${CONTINUE}" == "1" ]] && echo _cont || true)" ;;
+    65535|0xffff|0xFFFF) YOLAH_NAME_SUFFIX="_space" ;;
+    65278|0xfefe|0xFEFE) YOLAH_NAME_SUFFIX="_spacelite" ;;
+    *)             YOLAH_NAME_SUFFIX="_space${YOLAH_SPACE_MASK}" ;;
+esac
 
 if [[ "${CONTROL}" == "1" ]]; then
     VARIANT="control193"
@@ -55,6 +80,7 @@ else
     # the script silently, with empty .out and .err)
     VARIANT="k${YOLAH_PERSP_K}"
     if [[ "${YOLAH_PERSP_THEM}" == "1" ]]; then VARIANT="${VARIANT}_them"; fi
+    VARIANT="${VARIANT}${YOLAH_NAME_SUFFIX}"
     SCRIPT="nnue_persp_distill.py"
 fi
 MODEL_DIR="${MODEL_ROOT}/${VARIANT}"
@@ -67,8 +93,14 @@ for f in "${SIF}" "${CACHE_DIR}/meta.json" "${CACHE_DIR}/teacher_meta.json" "${I
          "${SRC_DIR}/${SCRIPT}" "${SRC_DIR}/nnue_persp.py" "${SRC_DIR}/distill_common.py"; do
     [[ -e "$f" ]] || { echo "missing: $f" >&2; exit 1; }
 done
+if [[ "${YOLAH_SPACE_MASK}" != "0" ]]; then
+    for f in "${CACHE_DIR}/space.u8" "${CACHE_DIR}/space_meta.json"; do
+        [[ -e "$f" ]] || { echo "missing: $f (run nnue/space_features.sh first)" >&2; exit 1; }
+    done
+fi
 # The starting weights, copied into the variant's directory (/mnt in the container).
-[[ -e "${MODEL_DIR}/init_193_distill.pt" ]] || cp "${INIT_MODEL}" "${MODEL_DIR}/init_193_distill.pt"
+INIT_NAME="$([[ "${STEP2}" == "1" ]] && echo init_persp.pt || echo init_193_distill.pt)"
+[[ -e "${MODEL_DIR}/${INIT_NAME}" ]] || cp "${INIT_MODEL}" "${MODEL_DIR}/${INIT_NAME}"
 
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job      : ${SLURM_JOB_ID:-(local)} on $(hostname)"
@@ -77,6 +109,7 @@ echo "  Cache    : ${CACHE_DIR}"
 echo "  Models   : ${MODEL_DIR}"
 echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
+echo "  Space    : mask ${YOLAH_SPACE_MASK}  continue=${CONTINUE}"
 echo "════════════════════════════════════════════════════════════════"
 
 singularity exec --nv \
@@ -85,7 +118,9 @@ singularity exec --nv \
     --bind "${SRC_DIR}:/work" \
     --env "YOLAH_CACHE_DIR=/cache" \
     --env "YOLAH_MODEL_DIR=/mnt/" \
-    --env "YOLAH_INIT_MODEL=/mnt/init_193_distill.pt" \
+    --env "YOLAH_INIT_MODEL=/mnt/${INIT_NAME}" \
+    --env "YOLAH_SPACE_MASK=${YOLAH_SPACE_MASK}" \
+    --env "YOLAH_NAME_SUFFIX=${YOLAH_NAME_SUFFIX}" \
     --env "YOLAH_PERSP_K=${YOLAH_PERSP_K}" \
     --env "YOLAH_PERSP_THEM=${YOLAH_PERSP_THEM}" \
     --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS}" \
