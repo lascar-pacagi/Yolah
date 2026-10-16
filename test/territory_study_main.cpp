@@ -57,6 +57,15 @@
 //            zone reached) — my zones lost to his speed
 //   late9    the same with 9 zones (3 × 3 grid: 3, 2, 3 files and ranks)
 //   geo      10 × mean Chebyshev distance between my pieces (no obstacles)
+// Connectivity (the user: "are my piece i and his piece j connected by a
+// path?", 4 × 4 pairs): the pieces of both sides in a fixed order, that of the
+// side to move's network view (rows 63 − sq, files mirrored a <-> h for White:
+// the piece nearest the top-left corner of the view first); pair p = 4 i + j,
+// i = my i-th piece, j = his j-th piece:
+//   kd_p      king-step distance: the fewest free squares on a king path from
+//             i to j (both touch the same block of free squares); 0 = not connected
+//   qd_p      queen moves for my piece i to land next to his piece j (0 = never)
+//   qh_p      queen moves for his piece j to land next to my piece i (0 = never)
 // NNUE (with --weights, a 193 network): its value for the side to move × 10000,
 // to measure what each quantity adds to what the network already sees.
 // And the targets: the result of the game for me (+1 / 0 / −1) and the points
@@ -96,7 +105,8 @@ enum Field { FREE, COLOUR, RESULT, FUTURE, CURRENT,
              WASTE, UNDER, OWNMIN, SPREAD, H_WASTE, H_UNDER, H_OWNMIN, H_SPREAD,  // per-piece zones
              KMEAN, KMAX, QMEAN, LATE4, LATE9, GEO,                              // coverage, me
              H_KMEAN, H_KMAX, H_QMEAN, H_LATE4, H_LATE9, H_GEO,                  // him
-             NF };
+             KD0, QD0 = KD0 + 16, QH0 = QD0 + 16,                                // connectivity, 16 pairs each
+             NF = QH0 + 16 };
 
 struct Side { int mob, dirs, trapped, ff, priv, corr, corrpriv; };
 
@@ -367,6 +377,41 @@ template <class F> static uint64_t for_each_game(const string& path, size_t stri
                     };
                     r[LATE4] = int16_t(late(Z4, 4, 0)); r[H_LATE4] = int16_t(late(Z4, 4, 1));
                     r[LATE9] = int16_t(late(Z9.data(), 9, 0)); r[H_LATE9] = int16_t(late(Z9.data(), 9, 1));
+                }
+                {   // connectivity
+                    const int flip = me == Yolah::BLACK ? 0 : 7;
+                    auto ordered = [&](uint64_t b, int out[4]) {
+                        int n = 0;
+                        for (; b && n < 4; b &= b - 1) out[n++] = std::countr_zero(b);
+                        std::sort(out, out + n, [&](int a, int c) { return ((63 - a) ^ flip) < ((63 - c) ^ flip); });
+                        return n;
+                    };
+                    int pm[4], ph[4];
+                    const int nm = ordered(y.bitboard(me), pm), nh = ordered(y.bitboard(him), ph);
+                    uint64_t around_h[4], around_m[4];
+                    for (int j = 0; j < nh; j++) around_h[j] = shift_all_directions(uint64_t(1) << ph[j]);
+                    for (int i = 0; i < nm; i++) around_m[i] = shift_all_directions(uint64_t(1) << pm[i]);
+                    for (int i = 0; i < nm; i++) {
+                        // king steps from my piece i through free squares: level d = squares at d steps
+                        uint64_t seen = 0, fr = uint64_t(1) << pm[i];
+                        for (int d = 1;; d++) {
+                            const uint64_t nx = shift_all_directions(fr) & free & ~seen;
+                            if (!nx) break;
+                            for (int j = 0; j < nh; j++)
+                                if (!r[KD0 + 4 * i + j] && (nx & around_h[j])) r[KD0 + 4 * i + j] = int16_t(d);
+                            seen |= nx; fr = nx;
+                        }
+                        uint64_t lv[64];
+                        const int nl = queen_levels(uint64_t(1) << pm[i], free, lv);
+                        for (int j = 0; j < nh; j++)
+                            for (int k = 0; k < nl; k++) if (lv[k] & around_h[j]) { r[QD0 + 4 * i + j] = int16_t(k + 1); break; }
+                    }
+                    for (int j = 0; j < nh; j++) {
+                        uint64_t lv[64];
+                        const int nl = queen_levels(uint64_t(1) << ph[j], free, lv);
+                        for (int i = 0; i < nm; i++)
+                            for (int k = 0; k < nl; k++) if (lv[k] & around_m[i]) { r[QH0 + 4 * i + j] = int16_t(k + 1); break; }
+                    }
                 }
                 if (net) {
                     NNUE_Quantized::Accumulator acc;
