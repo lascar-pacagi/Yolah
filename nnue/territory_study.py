@@ -36,7 +36,9 @@ NAMES = "FREE COLOUR RESULT FUTURE CURRENT MOB DIRS TRAPPED FF PRIV CORR CORRPRI
         "Q1 Q2 Q3 QFIRST QW H_Q1 H_Q2 H_Q3 H_QFIRST H_QW QTIE " \
         "WASTE UNDER OWNMIN SPREAD H_WASTE H_UNDER H_OWNMIN H_SPREAD " \
         "KMEAN KMAX QMEAN LATE4 LATE9 GEO H_KMEAN H_KMAX H_QMEAN H_LATE4 H_LATE9 H_GEO".split() + \
-        [f"{k}{p}" for k in ("KD", "QD", "QH") for p in range(16)]   # connectivity: connect_study.py
+        [f"{k}{p}" for k in ("KD", "QD", "QH") for p in range(16)] + \
+        [f"{k}{p}" for k in ("PSQ", "PBLK") for p in range(8)] + \
+        [f"{k}{p}" for k in ("ELIB", "EOPP", "EWALL", "EOWN", "ESHORT", "EGENE", "ECONTRIB", "EATT") for p in range(8)]   # connectivity: connect_study.py
 F = {n: i for i, n in enumerate(NAMES)}
 MEASURES = [("mobility", "MOB"), ("open directions", "DIRS"), ("trapped pieces", "TRAPPED"),
             ("flood fill", "FF"), ("flood fill, private", "PRIV"), ("corrected flood fill", "CORR"),

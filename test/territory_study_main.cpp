@@ -66,6 +66,21 @@
 //             i to j (both touch the same block of free squares); 0 = not connected
 //   qd_p      queen moves for my piece i to land next to his piece j (0 = never)
 //   qh_p      queen moves for his piece j to land next to my piece i (0 = never)
+//   psq_k     square of piece k (my 4 then his 4, same order) in the view, 0..63
+//   pblk_k    free squares piece k reaches by king steps (its blocks)
+// Encirclement (the user: "several of our pieces hinder the moves of one
+// piece"), per piece k in the same order, the "other side" being the side
+// that does not own piece k:
+//   elib      liberties: free neighbours
+//   eopp      neighbours occupied by the other side's pieces
+//   ewall     neighbours that are holes or off the board
+//   eown      neighbours occupied by its own side's pieces
+//   eshort    directions with only 1 or 2 free squares
+//   egene     queen moves the other side's pieces take away from it (its
+//             mobility if they were free squares minus its real mobility)
+//   econtrib  the other side's pieces that stop one of its lines first
+//   eatt      liberties the other side reaches in one queen move (it can
+//             plug them: the square it leaves becomes a hole, so a plug holds)
 // NNUE (with --weights, a 193 network): its value for the side to move × 10000,
 // to measure what each quantity adds to what the network already sees.
 // And the targets: the result of the game for me (+1 / 0 / −1) and the points
@@ -106,7 +121,10 @@ enum Field { FREE, COLOUR, RESULT, FUTURE, CURRENT,
              KMEAN, KMAX, QMEAN, LATE4, LATE9, GEO,                              // coverage, me
              H_KMEAN, H_KMAX, H_QMEAN, H_LATE4, H_LATE9, H_GEO,                  // him
              KD0, QD0 = KD0 + 16, QH0 = QD0 + 16,                                // connectivity, 16 pairs each
-             NF = QH0 + 16 };
+             PSQ0 = QH0 + 16, PBLK0 = PSQ0 + 8,                                   // per piece, my 4 then his 4
+             ELIB0 = PBLK0 + 8, EOPP0 = ELIB0 + 8, EWALL0 = EOPP0 + 8, EOWN0 = EWALL0 + 8,  // encirclement
+             ESHORT0 = EOWN0 + 8, EGENE0 = ESHORT0 + 8, ECONTRIB0 = EGENE0 + 8, EATT0 = ECONTRIB0 + 8,
+             NF = EATT0 + 8 };
 
 struct Side { int mob, dirs, trapped, ff, priv, corr, corrpriv; };
 
@@ -121,6 +139,10 @@ template <Direction D> static inline uint64_t slide(uint64_t gen, uint64_t free)
     gen |= pro & shift<D>(shift<D>(shift<D>(shift<D>(gen))));
     return shift<D>(gen) & free;
 }
+
+static uint64_t (*const SLIDES[8])(uint64_t, uint64_t) = {
+    slide<NORTH>, slide<SOUTH>, slide<EAST>, slide<WEST>,
+    slide<NORTH_EAST>, slide<NORTH_WEST>, slide<SOUTH_EAST>, slide<SOUTH_WEST>};
 
 static inline uint64_t queen_reach(uint64_t from, uint64_t free) {
     return slide<NORTH>(from, free) | slide<SOUTH>(from, free) | slide<EAST>(from, free) |
@@ -401,16 +423,47 @@ template <class F> static uint64_t for_each_game(const string& path, size_t stri
                                 if (!r[KD0 + 4 * i + j] && (nx & around_h[j])) r[KD0 + 4 * i + j] = int16_t(d);
                             seen |= nx; fr = nx;
                         }
+                        r[PSQ0 + i] = int16_t((63 - pm[i]) ^ flip);
+                        r[PBLK0 + i] = int16_t(std::popcount(seen));
                         uint64_t lv[64];
                         const int nl = queen_levels(uint64_t(1) << pm[i], free, lv);
                         for (int j = 0; j < nh; j++)
                             for (int k = 0; k < nl; k++) if (lv[k] & around_h[j]) { r[QD0 + 4 * i + j] = int16_t(k + 1); break; }
                     }
                     for (int j = 0; j < nh; j++) {
+                        uint64_t seen = 0, fr = uint64_t(1) << ph[j];
+                        for (uint64_t nx; (nx = shift_all_directions(fr) & free & ~seen); fr = nx) seen |= nx;
+                        r[PSQ0 + 4 + j] = int16_t((63 - ph[j]) ^ flip);
+                        r[PBLK0 + 4 + j] = int16_t(std::popcount(seen));
                         uint64_t lv[64];
                         const int nl = queen_levels(uint64_t(1) << ph[j], free, lv);
                         for (int i = 0; i < nm; i++)
                             for (int k = 0; k < nl; k++) if (lv[k] & around_m[i]) { r[QH0 + 4 * i + j] = int16_t(k + 1); break; }
+                    }
+                    // encirclement, pieces in the same order as above
+                    const uint64_t pcs[2] = {y.bitboard(me), y.bitboard(him)};
+                    const uint64_t holes = ~free & ~pcs[0] & ~pcs[1];
+                    const uint64_t reach1[2] = {queen_reach(pcs[0], free), queen_reach(pcs[1], free)};
+                    for (int k = 0; k < nm + nh; k++) {
+                        const int sd = k < 4 ? 0 : 1, sq = k < 4 ? pm[k] : ph[k - 4];
+                        const uint64_t b = uint64_t(1) << sq, opp = pcs[1 - sd], around = shift_all_directions(b);
+                        const int slot = sd * 4 + (k < 4 ? k : k - 4);
+                        r[ELIB0 + slot] = int16_t(std::popcount(around & free));
+                        r[EOPP0 + slot] = int16_t(std::popcount(around & opp));
+                        r[EWALL0 + slot] = int16_t(8 - std::popcount(around) + std::popcount(around & holes));
+                        r[EOWN0 + slot] = int16_t(std::popcount(around & pcs[sd]));
+                        r[EATT0 + slot] = int16_t(std::popcount(around & free & reach1[1 - sd]));
+                        int shortd = 0, gene = 0, contrib = 0;
+                        for (auto sl : SLIDES) {
+                            const uint64_t ray = sl(b, free), freed = sl(b, free | opp);
+                            const int len = std::popcount(ray);
+                            shortd += len == 1 || len == 2;
+                            gene += std::popcount(freed) - len;           // its squares count too
+                            contrib += (freed & opp) != 0;
+                        }
+                        r[ESHORT0 + slot] = int16_t(shortd);
+                        r[EGENE0 + slot] = int16_t(gene);
+                        r[ECONTRIB0 + slot] = int16_t(contrib);
                     }
                 }
                 if (net) {
