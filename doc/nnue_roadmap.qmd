@@ -842,40 +842,102 @@ la position, ajoutés à l'entrée de la deuxième couche. Ce chapitre décrit p
 candidats : l'idée de jeu qu'il traduit, sa définition exacte, un schéma, le code qui le calcule, ce que les
 mesures en ont dit et ce qu'il coûte. Le chapitre suivant décrit l'ablation qui choisira lesquels garder.
 
-## Conventions
+## Avant de commencer : quatre points communs à toutes les caractéristiques
 
-**Moi et lui.** Toutes les caractéristiques sont calculées du point de vue du joueur au trait (« moi », pions
-noirs pleins sur les schémas) contre l'autre joueur (« lui », pions blancs). Chaque caractéristique existe
-deux fois : une valeur pour moi, une pour lui. Le réseau les reçoit toutes deux et apprend lui-même comment les
-combiner (une différence, ou un poids plus fort pour l'une : l'étude de territoire a montré que ce que je
-retire à l'adversaire compte souvent plus que ce que je garde).
+### Où elles entrent dans le réseau
 
-**Des entiers de 0 à 64.** Chaque colonne est un entier borné à $[0, 64]$, donné au réseau sous la forme
-$\text{valeur}/64$. En C++, l'entrée int8 à l'échelle 64 *est* cet entier : le réseau quantifié voit
-exactement ce que le réseau flottant a appris, sans erreur de quantification. Les petites grandeurs (un
-nombre de pièces, de 0 à 4) sont multipliées pour occuper la plage (×16), et les distances sont inversées
-($64/d$, 0 si jamais) : une pièce proche donne un grand nombre, une pièce injoignable donne 0.
+Le réseau calcule d'abord deux grands vecteurs de 1024 nombres, les accumulateurs : l'un décrit la position
+vue par le joueur au trait, l'autre vue par son adversaire. Ils sont mis à jour à chaque coup, sans être
+recalculés. Les caractéristiques de ce chapitre sont des nombres en plus, calculés directement sur la
+position à chaque évaluation, et ajoutés à côté des accumulateurs à l'entrée de la deuxième couche.
 
-**Invariance par le miroir.** La vue des Blancs est le plateau retourné a ↔ h. Chaque colonne doit donc
-donner la même valeur sur une position et sur son miroir. C'est le cas : les mesures n'utilisent que des
-distances et des comptes, et quand des pièces sont triées, les égalités sont départagées par toutes les
-valeurs (vérifié sur 500 positions).
+![Les caractéristiques entrent dans la deuxième couche, à côté des deux accumulateurs. Elles ne touchent ni à la première couche ni à sa mise à jour incrémentale.](figs/fig-feat-where.png){#fig-feat-where width=95%}
 
-**Comment les mesures ont été faites.** `test/territory_study_main.cpp` calcule les quantités sur les
-positions de `data/games` (une sur 20, 12 millions de positions), avec la valeur du réseau 193 distillé. Les
-scripts `nnue/*_study.py` ajustent par moindres carrés, sur la moitié des parties, la valeur du réseau (un
-polynôme de degré 3) plus la quantité, et mesurent sur l'autre moitié ce que la quantité **ajoute** au R²
-(en points de %). Deux cibles : les points que le joueur au trait marquera encore moins ceux de l'adversaire
-(« points »), et le résultat de la partie (« résultat »). Toutes les quantités et les cibles sont centrées
-par (nombre de cases libres, couleur au trait) : on compare des positions du même stade de la partie. Les
-phases sont définies par le nombre de cases libres : ouverture 40–56, milieu 20–39, finale 10–19 et 0–9.
+### Chaque caractéristique est calculée deux fois : pour moi et pour lui
 
-**La vérification.** `space::compute_all` (`nnue/space_features.h`) calcule les 92 colonnes avec des
-bitboards. `nnue/space_reference.py` les recalcule autrement, case par case en Python, sans code commun :
-les deux donnent les mêmes 92 colonnes sur 20 000 positions de parties réelles
-(`space_features dump` puis `python3 space_reference.py`). Tous les nombres des schémas de ce chapitre sont
-calculés par cette référence (`doc/figs/make_feature_figs.py`). Les extraits de code sont condensés du code
-réel, sans en changer le calcul.
+« Moi » désigne toujours le joueur **au trait** (pions noirs pleins sur les schémas), « lui » son adversaire
+(pions blancs), quelle que soit leur couleur. Chaque caractéristique donne donc deux colonnes : la valeur
+pour moi et la valeur pour lui. Par exemple, pour la mobilité : mes 38 coups légaux et ses 35.
+
+Pourquoi ne pas donner directement la différence 38 − 35 ? Parce que les deux côtés ne pèsent pas pareil :
+l'étude de territoire a montré qu'une case de mobilité retirée à l'adversaire compte plus qu'une case de
+mobilité gagnée pour soi. Avec les deux valeurs, le réseau apprend lui-même le bon poids de chacune.
+
+### Chaque colonne est un entier de 0 à 64
+
+Le réseau reçoit $\text{valeur}/64$, donc un nombre entre 0 et 1. Ce choix a une raison pratique : dans le
+réseau quantifié du C++, les entrées sont des entiers sur 8 bits à l'échelle 64, et l'entrée est alors
+exactement l'entier calculé. Le réseau du C++ voit donc exactement ce que le réseau a vu pendant
+l'entraînement, sans aucune erreur d'arrondi.
+
+Pour que toutes les colonnes utilisent bien cette plage, deux règles :
+
+- **les petits comptes sont multipliés.** Un nombre de pièces (0 à 4) est multiplié par 16 : 3 pièces
+  donnent 48, que le réseau reçoit comme 0,75 ;
+- **les distances sont inversées**, en $64/d$ : une distance de 1 donne 64, de 2 donne 32, de 3 donne 21, et
+  « jamais » donne 0. Ainsi, plus c'est proche, plus le nombre est grand, et l'absence de chemin n'est pas
+  confondue avec une distance énorme.
+
+Les valeurs plus grandes que 64 (une mobilité de 80 en ouverture) sont ramenées à 64.
+
+### Une position et son miroir donnent les mêmes valeurs
+
+Pour que les deux couleurs partagent les mêmes poids, le réseau voit les positions des Blancs retournées
+de gauche à droite (la colonne a devient la colonne h). Une caractéristique doit donc donner exactement la
+même valeur sur une position et sur son reflet ; sinon, le réseau recevrait deux nombres différents pour la
+même situation selon la couleur du joueur au trait.
+
+Les comptes et les distances ne dépendent pas de ce retournement. Le seul risque vient des pièces triées
+(connectivité, encerclement) : si deux pièces ont la même clé de tri, leur ordre pourrait dépendre de leur
+position sur le plateau. On départage donc les égalités par toutes les valeurs de la pièce : deux pièces à
+égalité sur tout sont identiques, et leur ordre n'a plus d'importance. Vérifié sur 500 positions et leurs
+reflets.
+
+### Comment lire les mesures « ce que la caractéristique ajoute »
+
+Chaque section donne des chiffres comme « +18,6 / +1,9 en finale 10–19 ». Ils répondent à la question :
+**que sait cette caractéristique que le réseau actuel ne sait pas déjà ?** Voici comment ils sont obtenus.
+
+1. **Les données.** 12 millions de positions de parties réelles (`data/games`, une position sur 20), avec
+   pour chacune la valeur du réseau actuel, puis la suite de la partie.
+2. **Ce qu'on cherche à prédire.** Deux cibles : les **points** que le joueur au trait va encore marquer
+   jusqu'à la fin, moins ceux de l'adversaire, et le **résultat** de la partie (gagnée, nulle, perdue).
+3. **Deux prédictions.** On prédit la cible avec la valeur du réseau seule (un polynôme de degré 3 de cette
+   valeur), puis avec la valeur du réseau **plus** la caractéristique (une combinaison linéaire ajustée par
+   moindres carrés).
+4. **Le score.** Le R² est la part des variations de la cible que la prédiction explique : 0 % si elle
+   n'explique rien, 100 % si elle est parfaite. Le chiffre donné est la différence entre les deux R², en
+   points de pourcentage.
+
+Exemple : en finale 10–19, le réseau seul explique 58,2 % des variations des points restants ; avec le
+flood fill corrigé en plus, 76,8 %. Le flood fill corrigé ajoute donc +18,6 points : une information
+importante que le réseau ne calcule pas lui-même.
+
+Deux précautions rendent ces chiffres honnêtes :
+
+- **l'ajustement et la mesure se font sur des parties différentes** : les coefficients sont calculés sur
+  la moitié des parties, et le R² est mesuré sur l'autre moitié. Une caractéristique à beaucoup de colonnes
+  ne peut donc pas gagner en apprenant les données par cœur ;
+- **on compare des positions du même stade de la partie.** En début de partie, il reste beaucoup de cases
+  et beaucoup de points à marquer. Sans précaution, n'importe quel compte de cases « prédirait » donc les
+  points restants, simplement parce qu'il indique le stade de la partie. On retire à chaque valeur la
+  moyenne des positions qui ont le même nombre de cases libres et le même joueur au trait : il ne reste que
+  ce qui distingue une position de ses semblables.
+
+Les phases sont définies par le nombre de cases libres : **ouverture** 40 à 56, **milieu** 20 à 39,
+**finale** 10 à 19, puis 0 à 9. Les chiffres viennent de `test/territory_study_main.cpp` (le calcul des
+quantités) et des scripts `nnue/*_study.py` (l'ajustement), avec le réseau 193 distillé.
+
+### Comment on sait que le code calcule bien ce qui est décrit
+
+`space::compute_all` (`nnue/space_features.h`) calcule les 92 colonnes avec des bitboards : c'est rapide mais
+difficile à relire. `nnue/space_reference.py` refait le même calcul autrement, case par case en Python, sans
+aucun code commun. Sur 20 000 positions de parties réelles, les deux donnent exactement les mêmes 92 colonnes
+(`space_features dump`, puis `python3 space_reference.py`).
+
+Tous les nombres des schémas de ce chapitre sont calculés par cette référence
+(`doc/figs/make_feature_figs.py`). Les extraits de code sont raccourcis par rapport au code réel, sans
+changer le calcul.
 
 ## Deux outils communs : les blocs et les coups de dame
 

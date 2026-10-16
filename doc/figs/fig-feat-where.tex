@@ -1,0 +1,22 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[node distance=6mm and 9mm]
+  \node[box,minimum width=27mm] (pos) {position\\\scriptsize pièces, trous, joueur au trait};
+  \node[box,right=12mm of pos,yshift=11mm,minimum width=33mm] (us) {accumulateur ``moi''\\\scriptsize 1024 nombres};
+  \node[box,right=12mm of pos,minimum width=33mm] (them) {accumulateur ``lui''\\\scriptsize 1024 nombres};
+  \node[boxa,right=12mm of pos,yshift=-12mm,minimum width=33mm] (feat) {caractéristiques\\\scriptsize jusqu'à 92 nombres, valeur / 64};
+  \node[box,right=12mm of them,minimum height=30mm,minimum width=22mm] (fc2) {couche 2\\\scriptsize 64 neurones\\\scriptsize × 8 phases};
+  \node[box,right=9mm of fc2,minimum width=20mm] (rest) {couche 3\\\scriptsize 32};
+  \node[box,right=9mm of rest] (v) {valeur};
+  \draw[ar] (pos.east) -- (us.west);
+  \draw[ar] (pos.east) -- (them.west);
+  \draw[ar] (pos.east) -- (feat.west);
+  \draw[ar] (us.east) -- (fc2.west |- us.east);
+  \draw[ar] (them.east) -- (fc2.west |- them.east);
+  \draw[ar] (feat.east) -- (fc2.west |- feat.east);
+  \draw[ar] (fc2) -- (rest);
+  \draw[ar] (rest) -- (v);
+  \node[tiny,below=1mm of feat] {recalculées à chaque évaluation (ce chapitre)};
+\end{tikzpicture}
+\end{document}
