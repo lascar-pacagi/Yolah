@@ -23,7 +23,17 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
                           nnue/space_features.h; 65535 = all 16, 65278 = without the
                           corrected flood fill); needs CACHE/space.u8 (space_features
                           compute). Default 0: none.
-    YOLAH_NAME_SUFFIX     appended to the model name (default "_space" with a mask)
+    YOLAH_SPACE_GROUPS    the ablation (doc/nnue_roadmap.qmd): the GROUPS of candidate
+                          features fc2 reads (bit g = group g of space_features.h:
+                          0 corr, 1 qdist, 2 qfirst, 3 qw, 4 late9, 5 mob, 6 infl,
+                          7 connect, 8 encircle; 0x1ff = all); needs CACHE/space_all.u8
+                          (space_features compute-all). Not with YOLAH_SPACE_MASK.
+    YOLAH_SEED            another shuffling of the training data (default 0), to
+                          measure the noise between two otherwise identical runs
+    YOLAH_NAME_SUFFIX     appended to the model name (default "_space" with a mask,
+                          "_g<groups in hex>" with groups)
+After each epoch the validation numbers (overall and per phase) are appended to
+/mnt/<model name>.val.jsonl (one JSON object per line), read by ablation.py.
 A NetPersp start with fewer space features keeps its values (init_from_persp:
 the new fc2 columns start at 0).
 The model is saved as /mnt/nnue_persp_k<K>[_them]<suffix>_distill.<epoch>.pt; a
@@ -57,11 +67,17 @@ MODEL_PATH = os.environ.get("YOLAH_MODEL_DIR", "/mnt/")
 PERSP_K    = int(os.environ.get("YOLAH_PERSP_K", "8"))
 PERSP_THEM = os.environ.get("YOLAH_PERSP_THEM", "0") == "1"
 SPACE_MASK = int(os.environ.get("YOLAH_SPACE_MASK", "0"), 0)
-NAME_SUFFIX = os.environ.get("YOLAH_NAME_SUFFIX", "_space" if SPACE_MASK else "")
+SPACE_GROUPS = int(os.environ.get("YOLAH_SPACE_GROUPS", "0"), 0)
+SEED = int(os.environ.get("YOLAH_SEED", "0"))
+if SPACE_MASK and SPACE_GROUPS:
+    raise SystemExit("YOLAH_SPACE_MASK and YOLAH_SPACE_GROUPS are exclusive")
+NAME_SUFFIX = os.environ.get("YOLAH_NAME_SUFFIX", "_space" if SPACE_MASK else
+                             f"_g{SPACE_GROUPS:03x}" if SPACE_GROUPS else "")
 MODEL_NAME = f"nnue_persp_k{PERSP_K}{'_them' if PERSP_THEM else ''}{NAME_SUFFIX}_distill"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 INIT_MODEL = os.environ.get("YOLAH_INIT_MODEL", f"{MODEL_PATH}nnue_193x1024x64x32x1_distill.pt")
 CACHE_DIR  = os.environ.get("YOLAH_CACHE_DIR", "/cache")
+PHASES     = ["opening 40-56", "middle 20-39", "endgame 10-19", "endgame 0-9"]   # free squares
 
 
 def ddp_setup(rank, world_size):
@@ -84,14 +100,18 @@ def open_cache(cache_dir):
                        shape=tuple(meta["inputs"]["shape"]))
     values = np.memmap(os.path.join(cache_dir, meta["values"]["path"]), dtype=np.int8, mode='r', shape=(n,))
     teacher, _ = open_teacher_labels(cache_dir, n, mode='r')
-    space = None
-    if SPACE_MASK:
-        with open(os.path.join(cache_dir, "space_meta.json")) as f:
+    space, mask = None, SPACE_MASK
+    if SPACE_MASK or SPACE_GROUPS:
+        meta_name = "space_meta.json" if SPACE_MASK else "space_all_meta.json"
+        with open(os.path.join(cache_dir, meta_name)) as f:
             sm = json.load(f)
-        if sm["n_positions"] != n or sm["shape"][1] != SPACE_SIZE:
-            raise ValueError(f"space.u8: {sm['shape']} does not match the cache ({n} positions × {SPACE_SIZE})")
-        space = np.memmap(os.path.join(cache_dir, sm["path"]), dtype=np.uint8, mode='r', shape=(n, SPACE_SIZE))
-    return inputs, values, teacher, labelled_ranges(cache_dir, n), n, space
+        width = SPACE_SIZE if SPACE_MASK else len(sm["groups"])
+        if sm["n_positions"] != n or sm["shape"][1] != width:
+            raise ValueError(f"{sm['path']}: {sm['shape']} does not match the cache ({n} positions × {width})")
+        space = np.memmap(os.path.join(cache_dir, sm["path"]), dtype=np.uint8, mode='r', shape=(n, width))
+        if SPACE_GROUPS:
+            mask = sum(1 << c for c, g in enumerate(sm["groups"]) if SPACE_GROUPS >> g & 1)
+    return inputs, values, teacher, labelled_ranges(cache_dir, n), n, space, mask
 
 
 class TrainerDDP:
@@ -117,6 +137,19 @@ class TrainerDDP:
     def _save_checkpoint(self, epoch):
         torch.save(self.model.module.state_dict(), f"{MODEL_PATH}{MODEL_NAME}.{epoch}.pt")
 
+    def _log_val(self, epoch, m):
+        """Validation numbers of the epoch → /mnt/<model>.val.jsonl (and the per-phase mse on stdout)."""
+        sse, cnt = (t.cpu().tolist() for t in m.phases)
+        phases = {name: (a / b if b else None) for name, a, b in zip(PHASES, sse, cnt)}
+        print(f'epoch {epoch + 1} val   [vs teacher] mse per phase: '
+              + '  '.join(f'{k} {v:.4f}' for k, v in phases.items() if v is not None), flush=True)
+        n = max(m.n, 1)
+        rec = dict(epoch=epoch + 1, model=MODEL_NAME, groups=SPACE_GROUPS, seed=SEED, mask=hex(self.model.module.space_mask),
+                   n=m.n, loss=m.loss / n, mse_teacher=m.mse_t / n, mse_outcome=m.mse_z / n,
+                   sign_teacher=m.sign_t / n, phases=phases, phase_n=dict(zip(PHASES, cnt)))
+        with open(f"{MODEL_PATH}{MODEL_NAME}.val.jsonl", "a") as f:
+            f.write(json.dumps(rec) + "\n")
+
     def _h2d_async(self, batch_cpu):
         with torch.cuda.stream(self.stream):
             return tuple(t.to(self.gpu_id, non_blocking=True) for t in batch_cpu)
@@ -132,6 +165,9 @@ class TrainerDDP:
         """One pass over `loader`; returns the accumulated Metrics."""
         self.model.train(train)
         metrics = Metrics()
+        phase_sse = torch.zeros(len(PHASES), device=self.gpu_id)
+        phase_n = torch.zeros(len(PHASES), device=self.gpu_id)
+        metrics.phases = (phase_sse, phase_n)
         it = 0
         loader_iter = iter(loader)
         cpu_cur = next(loader_iter, None)
@@ -158,6 +194,11 @@ class TrainerDDP:
                     self.scaler.update()
                     self.model.module.clip()            # int8 trunk weight clamp
                 metrics.update(v_s.float(), z, v_t, loss.item())
+                if not train:                           # mse vs the teacher per phase (free squares)
+                    free = 56 - X[:, 128:192].sum(dim=1)
+                    ph = (free < 40).long() + (free < 20).long() + (free < 10).long()
+                    phase_sse.index_add_(0, ph, (v_s.float() - v_t) ** 2)
+                    phase_n.index_add_(0, ph, torch.ones_like(v_t))
 
                 it += 1
                 if it % 1000 == 0:
@@ -180,6 +221,7 @@ class TrainerDDP:
                 print(train_metrics.report(f'epoch {epoch + 1} train'), flush=True)
                 print(val_metrics.report(f'epoch {epoch + 1} val  '), flush=True)
                 print(f'epoch {epoch + 1} lr: {lr:.6f} alpha: {ALPHA}', flush=True)
+                self._log_val(epoch, val_metrics)
                 if epoch % self.save_every == 0:
                     self._save_checkpoint(epoch)
         if self.gpu_id == 0:
@@ -188,10 +230,11 @@ class TrainerDDP:
 
 def main(rank, world_size, batch_size, cache_dir):
     ddp_setup(rank, world_size)
-    inputs, values, teacher, ranges, n_total, space = open_cache(cache_dir)
+    inputs, values, teacher, ranges, n_total, space, space_mask = open_cache(cache_dir)
     n_train = int(0.95 * n_total)
     train_loader = DistillLoader(cache_dir, inputs, values, teacher, ranges, 0, n_train, batch_size,
-                                 rank, world_size, chunk_size=CHUNK_SIZE, shuffle=True, extra=space)
+                                 rank, world_size, chunk_size=CHUNK_SIZE, shuffle=True, extra=space,
+                                 seed=SEED)
     val_loader = DistillLoader(cache_dir, inputs, values, teacher, ranges, n_train, n_total, batch_size,
                                rank, world_size, chunk_size=CHUNK_SIZE, shuffle=False, extra=space)
     if rank == 0:
@@ -205,7 +248,7 @@ def main(rank, world_size, batch_size, cache_dir):
             print('WARNING: no complete labelled training chunk — label more positions or lower '
                   'YOLAH_CHUNK_SIZE', flush=True)
 
-    net = NetPersp(PERSP_K, PERSP_THEM, space_mask=SPACE_MASK)
+    net = NetPersp(PERSP_K, PERSP_THEM, space_mask=space_mask)
     if os.path.isfile(LAST_MODEL):
         net.init_from_persp(torch.load(LAST_MODEL, map_location='cpu'))
         src = LAST_MODEL
@@ -220,7 +263,7 @@ def main(rank, world_size, batch_size, cache_dir):
         src = 'random init'
     if rank == 0:
         print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, '
-              f'space mask={SPACE_MASK:#06x}, {net.n_space} space features)', flush=True)
+              f'space mask={space_mask:#x}, groups={SPACE_GROUPS:#x}, {net.n_space} space features)', flush=True)
         print(net, flush=True)
         print(f'Parameters: {sum(p.numel() for p in net.parameters()):,}', flush=True)
 

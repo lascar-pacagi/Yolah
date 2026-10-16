@@ -1,6 +1,8 @@
 #ifndef SPACE_FEATURES_H
 #define SPACE_FEATURES_H
 #include <algorithm>
+#include <array>
+#include <tuple>
 #include <bit>
 #include <cstdint>
 #include "magic.h"
@@ -177,6 +179,172 @@ inline void compute(uint64_t us, uint64_t them, uint64_t free, uint8_t out[NB], 
             if (f0 < f1) late[1] += std::popcount(z);
         }
         put(0, LATE9, late[0]); put(1, LATE9, late[1]);
+    }
+}
+
+// ── Every candidate feature, for the ablation (doc/nnue_roadmap.qmd) ─────────
+// NB_ALL columns, integers in [0, 64] like the 16 above, which are columns
+// 0–15 unchanged. Each GROUP is one feature of the ablation (removed whole):
+//   G_CORR      CORR                     0, 8
+//   G_QDIST     Q1, Q2, Q3               1–3, 9–11
+//   G_QFIRST    QFIRST                   4, 12
+//   G_QW        QW                       5, 13
+//   G_LATE9     LATE9                    6, 14
+//   G_MOB       MOB                      7, 15
+//   G_INFL      influence (heuristic::influence): free squares reached first
+//               by king steps, both sides spreading at once; squares reached
+//               together are neutral and spread too                         16, 17
+//   G_CONNECT   per piece, each side's pieces most isolated first (us 18–37,
+//               them 38–57), 5 numbers each:
+//                 block   free squares it reaches by king steps
+//                 contact 16 × the other side's pieces in those blocks
+//                 king    64 / king steps to land next to one of them (0: never)
+//                 go      64 / queen moves to land next to one of them
+//                 come    64 / queen moves for one of them to land next to it
+//   G_ENCIRCLE  per side (us 58–74, them 75–91), the encirclement of ITS pieces
+//               by the other side's: 9 sums over its 4 pieces
+//                 gene    queen moves the other side's pieces take from them
+//                 contrib 4 × other-side pieces stopping one of their lines first
+//                 opp     4 × neighbours that are other-side pieces
+//                 att     2 × liberties the other side reaches in one queen move
+//                 lib     2 × liberties (free neighbours)
+//                 short   2 × lines with only 1 or 2 free squares
+//                 tight   16 × pieces with at most 1 liberty
+//                 shut    16 × pieces with no liberty
+//                 close   16 × pieces with 1 liberty the other side reaches
+//               then, its pieces most encircled first, 8 × att and 64 × close
+// The 1 / distance and the multipliers keep every column in [0, 64]; the
+// orders break ties on all the numbers, so the columns stay invariant under
+// the a <-> h mirror.
+enum Group { G_CORR, G_QDIST, G_QFIRST, G_QW, G_LATE9, G_MOB, G_INFL, G_CONNECT, G_ENCIRCLE, NB_GROUPS };
+constexpr int INFL0 = 16, CONNECT0 = 18, ENCIRCLE0 = 58, NB_ALL = 92;
+constexpr int CONNECT_PER_PIECE = 5, ENCIRCLE_PER_SIDE = 17;
+
+inline const char* group_name(int g) {
+    static const char* names[NB_GROUPS] = {"corr", "qdist", "qfirst", "qw", "late9", "mob", "infl", "connect", "encircle"};
+    return names[g];
+}
+
+inline int group_of(int col) {
+    if (col >= ENCIRCLE0) return G_ENCIRCLE;
+    if (col >= CONNECT0) return G_CONNECT;
+    if (col >= INFL0) return G_INFL;
+    switch (col % PER_SIDE) {
+        case CORR: return G_CORR;
+        case Q1: case Q2: case Q3: return G_QDIST;
+        case QFIRST: return G_QFIRST;
+        case QW: return G_QW;
+        case LATE9: return G_LATE9;
+        default: return G_MOB;
+    }
+}
+
+// Influence, as the player computes it (heuristic::influence): both sides
+// spread one king step at a time through the free squares; a square reached
+// by both at once is neutral, and the neutral squares spread too, blocking
+// both. Returns the free squares each side ends up owning.
+inline void influence(uint64_t us, uint64_t them, uint64_t free, int out[2]) {
+    auto step = [&](uint64_t b) { return shift_all_directions(b) & free; };
+    uint64_t own[2] = {us, them}, front[2] = {us, them}, neutral = 0, prev[2] = {0, 0};
+    while (prev[0] != own[0] || prev[1] != own[1]) {
+        front[0] = step(front[0]) & ~own[1];
+        front[1] = step(front[1]) & ~own[0];
+        neutral |= step(neutral) | (front[0] & front[1]);
+        front[0] &= ~neutral; front[1] &= ~neutral;
+        prev[0] = own[0]; prev[1] = own[1];
+        own[0] |= front[0]; own[1] |= front[1];
+    }
+    out[0] = std::popcount(own[0] & free);
+    out[1] = std::popcount(own[1] & free);
+}
+
+// The 8 lines of a piece: SLIDES[d](b, free) = the free squares it reaches in direction d.
+inline uint64_t (*const SLIDES[8])(uint64_t, uint64_t) = {
+    slide<NORTH>, slide<SOUTH>, slide<EAST>, slide<WEST>,
+    slide<NORTH_EAST>, slide<NORTH_WEST>, slide<SOUTH_EAST>, slide<SOUTH_WEST>};
+
+inline int inverse64(int d) { return d ? (64 + d / 2) / d : 0; }     // 64 / d rounded, 0 = never
+
+// Connectivity of one piece with the other side (`opp`): the 5 numbers above.
+inline std::array<int, CONNECT_PER_PIECE> connect_piece(uint64_t piece, uint64_t opp, uint64_t free,
+                                                         uint64_t opp_reach_levels[], int opp_nl) {
+    const uint64_t near_opp = shift_all_directions(opp);
+    // king steps through the free squares
+    uint64_t seen = 0, front = piece;
+    int king = 0;
+    for (int d = 1; (front = shift_all_directions(front) & free & ~seen); d++) {
+        if (!king && (front & near_opp)) king = d;
+        seen |= front;
+    }
+    int contact = 0;
+    for (uint64_t b = opp; b; b &= b - 1) contact += (shift_all_directions(b & -b) & seen) != 0;
+    // queen moves, going (from the piece) and coming (from the other side's pieces)
+    uint64_t lv[64];
+    const int nl = queen_levels(piece, free, lv);
+    int go = 0, come = 0;
+    for (int k = 0; k < nl && !go; k++) if (lv[k] & near_opp) go = k + 1;
+    const uint64_t near_me = shift_all_directions(piece);
+    for (int k = 0; k < opp_nl && !come; k++) if (opp_reach_levels[k] & near_me) come = k + 1;
+    return {std::popcount(seen), 16 * contact, inverse64(king), inverse64(go), inverse64(come)};
+}
+
+// Encirclement of one piece by the other side (`opp`): lib, opp, short, gene, contrib, att.
+struct Encircle { int lib, opp, shrt, gene, contrib, att; };
+inline Encircle encircle_piece(uint64_t piece, uint64_t opp, uint64_t free, uint64_t opp_reach1) {
+    const uint64_t around = shift_all_directions(piece);
+    Encircle e{std::popcount(around & free), std::popcount(around & opp), 0, 0, 0,
+               std::popcount(around & free & opp_reach1)};
+    for (auto line : SLIDES) {
+        const uint64_t real = line(piece, free), freed = line(piece, free | opp);   // opp as free squares
+        const int len = std::popcount(real);
+        e.shrt += len == 1 || len == 2;
+        e.gene += std::popcount(freed) - len;       // the squares they take from it, theirs included
+        e.contrib += (freed & opp) != 0;            // the first obstacle of this line is one of them
+    }
+    return e;
+}
+
+// All NB_ALL columns of the position seen from `us` (the side to move).
+inline void compute_all(uint64_t us, uint64_t them, uint64_t free, uint8_t out[NB_ALL]) {
+    compute(us, them, free, out);
+    for (int i = NB; i < NB_ALL; i++) out[i] = 0;
+    auto put = [&](int col, int v) { out[col] = uint8_t(std::clamp(v, 0, 64)); };
+    const uint64_t pcs[2] = {us, them};
+    int infl[2];
+    influence(us, them, free, infl);
+    put(INFL0, infl[0]); put(INFL0 + 1, infl[1]);
+    uint64_t lv[2][64];
+    const int nl[2] = {queen_levels(us, free, lv[0]), queen_levels(them, free, lv[1])};
+    for (int sd = 0; sd < 2; sd++) {
+        const uint64_t mine = pcs[sd], opp = pcs[1 - sd];
+        // connectivity, most isolated first (fewest contacts, smallest block, then the rest)
+        std::array<std::array<int, CONNECT_PER_PIECE>, 4> c{};
+        int n = 0;
+        for (uint64_t b = mine; b && n < 4; b &= b - 1) c[n++] = connect_piece(b & -b, opp, free, lv[1 - sd], nl[1 - sd]);
+        std::sort(c.begin(), c.begin() + n, [](const auto& x, const auto& y) {
+            return std::tie(x[1], x[0], x[2], x[3], x[4]) < std::tie(y[1], y[0], y[2], y[3], y[4]); });
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < CONNECT_PER_PIECE; j++) put(CONNECT0 + (sd * 4 + i) * CONNECT_PER_PIECE + j, c[i][j]);
+        // encirclement of my pieces by his
+        std::array<Encircle, 4> e{};
+        n = 0;
+        for (uint64_t b = mine; b && n < 4; b &= b - 1) e[n++] = encircle_piece(b & -b, opp, free, nl[1 - sd] ? lv[1 - sd][0] : 0);
+        int sum[9] = {};
+        for (int i = 0; i < n; i++) {
+            const Encircle& x = e[i];
+            const int v[9] = {x.gene, x.contrib, x.opp, x.att, x.lib, x.shrt, x.lib <= 1, x.lib == 0, x.lib == 1 && x.att};
+            for (int j = 0; j < 9; j++) sum[j] += v[j];
+        }
+        const int mult[9] = {1, 4, 4, 2, 2, 2, 16, 16, 16};
+        const int base = ENCIRCLE0 + sd * ENCIRCLE_PER_SIDE;
+        for (int j = 0; j < 9; j++) put(base + j, mult[j] * sum[j]);
+        // most encircled first (fewest liberties, most gene, most attacked liberties)
+        std::sort(e.begin(), e.begin() + n, [](const Encircle& x, const Encircle& y) {
+            return std::tie(x.lib, y.gene, y.att) < std::tie(y.lib, x.gene, x.att); });
+        for (int i = 0; i < n; i++) {
+            put(base + 9 + 2 * i, 8 * e[i].att);
+            put(base + 10 + 2 * i, 64 * (e[i].lib == 1 && e[i].att > 0));
+        }
     }
 }
 

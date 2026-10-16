@@ -6,6 +6,12 @@
 //       reads CACHE_DIR/inputs.u8 (N × 193: black, white, holes MSB first, turn)
 //       and writes CACHE_DIR/space.u8 (N × 16, row i = position i) and
 //       CACHE_DIR/space_meta.json. The features are from the side to move.
+//   ./space_features compute-all CACHE_DIR [--threads 16]
+//       every candidate feature (space::compute_all, N × 92, the ablation of
+//       doc/nnue_roadmap.qmd) → CACHE_DIR/space_all.u8 and space_all_meta.json
+//   ./space_features dump GAMES_DIR OUT [--max-positions N] [--stride S]
+//       positions of data/games with their 92 columns (per record: us, them,
+//       free as 3 uint64, then 92 bytes), checked by nnue/space_reference.py
 //   ./space_features bench CACHE_DIR [--n 200000]
 //       cost of the features per position: all, without the corrected flood
 //       fill, the corrected flood fill alone.
@@ -17,6 +23,7 @@
 #include "magic.h"
 #include "zobrist.h"
 #include "space_features.h"
+#include "heuristic.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -44,11 +51,12 @@ static uint64_t bits(const uint8_t* row) {      // MSB first: byte i is square 6
     return b;
 }
 
-static void features_of_row(const uint8_t* row, uint8_t out[space::NB], uint32_t mask = space::ALL) {
+static void features_of_row(const uint8_t* row, uint8_t* out, uint32_t mask = space::ALL, bool all = false) {
     const uint64_t black = bits(row), white = bits(row + 64), holes = bits(row + 128);
     const bool white_to_move = row[192] != 0;
     const uint64_t us = white_to_move ? white : black, them = white_to_move ? black : white;
-    space::compute(us, them, ~(black | white | holes), out, mask);
+    if (all) space::compute_all(us, them, ~(black | white | holes), out);
+    else space::compute(us, them, ~(black | white | holes), out, mask);
 }
 
 struct Mapped {
@@ -68,25 +76,26 @@ struct Mapped {
     ~Mapped() { munmap((void*)data, size); }
 };
 
-static int compute(const string& dir, int threads) {
+static int compute(const string& dir, int threads, bool all) {
     Mapped in(dir + "/inputs.u8");
     const size_t n = in.size / ROW;
     if (n * ROW != in.size) { std::cerr << "inputs.u8: size not a multiple of 193\n"; return 1; }
-    const string out_path = dir + "/space.u8";
+    const int W = all ? space::NB_ALL : space::NB;
+    const string stem = all ? "space_all" : "space", out_path = dir + "/" + stem + ".u8";
     const int fd = open(out_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0 || ftruncate(fd, off_t(n) * space::NB) != 0) { std::perror(out_path.c_str()); return 1; }
+    if (fd < 0 || ftruncate(fd, off_t(n) * W) != 0) { std::perror(out_path.c_str()); return 1; }
     constexpr size_t BLOCK = 1 << 18;
     std::atomic<size_t> next{0}, done{0};
     const auto t0 = std::chrono::steady_clock::now();
     vector<std::thread> pool;
     for (int t = 0; t < threads; t++)
         pool.emplace_back([&] {
-            vector<uint8_t> buf(BLOCK * space::NB);
+            vector<uint8_t> buf(BLOCK * W);
             for (size_t b; (b = next++) * BLOCK < n;) {
                 const size_t lo = b * BLOCK, hi = std::min(n, lo + BLOCK);
-                for (size_t i = lo; i < hi; i++) features_of_row(in.data + i * ROW, &buf[(i - lo) * space::NB]);
-                const size_t bytes = (hi - lo) * space::NB;
-                if (pwrite(fd, buf.data(), bytes, off_t(lo) * space::NB) != ssize_t(bytes)) { std::perror("pwrite"); std::exit(1); }
+                for (size_t i = lo; i < hi; i++) features_of_row(in.data + i * ROW, &buf[(i - lo) * W], space::ALL, all);
+                const size_t bytes = (hi - lo) * W;
+                if (pwrite(fd, buf.data(), bytes, off_t(lo) * W) != ssize_t(bytes)) { std::perror("pwrite"); std::exit(1); }
                 const size_t d = done += hi - lo;
                 if (t == 0 && b % 64 == 0) {
                     const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -97,32 +106,54 @@ static int compute(const string& dir, int threads) {
     for (auto& t : pool) t.join();
     close(fd);
     const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    std::ofstream meta(dir + "/space_meta.json");
-    meta << "{\n  \"n_positions\": " << n << ",\n  \"path\": \"space.u8\",\n  \"dtype\": \"uint8\",\n"
-         << "  \"shape\": [" << n << ", " << space::NB << "],\n  \"features\": [";
+    std::ofstream meta(dir + "/" + stem + "_meta.json");
+    meta << "{\n  \"n_positions\": " << n << ",\n  \"path\": \"" << stem << ".u8\",\n  \"dtype\": \"uint8\",\n"
+         << "  \"shape\": [" << n << ", " << W << "],\n  \"features\": [";
     for (int i = 0; i < space::NB; i++)
         meta << (i ? ", " : "") << "\"" << (i < space::PER_SIDE ? "us_" : "them_") << space::name(i) << "\"";
+    if (all) {
+        meta << "],\n  \"groups\": [";
+        for (int i = 0; i < W; i++) meta << (i ? ", " : "") << space::group_of(i);
+        meta << "],\n  \"group_names\": [";
+        for (int g = 0; g < space::NB_GROUPS; g++) meta << (g ? ", " : "") << "\"" << space::group_name(g) << "\"";
+    }
     meta << "],\n  \"scale\": 64,\n  \"source\": \"test/space_features_main.cpp, nnue/space_features.h\"\n}\n";
     std::fprintf(stderr, "\n");
-    std::printf("%zu positions in %.1f s → %s, %s/space_meta.json\n", n, s, out_path.c_str(), dir.c_str());
+    std::printf("%zu positions in %.1f s → %s, %s/%s_meta.json\n", n, s, out_path.c_str(), dir.c_str(), stem.c_str());
     return 0;
 }
 
 static int bench(const string& dir, size_t n_max) {
     Mapped in(dir + "/inputs.u8");
     const size_t n = std::min(n_max, in.size / ROW);
-    uint8_t out[space::NB];
+    uint8_t out[space::NB_ALL];
     uint64_t sink = 0;
     const uint32_t corr_only = (1u << space::CORR) | (1u << (space::PER_SIDE + space::CORR));
-    for (auto [label, mask] : {std::pair{"all 16 features", space::ALL}, {"without corr (14)", space::NO_CORR},
-                               {"corr only (2)", corr_only}}) {
+    auto time = [&](const char* label, auto&& f) {
         const auto t0 = std::chrono::steady_clock::now();
         for (int rep = 0; rep < 3; rep++)
-            for (size_t i = 0; i < n; i++) { features_of_row(in.data + i * ROW, out, mask); sink += out[i & 15]; }
+            for (size_t i = 0; i < n; i++) { f(in.data + i * ROW); sink += out[i & 15]; }
         const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         std::printf("  %-20s %7.1f ns per position (row decoding included)%s\n", label, 1e9 * s / (3.0 * n),
                     sink == 12345 ? " " : "");
-    }
+    };
+    for (auto [label, mask] : {std::pair{"all 16 features", space::ALL}, {"without corr (14)", space::NO_CORR},
+                               {"corr only (2)", corr_only}})
+        time(label, [&](const uint8_t* r) { features_of_row(r, out, mask); });
+    time("all 92 (ablation)", [&](const uint8_t* r) { features_of_row(r, out, space::ALL, true); });
+    auto decode = [&](const uint8_t* r, auto&& f) {
+        const uint64_t black = bits(r), white = bits(r + 64), holes = bits(r + 128);
+        const bool w = r[192] != 0;
+        f(w ? white : black, w ? black : white, ~(black | white | holes));
+    };
+    time("influence (2)", [&](const uint8_t* r) { decode(r, [&](uint64_t u, uint64_t t, uint64_t f) {
+        int v[2]; space::influence(u, t, f, v); out[0] = uint8_t(v[0]); }); });
+    time("connect (40)", [&](const uint8_t* r) { decode(r, [&](uint64_t u, uint64_t t, uint64_t f) {
+        uint64_t lv[64]; const int nl = space::queen_levels(t, f, lv);
+        for (uint64_t b = u; b; b &= b - 1) out[0] += uint8_t(space::connect_piece(b & -b, t, f, lv, nl)[0]); }); });
+    time("encircle (34)", [&](const uint8_t* r) { decode(r, [&](uint64_t u, uint64_t t, uint64_t f) {
+        const uint64_t r1 = space::queen_reach(t, f);
+        for (uint64_t b = u; b; b &= b - 1) out[0] += uint8_t(space::encircle_piece(b & -b, t, f, r1).gene); }); });
     // the row decoding alone
     const auto t0 = std::chrono::steady_clock::now();
     for (int rep = 0; rep < 3; rep++)
@@ -189,6 +220,47 @@ static int make_cache(const string& games_dir, const string& out_dir, size_t max
     return 0;
 }
 
+static int dump(const string& games_dir, const string& out_path, size_t max_positions, size_t stride) {
+    vector<string> files;
+    for (const auto& d : fs::directory_iterator(games_dir)) if (d.is_regular_file()) files.push_back(d.path());
+    std::sort(files.begin(), files.end());
+    std::ofstream out(out_path, std::ios::binary);
+    size_t n = 0, games = 0, influence_diff = 0;
+    for (const string& path : files) {
+        std::ifstream in(path, std::ios::binary);
+        vector<uint8_t> e((std::istreambuf_iterator<char>(in)), {});
+        for (size_t i = 0; i + 1 < e.size() && n < max_positions; games++) {
+            const int len = e[i], nb_random = e[i + 1];
+            if (i + 2 * len + 4 > e.size()) break;
+            Yolah y;
+            for (int k = 0; k <= len && n < max_positions; k++) {
+                if (k >= nb_random && (k + games) % stride == 0 && !y.game_over()) {
+                    const uint8_t me = y.current_player();
+                    const uint64_t b[3] = {y.bitboard(me), y.bitboard(1 - me), y.free_squares()};
+                    uint8_t f[space::NB_ALL];
+                    space::compute_all(b[0], b[1], b[2], f);
+                    {   // the influence must be the player's
+                        const auto [bi, wi] = heuristic::influence(y);
+                        const uint64_t mine = me == Yolah::BLACK ? bi : wi, his = me == Yolah::BLACK ? wi : bi;
+                        if (f[space::INFL0] != std::popcount(mine & b[2]) || f[space::INFL0 + 1] != std::popcount(his & b[2]))
+                            influence_diff++;
+                    }
+                    out.write((const char*)b, sizeof b);
+                    out.write((const char*)f, sizeof f);
+                    n++;
+                }
+                if (k == len) break;
+                y.play(Move(Square(e[i + 2 + 2 * k]), Square(e[i + 3 + 2 * k])));
+            }
+            i += 2 * len + 4;
+        }
+        if (n >= max_positions) break;
+    }
+    std::printf("%zu positions → %s (24 + %d bytes each); influence differs from heuristic::influence in %zu\n",
+                n, out_path.c_str(), space::NB_ALL, influence_diff);
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
@@ -197,10 +269,12 @@ int main(int argc, char* argv[]) {
         for (int i = 2; i + 1 < argc; i++) if (argv[i] == name) return size_t(std::stoull(argv[i + 1]));
         return def;
     };
-    if (cmd == "compute" && argc >= 3) return compute(argv[2], int(opt("--threads", 16)));
+    if (cmd == "compute" && argc >= 3) return compute(argv[2], int(opt("--threads", 16)), false);
+    if (cmd == "compute-all" && argc >= 3) return compute(argv[2], int(opt("--threads", 16)), true);
+    if (cmd == "dump" && argc >= 4) return dump(argv[2], argv[3], opt("--max-positions", 100000), opt("--stride", 7));
     if (cmd == "bench" && argc >= 3) return bench(argv[2], opt("--n", 200000));
     if (cmd == "make-cache" && argc >= 4) return make_cache(argv[2], argv[3], opt("--max-positions", 4u << 20), opt("--stride", 1));
-    std::cerr << "usage: space_features compute CACHE_DIR [--threads T] | bench CACHE_DIR [--n N] |"
+    std::cerr << "usage: space_features compute|compute-all CACHE_DIR [--threads T] | dump GAMES_DIR OUT | bench CACHE_DIR [--n N] |"
                  " make-cache GAMES_DIR OUT_DIR [--max-positions N] [--stride S]\n";
     return 2;
 }

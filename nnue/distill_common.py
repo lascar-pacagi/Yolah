@@ -189,9 +189,10 @@ class DistillLoader:
 
     def __init__(self, cache_dir, inputs, values, teacher, ranges, lo, hi, batch_size,
                  rank, world_size, scale=1.0, chunk_size=CHUNK_SIZE, shuffle=True,
-                 pin_memory=True, queue_depth=BATCH_QUEUE_DEPTH, extra=None):
+                 pin_memory=True, queue_depth=BATCH_QUEUE_DEPTH, extra=None, seed=0):
         self.inputs, self.values, self.teacher = inputs, values, teacher
         self.extra = extra
+        self.seed = seed        # another order of the chunks and positions (0: the historical one)
         self.batch_size, self.rank, self.world_size = batch_size, rank, world_size
         self.scale, self.chunk_size, self.shuffle = scale, chunk_size, shuffle
         self.pin_memory, self.queue_depth = pin_memory, queue_depth
@@ -225,7 +226,7 @@ class DistillLoader:
                 tea = np.array(self.teacher[start:end])
                 ext = np.array(self.extra[start:end]) if self.extra is not None else None
                 if self.shuffle:
-                    rng = np.random.default_rng((self.epoch * 1_000_003 + start) & 0xFFFFFFFF)
+                    rng = np.random.default_rng((self.epoch * 1_000_003 + start + self.seed * 7_919_993) & 0xFFFFFFFF)
                     perm = rng.permutation(self.chunk_size)
                 else:
                     perm = np.arange(self.chunk_size)
@@ -249,7 +250,7 @@ class DistillLoader:
     def __iter__(self):
         order = list(range(len(self.my_chunks)))
         if self.shuffle:
-            random.Random(self.epoch).shuffle(order)
+            random.Random(self.epoch + 1000 * self.seed).shuffle(order)
         q = queue_mod.Queue(maxsize=self.queue_depth)
         t = threading.Thread(target=self._producer, args=(order, q), daemon=True)
         t.start()

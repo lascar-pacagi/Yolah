@@ -27,6 +27,14 @@
 #   CONTINUE=1                         no space feature, k8_them trained the same
 #                                      epochs more: the fair reference → k8_them_cont
 # (defaults for these three: 10 epochs, lr 1e-4)
+# Ablation of the candidate features (doc/nnue_roadmap.qmd; plan and report:
+# nnue/ablation.py, which writes these commands; needs CACHE_DIR/space_all.u8
+# from `COMMAND=compute-all nnue/space_features.sh`):
+#   YOLAH_SPACE_GROUPS=0x1ff           the groups fc2 reads (bit g = group g of
+#                                      space_features.h); 0 = none (= CONTINUE)
+#   YOLAH_SEED=1                       another order of the data (noise of a run)
+#   → variant k8_them_g<groups>[_s<seed>], same step-2 start and lr; the
+#   ablation sets YOLAH_NB_EPOCHS=5 and MODEL_ROOT=…/models_ablation.
 # Each variant writes to its own directory under MODEL_ROOT (the outputs of
 # a variant never overwrite those of another, nor the original models).
 # ────────────────────────────────────────────────────────────────────────────
@@ -54,8 +62,10 @@ YOLAH_PERSP_THEM="${YOLAH_PERSP_THEM:-0}"
 CONTROL="${CONTROL:-0}"
 CONTINUE="${CONTINUE:-0}"
 YOLAH_SPACE_MASK="${YOLAH_SPACE_MASK:-0}"
+YOLAH_SPACE_GROUPS="${YOLAH_SPACE_GROUPS:-}"      # empty: not the ablation
+YOLAH_SEED="${YOLAH_SEED:-0}"
 STEP2=0
-if [[ "${YOLAH_SPACE_MASK}" != "0" || "${CONTINUE}" == "1" ]]; then STEP2=1; fi
+if [[ "${YOLAH_SPACE_MASK}" != "0" || "${CONTINUE}" == "1" || -n "${YOLAH_SPACE_GROUPS}" ]]; then STEP2=1; fi
 if [[ "${STEP2}" == "1" ]]; then
     # step 2 fine-tunes the trained k8_them network
     INIT_MODEL="${INIT_MODEL_STEP2:-${SRC_DIR}/../models/nnue_persp_k${YOLAH_PERSP_K}$([[ "${YOLAH_PERSP_THEM}" == "1" ]] && echo _them || true)_distill.pt}"
@@ -65,12 +75,15 @@ fi
 YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-20}"
 YOLAH_DISTILL_ALPHA="${YOLAH_DISTILL_ALPHA:-0.8}"
 YOLAH_LR="${YOLAH_LR:-3e-4}"
-case "${YOLAH_SPACE_MASK}" in
+if [[ -n "${YOLAH_SPACE_GROUPS}" ]]; then
+    YOLAH_NAME_SUFFIX="$(printf '_g%03x' "$(( YOLAH_SPACE_GROUPS ))")"
+    if [[ "${YOLAH_SEED}" != "0" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_s${YOLAH_SEED}"; fi
+else case "${YOLAH_SPACE_MASK}" in
     0)             YOLAH_NAME_SUFFIX="$([[ "${CONTINUE}" == "1" ]] && echo _cont || true)" ;;
     65535|0xffff|0xFFFF) YOLAH_NAME_SUFFIX="_space" ;;
     65278|0xfefe|0xFEFE) YOLAH_NAME_SUFFIX="_spacelite" ;;
     *)             YOLAH_NAME_SUFFIX="_space${YOLAH_SPACE_MASK}" ;;
-esac
+esac; fi
 
 if [[ "${CONTROL}" == "1" ]]; then
     VARIANT="control193"
@@ -98,6 +111,11 @@ if [[ "${YOLAH_SPACE_MASK}" != "0" ]]; then
         [[ -e "$f" ]] || { echo "missing: $f (run nnue/space_features.sh first)" >&2; exit 1; }
     done
 fi
+if [[ -n "${YOLAH_SPACE_GROUPS}" && "$(( YOLAH_SPACE_GROUPS ))" != "0" ]]; then
+    for f in "${CACHE_DIR}/space_all.u8" "${CACHE_DIR}/space_all_meta.json"; do
+        [[ -e "$f" ]] || { echo "missing: $f (run COMMAND=compute-all nnue/space_features.sh first)" >&2; exit 1; }
+    done
+fi
 # The starting weights, copied into the variant's directory (/mnt in the container).
 INIT_NAME="$([[ "${STEP2}" == "1" ]] && echo init_persp.pt || echo init_193_distill.pt)"
 [[ -e "${MODEL_DIR}/${INIT_NAME}" ]] || cp "${INIT_MODEL}" "${MODEL_DIR}/${INIT_NAME}"
@@ -109,7 +127,7 @@ echo "  Cache    : ${CACHE_DIR}"
 echo "  Models   : ${MODEL_DIR}"
 echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
-echo "  Space    : mask ${YOLAH_SPACE_MASK}  continue=${CONTINUE}"
+echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none}  seed=${YOLAH_SEED}  continue=${CONTINUE}"
 echo "════════════════════════════════════════════════════════════════"
 
 singularity exec --nv \
@@ -120,6 +138,8 @@ singularity exec --nv \
     --env "YOLAH_MODEL_DIR=/mnt/" \
     --env "YOLAH_INIT_MODEL=/mnt/${INIT_NAME}" \
     --env "YOLAH_SPACE_MASK=${YOLAH_SPACE_MASK}" \
+    --env "YOLAH_SPACE_GROUPS=${YOLAH_SPACE_GROUPS:-0}" \
+    --env "YOLAH_SEED=${YOLAH_SEED}" \
     --env "YOLAH_NAME_SUFFIX=${YOLAH_NAME_SUFFIX}" \
     --env "YOLAH_PERSP_K=${YOLAH_PERSP_K}" \
     --env "YOLAH_PERSP_THEM=${YOLAH_PERSP_THEM}" \

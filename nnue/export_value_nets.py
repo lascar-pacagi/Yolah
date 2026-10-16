@@ -119,6 +119,9 @@ def export_persp(path, out_dir):
     from nnue_persp import load_persp
     name = os.path.splitext(os.path.basename(path))[0]
     net = load_persp(path)
+    if net.space_mask >> 16:
+        sys.exit(f"{path}: space columns beyond the first 16 (ablation features of space_all.u8): "
+                 f"not supported by the C++ NNUE_Persp yet")
     w8 = lambda what: quantizer(SCALE, -127, 127, f"{name} {what}")                    # int8 weights
     b16 = lambda what, scale: quantizer(scale, -32768, 32767, f"{name} {what}")        # int16 biases
     with open(os.path.join(out_dir, name + ".quantized.txt"), "w") as f:

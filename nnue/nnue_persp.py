@@ -35,6 +35,12 @@ int8 at scale 64 is the integer itself: no quantization error). fc2 sees
 [h1(us), h1(them), space]; the space columns start at 0, so a network
 initialised from one without them (init_from_persp) gives the same values.
 
+All candidate features (YOLAH_SPACE_GROUPS, the ablation): space_all.u8
+(`space_features compute-all`, N × 92, columns 0–15 = space.u8) appended
+instead; the mask then has up to 92 bits (bit i = column i), and the selected
+columns are saved with the weights (space_cols_t). Only masks within the first
+16 columns can be exported to C++ for now.
+
 Data. The cache of preprocess_nnue.py (193 inputs: black, white, holes, turn)
 and its teacher labels are used as they are: `perspective()` converts a batch
 on the GPU. The targets (z and the teacher value) are already for the side to
@@ -63,8 +69,8 @@ def bucket_of(holes, k):
 
 
 def space_columns(mask):
-    """The space features selected by a mask (bit i = feature i), in order."""
-    return [i for i in range(SPACE_SIZE) if mask >> i & 1]
+    """The space features selected by a mask (bit i = column i), in order."""
+    return [i for i in range(mask.bit_length()) if mask >> i & 1]
 
 
 class NetPersp(nn.Module):
@@ -84,10 +90,14 @@ class NetPersp(nn.Module):
         self.w4 = nn.Parameter(torch.stack([m.weight.data[0] for m in fc4]))        # (K, l3)
         self.b4 = nn.Parameter(torch.stack([m.bias.data[0] for m in fc4]))          # (K,)
         self.register_buffer("mirror", mirror_index(), persistent=False)
-        self.register_buffer("space_cols", torch.tensor(space_columns(self.space_mask), dtype=torch.long),
+        cols = space_columns(self.space_mask)
+        self.register_buffer("space_idx", torch.tensor(cols, dtype=torch.long) + CACHE_INPUT_SIZE,
                              persistent=False)
-        # saved with the weights: export and load_persp read the mask from it
-        self.register_buffer("space_mask_t", torch.tensor(self.space_mask, dtype=torch.long))
+        # saved with the weights: export and load_persp read the columns from them
+        # (space_mask_t: the mask when it fits in 63 bits, else −1; space_cols_t: the columns)
+        self.register_buffer("space_mask_t", torch.tensor(self.space_mask if self.space_mask < 1 << 63 else -1,
+                                                          dtype=torch.long))
+        self.register_buffer("space_cols_t", torch.tensor(cols, dtype=torch.long))
 
     def perspective(self, x):
         """Cache batch (bs, 193) → (us, them, bucket)."""
@@ -106,7 +116,7 @@ class NetPersp(nn.Module):
         if self.them:
             h1 = torch.cat([h1, torch.clamp(self.fc1(them), 0.0, 1.0)], dim=1)
         if self.n_space:
-            space = x[:, CACHE_INPUT_SIZE:CACHE_INPUT_SIZE + SPACE_SIZE][:, self.space_cols] / SPACE_SCALE
+            space = x[:, self.space_idx] / SPACE_SCALE
             h1 = torch.cat([h1, space.to(h1.dtype)], dim=1)
         h2 = torch.clamp(self.fc2(h1), 0.0, 1.0).view(-1, self.k, self.l2_size)          # (bs, K, l2)
         h3 = torch.clamp(torch.einsum('bki,koi->bko', h2, self.w3) + self.b3, 0.0, 1.0)  # (bs, K, l3)
@@ -170,7 +180,10 @@ def config_of(sd):
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
     k, l3, l2 = sd["w3"].shape
     l1 = sd["fc1.weight"].shape[0]
-    mask = int(sd["space_mask_t"]) if "space_mask_t" in sd else 0
+    if "space_cols_t" in sd:
+        mask = sum(1 << int(c) for c in sd["space_cols_t"])
+    else:
+        mask = int(sd["space_mask_t"]) if "space_mask_t" in sd else 0
     n_space = len(space_columns(mask))
     them = sd["fc2.weight"].shape[1] - n_space == 2 * l1
     return k, them, l1, l2, l3, mask
@@ -185,5 +198,6 @@ def load_persp(path, map_location="cpu"):
     k, them, l1, l2, l3, mask = config_of(sd)
     net = NetPersp(k, them, l1, l2, l3, mask)
     sd.setdefault("space_mask_t", torch.tensor(mask, dtype=torch.long))   # networks saved before step 2
+    sd.setdefault("space_cols_t", torch.tensor(space_columns(mask), dtype=torch.long))   # ... before the ablation
     net.load_state_dict(sd)
     return net
