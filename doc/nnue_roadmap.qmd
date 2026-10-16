@@ -835,6 +835,467 @@ Au passage, dans `nnue/nnue_quantized.h:24`, `h2_to_h3` est déclaré avec `H1_S
 seuls 64 × 32 = 2 Ko servent. Ces octets ne sont jamais lus, donc ils ne coûtent rien en cache, mais la taille
 est fausse et sera à corriger en même temps.
 
+# Les caractéristiques candidates
+
+La section « Des entrées globales après l'accumulateur » posait le principe : quelques nombres calculés sur
+la position, ajoutés à l'entrée de la deuxième couche. Ce chapitre décrit précisément chacun des nombres
+candidats : l'idée de jeu qu'il traduit, sa définition exacte, un schéma, le code qui le calcule, ce que les
+mesures en ont dit et ce qu'il coûte. Le chapitre suivant décrit l'ablation qui choisira lesquels garder.
+
+## Conventions
+
+**Moi et lui.** Toutes les caractéristiques sont calculées du point de vue du joueur au trait (« moi », pions
+noirs pleins sur les schémas) contre l'autre joueur (« lui », pions blancs). Chaque caractéristique existe
+deux fois : une valeur pour moi, une pour lui. Le réseau les reçoit toutes deux et apprend lui-même comment les
+combiner (une différence, ou un poids plus fort pour l'une : l'étude de territoire a montré que ce que je
+retire à l'adversaire compte souvent plus que ce que je garde).
+
+**Des entiers de 0 à 64.** Chaque colonne est un entier borné à $[0, 64]$, donné au réseau sous la forme
+$\text{valeur}/64$. En C++, l'entrée int8 à l'échelle 64 *est* cet entier : le réseau quantifié voit
+exactement ce que le réseau flottant a appris, sans erreur de quantification. Les petites grandeurs (un
+nombre de pièces, de 0 à 4) sont multipliées pour occuper la plage (×16), et les distances sont inversées
+($64/d$, 0 si jamais) : une pièce proche donne un grand nombre, une pièce injoignable donne 0.
+
+**Invariance par le miroir.** La vue des Blancs est le plateau retourné a ↔ h. Chaque colonne doit donc
+donner la même valeur sur une position et sur son miroir. C'est le cas : les mesures n'utilisent que des
+distances et des comptes, et quand des pièces sont triées, les égalités sont départagées par toutes les
+valeurs (vérifié sur 500 positions).
+
+**Comment les mesures ont été faites.** `test/territory_study_main.cpp` calcule les quantités sur les
+positions de `data/games` (une sur 20, 12 millions de positions), avec la valeur du réseau 193 distillé. Les
+scripts `nnue/*_study.py` ajustent par moindres carrés, sur la moitié des parties, la valeur du réseau (un
+polynôme de degré 3) plus la quantité, et mesurent sur l'autre moitié ce que la quantité **ajoute** au R²
+(en points de %). Deux cibles : les points que le joueur au trait marquera encore moins ceux de l'adversaire
+(« points »), et le résultat de la partie (« résultat »). Toutes les quantités et les cibles sont centrées
+par (nombre de cases libres, couleur au trait) : on compare des positions du même stade de la partie. Les
+phases sont définies par le nombre de cases libres : ouverture 40–56, milieu 20–39, finale 10–19 et 0–9.
+
+**La vérification.** `space::compute_all` (`nnue/space_features.h`) calcule les 92 colonnes avec des
+bitboards. `nnue/space_reference.py` les recalcule autrement, case par case en Python, sans code commun :
+les deux donnent les mêmes 92 colonnes sur 20 000 positions de parties réelles
+(`space_features dump` puis `python3 space_reference.py`). Tous les nombres des schémas de ce chapitre sont
+calculés par cette référence (`doc/figs/make_feature_figs.py`). Les extraits de code sont condensés du code
+réel, sans en changer le calcul.
+
+## Deux outils communs : les blocs et les coups de dame
+
+**Les blocs.** Un bloc est une composante connexe des cases libres par pas de roi (8 voisines). Une pièce ne
+pourra jamais atteindre que les blocs qui touchent sa case : une dame glisse de case libre en case libre, et
+la case qu'elle quitte devient un trou, qui ne se rouvre jamais. Un remplissage par décalages de bitboards
+trouve chaque bloc :
+
+```cpp
+// nnue/space_features.h — les blocs de cases libres
+for (uint64_t rest = free; rest;) {
+    uint64_t c = rest & -rest, prev = 0;            // une case libre au hasard...
+    while (c != prev) { prev = c; c |= shift_all_directions(c) & free; }   // ... et tout son bloc
+    comps[nc] = c;
+    size[nc++] = std::popcount(c);
+    rest &= ~c;
+}
+```
+
+**Les coups de dame.** `queen_levels` donne, niveau par niveau, les cases libres que des pièces atteignent en
+1, 2, 3… coups de dame. Chaque niveau se calcule pour toutes les cases du niveau précédent à la fois : dans
+chaque direction, un *remplissage occlus* (Kogge-Stone) fait glisser l'ensemble à travers les cases libres en
+trois doublements (1, 2 puis 4 pas), au lieu d'avancer case par case.
+
+```cpp
+// toutes les cases libres à un coup de dame de gen dans la direction D
+template <Direction D> uint64_t slide(uint64_t gen, uint64_t free) {
+    uint64_t pro = free;
+    gen |= pro & shift<D>(gen);                         // 1 pas
+    pro &= shift<D>(pro);
+    gen |= pro & shift<D>(shift<D>(gen));               // 2 pas de plus
+    pro &= shift<D>(shift<D>(pro));
+    gen |= pro & shift<D>(shift<D>(shift<D>(shift<D>(gen))));   // 4 de plus
+    return shift<D>(gen) & free;                        // la dernière case atteinte
+}
+
+int queen_levels(uint64_t pieces, uint64_t free, uint64_t levels[64]) {
+    int n = 0;
+    for (uint64_t seen = 0, front = pieces, next;
+         (next = queen_reach(front, free) & ~seen); front = next) {   // queen_reach = les 8 slide
+        levels[n++] = next;                             // les cases à n coups exactement
+        seen |= next;
+    }
+    return n;
+}
+```
+
+Le résultat a été vérifié identique à un parcours en largeur case par case avec les tables magiques, sur
+1,5 million de positions. Il coûte environ 80 ns pour les deux camps et tous les niveaux.
+
+## Le flood fill corrigé (CORR, 2 colonnes)
+
+**L'idée.** Le territoire qu'un camp peut encore occuper. Le flood fill classique compte toutes les cases
+libres des blocs que mes pièces touchent. Mais une pièce posée entre deux blocs doit **choisir** : en entrant
+dans l'un, elle laisse un trou derrière elle et ne pourra plus jamais atteindre l'autre (sauf si une autre de
+mes pièces le touche aussi).
+
+**La définition.** Chaque pièce choisit **un** des blocs qui la touchent (ou aucun), deux pièces ne peuvent
+pas compter le même bloc deux fois, et CORR est le plus grand total possible de cases libres. Avec 4 pièces et
+quelques blocs chacune, une recherche exhaustive suffit.
+
+![Le flood fill corrigé en finale. La pièce en d6 touche le bloc de 6 et celui de 8 : elle ne peut en garder qu'un. Celle en h3 touche le bloc de 4 et celui de 2. Les pièces b4 et c1 se partagent le bloc de 13. Flood fill : 13 + 4 + 2 + 8 + 6 = 33 cases ; corrigé : 13 + 4 + 8 = 25.](figs/fig-feat-corr.png){#fig-feat-corr width=80%}
+
+```cpp
+// chaque pièce : l'ensemble des blocs qu'elle touche (un bit par bloc)
+for (uint64_t b = pieces; b; b &= b - 1) {
+    const uint64_t around = shift_all_directions(b & -b);
+    uint64_t o = 0;
+    for (int i = 0; i < nc; i++) if (comps[i] & around) o |= uint64_t(1) << i;
+    options[np++] = o;
+}
+// essai de tous les choix (aucun bloc, ou un bloc pas encore pris)
+auto rec = [&](auto&& self, int k, uint64_t covered) -> void {
+    if (k == np) { best = std::max(best, total_size(covered)); return; }
+    self(self, k + 1, covered);
+    for (uint64_t o = options[k] & ~covered; o; o &= o - 1) self(self, k + 1, covered | (o & -o));
+};
+rec(rec, 0, 0);
+```
+
+**Ce que les mesures ont dit.** Inutile en ouverture (le plateau est d'un seul bloc). En finale 10–19, c'est
+la meilleure mesure isolée du territoire : R² des points 70 % contre 47 % pour le flood fill classique ; la
+correction change le compte dans 53 % des positions. Ajouté au réseau : +18,6 points de R² (points) et +1,9
+(résultat) en finale 10–19, +0,9 / +0,2 en milieu de partie.
+
+**Le coût.** C'est la plus chère des 16 premières colonnes : environ 185 ns pour les deux camps (les blocs,
+puis la recherche exhaustive).
+
+## La distance de dame (Q1, Q2, Q3 et QW, 8 colonnes)
+
+**L'idée.** Venue du jeu : être capable de couvrir beaucoup de cases en peu de coups. Une pièce qui atteint
+20 cases en un coup et 40 en deux contrôle plus d'espace qu'une pièce enfermée.
+
+**La définition.** Avec les niveaux de `queen_levels` pour toutes mes pièces ensemble :
+
+- **Q1, Q2, Q3** : le nombre de cases libres que j'atteins en au plus 1, 2 et 3 coups de dame ;
+- **QW** : la couverture pondérée $\left\lfloor \sum_k n_k \, 2^{-(k-1)} \right\rfloor$, où $n_k$ est le
+  nombre de cases atteintes en exactement $k$ coups (pour $k \le 6$). Une case à 1 coup vaut 1, à 2 coups ½,
+  à 3 coups ¼ : QW résume toute la courbe en un nombre.
+
+![Le nombre de coups de dame qu'il me faut pour atteindre chaque case libre (toutes mes pièces ensemble). Q1 compte les cases marquées 1, Q2 celles marquées 1 ou 2, etc. MOB (plus loin) compte les mêmes cases à 1 coup, mais une fois par pièce qui peut y aller.](figs/fig-feat-queen.png){#fig-feat-queen width=72%}
+
+```cpp
+uint64_t cover = 0;
+int w = 0, q[3] = {0, 0, 0};
+for (int k = 0; k < nl; k++) {
+    cover |= lv[k];
+    if (k < 3) q[k] = std::popcount(cover);             // Q1, Q2, Q3
+    if (k < 6) w += std::popcount(lv[k]) << (5 - k);    // 32, 16, 8... = 2^-k en virgule fixe
+}
+put(Q1, q[0]); put(Q2, q[1]); put(Q3, q[2]); put(QW, w >> 5);
+```
+
+**Ce que les mesures ont dit.** Les cinq mesures de dame ensemble (avec QFIRST, ci-dessous) ajoutent au réseau
++2,1 / +0,5 en milieu de partie. En finale 10–19, flood fill corrigé et distance de dame ensemble apportent
++27,0 / +3,2 : plus que flood fill corrigé et influence (+22,3 / +2,0). Une fois la distance de dame présente,
+l'influence n'ajoute plus que +0,5.
+
+## Les cases atteintes en premier (QFIRST, 2 colonnes)
+
+**L'idée.** Une case n'est vraiment à moi que si j'y arrive avant lui.
+
+**La définition.** QFIRST compte les cases libres que j'atteins en **strictement moins** de coups de dame que
+lui (une case qu'il n'atteint jamais compte si je l'atteins). Les cases à égalité ne sont à personne.
+
+![Pour chaque case libre : mes coups de dame / ses coups de dame. Bleu : j'arrive avant (QFIRST de moi) ; orange : il arrive avant (QFIRST de lui) ; gris : en même temps. Les traits pointillés découpent les 9 zones de LATE9 (section suivante).](figs/fig-feat-first.png){#fig-feat-first width=82%}
+
+```cpp
+for (int k = 0; k < std::max(nl[0], nl[1]); k++) {
+    const uint64_t a = k < nl[0] ? lv[0][k] : 0, b = k < nl[1] ? lv[1][k] : 0;
+    first0 += std::popcount(a & ~b & ~seen1);           // à moi au niveau k, ni à lui avant ni en même temps
+    first1 += std::popcount(b & ~a & ~seen0);
+    seen0 |= a; seen1 |= b;
+}
+```
+
+**Ce que les mesures ont dit.** C'est la meilleure mesure isolée du milieu de partie : seule, elle explique
+18,1 % des points restants (l'influence, 16,6 %).
+
+## Les zones où j'arrive en retard (LATE9, 2 colonnes)
+
+**L'idée.** Remarque de jeu : être « en retard pour revenir dans une zone », avoir ses pièces trop
+concentrées quand l'adversaire est bien réparti.
+
+**La définition.** Le plateau est découpé en 3 × 3 zones (colonnes a–c, d–e, f–h ; rangées 1–3, 4–5, 6–8).
+Pour chaque zone, on prend le nombre de coups de dame qu'il faut à chaque camp pour atteindre sa case libre la
+plus proche. LATE9 de moi = le nombre de cases libres des zones où **il** arrive strictement avant moi. Sur la
+figure précédente, la zone en haut à gauche (cadre bleu) est atteinte par moi en 1 coup, par lui en 2 : ses 6
+cases libres comptent dans le LATE9 de lui. Aucune zone n'est en retard pour moi.
+
+```cpp
+for (int i = 0; i < 9; i++) {
+    const uint64_t z = zones9()[i] & free;
+    if (!z) continue;
+    const int f0 = first_level(0, z), f1 = first_level(1, z);    // premier niveau qui touche la zone
+    if (f1 < f0) late[0] += std::popcount(z);           // il y arrive avant moi
+    if (f0 < f1) late[1] += std::popcount(z);
+}
+```
+
+**Ce que les mesures ont dit.** Seule, elle explique 8,5 % des points en milieu de partie et 50,6 % en finale
+10–19. Elle est en grande partie contenue dans les mesures de dame (les mesures de couverture, LATE9 en tête,
+n'ajoutent que +0,4 point à elles), mais presque
+gratuite une fois les niveaux de dame calculés. La simple dispersion géométrique des pièces (distance moyenne
+entre elles) ne prédit rien : ce qui compte, c'est le temps d'arrivée à travers les trous.
+
+## La mobilité (MOB, 2 colonnes)
+
+**La définition.** Le nombre de coups légaux : pour chaque pièce, les cases libres qu'elle atteint en un coup
+de dame, comptées une fois **par pièce** (MOB ≥ Q1 : deux pièces qui visent la même case la comptent deux
+fois).
+
+```cpp
+for (uint64_t b = pieces; b; b &= b - 1)
+    mob += std::popcount(attacks_bb(Square(std::countr_zero(b)), ~free) & free);
+```
+
+**Ce que les mesures ont dit.** Seule, 8,7 % des points en milieu de partie. Asymétrie nette : la mobilité de
+l'adversaire pèse plus que la mienne (poids par écart-type, en plus du réseau : milieu +0,06 pour la mienne,
+−0,16 pour la sienne). C'est une raison de donner au réseau les deux valeurs séparément.
+
+**Le coût des cinq dernières sections.** Q1–Q3, QW, QFIRST, LATE9 et MOB partagent les niveaux de dame :
+environ 160 ns ensemble pour les deux camps.
+
+## L'influence (INFL, 2 colonnes)
+
+**L'idée.** La mesure de territoire de l'ordre des coups du joueur (`heuristic::influence`, +36 Elo dans
+l'étude J) : à qui revient chaque case si les deux camps s'étendent à la même vitesse.
+
+**La définition.** Les deux camps s'étendent en même temps, d'un pas de roi à chaque tour, à travers les
+cases libres. Une case atteinte par les deux au même pas devient **neutre**, et la zone neutre s'étend elle
+aussi d'un pas à chaque tour, ce qui bloque les deux camps. INFL compte les cases libres que chaque camp
+possède à la fin.
+
+![L'influence : à qui revient chaque case libre, et à quel pas elle est prise. La zone neutre (gris) s'étend aussi : c'est elle qui coupe l'avance des deux camps.](figs/fig-feat-infl.png){#fig-feat-infl width=78%}
+
+```cpp
+auto step = [&](uint64_t b) { return shift_all_directions(b) & free; };
+uint64_t own[2] = {us, them}, front[2] = {us, them}, neutral = 0, prev[2] = {0, 0};
+while (prev[0] != own[0] || prev[1] != own[1]) {
+    front[0] = step(front[0]) & ~own[1];
+    front[1] = step(front[1]) & ~own[0];
+    neutral |= step(neutral) | (front[0] & front[1]);   // atteintes ensemble, ou gagnées par le neutre
+    front[0] &= ~neutral; front[1] &= ~neutral;
+    prev[0] = own[0]; prev[1] = own[1];
+    own[0] |= front[0]; own[1] |= front[1];
+}
+```
+
+C'est exactement l'algorithme du joueur : sur 20 000 positions, la colonne est identique à
+`heuristic::influence`.
+
+**Ce que les mesures ont dit.** Meilleure mesure isolée du milieu de partie avant QFIRST (16,6 % des points),
+mais en plus du réseau elle n'ajoute que +1,0 / +0,1, et presque rien une fois la distance de dame présente.
+Elle est candidate parce qu'elle ne coûte presque rien : 25 ns pour les deux camps.
+
+## La connectivité, pièce par pièce (CONNECT, 40 colonnes)
+
+**L'idée.** Remarque de jeu : savoir si chacune de mes pièces est encore en contact avec les siennes, ou déjà
+séparée. La première version donnait 16 nombres, un par paire (ma pièce $i$, sa pièce $j$), avec les pièces
+numérotées par leur position sur le plateau. Mais le réseau ne sait pas laquelle de ses pièces est « la
+numéro 0 », et le numéro d'une pièce change dès qu'une autre passe devant elle : il ne peut qu'en faire une
+moyenne. D'où la question : comment identifier une pièce ?
+
+**La réponse mesurée** (`nnue/piece_order_study.py`) : par son **rôle**, pas par sa position. On décrit
+chaque pièce par quelques nombres, puis on **trie** les pièces de chaque camp de la plus isolée à la moins
+isolée. Le premier emplacement est alors toujours « ma pièce la plus coupée », et son sens ne change pas d'une
+position à l'autre. Gain en plus du réseau et des 16 premières colonnes, milieu de partie (points | résultat) :
+
+| Version | Colonnes | Milieu | Finale 10–19 |
+|---|---:|---|---|
+| 16 paires, ordre du plateau | 64 | +0,23 \| +0,02 | +0,11 \| +0,04 |
+| par pièce, ordre du plateau | 40 | +0,93 \| +0,08 | +0,33 \| +0,15 |
+| **par pièce, la plus isolée d'abord** | 40 | **+1,42 \| +0,15** | +0,49 \| +0,20 |
+| + la zone de la pièce (3 × 3) | 112 | +1,51 \| +0,20 | +0,51 \| +0,29 |
+
+Le même contenu, mieux ordonné, gagne 50 % ; l'endroit où se trouve la pièce n'ajoute presque rien.
+
+**La définition.** Pour chaque pièce, 5 nombres, face aux pièces de l'autre camp :
+
+| Nombre | Définition | Codage |
+|---|---|---|
+| block | les cases libres qu'elle atteint par pas de roi (ses blocs) | tel quel |
+| contact | les pièces adverses qui touchent ces blocs | ×16 |
+| king | les pas de roi pour arriver à côté de l'une d'elles | 64/d, 0 = jamais |
+| go | les coups de dame pour arriver à côté de l'une d'elles | 64/d |
+| come | les coups de dame pour que l'une d'elles arrive à côté d'elle | 64/d |
+
+Les 4 pièces de chaque camp sont triées par (contact, block, king, go, come) croissants : la plus isolée
+d'abord.
+
+![Les blocs (couleurs) et le rang d'isolement de chaque pièce. b7 et g7 sont seules dans leur petit bloc, sans contact : rang 1 de chaque camp.](figs/fig-feat-connect.png){#fig-feat-connect width=80%}
+
+Les 5 nombres de la figure, dans l'ordre où le réseau les reçoit :
+
+| Pièce | block | contact | king | go | come |
+|---|---:|---:|---:|---:|---:|
+| moi 1 : b7 | 3 | 0 | 0 | 0 | 0 |
+| moi 2 : f4 | 28 | 48 (3 pièces) | 64 (1 pas) | 64 | 64 |
+| moi 3 : b1 | 28 | 48 | 64 | 64 | 64 |
+| moi 4 : g2 | 30 (deux blocs : 28 + 2) | 48 | 64 | 64 | 64 |
+| lui 1 : g7 | 3 | 0 | 0 | 0 | 0 |
+| lui 2 : a4 | 28 | 48 | 32 (2 pas) | 32 (2 coups) | 32 |
+| lui 3 : c2 | 28 | 48 | 64 | 64 | 64 |
+| lui 4 : h2 | 30 | 48 | 64 | 64 | 64 |
+
+```cpp
+// nnue/space_features.h — une pièce face aux pièces adverses (opp)
+const uint64_t near_opp = shift_all_directions(opp);   // les cases à côté d'elles
+uint64_t seen = 0, front = piece;
+int king = 0;
+for (int d = 1; (front = shift_all_directions(front) & free & ~seen); d++) {
+    if (!king && (front & near_opp)) king = d;          // premier pas qui arrive à côté de l'une
+    seen |= front;
+}
+int contact = 0;
+for (uint64_t b = opp; b; b &= b - 1) contact += (shift_all_directions(b & -b) & seen) != 0;
+// go : les niveaux de dame de la pièce ; come : ceux des pièces adverses (calculés une fois)
+for (int k = 0; k < nl && !go; k++) if (lv[k] & near_opp) go = k + 1;
+for (int k = 0; k < opp_nl && !come; k++) if (opp_lv[k] & shift_all_directions(piece)) come = k + 1;
+return {std::popcount(seen), 16 * contact, inverse64(king), inverse64(go), inverse64(come)};
+```
+
+**Le coût.** Un parcours par pas de roi et un par coups de dame pour chacune des 8 pièces : environ 650 ns
+pour les deux camps. C'est le groupe le plus cher, ce qui compte dans le choix.
+
+## L'encerclement (ENCIRCLE, 34 colonnes)
+
+**L'idée.** Remarque de jeu : l'encerclement, ou le presque-encerclement, quand plusieurs de mes pièces gênent
+les mouvements d'une de ses pièces. C'est l'analogue des libertés au go.
+
+**La définition, pour une pièce P** (face aux pièces de l'autre camp) :
+
+| Nombre | Définition |
+|---|---|
+| lib | ses libertés : les voisines libres |
+| opp | les voisines occupées par des pièces adverses |
+| wall | les voisines qui sont des trous ou hors du plateau |
+| own | les voisines occupées par ses propres pièces (lib + opp + wall + own = 8) |
+| short | ses lignes qui n'ont que 1 ou 2 cases libres |
+| gene | la **gêne** : les cases que les pièces adverses lui retirent = sa mobilité si elles étaient des cases libres, moins sa mobilité réelle (leurs cases comptent) |
+| contrib | les pièces adverses qui arrêtent une de ses lignes en premier |
+| att | ses libertés qu'une pièce adverse atteint en un coup de dame |
+| fermable | lib = 1 et att ≥ 1 : on peut l'enfermer au coup suivant |
+
+La menace (att, fermable) repose sur une règle propre à Yolah : la case qu'une pièce quitte devient un trou.
+Une pièce qui vient boucher la dernière liberté ne rouvre donc rien derrière elle : le bouchage tient
+toujours.
+
+![L'encerclement de la pièce de lui en e5. Ses lignes réelles (vert) ; en pointillé orange, ce que mes pièces lui retirent : en ôtant d6, b5 et e4, ses lignes continueraient (9 cases, celles de mes pièces comprises : gene = 9, par 3 pièces : contrib = 3). Sa seule liberté est d5, que ma pièce e4 peut occuper en un coup : elle est fermable.](figs/fig-feat-encircle.png){#fig-feat-encircle width=86%}
+
+```cpp
+// nnue/space_features.h — une pièce face aux pièces adverses (opp)
+const uint64_t around = shift_all_directions(piece);
+Encircle e{std::popcount(around & free),                 // lib
+           std::popcount(around & opp), 0, 0, 0,          // opp
+           std::popcount(around & free & opp_reach1)};    // att : ses libertés qu'ils atteignent en 1 coup
+for (auto line : SLIDES) {                               // ses 8 lignes
+    const uint64_t real = line(piece, free), freed = line(piece, free | opp);   // eux, comme cases libres
+    const int len = std::popcount(real);
+    e.shrt += len == 1 || len == 2;
+    e.gene += std::popcount(freed) - len;                // ce qu'ils lui prennent, leurs cases comprises
+    e.contrib += (freed & opp) != 0;                     // la ligne s'arrête d'abord sur l'un d'eux
+}
+```
+
+**Ce que le réseau reçoit** (`nnue/encircle_study.py`, version « compacte »). Pour chaque camp, l'encerclement
+de **ses** pièces par l'autre camp en 17 colonnes :
+
+- 9 sommes sur ses 4 pièces : gene, 4 × contrib, 4 × opp, 2 × att, 2 × lib, 2 × short, et 16 × le nombre de
+  pièces à au plus une liberté, sans liberté, fermables ;
+- puis, ses pièces triées de la plus encerclée à la moins encerclée (le moins de libertés, puis la plus
+  grande gêne), la menace de chacune : 8 × att et 64 × fermable.
+
+**Ce que les mesures ont dit**, en plus du réseau et des 16 premières colonnes (points | résultat) :
+
+| Version | Colonnes | Milieu | Finale 10–19 |
+|---|---:|---|---|
+| par pièce, la plus encerclée d'abord (9 nombres) | 72 | +0,99 \| **+0,28** | +0,51 \| **+0,31** |
+| sommes seulement | 18 | +1,41 \| +0,18 | +0,54 \| +0,26 |
+| par pièce, sans la menace (att, fermable) | 56 | +0,73 \| +0,15 | +0,10 \| +0,04 |
+| voisines seulement (lib, opp, wall, own) | 32 | +0,65 \| +0,12 | +0,08 \| +0,03 |
+| **compacte : sommes + menace par pièce** | 34 | **+1,54 \| +0,23** | **+0,57 \| +0,29** |
+
+C'est la **menace** qui apporte l'information nouvelle : sans elle, en finale, l'encerclement est déjà vu par
+le flood fill corrigé (+0,04 sur le résultat) ; avec elle, +0,31. C'est le meilleur gain sur le résultat
+parmi les candidats en plus des 16 premières colonnes. Une pièce fermable en un coup est rare (2,9 % des
+pièces en milieu de partie, 4,0 % en finale 10–19), mais décisive.
+
+Connectivité et encerclement se recouvrent peu : ensemble (compacte + connectivité), +2,17 / +0,33 en milieu
+de partie et +0,98 / +0,43 en finale 10–19, presque la somme des deux.
+
+**Le coût.** Environ 200 ns pour les deux camps.
+
+## Récapitulatif
+
+| Groupe | Colonnes | Pour | Coût (ns, deux camps) |
+|---|---:|---|---:|
+| CORR | 0, 8 | territoire réel en finale | 185 |
+| QDIST (Q1, Q2, Q3) | 1–3, 9–11 | couverture en coups de dame | 160 avec les 4 suivants |
+| QFIRST | 4, 12 | cases où j'arrive avant | (partagé) |
+| QW | 5, 13 | couverture pondérée | (partagé) |
+| LATE9 | 6, 14 | zones où j'arrive en retard | (partagé) |
+| MOB | 7, 15 | coups légaux | (partagé) |
+| INFL | 16, 17 | territoire par l'expansion simultanée | 25 |
+| CONNECT | 18–57 | chaque pièce : isolée ou en contact | 650 |
+| ENCIRCLE | 58–91 | pièces encerclées et menace de les enfermer | 200 |
+
+En tout 92 colonnes, environ 1,5 µs par position si tout est gardé (mesuré par `space_features bench`),
+à comparer aux environ 1,1 µs de `value()` aujourd'hui. Le réseau entier n'a besoin que des groupes gardés : c'est l'objet de l'ablation.
+
+# L'ablation des caractéristiques
+
+**La question.** Les mesures du chapitre précédent ajoutent chaque groupe à un modèle linéaire en plus du
+réseau. Le vrai juge est le réseau entier, entraîné avec les caractéristiques : un groupe que le réseau sait
+déjà recalculer, ou qu'un autre groupe contient, ne sert à rien et coûte du temps à chaque évaluation.
+
+**Le protocole** (élimination descendante) :
+
+1. **Référence.** Le réseau k8_them (étape 1) relit, en plus de ses deux accumulateurs, tous les groupes
+   gardés, et il est réentraîné 5 époques (distillation, lr 1e-4) à partir de ses poids. Les colonnes
+   nouvelles partent de 0 : au départ, le réseau donne exactement les valeurs de k8_them (vérifié).
+2. **Une course par groupe.** La même chose sans ce groupe.
+3. **Le coût de retirer un groupe** $g$, sur l'erreur de validation contre le maître après 5 époques :
+   $$\text{coût}(g) = \frac{\text{mse}(\text{gardés} - g) - \text{mse}(\text{gardés})}{\text{mse}(\text{aucun}) - \text{mse}(\text{tous})}$$
+   c'est-à-dire la part de ce qu'apportent toutes les caractéristiques qui est perdue sans $g$. Le même
+   calcul est fait par phase de jeu (un groupe peut ne servir qu'en finale).
+4. **On retire le groupe le moins coûteux** si son coût est faible (par défaut ≤ 5 % au total et ≤ 10 % dans
+   chaque phase), et on recommence avec les groupes restants. On s'arrête quand chaque groupe restant coûte
+   plus que ce seuil. À coût égal, on préfère retirer le groupe le plus cher à calculer.
+
+**Le bruit.** Au premier tour, la référence est entraînée une seconde fois avec un autre ordre des données
+(`YOLAH_SEED=1`) : l'écart entre les deux dit à partir de quel coût une différence est réelle. Une course
+sans aucune caractéristique, entraînée de la même façon, donne l'échelle (le dénominateur du coût).
+
+**En pratique** (`nnue/ablation.py`) :
+
+```bash
+# une fois, sur un nœud CPU : les 92 colonnes de chaque position du cache (≈ 1,5 µs par position)
+sbatch -p insa-cpu --exclude=crn07,crn14,crn15 --export=ALL,COMMAND=compute-all nnue/space_features.sh
+
+# un tour : le script écrit les sbatch (5 époques chacune, ~12 h sur un GPU)
+python3 ablation.py plan --kept 0x1ff --round 1      # → ablation_r1.sh : 12 courses
+bash ablation_r1.sh
+
+# quand tout est fini : le tableau des coûts et la proposition pour le tour suivant
+python3 ablation.py report /home/pgarcia/NNUE/DistillationNNUE/models_ablation --kept 0x1ff
+```
+
+Le premier tour compte 12 courses (référence, bruit, aucune caractéristique, et une par groupe) ; les
+suivants, une de moins à chaque groupe retiré (la référence d'un tour est une course du tour précédent).
+Chaque course écrit son erreur de validation, globale et par phase, dans
+`<modèle>.val.jsonl`, que `report` relit.
+
+**Ce qui vient ensuite.** Le jeu de groupes retenu sera entraîné complètement, puis mesuré en match (joueur
+dev + nouveau réseau contre joueur dev + k8_them), car seule une partie dit si le gain de précision paie le
+temps de calcul. Le C++ de `NNUE_Persp` ne lit aujourd'hui que les 16 premières colonnes ; il faudra lui
+ajouter les groupes retenus.
+
+
 # Plan et mesure
 
 | Étape | Ce qui change | Code | Calcul | Gain attendu |
@@ -842,7 +1303,7 @@ est fausse et sera à corriger en même temps.
 | 1. Point de vue + têtes par phase | encodage, `Net`, `play`/`value` ; variantes `us` / `[us, them]` | moyen | un réentraînement | élevé, sûr |
 | 2. Écart de score | cible, perte, maître à tête de score ; issue seule en fin de partie | faible | un réentraînement | moyen à élevé |
 | 3. Positions des arbres | générateur + étiquetage | important | $10^9$ étiquettes | élevé |
-| 4. Entrées globales | `Net`, `value` ; régions privées et disputées, en fin de partie seulement | moyen | un réentraînement | moyen ; défaut mesuré en fin de partie |
+| 4. Entrées globales | `Net`, `value` ; les groupes retenus par l'ablation (chapitre précédent) | moyen | un tour d'ablation = 12 courses de 5 époques | moyen ; défaut mesuré en fin de partie |
 | 5. Taille / vitesse | `Net`, SIMD | faible | plusieurs entraînements | moyen |
 
 **Une transformation à la fois**, avec les mêmes données et la même distillation, pour savoir ce que chacune
