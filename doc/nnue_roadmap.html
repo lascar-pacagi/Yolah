@@ -2429,7 +2429,7 @@ padding-right: 0.6em;
     <div>
     <div class="quarto-title-meta-heading">Date de publication</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">16 octobre 2026</p>
+      <p class="date">19 octobre 2026</p>
     </div>
   </div>
   
@@ -4094,7 +4094,7 @@ Figure 14: L’encerclement de la pièce de lui en e5. Ses lignes réelles (ver
 <span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a><span class="co"># quand tout est fini : le tableau des coûts et la proposition pour le tour suivant</span></span>
 <span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> ablation.py report /home/pgarcia/NNUE/DistillationNNUE/models_ablation <span class="at">--kept</span> 0x1ff</span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Le premier tour compte 12 courses (référence, bruit, aucune caractéristique, et une par groupe) ; les suivants, une de moins à chaque groupe retiré (la référence d’un tour est une course du tour précédent). Chaque course écrit son erreur de validation, globale et par phase, dans <code>&lt;modèle&gt;.val.jsonl</code>, que <code>report</code> relit.</p>
-<p><strong>Ce qui vient ensuite.</strong> Le jeu de groupes retenu sera entraîné complètement, puis mesuré en match (joueur dev + nouveau réseau contre joueur dev + k8_them), car seule une partie dit si le gain de précision paie le temps de calcul. Le C++ de <code>NNUE_Persp</code> ne lit aujourd’hui que les 16 premières colonnes ; il faudra lui ajouter les groupes retenus.</p>
+<p><strong>Ce qui vient ensuite.</strong> Le jeu de groupes retenu sera entraîné complètement, puis mesuré en match (joueur dev + nouveau réseau contre joueur dev + k8_them), car seule une partie dit si le gain de précision paie le temps de calcul. Le C++ de <code>NNUE_Persp</code> lit déjà n’importe quelles colonnes parmi les 92 (fichier de poids <code>PERSPC</code> : le nombre de colonnes puis les colonnes) et ne calcule que les groupes dont le réseau a besoin (<code>space::compute_groups</code>, identique à <code>compute_all</code> sur ces colonnes pour les 511 ensembles de groupes). Coût mesuré du calcul pour les deux camps : corr 150 ns, niveaux de dame (qdist, qfirst, qw, late9, mob) 125 ns, infl 22 ns, connect 640 ns, encircle 200 ns ; corr + encircle + infl : 380 ns.</p>
 </section>
 <section id="plan-et-mesure" class="level1" data-number="7">
 <h1 data-number="7"><span class="header-section-number">7</span> Plan et mesure</h1>

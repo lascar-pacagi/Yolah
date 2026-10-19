@@ -1354,8 +1354,11 @@ Chaque course écrit son erreur de validation, globale et par phase, dans
 
 **Ce qui vient ensuite.** Le jeu de groupes retenu sera entraîné complètement, puis mesuré en match (joueur
 dev + nouveau réseau contre joueur dev + k8_them), car seule une partie dit si le gain de précision paie le
-temps de calcul. Le C++ de `NNUE_Persp` ne lit aujourd'hui que les 16 premières colonnes ; il faudra lui
-ajouter les groupes retenus.
+temps de calcul. Le C++ de `NNUE_Persp` lit déjà n'importe quelles colonnes parmi les 92 (fichier de poids
+`PERSPC` : le nombre de colonnes puis les colonnes) et ne calcule que les groupes dont le réseau a besoin
+(`space::compute_groups`, identique à `compute_all` sur ces colonnes pour les 511 ensembles de groupes).
+Coût mesuré du calcul pour les deux camps : corr 150 ns, niveaux de dame (qdist, qfirst, qw, late9, mob)
+125 ns, infl 22 ns, connect 640 ns, encircle 200 ns ; corr + encircle + infl : 380 ns.
 
 
 # Plan et mesure

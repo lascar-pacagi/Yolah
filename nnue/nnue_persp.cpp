@@ -87,7 +87,7 @@ NNUE_Persp::~NNUE_Persp() {
 bool NNUE_Persp::is_persp_file(const std::string& filename) {
     std::ifstream ifs(filename);
     std::string tag;
-    return (ifs >> tag) && (tag == "PERSP" || tag == "PERSPS");
+    return (ifs >> tag) && (tag == "PERSP" || tag == "PERSPS" || tag == "PERSPC");
 }
 
 // "W\n<rows>\n<cols>\n" + the values row by row, as written by export_value_nets.py.
@@ -122,17 +122,27 @@ void NNUE_Persp::load(const std::string& filename) {
     std::ifstream ifs(filename);
     std::string tag;
     int l1, l2, l3, t;
-    if (!(ifs >> tag >> k >> t >> l1 >> l2 >> l3) || (tag != "PERSP" && tag != "PERSPS"))
+    if (!(ifs >> tag >> k >> t >> l1 >> l2 >> l3) || (tag != "PERSP" && tag != "PERSPS" && tag != "PERSPC"))
         throw std::runtime_error("NNUE_Persp: " + filename + " is not a PERSP weights file");
     if (l1 != H1_SIZE || l2 != H2_SIZE || l3 != H3_SIZE || k < 1)
         throw std::runtime_error("NNUE_Persp: unsupported sizes in " + filename);
-    space_mask = 0;
-    if (tag == "PERSPS" && !(ifs >> space_mask)) throw std::runtime_error("NNUE_Persp: no space mask in " + filename);
     n_space = 0;
-    for (int i = 0; i < space::NB; i++) if (space_mask >> i & 1) space_ids[n_space++] = i;
+    space_groups = 0;
+    if (tag == "PERSPS") {          // a mask of the 16 first columns
+        uint32_t mask;
+        if (!(ifs >> mask)) throw std::runtime_error("NNUE_Persp: no space mask in " + filename);
+        for (int i = 0; i < space::NB; i++) if (mask >> i & 1) space_cols[n_space++] = i;
+    } else if (tag == "PERSPC") {   // the number of columns, then the columns
+        if (!(ifs >> n_space) || n_space < 1 || n_space > space::NB_ALL)
+            throw std::runtime_error("NNUE_Persp: bad number of space columns in " + filename);
+        for (int j = 0; j < n_space; j++)
+            if (!(ifs >> space_cols[j]) || space_cols[j] < 0 || space_cols[j] >= space::NB_ALL)
+                throw std::runtime_error("NNUE_Persp: bad space column in " + filename);
+    }
+    for (int j = 0; j < n_space; j++) space_groups |= 1u << space::group_of(space_cols[j]);
     them = t != 0;
     h2_inputs = them ? 2 * H1_SIZE : H1_SIZE;
-    h2_stride = h2_inputs + (n_space ? 32 : 0);
+    h2_stride = h2_inputs + (n_space + 31) / 32 * 32;
     // fc1 is stored (out, in) by PyTorch: transposed into one row per input.
     read_matrix(ifs, H1_SIZE, INPUT_SIZE, input_to_h1, true, "fc1");
     read_bias(ifs, H1_SIZE, h1_bias, "fc1");
@@ -227,7 +237,7 @@ void NNUE_Persp::undo(uint8_t player, Move m, int16_t* acc) const {
 float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     const int stm = yolah.current_player();
     const int b = bucket(yolah);
-    alignas(64) int8_t h1[2 * H1_SIZE + 32];
+    alignas(64) int8_t h1[2 * H1_SIZE + MAX_SPACE];
     alignas(64) int8_t h2[H2_SIZE];
     alignas(64) int8_t h3[H3_SIZE];
     const int16_t* us = acc + stm * H1_SIZE;
@@ -238,10 +248,10 @@ float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     }
     if (n_space) {
         // the space features, at scale 64 = their integer value (0..64)
-        uint8_t f[space::NB];
-        space::compute(yolah.bitboard(stm), yolah.bitboard(1 - stm), yolah.free_squares(), f, space_mask);
+        uint8_t f[space::NB_ALL];
+        space::compute_groups(yolah.bitboard(stm), yolah.bitboard(1 - stm), yolah.free_squares(), f, space_groups);
         int8_t* s = h1 + h2_inputs;
-        for (int j = 0; j < 32; j++) s[j] = j < n_space ? int8_t(f[space_ids[j]]) : 0;
+        for (int j = 0; j < h2_stride - h2_inputs; j++) s[j] = j < n_space ? int8_t(f[space_cols[j]]) : 0;
     }
     const size_t off = size_t(b) * H2_SIZE * h2_stride;
     const int16_t* bias2 = h2_bias + b * H2_SIZE;
@@ -252,8 +262,12 @@ float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     switch (h2_stride) {
         case H1_SIZE:          fc2.template operator()<H1_SIZE>(); break;
         case H1_SIZE + 32:     fc2.template operator()<H1_SIZE + 32>(); break;
+        case H1_SIZE + 64:     fc2.template operator()<H1_SIZE + 64>(); break;
+        case H1_SIZE + 96:     fc2.template operator()<H1_SIZE + 96>(); break;
         case 2 * H1_SIZE:      fc2.template operator()<2 * H1_SIZE>(); break;
-        default:               fc2.template operator()<2 * H1_SIZE + 32>(); break;
+        case 2 * H1_SIZE + 32: fc2.template operator()<2 * H1_SIZE + 32>(); break;
+        case 2 * H1_SIZE + 64: fc2.template operator()<2 * H1_SIZE + 64>(); break;
+        default:               fc2.template operator()<2 * H1_SIZE + 96>(); break;
     }
     matvec<H3_SIZE, H2_SIZE>(h2_to_h3 + b * H3_SIZE * H2_SIZE, h2, h3, h3_bias + b * H3_SIZE);
     const float* w = value_weight + b * H3_SIZE;

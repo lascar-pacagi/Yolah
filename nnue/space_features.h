@@ -132,6 +132,7 @@ inline void compute(uint64_t us, uint64_t them, uint64_t free, uint8_t out[NB], 
         }
         for (int sd = 0; sd < 2; sd++) put(sd, CORR, corrected_flood_fill(pcs[sd], free, comps, size, nc));
     }
+    if (!(mask & ~((1u << CORR) | (1u << (PER_SIDE + CORR))))) return;    // no feature of the queen levels
     uint64_t lv[2][64];
     const int nl[2] = { queen_levels(us, free, lv[0]), queen_levels(them, free, lv[1]) };
     for (int sd = 0; sd < 2; sd++) {
@@ -288,14 +289,34 @@ inline std::array<int, CONNECT_PER_PIECE> connect_piece(uint64_t piece, uint64_t
     return {std::popcount(seen), 16 * contact, inverse64(king), inverse64(go), inverse64(come)};
 }
 
+// The 8 rays of each square on an empty board: RAYS[sq][d] = SLIDES[d] with every square free.
+inline const auto& rays() {
+    static const struct R {
+        uint64_t r[64][8];
+        R() { for (int sq = 0; sq < 64; sq++) for (int d = 0; d < 8; d++) r[sq][d] = SLIDES[d](uint64_t(1) << sq, ~uint64_t(0)); }
+    } rs;
+    return rs.r;
+}
+
+// The free squares the queens on `pieces` reach in one move (= queen_reach, by magic lookups).
+inline uint64_t queen_moves(uint64_t pieces, uint64_t free) {
+    uint64_t r = 0;
+    for (uint64_t b = pieces; b; b &= b - 1) r |= attacks_bb(Square(std::countr_zero(b)), ~free);
+    return r & free;
+}
+
 // Encirclement of one piece by the other side (`opp`): lib, opp, short, gene, contrib, att.
 struct Encircle { int lib, opp, shrt, gene, contrib, att; };
 inline Encircle encircle_piece(uint64_t piece, uint64_t opp, uint64_t free, uint64_t opp_reach1) {
     const uint64_t around = shift_all_directions(piece);
     Encircle e{std::popcount(around & free), std::popcount(around & opp), 0, 0, 0,
                std::popcount(around & free & opp_reach1)};
-    for (auto line : SLIDES) {
-        const uint64_t real = line(piece, free), freed = line(piece, free | opp);   // opp as free squares
+    // a queen on the piece's square: its moves, then the same with his pieces as free squares,
+    // each cut into its 8 lines by the rays
+    const Square sq = Square(std::countr_zero(piece));
+    const uint64_t all_real = queen_moves(piece, free), all_freed = queen_moves(piece, free | opp);
+    for (const uint64_t ray : rays()[sq]) {
+        const uint64_t real = all_real & ray, freed = all_freed & ray;
         const int len = std::popcount(real);
         e.shrt += len == 1 || len == 2;
         e.gene += std::popcount(freed) - len;       // the squares they take from it, theirs included
@@ -304,48 +325,74 @@ inline Encircle encircle_piece(uint64_t piece, uint64_t opp, uint64_t free, uint
     return e;
 }
 
-// All NB_ALL columns of the position seen from `us` (the side to move).
-inline void compute_all(uint64_t us, uint64_t them, uint64_t free, uint8_t out[NB_ALL]) {
-    compute(us, them, free, out);
+constexpr uint32_t ALL_GROUPS = (1u << NB_GROUPS) - 1;
+
+// The ids of the 16 first columns (compute's mask) that belong to `groups`.
+inline uint32_t ids_of_groups(uint32_t groups) {
+    uint32_t m = 0;
+    for (int i = 0; i < NB; i++) if (groups >> group_of(i) & 1) m |= 1u << i;
+    return m;
+}
+
+// The NB_ALL columns of the position seen from `us` (the side to move), only
+// those of `groups` (bit = Group) computed, the others 0: what a network
+// reading some groups needs (NNUE_Persp::value), at the cost of those only.
+inline void compute_groups(uint64_t us, uint64_t them, uint64_t free, uint8_t out[NB_ALL], uint32_t groups) {
+    compute(us, them, free, out, ids_of_groups(groups));
     for (int i = NB; i < NB_ALL; i++) out[i] = 0;
     auto put = [&](int col, int v) { out[col] = uint8_t(std::clamp(v, 0, 64)); };
     const uint64_t pcs[2] = {us, them};
-    int infl[2];
-    influence(us, them, free, infl);
-    put(INFL0, infl[0]); put(INFL0 + 1, infl[1]);
+    if (groups >> G_INFL & 1) {
+        int infl[2];
+        influence(us, them, free, infl);
+        put(INFL0, infl[0]); put(INFL0 + 1, infl[1]);
+    }
+    const bool connect = groups >> G_CONNECT & 1, encircle = groups >> G_ENCIRCLE & 1;
+    if (!connect && !encircle) return;
     uint64_t lv[2][64];
-    const int nl[2] = {queen_levels(us, free, lv[0]), queen_levels(them, free, lv[1])};
+    int nl[2] = {0, 0};
+    if (connect) { nl[0] = queen_levels(us, free, lv[0]); nl[1] = queen_levels(them, free, lv[1]); }
     for (int sd = 0; sd < 2; sd++) {
         const uint64_t mine = pcs[sd], opp = pcs[1 - sd];
-        // connectivity, most isolated first (fewest contacts, smallest block, then the rest)
-        std::array<std::array<int, CONNECT_PER_PIECE>, 4> c{};
         int n = 0;
-        for (uint64_t b = mine; b && n < 4; b &= b - 1) c[n++] = connect_piece(b & -b, opp, free, lv[1 - sd], nl[1 - sd]);
-        std::sort(c.begin(), c.begin() + n, [](const auto& x, const auto& y) {
-            return std::tie(x[1], x[0], x[2], x[3], x[4]) < std::tie(y[1], y[0], y[2], y[3], y[4]); });
-        for (int i = 0; i < n; i++)
-            for (int j = 0; j < CONNECT_PER_PIECE; j++) put(CONNECT0 + (sd * 4 + i) * CONNECT_PER_PIECE + j, c[i][j]);
-        // encirclement of my pieces by his
-        std::array<Encircle, 4> e{};
-        n = 0;
-        for (uint64_t b = mine; b && n < 4; b &= b - 1) e[n++] = encircle_piece(b & -b, opp, free, nl[1 - sd] ? lv[1 - sd][0] : 0);
-        int sum[9] = {};
-        for (int i = 0; i < n; i++) {
-            const Encircle& x = e[i];
-            const int v[9] = {x.gene, x.contrib, x.opp, x.att, x.lib, x.shrt, x.lib <= 1, x.lib == 0, x.lib == 1 && x.att};
-            for (int j = 0; j < 9; j++) sum[j] += v[j];
+        if (connect) {
+            // connectivity, most isolated first (fewest contacts, smallest block, then the rest)
+            std::array<std::array<int, CONNECT_PER_PIECE>, 4> c{};
+            for (uint64_t b = mine; b && n < 4; b &= b - 1) c[n++] = connect_piece(b & -b, opp, free, lv[1 - sd], nl[1 - sd]);
+            std::sort(c.begin(), c.begin() + n, [](const auto& x, const auto& y) {
+                return std::tie(x[1], x[0], x[2], x[3], x[4]) < std::tie(y[1], y[0], y[2], y[3], y[4]); });
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < CONNECT_PER_PIECE; j++) put(CONNECT0 + (sd * 4 + i) * CONNECT_PER_PIECE + j, c[i][j]);
         }
-        const int mult[9] = {1, 4, 4, 2, 2, 2, 16, 16, 16};
-        const int base = ENCIRCLE0 + sd * ENCIRCLE_PER_SIDE;
-        for (int j = 0; j < 9; j++) put(base + j, mult[j] * sum[j]);
-        // most encircled first (fewest liberties, most gene, most attacked liberties)
-        std::sort(e.begin(), e.begin() + n, [](const Encircle& x, const Encircle& y) {
-            return std::tie(x.lib, y.gene, y.att) < std::tie(y.lib, x.gene, x.att); });
-        for (int i = 0; i < n; i++) {
-            put(base + 9 + 2 * i, 8 * e[i].att);
-            put(base + 10 + 2 * i, 64 * (e[i].lib == 1 && e[i].att > 0));
+        if (encircle) {
+            // encirclement of my pieces by his (queen_reach = his first queen level)
+            std::array<Encircle, 4> e{};
+            const uint64_t reach1 = queen_moves(opp, free);
+            n = 0;
+            for (uint64_t b = mine; b && n < 4; b &= b - 1) e[n++] = encircle_piece(b & -b, opp, free, reach1);
+            int sum[9] = {};
+            for (int i = 0; i < n; i++) {
+                const Encircle& x = e[i];
+                const int v[9] = {x.gene, x.contrib, x.opp, x.att, x.lib, x.shrt, x.lib <= 1, x.lib == 0, x.lib == 1 && x.att};
+                for (int j = 0; j < 9; j++) sum[j] += v[j];
+            }
+            const int mult[9] = {1, 4, 4, 2, 2, 2, 16, 16, 16};
+            const int base = ENCIRCLE0 + sd * ENCIRCLE_PER_SIDE;
+            for (int j = 0; j < 9; j++) put(base + j, mult[j] * sum[j]);
+            // most encircled first (fewest liberties, most gene, most attacked liberties)
+            std::sort(e.begin(), e.begin() + n, [](const Encircle& x, const Encircle& y) {
+                return std::tie(x.lib, y.gene, y.att) < std::tie(y.lib, x.gene, x.att); });
+            for (int i = 0; i < n; i++) {
+                put(base + 9 + 2 * i, 8 * e[i].att);
+                put(base + 10 + 2 * i, 64 * (e[i].lib == 1 && e[i].att > 0));
+            }
         }
     }
+}
+
+// All NB_ALL columns of the position seen from `us` (the side to move).
+inline void compute_all(uint64_t us, uint64_t them, uint64_t free, uint8_t out[NB_ALL]) {
+    compute_groups(us, them, free, out, ALL_GROUPS);
 }
 
 } // namespace space

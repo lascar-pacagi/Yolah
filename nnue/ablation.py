@@ -29,9 +29,9 @@ import os
 
 GROUPS = ["corr", "qdist", "qfirst", "qw", "late9", "mob", "infl", "connect", "encircle"]
 COLUMNS = [2, 6, 2, 2, 2, 2, 2, 40, 34]
-# cost of the computation per position, both sides (space_features bench, local i9, ns);
-# qdist, qfirst, qw, late9 and mob together ~160 ns (they share the queen levels)
-COST_NS = ["185", "shared", "shared", "shared", "shared", "shared", "25", "650", "200"]
+# cost of the computation per position, both sides (space::compute_groups, one group alone, local
+# i7, ns); qdist, qfirst, qw, late9 and mob together ~125 ns (they share the queen levels)
+COST_NS = ["150", "shared", "shared", "shared", "shared", "shared", "22", "640", "200"]
 EPOCHS = 5
 PHASES = ["opening 40-56", "middle 20-39", "endgame 10-19", "endgame 0-9"]
 SUBMIT = ("sbatch --export=ALL,YOLAH_PERSP_K=8,YOLAH_PERSP_THEM=1,YOLAH_SPACE_GROUPS={g:#05x},"

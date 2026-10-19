@@ -26,9 +26,12 @@
 // layer also reads the other view, always in the order [us, them]. The head
 // is chosen by the number of holes: bucket = holes · K / 57.
 //
-// Space features (step 2, weights file tag "PERSPS" + mask): the next layer
-// also reads up to 16 numbers computed from the position by value()
-// (nnue/space_features.h), stored after the h1 values, padded to 32 columns.
+// Space features (step 2): the next layer also reads numbers computed from
+// the position by value() (nnue/space_features.h), stored after the h1
+// values, padded to a multiple of 32 columns. Weights file tag "PERSPS" + a
+// mask of the 16 first columns, or "PERSPC" + the number of columns and the
+// columns themselves (any of the NB_ALL of the ablation: influence,
+// encirclement, ...); value() computes only their groups.
 //
 // Accumulator: 2 × H1_SIZE int16, view v at acc + v · H1_SIZE (v = the colour).
 struct NNUE_Persp {
@@ -42,10 +45,11 @@ struct NNUE_Persp {
     int k = 1;                // number of phase heads
     bool them = false;        // fc2 reads [us, them] (2 · H1_SIZE inputs) instead of us
     int h2_inputs = H1_SIZE;  // h1 values read by fc2 (H1_SIZE or 2 · H1_SIZE)
-    uint32_t space_mask = 0;  // space features read by fc2 (bit = id in space_features.h)
-    int n_space = 0;
-    int space_ids[16]{};
-    int h2_stride = H1_SIZE;  // columns of fc2 in memory: h2_inputs (+ 32 with space features)
+    static constexpr int MAX_SPACE = 96;              // space columns, padded (space::NB_ALL = 92)
+    int n_space = 0;          // space columns read by fc2
+    int space_cols[MAX_SPACE]{};  // their columns in space::compute_groups (0..NB_ALL − 1)
+    uint32_t space_groups = 0;    // the groups to compute (bit = space::Group)
+    int h2_stride = H1_SIZE;  // columns of fc2 in memory: h2_inputs + n_space padded to 32
     bool sparse = false;      // value(): sparse product of fc2 (same results, zero groups of h1 skipped)
 
     alignas(64) int16_t h1_bias[H1_SIZE];

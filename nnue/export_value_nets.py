@@ -39,6 +39,9 @@ Formats (read by nnue.cpp / nnue_quantized.cpp / ffnn_value.h):
   NetPersp with space features (step 2): the tag is "PERSPS" and the space
   mask follows l3 ("PERSPS\n<K>\n<them>\n<l1>\n<l2>\n<l3>\n<mask>\n"); fc2
   then has l1 (or 2·l1) + popcount(mask) columns, the space ones last.
+  With columns beyond the first 16 (the ablation features of space_all.u8:
+  influence, connectivity, encirclement), the tag is "PERSPC" and the number
+  of columns, then the columns, follow l3 ("PERSPC\n…\n<l3>\n<n>\n<c1>\n…<cn>\n").
 """
 import glob
 import os
@@ -119,13 +122,15 @@ def export_persp(path, out_dir):
     from nnue_persp import load_persp
     name = os.path.splitext(os.path.basename(path))[0]
     net = load_persp(path)
-    if net.space_mask >> 16:
-        sys.exit(f"{path}: space columns beyond the first 16 (ablation features of space_all.u8): "
-                 f"not supported by the C++ NNUE_Persp yet")
+    from nnue_persp import space_columns
+    cols = space_columns(net.space_mask)
     w8 = lambda what: quantizer(SCALE, -127, 127, f"{name} {what}")                    # int8 weights
     b16 = lambda what, scale: quantizer(scale, -32768, 32767, f"{name} {what}")        # int16 biases
     with open(os.path.join(out_dir, name + ".quantized.txt"), "w") as f:
-        if net.space_mask:
+        if net.space_mask >> 16:
+            f.write(f"PERSPC\n{net.k}\n{int(net.them)}\n{net.l1_size}\n{net.l2_size}\n{net.l3_size}\n"
+                    f"{len(cols)}\n" + "".join(f"{c}\n" for c in cols))
+        elif net.space_mask:
             f.write(f"PERSPS\n{net.k}\n{int(net.them)}\n{net.l1_size}\n{net.l2_size}\n{net.l3_size}\n"
                     f"{net.space_mask}\n")
         else:
@@ -139,7 +144,8 @@ def export_persp(path, out_dir):
             write_bias(f, net.b3.data[k], b16(f"b3[{k}]", SCALE * SCALE))
         write_matrix(f, net.w4.data, as_float)
         write_bias(f, net.b4.data, as_float)
-    space = f" + {net.n_space} space features (mask {net.space_mask:#06x})" if net.n_space else ""
+    space = (f" + {net.n_space} space features (columns {cols[0]}–{cols[-1]})" if net.space_mask >> 16 else
+             f" + {net.n_space} space features (mask {net.space_mask:#06x})") if net.n_space else ""
     print(f"{name}: 192 → {net.l1_size}{' ×2 views' if net.them else ''}{space} → {net.k} heads "
           f"{net.l2_size} → {net.l3_size} → 1 (value heads in float, trunk int8 ×64) → {name}.quantized.txt")
 

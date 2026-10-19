@@ -5,7 +5,8 @@ check_persp_net.py — PyTorch reference values of a NetPersp (nnue_persp.py) fo
     ./nets_check dump positions.bin 2000
     python3 check_persp_net.py positions.bin refs.bin ../models/nnue_persp_k8_distill.pt
     (a network with space features also needs them: ./nets_check space positions.bin space.u8,
-     then python3 check_persp_net.py positions.bin refs.bin model.pt space.u8)
+     then python3 check_persp_net.py positions.bin refs.bin model.pt space.u8; with the
+     ablation columns: ./nets_check space-all positions.bin space_all.u8, 92 per position)
     ./nets_check check_persp positions.bin refs.bin ../models/nnue_persp_k8_distill.quantized.txt \
                  [../models/nnue_193x1024x64x32x1_distill.quantized.txt]
 
@@ -28,12 +29,12 @@ def main():
                                                np.array([t], np.float32)]) for b, w, e, t, _ in recs]))
     net = load_persp(model).eval()
     if net.n_space:
-        space = np.fromfile(sys.argv[4], np.uint8).reshape(-1, 16).astype(np.float32)
+        space = np.fromfile(sys.argv[4], np.uint8).reshape(len(recs), -1).astype(np.float32)   # 16 or 92 columns
         x = torch.cat([x, torch.tensor(space)], dim=1)
     with torch.no_grad():
         v = net(x)
     open(out_path, "wb").write(v.numpy().astype("<f4").tobytes())
-    print(f"{model}: K = {net.k}, them = {net.them}, space mask = {net.space_mask:#06x}; value range [{v.min():+.3f}, {v.max():+.3f}], "
+    print(f"{model}: K = {net.k}, them = {net.them}, space mask = {net.space_mask:#x}; value range [{v.min():+.3f}, {v.max():+.3f}], "
           f"mean |v| {v.abs().mean():.3f}")
 
 

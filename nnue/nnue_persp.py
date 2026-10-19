@@ -197,7 +197,8 @@ def load_persp(path, map_location="cpu"):
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
     k, them, l1, l2, l3, mask = config_of(sd)
     net = NetPersp(k, them, l1, l2, l3, mask)
-    sd.setdefault("space_mask_t", torch.tensor(mask, dtype=torch.long))   # networks saved before step 2
-    sd.setdefault("space_cols_t", torch.tensor(space_columns(mask), dtype=torch.long))   # ... before the ablation
+    # networks saved before step 2 / before the ablation lack these buffers: take the new network's
+    sd.setdefault("space_mask_t", net.space_mask_t)
+    sd.setdefault("space_cols_t", net.space_cols_t)
     net.load_state_dict(sd)
     return net
