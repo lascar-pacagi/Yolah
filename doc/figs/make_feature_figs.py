@@ -171,7 +171,7 @@ def fig_queen():
               labels={s: str(d) for s, d in dist.items()}, title="coups de dame pour moi")
     f16 = R.compute16(us, them, free)
     fig.raw(0, f"\\node[plain,right,align=left] at (5.3,3.0) {{Q1 = {f16[1]}\\\\Q2 = {f16[2]}\\\\Q3 = {f16[3]}\\\\"
-               f"QW = {f16[5]}\\\\MOB = {f16[7]}}};")
+               f"QW = {f16[5]}}};")
     fig.write("fig-feat-queen")
     print("queen me:", f16[:8], "him:", f16[8:16])
     return f16
@@ -219,6 +219,29 @@ def fig_first():
                f"LATE9 : moi {f16[6]}, lui {f16[14]}}};")
     fig.write("fig-feat-first")
     print("first: QFIRST", f16[4], f16[12], "LATE9", f16[6], f16[14], "late zones", late, "ahead", ahead)
+
+
+def fig_mob():
+    """MOB: for each free square, how many of my pieces reach it in one queen move."""
+    us, them, free = MIDDLE
+    count = {}
+    for p in us:
+        for t in R.queen_moves(p, free):
+            count[t] = count.get(t, 0) + 1
+    shade = {1: "me!45", 2: "me!100", 3: "accent!45", 4: "accent!70"}
+    fig = Fig()
+    fig.board(us, them, free, fills={s: shade[c] for s, c in count.items()},
+              labels={s: str(c) for s, c in count.items()}, title="combien de mes pièces y vont en un coup")
+    f16 = R.compute16(us, them, free)
+    assert f16[7] == min(64, sum(count.values())) and f16[1] == len(count)
+    n2 = sum(1 for c in count.values() if c >= 2)
+    fig.raw(0, legend_line(5.6, 4.6, [(swatch("me!45"), "1 pièce"), (swatch("me!100"), "2 pièces")]
+                           + ([(swatch("accent!45"), "3 pièces")] if 3 in count.values() else [])))
+    fig.raw(0, f"\\node[plain,right,align=left] at (5.3,2.6) {{Q1 = {f16[1]} cases\\\\"
+               f"MOB = {f16[7]} coups\\\\({n2} cases comptées\\\\plusieurs fois)\\\\[3pt]"
+               f"MOB de lui = {f16[15]}}};")
+    fig.write("fig-feat-mob")
+    print("mob: Q1", f16[1], "MOB", f16[7], "his MOB", f16[15], "multi", n2, "max", max(count.values()))
 
 
 def fig_influence():
@@ -402,6 +425,7 @@ if __name__ == "__main__":
     fig_corr()
     fig_queen()
     fig_first()
+    fig_mob()
     fig_influence()
     fig_connect()
     fig_encircle()

@@ -1408,7 +1408,7 @@ puis la recherche exhaustive), mesurés avant la règle « s'abstenir seulement 
   nombre de cases atteintes en exactement $k$ coups (pour $k \le 6$). Une case à 1 coup vaut 1, à 2 coups ½,
   à 3 coups ¼ : QW résume toute la courbe en un nombre.
 
-![Le nombre de coups de dame qu'il me faut pour atteindre chaque case libre (toutes mes pièces ensemble). Q1 compte les cases marquées 1, Q2 celles marquées 1 ou 2, etc. MOB (plus loin) compte les mêmes cases à 1 coup, mais une fois par pièce qui peut y aller.](figs/fig-feat-queen.png){#fig-feat-queen width=72%}
+![Le nombre de coups de dame qu'il me faut pour atteindre chaque case libre (toutes mes pièces ensemble). Q1 compte les cases marquées 1, Q2 celles marquées 1 ou 2, etc.](figs/fig-feat-queen.png){#fig-feat-queen width=72%}
 
 ```cpp
 uint8_t out[16];                                        // les colonnes du camp (0 à 64)
@@ -1492,6 +1492,11 @@ entre elles) ne prédit rien : ce qui compte, c'est le temps d'arrivée à trave
 **La définition.** Le nombre de coups légaux : pour chaque pièce, les cases libres qu'elle atteint en un coup
 de dame, comptées une fois **par pièce** (MOB ≥ Q1 : deux pièces qui visent la même case la comptent deux
 fois).
+
+![La mobilité, sur la position des coups de dame (@fig-feat-queen). Chaque case libre porte le nombre de mes pièces qui l'atteignent en un coup de dame. Q1 compte les cases numérotées (32) ; MOB additionne les nombres (38) : les 6 cases marquées 2 comptent deux fois, une fois pour chaque pièce qui peut y aller.](figs/fig-feat-mob.png){#fig-feat-mob width=72%}
+
+Sur la figure, a4 compte deux fois : la pièce en a6 y descend, celle en c2 y monte en diagonale. Q1 dit
+combien de cases je contrôle ; MOB dit combien de coups j'ai, donc combien de choix il me reste.
 
 ```cpp
 int mob = 0;
