@@ -1067,9 +1067,12 @@ Le vrai exemple : en finale 10–19, le réseau seul explique 58,2 % des variati
 le flood fill corrigé en plus, 76,8 %. Le flood fill corrigé ajoute donc **+18,6 points** : une information
 importante que le réseau ne calcule pas lui-même.
 
-Pour les caractéristiques décrites après les 16 premières colonnes, on donne aussi le gain par rapport à
-une base plus forte : le réseau **plus les 16 premières colonnes**. Ce second chiffre dit ce que la
-caractéristique apporte encore quand celles-là sont déjà là.
+**Une seconde base.** Les 16 premières colonnes (CORR, Q1–Q3, QFIRST, QW, LATE9 et MOB, pour moi et
+pour lui) sont celles de l'étape 2 : le premier lot, choisi en premier et déjà entraîné. Les caractéristiques
+venues ensuite (influence, connectivité, encerclement) peuvent dire en partie la même chose : l'influence et
+le flood fill corrigé mesurent tous deux, à leur façon, à qui appartient le territoire. Pour elles, on donne
+donc aussi le gain par rapport à une base plus forte, le réseau **plus ces 16 colonnes** : ce second chiffre
+ne compte que ce que la caractéristique apporte de vraiment nouveau.
 
 Les phases sont définies par le nombre de cases libres : **ouverture** 40 à 56, **milieu** 20 à 39,
 **finale** 10 à 19, puis 0 à 9. Les chiffres viennent de `test/territory_study_main.cpp` (le calcul des
