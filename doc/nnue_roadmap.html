@@ -3614,11 +3614,58 @@ Figure 8: Les caractéristiques entrent dans la deuxième couche, à côté des
 <p>soit ici −26 + 20 d = 0, d = 26 / 20 = <strong>1,3</strong>. C’est bien un minimum : la dérivée seconde, 2 Σ x², est positive. On peut aussi dériver sans développer, avec (u²)’ = 2u·u’ et u = y − d·x, dont la dérivée par rapport à d est −x :</p>
 <p><span class="math display">\[S&#39;(d) = -2 \sum x_i\,(y_i - d\,x_i)\]</span></p>
 <p>L’annuler donne Σ x·(y − d·x) = 0 : l’erreur n’est pas corrélée avec x. C’est l’équation du cas à plusieurs coefficients, ci-dessous, écrite pour une seule colonne.</p>
-<p><em>Avec plusieurs coefficients</em>, même principe : la dérivée est nulle pour chaque coefficient, soit une équation par colonne j :</p>
-<p><span class="math display">\[\sum_{\text{positions}} x_j \,(y - \hat y) = 0\]</span></p>
-<p>Au meilleur choix, <strong>l’erreur restante n’a plus aucune corrélation avec aucune des colonnes</strong> ; s’il en restait une, on pourrait encore réduire l’erreur en changeant le coefficient de cette colonne. En notation matricielle (X : une ligne par position, une colonne par entrée), ce sont les <em>équations normales</em> :</p>
+<p><em>Avec deux coefficients.</em> Ajoutons une seconde colonne x₂ à l’exemple, et prédisons y par a·x₁ + b·x₂ :</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>x₁</th>
+<th>−2</th>
+<th>−1</th>
+<th>+1</th>
+<th>+2</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>x₂</td>
+<td>+1</td>
+<td>−1</td>
+<td>+1</td>
+<td>−1</td>
+</tr>
+<tr class="even">
+<td>y</td>
+<td>−3</td>
+<td>−1</td>
+<td>+2</td>
+<td>+2</td>
+</tr>
+</tbody>
+</table>
+<p>S(a, b) = Σ (y − a·x₁ − b·x₂)² dépend maintenant de deux nombres. Au minimum, la dérivée par rapport à <strong>chacun</strong> est nulle. Avec la même règle qu’avant (la dérivée de y − a·x₁ − b·x₂ par rapport à a est −x₁, par rapport à b est −x₂) :</p>
+<p><span class="math display">\[\frac{\partial S}{\partial a} = -2 \sum x_1\,(y - a x_1 - b x_2) = 0 \qquad
+  \frac{\partial S}{\partial b} = -2 \sum x_2\,(y - a x_1 - b x_2) = 0\]</span></p>
+<p>En développant les sommes, cela donne deux équations à deux inconnues, dont les coefficients sont de simples sommes sur les positions :</p>
+<p><span class="math display">\[\begin{aligned}
+a \textstyle\sum x_1^2 &amp;+ b \textstyle\sum x_1 x_2 = \textstyle\sum x_1 y \\
+a \textstyle\sum x_1 x_2 &amp;+ b \textstyle\sum x_2^2 = \textstyle\sum x_2 y
+\end{aligned}
+\qquad\text{ici :}\qquad
+\begin{aligned}
+10\,a - 2\,b &amp;= 13 \\
+-2\,a + 4\,b &amp;= -2
+\end{aligned}\]</span></p>
+<p>La seconde donne a = 2b + 1 ; dans la première, 18 b = 3 : <strong>b = 1/6, a = 4/3</strong>. Les erreurs deviennent −0,5, +0,5, +0,5, −0,5, de somme des carrés <strong>1,0</strong>, moins que le 1,1 obtenu avec x₁ seule.</p>
+<p><em>Ce que disent ces équations.</em> Chacune s’écrit Σ x_j · (erreur) = 0 : au meilleur choix, l’erreur restante n’a plus aucune corrélation avec aucune colonne. Vérifions : Σ x₁·erreur = (−2)(−0,5) + (−1)(0,5) + (1)(0,5) + (2)(−0,5) = 0, et de même pour x₂. À l’inverse, avec x₁ seule (a = 1,3, b = 0), les erreurs étaient −0,4, +0,3, +0,7, −0,6, et Σ x₂·erreur = −0,4 − 0,3 + 0,7 + 0,6 = <strong>+0,6</strong> : l’erreur « ressemblait » encore à x₂. La dérivée par rapport à b valait donc −2 × 0,6 &lt; 0 : augmenter b un peu faisait encore baisser S, et c’est ce qu’a fait la solution à deux coefficients. Tant qu’une colonne reste corrélée avec l’erreur, on peut faire mieux ; au minimum, plus aucune ne l’est.</p>
+<p><em>Pour n colonnes</em>, c’est la même chose : n équations à n inconnues, une par colonne. Rangées en tableau, les sommes Σ x_j x_k forment une matrice n × n notée XᵀX (X : une ligne par position, une colonne par entrée ; Xᵀ, sa transposée, a une ligne par colonne), et les sommes Σ x_j y forment le vecteur Xᵀy. Le système s’écrit alors en une ligne, les <em>équations normales</em> :</p>
 <p><span class="math display">\[X^\top X \,\beta = X^\top y\]</span></p>
-<p><em>Dans les études.</em> On parcourt une fois les positions de la moitié d’ajustement en additionnant les produits de colonnes deux à deux (XᵀX) et colonne × cible (Xᵀy) : avec 3 + 40 colonnes, XᵀX est un tableau de 43 × 43, quel que soit le nombre de positions. On résout ensuite ce système de 43 équations à 43 inconnues, ce qui est instantané (<code>piece_order_study.py</code> le fait ainsi, en ajoutant 10⁻⁶ sur la diagonale pour éviter une division par presque zéro quand deux colonnes sont presque identiques ; les autres scripts appellent <code>numpy.linalg.lstsq</code>, qui donne le même résultat par une méthode plus robuste mais plus gourmande en mémoire). Le centrage dispense d’une constante (le « + e » d’une droite d·x + e) : toutes les moyennes valant 0, la meilleure constante serait 0.</p>
+<p>Dans l’exemple, XᵀX = [[10, −2], [−2, 4]], Xᵀy = [13, −2] et β = [a, b].</p>
+<p><em>Dans les études.</em> Une étude a des millions de positions, mais le système ne dépend que des sommes. On parcourt donc une fois les positions de la moitié d’ajustement, et pour chacune on ajoute x_j·x_k à la case (j, k) de XᵀX et x_j·y à la case j de Xᵀy. Avec 3 colonnes pour le réseau (v, v², v³) et 40 pour la connectivité, XᵀX est un tableau de 43 × 43, quel que soit le nombre de positions, et résoudre 43 équations à 43 inconnues est instantané. Deux détails :</p>
+<ul>
+<li><strong>10⁻⁶ sur la diagonale.</strong> Si deux colonnes sont presque identiques (deux distances qui valent presque toujours la même chose), le système a une infinité de solutions presque aussi bonnes : on « divise par presque zéro » et les coefficients explosent. Ajouter 10⁻⁶ à chaque case Σ x_j² départage en faveur des petits coefficients, sans changer les prédictions de façon mesurable. <code>piece_order_study.py</code> procède ainsi.</li>
+<li><strong><code>numpy.linalg.lstsq</code></strong>, utilisé par les autres scripts, donne le même résultat en travaillant sur X lui-même (une décomposition plus robuste numériquement). Mais X a une ligne par position : 12 millions de lignes × 43 colonnes en nombres de 8 octets font 4 Go, plus les copies de travail. C’est ce qui a manqué de mémoire sur l’étude de l’ordre des pièces, et pourquoi elle accumule XᵀX à la place.</li>
+</ul>
+<p><em>Pas de constante.</em> Une droite a d’habitude une constante, d·x + e. Avec une constante, il y aurait une équation de plus, Σ 1 · (erreur) = 0, c’est-à-dire « l’erreur est en moyenne nulle ». Comme toutes les colonnes et la cible sont centrées (moyenne 0), cette équation est satisfaite avec e = 0 : la constante est inutile.</p>
 </section>
 <section id="ajustement-sur-une-moitié-mesure-sur-lautre" class="level4" data-number="5.1.5.4">
 <h4 data-number="5.1.5.4" class="anchored" data-anchor-id="ajustement-sur-une-moitié-mesure-sur-lautre"><span class="header-section-number">5.1.5.4</span> 4. Ajustement sur une moitié, mesure sur l’autre</h4>
