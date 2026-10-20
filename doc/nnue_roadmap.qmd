@@ -1269,27 +1269,37 @@ quelques blocs chacune, une recherche exhaustive suffit.
 ![Le flood fill corrigé en finale. La pièce en d6 touche le bloc de 6 et celui de 8 : elle ne peut en garder qu'un. Celle en h3 touche le bloc de 4 et celui de 2. Les pièces b4 et c1 se partagent le bloc de 13. Flood fill : 13 + 4 + 2 + 8 + 6 = 33 cases ; corrigé : 13 + 4 + 8 = 25.](figs/fig-feat-corr.png){#fig-feat-corr width=80%}
 
 ```cpp
-// nnue/space_features.h — corrected_flood_fill(pieces, free, comps, size, nc), avec les blocs ci-dessus
-uint64_t options[8];      // pour chaque pièce : les blocs qu'elle touche (un bit par bloc)
-int np = 0, best = 0;     // le nombre de pièces, le meilleur total trouvé
-for (uint64_t b = pieces; b; b &= b - 1) {
-    const uint64_t around = shift_all_directions(b & -b);
-    uint64_t o = 0;
-    for (int i = 0; i < nc; i++) if (comps[i] & around) o |= uint64_t(1) << i;
-    options[np++] = o;
-}
-// essai de tous les choix (aucun bloc, ou un bloc pas encore pris)
-auto rec = [&](auto&& self, int k, uint64_t covered) -> void {
-    if (k == np) {                                      // tous les choix faits : taille des blocs pris
-        int total = 0;
-        for (uint64_t c = covered; c; c &= c - 1) total += size[std::countr_zero(c)];
-        best = std::max(best, total);
-        return;
+// nnue/space_features.h
+//   pieces : mes pièces (bitboard)          comps[i] : le bloc i (bitboard), calculé ci-dessus
+//   free   : les cases libres (inutilisé    size[i]  : son nombre de cases
+//            ici : les blocs suffisent)
+//                                           nc       : le nombre de blocs
+int corrected_flood_fill(uint64_t pieces, uint64_t free, const uint64_t* comps, const int* size, int nc) {
+    uint64_t options[8];      // pour chaque pièce : les blocs qu'elle touche (bit i = bloc i)
+    int np = 0, best = 0;     // le nombre de pièces, le meilleur total trouvé
+    for (uint64_t b = pieces; b; b &= b - 1) {          // b & -b : une pièce ; b &= b - 1 : la suivante
+        const uint64_t around = shift_all_directions(b & -b);   // ses 8 voisines
+        uint64_t o = 0;
+        for (int i = 0; i < nc; i++) if (comps[i] & around) o |= uint64_t(1) << i;
+        options[np++] = o;
     }
-    self(self, k + 1, covered);                         // la pièce k ne prend aucun bloc
-    for (uint64_t o = options[k] & ~covered; o; o &= o - 1) self(self, k + 1, covered | (o & -o));
-};
-rec(rec, 0, 0);                                         // CORR = best
+    // rec(self, k, covered) : choisit le bloc de la pièce k, les pièces 0 à k − 1 ayant déjà pris les
+    // blocs de covered (bit i = bloc i pris) ; self = rec elle-même (une lambda ne peut pas s'appeler
+    // par son nom)
+    auto rec = [&](auto&& self, int k, uint64_t covered) -> void {
+        if (k == np) {                                  // tous les choix faits : taille des blocs pris
+            int total = 0;
+            for (uint64_t c = covered; c; c &= c - 1) total += size[std::countr_zero(c)];
+            best = std::max(best, total);
+            return;
+        }
+        self(self, k + 1, covered);                     // la pièce k ne prend aucun bloc
+        for (uint64_t o = options[k] & ~covered; o; o &= o - 1)   // ou un des blocs qu'elle touche, libre
+            self(self, k + 1, covered | (o & -o));
+    };
+    rec(rec, 0, 0);                                     // de la pièce 0, aucun bloc pris
+    return best;                                        // CORR
+}
 ```
 
 **Ce que les mesures ont dit.** Inutile en ouverture (le plateau est d'un seul bloc). En finale 10–19, c'est
