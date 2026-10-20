@@ -1228,10 +1228,17 @@ template <Direction D> uint64_t slide(uint64_t gen, uint64_t free) {
     return shift<D>(gen) & free;                        // la dernière case atteinte
 }
 
+// toutes les cases libres à un coup de dame de from : les 8 directions
+uint64_t queen_reach(uint64_t from, uint64_t free) {
+    return slide<NORTH>(from, free) | slide<SOUTH>(from, free) | slide<EAST>(from, free) |
+           slide<WEST>(from, free) | slide<NORTH_EAST>(from, free) | slide<NORTH_WEST>(from, free) |
+           slide<SOUTH_EAST>(from, free) | slide<SOUTH_WEST>(from, free);
+}
+
 int queen_levels(uint64_t pieces, uint64_t free, uint64_t levels[64]) {
     int n = 0;
     for (uint64_t seen = 0, front = pieces, next;
-         (next = queen_reach(front, free) & ~seen); front = next) {   // queen_reach = les 8 slide
+         (next = queen_reach(front, free) & ~seen); front = next) {   // un coup de plus, cases nouvelles
         levels[n++] = next;                             // les cases à n coups exactement
         seen |= next;
     }
