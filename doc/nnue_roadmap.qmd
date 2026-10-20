@@ -954,7 +954,8 @@ libres, alors « Q1 grand » va de pair avec « beaucoup de points restants », 
 signalent l'ouverture. Q1 aurait l'air de prédire la suite, sans rien savoir de la position elle-même.
 
 Pour l'éviter, on range les positions en **groupes de semblables** : même nombre de cases libres et même
-couleur au trait (57 × 2 groupes). Dans chaque groupe, on retire à chaque nombre (la cible, la valeur du
+couleur au trait (57 × 2 groupes : de 56 cases libres au départ, 64 cases moins les 8 pièces, à 0 en fin
+de partie). Dans chaque groupe, on retire à chaque nombre (la cible, la valeur du
 réseau, la caractéristique) sa moyenne dans le groupe :
 
 ```
@@ -969,14 +970,21 @@ seul ce qui distingue une position de ses semblables peut encore prédire la cib
 
 #### 3. Deux prédictions
 
-Avec v la valeur du réseau et f la caractéristique, toutes deux centrées comme ci-dessus :
+Deux nombres décrivent chaque position :
+
+- **v**, la valeur que le réseau actuel donne à la position, entre −1 et +1 (par exemple +0,4 : le joueur au
+  trait est un peu mieux) ;
+- **f**, la caractéristique. La plupart en ont deux colonnes, une pour moi et une pour l'adversaire : pour le
+  flood fill corrigé, par exemple, f₁ = 20 cases pour moi et f₂ = 14 pour lui.
+
+Tous deux sont centrés comme à l'étape 2. On fait alors deux prédictions de la cible :
 
 - **le réseau seul** : cible ≈ a·v + b·v² + c·v³. Le polynôme de degré 3 laisse au réseau toutes ses chances :
   sa valeur n'est pas forcément proportionnelle aux points (elle sature près de ±1, par exemple) ;
-- **le réseau plus la caractéristique** : cible ≈ a·v + b·v² + c·v³ + d·f, avec un coefficient de plus par
-  colonne quand la caractéristique en a plusieurs (40 pour la connectivité, par exemple).
+- **le réseau plus la caractéristique** : cible ≈ a·v + b·v² + c·v³ + d₁·f₁ + d₂·f₂, avec un coefficient par
+  colonne de la caractéristique (2 pour le flood fill corrigé, 40 pour la connectivité).
 
-Les coefficients (a, b, c, d…) sont ceux qui rendent la somme des carrés des erreurs la plus petite
+Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite
 possible (moindres carrés).
 
 #### 4. Ajustement sur une moitié, mesure sur l'autre

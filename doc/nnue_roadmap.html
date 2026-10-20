@@ -3542,7 +3542,7 @@ Figure 8: Les caractéristiques entrent dans la deuxième couche, à côté des
 <section id="on-compare-des-positions-du-même-stade" class="level4" data-number="5.1.5.2">
 <h4 data-number="5.1.5.2" class="anchored" data-anchor-id="on-compare-des-positions-du-même-stade"><span class="header-section-number">5.1.5.2</span> 2. On compare des positions du même stade</h4>
 <p>Prenons une caractéristique simple : Q1, le nombre de cases libres que j’atteins en un coup de dame. En ouverture, il reste beaucoup de cases libres et Q1 vaut souvent 30 ; en finale, il en reste peu et Q1 vaut plutôt 8. Or la cible dépend aussi du stade de la partie et du joueur au trait : par exemple, si les Noirs au trait avec 45 cases libres finissent en moyenne avec +3 points, mais avec +1 seulement à 15 cases libres, alors « Q1 grand » va de pair avec « beaucoup de points restants », simplement parce que les deux signalent l’ouverture. Q1 aurait l’air de prédire la suite, sans rien savoir de la position elle-même.</p>
-<p>Pour l’éviter, on range les positions en <strong>groupes de semblables</strong> : même nombre de cases libres et même couleur au trait (57 × 2 groupes). Dans chaque groupe, on retire à chaque nombre (la cible, la valeur du réseau, la caractéristique) sa moyenne dans le groupe :</p>
+<p>Pour l’éviter, on range les positions en <strong>groupes de semblables</strong> : même nombre de cases libres et même couleur au trait (57 × 2 groupes : de 56 cases libres au départ, 64 cases moins les 8 pièces, à 0 en fin de partie). Dans chaque groupe, on retire à chaque nombre (la cible, la valeur du réseau, la caractéristique) sa moyenne dans le groupe :</p>
 <pre><code>groupe « 45 cases libres, Noirs au trait » : moyenne de Q1 = 30, moyenne des points restants = +3
   position P : Q1 = 34, points restants = +7   →   Q1 centré = +4, points centrés = +4
   position R : Q1 = 27, points restants = +1   →   Q1 centré = −3, points centrés = −2</code></pre>
@@ -3550,12 +3550,17 @@ Figure 8: Les caractéristiques entrent dans la deuxième couche, à côté des
 </section>
 <section id="deux-prédictions" class="level4" data-number="5.1.5.3">
 <h4 data-number="5.1.5.3" class="anchored" data-anchor-id="deux-prédictions"><span class="header-section-number">5.1.5.3</span> 3. Deux prédictions</h4>
-<p>Avec v la valeur du réseau et f la caractéristique, toutes deux centrées comme ci-dessus :</p>
+<p>Deux nombres décrivent chaque position :</p>
+<ul>
+<li><strong>v</strong>, la valeur que le réseau actuel donne à la position, entre −1 et +1 (par exemple +0,4 : le joueur au trait est un peu mieux) ;</li>
+<li><strong>f</strong>, la caractéristique. La plupart en ont deux colonnes, une pour moi et une pour l’adversaire : pour le flood fill corrigé, par exemple, f₁ = 20 cases pour moi et f₂ = 14 pour lui.</li>
+</ul>
+<p>Tous deux sont centrés comme à l’étape 2. On fait alors deux prédictions de la cible :</p>
 <ul>
 <li><strong>le réseau seul</strong> : cible ≈ a·v + b·v² + c·v³. Le polynôme de degré 3 laisse au réseau toutes ses chances : sa valeur n’est pas forcément proportionnelle aux points (elle sature près de ±1, par exemple) ;</li>
-<li><strong>le réseau plus la caractéristique</strong> : cible ≈ a·v + b·v² + c·v³ + d·f, avec un coefficient de plus par colonne quand la caractéristique en a plusieurs (40 pour la connectivité, par exemple).</li>
+<li><strong>le réseau plus la caractéristique</strong> : cible ≈ a·v + b·v² + c·v³ + d₁·f₁ + d₂·f₂, avec un coefficient par colonne de la caractéristique (2 pour le flood fill corrigé, 40 pour la connectivité).</li>
 </ul>
-<p>Les coefficients (a, b, c, d…) sont ceux qui rendent la somme des carrés des erreurs la plus petite possible (moindres carrés).</p>
+<p>Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite possible (moindres carrés).</p>
 </section>
 <section id="ajustement-sur-une-moitié-mesure-sur-lautre" class="level4" data-number="5.1.5.4">
 <h4 data-number="5.1.5.4" class="anchored" data-anchor-id="ajustement-sur-une-moitié-mesure-sur-lautre"><span class="header-section-number">5.1.5.4</span> 4. Ajustement sur une moitié, mesure sur l’autre</h4>
