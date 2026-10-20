@@ -1312,6 +1312,35 @@ quelques blocs chacune, une recherche exhaustive suffit.
 
 ![Le flood fill corrigé en finale. La pièce en d6 touche le bloc de 6 et celui de 8 : elle ne peut en garder qu'un. Celle en h3 touche le bloc de 4 et celui de 2. Les pièces b4 et c1 se partagent le bloc de 13. Flood fill : 13 + 4 + 2 + 8 + 6 = 33 cases ; corrigé : 13 + 4 + 8 = 25.](figs/fig-feat-corr.png){#fig-feat-corr width=80%}
 
+**Le code.** D'abord les blocs, une seule fois pour les deux camps : c'est le code de la section sur les
+blocs, extrait du début de `compute`. Ensuite CORR, pour chaque camp :
+
+```cpp
+// nnue/space_features.h, début de compute (simplifié : us, them, free sont ses paramètres)
+//   us, them : les pièces du joueur au trait et de l'autre (bitboards)    free : les cases libres
+//   out[0]   : CORR pour moi ;  out[8] : CORR pour lui (entier de 0 à 64)
+void compute_corr(uint64_t us, uint64_t them, uint64_t free, uint8_t out[16]) {
+    uint64_t comps[64];        // les blocs trouvés (un bitboard chacun) ; au plus 64
+    int size[64], nc = 0;      // leur taille, leur nombre
+    for (uint64_t rest = free; rest;) {                 // rest : les cases libres pas encore rangées
+        uint64_t c = rest & -rest, prev = 0;            // c part de la première de ces cases
+        // c grandit d'un pas de roi à la fois, dans les cases libres, jusqu'à ne plus changer :
+        // c est alors tout le bloc de cette case
+        while (c != prev) { prev = c; c |= shift_all_directions(c) & free; }
+        comps[nc] = c;                                  // le bloc
+        size[nc++] = std::popcount(c);                  // son nombre de cases
+        rest &= ~c;                                     // ses cases sont rangées
+    }
+    const uint64_t pcs[2] = { us, them };
+    for (int sd = 0; sd < 2; sd++)                      // sd = 0 : moi ; sd = 1 : lui
+        out[sd * 8] = uint8_t(std::min(64, corrected_flood_fill(pcs[sd], free, comps, size, nc)));
+}
+```
+
+Les deux camps partagent les blocs : ils ne dépendent que des cases libres, pas des pièces. Seules les
+options de chaque pièce (les blocs qu'elle touche) diffèrent. Dans le vrai code, `put` borne la valeur
+entre 0 et 64, comme ici `std::min`.
+
 ```cpp
 // nnue/space_features.h
 //   pieces : mes pièces (bitboard)          comps[i] : le bloc i (bitboard), calculé ci-dessus
