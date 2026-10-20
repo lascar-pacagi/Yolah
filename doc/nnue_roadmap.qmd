@@ -1212,6 +1212,12 @@ vers la droite, sans les cases de départ.
 
 ![Le remplissage occlus vers la droite (`slide<EAST>`) sur un plateau : en bleu les cases déjà atteintes (`gen`), en points orange les arrivées permises au tour suivant (`pro`), en flèches les sauts ajoutés à chaque tour.](figs/fig-occluded.png){#fig-occluded width=100%}
 
+**À vous de jouer.** Le visualiseur ci-dessous refait le calcul pas à pas, ligne de code par ligne de code,
+sur la position de la figure ou sur une position que vous composez ; il calcule avec de vrais bitboards de 64
+bits et les mêmes décalages que le C++.
+
+{{< include _occluded_viewer.qmd >}}
+
 Deux avantages : il n'y a ni boucle ni test, seulement 3 tours de décalages et de ET logiques ; et `gen`
 peut contenir plusieurs cases de départ, qui avancent toutes en même temps, comme les quatre pièces de la
 figure (tout un niveau de dame d'un coup).

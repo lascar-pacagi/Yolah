@@ -1,0 +1,267 @@
+```{=html}
+<!-- Pas à pas du remplissage occlus (slide<D> de nnue/space_features.h), inclus par nnue_roadmap.qmd.
+     Les bitboards sont des BigInt de 64 bits, case = 8 · rangée + colonne (a1 = 0), et les décalages
+     reprennent ceux de game/types.h (masques des colonnes a et h). -->
+<div class="ks" id="ks" tabindex="0">
+  <div class="ks-bar">
+    <label>Direction
+      <select id="ks-dir">
+        <option value="EAST">→ EAST</option>
+        <option value="WEST">← WEST</option>
+        <option value="NORTH">↑ NORTH</option>
+        <option value="SOUTH">↓ SOUTH</option>
+        <option value="NORTH_EAST">↗ NORTH_EAST</option>
+        <option value="NORTH_WEST">↖ NORTH_WEST</option>
+        <option value="SOUTH_EAST">↘ SOUTH_EAST</option>
+        <option value="SOUTH_WEST">↙ SOUTH_WEST</option>
+        <option value="ALL">✳ les 8 (queen_reach)</option>
+      </select>
+    </label>
+    <label>Position
+      <select id="ks-preset">
+        <option value="fig">celle de la figure</option>
+        <option value="mid">milieu de partie</option>
+        <option value="one">une pièce, plateau vide</option>
+      </select>
+    </label>
+    <span class="ks-nav">
+      <button id="ks-first" title="départ">⏮</button>
+      <button id="ks-prev" title="étape précédente (←)">◀</button>
+      <span id="ks-step"></span>
+      <button id="ks-next" title="étape suivante (→)">▶</button>
+      <button id="ks-last" title="résultat">⏭</button>
+    </span>
+  </div>
+  <div class="ks-main">
+    <svg id="ks-board" viewBox="-18 -4 344 344" role="img" aria-label="plateau"></svg>
+    <div class="ks-side">
+      <pre class="ks-code" id="ks-code"></pre>
+      <div class="ks-explain" id="ks-explain"></div>
+      <div class="ks-legend">
+        <span><i class="ks-sw ks-gen"></i>gen : cases atteintes</span>
+        <span><i class="ks-dot"></i>pro : arrivée permise</span>
+        <span><i class="ks-ring"></i>vient de perdre son point</span>
+        <span><i class="ks-sw ks-res"></i>résultat</span>
+        <span><i class="ks-sw ks-hole"></i>trou</span>
+      </div>
+    </div>
+  </div>
+  <p class="ks-help">Cliquez sur une case pour changer son contenu : libre → trou → ma pièce → sa pièce. Mes pièces
+  sont les cases de départ (gen) ; les siennes, comme les trous, arrêtent les lignes. Flèches du clavier :
+  étape précédente / suivante.</p>
+</div>
+
+<style>
+.ks { --ks-ink:#1B2430; --ks-muted:#6B7785; --ks-gen:#CFE0F3; --ks-res:#CFE6D6; --ks-hole:#9AA3AE;
+      --ks-pro:#C1611F; --ks-arrow:#2F6FB5; --ks-line:#c9cfd6;
+      border:1px solid var(--ks-line); border-radius:8px; padding:12px; margin:1em 0; background:#fbfcfd;
+      color:var(--ks-ink); font-size:0.9rem; outline:none; }
+.ks:focus-visible { box-shadow:0 0 0 2px var(--ks-arrow); }
+.ks-bar { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin-bottom:10px; }
+.ks-bar select { margin-left:4px; padding:2px 4px; }
+.ks-nav { display:inline-flex; gap:4px; align-items:center; margin-left:auto; }
+.ks-nav button { min-width:34px; padding:2px 6px; border:1px solid var(--ks-line); border-radius:5px;
+                 background:white; cursor:pointer; }
+.ks-nav button:disabled { opacity:.4; cursor:default; }
+#ks-step { min-width:82px; text-align:center; color:var(--ks-muted); font-variant-numeric:tabular-nums; }
+.ks-main { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+#ks-board { width:340px; max-width:100%; flex:0 0 auto; user-select:none; }
+.ks-side { flex:1 1 300px; min-width:0; }
+.ks-code { font-size:0.75rem; line-height:1.45; background:white; border:1px solid var(--ks-line);
+           border-radius:6px; padding:6px 0; margin:0 0 8px; overflow-x:auto; }
+.ks-code span { display:block; padding:0 8px; white-space:pre; }
+.ks-code span.on { background:#fff1c9; box-shadow:inset 3px 0 0 var(--ks-pro); }
+.ks-explain { min-height:4.5em; line-height:1.45; }
+.ks-explain b { color:var(--ks-arrow); }
+.ks-legend { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:8px; color:var(--ks-muted); font-size:0.8rem; }
+.ks-legend span { display:inline-flex; align-items:center; gap:5px; }
+.ks-sw { display:inline-block; width:12px; height:12px; border:1px solid var(--ks-line); }
+.ks-gen { background:var(--ks-gen); } .ks-res { background:var(--ks-res); } .ks-hole { background:var(--ks-hole); }
+.ks-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--ks-pro); }
+.ks-ring { display:inline-block; width:8px; height:8px; border-radius:50%; border:1.5px solid var(--ks-pro); }
+.ks-help { color:var(--ks-muted); font-size:0.8rem; margin:8px 0 0; }
+#ks-board text { font: 11px sans-serif; fill: var(--ks-muted); }
+</style>
+
+<script>
+(() => {
+  const M = (1n << 64n) - 1n;
+  const FA = 0x0101010101010101n, FH = FA << 7n;
+  // shift<D> of game/types.h; [rank step, file step] for the arrows
+  const DIRS = {
+    NORTH:      [b => b << 8n,                 1,  0],
+    SOUTH:      [b => b >> 8n,                -1,  0],
+    EAST:       [b => (b & ~FH) << 1n,         0,  1],
+    WEST:       [b => (b & ~FA) >> 1n,         0, -1],
+    NORTH_EAST: [b => (b & ~FH) << 9n,         1,  1],
+    NORTH_WEST: [b => (b & ~FA) << 7n,         1, -1],
+    SOUTH_EAST: [b => (b & ~FH) >> 7n,        -1,  1],
+    SOUTH_WEST: [b => (b & ~FA) >> 9n,        -1, -1],
+  };
+  const FREE = 0, HOLE = 1, MINE = 2, HIS = 3;
+  const sqs = s => [...Array(64).keys()].filter(i => s >> BigInt(i) & 1n);
+  const count = b => sqs(b).length;
+  const name = i => "abcdefgh"[i % 8] + (Math.floor(i / 8) + 1);
+
+  function parse(rows) {                      // rank 8 first: M mine, H his, x hole, . free
+    const c = Array(64).fill(FREE);
+    rows.forEach((row, i) => row.split(" ").forEach((ch, f) => {
+      c[8 * (7 - i) + f] = {M: MINE, H: HIS, x: HOLE}[ch] ?? FREE; }));
+    return c;
+  }
+  const PRESETS = {
+    fig: (() => { const c = Array(64).fill(HOLE);
+      "b8 c8 d8 e8 f8 g8 h8 b6 c6 d6 e6 g6 h6 d4 e4 g4 h4 f2 g2 h2".split(" ").forEach(n => c[sqOf(n)] = FREE);
+      ["a8", "a6", "c4", "e2"].forEach(n => c[sqOf(n)] = MINE); c[sqOf("f4")] = HIS; return c; })(),
+    mid: parse([". . x . . . H .", ". x . . x . . .", "M . . x . . x .", ". . x . M . . .",
+                ". x . . x . x H", ". . . H . x . .", "x . M . . . x .", ". . . x . M . H"]),
+    one: (() => { const c = Array(64).fill(FREE); c[sqOf("c3")] = MINE; return c; })(),
+  };
+  function sqOf(n) { return 8 * (+n[1] - 1) + "abcdefgh".indexOf(n[0]); }
+
+  const SLIDE = [
+    "template <Direction D> uint64_t slide(uint64_t gen, uint64_t free) {",
+    "    uint64_t pro = free;",
+    "    gen |= pro & shift<D>(gen);                          // sauts de 1",
+    "    pro &= shift<D>(pro);",
+    "    gen |= pro & shift<D>(shift<D>(gen));                // sauts de 2",
+    "    pro &= shift<D>(shift<D>(pro));",
+    "    gen |= pro & shift<D>(shift<D>(shift<D>(shift<D>(gen))));   // sauts de 4",
+    "    return shift<D>(gen) & free;",
+    "}"];
+  const REACH = [
+    "uint64_t queen_reach(uint64_t from, uint64_t free) {",
+    "    return slide<NORTH>(from, free) | slide<SOUTH>(from, free) | slide<EAST>(from, free) |",
+    "           slide<WEST>(from, free) | slide<NORTH_EAST>(from, free) | slide<NORTH_WEST>(from, free) |",
+    "           slide<SOUTH_EAST>(from, free) | slide<SOUTH_WEST>(from, free);",
+    "}"];
+
+  let cells = PRESETS.fig.slice(), dir = "EAST", steps = [], at = 0;
+
+  const bbOf = kind => cells.reduce((b, c, i) => c === kind ? b | (1n << BigInt(i)) : b, 0n);
+
+  function slideTrace(d) {
+    const [f] = DIRS[d], sh = b => f(b) & M;
+    const free = bbOf(FREE);
+    let gen = bbOf(MINE), pro = free, before;
+    const S = [];
+    const add = (o) => S.push(Object.assign({gen, pro}, o));
+    add({line: 1, jump: 0, text: `<b>Départ.</b> gen = mes pièces (${count(gen)}) ; pro = les cases libres
+      (${count(pro)}) : les arrivées permises pour un saut de 1.`});
+    for (const [k, lg, lp] of [[1, 2, 3], [2, 4, 5], [4, 6, 0]]) {
+      before = gen;
+      let s = gen; for (let i = 0; i < k; i++) s = sh(s);
+      gen |= pro & s;
+      const added = gen & ~before;
+      add({line: lg, jump: k, added, text: `<b>Sauts de ${k}.</b> Chaque case atteinte saute de ${k} case${k > 1 ? "s" : ""} ;
+        l'arrivée est gardée si elle porte un point. ${count(added) ? `+${count(added)} case${count(added) > 1 ? "s" : ""}
+        (flèches) : ${sqs(added).map(name).join(", ")}.` : "Aucune case nouvelle."}`});
+      if (lp) {
+        const old = pro;
+        let s2 = pro; for (let i = 0; i < k; i++) s2 = sh(s2);
+        pro &= s2;
+        const lost = old & ~pro;
+        add({line: lp, jump: 0, lost, text: `<b>pro pour des sauts de ${2 * k}.</b> Une case garde son point si la case
+          ${k} plus loin en arrière le portait aussi : il faut ${2 * k} cases libres d'affilée pour y arriver.
+          ${count(lost) ? `${count(lost)} case${count(lost) > 1 ? "s perdent" : " perd"} son point (cercles).` : "Aucune ne perd son point."}`});
+      }
+    }
+    const res = sh(gen) & free;
+    add({line: 7, jump: 0, result: res, pro: 0n, text: `<b>Résultat.</b> Un dernier pas d'une case, en ne gardant que
+      les cases libres : les ${count(res)} cases à un coup de dame dans cette direction, sans les cases de départ.
+      Trois tours ont suffi : toute distance de 1 à 7 s'écrit avec 1, 2 et 4.`});
+    return S;
+  }
+
+  function reachTrace() {
+    const free = bbOf(FREE), gen = bbOf(MINE);
+    let res = 0n;
+    for (const d of Object.keys(DIRS)) { const t = slideTrace(d); res |= t[t.length - 1].result; }
+    return [
+      {gen, pro: 0n, line: -1, jump: 0, text: `<b>Départ.</b> Mes pièces (${count(gen)}). queen_reach fait les 8
+        remplissages occlus, un par direction (choisissez une direction pour les voir pas à pas).`},
+      {gen, pro: 0n, line: 1, jump: 0, result: res, text: `<b>Résultat.</b> La réunion des 8 directions : les
+        ${count(res)} cases libres à un coup de dame de l'une de mes pièces. C'est un niveau de queen_levels.`}];
+  }
+
+  const $ = id => document.getElementById(id);
+  const svg = $("ks-board"), NS = "http://www.w3.org/2000/svg", Q = 40;
+  const X = i => (i % 8) * Q, Y = i => (7 - Math.floor(i / 8)) * Q;
+  function el(tag, attrs, parent = svg) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    parent.appendChild(e); return e;
+  }
+
+  function draw() {
+    const st = steps[at];
+    svg.replaceChildren();
+    const defs = el("defs", {});
+    const mk = el("marker", {id: "ks-arr", viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 6, markerHeight: 6,
+                             orient: "auto-start-reverse"}, defs);
+    el("path", {d: "M0,0 L10,5 L0,10 z", fill: "var(--ks-arrow)"}, mk);
+    for (let i = 0; i < 64; i++) {
+      const bit = 1n << BigInt(i);
+      let fill = "white";
+      if (cells[i] === HOLE) fill = "var(--ks-hole)";
+      else if (st.result !== undefined && (st.result & bit)) fill = "var(--ks-res)";
+      else if (st.result === undefined && (st.gen & bit)) fill = "var(--ks-gen)";
+      if (st.result !== undefined && cells[i] === MINE) fill = "white";
+      const r = el("rect", {x: X(i), y: Y(i), width: Q, height: Q, fill, stroke: "var(--ks-line)", "stroke-width": 1,
+                            style: "cursor:pointer"});
+      r.addEventListener("click", () => { cells[i] = (cells[i] + 1) % 4; recompute(true); });
+      if (cells[i] === MINE) el("circle", {cx: X(i) + Q / 2, cy: Y(i) + Q / 2, r: 13, fill: "var(--ks-ink)",
+                                           "pointer-events": "none"});
+      if (cells[i] === HIS) el("circle", {cx: X(i) + Q / 2, cy: Y(i) + Q / 2, r: 12, fill: "white",
+                                          stroke: "var(--ks-ink)", "stroke-width": 2, "pointer-events": "none"});
+      if (st.pro & bit) el("circle", {cx: X(i) + Q - 8, cy: Y(i) + 8, r: 4, fill: "var(--ks-pro)", "pointer-events": "none"});
+      if (st.lost && (st.lost & bit)) el("circle", {cx: X(i) + Q - 8, cy: Y(i) + 8, r: 4, fill: "none",
+                                                     stroke: "var(--ks-pro)", "stroke-width": 1.5, "pointer-events": "none"});
+    }
+    el("rect", {x: 0, y: 0, width: 8 * Q, height: 8 * Q, fill: "none", stroke: "var(--ks-ink)", "stroke-width": 1.5,
+                "pointer-events": "none"});
+    for (let f = 0; f < 8; f++) el("text", {x: f * Q + Q / 2, y: 8 * Q + 14, "text-anchor": "middle"}).textContent = "abcdefgh"[f];
+    for (let r = 0; r < 8; r++) el("text", {x: -9, y: (7 - r) * Q + Q / 2 + 4, "text-anchor": "middle"}).textContent = r + 1;
+    if (st.jump && dir !== "ALL") {
+      const [, dr, df] = DIRS[dir];
+      for (const i of sqs(st.added)) {
+        const from = i - st.jump * (8 * dr + df);
+        const x1 = X(from) + Q / 2, y1 = Y(from) + Q / 2, x2 = X(i) + Q / 2, y2 = Y(i) + Q / 2;
+        const len = Math.hypot(x2 - x1, y2 - y1), h = 8 + 2.5 * st.jump;
+        const cx = (x1 + x2) / 2 + (-(y2 - y1) / len) * h * -1, cy = (y1 + y2) / 2 + ((x2 - x1) / len) * h * -1;
+        el("path", {d: `M${x1},${y1} Q${cx},${cy} ${x2 - (x2 - x1) / len * 9},${y2 - (y2 - y1) / len * 9}`, fill: "none",
+                    stroke: "var(--ks-arrow)", "stroke-width": 2, "marker-end": "url(#ks-arr)", "pointer-events": "none"});
+      }
+    }
+    const code = dir === "ALL" ? REACH : SLIDE;
+    $("ks-code").replaceChildren(...code.map((t, j) => {
+      const s = document.createElement("span"); s.textContent = t;
+      if (j === st.line || (dir === "ALL" && st.line === 1 && j >= 1 && j <= 3)) s.className = "on";
+      return s; }));
+    $("ks-explain").innerHTML = st.text;
+    $("ks-step").textContent = `étape ${at + 1} / ${steps.length}`;
+    $("ks-first").disabled = $("ks-prev").disabled = at === 0;
+    $("ks-last").disabled = $("ks-next").disabled = at === steps.length - 1;
+  }
+
+  function recompute(toStart) {
+    steps = dir === "ALL" ? reachTrace() : slideTrace(dir);
+    if (toStart) at = 0;
+    at = Math.min(at, steps.length - 1);
+    draw();
+  }
+  const go = k => { at = Math.max(0, Math.min(steps.length - 1, k)); draw(); };
+  $("ks-dir").addEventListener("change", e => { dir = e.target.value; recompute(true); });
+  $("ks-preset").addEventListener("change", e => { cells = PRESETS[e.target.value].slice(); recompute(true); });
+  $("ks-first").addEventListener("click", () => go(0));
+  $("ks-prev").addEventListener("click", () => go(at - 1));
+  $("ks-next").addEventListener("click", () => go(at + 1));
+  $("ks-last").addEventListener("click", () => go(steps.length - 1));
+  $("ks").addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") { go(at + 1); e.preventDefault(); }
+    if (e.key === "ArrowLeft") { go(at - 1); e.preventDefault(); }
+  });
+  recompute(true);
+})();
+</script>
+```
