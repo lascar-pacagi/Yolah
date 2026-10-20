@@ -1,0 +1,14 @@
+# Campaign P4 (NNUE feature ablation finalists, doc/nnue_roadmap.qmd). The ablation (AB1, 5 epochs, val mse vs
+# the teacher) kept: corr (the corrected flood fill, −56 % of the gain without it), encircle, infl, and the queen
+# levels qdist + qfirst; qw, late9 and mob brought nothing, connect too little for its 640 ns. Each finalist is
+# trained 10 epochs from k8_them like P3 (YOLAH_SPACE_GROUPS) and plays spacelite, the best network so far
+# (P3: +17.7 vs cont at 1 s). P3 showed corr losing ~80 Elo in play despite its mse: g146 is the one without it.
+#   g147  corr + qdist + qfirst + infl + encircle    ~510 ns of features
+#   g141  corr + infl + encircle                     ~380 ns
+#   g146  qdist + qfirst + infl + encircle           ~350 ns   (spacelite ~125 ns)
+nnue_k8_them_g147 nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_g147 nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_g141 nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_g141 nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_g146 nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_g146 nnue_k8_them_spacelite 200000 2000
