@@ -1194,6 +1194,49 @@ longueur du saut à chaque tour. Il manipule deux ensembles :
   précédées d'assez de cases libres (au tour k, un saut de 2^k cases vers une case x n'est permis que si
   toutes les cases traversées sont libres).
 
+**Pourquoi trois tours suffisent : les distances en binaire.** Dans la direction D, notons s−1 la case juste
+avant s, s−2 celle d'avant, etc. Voici le code, ligne à ligne :
+
+```cpp
+uint64_t pro = free;                         // s libre
+gen |= pro & shift<D>(gen);                  // sauts de 1
+pro &= shift<D>(pro);                        // s, s−1 libres
+gen |= pro & shift<D>(shift<D>(gen));        // sauts de 2
+pro &= shift<D>(shift<D>(pro));              // s, s−1, s−2, s−3 libres
+gen |= pro & shift<D>(shift<D>(shift<D>(shift<D>(gen))));   // sauts de 4
+return shift<D>(gen) & free;                 // un pas de plus, sur une case libre
+```
+
+*Les sauts.* Après chaque ligne `gen |= …`, `gen` contient les cases atteintes à toutes les distances
+de 0 à 2^k^−1 :
+
+| après        | distances dans `gen`                    |
+|--------------|-----------------------------------------|
+| départ       | 0                                       |
+| saut de 1    | 0, 1                                    |
+| saut de 2    | 0, 1, 2, 3   (= {0, 1} + {0, 2})        |
+| saut de 4    | 0, 1, …, 7   (= {0, …, 3} + {0, 4})     |
+
+C'est l'écriture de la distance en binaire : 5 = 1 + 4, 6 = 2 + 4, 7 = 1 + 2 + 4. Garder la distance 0
+(`gen |=` et non `gen =`) est ce qui permet 4 = 0 + 4. Sept suffit pour une ligne du plateau.
+
+*Le filtre `pro`.* Il dit si un saut peut arriver sur s :
+
+- au départ, `pro = free` : s est libre. C'est ce qu'il faut pour un saut de 1 vers s ;
+- `pro &= shift<D>(pro)` : `shift<D>(pro)` vaut 1 en s si s−1 était dans `pro`. Le nouveau `pro`
+  dit donc « s et s−1 libres ». C'est exactement ce qu'il faut pour un saut de 2 qui part de s−2,
+  traverse s−1 et arrive sur s ;
+- `pro &= shift<D>(shift<D>(pro))` : l'ancien `pro` en s (s, s−1 libres) et en s−2 (s−2, s−3 libres).
+  Le nouveau `pro` dit « s, s−1, s−2, s−3 libres ». Ce sont les quatre cases d'un saut de 4 qui part de s−4.
+
+`pro` double de longueur à chaque tour en se combinant avec lui-même décalé, comme `gen`. D'où le nom de
+« doublement ». Deux précisions :
+
+- la case de départ du saut (s−2, s−4) n'a pas à être libre. Elle est dans `gen` : une pièce, ou une case
+  déjà atteinte. `pro` ne teste que les cases traversées et la case d'arrivée ;
+- le bord compte comme un obstacle. `shift<D>` efface ce qui sortirait du plateau, donc une case libre en
+  colonne h n'est jamais la « précédente » d'une case en colonne a. Le bord coupe `pro` comme un trou.
+
 @fig-occluded le montre sur un vrai plateau, vers la droite, avec quatre de mes pièces qui partent en même
 temps (les rangées impaires sont des trous, pour ne garder que quatre lignes) :
 
@@ -1208,7 +1251,8 @@ temps (les rangées impaires sont des trous, pour ne garder que quatre lignes) :
 permise pour cette longueur de saut) et si la case située un saut plus à gauche est déjà bleue (`gen`). Après les sauts de 1, 2 et 4,
 toutes les distances de 0 à 7 sont couvertes, puisque toute longueur s'écrit comme une somme de 1, 2 et 4. Le
 dernier pas (`shift(gen) & free`) avance d'une case et ne garde que les cases libres : on obtient les coups
-vers la droite, sans les cases de départ.
+vers la droite, à distance 1 à 7. Les cases de départ ne restent dans le résultat que si une autre case de
+départ, placée avant elles, les atteint.
 
 ![Le remplissage occlus vers la droite (`slide<EAST>`) sur un plateau : en bleu les cases déjà atteintes (`gen`), en points orange les arrivées permises au tour suivant (`pro`), en flèches les sauts ajoutés à chaque tour.](figs/fig-occluded.png){#fig-occluded width=100%}
 
