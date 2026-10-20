@@ -898,8 +898,9 @@ de mes 4 pièces, on calcule trois nombres :
 - sa **gêne** : combien de cases ses lignes de dame perdent à cause des pièces adverses ;
 - son **attaque** : combien de ses libertés l'adversaire atteint en un coup de dame.
 
-La gêne sert dans la somme du camp (la première des 9 sommes) et pour ranger les pièces, mais elle n'est
-pas écrite pièce par pièce. Chaque pièce écrit seulement deux nombres : **8 × attaque** et
+Ici, la gêne sert seulement à ranger les pièces : elle n'est pas écrite pièce par pièce (on la retrouve
+dans les totaux du camp, décrits avec l'encerclement, @sec-encircle). Chaque pièce écrit seulement deux
+nombres : **8 × attaque** et
 **64 × fermable** (1 si elle n'a qu'une liberté et que l'adversaire peut y aller). Les pièces sont rangées
 de la plus encerclée à la moins encerclée : le moins de libertés d'abord, puis la plus gênée, puis la plus
 attaquée. Supposons qu'on s'arrête aux deux premiers critères, **libertés puis gêne** :
@@ -1256,7 +1257,7 @@ return {std::popcount(seen), 16 * contact, inverse64(king), inverse64(go), inver
 **Le coût.** Un parcours par pas de roi et un par coups de dame pour chacune des 8 pièces : environ 650 ns
 pour les deux camps. C'est le groupe le plus cher, ce qui compte dans le choix.
 
-## L'encerclement (ENCIRCLE, 34 colonnes)
+## L'encerclement (ENCIRCLE, 34 colonnes) {#sec-encircle}
 
 **L'idée.** Remarque de jeu : l'encerclement, ou le presque-encerclement, quand plusieurs de mes pièces gênent
 les mouvements d'une de ses pièces. C'est l'analogue des libertés au go.

@@ -2403,7 +2403,7 @@ padding-right: 0.6em;
   <li><a href="#la-mobilité-mob-2-colonnes" id="toc-la-mobilité-mob-2-colonnes" class="nav-link" data-scroll-target="#la-mobilité-mob-2-colonnes"><span class="header-section-number">5.7</span> La mobilité (MOB, 2 colonnes)</a></li>
   <li><a href="#linfluence-infl-2-colonnes" id="toc-linfluence-infl-2-colonnes" class="nav-link" data-scroll-target="#linfluence-infl-2-colonnes"><span class="header-section-number">5.8</span> L’influence (INFL, 2 colonnes)</a></li>
   <li><a href="#la-connectivité-pièce-par-pièce-connect-40-colonnes" id="toc-la-connectivité-pièce-par-pièce-connect-40-colonnes" class="nav-link" data-scroll-target="#la-connectivité-pièce-par-pièce-connect-40-colonnes"><span class="header-section-number">5.9</span> La connectivité, pièce par pièce (CONNECT, 40 colonnes)</a></li>
-  <li><a href="#lencerclement-encircle-34-colonnes" id="toc-lencerclement-encircle-34-colonnes" class="nav-link" data-scroll-target="#lencerclement-encircle-34-colonnes"><span class="header-section-number">5.10</span> L’encerclement (ENCIRCLE, 34 colonnes)</a></li>
+  <li><a href="#sec-encircle" id="toc-sec-encircle" class="nav-link" data-scroll-target="#sec-encircle"><span class="header-section-number">5.10</span> L’encerclement (ENCIRCLE, 34 colonnes)</a></li>
   <li><a href="#récapitulatif" id="toc-récapitulatif" class="nav-link" data-scroll-target="#récapitulatif"><span class="header-section-number">5.11</span> Récapitulatif</a></li>
   </ul></li>
   <li><a href="#lablation-des-caractéristiques" id="toc-lablation-des-caractéristiques" class="nav-link" data-scroll-target="#lablation-des-caractéristiques"><span class="header-section-number">6</span> L’ablation des caractéristiques</a></li>
@@ -3484,7 +3484,7 @@ Figure 8: Les caractéristiques entrent dans la deuxième couche, à côté des
 <li>sa <strong>gêne</strong> : combien de cases ses lignes de dame perdent à cause des pièces adverses ;</li>
 <li>son <strong>attaque</strong> : combien de ses libertés l’adversaire atteint en un coup de dame.</li>
 </ul>
-<p>La gêne sert dans la somme du camp (la première des 9 sommes) et pour ranger les pièces, mais elle n’est pas écrite pièce par pièce. Chaque pièce écrit seulement deux nombres : <strong>8 × attaque</strong> et <strong>64 × fermable</strong> (1 si elle n’a qu’une liberté et que l’adversaire peut y aller). Les pièces sont rangées de la plus encerclée à la moins encerclée : le moins de libertés d’abord, puis la plus gênée, puis la plus attaquée. Supposons qu’on s’arrête aux deux premiers critères, <strong>libertés puis gêne</strong> :</p>
+<p>Ici, la gêne sert seulement à ranger les pièces : elle n’est pas écrite pièce par pièce (on la retrouve dans les totaux du camp, décrits avec l’encerclement, <a href="#sec-encircle" class="quarto-xref">Section 5.10</a>). Chaque pièce écrit seulement deux nombres : <strong>8 × attaque</strong> et <strong>64 × fermable</strong> (1 si elle n’a qu’une liberté et que l’adversaire peut y aller). Les pièces sont rangées de la plus encerclée à la moins encerclée : le moins de libertés d’abord, puis la plus gênée, puis la plus attaquée. Supposons qu’on s’arrête aux deux premiers critères, <strong>libertés puis gêne</strong> :</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 20%">
@@ -3908,8 +3908,8 @@ Figure 13: Les blocs (couleurs) et le rang d’isolement de chaque pièce. b7 e
 <span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> <span class="op">{</span><span class="bu">std::</span>popcount<span class="op">(</span>seen<span class="op">),</span> <span class="dv">16</span> <span class="op">*</span> contact<span class="op">,</span> inverse64<span class="op">(</span>king<span class="op">),</span> inverse64<span class="op">(</span>go<span class="op">),</span> inverse64<span class="op">(</span>come<span class="op">)};</span></span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Le coût.</strong> Un parcours par pas de roi et un par coups de dame pour chacune des 8 pièces : environ 650 ns pour les deux camps. C’est le groupe le plus cher, ce qui compte dans le choix.</p>
 </section>
-<section id="lencerclement-encircle-34-colonnes" class="level2" data-number="5.10">
-<h2 data-number="5.10" class="anchored" data-anchor-id="lencerclement-encircle-34-colonnes"><span class="header-section-number">5.10</span> L’encerclement (ENCIRCLE, 34 colonnes)</h2>
+<section id="sec-encircle" class="level2" data-number="5.10">
+<h2 data-number="5.10" class="anchored" data-anchor-id="sec-encircle"><span class="header-section-number">5.10</span> L’encerclement (ENCIRCLE, 34 colonnes)</h2>
 <p><strong>L’idée.</strong> Remarque de jeu : l’encerclement, ou le presque-encerclement, quand plusieurs de mes pièces gênent les mouvements d’une de ses pièces. C’est l’analogue des libertés au go.</p>
 <p><strong>La définition, pour une pièce P</strong> (face aux pièces de l’autre camp) :</p>
 <table class="caption-top table">
