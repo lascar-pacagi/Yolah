@@ -887,11 +887,35 @@ de gauche à droite (la colonne a devient la colonne h). Une caractéristique do
 même valeur sur une position et sur son reflet ; sinon, le réseau recevrait deux nombres différents pour la
 même situation selon la couleur du joueur au trait.
 
-Les comptes et les distances ne dépendent pas de ce retournement. Le seul risque vient des pièces triées
-(connectivité, encerclement) : si deux pièces ont la même clé de tri, leur ordre pourrait dépendre de leur
-position sur le plateau. On départage donc les égalités par toutes les valeurs de la pièce : deux pièces à
-égalité sur tout sont identiques, et leur ordre n'a plus d'importance. Vérifié sur 500 positions et leurs
-reflets.
+**Les comptes ne posent aucun problème.** « J'atteins 23 cases en un coup de dame » reste vrai dans le
+reflet : on retourne le plateau, pas les distances. C'est le cas de CORR, des distances de dame, de
+l'influence et des sommes de l'encerclement.
+
+**Le piège vient des listes de pièces** (connectivité, encerclement). L'encerclement écrit, pour chacune de
+mes 4 pièces, deux nombres : **8 × attaque** (combien de ses libertés l'adversaire atteint en un coup de
+dame) et **64 × fermable** (1 si elle n'a qu'une liberté et que l'adversaire peut y aller). Les pièces sont
+rangées de la plus encerclée à la moins encerclée. Supposons qu'on les range **seulement par le nombre de
+libertés** :
+
+```
+position :  pièce en a1 : 1 liberté, attaquée      → (8, 64)
+            pièce en h8 : 1 liberté, pas attaquée  → (0, 0)
+```
+
+- Les deux pièces sont à égalité (1 liberté) : le tri garde l'ordre dans lequel on les a parcourues, celui
+  des cases, a1 avant h8. Colonnes : **(8, 64), (0, 0)**.
+- Dans le reflet, a1 devient h1 et h8 devient a8 : a8, la pièce non attaquée, est maintenant parcourue en
+  premier. Colonnes : **(0, 0), (8, 64)**.
+
+Même situation, entrée différente : la case a décidé de l'ordre.
+
+**La parade : départager les égalités par toutes les valeurs de la pièce.** On range par libertés, puis par
+gêne, puis par attaque : la pièce attaquée passe toujours en premier, quelle que soit sa case, et les
+colonnes sont **(8, 64), (0, 0)** dans les deux cas. Si deux pièces sont égales sur *toutes* leurs valeurs,
+leur ordre dépend encore de la case, mais cela n'a plus d'importance : les échanger écrit exactement les
+mêmes nombres.
+
+Vérification : les 92 colonnes calculées sur 500 positions et sur leurs reflets sont identiques partout.
 
 ### Comment lire les mesures « ce que la caractéristique ajoute »
 
