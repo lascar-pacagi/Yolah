@@ -929,33 +929,88 @@ Vérification : les 92 colonnes calculées sur 500 positions et sur leurs reflet
 ### Comment lire les mesures « ce que la caractéristique ajoute »
 
 Chaque section donne des chiffres comme « +18,6 / +1,9 en finale 10–19 ». Ils répondent à la question :
-**que sait cette caractéristique que le réseau actuel ne sait pas déjà ?** Voici comment ils sont obtenus.
+**que sait cette caractéristique que le réseau actuel ne sait pas déjà ?** Voici le calcul, étape par
+étape.
 
-1. **Les données.** 12 millions de positions de parties réelles (`data/games`, une position sur 20), avec
-   pour chacune la valeur du réseau actuel, puis la suite de la partie.
-2. **Ce qu'on cherche à prédire.** Deux cibles : les **points** que le joueur au trait va encore marquer
-   jusqu'à la fin, moins ceux de l'adversaire, et le **résultat** de la partie (gagnée, nulle, perdue).
-3. **Deux prédictions.** On prédit la cible avec la valeur du réseau seule (un polynôme de degré 3 de cette
-   valeur), puis avec la valeur du réseau **plus** la caractéristique (une combinaison linéaire ajustée par
-   moindres carrés).
-4. **Le score.** Le R² est la part des variations de la cible que la prédiction explique : 0 % si elle
-   n'explique rien, 100 % si elle est parfaite. Le chiffre donné est la différence entre les deux R², en
-   points de pourcentage.
+#### 1. Les données et les deux cibles
 
-Exemple : en finale 10–19, le réseau seul explique 58,2 % des variations des points restants ; avec le
-flood fill corrigé en plus, 76,8 %. Le flood fill corrigé ajoute donc +18,6 points : une information
+12 millions de positions de parties réelles (`data/games`, une position sur 20). Pour chaque position, on
+connaît la valeur du réseau actuel, la caractéristique, et la suite de la partie. On cherche à prédire deux
+**cibles**, vues du joueur au trait :
+
+- les **points restants** : l'écart final (mes points − ses points en fin de partie) moins l'écart actuel.
+  C'est ce que la suite de la partie va encore changer au score ;
+- le **résultat** : +1 si je gagne, 0 en cas de nulle, −1 si je perds.
+
+Le premier chiffre (« +18,6 ») porte sur les points restants, le second (« +1,9 ») sur le résultat.
+
+#### 2. On compare des positions du même stade
+
+Prenons une caractéristique simple : Q1, le nombre de cases libres que j'atteins en un coup de dame. En
+ouverture, il reste beaucoup de cases libres et Q1 vaut souvent 30 ; en finale, il en reste peu et Q1 vaut
+plutôt 8. Or la cible dépend aussi du stade de la partie et du joueur au trait : par exemple, si les Noirs
+au trait avec 45 cases libres finissent en moyenne avec +3 points, mais avec +1 seulement à 15 cases
+libres, alors « Q1 grand » va de pair avec « beaucoup de points restants », simplement parce que les deux
+signalent l'ouverture. Q1 aurait l'air de prédire la suite, sans rien savoir de la position elle-même.
+
+Pour l'éviter, on range les positions en **groupes de semblables** : même nombre de cases libres et même
+couleur au trait (57 × 2 groupes). Dans chaque groupe, on retire à chaque nombre (la cible, la valeur du
+réseau, la caractéristique) sa moyenne dans le groupe :
+
+```
+groupe « 45 cases libres, Noirs au trait » : moyenne de Q1 = 30, moyenne des points restants = +3
+  position P : Q1 = 34, points restants = +7   →   Q1 centré = +4, points centrés = +4
+  position R : Q1 = 27, points restants = +1   →   Q1 centré = −3, points centrés = −2
+```
+
+Après ce centrage, un nombre ne dit plus « on est en ouverture » mais « cette position a plus (ou moins) de
+Q1 que les autres positions au même stade ». C'est le sens de « on compare des positions du même stade » :
+seul ce qui distingue une position de ses semblables peut encore prédire la cible.
+
+#### 3. Deux prédictions
+
+Avec v la valeur du réseau et f la caractéristique, toutes deux centrées comme ci-dessus :
+
+- **le réseau seul** : cible ≈ a·v + b·v² + c·v³. Le polynôme de degré 3 laisse au réseau toutes ses chances :
+  sa valeur n'est pas forcément proportionnelle aux points (elle sature près de ±1, par exemple) ;
+- **le réseau plus la caractéristique** : cible ≈ a·v + b·v² + c·v³ + d·f, avec un coefficient de plus par
+  colonne quand la caractéristique en a plusieurs (40 pour la connectivité, par exemple).
+
+Les coefficients (a, b, c, d…) sont ceux qui rendent la somme des carrés des erreurs la plus petite
+possible (moindres carrés).
+
+#### 4. Ajustement sur une moitié, mesure sur l'autre
+
+Les positions sont rangées partie par partie. Les coefficients sont calculés sur la **première moitié**, et
+les erreurs mesurées sur la **seconde**, qui contient d'autres parties. Une caractéristique à 40 colonnes ne
+peut donc pas gagner en apprenant les données par cœur : ses 40 coefficients doivent aussi marcher sur des
+parties qu'ils n'ont jamais vues. (Les toutes premières mesures, sur une ou deux colonnes, ont été faites sur
+toutes les données ; avec si peu de coefficients et des millions de positions, l'écart est négligeable.)
+
+#### 5. Le R² et le gain
+
+Le **R²** est la part des variations de la cible que la prédiction explique :
+
+$$R^2 = 1 - \frac{\text{moyenne des carrés des erreurs (cible − prédiction)}}{\text{variance de la cible}}$$
+
+Il vaut 0 % si la prédiction n'explique rien, 100 % si elle est parfaite. Sur quatre positions, avec des
+points restants centrés de +4, −2, +1, −3 (variance (16 + 4 + 1 + 9) / 4 = 7,5) :
+
+| | prédictions | erreurs | moyenne des carrés des erreurs | R² |
+|---|---|---|---|---|
+| réseau seul | +3, −1, 0, −2 | +1, −1, +1, −1 | 1 | 1 − 1 / 7,5 = 86,7 % |
+| réseau + caractéristique | +3,5, −1,5, +0,5, −2,5 | +0,5, −0,5, +0,5, −0,5 | 0,25 | 1 − 0,25 / 7,5 = 96,7 % |
+
+Le **gain** est la différence des deux R², en points de pourcentage : ici +10 points. La caractéristique a
+réduit l'erreur de prédiction d'une quantité qui représente 10 % des variations de la cible.
+
+Le vrai exemple : en finale 10–19, le réseau seul explique 58,2 % des variations des points restants ; avec
+le flood fill corrigé en plus, 76,8 %. Le flood fill corrigé ajoute donc **+18,6 points** : une information
 importante que le réseau ne calcule pas lui-même.
 
-Deux précautions rendent ces chiffres honnêtes :
-
-- **l'ajustement et la mesure se font sur des parties différentes** : les coefficients sont calculés sur
-  la moitié des parties, et le R² est mesuré sur l'autre moitié. Une caractéristique à beaucoup de colonnes
-  ne peut donc pas gagner en apprenant les données par cœur ;
-- **on compare des positions du même stade de la partie.** En début de partie, il reste beaucoup de cases
-  et beaucoup de points à marquer. Sans précaution, n'importe quel compte de cases « prédirait » donc les
-  points restants, simplement parce qu'il indique le stade de la partie. On retire à chaque valeur la
-  moyenne des positions qui ont le même nombre de cases libres et le même joueur au trait : il ne reste que
-  ce qui distingue une position de ses semblables.
+Pour les caractéristiques décrites après les 16 premières colonnes, on donne aussi le gain par rapport à
+une base plus forte : le réseau **plus les 16 premières colonnes**. Ce second chiffre dit ce que la
+caractéristique apporte encore quand celles-là sont déjà là.
 
 Les phases sont définies par le nombre de cases libres : **ouverture** 40 à 56, **milieu** 20 à 39,
 **finale** 10 à 19, puis 0 à 9. Les chiffres viennent de `test/territory_study_main.cpp` (le calcul des
