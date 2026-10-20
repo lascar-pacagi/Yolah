@@ -38,10 +38,10 @@ class Fig:
     def __init__(self):
         self.parts = []
 
-    def board(self, us, them, free, ox=0.0, fills=None, labels=None, title=None, coords=True):
-        """fills: {sq: colour}, labels: {sq: text}; drawn under the pieces."""
+    def board(self, us, them, free, ox=0.0, fills=None, labels=None, title=None, coords=True, oy=0.0, extra=""):
+        """fills: {sq: colour}, labels: {sq: text}; drawn under the pieces; extra: tikz drawn on top."""
         p = self.parts
-        p.append(f"\\begin{{scope}}[shift={{({ox:.2f},0)}}]")
+        p.append(f"\\begin{{scope}}[shift={{({ox:.2f},{oy:.2f})}}]")
         for sq, col in (fills or {}).items():
             x, y = xy(sq)
             p.append(f"\\fill[{col}] ({x - S / 2:.3f},{y - S / 2:.3f}) rectangle +({S:.3f},{S:.3f});")
@@ -63,12 +63,14 @@ class Fig:
                 p.append(f"\\node[tiny] at ({(c + 0.5) * S:.3f},-0.22) {{{'abcdefgh'[c]}}};")
             for r in range(8):
                 p.append(f"\\node[tiny] at (-0.2,{(r + 0.5) * S:.3f}) {{{r + 1}}};")
+        if extra:
+            p.append(extra)
         if title:
             p.append(f"\\node[plain,above] at ({4 * S:.3f},{8 * S + 0.05:.3f}) {{{title}}};")
         p.append("\\end{scope}")
 
-    def raw(self, ox, tikz):
-        self.parts.append(f"\\begin{{scope}}[shift={{({ox:.2f},0)}}]{tikz}\\end{{scope}}")
+    def raw(self, ox, tikz, oy=0.0):
+        self.parts.append(f"\\begin{{scope}}[shift={{({ox:.2f},{oy:.2f})}}]{tikz}\\end{{scope}}")
 
     def write(self, name, legend=None):
         body = "\n".join(self.parts)
@@ -342,7 +344,61 @@ def fig_encircle():
     print("encircle e5:", e, "close", close, "att squares", [name_of(s) for s in att])
 
 
+# ── 0. the occluded fill (Kogge-Stone) of slide<EAST> ─────────────────────────
+def fig_occluded():
+    """slide<EAST> step by step on a real board: gen (squares reached), pro (where a jump of the
+    current length may land), the jumps of 1, 2 and 4, then the final step. Odd ranks are holes so
+    that only the four interesting lines remain."""
+    us = {sq(n) for n in ("a8", "a6", "c4", "e2")}
+    them = {sq("f4")}
+    free = {sq(n) for n in "b8 c8 d8 e8 f8 g8 h8 b6 c6 d6 e6 g6 h6 d4 e4 g4 h4 f2 g2 h2".split()}
+    east = lambda s, k: {x + k for x in s if x % 8 + k < 8}      # shift<EAST> k times (no wrap)  # noqa: E731
+    gen, pro = set(us), set(free)
+    stages = [(set(gen), set(pro), [], "départ : gen = les pièces", "points : pro, arrivées des sauts de 1")]
+    nxt = {1: "points : pro, arrivées des sauts de 2", 2: "points : pro, arrivées des sauts de 4", 4: ""}
+    for k in (1, 2, 4):
+        new = (pro & east(gen, k)) - gen
+        gen |= new
+        if k < 4:
+            pro &= east(pro, k)
+        stages.append((set(gen), set(pro) if k < 4 else set(), [(x - k, x) for x in sorted(new)],
+                       f"tour {(1, 2, 4).index(k) + 1} : sauts de {k}", nxt[k]))
+    result = east(gen, 1) & free
+    expect = set().union(*(R.line(p, (0, 1), free) for p in us))
+    assert result == expect, (sorted(result), sorted(expect))
+    fig = Fig()
+    W, H = 6.3, -6.9
+    pos = [(0, 0), (W, 0), (2 * W, 0), (0, H), (W, H)]
+    for (g, pr, arrows, title, sub), (ox, oy) in zip(stages, pos):
+        extra = []
+        for s in pr:
+            x, y = xy(s)
+            extra.append(f"\\fill[accent2] ({x + 0.17:.3f},{y + 0.17:.3f}) circle (0.065);")
+        for a, b in arrows:
+            (x1, y1), (x2, y2) = xy(a), xy(b)
+            extra.append(f"\\draw[-{{Stealth[length=1.6mm]}},accent,line width=.9pt] ({x1:.3f},{y1 + 0.1:.3f}) "
+                         f"to[bend left={40 if b - a == 1 else 22}] ({x2:.3f},{y2 + 0.1:.3f});")
+        if sub:
+            extra.append(f"\\node[tiny] at ({4 * S:.3f},-0.55) {{{sub}}};")
+        # the title above the arrows of rank 8 (every panel at the same height)
+        extra.append(f"\\node[plain,anchor=base] at ({4 * S:.3f},{8 * S + 0.55:.3f}) {{{title}}};")
+        fig.board(us, them, free, ox=ox, oy=oy, fills={s: "me" for s in g}, extra="\n".join(extra))
+    fig.board(us, them, free, ox=pos[4][0], oy=H, fills={s: "soft3" for s in result},
+              extra=f"\\node[tiny] at ({4 * S:.3f},-0.55) {{les coups vers la droite de chaque pièce}};"
+                    f"\\node[plain,anchor=base] at ({4 * S:.3f},{8 * S + 0.55:.3f}) {{résultat : un pas de plus, cases libres}};")
+    leg = legend_line(0.0, 0, [(MINE, "moi"), (HIS, "lui"), (HOLE, "trou"),
+                               (swatch("me"), "gen : cases déjà atteintes"),
+                               ("\\fill[accent2] (0,0) circle (0.065);", "pro : arrivée permise au tour suivant"),
+                               ("\\draw[-{Stealth[length=1.6mm]},accent,line width=.9pt] (-0.25,0) -- (0.2,0);",
+                                "saut ajouté à ce tour"),
+                               (swatch("soft3"), "résultat : les coups vers la droite")])
+    fig.raw(2 * W + 0.2, leg, oy=H + 8 * S - 0.4)
+    fig.write("fig-occluded")
+    print("occluded fill: result", sorted(name_of(s) for s in result))
+
+
 if __name__ == "__main__":
+    fig_occluded()
     fig_corr()
     fig_queen()
     fig_first()

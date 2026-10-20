@@ -1194,28 +1194,27 @@ longueur du saut à chaque tour. Il manipule deux ensembles :
   précédées d'assez de cases libres (au tour k, un saut de 2^k cases vers une case x n'est permis que si
   toutes les cases traversées sont libres).
 
-Exemple sur une seule rangée, vers la droite : une pièce en b, les cases c, d, e, f libres, un trou en g, h
-libre. La pièce doit atteindre c, d, e, f, et pas h, cachée derrière le trou.
+@fig-occluded le montre sur un vrai plateau, vers la droite, avec quatre de mes pièces qui partent en même
+temps (les rangées impaires sont des trous, pour ne garder que quatre lignes) :
 
-| | a | b | c | d | e | f | g | h | |
-|---|---|---|---|---|---|---|---|---|---|
-| libres | | | ● | ● | ● | ● | | ● | |
-| départ : `gen` | | ● | | | | | | | |
-| tour 1 (sauts de 1) : `gen` | | ● | ● | | | | | | c libre |
-| `pro` pour des sauts de 2 | | | | ● | ● | ● | | | d, e, f et la case d'avant libres |
-| tour 2 (sauts de 2) : `gen` | | ● | ● | ● | ● | | | | b → d, c → e |
-| `pro` pour des sauts de 4 | | | | | | ● | | | c, d, e, f libres |
-| tour 3 (sauts de 4) : `gen` | | ● | ● | ● | ● | ● | | | b → f |
-| résultat : un pas de plus, cases libres | | | ● | ● | ● | ● | | | |
+- **rangée 8** : a8 et sept cases libres. Il faut les trois tours pour aller jusqu'en h8 (7 = 1 + 2 + 4) ;
+- **rangée 6** : le trou en f6 arrête la pièce à e6. f6 n'a jamais de point ; après le tour 1, g6 perd
+  le sien (un saut de 2 vers g6 traverserait f6), et après le tour 2, h6 aussi (un saut de 4 vers h6 aussi) ;
+- **rangée 4** : sa pièce en f4 arrête la mienne à e4 de la même façon (une pièce n'est pas une case libre) ;
+- **rangée 2** : la pièce en e2 va jusqu'au bord, h2, sans réapparaître en a3 : le décalage efface ce qui
+  sortirait du plateau.
 
-Au tour 3, d → h est refusé : `pro` ne contient pas h, car g n'est pas libre. Après les sauts de 1, 2 et 4,
-toutes les distances de 0 à 7 sont couvertes (toute longueur s'écrit comme une somme de 1, 2 et 4). Le
-dernier pas (`shift(gen) & free`) donne les cases réellement atteintes, sans la case de départ.
+À chaque tour, une case reçoit une flèche si elle portait un point au panneau précédent (`pro` : arrivée
+permise pour cette longueur de saut) et si la case située un saut plus à gauche est déjà bleue (`gen`). Après les sauts de 1, 2 et 4,
+toutes les distances de 0 à 7 sont couvertes, puisque toute longueur s'écrit comme une somme de 1, 2 et 4. Le
+dernier pas (`shift(gen) & free`) avance d'une case et ne garde que les cases libres : on obtient les coups
+vers la droite, sans les cases de départ.
+
+![Le remplissage occlus vers la droite (`slide<EAST>`) sur un plateau : en bleu les cases déjà atteintes (`gen`), en points orange les arrivées permises au tour suivant (`pro`), en flèches les sauts ajoutés à chaque tour.](figs/fig-occluded.png){#fig-occluded width=100%}
 
 Deux avantages : il n'y a ni boucle ni test, seulement 3 tours de décalages et de ET logiques ; et `gen`
-peut contenir plusieurs cases de départ, qui avancent toutes en même temps (tout un niveau d'un coup). Les
-décalages `shift<D>` effacent la colonne qui sortirait du plateau, pour qu'une case en h ne réapparaisse
-pas en a de la rangée suivante.
+peut contenir plusieurs cases de départ, qui avancent toutes en même temps, comme les quatre pièces de la
+figure (tout un niveau de dame d'un coup).
 
 ```cpp
 // toutes les cases libres à un coup de dame de gen dans la direction D
