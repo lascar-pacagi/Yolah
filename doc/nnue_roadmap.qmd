@@ -910,13 +910,11 @@ position :  pièce en a1 : 1 liberté, attaquée      → (8, 64)
 Même situation, entrée différente : la case a décidé de l'ordre.
 
 **La parade : que la clé de tri contienne tout ce que la pièce écrit.** Ici, la pièce écrit son attaque et
-« fermable », qui se déduit des libertés et de l'attaque. On range donc par libertés, puis par gêne, puis
-par attaque : la pièce attaquée passe toujours en premier, quelle que soit sa case, et les colonnes sont
+« fermable », qui se déduit des libertés et de l'attaque. On range donc par libertés, puis par attaque :
+la pièce attaquée passe toujours en premier, quelle que soit sa case, et les colonnes sont
 **(8, 64), (0, 0)** dans les deux cas. Deux pièces encore à égalité ont les mêmes libertés et la même
 attaque : elles écrivent les mêmes deux nombres, et leur ordre, qui dépend encore de la case, n'a plus
-d'importance. (La gêne n'est pas nécessaire à cette invariance : elle précise seulement « la plus
-encerclée » quand deux pièces ont autant de libertés.) La connectivité suit la même règle : ses 5 nombres
-par pièce sont tous dans sa clé de tri.
+d'importance. La connectivité suit la même règle : ses 5 nombres par pièce sont tous dans sa clé de tri.
 
 Vérification : les 92 colonnes calculées sur 500 positions et sur leurs reflets sont identiques partout.
 
