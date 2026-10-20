@@ -1003,6 +1003,41 @@ deux fois, une fois pour les points restants (premier chiffre) et une fois pour 
 chiffre), avec des coefficients ajustés séparément. Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite
 possible (moindres carrés).
 
+**Les moindres carrés, comment ça marche.** On cherche les coefficients β (a, b, c, d₁, d₂…) pour lesquels
+la somme des carrés des erreurs Σ (y − ŷ)² est la plus petite, y étant la cible et ŷ la prédiction.
+
+*Avec un seul coefficient.* Prédisons y par d·x sur quatre positions centrées :
+
+| x | −2 | −1 | +1 | +2 |
+|---|---|---|---|---|
+| y | −3 | −1 | +2 | +2 |
+
+En essayant : d = 1 donne les erreurs −1, 0, +1, 0, de somme des carrés 2 ; d = 1,5 donne 0, +0,5, +0,5,
+−1, somme 1,5 ; d = 1,3 donne −0,4, +0,3, +0,7, −0,6, somme 1,1, le minimum. Inutile de chercher à
+tâtons : au minimum, la dérivée de Σ (y − d·x)² par rapport à d est nulle, ce qui donne directement
+
+$$d = \frac{\sum x\,y}{\sum x^2} = \frac{6 + 1 + 2 + 4}{4 + 1 + 1 + 4} = 1{,}3$$
+
+*Avec plusieurs coefficients*, même principe : la dérivée est nulle pour chaque coefficient, soit une
+équation par colonne j :
+
+$$\sum_{\text{positions}} x_j \,(y - \hat y) = 0$$
+
+Au meilleur choix, **l'erreur restante n'a plus aucune corrélation avec aucune des colonnes** ; s'il en
+restait une, on pourrait encore réduire l'erreur en changeant le coefficient de cette colonne. En notation
+matricielle (X : une ligne par position, une colonne par entrée), ce sont les *équations normales* :
+
+$$X^\top X \,\beta = X^\top y$$
+
+*Dans les études.* On parcourt une fois les positions de la moitié d'ajustement en additionnant les produits
+de colonnes deux à deux (XᵀX) et colonne × cible (Xᵀy) : avec 3 + 40 colonnes, XᵀX est un tableau de
+43 × 43, quel que soit le nombre de positions. On résout ensuite ce système de 43 équations à 43 inconnues,
+ce qui est instantané (`piece_order_study.py` le fait ainsi, en ajoutant 10⁻⁶ sur la diagonale pour éviter
+une division par presque zéro quand deux colonnes sont presque identiques ; les autres scripts appellent
+`numpy.linalg.lstsq`, qui donne le même résultat par une méthode plus robuste mais plus gourmande en
+mémoire). Le centrage dispense d'une constante (le « + e » d'une droite d·x + e) : toutes les moyennes
+valant 0, la meilleure constante serait 0.
+
 #### 4. Ajustement sur une moitié, mesure sur l'autre
 
 Les positions sont rangées partie par partie. Les coefficients sont calculés sur la **première moitié**, et
