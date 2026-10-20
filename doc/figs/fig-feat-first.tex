@@ -7,7 +7,7 @@
 \definecolor{me}{HTML}{CFE0F3}\definecolor{him}{HTML}{F6D9C3}\definecolor{neutral}{HTML}{E4E7EB}
 \begin{document}
 \begin{tikzpicture}
-\begin{scope}[shift={(0.00,0)}]
+\begin{scope}[shift={(0.00,0.00)}]
 \fill[me] (0.000,0.000) rectangle +(0.620,0.620);
 \fill[me] (0.620,0.000) rectangle +(0.620,0.620);
 \fill[me] (1.240,0.000) rectangle +(0.620,0.620);
@@ -135,12 +135,12 @@
 \node[tiny] at (-0.2,4.650) {8};
 \node[plain,above] at (2.480,5.010) {qui arrive le premier (moi / lui)};
 \end{scope}
-\begin{scope}[shift={(0.00,0)}]\draw[ink,line width=1.3pt,dashed] (1.860,0) -- (1.860,4.960);\draw[ink,line width=1.3pt,dashed] (0,1.860) -- (4.960,1.860);\draw[ink,line width=1.3pt,dashed] (3.100,0) -- (3.100,4.960);\draw[ink,line width=1.3pt,dashed] (0,3.100) -- (4.960,3.100);\draw[accent,line width=1.6pt] (0.040,3.140) rectangle (1.820,4.920);\end{scope}
-\begin{scope}[shift={(0.00,0)}]\begin{scope}[shift={(5.60,4.60)}]\fill[me] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {j'arrive avant};\end{scope}
+\begin{scope}[shift={(0.00,0.00)}]\draw[ink,line width=1.3pt,dashed] (1.860,0) -- (1.860,4.960);\draw[ink,line width=1.3pt,dashed] (0,1.860) -- (4.960,1.860);\draw[ink,line width=1.3pt,dashed] (3.100,0) -- (3.100,4.960);\draw[ink,line width=1.3pt,dashed] (0,3.100) -- (4.960,3.100);\draw[accent,line width=1.6pt] (0.040,3.140) rectangle (1.820,4.920);\end{scope}
+\begin{scope}[shift={(0.00,0.00)}]\begin{scope}[shift={(5.60,4.60)}]\fill[me] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {j'arrive avant};\end{scope}
 \begin{scope}[shift={(5.60,4.10)}]\fill[him] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {il arrive avant};\end{scope}
 \begin{scope}[shift={(5.60,3.60)}]\fill[neutral] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {en même temps};\end{scope}
 \begin{scope}[shift={(5.60,3.10)}]\draw[accent,line width=1.6pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {zone où j'arrive avant};\end{scope}
 \begin{scope}[shift={(5.60,2.60)}]\draw[accent2,line width=1.6pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {zone où il arrive avant};\end{scope}\end{scope}
-\begin{scope}[shift={(0.00,0)}]\node[plain,right,align=left] at (5.3,1.6) {QFIRST : moi 13, lui 8\\LATE9 : moi 0, lui 6};\end{scope}
+\begin{scope}[shift={(0.00,0.00)}]\node[plain,right,align=left] at (5.3,1.6) {QFIRST : moi 13, lui 8\\LATE9 : moi 0, lui 6};\end{scope}
 \end{tikzpicture}
 \end{document}
