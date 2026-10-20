@@ -3736,6 +3736,140 @@ a \textstyle\sum x_1 x_2 &amp;+ b \textstyle\sum x_2^2 = \textstyle\sum x_2 y
 <span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    rest <span class="op">&amp;=</span> <span class="op">~</span>c<span class="op">;</span>                                     <span class="co">// ce bloc est rangé</span></span>
 <span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Les coups de dame.</strong> <code>queen_levels</code> donne, niveau par niveau, les cases libres que des pièces atteignent en 1, 2, 3… coups de dame. Chaque niveau se calcule pour toutes les cases du niveau précédent à la fois : dans chaque direction, un <em>remplissage occlus</em> (Kogge-Stone) fait glisser l’ensemble à travers les cases libres en trois doublements (1, 2 puis 4 pas), au lieu d’avancer case par case.</p>
+<p><strong>Le remplissage occlus, pas à pas.</strong> « Remplissage » : on étend un ensemble de cases dans une direction ; « occlus » : l’extension s’arrête sur la première case non libre (trou ou pièce), comme le coup d’une dame. Le moyen simple avance d’un pas à la fois : décaler l’ensemble d’une case, garder les cases libres, recommencer ; il faut jusqu’à 7 tours sur un plateau de 8. Le remplissage de Kogge-Stone (du nom d’un additionneur de processeur qui propage ses retenues de la même façon) n’en fait que 3, en doublant la longueur du saut à chaque tour. Il manipule deux ensembles :</p>
+<ul>
+<li><code>gen</code> : les cases déjà atteintes (au départ, les cases d’où l’on part) ;</li>
+<li><code>pro</code> : les cases d’arrivée possibles pour un saut de la longueur courante, c’est-à-dire les cases libres précédées d’assez de cases libres (au tour k, un saut de 2^k cases vers une case x n’est permis que si toutes les cases traversées sont libres).</li>
+</ul>
+<p>Exemple sur une seule rangée, vers la droite : une pièce en b, les cases c, d, e, f libres, un trou en g, h libre. La pièce doit atteindre c, d, e, f, et pas h, cachée derrière le trou.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>a</th>
+<th>b</th>
+<th>c</th>
+<th>d</th>
+<th>e</th>
+<th>f</th>
+<th>g</th>
+<th>h</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>libres</td>
+<td></td>
+<td></td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td></td>
+<td>●</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>départ : <code>gen</code></td>
+<td></td>
+<td>●</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td>tour 1 (sauts de 1) : <code>gen</code></td>
+<td></td>
+<td>●</td>
+<td>●</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>c libre</td>
+</tr>
+<tr class="even">
+<td><code>pro</code> pour des sauts de 2</td>
+<td></td>
+<td></td>
+<td></td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td></td>
+<td></td>
+<td>d, e, f et la case d’avant libres</td>
+</tr>
+<tr class="odd">
+<td>tour 2 (sauts de 2) : <code>gen</code></td>
+<td></td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td></td>
+<td></td>
+<td></td>
+<td>b → d, c → e</td>
+</tr>
+<tr class="even">
+<td><code>pro</code> pour des sauts de 4</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>●</td>
+<td></td>
+<td></td>
+<td>c, d, e, f libres</td>
+</tr>
+<tr class="odd">
+<td>tour 3 (sauts de 4) : <code>gen</code></td>
+<td></td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td></td>
+<td></td>
+<td>b → f</td>
+</tr>
+<tr class="even">
+<td>résultat : un pas de plus, cases libres</td>
+<td></td>
+<td></td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td>●</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Au tour 3, d → h est refusé : <code>pro</code> ne contient pas h, car g n’est pas libre. Après les sauts de 1, 2 et 4, toutes les distances de 0 à 7 sont couvertes (toute longueur s’écrit comme une somme de 1, 2 et 4). Le dernier pas (<code>shift(gen) &amp; free</code>) donne les cases réellement atteintes, sans la case de départ.</p>
+<p>Deux avantages : il n’y a ni boucle ni test, seulement 3 tours de décalages et de ET logiques ; et <code>gen</code> peut contenir plusieurs cases de départ, qui avancent toutes en même temps (tout un niveau d’un coup). Les décalages <code>shift&lt;D&gt;</code> effacent la colonne qui sortirait du plateau, pour qu’une case en h ne réapparaisse pas en a de la rangée suivante.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">// toutes les cases libres à un coup de dame de gen dans la direction D</span></span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span> <span class="op">&lt;</span>Direction D<span class="op">&gt;</span> <span class="dt">uint64_t</span> slide<span class="op">(</span><span class="dt">uint64_t</span> gen<span class="op">,</span> <span class="dt">uint64_t</span> free<span class="op">)</span> <span class="op">{</span></span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">uint64_t</span> pro <span class="op">=</span> free<span class="op">;</span></span>
