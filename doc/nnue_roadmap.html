@@ -3605,8 +3605,15 @@ Figure 8: Les caractéristiques entrent dans la deuxième couche, à côté des
 </tr>
 </tbody>
 </table>
-<p>En essayant : d = 1 donne les erreurs −1, 0, +1, 0, de somme des carrés 2 ; d = 1,5 donne 0, +0,5, +0,5, −1, somme 1,5 ; d = 1,3 donne −0,4, +0,3, +0,7, −0,6, somme 1,1, le minimum. Inutile de chercher à tâtons : au minimum, la dérivée de Σ (y − d·x)² par rapport à d est nulle, ce qui donne directement</p>
-<p><span class="math display">\[d = \frac{\sum x\,y}{\sum x^2} = \frac{6 + 1 + 2 + 4}{4 + 1 + 1 + 4} = 1{,}3\]</span></p>
+<p>En essayant : d = 1 donne les erreurs −1, 0, +1, 0, de somme des carrés 2 ; d = 1,5 donne 0, +0,5, +0,5, −1, somme 1,5 ; d = 1,3 donne −0,4, +0,3, +0,7, −0,6, somme 1,1, le minimum. Inutile de chercher à tâtons : la somme des carrés est une fonction de d,</p>
+<p><span class="math display">\[S(d) = \sum_i (y_i - d\,x_i)^2\]</span></p>
+<p>En développant chaque carré, (y − d·x)² = y² − 2d·xy + d²·x², puis en additionnant :</p>
+<p><span class="math display">\[S(d) = \sum y_i^2 \;-\; 2d \sum x_i y_i \;+\; d^2 \sum x_i^2\]</span></p>
+<p>Les trois sommes sont de simples nombres calculés sur les données : S(d) est une <strong>parabole en d</strong>, tournée vers le haut (Σ x² &gt; 0). Dans l’exemple, Σ y² = 18, Σ xy = 13 et Σ x² = 10, donc S(d) = 18 − 26 d + 10 d², et l’on retrouve les essais : S(1) = 2, S(1,5) = 1,5, S(1,3) = 1,1. Le minimum d’une parabole est là où sa dérivée s’annule :</p>
+<p><span class="math display">\[S&#39;(d) = -2\sum x_i y_i + 2d \sum x_i^2 = 0 \quad\Longrightarrow\quad d = \frac{\sum x_i y_i}{\sum x_i^2}\]</span></p>
+<p>soit ici −26 + 20 d = 0, d = 26 / 20 = <strong>1,3</strong>. C’est bien un minimum : la dérivée seconde, 2 Σ x², est positive. On peut aussi dériver sans développer, avec (u²)’ = 2u·u’ et u = y − d·x, dont la dérivée par rapport à d est −x :</p>
+<p><span class="math display">\[S&#39;(d) = -2 \sum x_i\,(y_i - d\,x_i)\]</span></p>
+<p>L’annuler donne Σ x·(y − d·x) = 0 : l’erreur n’est pas corrélée avec x. C’est l’équation du cas à plusieurs coefficients, ci-dessous, écrite pour une seule colonne.</p>
 <p><em>Avec plusieurs coefficients</em>, même principe : la dérivée est nulle pour chaque coefficient, soit une équation par colonne j :</p>
 <p><span class="math display">\[\sum_{\text{positions}} x_j \,(y - \hat y) = 0\]</span></p>
 <p>Au meilleur choix, <strong>l’erreur restante n’a plus aucune corrélation avec aucune des colonnes</strong> ; s’il en restait une, on pourrait encore réduire l’erreur en changeant le coefficient de cette colonne. En notation matricielle (X : une ligne par position, une colonne par entrée), ce sont les <em>équations normales</em> :</p>
