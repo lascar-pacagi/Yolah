@@ -73,7 +73,8 @@ inline int queen_levels(uint64_t pieces, uint64_t free, uint64_t levels[64]) {
 }
 
 // Corrected flood fill of `pieces`: the largest total size of the blocks they
-// can occupy, each piece choosing one block touching it (or none).
+// can occupy, each piece choosing one block touching it (or none, when all
+// the blocks touching it are taken).
 inline int corrected_flood_fill(uint64_t pieces, uint64_t free, const uint64_t* comps, const int* size, int nc) {
     uint64_t options[8];
     int np = 0;
@@ -92,8 +93,11 @@ inline int corrected_flood_fill(uint64_t pieces, uint64_t free, const uint64_t* 
             best = std::max(best, s);
             return;
         }
-        self(self, k + 1, covered);
-        for (uint64_t o = options[k] & ~covered; o; o &= o - 1) self(self, k + 1, covered | (o & -o));
+        // a piece skips only when every block it touches is taken: taking a free
+        // block never lowers the total (same maximum, ~30 % faster)
+        const uint64_t avail = options[k] & ~covered;
+        if (!avail) self(self, k + 1, covered);
+        for (uint64_t o = avail; o; o &= o - 1) self(self, k + 1, covered | (o & -o));
     };
     rec(rec, 0, 0);
     return best;
