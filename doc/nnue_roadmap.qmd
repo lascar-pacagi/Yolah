@@ -1166,12 +1166,14 @@ trouve chaque bloc :
 
 ```cpp
 // nnue/space_features.h — les blocs de cases libres
-for (uint64_t rest = free; rest;) {
-    uint64_t c = rest & -rest, prev = 0;            // une case libre au hasard...
+uint64_t comps[64];        // les blocs trouvés (un bitboard chacun)
+int size[64], nc = 0;      // leur taille, leur nombre
+for (uint64_t rest = free; rest;) {                 // rest : les cases libres pas encore rangées
+    uint64_t c = rest & -rest, prev = 0;            // la première de ces cases...
     while (c != prev) { prev = c; c |= shift_all_directions(c) & free; }   // ... et tout son bloc
     comps[nc] = c;
     size[nc++] = std::popcount(c);
-    rest &= ~c;
+    rest &= ~c;                                     // ce bloc est rangé
 }
 ```
 
@@ -1220,7 +1222,9 @@ quelques blocs chacune, une recherche exhaustive suffit.
 ![Le flood fill corrigé en finale. La pièce en d6 touche le bloc de 6 et celui de 8 : elle ne peut en garder qu'un. Celle en h3 touche le bloc de 4 et celui de 2. Les pièces b4 et c1 se partagent le bloc de 13. Flood fill : 13 + 4 + 2 + 8 + 6 = 33 cases ; corrigé : 13 + 4 + 8 = 25.](figs/fig-feat-corr.png){#fig-feat-corr width=80%}
 
 ```cpp
-// chaque pièce : l'ensemble des blocs qu'elle touche (un bit par bloc)
+// nnue/space_features.h — corrected_flood_fill(pieces, free, comps, size, nc), avec les blocs ci-dessus
+uint64_t options[8];      // pour chaque pièce : les blocs qu'elle touche (un bit par bloc)
+int np = 0, best = 0;     // le nombre de pièces, le meilleur total trouvé
 for (uint64_t b = pieces; b; b &= b - 1) {
     const uint64_t around = shift_all_directions(b & -b);
     uint64_t o = 0;
@@ -1229,11 +1233,16 @@ for (uint64_t b = pieces; b; b &= b - 1) {
 }
 // essai de tous les choix (aucun bloc, ou un bloc pas encore pris)
 auto rec = [&](auto&& self, int k, uint64_t covered) -> void {
-    if (k == np) { best = std::max(best, total_size(covered)); return; }
-    self(self, k + 1, covered);
+    if (k == np) {                                      // tous les choix faits : taille des blocs pris
+        int total = 0;
+        for (uint64_t c = covered; c; c &= c - 1) total += size[std::countr_zero(c)];
+        best = std::max(best, total);
+        return;
+    }
+    self(self, k + 1, covered);                         // la pièce k ne prend aucun bloc
     for (uint64_t o = options[k] & ~covered; o; o &= o - 1) self(self, k + 1, covered | (o & -o));
 };
-rec(rec, 0, 0);
+rec(rec, 0, 0);                                         // CORR = best
 ```
 
 **Ce que les mesures ont dit.** Inutile en ouverture (le plateau est d'un seul bloc). En finale 10–19, c'est
@@ -1259,7 +1268,11 @@ puis la recherche exhaustive).
 ![Le nombre de coups de dame qu'il me faut pour atteindre chaque case libre (toutes mes pièces ensemble). Q1 compte les cases marquées 1, Q2 celles marquées 1 ou 2, etc. MOB (plus loin) compte les mêmes cases à 1 coup, mais une fois par pièce qui peut y aller.](figs/fig-feat-queen.png){#fig-feat-queen width=72%}
 
 ```cpp
-uint64_t cover = 0;
+uint8_t out[16];                                        // les colonnes du camp (0 à 64)
+auto put = [&](int id, int v) { out[id] = uint8_t(std::min(v, 64)); };
+uint64_t lv[64];
+const int nl = queen_levels(pieces, free, lv);          // lv[k] : les cases à k + 1 coups exactement
+uint64_t cover = 0;                                     // les cases atteintes jusqu'ici
 int w = 0, q[3] = {0, 0, 0};
 for (int k = 0; k < nl; k++) {
     cover |= lv[k];
@@ -1284,6 +1297,9 @@ lui (une case qu'il n'atteint jamais compte si je l'atteins). Les cases à égal
 ![Pour chaque case libre : mes coups de dame / ses coups de dame. Bleu : j'arrive avant (QFIRST de moi) ; orange : il arrive avant (QFIRST de lui) ; gris : en même temps. Les traits pointillés découpent les 9 zones de LATE9 (section suivante).](figs/fig-feat-first.png){#fig-feat-first width=82%}
 
 ```cpp
+// lv[0], nl[0] : mes niveaux de dame ; lv[1], nl[1] : les siens
+uint64_t seen0 = 0, seen1 = 0;                          // ce que chacun a atteint aux niveaux précédents
+int first0 = 0, first1 = 0;                             // QFIRST de moi, de lui
 for (int k = 0; k < std::max(nl[0], nl[1]); k++) {
     const uint64_t a = k < nl[0] ? lv[0][k] : 0, b = k < nl[1] ? lv[1][k] : 0;
     first0 += std::popcount(a & ~b & ~seen1);           // à moi au niveau k, ni à lui avant ni en même temps
@@ -1307,6 +1323,12 @@ figure précédente, la zone en haut à gauche (cadre bleu) est atteinte par moi
 cases libres comptent dans le LATE9 de lui. Aucune zone n'est en retard pour moi.
 
 ```cpp
+// lv, nl comme ci-dessus ; zones9() : les 9 zones de la grille 3 × 3
+auto first_level = [&](int side, uint64_t zone) {      // premier niveau du camp qui touche la zone
+    for (int k = 0; k < nl[side]; k++) if (lv[side][k] & zone) return k;
+    return 99;                                          // jamais
+};
+int late[2] = {0, 0};                                   // LATE9 de moi, de lui
 for (int i = 0; i < 9; i++) {
     const uint64_t z = zones9()[i] & free;
     if (!z) continue;
@@ -1329,7 +1351,8 @@ de dame, comptées une fois **par pièce** (MOB ≥ Q1 : deux pièces qui visent
 fois).
 
 ```cpp
-for (uint64_t b = pieces; b; b &= b - 1)
+int mob = 0;
+for (uint64_t b = pieces; b; b &= b - 1)                // chaque pièce : ses coups de dame (tables magiques)
     mob += std::popcount(attacks_bb(Square(std::countr_zero(b)), ~free) & free);
 ```
 
@@ -1423,20 +1446,26 @@ Les 5 nombres de la figure, dans l'ordre où le réseau les reçoit :
 | lui 4 : h2 | 30 | 48 | 64 | 64 | 64 |
 
 ```cpp
-// nnue/space_features.h — une pièce face aux pièces adverses (opp)
-const uint64_t near_opp = shift_all_directions(opp);   // les cases à côté d'elles
-uint64_t seen = 0, front = piece;
-int king = 0;
-for (int d = 1; (front = shift_all_directions(front) & free & ~seen); d++) {
-    if (!king && (front & near_opp)) king = d;          // premier pas qui arrive à côté de l'une
-    seen |= front;
+// nnue/space_features.h — une pièce face aux pièces adverses (opp) ; opp_lv, opp_nl : les niveaux
+// de dame des pièces adverses, calculés une fois pour les 4 pièces
+std::array<int, 5> connect_piece(uint64_t piece, uint64_t opp, uint64_t free,
+                                 const uint64_t opp_lv[], int opp_nl) {
+    const uint64_t near_opp = shift_all_directions(opp);   // les cases à côté d'elles
+    uint64_t seen = 0, front = piece;
+    int king = 0;
+    for (int d = 1; (front = shift_all_directions(front) & free & ~seen); d++) {
+        if (!king && (front & near_opp)) king = d;          // premier pas qui arrive à côté de l'une
+        seen |= front;
+    }
+    int contact = 0;
+    for (uint64_t b = opp; b; b &= b - 1) contact += (shift_all_directions(b & -b) & seen) != 0;
+    uint64_t lv[64];
+    const int nl = queen_levels(piece, free, lv);          // les niveaux de dame de la pièce
+    int go = 0, come = 0;
+    for (int k = 0; k < nl && !go; k++) if (lv[k] & near_opp) go = k + 1;
+    for (int k = 0; k < opp_nl && !come; k++) if (opp_lv[k] & shift_all_directions(piece)) come = k + 1;
+    return {std::popcount(seen), 16 * contact, inverse64(king), inverse64(go), inverse64(come)};
 }
-int contact = 0;
-for (uint64_t b = opp; b; b &= b - 1) contact += (shift_all_directions(b & -b) & seen) != 0;
-// go : les niveaux de dame de la pièce ; come : ceux des pièces adverses (calculés une fois)
-for (int k = 0; k < nl && !go; k++) if (lv[k] & near_opp) go = k + 1;
-for (int k = 0; k < opp_nl && !come; k++) if (opp_lv[k] & shift_all_directions(piece)) come = k + 1;
-return {std::popcount(seen), 16 * contact, inverse64(king), inverse64(go), inverse64(come)};
 ```
 
 **Le coût.** Un parcours par pas de roi et un par coups de dame pour chacune des 8 pièces : environ 650 ns
@@ -1468,17 +1497,25 @@ toujours.
 ![L'encerclement de la pièce de lui en e5. Ses lignes réelles (vert) ; en pointillé orange, ce que mes pièces lui retirent : en ôtant d6, b5 et e4, ses lignes continueraient (9 cases, celles de mes pièces comprises : gene = 9, par 3 pièces : contrib = 3). Sa seule liberté est d5, que ma pièce e4 peut occuper en un coup : elle est fermable.](figs/fig-feat-encircle.png){#fig-feat-encircle width=86%}
 
 ```cpp
-// nnue/space_features.h — une pièce face aux pièces adverses (opp)
-const uint64_t around = shift_all_directions(piece);
-Encircle e{std::popcount(around & free),                 // lib
-           std::popcount(around & opp), 0, 0, 0,          // opp
-           std::popcount(around & free & opp_reach1)};    // att : ses libertés qu'ils atteignent en 1 coup
-for (auto line : SLIDES) {                               // ses 8 lignes
-    const uint64_t real = line(piece, free), freed = line(piece, free | opp);   // eux, comme cases libres
-    const int len = std::popcount(real);
-    e.shrt += len == 1 || len == 2;
-    e.gene += std::popcount(freed) - len;                // ce qu'ils lui prennent, leurs cases comprises
-    e.contrib += (freed & opp) != 0;                     // la ligne s'arrête d'abord sur l'un d'eux
+// nnue/space_features.h — une pièce face aux pièces adverses (opp) ; opp_reach1 : les cases libres
+// qu'elles atteignent en un coup de dame
+struct Encircle { int lib, opp, shrt, gene, contrib, att; };
+Encircle encircle_piece(uint64_t piece, uint64_t opp, uint64_t free, uint64_t opp_reach1) {
+    const uint64_t around = shift_all_directions(piece);
+    Encircle e{std::popcount(around & free),                 // lib
+               std::popcount(around & opp), 0, 0, 0,          // opp
+               std::popcount(around & free & opp_reach1)};    // att : ses libertés qu'ils atteignent en 1 coup
+    // ses coups de dame, puis les mêmes en comptant leurs pièces comme des cases libres
+    // (queen_moves : tables magiques) ; rays()[case] : les 8 lignes d'une case sur un plateau vide
+    const uint64_t all_real = queen_moves(piece, free), all_freed = queen_moves(piece, free | opp);
+    for (const uint64_t ray : rays()[std::countr_zero(piece)]) {   // ses 8 lignes, une à une
+        const uint64_t real = all_real & ray, freed = all_freed & ray;
+        const int len = std::popcount(real);
+        e.shrt += len == 1 || len == 2;
+        e.gene += std::popcount(freed) - len;                // ce qu'ils lui prennent, leurs cases comprises
+        e.contrib += (freed & opp) != 0;                     // la ligne s'arrête d'abord sur l'un d'eux
+    }
+    return e;
 }
 ```
 
@@ -1488,7 +1525,7 @@ de **ses** pièces par l'autre camp en 17 colonnes :
 - 9 sommes sur ses 4 pièces : gene, 4 × contrib, 4 × opp, 2 × att, 2 × lib, 2 × short, et 16 × le nombre de
   pièces à au plus une liberté, sans liberté, fermables ;
 - puis, ses pièces triées de la plus encerclée à la moins encerclée (le moins de libertés, puis la plus
-  grande gêne), la menace de chacune : 8 × att et 64 × fermable.
+  grande gêne, puis la plus attaquée), la menace de chacune : 8 × att et 64 × fermable.
 
 **Ce que les mesures ont dit**, en plus du réseau et des 16 premières colonnes (points | résultat) :
 
