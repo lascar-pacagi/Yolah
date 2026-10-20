@@ -3557,9 +3557,31 @@ Figure 8: Les caractéristiques entrent dans la deuxième couche, à côté des
 </ul>
 <p>Tous deux sont centrés comme à l’étape 2. On fait alors deux prédictions de la cible :</p>
 <ul>
-<li><strong>le réseau seul</strong> : cible ≈ a·v + b·v² + c·v³. Le polynôme de degré 3 laisse au réseau toutes ses chances : sa valeur n’est pas forcément proportionnelle aux points (elle sature près de ±1, par exemple) ;</li>
+<li><strong>le réseau seul</strong> : cible ≈ a·v + b·v² + c·v³ (pourquoi un polynôme, voir ci-dessous) ;</li>
 <li><strong>le réseau plus la caractéristique</strong> : cible ≈ a·v + b·v² + c·v³ + d₁·f₁ + d₂·f₂, avec un coefficient par colonne de la caractéristique (2 pour le flood fill corrigé, 40 pour la connectivité).</li>
 </ul>
+<p><strong>Pourquoi un polynôme de degré 3 et pas une droite ?</strong> La valeur du réseau sort d’un tanh, entre −1 et +1, alors que les points restants vont de −30 à +30, et le lien entre les deux n’est pas une droite :</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>valeur du réseau v</th>
+<th>0,0</th>
+<th>0,5</th>
+<th>0,9</th>
+<th>0,99</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>points restants (ordre de grandeur)</td>
+<td>0</td>
+<td>+3</td>
+<td>+8</td>
+<td>+20</td>
+</tr>
+</tbody>
+</table>
+<p>Près de ±1, la valeur sature : de 0,9 à 0,99, v bouge à peine mais les points beaucoup. Une droite a·v ne peut pas suivre cette courbe et se tromperait fortement sur les positions très gagnées (+9 annoncé au lieu de +20). Une caractéristique qui repère ces positions (« j’ai bien plus de territoire ») corrigerait cette erreur et paraîtrait utile, alors qu’elle n’apprend rien au réseau : il savait déjà que la position était très gagnée, c’est la droite qui lisait mal sa valeur. Le polynôme de degré 3 peut se courber et corrige cette échelle d’abord ; le gain mesuré ne compte ensuite que ce que la caractéristique sait <strong>en plus</strong> du réseau.</p>
 <p>Ici, <strong>cible</strong> désigne l’une des deux cibles de l’étape 1, centrée elle aussi : tout le calcul est fait deux fois, une fois pour les points restants (premier chiffre) et une fois pour le résultat (second chiffre), avec des coefficients ajustés séparément. Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite possible (moindres carrés).</p>
 </section>
 <section id="ajustement-sur-une-moitié-mesure-sur-lautre" class="level4" data-number="5.1.5.4">

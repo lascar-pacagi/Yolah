@@ -979,10 +979,24 @@ Deux nombres décrivent chaque position :
 
 Tous deux sont centrés comme à l'étape 2. On fait alors deux prédictions de la cible :
 
-- **le réseau seul** : cible ≈ a·v + b·v² + c·v³. Le polynôme de degré 3 laisse au réseau toutes ses chances :
-  sa valeur n'est pas forcément proportionnelle aux points (elle sature près de ±1, par exemple) ;
+- **le réseau seul** : cible ≈ a·v + b·v² + c·v³ (pourquoi un polynôme, voir ci-dessous) ;
 - **le réseau plus la caractéristique** : cible ≈ a·v + b·v² + c·v³ + d₁·f₁ + d₂·f₂, avec un coefficient par
   colonne de la caractéristique (2 pour le flood fill corrigé, 40 pour la connectivité).
+
+**Pourquoi un polynôme de degré 3 et pas une droite ?** La valeur du réseau sort d'un tanh, entre −1 et +1,
+alors que les points restants vont de −30 à +30, et le lien entre les deux n'est pas une droite :
+
+| valeur du réseau v | 0,0 | 0,5 | 0,9 | 0,99 |
+|---|---|---|---|---|
+| points restants (ordre de grandeur) | 0 | +3 | +8 | +20 |
+
+Près de ±1, la valeur sature : de 0,9 à 0,99, v bouge à peine mais les points beaucoup. Une droite a·v ne
+peut pas suivre cette courbe et se tromperait fortement sur les positions très gagnées (+9 annoncé au lieu
+de +20). Une caractéristique qui repère ces positions (« j'ai bien plus de territoire ») corrigerait cette
+erreur et paraîtrait utile, alors qu'elle n'apprend rien au réseau : il savait déjà que la position était
+très gagnée, c'est la droite qui lisait mal sa valeur. Le polynôme de degré 3 peut se courber et corrige
+cette échelle d'abord ; le gain mesuré ne compte ensuite que ce que la caractéristique sait **en plus** du
+réseau.
 
 Ici, **cible** désigne l'une des deux cibles de l'étape 1, centrée elle aussi : tout le calcul est fait
 deux fois, une fois pour les points restants (premier chiffre) et une fois pour le résultat (second
