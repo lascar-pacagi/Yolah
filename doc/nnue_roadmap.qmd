@@ -1411,19 +1411,31 @@ puis la recherche exhaustive), mesurés avant la règle « s'abstenir seulement 
 ![Le nombre de coups de dame qu'il me faut pour atteindre chaque case libre (toutes mes pièces ensemble). Q1 compte les cases marquées 1, Q2 celles marquées 1 ou 2, etc.](figs/fig-feat-queen.png){#fig-feat-queen width=72%}
 
 ```cpp
-uint8_t out[16];                                        // les colonnes du camp (0 à 64)
-auto put = [&](int id, int v) { out[id] = uint8_t(std::min(v, 64)); };
-uint64_t lv[64];
-const int nl = queen_levels(pieces, free, lv);          // lv[k] : les cases à k + 1 coups exactement
-uint64_t cover = 0;                                     // les cases atteintes jusqu'ici
-int w = 0, q[3] = {0, 0, 0};
-for (int k = 0; k < nl; k++) {
-    cover |= lv[k];
-    if (k < 3) q[k] = std::popcount(cover);             // Q1, Q2, Q3
-    if (k < 6) w += std::popcount(lv[k]) << (5 - k);    // 32, 16, 8... = 2^-k en virgule fixe
+// out : les 16 colonnes (out[0..7] pour moi, out[8..15] pour lui) ; une colonne = camp × 8 + numéro,
+// le numéro venant de enum Id { CORR, Q1, Q2, Q3, QFIRST, QW, LATE9, MOB } (Q1 = 1, ..., MOB = 7)
+uint8_t out[16];
+// put(sd, id, v) : écrit v dans la colonne id du camp sd (0 = moi, 1 = lui), bornée à 0..64
+auto put = [&](int sd, int id, int v) { out[sd * 8 + id] = uint8_t(std::clamp(v, 0, 64)); };
+const uint64_t pcs[2] = { us, them };                   // les pièces de chaque camp
+for (int sd = 0; sd < 2; sd++) {
+    uint64_t lv[64];
+    const int nl = queen_levels(pcs[sd], free, lv);     // lv[k] : les cases à k + 1 coups exactement
+    uint64_t cover = 0;                                 // les cases atteintes jusqu'ici
+    int w = 0, q[3] = {0, 0, 0};
+    for (int k = 0; k < nl; k++) {
+        cover |= lv[k];
+        if (k < 3) q[k] = std::popcount(cover);         // Q1, Q2, Q3
+        if (k < 6) w += std::popcount(lv[k]) << (5 - k);    // 32, 16, 8... = 2^-k en virgule fixe
+    }
+    for (int k = std::max(nl, 1); k < 3; k++) q[k] = q[k - 1];   // moins de 3 niveaux : Q2, Q3 = le dernier
+    put(sd, Q1, q[0]); put(sd, Q2, q[1]); put(sd, Q3, q[2]); put(sd, QW, w >> 5);
 }
-put(Q1, q[0]); put(Q2, q[1]); put(Q3, q[2]); put(QW, w >> 5);
 ```
+
+`out` contient les 16 premières colonnes des deux camps : les 8 premières pour moi, les 8 suivantes pour
+lui, dans l'ordre de `enum Id`. Q2 de lui est donc la colonne 8 + 2 = 10. `put` évite d'écrire ce calcul
+d'indice à chaque fois, et ramène la valeur dans 0..64 : le réseau reçoit valeur / 64, et `out` est un
+tableau d'octets. Q1 à Q3 ne dépassent jamais 56 (les cases libres), mais MOB peut dépasser 64 en ouverture.
 
 **Ce que les mesures ont dit.** Les cinq mesures de dame ensemble (avec QFIRST, ci-dessous) ajoutent au réseau
 +2,1 / +0,5 en milieu de partie. En finale 10–19, flood fill corrigé et distance de dame ensemble apportent
