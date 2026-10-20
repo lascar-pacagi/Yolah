@@ -984,7 +984,9 @@ Tous deux sont centrés comme à l'étape 2. On fait alors deux prédictions de 
 - **le réseau plus la caractéristique** : cible ≈ a·v + b·v² + c·v³ + d₁·f₁ + d₂·f₂, avec un coefficient par
   colonne de la caractéristique (2 pour le flood fill corrigé, 40 pour la connectivité).
 
-Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite
+Ici, **cible** désigne l'une des deux cibles de l'étape 1, centrée elle aussi : tout le calcul est fait
+deux fois, une fois pour les points restants (premier chiffre) et une fois pour le résultat (second
+chiffre), avec des coefficients ajustés séparément. Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite
 possible (moindres carrés).
 
 #### 4. Ajustement sur une moitié, mesure sur l'autre

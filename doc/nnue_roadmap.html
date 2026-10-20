@@ -3560,7 +3560,7 @@ Figure 8: Les caractéristiques entrent dans la deuxième couche, à côté des
 <li><strong>le réseau seul</strong> : cible ≈ a·v + b·v² + c·v³. Le polynôme de degré 3 laisse au réseau toutes ses chances : sa valeur n’est pas forcément proportionnelle aux points (elle sature près de ±1, par exemple) ;</li>
 <li><strong>le réseau plus la caractéristique</strong> : cible ≈ a·v + b·v² + c·v³ + d₁·f₁ + d₂·f₂, avec un coefficient par colonne de la caractéristique (2 pour le flood fill corrigé, 40 pour la connectivité).</li>
 </ul>
-<p>Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite possible (moindres carrés).</p>
+<p>Ici, <strong>cible</strong> désigne l’une des deux cibles de l’étape 1, centrée elle aussi : tout le calcul est fait deux fois, une fois pour les points restants (premier chiffre) et une fois pour le résultat (second chiffre), avec des coefficients ajustés séparément. Les coefficients (a, b, c, d₁, d₂…) sont ceux qui rendent la somme des carrés des erreurs la plus petite possible (moindres carrés).</p>
 </section>
 <section id="ajustement-sur-une-moitié-mesure-sur-lautre" class="level4" data-number="5.1.5.4">
 <h4 data-number="5.1.5.4" class="anchored" data-anchor-id="ajustement-sur-une-moitié-mesure-sur-lautre"><span class="header-section-number">5.1.5.4</span> 4. Ajustement sur une moitié, mesure sur l’autre</h4>
