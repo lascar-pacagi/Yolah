@@ -12,10 +12,20 @@
 #        tail -f yolah_progsearch_<job>.out                 (new best and new Pareto programs)
 #        cat ~/SearchStudy/program_search/<RUN>/leaderboard.txt   (best 50 + Pareto front, every minute)
 #
+# It first times ~160 programs in C++ to fit the price (ns) of each operation
+# (RUN/prices.json), every MEASURE_MINUTES it compiles and times the Pareto front
+# and the best programs (column "mes.", values checked against Python), and
+# every STAGE_MINUTES it freezes the best program by speed prior (OOPS stage:
+# RUN/library.txt, RUN/features.h; printed as ===== ÉTAPE k =====).
+#
 # Environment: BASE (base network, default the repo's k8_them), BASE_FEATURES
-# (known features added to the base: infl,qfirst,mob; default none), STRIDE (20),
+# (known features added to the base: infl,qfirst,mob; default none), HAVE
+# (expressions the engine already computes, free, ';'-separated), STRIDE (20),
 # N (positions used, 1000000), MINUTES (1380 = 23 h), MAX_SIZE (6), BODY_SIZE (5),
-# MAX_NODES (15), WEIGHTS ("1,10" = points, result), RUN (output dir name), SEED.
+# MAX_NODES (15), WEIGHTS ("1,10" = points, result), LAM (0.03, speed prior: score
+# per doubling of the time), MU (0.002, per node), STAGE_MINUTES (240),
+# MIN_GAIN (0.05), MEASURE_MINUTES (30), PRICES (prices.json of an earlier run),
+# RUN (output dir name), SEED.
 # ────────────────────────────────────────────────────────────────────────────
 #SBATCH --job-name=yolah_progsearch
 #SBATCH --output=yolah_progsearch_%j.out
@@ -48,6 +58,9 @@ fi
 start_in_container bash -c "cd /Yolah/nnue && exec python3 -u program_search.py /work/program_search/${POS} \
     /work/program_search/${RUN} --n ${N:-1000000} --minutes ${MINUTES:-1380} --workers ${CPUS} \
     --max-size ${MAX_SIZE:-6} --body-size ${BODY_SIZE:-5} --max-nodes ${MAX_NODES:-15} \
-    --weights ${WEIGHTS:-1,10} --seed ${SEED:-0} ${BASE_FEATURES:+--base ${BASE_FEATURES}}"
+    --weights ${WEIGHTS:-1,10} --lam ${LAM:-0.03} --mu ${MU:-0.002} \
+    --stage-minutes ${STAGE_MINUTES:-240} --min-gain ${MIN_GAIN:-0.05} --measure-minutes ${MEASURE_MINUTES:-30} \
+    --seed ${SEED:-0} ${BASE_FEATURES:+--base ${BASE_FEATURES}} ${PRICES:+--prices ${PRICES}} \
+    ${HAVE:+--have '${HAVE}'}"
 wait_forwarding_signals
 echo "[$(date '+%F %T')] done (exit code ${RC})"
