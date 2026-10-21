@@ -926,7 +926,7 @@ connectivité suit la même règle : ses 5 nombres par pièce sont tous dans sa 
 
 Vérification : les 92 colonnes calculées sur 500 positions et sur leurs reflets sont identiques partout.
 
-### Comment lire les mesures « ce que la caractéristique ajoute »
+### Comment lire les mesures « ce que la caractéristique ajoute » {#sec-mesure}
 
 Chaque section donne des chiffres comme « +18,6 / +1,9 en finale 10–19 ». Ils répondent à la question :
 **que sait cette caractéristique que le réseau actuel ne sait pas déjà ?** Voici le calcul, étape par
@@ -1157,7 +1157,7 @@ Tous les nombres des schémas de ce chapitre sont calculés par cette référenc
 (`doc/figs/make_feature_figs.py`). Les extraits de code sont raccourcis par rapport au code réel, sans
 changer le calcul.
 
-## Deux outils communs : les blocs et les coups de dame
+## Deux outils communs : les blocs et les coups de dame {#sec-outils}
 
 **Les blocs.** Un bloc est une composante connexe des cases libres par pas de roi (8 voisines). Une pièce ne
 pourra jamais atteindre que les blocs qui touchent sa case : une dame glisse de case libre en case libre, et
@@ -1774,6 +1774,455 @@ temps de calcul. Le C++ de `NNUE_Persp` lit déjà n'importe quelles colonnes pa
 (`space::compute_groups`, identique à `compute_all` sur ces colonnes pour les 511 ensembles de groupes).
 Coût mesuré du calcul pour les deux camps : corr 150 ns, niveaux de dame (qdist, qfirst, qw, late9, mob)
 125 ns, infl 22 ns, connect 640 ns, encircle 200 ns ; corr + encircle + infl : 380 ns.
+
+
+# Chercher les caractéristiques automatiquement : la recherche de programmes
+
+## L'idée
+
+L'influence a été trouvée **à la main** : en jouant, on remarque que « à qui revient une case si les deux
+camps avancent à la même vitesse » prédit bien la suite, puis on l'écrit en quelques lignes de bitboards, et
+la mesure confirme qu'elle coûte 25 ns et apporte quelque chose. Peut-on faire faire ce travail à la machine ?
+
+Une caractéristique comme l'influence est un **petit programme** : quelques opérations sur des bitboards,
+parfois une boucle, puis un `popcount`. On peut donc :
+
+1. définir un **langage restreint** dont chaque programme calcule une caractéristique bon marché ;
+2. donner à chaque programme une **note** : ce qu'il ajoute à la prédiction du réseau actuel, mesuré comme au
+   chapitre précédent (@sec-mesure) ;
+3. lui donner un **prix** en nanosecondes, prédit puis vérifié en C++ ;
+4. **chercher** dans ce langage les programmes qui apportent le plus pour le moins de temps, en partant des
+   plus petits ;
+5. **réutiliser** ce qui a été trouvé : une bonne caractéristique, une fois gardée, devient une brique du
+   langage, et la recherche se met à chercher ce qu'elle n'apporte pas.
+
+Ces cinq points reprennent, en version pratique, deux idées de Jürgen Schmidhuber. Le **Speed Prior**
+(2002) préfère, à qualité égale, les programmes courts *et* rapides. L'**OOPS** (*Optimal Ordered Problem
+Solver*, 2004) résout une suite de problèmes en réutilisant les solutions des précédents. Le tout tient
+dans `nnue/program_search.py` (1 300 lignes de Python et numpy), `test/program_search_dump_main.cpp` (les
+données) et `nnue/program_search.sh` (le lancement sur le cluster).
+
+![Le circuit de la recherche. Les positions sont extraites une fois par le C++. Trois échantillons servent ensuite à trois choses : noter (1 million de positions), reconnaître les doublons et compter les tours de boucle (2 000 témoins), chronométrer en C++ (20 000).](figs/fig-ps-pipeline.png){#fig-ps-pipeline width=82%}
+
+## Les données
+
+`program_search_dump` rejoue les parties de `data/games` avec le réseau de base (k8_them, mis à jour coup par
+coup comme dans la recherche) et garde une position sur 20, vue du joueur au trait :
+
+```cpp
+struct __attribute__((packed)) Rec {
+    uint64_t mine, his, holes;   // mes pièces, les siennes, les trous
+    float value;                 // ce que dit le réseau de base, dans [-1, 1]
+    int8_t future, result;       // points restants, résultat (+1 / 0 / -1)
+    uint8_t free, colour;        // nombre de cases libres, couleur au trait
+    uint32_t game;               // numéro de partie (moitié d'apprentissage / moitié de test)
+};                               // 36 octets
+```
+
+Sur les 4,8 millions de parties, cela donne 6,6 millions de positions en 9 secondes. Python les lit
+d'un coup avec `np.fromfile` : chaque champ devient un tableau numpy, et un programme s'évalue sur toutes
+les positions à la fois.
+
+## Le langage
+
+### Les briques
+
+Un programme calcule un **ensemble de cases**, c'est-à-dire un bitboard de 64 bits. Il part de quatre
+ensembles connus :
+
+| Feuille | Ensemble |
+|---|---|
+| `M` | mes pièces (le joueur au trait) |
+| `H` | ses pièces |
+| `F` | les cases libres |
+| `X` | les trous |
+
+Il les combine avec sept opérations :
+
+| Opération | Résultat | Coût mesuré |
+|---|---|---:|
+| `N(s)` | les 8 voisines des cases de `s` | 1,4 ns |
+| `S(s)` | `N(s) & F` : un pas de roi vers une case libre | 1,9 ns |
+| `Q(s)` | un coup de dame depuis `s` à travers les cases libres (le *Kogge-Stone* de @sec-outils) | 8,8 ns |
+| `C(s)` | tout ce qu'un roi atteint depuis `s` par les cases libres (`S` répété jusqu'à ce que rien ne change) | 4,0 ns par tour |
+| `a & b`, <code>a &#124; b</code>, `a - b` | intersection, union, différence (`a & ~b`) | ≈ 0 |
+
+![Les quatre opérations unaires appliquées à mes pièces, sur la position du milieu de partie déjà utilisée pour l'influence. `N` compte aussi les trous et les pièces voisines (en gris ou sous une pièce sur la figure) ; `S` ne garde que les cases libres.](figs/fig-ps-ops.png){#fig-ps-ops width=100%}
+
+La caractéristique est le **nombre de cases** de l'ensemble, qu'on écrit entre barres. Par exemple, sur la
+figure, `|S(M)|` = 20 et `|C(M)|` = 43. En Python, chaque opération est une fonction sur un tableau de
+bitboards (un par position) :
+
+```python
+def near(x):                       # N : les 8 décalages, avec les masques de bord
+    out = np.zeros_like(x)
+    for d, m in DIRS:              # (8, tout), (-8, tout), (1, pas la colonne a), …
+        out |= sh(x, d, m)
+    return out
+
+def closure(x, free):              # C : S répété jusqu'au point fixe
+    c = (x | near(x)) & free
+    while True:
+        n = c | (near(c) & free)
+        if (n == c).all():
+            return c
+        c = n
+```
+
+Une expression est un arbre de tuples : `('S', ('Q', ('M',)))` s'écrit `S(Q(M))`. L'évaluation descend
+l'arbre et garde en cache les sous-expressions déjà calculées.
+
+### Les boucles : GROW et RACE
+
+Sans boucle, le langage ne peut pas exprimer l'influence, qui fait avancer deux fronts tour après tour.
+Plutôt que d'ajouter des boucles quelconques, qui seraient difficiles à chercher et à chiffrer, le langage
+offre **deux modèles** de boucle. Chacun a un corps `g`, une expression qui peut lire un état :
+
+- **`GROW[g]`** : un état `A`, qui part de mes pièces. À chaque tour, `A |= g(A)`, jusqu'à ce que rien
+  ne change.
+- **`RACE[g]`** : deux états, `A` qui part de mes pièces et `B` qui part des siennes. À chaque tour, chacun
+  propose ses nouvelles cases : `g(A, B)` pour moi, et le même corps vu de l'autre côté, `g(B, A)`, pour lui.
+  Une case proposée par les deux au même tour devient **neutre** pour toujours, et personne ne la prend.
+
+Les deux boucles s'arrêtent quand rien ne change, ou au bout de 12 tours. Elles ont chacune deux sorties
+possibles : `#` compte les cases libres de `A`, et `w` les pondère par le tour où elles sont prises
+(32 au premier tour, 16 au deuxième…). Voici le cœur de `RACE` :
+
+```python
+A, B, neutral = M, H, 0
+for k in range(MAX_ROUNDS):                       # 12
+    a = g(A, B)        & ~A & ~neutral            # ce que je propose de nouveau
+    b = swap(g)(A, B)  & ~B & ~neutral            # pareil pour lui : M↔H, A↔B
+    both = a & b
+    neutral |= both                               # proposées ensemble : neutres pour toujours
+    a &= ~both; b &= ~both
+    if not (a | b).any(): break
+    A |= a; B |= b
+me, him = popcount(A & F), popcount(B & F)        # sortie « # »
+```
+
+![Les deux modèles de boucle. À gauche, `RACE#[S(A) - B]` : chaque camp avance d'un pas de roi sans entrer chez l'autre. Sur cette position, il donne exactement l'influence (23 et 14, comparer avec @fig-feat-infl). À droite, `GROW#[S(A) - Q(H)]` : j'avance d'un pas de roi sans jamais entrer sur une case qu'il atteint en un coup de dame (en vert).](figs/fig-ps-loops.png){#fig-ps-loops width=95%}
+
+**Le langage retrouve l'influence.** `RACE#[S(A) - B]` se lit « chacun avance d'un pas de roi, sans
+entrer chez l'autre ». C'est l'influence, à un détail près : dans l'influence, la zone neutre s'étend aussi
+d'un pas à chaque tour. Les deux sont égales sur 60 % des positions (corrélation 0,96), avec une note
+presque identique (0,512 contre 0,526). Le programme ne compte que 5 nœuds. Sans le `- B`, `RACE#[S(A)]`
+laisse chaque camp entrer chez l'autre et note moins bien (0,472). La différence entre les deux est
+exactement le genre de détail qu'une recherche essaie pour nous.
+
+### Pour moi et pour lui, et le miroir
+
+Chaque programme donne **deux colonnes**, comme les caractéristiques du chapitre précédent : une pour moi,
+et le même programme vu de l'autre camp pour lui. Pour l'obtenir, `swap` échange `M` et `H` (et `A` et `B`
+dans une course) :
+
+```python
+def swap(e, ab=True):
+    if len(e) == 1:
+        return (swap_leaf(e[0], ab),)     # M↔H, A↔B, L1↔L1s (les briques, plus bas)
+    return (e[0],) + tuple(swap(c, ab) for c in e[1:])
+```
+
+Toutes les opérations traitent les 8 directions de la même façon. Une position et son miroir donnent donc
+les mêmes valeurs, sans rien vérifier : la propriété exigée au chapitre précédent est acquise par
+construction.
+
+## La note : ce que le programme ajoute au réseau
+
+La note est exactement la mesure de @sec-mesure, appliquée aux deux colonnes du programme :
+
+1. On ajuste d'abord la **base** : un polynôme de degré 3 de la valeur du réseau (plus les caractéristiques
+   déjà gardées, plus bas), centré par groupe (cases libres, couleur), par phase, sur la moitié
+   d'apprentissage des parties. On obtient ainsi le **résidu**, c'est-à-dire ce que le réseau se trompe.
+2. Les deux colonnes du programme, centrées de même, prédisent ce résidu par une régression linéaire
+   ajustée sur la même moitié.
+3. Le **gain** est la part de la variance de la cible, sur l'autre moitié des parties, que cette prédiction
+   retire, en points de R². On le calcule pour les deux cibles (points restants, résultat) et les quatre
+   phases (40–56, 20–39, 10–19 et 0–9 cases libres), soit 8 gains.
+4. La **note** est la moyenne de ces 8 gains, avec un poids 10 sur le résultat : pour la même information,
+   un gain sur le résultat est environ dix fois plus petit.
+
+```python
+def gains(self, me, him):
+    X = np.stack([self.center(me), self.center(him)], 1)
+    for ph in range(4):
+        tr, te = (self.phase == ph) & ~self.test, (self.phase == ph) & self.test
+        for i, t in enumerate(["points", "result"]):
+            coef = np.linalg.solve(X[tr].T @ X[tr] + 1e-6 * np.eye(2), X[tr].T @ self.resid[t][tr])
+            r = self.resid[t][te]
+            out[i, ph] = 100 * ((r ** 2).sum() - ((r - X[te] @ coef) ** 2).sum()) / self.sst[t][ph]
+```
+
+Une note se calcule en quelques dizaines de millisecondes sur un million de positions. Une recherche
+de 23 h sur 32 cœurs peut donc en noter des millions. Repères, sur la même échelle :
+
+| Programme | Note | Coût mesuré (ns) |
+|---|---:|---:|
+| <code>&#124;S(M)&#124;</code> | 0,197 | 3 |
+| <code>&#124;S(S(S(M)))&#124;</code> | 0,382 | 9 |
+| <code>&#124;C(M)&#124;</code> | 0,410 | 26 |
+| `RACE#[S(A)]` | 0,472 | 32 |
+| `RACE#[S(A) - B]` (≈ influence) | 0,512 | 20 |
+| `GROW#[S(A) - Q(H)]` | 0,578 | 38 |
+| influence (`heuristic::influence`) | 0,526 | 22 |
+| QFIRST (chapitre précédent) | 0,573 | — |
+
+Le jeu de données est petit (100 000 positions, réseau de base k8_them). Presque toute la note vient des
+points restants en finale : 9 à 11 points de R² dans les phases 10–19 et 0–9, très peu sur le résultat.
+C'est ce que les mesures du chapitre précédent disaient déjà, et le défaut connu du réseau.
+
+## Ne pas noter deux fois la même caractéristique
+
+Beaucoup de programmes différents calculent la même chose pour le réseau. `|S(M) | X|` vaut
+`|S(M)| + (56 − free)` (les trous et les cases libres sont disjoints), soit `|S(M)|` plus une fonction du nombre de cases libres, que le centrage par
+groupe efface. `|F - S(M)|` vaut `free − |S(M)|`, la même information au signe près. Les noter tous
+remplirait le tableau de copies.
+
+D'où l'**équivalence observationnelle** : on calcule les deux colonnes sur 2 000 positions **témoins**, puis
+on les normalise (centrées par nombre de cases libres, divisées par leur plus grande valeur, signe fixé par
+la première valeur non nulle) et on en tire une empreinte. Deux programmes de même empreinte sont la même
+caractéristique, et seul le **moins cher** est gardé.
+
+```python
+c = c - moyenne_par_nombre_de_cases_libres(c)        # pour chaque colonne
+both = np.concatenate(cols) / np.abs(both).max()      # l'échelle
+both = np.round(both * np.sign(first_nonzero), 6)     # le signe
+key = blake2b(both.tobytes(), digest_size=12)
+```
+
+Sur les 620 expressions de taille 1 à 4, il ne reste que 179 caractéristiques distinctes. Les mêmes
+2 000 témoins servent aussi à mesurer le nombre moyen de tours des boucles, dont le coût a besoin.
+
+## Le coût en nanosecondes
+
+Compter les nœuds de l'arbre ne suffit pas : un `Q` coûte six fois un `S`, et une boucle répète son corps.
+Le coût d'un programme est donc **prédit en ns**, en quatre étapes.
+
+**1. Les prix des opérations.** Au démarrage, 160 programmes variés sont traduits en C++, compilés
+(`g++ -O3 -march=native`) et chronométrés sur 20 000 positions. Pour chacun, on compte combien de fois
+chaque opération s'exécute. Le prix de chaque opération est alors ajusté par **moindres carrés à
+coefficients positifs** : temps mesuré ≈ Σ nombre × prix. Cela prend 5 secondes, et l'ajustement colle aux
+mesures avec une corrélation de 0,995. Les prix obtenus sur le PC de test sont `N` 1,4 ns, `S` 1,9 ns, `Q`
+8,8 ns, un tour de `C` 4,0 ns, un tour de boucle 1,4 ns ; les `&`, `|`, `-` et les `popcount` sont
+presque gratuits. Sur le cluster, la calibration est refaite sur le nœud : les prix sont ceux de son
+processeur.
+
+**2. Les tours de boucle.** Le corps d'une boucle s'exécute (tours actifs + 1) fois, car le dernier tour
+calcule et ne trouve plus rien. On mesure cette moyenne par position sur les témoins : 3,6 tours pour
+`RACE#[S(A) - B]`, 3,2 tours de `C` par camp pour `C(M)`. Le premier prototype oubliait le « + 1 », et certaines
+boucles étaient alors sous-estimées jusqu'à 10 fois.
+
+**3. Un graphe, pas un arbre.** Le C++ ne recalcule pas ce qu'il a déjà, donc le coût se compte sur le
+**graphe de calcul** :
+
+- les deux camps sont fusionnés, et une sous-expression commune (`C(X)`, `N(F)`, ou `Q(Q(M))` qu'utilisent
+  les deux corps d'une course) n'est payée qu'une fois ;
+- une partie du corps de boucle qui ne lit pas l'état (`A`, `B`) est calculée une seule fois, avant la
+  boucle ;
+- ce que le moteur calcule déjà (les caractéristiques gardées, plus bas) est gratuit : le coût est
+  **marginal**.
+
+![Arbre contre graphe, sur `RACE#[(S(A) - Q(Q(H))) | Q(Q(M))]`, la caractéristique gelée à la première étape d'un essai. Les quatre `Q` ne lisent pas l'état : ils sortent de la boucle et servent aux deux camps. Seuls les `S` et les opérations de bits se répètent à chaque tour.](figs/fig-ps-graph.png){#fig-ps-graph width=92%}
+
+```python
+def walk(e, rounds):
+    if len(e) == 1 or e in HAVE:                  # feuille, ou déjà calculé par le moteur : gratuit
+        return
+    m = rounds if uses_state(e) else 1.0          # hors de la boucle : une seule fois
+    key = (e, m) if uses_state(e) else e
+    if key in seen:                               # déjà compté (l'autre camp, ou ailleurs)
+        return
+    seen.add(key)
+    counts[op_of(e)] += m
+    for c in e[1:]:
+        walk(c, rounds)
+
+for e, rounds in [(g, r), (swap(g), r)]:          # les deux camps, un seul `seen`
+    walk(e, rounds)
+ns = sum(counts[k] * prices[k] for k in counts)
+```
+
+**4. La vérification en C++.** Toutes les 30 minutes, le front de Pareto et les 20 meilleurs programmes
+selon le Speed Prior sont traduits en C++, une ligne par nœud du graphe, puis compilés et chronométrés. Les
+sommes des colonnes sont comparées à celles de Python. Voici, par exemple, ce que le générateur écrit pour
+la caractéristique de la figure :
+
+```cpp
+const u64 v1 = qreach(M, F);           // hors de la boucle, partagés
+const u64 v2 = qreach(H, F);
+const u64 v3 = qreach(v2, F);          // Q(Q(H))
+const u64 v4 = qreach(v1, F);          // Q(Q(M))
+u64 A = M, B = H, neu = 0;
+for (int k = 0; k < 12; k++) {
+  const u64 v5 = near_(A) & F;         // S(A)
+  const u64 v6 = v5 & ~v3;             // − Q(Q(H))
+  const u64 v7 = v6 | v4;              // | Q(Q(M))
+  const u64 v8 = near_(B) & F;         // et de son côté
+  const u64 v9 = v8 & ~v4;
+  const u64 v10 = v9 | v3;
+  u64 a = v7 & ~A & ~neu, b = v10 & ~B & ~neu; const u64 both = a & b;
+  neu |= both; a &= ~both; b &= ~both; if (!(a | b)) break;
+  A |= a; B |= b; }
+out[0] = pc(A & F); out[1] = pc(B & F);
+```
+
+Le chronomètre recalcule tout, y compris ce que les caractéristiques gardées fournissent déjà. Il est
+donc comparé au coût prédit **hors partage**. Sur l'essai local, le rapport prédit / mesuré est entre 0,98
+et 1,06, la corrélation entre 0,98 et 1,00, et il n'y a **aucune différence de valeurs** entre C++ et
+Python. Le tableau affiche les deux : `ns`, le coût marginal prédit, qui sert au classement, et `mes.`, le
+temps mesuré seul.
+
+## Le Speed Prior : préférer le court et le rapide
+
+Chaque programme a maintenant une note et un prix. Lequel est le meilleur ? Le meilleur score tout court
+favoriserait des programmes énormes et lents, qui gagnent 0,01 de plus pour trois fois le temps. Le
+**front de Pareto**, c'est-à-dire les programmes qu'aucun programme moins cher ne bat, montre tous les
+compromis, mais ne choisit pas.
+
+Le *Speed Prior* de Schmidhuber donne à un programme une probabilité a priori proportionnelle à
+$2^{-\text{longueur}} / \text{temps}$. En prenant le logarithme, et en le mélangeant à la note :
+
+$$\text{sp} = \text{note} - \lambda \log_2(\text{ns}) - \mu \cdot \text{nœuds}, \qquad \lambda = 0{,}03,\ \mu = 0{,}002$$
+
+Ce qui se lit simplement :
+
+- **doubler le temps** doit rapporter au moins 0,03 de note ;
+- **un nœud de plus** doit rapporter au moins 0,002. Ce terme casse les égalités en faveur du programme le
+  plus lisible, et freine l'enflure des programmes au fil de l'évolution.
+
+![Les 7 900 programmes notés pendant les premières minutes d'un essai local (60 000 positions), selon leur coût prédit (échelle log) et leur note. En bleu, le front de Pareto. En pointillé, les droites de même Speed Prior : un programme est meilleur selon le Speed Prior s'il est au-dessus d'une droite plus haute.](figs/fig-ps-front.png){#fig-ps-front width=92%}
+
+Sur la figure, les droites de même sp montent de 0,03 par doublement du temps. Le meilleur selon sp est
+le point du front qui touche la droite la plus haute. Ici, ce sont les courses de 20 à 40 ns, et non le
+programme le mieux noté (66 ns). λ fixe la pente : un λ plus grand favorise des programmes plus rapides.
+
+## La recherche : énumérer, puis faire évoluer
+
+**1. L'énumération par taille.** Tous les ensembles jusqu'à 6 nœuds, puis toutes les boucles dont le corps
+a jusqu'à 5 nœuds, sont construits du plus petit au plus grand. Chacun passe par les témoins (doublons,
+coût), puis, s'il est nouveau, par la note. Quelques règles évitent les cas inutiles : `a & b` et `b & a`
+ne sont essayés qu'une fois, et pas de `S(C(…))`, car `C` est déjà fermé.
+
+**2. L'évolution**, jusqu'à la fin du temps. Les parents sont les 50 meilleurs selon sp, les 20 mieux notés
+et le front de Pareto, tous limités à 15 nœuds. Chaque génération produit 256 enfants par mutation :
+
+- remplacer un sous-arbre par un sous-arbre au hasard ;
+- envelopper un nœud dans `N`, `S`, `Q`, `C`, ou dans un `&`, `|`, `-` avec un sous-arbre nouveau ;
+- changer d'opérateur, remplacer un nœud par l'un de ses enfants ;
+- croiser deux parents (`a | b` entre deux ensembles) ;
+- passer d'un ensemble à une boucle, de `GROW` à `RACE`, de la sortie `#` à `w`.
+
+Tout se calcule en parallèle sur les 32 cœurs du nœud. Chaque nouveau record s'affiche tout de suite :
+
+```
+[ 42.0 min] MEILLEUR SP  score 0.582 sp 0.393 ns 46.4 mes. 41.0 | points 0.13 1.40 9.25 11.02 | résultat 0.00 0.18 0.19 0.01 | RACE#[(S(A) - Q(Q(H))) | Q(Q(M))]
+[ 43.1 min] front        score 0.512 sp 0.370 ns 20.8 mes.    - | points 0.07 0.74 8.97 10.98 | résultat 0.00 0.02 0.14 0.01 | RACE#[S(A) - B]
+```
+
+(Ces deux lignes illustrent le format ; les minutes sont fictives.) Le tableau complet (`leaderboard.txt`) est réécrit chaque
+minute : la bibliothèque, les 40 meilleurs selon sp, les 20 mieux notés et le front de Pareto. `all.tsv`
+garde tous les programmes notés.
+
+## Les étapes OOPS : réutiliser ce qui a été trouvé
+
+Une fois une bonne caractéristique de territoire trouvée, la recherche risque de proposer cent variantes
+de la même idée. Ce qui compterait ensuite, c'est ce qu'**elle n'apporte pas**. Toutes les 4 heures, une
+**étape** gèle donc le meilleur programme selon sp, si sa note dépasse 0,05 :
+
+![Une étape OOPS. Le programme gelé change trois choses : la base (on cherche désormais ce qu'il n'apporte pas), le langage (une nouvelle feuille) et les prix (ses sous-calculs deviennent gratuits).](figs/fig-ps-oops.png){#fig-ps-oops width=78%}
+
+```python
+LIBRARY.append(e.p)                               # L{k} : feuille du langage (Lk pour moi, Lks pour lui)
+for s in subexprs(e.p[1]) | subexprs(swap(e.p[1])):
+    if not uses_state(s):
+        HAVE.add(s)                               # le moteur les calcule déjà : gratuits
+self.scorer.add_base(me, him)                     # ses 2 colonnes rejoignent la base → nouveaux résidus
+# renoter les 300 meilleurs et le front contre la nouvelle base ; essayer |Lk|, |S(Lk)|, |Lk - M|, …
+```
+
+**La base grandit.** Les deux colonnes rejoignent le polynôme de la valeur. Les notes suivantes mesurent ce
+qu'un programme ajoute *au réseau et aux caractéristiques gelées*. Les 300 meilleurs programmes sont
+renotés, et une variante de `L1` tombe aussitôt près de 0.
+
+**Le langage grandit.** L'ensemble final du programme gelé devient une feuille, `L1` pour moi et `L1s` pour
+lui. Un programme comme `|L1 - N(F)|` (« mes cases de `L1` qui touchent une case libre ») ne coûte que
+quelques opérations de bits. C'est le principe d'OOPS : une solution trouvée sert de sous-programme aux
+suivantes.
+
+**Les prix baissent.** Le moteur calcule déjà `L1`, et aussi ses sous-expressions sans état (ici
+`Q(M)`, `Q(Q(M))`…). Elles deviennent gratuites, et un programme qui les réutilise ne paie que ce qu'il
+ajoute.
+
+Chaque étape s'affiche `===== ÉTAPE k : Lk = … =====`. `library.txt` garde le programme, sa note et son
+coût, et `features.h` contient le C++ des caractéristiques gelées, prêt à copier dans le moteur :
+
+```cpp
+// L1 = the set of RACE#[(S(A) - Q(Q(H))) | Q(Q(M))]
+static inline u64 lib1(u64 M, u64 H, u64 X, u64 F, const u64* Lm, const u64* Lh) {
+    const u64 v1 = qreach(M, F);
+    ...
+    return A;
+}
+// la caractéristique : popcount(lib1(M, H, …) & F) pour moi, popcount(lib1(H, M, …) & F) pour lui
+```
+
+## Ce qu'ont montré les essais locaux
+
+Les essais locaux (60 000 à 100 000 positions, 7 à 20 minutes, une étape toutes les 3 minutes) ont servi
+à mettre l'outil au point. Ils disent déjà trois choses :
+
+1. **Le langage retrouve les caractéristiques connues** : `RACE#[S(A) - B]` (≈ influence, 0,512), et des
+   courses qui égalent QFIRST (0,573) pour 20 à 40 ns.
+2. **La première étape gèle toujours une course de territoire**, de note 0,54 à 0,60 pour 32 à 47 ns
+   mesurées. Par exemple `L1 = RACE#[(S(A) - Q(Q(H))) | Q(Q(M))]` : 0,536 (sur 60 000 positions),
+   46 ns prédites, 47 ns mesurées. Ses gains sont presque tous en finale, sur les points restants
+   (+9,1 en 10–19, +10,4 en 0–9).
+3. **Après elle, il reste peu** : les meilleures notes tombent vers 0,05–0,1, par exemple
+   `L2 = |N(F) & ((Q(H) | L1) | Q(Q(H)))|`, note 0,097 pour 2 ns marginales. Une seule caractéristique
+   de territoire capte donc l'essentiel de ce que la base linéaire voit manquer au réseau.
+
+**Les limites.**
+
+- Le juge est **linéaire** : une caractéristique utile seulement en combinaison avec les accumulateurs du
+  réseau peut être sous-notée. Le vrai juge reste l'entraînement du réseau avec la colonne, comme dans
+  l'ablation.
+- La cible est la **partie jouée**, bruitée sur le résultat : le poids 10 l'amplifie, mais les gains sur
+  le résultat restent proches du bruit.
+- Le langage ne voit que des ensembles et des comptes. Il ne peut pas exprimer « par pièce » (comme
+  CONNECT) ni « la plus petite distance ». On pourrait l'étendre si la grosse recherche montre que le
+  territoire est épuisé.
+
+## En pratique
+
+```bash
+cd ~/Yolah && git pull
+sbatch -p insa-cpu --exclude=crn07,crn14,crn15 nnue/program_search.sh
+tail -f yolah_progsearch_<job>.out                         # MEILLEUR, MEILLEUR SP, front, mesures C++, ÉTAPES
+cat ~/SearchStudy/program_search/run_*/leaderboard.txt     # le tableau, réécrit chaque minute
+cat ~/SearchStudy/program_search/run_*/library.txt         # les caractéristiques gelées
+```
+
+**Ce que fait le script :**
+
+1. La première fois seulement, il extrait les positions (`positions_<base>_s20.bin`, une position sur 20).
+2. Il lance la recherche pour 23 h sur 32 cœurs, sur 1 million de positions.
+
+Les réglages se changent par variables d'environnement, avec `--export=ALL,…` :
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `MINUTES` | 1380 | durée de la recherche |
+| `N` | 1 000 000 | positions notées |
+| `LAM`, `MU` | 0,03, 0,002 | Speed Prior : prix d'un doublement du temps, d'un nœud |
+| `STAGE_MINUTES`, `MIN_GAIN` | 240, 0,05 | étapes OOPS : fréquence, note minimale gelée |
+| `MEASURE_MINUTES` | 30 | chronométrage C++ du front |
+| `BASE_FEATURES` | aucune | caractéristiques connues ajoutées à la base (`infl,qfirst,mob`), pour chercher ce qu'elles n'apportent pas |
+| `HAVE` | aucune | expressions que le moteur calcule déjà (gratuites), séparées par `;` |
+| `WEIGHTS` | `1,10` | poids des gains sur les points et sur le résultat |
+| `MAX_SIZE`, `BODY_SIZE`, `MAX_NODES` | 6, 5, 15 | tailles de l'énumération et de l'évolution |
+
+Une caractéristique trouvée ne sert qu'une fois validée comme les autres : on l'ajoute aux colonnes du
+réseau, on réentraîne, puis on la mesure en match.
 
 
 # Plan et mesure

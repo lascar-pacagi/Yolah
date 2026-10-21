@@ -1,0 +1,16 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+
+\begin{tikzpicture}[node distance=6mm and 10mm]
+\node[box,minimum width=46mm] (search) {la recherche\\[-1pt]\scriptsize énumération, évolution,\\[-1pt]\scriptsize mesure C++ toutes les 30 min};
+\node[boxa,right=of search,minimum width=46mm] (pick) {toutes les 4 h : le meilleur\\[-1pt]\scriptsize selon le Speed Prior\\[-1pt]\scriptsize (si son score est $\ge 0{,}05$)};
+\node[boxb,below=of pick,minimum width=46mm,align=left] (freeze) {\textbf{gel} de $L_k$ :\\[-1pt]\scriptsize $\bullet$ ses 2 colonnes rejoignent la base\\[-1pt]\scriptsize $\bullet$ son ensemble devient une feuille $L_k$\\[-1pt]\scriptsize $\bullet$ ses sous-calculs deviennent gratuits};
+\node[box,below=of search,minimum width=46mm] (rescore) {renotation des 300 meilleurs\\[-1pt]\scriptsize et du front, contre la nouvelle base ;\\[-1pt]\scriptsize petits programmes autour de $L_k$};
+\draw[ar] (search) -- (pick);
+\draw[ar] (pick) -- (freeze);
+\draw[ar] (freeze) -- (rescore);
+\draw[ar] (rescore) -- (search);
+\node[plain,below=4mm of $(rescore.south)!0.5!(freeze.south)$,text=muted] {\scriptsize écrit dans library.txt (le programme, son gain, son coût) et features.h (son C++)};
+\end{tikzpicture}
+\end{document}

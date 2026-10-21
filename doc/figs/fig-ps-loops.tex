@@ -1,0 +1,233 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\tikzset{mine/.style={circle,fill=ink,minimum size=4.2mm,inner sep=0pt},
+  his/.style={circle,draw=ink,line width=.8pt,fill=white,minimum size=4.2mm,inner sep=0pt},
+  hole/.style={fill=muted!75},
+  lab/.style={font=\sffamily\scriptsize,text=ink,inner sep=0pt}}
+\definecolor{me}{HTML}{CFE0F3}\definecolor{him}{HTML}{F6D9C3}\definecolor{neutral}{HTML}{E4E7EB}
+\begin{document}
+\begin{tikzpicture}
+\begin{scope}[shift={(0.00,0.00)}]
+\fill[me] (0.000,2.480) rectangle +(0.620,0.620);
+\fill[me] (0.620,0.000) rectangle +(0.620,0.620);
+\fill[me] (1.240,0.000) rectangle +(0.620,0.620);
+\fill[me] (0.620,2.480) rectangle +(0.620,0.620);
+\fill[me] (2.480,0.000) rectangle +(0.620,0.620);
+\fill[me] (1.860,2.480) rectangle +(0.620,0.620);
+\fill[me] (3.100,2.480) rectangle +(0.620,0.620);
+\fill[me] (0.620,0.620) rectangle +(0.620,0.620);
+\fill[me] (0.620,3.100) rectangle +(0.620,0.620);
+\fill[me] (2.480,3.100) rectangle +(0.620,0.620);
+\fill[me] (3.100,0.620) rectangle +(0.620,0.620);
+\fill[me] (3.100,3.100) rectangle +(0.620,0.620);
+\fill[me] (0.000,3.720) rectangle +(0.620,0.620);
+\fill[me] (0.620,1.240) rectangle +(0.620,0.620);
+\fill[me] (3.100,1.860) rectangle +(0.620,0.620);
+\fill[him] (3.720,2.480) rectangle +(0.620,0.620);
+\fill[him] (4.340,2.480) rectangle +(0.620,0.620);
+\fill[him] (4.340,0.620) rectangle +(0.620,0.620);
+\fill[him] (2.480,1.240) rectangle +(0.620,0.620);
+\fill[him] (3.100,3.720) rectangle +(0.620,0.620);
+\fill[him] (3.720,1.240) rectangle +(0.620,0.620);
+\fill[him] (4.340,1.240) rectangle +(0.620,0.620);
+\fill[him] (3.720,3.720) rectangle +(0.620,0.620);
+\fill[him] (4.340,3.720) rectangle +(0.620,0.620);
+\fill[him] (1.240,1.860) rectangle +(0.620,0.620);
+\fill[him] (3.100,4.340) rectangle +(0.620,0.620);
+\fill[him] (4.340,4.340) rectangle +(0.620,0.620);
+\fill[neutral] (3.720,0.000) rectangle +(0.620,0.620);
+\fill[neutral] (1.860,0.620) rectangle +(0.620,0.620);
+\fill[neutral] (2.480,0.620) rectangle +(0.620,0.620);
+\fill[neutral] (1.240,1.240) rectangle +(0.620,0.620);
+\fill[neutral] (1.860,1.860) rectangle +(0.620,0.620);
+\fill[me] (0.000,0.000) rectangle +(0.620,0.620);
+\fill[me] (1.240,3.100) rectangle +(0.620,0.620);
+\fill[me] (0.000,1.240) rectangle +(0.620,0.620);
+\fill[me] (1.240,3.720) rectangle +(0.620,0.620);
+\fill[me] (1.860,3.720) rectangle +(0.620,0.620);
+\fill[me] (0.000,1.860) rectangle +(0.620,0.620);
+\fill[me] (0.620,4.340) rectangle +(0.620,0.620);
+\fill[me] (0.000,4.340) rectangle +(0.620,0.620);
+\fill[him] (2.480,4.340) rectangle +(0.620,0.620);
+\fill[him] (4.340,3.100) rectangle +(0.620,0.620);
+\fill[neutral] (1.860,4.340) rectangle +(0.620,0.620);
+\fill[hole] (1.860,0.000) rectangle +(0.620,0.620);
+\fill[hole] (0.000,0.620) rectangle +(0.620,0.620);
+\fill[hole] (3.720,0.620) rectangle +(0.620,0.620);
+\fill[hole] (3.100,1.240) rectangle +(0.620,0.620);
+\fill[hole] (0.620,1.860) rectangle +(0.620,0.620);
+\fill[hole] (2.480,1.860) rectangle +(0.620,0.620);
+\fill[hole] (3.720,1.860) rectangle +(0.620,0.620);
+\fill[hole] (1.240,2.480) rectangle +(0.620,0.620);
+\fill[hole] (1.860,3.100) rectangle +(0.620,0.620);
+\fill[hole] (3.720,3.100) rectangle +(0.620,0.620);
+\fill[hole] (0.620,3.720) rectangle +(0.620,0.620);
+\fill[hole] (2.480,3.720) rectangle +(0.620,0.620);
+\fill[hole] (1.240,4.340) rectangle +(0.620,0.620);
+\draw[muted!60,line width=.3pt,step=0.62] (0,0) grid (4.960,4.960);
+\draw[ink,line width=.6pt] (0,0) rectangle (4.960,4.960);
+\node[lab] at (0.310,2.790) {1};
+\node[lab] at (0.930,0.310) {1};
+\node[lab] at (1.550,0.310) {1};
+\node[lab] at (0.930,2.790) {1};
+\node[lab] at (2.790,0.310) {1};
+\node[lab] at (2.170,2.790) {1};
+\node[lab] at (3.410,2.790) {1};
+\node[lab] at (0.930,0.930) {1};
+\node[lab] at (0.930,3.410) {1};
+\node[lab] at (2.790,3.410) {1};
+\node[lab] at (3.410,0.930) {1};
+\node[lab] at (3.410,3.410) {1};
+\node[lab] at (0.310,4.030) {1};
+\node[lab] at (0.930,1.550) {1};
+\node[lab] at (3.410,2.170) {1};
+\node[lab] at (4.030,2.790) {1};
+\node[lab] at (4.650,2.790) {1};
+\node[lab] at (4.650,0.930) {1};
+\node[lab] at (2.790,1.550) {1};
+\node[lab] at (3.410,4.030) {1};
+\node[lab] at (4.030,1.550) {1};
+\node[lab] at (4.650,1.550) {1};
+\node[lab] at (4.030,4.030) {1};
+\node[lab] at (4.650,4.030) {1};
+\node[lab] at (1.550,2.170) {1};
+\node[lab] at (3.410,4.650) {1};
+\node[lab] at (4.650,4.650) {1};
+\node[lab] at (4.030,0.310) {1};
+\node[lab] at (2.170,0.930) {1};
+\node[lab] at (2.790,0.930) {1};
+\node[lab] at (1.550,1.550) {1};
+\node[lab] at (2.170,2.170) {1};
+\node[lab] at (0.310,0.310) {2};
+\node[lab] at (1.550,3.410) {2};
+\node[lab] at (0.310,1.550) {2};
+\node[lab] at (1.550,4.030) {2};
+\node[lab] at (2.170,4.030) {2};
+\node[lab] at (0.310,2.170) {2};
+\node[lab] at (0.930,4.650) {2};
+\node[lab] at (0.310,4.650) {2};
+\node[lab] at (2.790,4.650) {2};
+\node[lab] at (4.650,3.410) {2};
+\node[lab] at (2.170,4.650) {3};
+\node[mine] at (0.310,3.410) {};
+\node[mine] at (1.550,0.930) {};
+\node[mine] at (2.790,2.790) {};
+\node[mine] at (3.410,0.310) {};
+\node[his] at (2.170,1.550) {};
+\node[his] at (4.650,0.310) {};
+\node[his] at (4.030,4.650) {};
+\node[his] at (4.650,2.170) {};
+\node[tiny] at (0.310,-0.22) {a};
+\node[tiny] at (0.930,-0.22) {b};
+\node[tiny] at (1.550,-0.22) {c};
+\node[tiny] at (2.170,-0.22) {d};
+\node[tiny] at (2.790,-0.22) {e};
+\node[tiny] at (3.410,-0.22) {f};
+\node[tiny] at (4.030,-0.22) {g};
+\node[tiny] at (4.650,-0.22) {h};
+\node[tiny] at (-0.2,0.310) {1};
+\node[tiny] at (-0.2,0.930) {2};
+\node[tiny] at (-0.2,1.550) {3};
+\node[tiny] at (-0.2,2.170) {4};
+\node[tiny] at (-0.2,2.790) {5};
+\node[tiny] at (-0.2,3.410) {6};
+\node[tiny] at (-0.2,4.030) {7};
+\node[tiny] at (-0.2,4.650) {8};
+\node[tiny] at (2.480,-0.55) {chiffre = tour où la case est prise};
+\node[plain,above] at (2.480,5.010) {\texttt{RACE\#[S(A) - B]} : moi 23, lui 14};
+\end{scope}
+\begin{scope}[shift={(6.16,0.00)}]
+\fill[soft3] (2.480,0.000) rectangle +(0.620,0.620);
+\fill[soft3] (3.720,0.000) rectangle +(0.620,0.620);
+\fill[soft3] (1.860,0.620) rectangle +(0.620,0.620);
+\fill[soft3] (2.480,0.620) rectangle +(0.620,0.620);
+\fill[soft3] (3.100,0.620) rectangle +(0.620,0.620);
+\fill[soft3] (4.340,0.620) rectangle +(0.620,0.620);
+\fill[soft3] (0.000,1.240) rectangle +(0.620,0.620);
+\fill[soft3] (0.620,1.240) rectangle +(0.620,0.620);
+\fill[soft3] (1.240,1.240) rectangle +(0.620,0.620);
+\fill[soft3] (2.480,1.240) rectangle +(0.620,0.620);
+\fill[soft3] (3.720,1.240) rectangle +(0.620,0.620);
+\fill[soft3] (4.340,1.240) rectangle +(0.620,0.620);
+\fill[soft3] (1.240,1.860) rectangle +(0.620,0.620);
+\fill[soft3] (1.860,1.860) rectangle +(0.620,0.620);
+\fill[soft3] (0.620,2.480) rectangle +(0.620,0.620);
+\fill[soft3] (1.860,2.480) rectangle +(0.620,0.620);
+\fill[soft3] (3.720,2.480) rectangle +(0.620,0.620);
+\fill[soft3] (4.340,2.480) rectangle +(0.620,0.620);
+\fill[soft3] (2.480,3.100) rectangle +(0.620,0.620);
+\fill[soft3] (3.100,3.100) rectangle +(0.620,0.620);
+\fill[soft3] (4.340,3.100) rectangle +(0.620,0.620);
+\fill[soft3] (3.100,3.720) rectangle +(0.620,0.620);
+\fill[soft3] (3.720,3.720) rectangle +(0.620,0.620);
+\fill[soft3] (4.340,3.720) rectangle +(0.620,0.620);
+\fill[soft3] (1.860,4.340) rectangle +(0.620,0.620);
+\fill[soft3] (2.480,4.340) rectangle +(0.620,0.620);
+\fill[soft3] (3.100,4.340) rectangle +(0.620,0.620);
+\fill[soft3] (4.340,4.340) rectangle +(0.620,0.620);
+\fill[me] (0.000,0.000) rectangle +(0.620,0.620);
+\fill[me] (0.620,0.000) rectangle +(0.620,0.620);
+\fill[me] (1.240,0.000) rectangle +(0.620,0.620);
+\fill[me] (0.000,2.480) rectangle +(0.620,0.620);
+\fill[me] (3.100,2.480) rectangle +(0.620,0.620);
+\fill[me] (0.620,0.620) rectangle +(0.620,0.620);
+\fill[me] (0.620,3.100) rectangle +(0.620,0.620);
+\fill[me] (1.240,3.100) rectangle +(0.620,0.620);
+\fill[me] (0.000,3.720) rectangle +(0.620,0.620);
+\fill[me] (1.240,3.720) rectangle +(0.620,0.620);
+\fill[me] (1.860,3.720) rectangle +(0.620,0.620);
+\fill[me] (0.000,1.860) rectangle +(0.620,0.620);
+\fill[me] (0.620,4.340) rectangle +(0.620,0.620);
+\fill[me] (0.000,4.340) rectangle +(0.620,0.620);
+\fill[me] (3.100,1.860) rectangle +(0.620,0.620);
+\fill[hole] (1.860,0.000) rectangle +(0.620,0.620);
+\fill[hole] (0.000,0.620) rectangle +(0.620,0.620);
+\fill[hole] (3.720,0.620) rectangle +(0.620,0.620);
+\fill[hole] (3.100,1.240) rectangle +(0.620,0.620);
+\fill[hole] (0.620,1.860) rectangle +(0.620,0.620);
+\fill[hole] (2.480,1.860) rectangle +(0.620,0.620);
+\fill[hole] (3.720,1.860) rectangle +(0.620,0.620);
+\fill[hole] (1.240,2.480) rectangle +(0.620,0.620);
+\fill[hole] (1.860,3.100) rectangle +(0.620,0.620);
+\fill[hole] (3.720,3.100) rectangle +(0.620,0.620);
+\fill[hole] (0.620,3.720) rectangle +(0.620,0.620);
+\fill[hole] (2.480,3.720) rectangle +(0.620,0.620);
+\fill[hole] (1.240,4.340) rectangle +(0.620,0.620);
+\draw[muted!60,line width=.3pt,step=0.62] (0,0) grid (4.960,4.960);
+\draw[ink,line width=.6pt] (0,0) rectangle (4.960,4.960);
+\node[mine] at (0.310,3.410) {};
+\node[mine] at (1.550,0.930) {};
+\node[mine] at (2.790,2.790) {};
+\node[mine] at (3.410,0.310) {};
+\node[his] at (2.170,1.550) {};
+\node[his] at (4.650,0.310) {};
+\node[his] at (4.030,4.650) {};
+\node[his] at (4.650,2.170) {};
+\node[tiny] at (0.310,-0.22) {a};
+\node[tiny] at (0.930,-0.22) {b};
+\node[tiny] at (1.550,-0.22) {c};
+\node[tiny] at (2.170,-0.22) {d};
+\node[tiny] at (2.790,-0.22) {e};
+\node[tiny] at (3.410,-0.22) {f};
+\node[tiny] at (4.030,-0.22) {g};
+\node[tiny] at (4.650,-0.22) {h};
+\node[tiny] at (-0.2,0.310) {1};
+\node[tiny] at (-0.2,0.930) {2};
+\node[tiny] at (-0.2,1.550) {3};
+\node[tiny] at (-0.2,2.170) {4};
+\node[tiny] at (-0.2,2.790) {5};
+\node[tiny] at (-0.2,3.410) {6};
+\node[tiny] at (-0.2,4.030) {7};
+\node[tiny] at (-0.2,4.650) {8};
+\node[tiny] at (2.480,-0.55) {pas de roi, sans entrer là où il va en un coup};
+\node[plain,above] at (2.480,5.010) {\texttt{GROW\#[S(A) - Q(H)]} : moi 15};
+\end{scope}
+\begin{scope}[shift={(11.72,0.00)}]\begin{scope}[shift={(0.00,4.20)}]\node[mine] at (0,0) {};\node[plain,right] at (0.3,0) {moi};\end{scope}
+\begin{scope}[shift={(0.00,3.70)}]\node[his] at (0,0) {};\node[plain,right] at (0.3,0) {lui};\end{scope}
+\begin{scope}[shift={(0.00,3.20)}]\fill[hole] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {trou};\end{scope}
+\begin{scope}[shift={(0.00,2.70)}]\fill[me] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {A (à moi)};\end{scope}
+\begin{scope}[shift={(0.00,2.20)}]\fill[him] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {B (à lui)};\end{scope}
+\begin{scope}[shift={(0.00,1.70)}]\fill[neutral] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {neutre (pris au même tour)};\end{scope}
+\begin{scope}[shift={(0.00,1.20)}]\fill[soft3] (-0.15,-0.15) rectangle (0.15,0.15);\draw[muted!60,line width=.3pt] (-0.15,-0.15) rectangle (0.15,0.15);\node[plain,right] at (0.3,0) {Q(H) : interdit à A};\end{scope}\end{scope}
+\end{tikzpicture}
+\end{document}
