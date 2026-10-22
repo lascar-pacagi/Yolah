@@ -80,6 +80,13 @@ AUX="${AUX:-0}"
 # Value target = (1 − Q_WEIGHT)·z + Q_WEIGHT·q, q = the search value of the
 # position (already recorded in every row). 0 = the game result alone.
 Q_WEIGHT="${Q_WEIGHT:-0}"
+# Grown network (nnue/alphazero_grow.py, INIT_MODEL = its .pt) started in a
+# NEW work dir: SEED_FROM = the earlier run's work dir, whose selfplay/*.bin
+# are linked into the new one (new run only), so the replay window is full at
+# once; WARMUP_SAMPLES = training samples on those rows before self-play sets
+# the pace (e.g. 8000000 ≈ 1.5 passes over the window).
+SEED_FROM="${SEED_FROM:-}"
+WARMUP_SAMPLES="${WARMUP_SAMPLES:-0}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"                  # anything else for alphazero_learn.py
 RESUBMIT="${RESUBMIT:-0}"                     # 1 = sbatch this script again when the time is up
 
@@ -93,6 +100,13 @@ if [[ ! -f "${WORK_DIR}/init_model.pt" ]] && head -c 100 "${INIT_MODEL}" 2>/dev/
     exit 1
 fi
 cp -n "${INIT_MODEL}" "${WORK_DIR}/init_model.pt" 2>/dev/null || true
+if [[ -n "${SEED_FROM}" && ! -f "${WORK_DIR}/checkpoint.pt" ]]; then
+    mkdir -p "${WORK_DIR}/selfplay"
+    # hard links (same file system: no copy, no space); a copy otherwise
+    find "${SEED_FROM}/selfplay" -maxdepth 1 -name '*.bin' -exec cp -ln -t "${WORK_DIR}/selfplay" {} + 2>/dev/null \
+        || find "${SEED_FROM}/selfplay" -maxdepth 1 -name '*.bin' -exec cp -n -t "${WORK_DIR}/selfplay" {} +
+    echo "seeded ${WORK_DIR}/selfplay with $(ls "${WORK_DIR}/selfplay" | wc -l) files of ${SEED_FROM}"
+fi
 MAX_HOURS=$(max_hours_for_job 1200)           # stop 20 min before the limit
 AUX_ARGS=""
 [[ "${AUX}" == "1" ]] && AUX_ARGS="--aux"
@@ -121,7 +135,7 @@ start_in_container bash -c "cd /Yolah/nnue && exec python3 -u alphazero_learn.py
     --selfplay-set 'nn cache=${SELFPLAY_NN_CACHE}' --max-window ${MAX_WINDOW} \
     --min-rows ${MIN_ROWS} --export-every ${EXPORT_EVERY} --eval-hours ${EVAL_HOURS} \
     --eval-games ${EVAL_GAMES} --eval-seconds ${EVAL_SECONDS} --eval-opponents ${EVAL_OPPONENTS} \
-    --q-weight ${Q_WEIGHT} --max-hours ${MAX_HOURS} ${AUX_ARGS} ${EXTRA_ARGS}"
+    --q-weight ${Q_WEIGHT} --max-hours ${MAX_HOURS} --inherit-warmup ${WARMUP_SAMPLES} ${AUX_ARGS} ${EXTRA_ARGS}"
 wait_forwarding_signals
 
 echo "[$(date '+%F %T')] === Stopped (exit code ${RC}) ==="

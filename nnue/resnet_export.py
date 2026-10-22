@@ -65,7 +65,7 @@ import torch
 
 sys.path.append("../server")
 from yolah import Yolah, Move, Square                     # noqa: E402
-from cnn_resnet_value_policy_chunked import Net, encode_cnn  # noqa: E402
+from cnn_resnet_value_policy_chunked import Net, encode_cnn, net_from_state_dict  # noqa: E402
 
 MAGIC   = b"YOLAHRSN"
 VERSION = 1
@@ -218,18 +218,20 @@ def main():
     sd = torch.load(args.checkpoint, map_location="cpu")
     # Tolerate a DDP-wrapped checkpoint ("module." prefix).
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
-    C = sd["input_conv.0.weight"].shape[0]
-    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
-    net = Net(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
-              num_actions=sd["policy_fc.weight"].shape[0])
-    net.load_state_dict(sd)
+    net, _ = net_from_state_dict(sd)
     net.eval()
 
     base = os.path.splitext(args.checkpoint)[0]
-    export_bin(net, sd, base + ".bin")
+    if net.global_pool:
+        # The CPU backend (nn::ResNetCPU) knows only the heads without
+        # global pooling: such a network runs on the GPU backend (.ts) only.
+        print("global pooling: no .bin (CPU backend), TorchScript only")
+    else:
+        export_bin(net, sd, base + ".bin")
     if not args.no_ts:
         export_torchscript(net, base + ".ts")
-    export_test_vectors(net, base + ".test.bin", args.nb_test)
+    if not net.global_pool:
+        export_test_vectors(net, base + ".test.bin", args.nb_test)
 
 
 if __name__ == "__main__":

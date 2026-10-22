@@ -390,11 +390,21 @@ class Net(nn.Module):
       Policy head : 1×1 conv to 2 channels → flatten(128) → FC
                     → 4096 logits, one per (from, to) action.
 
+      global_pool (KataGo): both heads also see the mean and the max of the
+      trunk over the 64 squares (2C numbers), through value_gp_fc (added to
+      value_fc1 before its ReLU) and policy_gp_fc (added to the logits). The
+      1- and 2-channel maps above are narrow bottlenecks; the pooled vector
+      gives the heads a summary of the whole board. Both layers have no
+      bias, so zero weights make the network exactly the one without
+      pooling (alphazero_grow.py relies on it).
+
     forward() returns the pair (value, policy_logits).
     """
     def __init__(self, channels: int = 256, nb_blocks: int = 30,
-                 value_fc_size: int = 256, num_actions: int = NUM_ACTIONS):
+                 value_fc_size: int = 256, num_actions: int = NUM_ACTIONS,
+                 global_pool: bool = False):
         super().__init__()
+        self.global_pool = global_pool
 
         # Stem: lift the 4 input planes to `channels` feature maps.
         self.input_conv = nn.Sequential(
@@ -419,23 +429,50 @@ class Net(nn.Module):
         self.policy_bn   = nn.BatchNorm2d(2)
         self.policy_fc   = nn.Linear(2 * 64, num_actions)
 
-    def forward(self, x):
-        # Shared trunk.
+        if global_pool:
+            self.value_gp_fc  = nn.Linear(2 * channels, value_fc_size, bias=False)
+            self.policy_gp_fc = nn.Linear(2 * channels, num_actions, bias=False)
+
+    def trunk(self, x):
         x = self.input_conv(x)
         x = self.res_blocks(x)
-        x = torch.relu(self.output_bn(x))             # shared (B, C, 8, 8)
+        return torch.relu(self.output_bn(x))          # shared (B, C, 8, 8)
 
+    def heads(self, x):
         # Value head: (B,C,8,8) → (B,1,8,8) → (B,64) → (B,fc) → (B,1) → (B,)
         v = torch.relu(self.value_bn(self.value_conv(x)))
         v = v.flatten(1)                              # keep batch dim, flatten rest
-        v = torch.relu(self.value_fc1(v))
-        v = torch.tanh(self.value_fc2(v)).squeeze(-1) # tanh → (-1,1); drop last dim
+        v = self.value_fc1(v)
 
         # Policy head: (B,C,8,8) → (B,2,8,8) → (B,128) → (B, NUM_ACTIONS)
         p = torch.relu(self.policy_bn(self.policy_conv(x)))
         p = p.flatten(1)
         p = self.policy_fc(p)                         # raw logits (no softmax)
+
+        if self.global_pool:
+            pooled = torch.cat([x.mean(dim=(2, 3)), x.amax(dim=(2, 3))], dim=1)   # (B, 2C)
+            v = v + self.value_gp_fc(pooled)
+            p = p + self.policy_gp_fc(pooled)
+        v = torch.relu(v)
+        v = torch.tanh(self.value_fc2(v)).squeeze(-1) # tanh → (-1,1); drop last dim
         return v, p
+
+    def forward(self, x):
+        return self.heads(self.trunk(x))
+
+
+def net_from_state_dict(sd, cls=None, strict=True):
+    """
+    A Net (or a subclass `cls`) sized from a state_dict: channels, blocks,
+    head sizes and global pooling are read off the tensors. Returns the
+    network and load_state_dict's (missing, unexpected) keys.
+    """
+    C = sd["input_conv.0.weight"].shape[0]
+    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
+    net = (cls or Net)(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
+                       num_actions=sd["policy_fc.weight"].shape[0],
+                       global_pool="value_gp_fc.weight" in sd)
+    return net, net.load_state_dict(sd, strict=strict)
 
     def clip(self):
         # No-op: kept so the training loop can call model.clip() uniformly

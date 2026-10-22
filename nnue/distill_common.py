@@ -69,15 +69,10 @@ def load_teacher(checkpoint, device):
     checkpoint (a state_dict, DDP prefix tolerated). Returns the eval-mode
     model on `device`, in channels-last memory format.
     """
-    from cnn_resnet_value_policy_chunked import Net   # imports ../server/yolah.py
+    from cnn_resnet_value_policy_chunked import net_from_state_dict   # imports ../server/yolah.py
     sd = torch.load(checkpoint, map_location="cpu")
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
-    C = sd["input_conv.0.weight"].shape[0]
-    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
-    net = Net(channels=C, nb_blocks=B,
-              value_fc_size=sd["value_fc1.weight"].shape[0],
-              num_actions=sd["policy_fc.weight"].shape[0])
-    net.load_state_dict(sd)
+    net, _ = net_from_state_dict(sd)
     net.eval()
     return net.to(device).to(memory_format=torch.channels_last)
 

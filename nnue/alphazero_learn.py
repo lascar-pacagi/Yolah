@@ -78,7 +78,7 @@ import torch.nn.functional as F
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(HERE, "../server"))
 sys.path.append(HERE)
-from cnn_resnet_value_policy_chunked import Net  # noqa: E402
+from cnn_resnet_value_policy_chunked import net_from_state_dict  # noqa: E402
 
 # ── sample format: MUST match az::TrainingSample (player/alphazero_selfplay.h) ──
 MAX_NB_MOVES = 75
@@ -323,18 +323,13 @@ def load_state_dict(path):
 
 def make_net(sd):
     """
-    Build a Net whose sizes (channels, blocks, heads) are read off the
+    Build a Net whose sizes (channels, blocks, heads, global pooling) are read off the
     state_dict. The parameters of the auxiliary heads (--aux runs) are not
     part of a Net and are ignored.
     """
     from alphazero_aux import base_state_dict
     sd = base_state_dict(sd)
-    C = sd["input_conv.0.weight"].shape[0]
-    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
-    net = Net(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
-              num_actions=sd["policy_fc.weight"].shape[0])
-    net.load_state_dict(sd)
-    return net
+    return net_from_state_dict(sd)[0]
 
 
 def model_paths(work, step):
@@ -602,6 +597,10 @@ def main():
     ap.add_argument("--eval-opponents", default="previous",
                     help="comma separated: previous (last evaluated model), initial, lag:K")
     ap.add_argument("--keep-all", action="store_true", help="keep every exported model")
+    ap.add_argument("--inherit-warmup", type=int, default=0,
+                    help="new run whose selfplay/ already holds the rows of an earlier run (a grown "
+                         "network, alphazero_grow.py): train this many samples on them at once, then "
+                         "keep the usual pace, as if the run went on (default 0: no burst)")
     ap.add_argument("--max-hours", type=float, default=0, help="stop cleanly after this long (0 = never)")
     ap.add_argument("--train-gpu", type=int, default=0, help="index among the visible GPUs")
     ap.add_argument("--eval-gpu", type=int, default=-1,
@@ -742,6 +741,14 @@ def main():
                           dtype=SAMPLE_DTYPE_AUX if args.aux else SAMPLE_DTYPE)
     window.scan()
     log(f"replay: {window.total:,} rows from {window.games:,} games on disk, {window.filled:,} in memory")
+    if ckpt is None and window.total > 0:
+        # A new run started on the rows of an earlier one: the reuse cap
+        # (samples_trained <= reuse·rows) would otherwise let the trainer
+        # go through reuse× all those rows before waiting for self-play.
+        # Count them as already trained on, except --inherit-warmup samples.
+        done = max(0, int(args.reuse * window.total) - args.inherit_warmup)
+        state.d["samples_trained"] = state.d["samples_at_last_export"] = done
+        log(f"inherited rows: {args.inherit_warmup:,} training samples on them before the usual pace")
     make_batch = BatchMaker(device, aux=args.aux, q_weight=args.q_weight)
     if args.q_weight > 0:
         log(f"value target: {1 - args.q_weight:g}·z + {args.q_weight:g}·q (game result blended with the search value)")

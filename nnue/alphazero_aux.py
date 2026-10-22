@@ -23,7 +23,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from cnn_resnet_value_policy_chunked import Net
+from cnn_resnet_value_policy_chunked import Net, net_from_state_dict
 
 # ── targets: the future ownership map of a row (TrainingSampleAux::own) ──────
 OWN_NONE, OWN_MINE, OWN_OPP, OWN_PAST = 0, 1, 2, 3   # as in alphazero_selfplay.h
@@ -70,27 +70,13 @@ class AuxNet(Net):
     forward() returns (value, policy) like Net, so an AuxNet can be used
     anywhere a Net is; forward_all() adds the two auxiliary outputs.
     """
-    def __init__(self, channels=256, nb_blocks=30, value_fc_size=256, num_actions=64 * 64):
-        super().__init__(channels=channels, nb_blocks=nb_blocks,
-                         value_fc_size=value_fc_size, num_actions=num_actions)
+    def __init__(self, channels=256, nb_blocks=30, value_fc_size=256, num_actions=64 * 64,
+                 global_pool=False):
+        super().__init__(channels=channels, nb_blocks=nb_blocks, value_fc_size=value_fc_size,
+                         num_actions=num_actions, global_pool=global_pool)
         self.own_conv = nn.Conv2d(channels, 3, kernel_size=1)
         self.score_fc1 = nn.Linear(2 * channels, 256)
         self.score_fc2 = nn.Linear(256, SCORE_BINS)
-
-    def trunk(self, x):
-        x = self.input_conv(x)
-        x = self.res_blocks(x)
-        return torch.relu(self.output_bn(x))                  # (B, C, 8, 8)
-
-    def heads(self, h):
-        """The two heads of Net, verbatim (see Net.forward)."""
-        v = torch.relu(self.value_bn(self.value_conv(h))).flatten(1)
-        v = torch.tanh(self.value_fc2(torch.relu(self.value_fc1(v)))).squeeze(-1)
-        p = torch.relu(self.policy_bn(self.policy_conv(h))).flatten(1)
-        return v, self.policy_fc(p)
-
-    def forward(self, x):
-        return self.heads(self.trunk(x))
 
     def forward_all(self, x):
         h = self.trunk(x)
@@ -116,11 +102,7 @@ def make_aux_net(sd):
     network, or a run that did not use --aux) leaves the auxiliary heads at
     their random initialisation — the only keys allowed to be missing.
     """
-    C = sd["input_conv.0.weight"].shape[0]
-    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
-    net = AuxNet(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
-                 num_actions=sd["policy_fc.weight"].shape[0])
-    missing, unexpected = net.load_state_dict(sd, strict=False)
+    net, (missing, unexpected) = net_from_state_dict(sd, cls=AuxNet, strict=False)
     bad = [k for k in missing if not is_aux_key(k)] + list(unexpected)
     if bad:
         raise KeyError(f"state_dict does not fit AuxNet: {bad[:5]}")
