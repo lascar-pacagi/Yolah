@@ -23,6 +23,7 @@ public:
     Move    move() const { return move16; }
     int16_t value() const { return value16; }
     uint8_t depth() const { return depth8; }
+    uint32_t key32() const { return uint32_t(key_lo) | uint32_t(key_hi) << 16; }
     Bound   bound() const { return Bound(gen_bound8 & 3); }
     void    save(uint64_t k, int16_t v, Bound b, uint8_t d, Move m, uint8_t generation);
     uint8_t relative_age(uint8_t generation) const;

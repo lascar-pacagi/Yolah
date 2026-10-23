@@ -263,6 +263,29 @@ if(ENABLE_TORCH)
     target_link_libraries(search_bench PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# The search debugger (test/search_trace_main.cpp): records every step of the
+# dev player's search for ui/search_debugger.html. `make search_trace`.
+#   ./search_trace --positions ../test/bench_positions.txt --index 40 --depth 7 --out trace.ytrace
+# The dev player's source is embedded (the page shows it, line by line).
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/search_trace_source.cpp
+    COMMAND ${CMAKE_COMMAND} -DIN=${CMAKE_SOURCE_DIR}/player/minmax_nnue_dev_player.cpp
+            -DOUT=${CMAKE_BINARY_DIR}/search_trace_source.cpp -DNAME=search_trace_source
+            -P ${CMAKE_SOURCE_DIR}/misc/embed_source.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/player/minmax_nnue_dev_player.cpp ${CMAKE_SOURCE_DIR}/misc/embed_source.cmake)
+add_executable(search_trace EXCLUDE_FROM_ALL test/search_trace_main.cpp ${CMAKE_BINARY_DIR}/search_trace_source.cpp)
+target_compile_options(search_trace PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(search_trace PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_compile_definitions(search_trace PRIVATE YOLAH_SEARCH_TRACE)
+target_link_libraries(search_trace PRIVATE game misc test player_trace ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(search_trace PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(search_trace PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # AlphaZero (only if CUDA is enabled)
 if(ENABLE_CUDA)
     add_subdirectory(alphazero)

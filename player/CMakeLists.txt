@@ -24,3 +24,15 @@ if(ENABLE_CUDA)
     include_directories(../alphazero)
     target_compile_definitions(player PRIVATE ENABLE_CUDA)
 endif()
+
+# The search debugger (test/search_trace_main.cpp, ui/search_debugger.html):
+# the same player sources compiled with the trace hooks of
+# minmax_nnue_dev_player.cpp switched on. Only built with
+# `make search_trace` (the other programs keep the library above, without hooks).
+add_library(player_trace OBJECT EXCLUDE_FROM_ALL ${PLAYER_SOURCES})
+target_compile_options(player_trace PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_compile_definitions(player_trace PRIVATE YOLAH_SEARCH_TRACE)
+target_include_directories(player_trace PUBLIC .)
+if(ENABLE_CUDA)
+    target_compile_definitions(player_trace PRIVATE ENABLE_CUDA)
+endif()

@@ -13,6 +13,8 @@
 #include "nnue_persp.h"
 #include "endgame_solver.h"
 
+struct SearchTracer;   // player/search_trace.h, only used by the search_trace executable
+
 // The search being improved, step by step. It started as an exact copy of
 // MinMaxNNUE_BaselinePlayer (the reference, which never changes); every change
 // is measured against it with test/search_bench_main.cpp and matches.
@@ -371,6 +373,12 @@ private:
     void update_history(Search&, uint8_t player, Move m, int bonus);
     void iterative_deepening(Yolah, Search&, uint8_t max_depth);
     void print_pv(Yolah, uint64_t hash, int8_t depth);
+    // The search debugger's helpers (defined only with YOLAH_SEARCH_TRACE, see search_trace.h).
+    int  trace_return(int line, int value);
+    int  trace_value(const Yolah&);
+    void trace_child_evals(int line, const Yolah&);
+    void trace_search_start(int line, const Yolah&);
+    void trace_pv(int line, Yolah, uint64_t hash, int depth);
 
 public:
     // T. Cutoff statistics for the history prior (search_bench cutstats):
@@ -389,6 +397,10 @@ public:
         }
     };
     CutStats* cut_stats = nullptr;   // when set, every search counts its cutoffs there
+    // The search debugger's recorder (test/search_trace_main.cpp): only read by
+    // a build with YOLAH_SEARCH_TRACE, where every step of the search is recorded.
+    SearchTracer* tracer = nullptr;
+    std::atomic_bool* stop_flag() { return &stop; }
     MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size_mb, size_t nb_moves_at_full_depth, uint8_t late_move_reduction,
                          const std::string& nnue_q_parameters_filename, bool verbose = false, Options options = {},
                          size_t nb_threads = 1);
