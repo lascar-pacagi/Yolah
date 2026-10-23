@@ -1,0 +1,11 @@
+# Campaign P5 (doc/nnue_roadmap.qmd). P4 lost to spacelite (g147 −21, g146 −37, g141 −71 at 1 s): the features
+# cost 18–24 % more time per evaluation, mostly encircle (~200 ns) and corr (~150 ns). spacelite = groups qdist,
+# qfirst, qw, late9, mob (0x3e) and NO influence, although the ablation found qw, late9 and mob useless and the
+# influence useful (and the program search PS1 found nothing beyond influence + queen reach). Two cheap networks,
+# trained 10 epochs from k8_them like spacelite (YOLAH_SPACE_GROUPS):
+#   g046  qdist + qfirst + infl                      cheaper than spacelite
+#   g07e  spacelite + infl                           the influence alone (+22 ns)
+nnue_k8_them_g046 nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_g046 nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_g07e nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_g07e nnue_k8_them_spacelite 200000 2000
