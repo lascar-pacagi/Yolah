@@ -28,7 +28,8 @@ button { background: var(--panel2); color: var(--text); border: 1px solid var(--
 button:hover { border-color: var(--accent); }
 button:disabled { opacity: .4; cursor: default; }
 input, select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: inherit; padding: 2px 4px; }
-#app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+#app { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); height: 100%; overflow: hidden; }
+#top { min-width: 0; }
 #top { background: var(--panel); border-bottom: 1px solid var(--line); padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
 #top .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 #title { font-weight: 600; margin-right: 8px; }
@@ -116,6 +117,17 @@ td.r, th.r { text-align: right; }
 .bpline { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
 .bpline input[type=text] { flex: 1; }
 #drop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.6); font-size: 22px; z-index: 10; }
+#gamerow { flex-wrap: nowrap; min-width: 0; }
+#plies { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 11px; padding-bottom: 2px; }
+#plies a.ply { display: inline-block; padding: 1px 4px; margin-right: 2px; border-radius: 3px; background: var(--panel2); cursor: pointer; font-family: ui-monospace, monospace; }
+#plies a.ply.dim { cursor: default; background: transparent; }
+#plies a.ply.on { background: var(--cur); color: var(--curtext); }
+#guide { display: none; position: fixed; inset: 40px 8% 40px 8%; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; z-index: 20; overflow: auto; padding: 18px 26px; box-shadow: 0 10px 40px #000a; line-height: 1.5; }
+#guide h2 { margin-top: 0; } #guide h3 { margin: 18px 0 6px; color: var(--accent); }
+#guide pre { background: var(--bg); padding: 8px 10px; border-radius: 4px; overflow: auto; }
+#guide table.t td { white-space: normal; vertical-align: top; padding: 3px 8px; }
+#guide table.t td:first-child { white-space: nowrap; font-family: ui-monospace, monospace; color: var(--curtext); }
+#guide .close { position: sticky; top: 0; float: right; }
 #welcome { display: none; position: fixed; top: 80px; left: 0; right: 0; bottom: 0; background: var(--bg); padding: 30px 40px; z-index: 5; }
 #welcome > div { max-width: 760px; }
 #welcome code { background: var(--panel2); padding: 1px 4px; border-radius: 3px; }
@@ -131,8 +143,10 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
       <span id="title">Débogueur minimax</span>
       <label><button onclick="document.getElementById('file').click()">Ouvrir une trace…</button>
         <input id="file" type="file" accept=".ytrace,.gz" style="display:none"></label>
+      <button onclick="showGuide()" title="Toutes les options de search_trace, et la taille des traces">Comment enregistrer une trace ?</button>
       <span id="info"></span>
     </div>
+    <div class="row" id="gamerow" style="display:none"></div>
     <div class="row" id="controls">
       <button id="b-start" title="Début (Home)">⏮</button>
       <button id="b-rcont" title="Continuer en arrière jusqu'au point d'arrêt précédent (Maj+F8)">◀◀</button>
@@ -190,6 +204,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
 </div>
 <div id="drop">Déposer la trace ici</div>
 <div id="welcome"></div>
+<div id="guide"></div>
 <script>
 "use strict";
 // ═══════════════════════════════════════════════════════════════════════════
@@ -261,10 +276,63 @@ async function loadBuffer(buf, name) {
   let off = 12 + hlen; off += (4 - off % 4) % 4;
   const nWords = (u8.byteLength - off) >> 2;
   const W = new Int32Array(u8.buffer.slice(u8.byteOffset + off, u8.byteOffset + off + nWords * 4));
+  $("welcome").style.display = "none";
+  ui.bps = new Map();
+  if (H.mode === "game") {
+    G = { H, W, name, k: -1 };
+    renderGame();
+    const want = +(new URLSearchParams(location.search).get("search") || 0);
+    selectSearch(Math.min(want, H.searches.length - 1), 0);
+    return;
+  }
+  G = null; $("gamerow").style.display = "none";
   T = index(H, W);
   T.name = name;
-  $("welcome").style.display = "none";
   setup();
+}
+
+// ── a whole game (search_trace --game 1): one trace per recorded search ──
+let G = null;
+function selectSearch(k, at) {
+  const H = G.H, S = H.searches[k];
+  if (!S) return;
+  const side = S.side;
+  const sub = Object.assign({}, H, {
+    position: S.position, result: S.result, full: S.full, warm: 0,
+    config: H.configs[side], "config file": H["config files"][side],
+    origin: `partie, ply ${S.ply} (${side ? "○ blanc" : "● noir"}), joué ${mvStr(S.played)}` + (S.played !== S.result.move ? ` (rejoué ; la recherche voulait ${mvStr(S.result.move)})` : ""),
+  });
+  delete sub.searches;
+  T = index(sub, G.W.subarray(S.offset, S.offset + S.words));
+  T.name = G.name; T.searchK = k; G.k = k;
+  setup();
+  if (at !== undefined) go(at < 0 ? T.nEv - 1 : at);
+  renderGame();
+}
+function renderGame() {
+  const H = G.H, row = $("gamerow");
+  row.style.display = "flex";
+  const rec = new Map(H.searches.map((S, k) => [S.ply, k]));
+  const W = H.constants.WIN;
+  // values of the recorded searches, from black's side, for the little curve
+  const pts = H.searches.map(S => [S.ply, Math.max(-1.2, Math.min(1.2, (S.side ? -S.result.value : S.result.value) / W))]);
+  const n = H.game.length, wpx = Math.max(200, n * 6);
+  let svg = `<svg width="${wpx}" height="34" style="vertical-align:middle"><line x1="0" y1="17" x2="${wpx}" y2="17" stroke="#444"/>`;
+  svg += `<polyline fill="none" stroke="#5aa9ff" stroke-width="1.5" points="${pts.map(([pl, v]) => `${(pl + 0.5) * wpx / n},${17 - v * 13}`).join(" ")}"/>`;
+  if (G.k >= 0) { const pl = H.searches[G.k].ply; svg += `<line x1="${(pl + 0.5) * wpx / n}" y1="0" x2="${(pl + 0.5) * wpx / n}" y2="34" stroke="#e2b93d"/>`; }
+  svg += `</svg>`;
+  const plies = H.game.map((m, pl) => {
+    const k = rec.get(pl), side = pl & 1;
+    const cls = k === undefined ? "dim" : k === G.k ? "on" : "";
+    return `<a class="ply ${cls}" ${k !== undefined ? `data-k="${k}"` : ""} title="ply ${pl}${pl < H["opening plies"] ? " (ouverture, sans recherche)" : k === undefined ? " (non enregistré)" : ""}">${pl}${side ? "○" : "●"}${mvStr(m)}</a>`;
+  }).join("");
+  row.innerHTML = `<span class=dim>Partie : ${n} plis, score final ${H["final score"][0]}–${H["final score"][1]} ·</span>` +
+    `<button id="b-ps" title="Recherche précédente ( [ )">◀ coup</button><button id="b-ns" title="Recherche suivante ( ] )">coup ▶</button>` +
+    `<span title="valeur de chaque recherche, du point de vue de noir (haut : noir mieux)">${svg}</span><div id="plies">${plies}</div>`;
+  $("b-ps").onclick = () => selectSearch(G.k - 1, 0);
+  $("b-ns").onclick = () => selectSearch(G.k + 1, 0);
+  for (const a of row.querySelectorAll("a[data-k]")) a.onclick = () => selectSearch(+a.dataset.k, 0);
+  const on = row.querySelector("a.on"); if (on) on.scrollIntoView({ block: "nearest", inline: "center" });
 }
 
 function index(H, W) {
@@ -633,6 +701,13 @@ function stepOut(dir) {
 }
 function cont(dir) {
   for (let t = cur + dir; t >= 0 && t < T.nEv; t += dir) if (bpHit(t)) return go(t);
+  // a game: on into the next (previous) recorded searches
+  if (G) {
+    for (let k = G.k + dir; k >= 0 && k < G.H.searches.length; k += dir) {
+      selectSearch(k);
+      for (let t = dir > 0 ? 0 : T.nEv - 1; t >= 0 && t < T.nEv; t += dir) if (bpHit(t)) return go(t);
+    }
+  }
   go(dir > 0 ? T.nEv - 1 : 0);
 }
 function nextIter(dir) {
@@ -701,6 +776,8 @@ function renderStack(frames) {
 }
 // the root move a node descends from (for the arrow on the game's board)
 function firstMoveOf(q) { const p = pathOf(q); return p.length > 1 ? T.nd.move[p[1]] : 0; }
+// the best move of an iteration: none when every root move failed low (≤ α)
+function resMove(it) { return it.move === 0 && it.outcome === 1 ? "<span class=dim>aucun coup &gt; α</span>" : mvStr(it.move); }
 function curIterAt(t) { let k = -1; for (let j = 0; j < T.iters.length && T.iters[j].ev <= t; j++) k = j; return k; }
 function iterLabel(k) {
   if (k < 0) return "avant la première itération";
@@ -716,7 +793,7 @@ function describe(e) {
   switch (t) {
     case E.SEARCH: s = `Début de la recherche : ${a(1)} coups à la racine. Historique (vieilli : divisé par 2) et contre-coups repris des recherches précédentes.`; break;
     case E.ITER: s = `Approfondissement itératif : root_search à la profondeur <b>${a(0)}</b>, fenêtre ${winStr(a(1), a(2))}` + (a(3) ? ` — tentative ${a(3) + 1} (fenêtre d'aspiration élargie)` : (a(1) > -32000 ? " (fenêtre d'aspiration ±δ autour de la valeur précédente)" : " (fenêtre complète)")) + "."; break;
-    case E.ITER_RESULT: s = `Profondeur ${a(0)} : valeur ${valStr(a(1))}, meilleur coup ${mvStr(a(2))} → ` + ["<span class=good>résultat accepté</span>", "<span class=bad>échec bas (valeur ≤ α) : on élargit vers le bas</span>", "<span class=warn>échec haut (valeur ≥ β) : on élargit vers le haut</span>", "arrêté"][a(3)]; break;
+    case E.ITER_RESULT: s = `Profondeur ${a(0)} : valeur ${valStr(a(1))}, meilleur coup ${a(2) === 0 && a(3) === 1 ? "aucun (tous ≤ α)" : mvStr(a(2))} → ` + ["<span class=good>résultat accepté</span>", "<span class=bad>échec bas (valeur ≤ α) : on élargit vers le bas</span>", "<span class=warn>échec haut (valeur ≥ β) : on élargit vers le haut</span>", "arrêté"][a(3)]; break;
     case E.PV: s = `Variante principale lue dans la table : ${Array.from({length: a(0)}, (_, i) => mvStr(a(1 + i))).join(" ")}`; break;
     case E.ROOT_ORDER: s = `Racine réordonnée pour l'itération suivante : le meilleur coup d'abord, puis par taille de sous-arbre. ` + Array.from({length: Math.min(8, a(0))}, (_, i) => `${mvStr(a(1 + 2 * i))} (${fmtN(a(2 + 2 * i))})`).join(", ") + (a(0) > 8 ? "…" : ""); break;
     case E.ENTER: s = (a(0) ? "Entrée dans <b>root_search</b>" : `Entrée dans <b>negamax</b> après ${mvStr(a(5))}`) + ` — profondeur ${a(3)}, fenêtre ${winStr(a(1), a(2))}` + (a(2) - a(1) === 1 ? " (fenêtre nulle : la question est seulement « ≥ β ? »)" : " (nœud PV)") + `, ply ${a(4)}. Valeur statique NNUE de la position : ${valStr(a(8))}.` + (q >= 0 && nd.kind[q] ? ` Appel de type <b>${KIND[nd.kind[q]]}</b> : ${KINDTIP[nd.kind[q]]}.` : ""); break;
@@ -821,7 +898,7 @@ function renderTree() {
     out.push(`<div class="row${q === q0 ? " cur" : onP ? " onpath" : ""}" data-q="${q}" data-it="${j}" style="padding-left:4px">` +
       `<span class="tw" data-tw="${q}">${q >= 0 && nd.first[q] >= 0 ? (ui.expanded.has(q) || onP ? "▾" : "▸") : ""}</span>` +
       `<span class="badge b-root">d=${it.d}${it.attempt ? " #" + (it.attempt + 1) : ""}</span><span class="dim">${winStr(it.alpha, it.beta)}</span>` +
-      (done ? `<span>${valStr(it.v)} ${mvStr(it.move)}</span>` : "") + oc + `<span class="dim small">${q >= 0 ? fmtN(nd.sub[q]) + " n." : ""}</span></div>`);
+      (done ? `<span>${valStr(it.v)} ${resMove(it)}</span>` : "") + oc + `<span class="dim small">${q >= 0 ? fmtN(nd.sub[q]) + " n." : ""}</span></div>`);
     if (q >= 0 && (ui.expanded.has(q) || onP) && nd.first[q] >= 0) walk(nd.first[q], 1);
   });
   if (out.length > 4000) out.push("<div class=dim style='padding:4px'>… (trop de lignes : repliez des nœuds)</div>");
@@ -891,7 +968,8 @@ function renderBoard(q, frames) {
   $("boardcap").innerHTML = q < 0 ? "racine" : `position du nœud #${q} · ${pos.ply & 1 ? "○ blanc" : "● noir"} au trait`;
   $("movecap").innerHTML = (last ? `<span style="color:#e2b93d">■</span> joué : ${mover ? "○" : "●"} ${mvStr(last)}` : "") +
     (next ? `${last ? " · " : ""}<span style="color:#5aa9ff">■</span> ${nextWhat} : ${mvStr(next)}` : "");
-  $("rootboard").innerHTML = boardSvg(rootPosition(), { size: 19, id: "r", next: q >= 0 ? firstMoveOf(q) : 0 });
+  const S = G && G.H.searches[G.k], prevMove = S && S.ply > 0 ? G.H.game[S.ply - 1] : 0;
+  $("rootboard").innerHTML = boardSvg(rootPosition(), { size: 19, id: "r", last: prevMove, next: q >= 0 ? firstMoveOf(q) : 0 });
   // the line from the root: each move clickable (jump to that node's entry)
   if (q >= 0) {
     const path = pathOf(q);
@@ -944,15 +1022,15 @@ function ttStateAt(key, t) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Tabs
 // ═══════════════════════════════════════════════════════════════════════════
-const TABS = [["coups", "Coups"], ["tt", "TT"], ["hist", "Historique"], ["iter", "Itérations"], ["stats", "Stats"], ["arrets", "Points d'arrêt"], ["aide", "Aide"]];
+const TABS = [["coups", "Coups"], ["tt", "TT"], ["hist", "Historique"], ["iter", "Itérations"], ["stats", "Stats"], ["arrets", "Points d'arrêt"], ["valid", "Validation"], ["aide", "Aide"]];
 function renderTabs() {
   $("tabs").innerHTML = TABS.map(([k, n]) => `<button class="${ui.tab === k ? "on" : ""}" data-k="${k}">${n}</button>`).join("");
   for (const b of $("tabs").children) b.onclick = () => { ui.tab = b.dataset.k; renderTabs(); renderTab(); };
 }
 function renderTab() {
-  const f = { coups: tabMoves, tt: tabTT, hist: tabHistory, iter: tabIters, stats: tabStats, arrets: tabBps, aide: tabHelp }[ui.tab];
+  const f = { coups: tabMoves, tt: tabTT, hist: tabHistory, iter: tabIters, stats: tabStats, arrets: tabBps, aide: tabHelp, valid: tabValidation }[ui.tab];
   $("tabbody").innerHTML = f ? f() : "";
-  const after = { coups: afterMoves, tt: afterTT, hist: afterHistory, iter: afterIters, arrets: afterBps }[ui.tab];
+  const after = { coups: afterMoves, tt: afterTT, hist: afterHistory, iter: afterIters, arrets: afterBps, valid: afterValidation }[ui.tab];
   if (after) after();
 }
 
@@ -1114,7 +1192,7 @@ function tabIters() {
   T.iters.forEach((it, j) => {
     const n = it.node >= 0 ? T.nd.sub[it.node] : 0, fut = it.ev > cur;
     h += `<tr class="click${j === k ? " curr" : ""}${fut ? " dim" : ""}" data-ev="${it.ev}"><td>${it.d}</td><td>${it.attempt + 1}</td><td>${winStr(it.alpha, it.beta)}</td>` +
-      `<td class=r>${it.res >= 0 ? valStr(it.v) : ""}</td><td>${it.res >= 0 ? mvStr(it.move) : ""}</td>` +
+      `<td class=r>${it.res >= 0 ? valStr(it.v) : ""}</td><td>${it.res >= 0 ? resMove(it) : ""}</td>` +
       `<td>${it.res >= 0 ? ["<span class=good>OK</span>", "<span class=bad>échec bas</span>", "<span class=warn>échec haut</span>", "arrêtée"][it.outcome] : "…"}</td>` +
       `<td class=r>${fmtN(n)}</td><td><span class="bar" style="width:${Math.max(1, 80 * Math.log1p(n) / Math.log1p(maxN))}px"></span></td>` +
       `<td class="small">${it.pv ? it.pv.map(mvStr).join(" ") : ""}</td></tr>`;
@@ -1165,14 +1243,14 @@ function tabHelp() {
   <kbd>↓</kbd>/<kbd>F10</kbd> pas par-dessus (saute le sous-arbre) · <kbd>↑</kbd> idem en arrière ·
   <kbd>PgDn</kbd>/<kbd>Maj+F11</kbd> sortir (retour du nœud) · <kbd>PgUp</kbd> début du nœud ·
   <kbd>F8</kbd>/<kbd>c</kbd> continuer jusqu'au point d'arrêt · <kbd>Maj+F8</kbd>/<kbd>C</kbd> en arrière ·
-  <kbd>n</kbd>/<kbd>N</kbd> itération suivante/précédente · <kbd>Home</kbd>/<kbd>End</kbd> · <kbd>espace</kbd> lecture.<br>
+  <kbd>n</kbd>/<kbd>N</kbd> itération suivante/précédente · <kbd>Home</kbd>/<kbd>End</kbd> · <kbd>espace</kbd> lecture · <kbd>[</kbd>/<kbd>]</kbd> recherche précédente/suivante d'une partie. Bouton « Comment enregistrer une trace ? » en haut : toutes les options et les tailles.<br>
   <b>Arbre</b> : clic sur un nœud = aller à son entrée, Maj+clic = à son retour ; ▸ déplie. Badges : <span class="badge b-lmr">LMR</span> recherche réduite, <span class="badge b-nw">nulle</span> fenêtre nulle (PVS), <span class="badge b-rs">re-rech.</span> re-recherche pleine fenêtre, <span class="badge b-full">pleine</span>, <span class="badge b-mpc">MPC↑</span>/<span class="badge b-mpc">MPC↓</span> Multi-ProbCut (même position, moins profond), <span class="badge b-proxy">proxy</span> témoin de la coupe proxy. Résultat : ≤ borne supérieure, ≥ borne inférieure, = exacte ; puis la raison du retour (TT, éval, RFP, MPC, proxy, cut@i = β-coupure au coup i, tous = aucun coup n'a coupé).<br>
   <b>Valeurs</b> : unités de la recherche, ±${T.C.WIN} = tanh ±1 du réseau ; « gain +k » = partie gagnée de k points (au-delà de toute évaluation).<br>
   <b>Enregistrer une trace</b> (dans <code>build/</code>) :
   <pre class="mono">make search_trace
 ./search_trace --positions ../test/bench_positions.txt --index 10 --depth 9 --out t.ytrace
-./search_trace --moves "a1:b2 h8:g7 ..." --depth 10 --warm 6 --warm-time 1000000 --out t.ytrace</pre>
-  <code>--warm N</code> : N recherches non tracées des positions précédentes du même camp, comme en partie (table, historique et contre-coups déjà chauds). <code>--player CFG</code> (défaut : spacelite), <code>--child-evals-depth</code>, <code>--max-mb</code>, <code>--check 1</code>. Un seul thread, sans horloge (même arbre à chaque fois).
+./search_trace --moves "a1:b2 a8:b7 ..." --depth 10 --warm 6 --out t.ytrace</pre>
+  Toutes les options et les tailles : bouton « Comment enregistrer une trace ? » en haut. Un seul thread, sans horloge (même arbre à chaque fois). Onglet « Validation » : la page vérifie que la trace est cohérente avec le code.
   </div>`;
 }
 
@@ -1198,8 +1276,9 @@ function setup() {
     (H.full ? " · <span class=bad>trace tronquée</span>" : "") + ` · <span class=dim>${esc(H.config.weights || "")}</span>`;
   $("scrub").max = T.nEv - 1;
   $("marks").innerHTML = T.iters.filter(it => it.attempt === 0).map(it => `<div style="left:${100 * it.ev / T.nEv}%">${it.d}</div>`).join("");
-  ui.expanded = new Set(); ui.bps = new Map(); ui.inspect = null;
+  ui.expanded = new Set(); ui.inspect = null;
   renderCode(); renderTabs();
+  for (const ln of ui.bps.keys()) refreshBpMarks(ln);
   // root position hash check
   const h = hashPos(rootPosition());
   if (T.N && (h[0] !== T.nd.hlo[0] || h[1] !== T.nd.hhi[0])) alert("Attention : le hash de la racine recalculé ne correspond pas à la trace.");
@@ -1211,8 +1290,519 @@ function welcome() {
   <p>Ouvrez (ou déposez) une trace <code>.ytrace</code> enregistrée par <code>search_trace</code> : la vraie recherche du joueur dev, événement par événement, avec la ligne de code de chaque événement.</p>
   <pre>cd build && make search_trace
 ./search_trace --positions ../test/bench_positions.txt --index 10 --depth 9 --out t.ytrace</pre>
+  <p><button onclick="showGuide()">Comment enregistrer une trace ? (toutes les options, tailles)</button></p>
   <p>Ensuite : pas à pas dans les deux sens, points d'arrêt (avec conditions) dans la marge du code, arbre, approfondissement itératif, table de transposition, valeurs du réseau, historique, tueurs, contre-coups.</p></div>`;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Validation: everything the code must have done, recomputed here independently
+// (move generation, game end, Zobrist hashes, negamax values, windows, PVS /
+// LMR sequences, move ordering, history / killer / countermove updates, table
+// entries, network values, iterative deepening), against the recorded events.
+// It also checks the page's own reconstructions (history, killers, table, α of
+// the frames, subtree sizes). Written for the default options of the dev
+// player (those of spacelite); other options are reported, not checked.
+// ═══════════════════════════════════════════════════════════════════════════
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+function legalMoves(pos, player) {
+  const p = player ?? (pos.ply & 1), res = [];
+  for (let s = 0; s < 64; s++) {
+    if (pos.cells[s] !== p) continue;
+    for (const [df, dr] of DIRS) {
+      let f = (s & 7) + df, r = (s >> 3) + dr;
+      while (f >= 0 && f < 8 && r >= 0 && r < 8 && pos.cells[r * 8 + f] === 3) { res.push(s | ((r * 8 + f) << 6)); f += df; r += dr; }
+    }
+  }
+  return res;
+}
+const isGameOver = pos => legalMoves(pos, 0).length === 0 && legalMoves(pos, 1).length === 0;
+function gameValue(pos) {   // Yolah::score(current player) pushed beyond WIN, as negamax step 1
+  const sc = (pos.score[0] - pos.score[1]) * ((pos.ply & 1) ? -1 : 1);
+  return sc === 0 ? 0 : sc + (sc > 0 ? T.C.WIN : -T.C.WIN);
+}
+// influence_fast (minmax_nnue_dev_player.cpp), on BigInt bitboards: the territory term of the ordering
+const M64 = (1n << 64n) - 1n;
+const bbOf = (pos, c) => { let b = 0n; for (let s = 0; s < 64; s++) if (pos.cells[s] === c) b |= 1n << BigInt(s); return b; };
+const popc = b => { let n = 0; while (b) { b &= b - 1n; n++; } return n; };
+function expandKing(b) {
+  const h = b | ((b << 1n) & 0xFEFEFEFEFEFEFEFEn) | ((b >> 1n) & 0x7F7F7F7F7F7F7F7Fn);
+  return (h | (h << 8n) | (h >> 8n)) & M64;
+}
+function influenceFast(me, opp, free) {
+  let mi = me, oi = opp, mf = me, of = opp, neutral = 0n;
+  while (mf | of) {
+    let nm = expandKing(mf) & free & ~oi & ~mi & M64, no = expandKing(of) & free & ~mi & ~oi & M64;
+    const col = nm & no;
+    if (neutral | col) { neutral |= col | (expandKing(neutral) & free); nm &= ~neutral & M64; no &= ~neutral & M64; }
+    mi |= nm; oi |= no; mf = nm; of = no;
+  }
+  return popc(mi & free) - popc(oi & free);
+}
+function territoryAfter(pos, m) {
+  if (m === 0) return 0;
+  const p = pos.ply & 1, from = 1n << BigInt(mvFrom(m)), to = 1n << BigInt(mvTo(m));
+  const me = (bbOf(pos, p) & ~from & M64) | to, opp = bbOf(pos, 1 - p), free = bbOf(pos, 3) & ~to & M64;
+  return influenceFast(me, opp, free);
+}
+const i16 = x => ((x + 32768) & 0xFFFF) - 32768;
+const tdiv = (a, b) => Math.trunc(a / b);
+
+function validateTrace() {
+  const E = T.E, nd = T.nd, C = T.C, cfg = T.H.config, W = C.WIN, INF = C.INFINITE;
+  const checks = new Map();
+  const ck = (name, ok, e, msg) => {
+    let c = checks.get(name); if (!c) checks.set(name, c = { n: 0, fail: 0, ex: [] });
+    c.n++; if (!ok) { c.fail++; if (c.ex.length < 6) c.ex.push({ e, msg: typeof msg === "function" ? msg() : msg }); }
+  };
+  // the options the checks assume (the dev player's defaults)
+  const assumed = { pvs: true, "aspiration window": 300, history: true, countermove: true, "root ordering": true, lmr: true,
+    "null move": false, "pass rule": false, "articulation ordering": false, "articulation lmr": false, "territory ordering": 1,
+    "fast influence": true, "proxy cut": 1, "proxy rank": 0, "proxy delta": 0, "proxy witness": 0, "proxy multi c": 1, "proxy multi m": 1,
+    "proxy diverse": false, "proxy second": -1, "proxy prefilter": 0, "proxy weval": 0, "proxy verify": 0, "proxy lazy": 0, "proxy first": false,
+    "proxy tail": 0, probcut: 0, staged: true, "yolah table": false, "endgame root": 0, "endgame tree": 0, "eval grain": 1, "history prior": "" };
+  const notAssumed = Object.entries(assumed).filter(([k, v]) => cfg[k] !== undefined && cfg[k] !== v).map(([k]) => k);
+  const lmrBase = cfg["lmr base"], lmrDiv = cfg["lmr divisor"];
+  const lmrTable = (d, n) => Math.trunc(1024 * (lmrBase + Math.log(d) * Math.log(n) / lmrDiv));
+  const lmrRed = (depth, i, pv, special, hist) => {
+    if (depth < 3 || i === 0) return 0;
+    let r = lmrTable(Math.min(depth, 63), Math.min(i + 1, 74));
+    if (pv) r -= 1024; if (special) r -= 1024;
+    r -= tdiv(hist * 1024, 8192);
+    return Math.max(0, Math.min(tdiv(r, 1024), depth - 2));
+  };
+  const full = !!(T.H.full || T.stopped);
+  const st = new Map();                     // node → its state while it runs
+  const root = { orderFromScores: null, order: null, lastRoot: -1, iterDelta: null, lastOk: null, prevIter: null };
+  let enters = 0, roots = 0;
+  const incoming = q => { for (let x = q; x >= 0; x = nd.parent[x]) { const p = nd.parent[x]; if (p >= 0 && nd.ply[x] > nd.ply[p]) return nd.move[x]; } return 0; };
+  let terrChecks = 0;
+
+  for (let e = 0; e < T.nEv; e++) {
+    const t = T.type[e], q = T.own[e], a = i => arg(e, i);
+    const S = q >= 0 ? st.get(q) : null;
+    if (t === E.ENTER) {
+      enters++;
+      const p = nd.parent[q], P = p >= 0 ? st.get(p) : null;
+      let pos;
+      if (p < 0) { pos = rootPosition(); roots++; }
+      else if (nd.ply[q] > nd.ply[p]) {
+        const legal = legalMoves(P.pos); const m = nd.move[q];
+        ck("coup légal (générateur JS)", m === 0 ? legal.length === 0 : legal.includes(m), e, () => `${mvStr(m)} illégal`);
+        pos = playPos(P.pos, m);
+      } else pos = P.pos;
+      const h = hashPos(pos);
+      ck("hash Zobrist recalculé = hash de la trace", h[0] === nd.hlo[q] && h[1] === nd.hhi[q], e, "hash différent");
+      ck("ply du nœud", pos.ply === nd.ply[q], e, () => `ply ${nd.ply[q]} ≠ ${pos.ply}`);
+      // the window and depth the caller asked for
+      if (p < 0) {
+        const it = T.iters[nd.iter[q]];
+        ck("fenêtre et profondeur de la racine = celles de l'itération", it && nd.alpha[q] === it.alpha && nd.beta[q] === it.beta && nd.depth[q] === it.d, e, "racine ≠ itération");
+      } else if (P.pending) {
+        const c = P.pending; let ok;
+        if (c.type === "CALL") ok = nd.alpha[q] === -c.b && nd.beta[q] === -c.a && nd.depth[q] === c.d;
+        else if (c.type === "MPC") ok = (c.dir === 1 ? nd.alpha[q] === c.bound - 1 && nd.beta[q] === c.bound : nd.alpha[q] === c.bound && nd.beta[q] === c.bound + 1) && nd.depth[q] === c.d2;
+        else ok = nd.alpha[q] === -c.bound && nd.beta[q] === -c.bound + 1 && nd.depth[q] === c.d;
+        ck("fenêtre et profondeur de l'enfant = celles de l'appel (négées)", ok, e, () => `${c.type} : enfant ${winStr(nd.alpha[q], nd.beta[q])} d${nd.depth[q]}`);
+        if (c.type === "MPC") ck("MPC : même position que le nœud", nd.ply[q] === nd.ply[p], e, "ply différent");
+        // the network's value of this child, computed beforehand by CHILD_EVALS
+        if (nd.ply[q] > nd.ply[p] && P.childEvals && P.childEvals.has(nd.move[q])) {
+          const want = isGameOver(pos) ? -gameValue(pos) : -nd.nnue[q];
+          ck("valeur NNUE de l'enfant (onglet Coups) = valeur du nœud enfant", P.childEvals.get(nd.move[q]) === want, e, () => `${P.childEvals.get(nd.move[q])} ≠ ${want}`);
+        }
+      } else ck("appel d'un enfant précédé d'un événement d'appel", false, e, "pas de CALL / MPC / PROXY avant");
+      st.set(q, { pos, tt: null, evals: [], nMoves: 0, arr: null, cur: null, best: -INF, alpha: nd.alpha[q], pending: null, lastRet: -1,
+        cut: null, expectHist: null, childEvals: null, tried: [], gen: null, lmp: false, bestMove: 0, stores: [], gameOver: isGameOver(pos) });
+      if (q >= 0 && nd.depth[q] >= 1 && p >= 0 && !isGameOver(pos)) {
+        // nothing
+      }
+      continue;
+    }
+    if (q < 0) {   // iterative deepening frame
+      if (t === E.SCORES) {
+        const n = a(0), arr = []; for (let i = 0; i < n; i++) arr.push([a(1 + 3 * i), a(2 + 3 * i)]);
+        const pos = rootPosition();
+        ck("coups notés = coups légaux (racine)", sameSet(arr.map(x => x[0]), legalOrPass(pos)), e, "ensembles différents");
+        // root_moves: picked one by one from these scores
+        const order = [];
+        for (let i = 0; i < arr.length; i++) { let b = i; for (let j = i + 1; j < arr.length; j++) if (arr[j][1] > arr[b][1]) b = j; [arr[i], arr[b]] = [arr[b], arr[i]]; order.push(arr[i][0]); }
+        root.order = order;
+      } else if (t === E.ITER) {
+        const d = a(0), al = a(1), be = a(2), att = a(3);
+        if (att === 0) {
+          const v = root.lastOk ? root.lastOk.v : 0;
+          const asp = cfg["aspiration window"] > 0 && d >= 4 && Math.abs(v) < W;
+          ck("fenêtre d'aspiration de départ", asp ? al === Math.max(v - cfg["aspiration window"], -INF) && be === Math.min(v + cfg["aspiration window"], INF) : al === -INF && be === INF, e, () => `${winStr(al, be)} (valeur précédente ${v})`);
+          root.delta = cfg["aspiration window"];
+        } else {
+          const pr = root.prevIter;
+          let wa = pr.alpha, wb = pr.beta;
+          if (pr.outcome === 1) wa = Math.max(pr.alpha - root.delta, -INF); else if (pr.outcome === 2) wb = Math.min(pr.beta + root.delta, INF);
+          ck("fenêtre élargie après un échec (δ doublé)", al === wa && be === wb && d === pr.d, e, () => `${winStr(al, be)} attendu ${winStr(wa, wb)}`);
+          root.delta *= 2;
+        }
+        root.cur = { d, alpha: al, beta: be };
+      } else if (t === E.ITER_RESULT) {
+        const d = a(0), v = a(1), m = a(2), oc = a(3), rq = root.lastRoot;
+        if (oc !== 3) {
+          ck("valeur de l'itération = valeur rendue par root_search", rq >= 0 && nd.value[rq] === v, e, () => `${v} ≠ ${nd.value[rq]}`);
+          const c = root.cur, want = v <= c.alpha && c.alpha > -INF ? 1 : v >= c.beta && c.beta < INF ? 2 : 0;
+          ck("issue de l'itération (OK / échec bas / échec haut)", oc === want, e, () => `${oc} ≠ ${want}`);
+          ck("coup de l'itération = meilleur coup de root_search", rq >= 0 && st.get(rq) === undefined && root.rootBest === m, e, () => `${mvStr(m)} ≠ ${mvStr(root.rootBest)}`);
+        }
+        root.prevIter = { d, alpha: root.cur.alpha, beta: root.cur.beta, outcome: oc };
+        if (oc === 0) root.lastOk = { d, v, m };
+      } else if (t === E.PV) {
+        ck("variante principale : commence par le coup de l'itération", a(0) === 0 || a(1) === root.lastOk.m, e, "PV[0] ≠ coup");
+      }
+      continue;
+    }
+    if (!S) continue;
+    const depth = nd.depth[q], beta = nd.beta[q], isRoot = nd.root[q] === 1;
+    switch (t) {
+      case E.TT_PROBE:
+        S.tt = { found: a(0), depth: a(1), lower: a(2), upper: a(3), move: a(4) };
+        // the page's reconstruction of the table predicts what the probe reads
+        { const key = hkey(nd.hlo[q], nd.hhi[q]), pred = ttStateAt(key, e - 1);
+          const lastStore = pred.hist.length ? pred.hist[pred.hist.length - 1] : null;
+          if (lastStore && lastStore.what !== "probe") {
+            if (lastStore.what === "evicted") ck("sonde TT = reconstruction de la page (entrée évincée → absente)", !a(0), e, "trouvée alors qu'évincée");
+            else { const en = pred.entry, lo = en.bound & 2 ? en.value : -32767, up = en.bound & 1 ? en.value : 32767;
+              ck("sonde TT = reconstruction de la page (dernière écriture)", a(0) === 1 && a(1) === en.depth && a(2) === lo && a(3) === up && a(4) === en.move, e,
+                () => `lu prof. ${a(1)} [${a(2)}, ${a(3)}] ${mvStr(a(4))}, attendu prof. ${en.depth} [${lo}, ${up}] ${mvStr(en.move)}`); }
+          } }
+        break;
+      case E.EVAL:
+        S.evals.push(a(0));
+        ck("evaluate() (accumulateurs paresseux, cache) = valeur NNUE recalculée de zéro", a(0) === nd.nnue[q], e, () => `${a(0)} ≠ ${nd.nnue[q]}${a(1) ? " (cache)" : ""}`);
+        break;
+      case E.RFP: {
+        const se = S.evals[0];
+        ck("RFP : valeur statique, marge, β, décision", a(0) === se && a(1) === cfg["rfp margin"] * depth && a(2) === beta && a(3) === (a(0) - a(1) >= beta ? 1 : 0) && depth <= cfg["rfp depth"] && beta - nd.alpha[q] === 1, e, "incohérent");
+        break; }
+      case E.MPC: {
+        const d2 = Math.max(1, tdiv(depth * cfg["mpc ratio"], 100)), margin = cfg["mpc margin"] + cfg["mpc margin per ply"] * (depth - d2);
+        const se = S.evals[0], dir = a(0);
+        ck("MPC : profondeur d', marge, borne, condition sur la valeur statique", a(1) === d2 && a(2) === margin && a(3) === (dir === 1 ? beta + margin : nd.alpha[q] - margin) && (dir === 1 ? se >= beta : se <= nd.alpha[q]) && depth >= cfg["mpc depth"], e, "incohérent");
+        S.pending = { type: "MPC", dir, d2: a(1), bound: a(3), e }; S.lastRet = -1;
+        break; }
+      case E.MPC_RESULT: {
+        const c = S.lastRet;
+        ck("MPC : résultat = valeur de la recherche courte (même position, sans négation)", full || (c >= 0 && nd.value[c] === a(1) && a(2) === ((a(0) === 1 ? a(1) >= S.pending.bound : a(1) <= S.pending.bound) ? 1 : 0)), e, () => `${a(1)} vs enfant ${c >= 0 ? nd.value[c] : "?"}, coupe ${a(2)}`);
+        S.pending = null; break; }
+      case E.PROXY: {
+        const R = cfg["proxy reduction"] + tdiv(depth, 4) - 1;
+        ck("proxy : borne β, profondeur réduite, valeur statique ≥ β", a(1) === beta && a(2) === depth - 1 - R && S.evals[0] >= beta && depth >= cfg["proxy depth"], e, "incohérent");
+        // the witness: the best-scored ordinary move (not table, killer or countermove), first in generation order on ties
+        if (S.arr) { let b = null; for (const [m, sc] of S.arr) if (sc < C.SCORE_COUNTER && (b === null || sc > b[1])) b = [m, sc];
+          ck("proxy : témoin = meilleur coup ordinaire", b && b[0] === a(0), e, () => `${mvStr(a(0))} ≠ ${b ? mvStr(b[0]) : "?"}`); }
+        S.pending = { type: "PROXY", bound: a(1), d: a(2), e }; S.lastRet = -1;
+        break; }
+      case E.PROXY_RESULT: {
+        const c = S.lastRet;
+        ck("proxy : résultat = −valeur de l'enfant", full || (c >= 0 && -nd.value[c] === a(1) && a(2) === (a(1) >= S.pending.bound ? 1 : 0)), e, "incohérent");
+        S.proxyV = a(1); S.pending = null; break; }
+      case E.GEN:
+        if (a(0) === 1) ck("étape 1 : le coup de la table est légal", S.tt && legalMoves(S.pos).includes(S.tt.move), e, "coup de table illégal");
+        else ck("nombre de coups générés = générateur JS", a(1) === legalOrPass(S.pos).length, e, () => `${a(1)} ≠ ${legalOrPass(S.pos).length}`);
+        S.gen = a(0); break;
+      case E.CHILD_EVALS: {
+        const m = new Map(); for (let i = 0; i < a(0); i++) m.set(a(1 + 2 * i), a(2 + 2 * i));
+        ck("valeurs des enfants : un par coup légal", sameSet([...m.keys()], legalOrPass(S.pos)), e, "ensembles différents");
+        S.childEvals = m; break; }
+      case E.SCORES: {
+        const n = a(0), arr = [];
+        for (let i = 0; i < n; i++) arr.push([a(1 + 3 * i), a(2 + 3 * i), a(3 + 3 * i)]);
+        ck("coups notés = coups légaux", sameSet(arr.map(x => x[0]), legalOrPass(S.pos)), e, "ensembles différents");
+        // each score, recomputed: table move, killers, countermove, history + weight · territory
+        const ply = nd.ply[q], player = S.pos.ply & 1, H = historyAt(e), k = killersAt(ply, e), prev = incoming(q);
+        const counter = ply > 0 ? counterAt(prev, e) : 0, ttm = S.tt ? S.tt.move : 0, terr = depth >= cfg["territory depth"];
+        for (const [m, sc, tv] of arr) {
+          let want;
+          if (m === ttm) want = C.SCORE_TT; else if (m === k[0]) want = C.SCORE_KILLER1; else if (m === k[1]) want = C.SCORE_KILLER2;
+          else if (m === counter && counter !== 0) want = C.SCORE_COUNTER;
+          else want = H[player * 4096 + mvFrom(m) * 64 + mvTo(m)] + (terr ? cfg["territory weight"] * tv : 0);
+          ck("score de chaque coup = table / tueurs / contre-coup / historique (reconstruits) + territoire", sc === want, e, () => `${mvStr(m)} : ${sc} ≠ ${want}`);
+          if (terr && sc < C.SCORE_ARTICULATION && terrChecks < 3000) { terrChecks++;
+            ck("territoire (influence) recalculé en JS", tv === territoryAfter(S.pos, m), e, () => `${mvStr(m)} : ${tv} ≠ ${territoryAfter(S.pos, m)}`); }
+        }
+        if (S.nMoves === 1) ck("étape 2 : le coup de la table remis en tête de liste", arr[0][0] === ttm, e, "pas en tête");
+        S.arr = arr.map(x => [x[0], x[1]]);
+        break; }
+      case E.MOVE: {
+        const i = a(0), m = a(1), sc = a(2), r = a(3);
+        ck("rang des coups : 0, 1, 2…", i === S.nMoves, e, () => `${i} ≠ ${S.nMoves}`);
+        let wantM, wantS;
+        if (isRoot) { wantM = root.order ? root.order[i] : undefined; wantS = historyAt(e)[(S.pos.ply & 1) * 4096 + mvFrom(m) * 64 + mvTo(m)]; }
+        else if (!S.arr) { wantM = S.tt ? S.tt.move : undefined; wantS = C.SCORE_TT; ck("étape 1 : seul le coup de la table, au rang 0", i === 0 && S.gen === 1, e, "incohérent"); }
+        else { const A = S.arr; let b = i; for (let j = i + 1; j < A.length; j++) if (A[j][1] > A[b][1]) b = j; [A[i], A[b]] = [A[b], A[i]]; wantM = A[i][0]; wantS = A[i][1]; }
+        ck(isRoot ? "ordre des coups de la racine (ordre de l'itération précédente)" : "coup choisi = meilleur score restant (sélection de pick_move)", m === wantM && sc === wantS, e, () => `${mvStr(m)} (${sc}) ≠ ${wantM !== undefined ? mvStr(wantM) : "?"} (${wantS})`);
+        const special = !isRoot && sc >= C.SCORE_COUNTER, hist = isRoot ? sc : sc >= C.SCORE_ARTICULATION ? 0 : sc;
+        // (as the code: "PV" with the CURRENT α, beta − alpha > 1, updated by the loop — not the window the node got)
+        const wantR = !isRoot && !S.arr ? 0 : lmrRed(depth, i, isRoot || beta - S.alpha > 1, special, hist);
+        ck("réduction LMR = formule (table ln·ln, PV, coup spécial, historique)", r === wantR && a(4) === 0, e, () => `${r} ≠ ${wantR}`);
+        S.cur = { i, m, r, calls: [] }; S.tried.push(m); S.nMoves++;
+        break; }
+      case E.CALL: {
+        const c = S.cur, k = a(0), al = a(1), be = a(2), d = a(3);
+        ck("appel : α courant du nœud (suivi ici) = α de l'appel", al === S.alpha, e, () => `${al} ≠ ${S.alpha}`);
+        const fr = frameState(q, e);
+        ck("page : α courant affiché dans la pile = α de l'appel", fr.alpha === al, e, () => `${fr.alpha} ≠ ${al}`);
+        // the order of the searches of one move (search_move): reduced, null window, re-search / full
+        const prev = c.calls.length ? c.calls[c.calls.length - 1] : null;
+        let ok;
+        if (!prev) ok = c.r > 0 ? k === 1 : (c.i > 0 ? k === 2 : k === 4);
+        else if (prev.k === 1) ok = prev.v > S.alpha && (c.i > 0 ? k === 2 : k === 4);
+        else if (prev.k === 2) ok = k === 3 && prev.v > S.alpha && prev.v < beta;
+        else ok = false;
+        ck("enchaînement des recherches d'un coup (LMR → fenêtre nulle → re-recherche)", ok, e, () => `${KIND[k]} après ${prev ? KIND[prev.k] + " " + prev.v : "rien"}`);
+        const wantD = k === 1 ? depth - 1 - c.r : depth - 1, wantB = k === 1 || k === 2 ? al + 1 : beta;
+        ck("appel : fenêtre et profondeur", d === wantD && be === wantB, e, () => `${winStr(al, be)} d${d}`);
+        c.calls.push({ k, v: null }); S.pending = { type: "CALL", a: al, b: be, d, e }; S.lastRet = -1;
+        break; }
+      case E.CALL_RESULT: {
+        const c = S.cur, ch = S.lastRet;
+        ck("résultat d'un appel = −valeur rendue par l'enfant", full || (ch >= 0 && -nd.value[ch] === a(1)), e, () => `${a(1)} ≠ ${ch >= 0 ? -nd.value[ch] : "?"}`);
+        if (c && c.calls.length) c.calls[c.calls.length - 1].v = a(1);
+        S.pending = null; break; }
+      case E.MOVE_DONE: {
+        const c = S.cur, v = a(2);
+        const lastV = c && c.calls.length ? c.calls[c.calls.length - 1].v : null;
+        ck("valeur du coup = résultat de sa dernière recherche", full || v === lastV, e, () => `${v} ≠ ${lastV}`);
+        // the last search must be the one search_move ends with
+        const lc = c.calls[c.calls.length - 1];
+        const ends = lc && ((lc.k === 1 && lc.v <= S.alpha) || lc.k === 3 || lc.k === 4 || (lc.k === 2 && !(lc.v > S.alpha && lc.v < beta)));
+        ck("search_move s'arrête au bon moment", full || ends, e, "recherche manquante ou en trop");
+        ck("meilleur et α avant le coup (suivis ici)", a(3) === S.best && a(4) === S.alpha, e, () => `meilleur ${a(3)}/${S.best}, α ${a(4)}/${S.alpha}`);
+        if (v > S.best) { S.best = v; if (v > S.alpha) { S.bestMove = a(1); if (v < beta) S.alpha = v; } }
+        S.lastMoveV = v;
+        break; }
+      case E.LMP:
+        ck("LMP : profondeur, nombre de coups, nœud non-PV, un coup non perdant trouvé", depth <= cfg["lmp depth"] && a(0) === cfg["lmp moves"] + depth * depth && beta - nd.alpha[q] === 1 && S.best > -W, e, "incohérent");
+        S.lmp = true; break;
+      case E.CUTOFF: {
+        ck("β-coupure : v ≥ β, v = valeur du coup", a(2) >= a(3) && a(3) === beta && a(2) === S.lastMoveV && a(0) === S.cur.i, e, "incohérent");
+        S.cut = { i: a(0), m: a(1), v: a(2) };
+        if (!isRoot) {
+          const bonus = Math.min(16 * depth * depth + 32 * depth, 2000);
+          S.expectHist = [[a(1), bonus], ...S.tried.slice(0, a(0)).map(m => [m, -bonus])];
+        }
+        break; }
+      case E.KILLER: {
+        const old = killersAt(a(0), e - 1), m = S.cut.m;
+        const want = old[0] !== m ? [m, old[0]] : old;
+        ck("tueurs mis à jour (k2 ← k1, k1 ← coup)", a(0) === nd.ply[q] && a(1) === want[0] && a(2) === want[1], e, "incohérent");
+        break; }
+      case E.HISTORY: {
+        const idx = a(0) * 4096 + mvFrom(a(1)) * 64 + mvTo(a(1)), before = historyAt(e - 1)[idx];
+        ck("historique : valeur avant = reconstruction de la page", a(2) === before, e, () => `${a(2)} ≠ ${before}`);
+        ck("historique : formule de gravité h + b − h·|b|/16384", a(3) === i16(a(2) + a(4) - tdiv(a(2) * Math.abs(a(4)), T.C.HISTORY_MAX)), e, "formule");
+        const x = S.expectHist ? S.expectHist.shift() : null;
+        ck("historique : bonus au coup qui coupe, malus aux coups essayés avant (dans l'ordre)", x && x[0] === a(1) && x[1] === a(4) && a(0) === (S.pos.ply & 1), e, () => `${mvStr(a(1))} ${a(4)} ≠ ${x ? mvStr(x[0]) + " " + x[1] : "rien"}`);
+        break; }
+      case E.COUNTER:
+        ck("contre-coup : (coup précédent → coup qui coupe)", a(0) === incoming(q) && a(1) === S.cut.m, e, "incohérent");
+        break;
+      case E.TT_STORE: {
+        const ao = nd.alpha[q], v = a(2), b = v >= beta ? 2 : v > ao ? 3 : 1;
+        ck("écriture TT : profondeur et type de borne", a(0) === depth && a(1) === b, e, () => `prof. ${a(0)} borne ${a(1)} ≠ ${depth} ${b}`);
+        // the entry left in the slot: TranspositionTableEntry::save
+        const sameKey = hkey(a(4), a(5)) === hkey(nd.hlo[q], nd.hhi[q]) && a(6) > 0;
+        const known = sameKey && (T.ttMap.get(hkey(nd.hlo[q], nd.hhi[q])) || []).some(x => x < e && T.type[x] === E.TT_STORE && T.own[x] >= 0 && hkey(nd.hlo[T.own[x]], nd.hhi[T.own[x]]) === hkey(nd.hlo[q], nd.hhi[q]));
+        const replace = !sameKey || a(0) > a(6) || (a(0) === a(6) && a(1) === 3);
+        if (!sameKey || known) {
+          const nm = a(3) !== 0 ? a(3) : (sameKey ? a(9) : a(13));
+          const ok = replace ? a(10) === a(0) && a(11) === a(1) && a(12) === a(2) && a(13) === nm
+                             : a(10) === a(6) && a(11) === a(7) && a(12) === a(8) && a(13) === a(9);
+          ck("écriture TT : entrée laissée (remplacement de TranspositionTableEntry::save)", ok, e, "incohérent");
+        }
+        S.stores.push([a(2), a(3)]);
+        break; }
+      case E.RETURN: {
+        const v = a(0), r = nd.reason[q];
+        if (full && nd.exit[q] === e && e > T.nEv - 50) break;
+        if (r === R.OVER) ck("partie finie : vraiment finie (JS) et valeur = score", S.gameOver && v === gameValue(S.pos), e, () => `${v}`);
+        else ck("partie non finie là où la recherche continue", !S.gameOver, e, "partie finie non détectée");
+        if (r === R.TT) { const x = S.tt, al = nd.alpha[q];
+          const want = x.lower >= beta ? x.lower : x.upper <= al ? x.upper : x.lower === x.upper ? x.lower : null;
+          ck("coupure TT : profondeur suffisante et borne qui conclut", x.found && x.depth >= depth && v === want, e, "incohérent"); }
+        if (r === R.LEAF) ck("feuille : profondeur ≤ 0, valeur = évaluation", depth <= 0 && v === S.evals[S.evals.length - 1], e, "incohérent");
+        if (r === R.RFP) ck("RFP : valeur rendue = valeur statique", v === S.evals[0], e, "incohérent");
+        if (r === R.MPCH) ck("MPC↑ : rend β", v === beta, e, "incohérent");
+        if (r === R.MPCL) ck("MPC↓ : rend α", v === nd.alpha[q], e, "incohérent");
+        if (r === R.PROXY) ck("proxy : rend la valeur du témoin", v === (S.proxyV >= W ? beta : S.proxyV), e, "incohérent");
+        if (r === R.CUT) {
+          ck("β-coupure : valeur rendue = valeur du coup qui coupe", v === S.cut.v, e, "incohérent");
+          if (!isRoot) ck("β-coupure : toutes les mises à jour de l'historique faites", S.expectHist && S.expectHist.length === 0, e, "manquantes");
+        }
+        if (r === R.ALL || r === R.CUT) {
+          const sv = S.stores[S.stores.length - 1];
+          ck("TT : valeur et coup écrits = valeur rendue et meilleur coup", sv && sv[0] === v && (r === R.CUT ? sv[1] === S.cut.m : sv[1] === S.bestMove), e, "incohérent");
+        }
+        if (r === R.ALL) {
+          ck("tous les coups : valeur rendue = meilleure valeur des coups", v === S.best, e, () => `${v} ≠ ${S.best}`);
+          ck("tous les coups : aucun coup oublié (sauf LMP)", S.lmp || S.nMoves === legalOrPass(S.pos).length, e, () => `${S.nMoves} coups sur ${legalOrPass(S.pos).length}`);
+        }
+        if (isRoot) {
+          if (S.cut) ck("root_search : échec haut (aspiration) seulement si v ≥ β < +∞", S.cut.v >= beta && beta < INF, e, "incohérent");
+          else ck("root_search : tous les coups de la racine cherchés", S.nMoves === legalOrPass(S.pos).length, e, "incomplet");
+          ck("root_search : valeur rendue = meilleure valeur", v === S.best, e, "incohérent");
+          root.lastRoot = q; root.rootBest = S.bestMove;
+        }
+        const p = nd.parent[q]; if (p >= 0 && st.get(p)) st.get(p).lastRet = q;
+        st.delete(q);
+        break; }
+      case E.ROOT_ORDER: {
+        const n = a(0), list = []; for (let i = 0; i < n; i++) list.push([a(1 + 2 * i), a(2 + 2 * i)]);
+        // nodes of each root move = sizes of its subtrees (the page's counts)
+        const sizes = new Map();
+        for (let c = nd.first[q]; c >= 0; c = nd.next[c]) sizes.set(nd.move[c], (sizes.get(nd.move[c]) || 0) + nd.sub[c]);
+        for (const [m, nn] of list) if (sizes.has(m)) ck("nœuds de chaque coup racine = taille de ses sous-arbres (page)", sizes.get(m) === nn, e, () => `${mvStr(m)} ${nn} ≠ ${sizes.get(m)}`);
+        // best move first, then by subtree size (stable)
+        const prevOrder = root.order.slice(), best = S.bestMove;
+        const want = prevOrder.map(m => [m, list.find(x => x[0] === m)[1]]).sort((x, y) => ((x[0] === best) !== (y[0] === best)) ? (x[0] === best ? -1 : 1) : y[1] - x[1]);
+        ck("racine réordonnée : meilleur coup d'abord puis par taille", want.every((x, i) => x[0] === list[i][0]), e, "ordre différent");
+        root.order = list.map(x => x[0]);
+        break; }
+    }
+  }
+  if (!full) {
+    ck("nœuds de la trace − appels de root_search = nœuds du joueur", enters - roots === T.H.result.nodes, -1, () => `${enters - roots} ≠ ${T.H.result.nodes}`);
+    const lo = root.lastOk;
+    ck("résultat final = dernière itération acceptée", lo && lo.m === T.H.result.move && lo.v === T.H.result.value && lo.d === T.H.result.depth, -1, "incohérent");
+  }
+  // the page's subtree sizes
+  for (let q = 0; q < T.N; q += Math.max(1, Math.floor(T.N / 300))) {
+    const x = nd.exit[q]; if (x < 0) continue;
+    let n = 0; for (let e = nd.enter[q]; e <= x; e++) if (T.type[e] === E.ENTER) n++;
+    ck("page : taille des sous-arbres", n === nd.sub[q], nd.enter[q], "différente");
+  }
+  return { checks, notAssumed, full };
+}
+function legalOrPass(pos) { const l = legalMoves(pos); return l.length ? l : [0]; }
+function sameSet(a, b) { if (a.length !== b.length) return false; const s = new Set(a); return b.every(x => s.has(x)); }
+
+function tabValidation() {
+  const r = ui.validation;
+  let h = `<div class="legend">La page refait ici, indépendamment du C++, ce que le code doit avoir fait à chaque événement — génération des coups et fin de partie,
+  hash Zobrist, valeurs négamax d'après celles des enfants, fenêtres et profondeurs des appels, enchaînement LMR / fenêtre nulle / re-recherche, réductions LMR,
+  ordre des coups et leurs scores, territoire (influence), mises à jour de l'historique, des tueurs et des contre-coups, entrées de la table, valeurs du réseau,
+  approfondissement itératif et fenêtres d'aspiration — et vérifie aussi ses propres reconstructions (historique, tueurs, table, α des cadres, tailles des sous-arbres).</div>
+  <button id="b-val">Vérifier cette recherche</button>${G ? ` <button id="b-valall">Vérifier toute la partie (${G.H.searches.length} recherches)</button>` : ""} <span id="valmsg" class=dim></span>`;
+  if (r) {
+    const tot = [...r.checks.values()].reduce((s, c) => s + c.n, 0), bad = [...r.checks.values()].reduce((s, c) => s + c.fail, 0);
+    h += `<div style="margin:8px 0;font-size:14px">${bad ? `<span class=bad>${bad} échecs</span>` : `<span class=good>Tout est cohérent</span>`} sur ${fmtN(tot)} vérifications${r.label ? " — " + r.label : ""}.</div>`;
+    if (r.notAssumed.length) h += `<div class=warn>Options différentes des valeurs par défaut (certaines vérifications ne s'appliquent pas) : ${r.notAssumed.join(", ")}</div>`;
+    if (r.full) h += `<div class=warn>Trace tronquée : la fin n'est pas vérifiée.</div>`;
+    h += `<table class="t"><tr><th>vérification</th><th class=r>cas</th><th class=r>échecs</th><th>exemples</th></tr>`;
+    for (const [name, c] of r.checks) h += `<tr><td style="white-space:normal">${esc(name)}</td><td class=r>${fmtN(c.n)}</td><td class="r ${c.fail ? "bad" : "good"}">${c.fail}</td>` +
+      `<td>${c.ex.map(x => `<a href="#" data-ev="${x.e}" data-k="${x.k ?? ""}" title="${esc(x.msg)}">#${x.e}${x.k !== undefined ? " (rech. " + x.k + ")" : ""}</a>`).join(" ")}</td></tr>`;
+    h += `</table>`;
+  }
+  return h;
+}
+function afterValidation() {
+  $("b-val").onclick = () => { $("valmsg").textContent = "vérification…"; setTimeout(() => { const t0 = performance.now(); ui.validation = validateTrace(); ui.validation.label = `${((performance.now() - t0) / 1000).toFixed(1)} s`; renderTab(); }, 20); };
+  if ($("b-valall")) $("b-valall").onclick = () => {
+    $("valmsg").textContent = "vérification de toute la partie…";
+    setTimeout(() => {
+      const t0 = performance.now(), keep = G.k, all = new Map(); let full = false, notAssumed = [];
+      for (let k = 0; k < G.H.searches.length; k++) {
+        selectSearch(k);
+        const r = validateTrace(); full ||= r.full; notAssumed = r.notAssumed;
+        for (const [n, c] of r.checks) { let A = all.get(n); if (!A) all.set(n, A = { n: 0, fail: 0, ex: [] }); A.n += c.n; A.fail += c.fail; for (const x of c.ex) if (A.ex.length < 6) A.ex.push({ ...x, k }); }
+      }
+      selectSearch(keep);
+      ui.validation = { checks: all, notAssumed, full, label: `toute la partie, ${((performance.now() - t0) / 1000).toFixed(1)} s` };
+      ui.tab = "valid"; renderTabs(); renderTab();
+    }, 20);
+  };
+  for (const x of $("tabbody").querySelectorAll("a[data-ev]")) x.onclick = ev => { ev.preventDefault(); if (x.dataset.k !== "" && G) selectSearch(+x.dataset.k); go(+x.dataset.ev); };
+}
+
+// ── the guide: how to record a trace, every option, sizes ──
+function showGuide() {
+  const g = $("guide");
+  g.innerHTML = `<button class="close" onclick="this.parentNode.style.display='none'">Fermer ✕</button>
+<h2>Enregistrer une trace</h2>
+<p>La trace est écrite par <code>search_trace</code>, un programme à part qui contient <b>le code du joueur lui-même</b>
+(<code>player/minmax_nnue_dev_player.cpp</code>), compilé avec des points d'enregistrement : chaque événement de la recherche
+(entrée dans un nœud, sonde de la table, évaluation, coupure…) est écrit avec sa ligne de code. Les autres programmes
+(tournoi, search_bench, UI) n'ont pas ces points d'enregistrement : leur recherche n'est pas modifiée.
+La recherche se fait sur <b>un seul thread</b> et <b>sans horloge</b>, à profondeur fixe : le même arbre à chaque fois.</p>
+<h3>1. Compiler (une fois, et après chaque modification du joueur)</h3>
+<pre>cd ~/Yolah/build
+make search_trace</pre>
+<p>Le code source du joueur est copié dans la trace au moment de la compilation : la page montre exactement le code qui a tourné.</p>
+
+<h3>2. Une recherche (une position, un coup à choisir)</h3>
+<pre>./search_trace --positions ../test/bench_positions.txt --index 10 --depth 9 --out t.ytrace</pre>
+<table class="t">
+<tr><td>--positions FICHIER --index K</td><td>La position à chercher : la ligne K (à partir de 0) d'un fichier de positions JSON
+(une par ligne, comme <code>test/bench_positions.txt</code> : 209 positions prises dans des parties, tous les ~6 plis, dans l'ordre des parties).</td></tr>
+<tr><td>--moves "a1:b2 a8:b7 …"</td><td>Ou bien : la position atteinte depuis le début de la partie par ces coups (« pass » pour une passe). Noir joue en premier ; pièces au départ : noir a1, h8, d5, e4 ; blanc a8, h1, d4, e5.</td></tr>
+<tr><td>--position JSON</td><td>Ou bien : une position donnée directement en JSON (format de <code>Yolah::to_json</code>).</td></tr>
+<tr><td>--depth D</td><td>Profondeur maximale de l'approfondissement itératif (défaut 7) : itérations 1, 2, …, D, chacune avec ses fenêtres d'aspiration. C'est le paramètre qui fixe la taille de la trace (voir plus bas).</td></tr>
+<tr><td>--warm N</td><td>Avant la recherche tracée, N recherches <b>non enregistrées</b> des positions précédentes du même camp
+(celles de la partie --moves, ou les lignes précédentes du fichier --positions). La recherche tracée part alors avec la table, l'historique et les contre-coups qu'elles ont laissés, comme en partie.</td></tr>
+<tr><td>--warm-depth D</td><td>Profondeur de ces recherches d'échauffement (défaut : la même que --depth). Profondeur fixe : la même trace à chaque exécution.</td></tr>
+<tr><td>--warm-time US</td><td>Ou bien : échauffement au temps (µs par recherche), comme en partie. <b>Pas reproductible</b> : deux exécutions laissent une table un peu différente (l'horloge), donc des traces différentes, et --check 1 dit alors DIFFERENT sans que l'enregistreur y soit pour rien.
+Sans --warm : table et historique vides (comme search_bench). Les entrées laissées dans la table par l'échauffement n'apparaissent dans la page que quand une sonde les lit.</td></tr>
+<tr><td>--player CFG</td><td>Le joueur (défaut <code>../config/search_study/nnue_k8_them_spacelite.cfg</code>, la meilleure version actuelle). Doit être un MinMaxNNUE_DevPlayer ; « nb threads » est forcé à 1.</td></tr>
+<tr><td>--child-evals-depth N</td><td>Aux nœuds de profondeur ≥ N, la valeur du réseau de <b>chaque enfant</b> est calculée à part (la recherche ne la voit pas) et montrée dans l'onglet Coups. Défaut 1 : tous les nœuds internes. 0 : jamais (trace ~40 % plus petite). La valeur du réseau du nœud lui-même est toujours enregistrée.</td></tr>
+<tr><td>--max-mb M</td><td>Taille maximale de l'enregistrement (défaut 256 Mo). Au-delà, la recherche est arrêtée et la page indique « trace tronquée ».</td></tr>
+<tr><td>--check 1</td><td>Refait la même recherche sans l'enregistreur et affiche IDENTICAL si le coup, la valeur, la profondeur et les nœuds sont les mêmes (l'enregistrement ne change rien).</td></tr>
+<tr><td>--out FICHIER</td><td>Le fichier écrit (défaut <code>trace.ytrace</code>).</td></tr>
+</table>
+
+<h3>3. Une partie entière</h3>
+<pre>./search_trace --game 1 --depth 7 --opening "a1:b2 a8:b7" --out partie.ytrace</pre>
+<p>Deux joueurs jouent une partie depuis le début, chacun avec <b>sa propre</b> table, son historique et ses contre-coups (comme dans un tournoi),
+chaque coup cherché à la profondeur --depth. Chaque recherche est enregistrée à part ; dans la page, la barre « Partie » permet de passer de l'une à l'autre
+(<kbd>[</kbd> / <kbd>]</kbd>), avec la courbe des valeurs. Les points d'arrêt restent posés d'une recherche à l'autre, et ▶▶ / F8 continue dans les recherches suivantes.</p>
+<table class="t">
+<tr><td>--game 1</td><td>Le mode partie.</td></tr>
+<tr><td>--depth D</td><td>La profondeur de chaque coup (défaut 7). Profondeur fixe : la même partie à chaque fois, et l'enregistrement (qui ralentit) ne change aucun coup.</td></tr>
+<tr><td>--player CFG / --opponent CFG</td><td>Noir / blanc (défaut : le même joueur des deux côtés).</td></tr>
+<tr><td>--opening "coups"</td><td>Coups joués au début <b>sans recherche</b> (comme les ouvertures du tournoi), pour varier les parties.</td></tr>
+<tr><td>--replay "coups"</td><td>Coups imposés <b>avec</b> recherche : chaque joueur cherche (et la recherche est enregistrée), puis le coup donné est joué. Pour voir ce que le joueur aurait pensé dans une partie jouée par d'autres. Après la liste, les joueurs continuent seuls.</td></tr>
+<tr><td>--record A-B</td><td>N'enregistrer que les recherches des plis A à B (plis de la partie, à partir de 0) ; les autres sont jouées normalement, sans enregistrement.</td></tr>
+<tr><td>--side both|black|white</td><td>N'enregistrer que les recherches d'un camp (défaut both).</td></tr>
+<tr><td>--max-plies N</td><td>Arrêter la partie après N plis.</td></tr>
+<tr><td>--max-mb M</td><td>Taille maximale de l'enregistrement d'<b>une</b> recherche (défaut 256). Au-delà, la recherche <b>continue</b> sans être enregistrée (la partie ne doit pas changer) : la page la marque tronquée.</td></tr>
+<tr><td>--total-mb M</td><td>Taille maximale du fichier (défaut 1024) : au-delà, les recherches suivantes sont jouées sans être enregistrées.</td></tr>
+<tr><td>--check 1</td><td>Rejoue la partie sans l'enregistreur : THE SAME GAME si les coups sont les mêmes.</td></tr>
+</table>
+
+<h3>4. Taille des traces (mesurée)</h3>
+<p>Environ <b>460 octets par nœud</b> (≈ 280 avec <code>--child-evals-depth 0</code>). La taille croît donc comme le nombre de nœuds,
+c'est-à-dire d'un facteur ~1,5 à 2 par pli de profondeur. Les positions d'ouverture (beaucoup de coups) sont les plus lourdes.</p>
+<table class="t">
+<tr><td>une recherche, profondeur 9</td><td>position 10 du bench : 32 000 nœuds, <b>15 Mo</b> (9 Mo sans les valeurs des enfants), 2 s</td></tr>
+<tr><td>une recherche, profondeur 13</td><td>position 4 : 43 000 nœuds, <b>14 Mo</b></td></tr>
+<tr><td>une recherche, profondeur 17</td><td>position 4 : 137 000 nœuds, <b>43 Mo</b>, 4 s</td></tr>
+<tr><td>une recherche de 1 s en partie</td><td>≈ 1 à 2 millions de nœuds sur un thread → <b>0,5 à 1 Go</b> : trop pour la page ; préférer une profondeur fixe ≤ 13 en milieu de partie</td></tr>
+<tr><td>partie entière, profondeur 5</td><td>53 plis, 51 recherches : <b>27 Mo</b>, 3 s</td></tr>
+<tr><td>partie entière, profondeur 7</td><td><b>105 Mo</b> (recherche médiane 0,9 Mo, la plus grosse 11 Mo), 10 s</td></tr>
+<tr><td>partie entière, profondeur 9</td><td><b>357 Mo</b> (médiane 1,5 Mo, la plus grosse 61 Mo, au 6e pli), 36 s</td></tr>
+</table>
+<p>La page garde le fichier en mémoire (il en faut environ 2 à 3 fois sa taille dans le navigateur) : jusqu'à quelques centaines de Mo, tout va bien
+(43 Mo se chargent en 0,5 s) ; au-delà d'un Go, le navigateur peut refuser. Pour les grosses parties : --record pour une partie des plis, ou --side.
+Une trace se compresse bien : <code>gzip -k t.ytrace</code> divise par ~4, et la page ouvre directement le .gz.</p>
+
+<h3>5. Vérifier une trace</h3>
+<p>Onglet « Validation » : la page refait de son côté (générateur de coups, fin de partie, hash Zobrist, influence en JavaScript) tout ce que le code a dû faire,
+et compare avec chaque événement : valeurs négamax d'après celles des enfants, fenêtres et profondeurs des appels, enchaînement LMR / fenêtre nulle / re-recherche,
+réductions LMR, ordre et scores des coups, mises à jour de l'historique, des tueurs et des contre-coups, entrées de la table, valeurs du réseau, fenêtres d'aspiration.
+Elle vérifie aussi ses propres reconstructions (historique, tueurs, table, α des cadres de la pile, tailles des sous-arbres).
+Côté C++, <code>--check 1</code> refait la recherche (ou la partie) sans l'enregistreur.</p>
+<h3>6. Ouvrir la trace</h3>
+<pre>explorer.exe ~/Yolah/ui/search_debugger.html     # depuis WSL, dans le navigateur Windows</pre>
+<p>Puis « Ouvrir une trace… » ou glisser le fichier sur la page. Si la page est servie en http
+(<code>python3 -m http.server</code> dans ~/Yolah), <code>search_debugger.html?trace=../build/t.ytrace</code> l'ouvre directement
+(<code>&amp;search=K</code> : la K-ième recherche d'une partie).</p>`;
+  g.style.display = "block";
+}
+document.addEventListener("keydown", ev => { if (ev.key === "Escape") $("guide").style.display = "none"; });
 
 // ── wiring ──
 $("file").onchange = async ev => { const f = ev.target.files[0]; if (f) await openFile(f); };
@@ -1242,6 +1832,7 @@ document.addEventListener("keydown", ev => {
     F11: () => sh ? stepOut(1) : go(cur + 1), F10: () => stepOver(sh ? -1 : 1), PageDown: () => stepOut(1), PageUp: () => stepOut(-1),
     F8: () => cont(sh ? -1 : 1), F5: () => cont(sh ? -1 : 1), c: () => cont(1), C: () => cont(-1), n: () => nextIter(1), N: () => nextIter(-1),
     Home: () => go(0), End: () => go(T.nEv - 1), " ": play,
+    "[": () => G && selectSearch(G.k - 1, 0), "]": () => G && selectSearch(G.k + 1, 0),
   }[k];
   if (act) { ev.preventDefault(); act(); }
 });
