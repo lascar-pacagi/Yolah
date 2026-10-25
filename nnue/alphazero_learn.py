@@ -490,7 +490,7 @@ class Evaluator(threading.Thread):
         cmd = [a.bin, "match", "--config", a.eval_config, "--a", ts_a, "--b", ts_b,
                "--games", str(a.eval_games), "--time", str(int(a.eval_seconds * 1e6)),
                "--opening-plies", str(a.eval_opening_plies), "--seed", str(step + 1),
-               "--out", out]
+               "--out", out] + (["--book", a.eval_book] if a.eval_book else [])
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=self.gpu)
         log(f"evaluation: az_{step} vs az_{opp} ({a.eval_games} games, {a.eval_seconds} s/move)")
         with open(os.path.join(a.work, "logs", "eval.log"), "a") as logf:
@@ -594,6 +594,9 @@ def main():
     ap.add_argument("--eval-games", type=int, default=20)
     ap.add_argument("--eval-seconds", type=float, default=2.0)
     ap.add_argument("--eval-opening-plies", type=int, default=4)
+    ap.add_argument("--eval-book", default="",
+                    help="book of balanced openings for the evaluations (config/openings/balanced.txt); "
+                         "empty: random openings of --eval-opening-plies plies")
     ap.add_argument("--eval-opponents", default="previous",
                     help="comma separated: previous (last evaluated model), initial, lag:K")
     ap.add_argument("--keep-all", action="store_true", help="keep every exported model")

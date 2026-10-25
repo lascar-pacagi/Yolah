@@ -249,6 +249,20 @@ if(ENABLE_TORCH)
     target_link_libraries(yolah_tournament PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# Balanced openings for the matches between networks (test/opening_book_main.cpp):
+#   ./opening_book build --out ../config/openings/balanced.txt ; ./opening_book check
+add_executable(opening_book test/opening_book_main.cpp)
+target_compile_options(opening_book PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(opening_book PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_link_libraries(opening_book PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(opening_book PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(opening_book PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # Search benchmarks on fixed positions (test/search_bench_main.cpp):
 #   ./search_bench run --player ../config/mm_nnue_dev_player.cfg --depth 7 --positions ...
 add_executable(search_bench test/search_bench_main.cpp)

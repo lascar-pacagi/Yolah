@@ -482,12 +482,14 @@ exports.
 
 A detail matters here. Two deterministic players repeat the same game from the
 same position: 10 games with the new network as black would be *one* game
-played ten times. So each pair of games starts from a fresh random opening of 4
-plies, and the new network plays it once with each colour (@fig-eval). The pair
-cancels the bias of the opening, whichever side it favours — and the first
-player's advantage in Yolah is large (@sec-learn-sizing).
+played ten times. So each pair of games starts from its own opening, and the
+new network plays it once with each colour (@fig-eval). The pair cancels the
+bias of the opening, whichever side it favours — and the first player's
+advantage in Yolah is large (@sec-colour-balance). The openings were at first
+random (4 plies); they now come from a book of balanced openings
+(@sec-learn-book), after which the colour decides far fewer pairs.
 
-![The 20 evaluation games: 10 random openings, each played once with each colour.](figs/fig-eval.png){#fig-eval width=100%}
+![The 20 evaluation games: 10 openings, each played once with each colour.](figs/fig-eval.png){#fig-eval width=100%}
 
 A match takes $20 \times 55 \times 2\ \text{s} \approx 37$ minutes. It runs on
 the last GPU while that GPU also plays self-play games: both players suffer the
@@ -527,6 +529,7 @@ learning job:
 ```bash
 sbatch alphazero_match.sh                              # latest vs initial, 200 games, 0.5 s/move
 sbatch --export=ALL,A=7168,B=4096,GAMES=400 alphazero_match.sh
+sbatch --export=ALL,BOOK=none alphazero_match.sh       # random openings instead of the book
 ```
 
 It copies the two networks first (the learning job prunes old files at every
@@ -537,6 +540,105 @@ confidence interval to `WORK_DIR/matches.csv`.
 Adding `initial` to `--eval-opponents` gives an unchained measurement against a
 fixed reference, at the cost of another 20 games per evaluation.
 :::
+
+### A book of balanced openings {#sec-learn-book}
+
+A pair of games tells which network is stronger only when the two games end
+differently *because of the networks*. With random openings they often do not:
+Black wins the game in which A is black and the game in which B is black, the
+pair ends 1–1, and those two games — two hours of GPU at 1 s per move — have
+measured nothing. The long matches of October showed it plainly (most pairs
+1–1, Black winning almost every game). The cure used by every engine-testing
+framework is a book of openings in which neither side is clearly ahead. Yolah
+has no opening theory to borrow one from, so the book is built by search:
+`test/opening_book_main.cpp`, written to `config/openings/balanced.txt`.
+
+**1. Candidates.** 200 000 random openings of 6 plies (3 per side; uniformly
+random legal moves, none ending the game). Two openings can lead to the same
+game up to a symmetry: 4 of the 8 symmetries of the board (@sec-symmetries)
+map the initial position to itself — the identity, the half turn and the two
+diagonal flips; the other four send the black pieces to the white ones'
+initial squares. Each opening is reduced to the smallest of its 4 images
+(`canonical`) and only one opening per class is kept. (That the 4
+transformations turn a game into a game was checked on 2 000 random games of
+30 plies: the transformed moves are always legal and give the transformed
+positions; for an axis mirror they never are.)
+
+**2. Values.** Each candidate is searched by the minimax player (the dev player
+with the `spacelite` network, one thread) at a **fixed depth** rather than a
+fixed time, so that the book is reproducible from its command line, which is
+written in its header. The values are turned to Black's point of view, on the
+search's scale where ±30 000 is tanh ±1. Most random openings are far from
+balanced (@fig-book, left): the initial position is worth +0.35 to Black at
+depth 12, the random openings +0.47 on average, and only 15 % lie within
+±0.27. A search at depth 6 ($\approx$ 0.1 s) discards the others — its values
+correlate at 0.95 with those of depth 10 — and the 29 598 left are searched
+again at depth 12 ($\approx$ 0.25 s each; 24 minutes on 18 cores in all, two thirds of them for the depth-6 filter).
+
+**3. Calibration.** A first book took the 1 000 openings closest to a value of
+0, and was too good for White: from it the minimax player against itself
+scored only 0.41–0.47 with Black, depending on the depth. A value of 0 is not
+an even game. To find the value that is, 6 000 of the 29 598 openings (all
+values, from −0.58 to +0.54) were played out, minimax against itself at depth
+10, and Black's score was regressed on the depth-12 value (@fig-book, right):
+it reaches 1/2 at **+0.12** (+3 500; 95 % interval of the regression's zero
++2 500 to +3 900). The book is therefore the 1 000 openings whose value is
+closest to +3 500 — all within 3 500 ± 312 — written in a random order so
+that a short match does not only use the most balanced ones.
+
+![Left: the depth-6 value of 200 000 random 6-ply openings for Black, and the depth-12 window the book is taken from. Right: Black's score in 6 000 games of the minimax player against itself at depth 10, by the depth-12 value of the opening; 1/2 is reached at +0.12, not 0.](figs/fig-book.png){#fig-book width=100%}
+
+The regression also says how little a value says about one game: the
+correlation between an opening's value and the game's result is 0.17. Over
+this range, the opening shifts the odds by a few percent per 0.03; the rest is
+the play. That is the point — the openings should leave the result to the
+players.
+
+**4. Checks.** `opening_book check` plays from the book (and, for comparison,
+from random 4-ply openings) with the minimax player:
+
+| games from 1 000 openings | Black's score (±0.025) |
+|---|---|
+| book, minimax vs itself at depth 6 / 8 / 10 / 12 | 0.496 / 0.498 / 0.520 / 0.499 |
+| random 4-ply openings, depth 10 | 0.724 |
+
+| pairs (each opening, both colours) | colour decides the pair | stronger wins both | stronger's score (Elo) |
+|---|---|---|---|
+| depth 8 vs 6, random openings | 30.9 % | 30.9 % | 0.698 (+146) |
+| depth 8 vs 6, **book** | **18.6 %** | **38.2 %** | 0.739 (+180) |
+| depth 10 vs 8, random openings | 26.9 % | 25.9 % | 0.692 (+141) |
+| depth 10 vs 8, **book** | **16.9 %** | **33.1 %** | 0.713 (+158) |
+
+"Colour decides" counts the pairs whose two games were won by the same colour.
+With the book their share drops by 40 %, the pairs won twice by the stronger
+player become more frequent, and the same difference of strength shows as a
+larger score: random openings compress the measured gaps towards 0, by 10–20 %
+here. The book is calibrated with the minimax player; whether its +0.12
+is also the even point for the networks, which see the game differently, is
+measured for free by every match (`evals/match_*.json` records the opening and
+the colours of each game).
+
+**Use.** `nnue/alphazero_match.sh` uses the book by default (`BOOK=none`:
+random openings as before), and so do the evaluations of the learning job
+(`EVAL_BOOK`, i.e. `--eval-book`; `none` to switch back). Pair $k$ of a match
+plays opening $k$ of the book in an order shuffled by the match's seed, so
+1 000 openings cover 2 000 games without repetition. Changing the openings in
+the middle of a run changes the scale of the chained Elo a little (gaps look
+larger, see above): compare evaluations made with the same kind of openings.
+
+```bash
+cd build
+./opening_book build --plies 6 --candidates 200000 --pre-depth 6 --pre-max 8000 \
+    --depth 12 --target 3500 --max-value 1500 --size 1000 --threads 18 --seed 1 \
+    --out ../config/openings/balanced.txt                      # 25 min on 18 cores
+./opening_book check --games 1000 --depth 10                   # Black's score from the book
+./opening_book check --games 1000 --depth 10 --opponent-depth 8  # pairs, as in the matches
+```
+
+To recalibrate (another player, another network): build with `--target 0
+--max-value 30000 --size 100000` to keep every value, play them with `check
+--random-plies 0 --csv calib.csv`, and take the value at which Black's score
+crosses 1/2 (`doc/figs/make_book_fig.py` draws it).
 
 ## Running it on the cluster {#sec-cluster}
 
@@ -738,8 +840,8 @@ the random openings: after an *odd* number of random plies, black has played
 one random — hence usually bad — move more than white, and the more random
 plies, the better white does. A comparison of colour balances is therefore
 only meaningful between games that start from the same kind of position. (The
-evaluation matches use 4 random plies, 2 per side, and play each opening with
-both colours.)
+evaluation matches play each opening with both colours, from a book of
+balanced openings, @sec-learn-book.)
 
 Consequences for the learning loop:
 
@@ -843,7 +945,8 @@ important ones as environment variables and sets the cluster values:
 | `--eval-hours` | 4 | 4 | time between two evaluations |
 | `--eval-every` | 0 | | evaluate every $K$ exports instead (0 = use `--eval-hours`) |
 | `--eval-games` / `--eval-seconds` | 20 / 2 | 20 / 2 | the match |
-| `--eval-opening-plies` | 4 | 4 | random plies before each pair of games |
+| `--eval-opening-plies` | 4 | 4 | random plies before each pair of games, without a book |
+| `--eval-book` | none | `EVAL_BOOK` = `config/openings/balanced.txt` | balanced openings (@sec-learn-book) |
 | `--eval-opponents` | previous | previous | `previous`, `initial`, `lag:K`, comma separated |
 | `--train-gpu` / `--eval-gpu` | 0 / −1 | | trainer on the first GPU, matches on the last |
 | `--keep-all` | off | | keep every exported network |

@@ -2755,7 +2755,7 @@ choice when the cache fits in page cache).
 
 ### `nnue/cnn_resnet_value_policy_chunked.py` {#sec-src-nnue-cnn-resnet-value-policy-chunked-py}
 
-*838 lines.*
+*875 lines.*
 
 The network definition, the encoding, and the training loop.
 
@@ -3183,11 +3183,21 @@ class Net(nn.Module):
       Policy head : 1×1 conv to 2 channels → flatten(128) → FC
                     → 4096 logits, one per (from, to) action.
 
+      global_pool (KataGo): both heads also see the mean and the max of the
+      trunk over the 64 squares (2C numbers), through value_gp_fc (added to
+      value_fc1 before its ReLU) and policy_gp_fc (added to the logits). The
+      1- and 2-channel maps above are narrow bottlenecks; the pooled vector
+      gives the heads a summary of the whole board. Both layers have no
+      bias, so zero weights make the network exactly the one without
+      pooling (alphazero_grow.py relies on it).
+
     forward() returns the pair (value, policy_logits).
     """
     def __init__(self, channels: int = 256, nb_blocks: int = 30,
-                 value_fc_size: int = 256, num_actions: int = NUM_ACTIONS):
+                 value_fc_size: int = 256, num_actions: int = NUM_ACTIONS,
+                 global_pool: bool = False):
         super().__init__()
+        self.global_pool = global_pool
 
         # Stem: lift the 4 input planes to `channels` feature maps.
         self.input_conv = nn.Sequential(
@@ -3212,23 +3222,50 @@ class Net(nn.Module):
         self.policy_bn   = nn.BatchNorm2d(2)
         self.policy_fc   = nn.Linear(2 * 64, num_actions)
 
-    def forward(self, x):
-        # Shared trunk.
+        if global_pool:
+            self.value_gp_fc  = nn.Linear(2 * channels, value_fc_size, bias=False)
+            self.policy_gp_fc = nn.Linear(2 * channels, num_actions, bias=False)
+
+    def trunk(self, x):
         x = self.input_conv(x)
         x = self.res_blocks(x)
-        x = torch.relu(self.output_bn(x))             # shared (B, C, 8, 8)
+        return torch.relu(self.output_bn(x))          # shared (B, C, 8, 8)
 
+    def heads(self, x):
         # Value head: (B,C,8,8) → (B,1,8,8) → (B,64) → (B,fc) → (B,1) → (B,)
         v = torch.relu(self.value_bn(self.value_conv(x)))
         v = v.flatten(1)                              # keep batch dim, flatten rest
-        v = torch.relu(self.value_fc1(v))
-        v = torch.tanh(self.value_fc2(v)).squeeze(-1) # tanh → (-1,1); drop last dim
+        v = self.value_fc1(v)
 
         # Policy head: (B,C,8,8) → (B,2,8,8) → (B,128) → (B, NUM_ACTIONS)
         p = torch.relu(self.policy_bn(self.policy_conv(x)))
         p = p.flatten(1)
         p = self.policy_fc(p)                         # raw logits (no softmax)
+
+        if self.global_pool:
+            pooled = torch.cat([x.mean(dim=(2, 3)), x.amax(dim=(2, 3))], dim=1)   # (B, 2C)
+            v = v + self.value_gp_fc(pooled)
+            p = p + self.policy_gp_fc(pooled)
+        v = torch.relu(v)
+        v = torch.tanh(self.value_fc2(v)).squeeze(-1) # tanh → (-1,1); drop last dim
         return v, p
+
+    def forward(self, x):
+        return self.heads(self.trunk(x))
+
+
+def net_from_state_dict(sd, cls=None, strict=True):
+    """
+    A Net (or a subclass `cls`) sized from a state_dict: channels, blocks,
+    head sizes and global pooling are read off the tensors. Returns the
+    network and load_state_dict's (missing, unexpected) keys.
+    """
+    C = sd["input_conv.0.weight"].shape[0]
+    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
+    net = (cls or Net)(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
+                       num_actions=sd["policy_fc.weight"].shape[0],
+                       global_pool="value_gp_fc.weight" in sd)
+    return net, net.load_state_dict(sd, strict=strict)
 
     def clip(self):
         # No-op: kept so the training loop can call model.clip() uniformly
@@ -3634,7 +3671,7 @@ if __name__ == "__main__":
 
 ### `nnue/resnet_export.py` {#sec-src-nnue-resnet-export-py}
 
-*236 lines.*
+*238 lines.*
 
 One checkpoint in, three artefacts out. The module docstring is the
 authoritative `.bin` layout; @sec-export is the same thing with the algebra
@@ -3724,7 +3761,7 @@ import torch
 
 sys.path.append("../server")
 from yolah import Yolah, Move, Square                     # noqa: E402
-from cnn_resnet_value_policy_chunked import Net, encode_cnn  # noqa: E402
+from cnn_resnet_value_policy_chunked import Net, encode_cnn, net_from_state_dict  # noqa: E402
 
 MAGIC   = b"YOLAHRSN"
 VERSION = 1
@@ -3877,18 +3914,20 @@ def main():
     sd = torch.load(args.checkpoint, map_location="cpu")
     # Tolerate a DDP-wrapped checkpoint ("module." prefix).
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
-    C = sd["input_conv.0.weight"].shape[0]
-    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
-    net = Net(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
-              num_actions=sd["policy_fc.weight"].shape[0])
-    net.load_state_dict(sd)
+    net, _ = net_from_state_dict(sd)
     net.eval()
 
     base = os.path.splitext(args.checkpoint)[0]
-    export_bin(net, sd, base + ".bin")
+    if net.global_pool:
+        # The CPU backend (nn::ResNetCPU) knows only the heads without
+        # global pooling: such a network runs on the GPU backend (.ts) only.
+        print("global pooling: no .bin (CPU backend), TorchScript only")
+    else:
+        export_bin(net, sd, base + ".bin")
     if not args.no_ts:
         export_torchscript(net, base + ".ts")
-    export_test_vectors(net, base + ".test.bin", args.nb_test)
+    if not net.global_pool:
+        export_test_vectors(net, base + ".test.bin", args.nb_test)
 
 
 if __name__ == "__main__":
@@ -4221,7 +4260,7 @@ double alphazero_vs(const json& player_config, const json& opponent_config, size
 ## The learning loop
 
 The self-play learning loop of @sec-selfplay: the C++ self-play driver and its
-command-line front end, the Python trainer that orchestrates everything, the
+command-line front end, the book of balanced openings of the matches, the Python trainer that orchestrates everything, the
 two search configurations, and the cluster image and job scripts.
 
 
@@ -4716,17 +4755,19 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
 
 ### `test/alphazero_learn_main.cpp` {#sec-src-test-alphazero-learn-main-cpp}
 
-*208 lines.*
+*263 lines.*
 
 The `alphazero_learn` binary. `selfplay` wraps `run_selfplay` with a signal
-handler; `match` plays two networks against each other with paired random
-openings (@sec-eval) and writes the full record as JSON.
+handler; `match` plays two networks against each other, each opening once with
+each colour — from a book of balanced openings (@sec-learn-book) or random —
+and writes the full record as JSON.
 
 
 | symbol | role |
 |---|---|
 | `selfplay_main` | parse options, install SIGINT/SIGTERM, run |
-| `match_main` | A vs B, colours alternated, a random opening per pair of games |
+| `match_main` | A vs B, colours alternated, one opening per pair of games |
+| `read_book` | `--book`: one opening per line, every move checked legal |
 | `apply_set` | `--set 'key=value'`: override a key of the JSON config |
 
 
@@ -4743,17 +4784,23 @@ openings (@sec-eval) and writes the full record as JSON.
 //
 //   alphazero_learn match --config ../config/alphazero_mcts_eval_player.cfg
 //         --a new.ts --b old.ts [--games 10] [--time 2000000] [--opening-plies 4]
-//         [--seed 1] [--out result.json] [--set 'key=value' ...]
+//         [--book openings.txt] [--seed 1] [--out result.json] [--set 'key=value' ...]
 //     Plays A against B, alternating colours, and reports A's result. Games
-//     2k and 2k+1 start from the same random opening of --opening-plies plies
-//     (A black in one, white in the other): with deterministic players and no
-//     opening, the 5 games of each colour would be the same game 5 times.
+//     2k and 2k+1 start from the same opening (A black in one, white in the
+//     other): with deterministic players and no opening, the 5 games of each
+//     colour would be the same game 5 times. The opening: a random one of
+//     --opening-plies plies, or with --book the next one of a book of balanced
+//     openings (config/openings/balanced.txt, test/opening_book_main.cpp: one
+//     opening per line, "a1:b2 a8:b7 ...", '#' starts a comment), taken in an
+//     order shuffled by --seed — a different opening for each pair as long as
+//     the book has enough of them.
 //
 // --set overrides any key of the player JSON config ('key=value', value parsed as JSON).
 #include "alphazero_mcts_player.h"
 #include "alphazero_selfplay.h"
 #include "magic.h"
 #include "zobrist.h"
+#include <algorithm>
 #include <atomic>
 #include <csignal>
 #include <format>
@@ -4761,6 +4808,7 @@ openings (@sec-eval) and writes the full record as JSON.
 #include <iostream>
 #include <random>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -4821,6 +4869,43 @@ int selfplay_main(Args& a) {
     return 0;
 }
 
+Move parse_move(const string& s) {
+    auto sq = [&](const string& t) {
+        if (t.size() != 2 || t[0] < 'a' || t[0] > 'h' || t[1] < '1' || t[1] > '8')
+            throw std::runtime_error("bad move " + s);
+        return Square((t[1] - '1') * 8 + (t[0] - 'a'));
+    };
+    const auto colon = s.find(':');
+    if (colon == string::npos) throw std::runtime_error("bad move " + s + " (expected a1:b2)");
+    return Move(sq(s.substr(0, colon)), sq(s.substr(colon + 1)));
+}
+
+// A book of openings: one per line, '#' starts a comment; every opening legal
+// and not ending the game.
+std::vector<std::vector<Move>> read_book(const string& path) {
+    std::ifstream f(path);
+    if (!f) throw std::runtime_error("cannot open the book " + path);
+    std::vector<std::vector<Move>> book;
+    for (string line; std::getline(f, line);) {
+        std::istringstream is(line.substr(0, line.find('#')));
+        std::vector<Move> o;
+        Yolah y;
+        for (string t; is >> t;) {
+            const Move m = parse_move(t);
+            Yolah::MoveList legal;
+            y.moves(legal);
+            if (std::find(legal.begin(), legal.end(), m) == legal.end()) throw std::runtime_error("illegal move " + t + " in the book " + path + ": " + line);
+            o.push_back(m);
+            y.play(m);
+        }
+        if (o.empty()) continue;
+        if (y.game_over()) throw std::runtime_error("an opening of " + path + " ends the game: " + line);
+        book.push_back(std::move(o));
+    }
+    if (book.empty()) throw std::runtime_error("no opening in " + path);
+    return book;
+}
+
 string move_list(const std::vector<Move>& moves) {
     std::ostringstream os;
     for (size_t i = 0; i < moves.size(); i++) os << (i ? " " : "") << moves[i];
@@ -4828,7 +4913,7 @@ string move_list(const std::vector<Move>& moves) {
 }
 
 int match_main(Args& a) {
-    string config, model_a, model_b, out;
+    string config, model_a, model_b, out, book_path;
     size_t games = 10, opening_plies = 4;
     uint64_t time_us = 2'000'000, seed = 1;
     std::vector<string> sets;
@@ -4840,6 +4925,7 @@ int match_main(Args& a) {
         else if (o == "--games") games = std::stoul(a.next(o));
         else if (o == "--time") time_us = std::stoull(a.next(o));
         else if (o == "--opening-plies") opening_plies = std::stoul(a.next(o));
+        else if (o == "--book") book_path = a.next(o);
         else if (o == "--seed") seed = std::stoull(a.next(o));
         else if (o == "--out") out = a.next(o);
         else if (o == "--set") sets.push_back(a.next(o));
@@ -4859,12 +4945,22 @@ int match_main(Args& a) {
     AlphaZeroMCTSPlayer player_a(cfg_a), player_b(cfg_b);
 
     std::mt19937_64 rng(seed);
+    std::vector<std::vector<Move>> book;
+    std::vector<size_t> order;
+    if (!book_path.empty()) {
+        book = read_book(book_path);
+        for (size_t i = 0; i < book.size(); i++) order.push_back(i);
+        std::shuffle(order.begin(), order.end(), rng);
+        std::cout << "book " << book_path << ": " << book.size() << " openings\n";
+    }
     int wins = 0, draws = 0, losses = 0;
     json records = json::array();
     std::vector<Move> opening;
     for (size_t g = 0; g < games; g++) {
         const bool a_black = (g % 2 == 0);
-        if (g % 2 == 0) {
+        if (g % 2 == 0 && !book.empty()) {
+            opening = book[order[(g / 2) % book.size()]];
+        } else if (g % 2 == 0) {
             // A fresh random opening for the pair (not a finished game).
             for (;;) {
                 Yolah y;
@@ -4906,7 +5002,7 @@ int match_main(Args& a) {
     }
     const double score = games ? (wins + 0.5 * draws) / games : 0.0;
     json res = {{"a", model_a}, {"b", model_b}, {"games", games}, {"time_us", time_us},
-                {"opening_plies", opening_plies}, {"seed", seed},
+                {"opening_plies", opening_plies}, {"book", book_path}, {"seed", seed},
                 {"wins", wins}, {"draws", draws}, {"losses", losses}, {"score", score},
                 {"records", records}};
     if (!out.empty()) {
@@ -4942,9 +5038,411 @@ int main(int argc, char* argv[]) {
 ```
 
 
+### `test/opening_book_main.cpp` {#sec-src-test-opening-book-main-cpp}
+
+*381 lines.*
+
+The book of balanced openings of the matches (@sec-learn-book): random
+openings, one per class of symmetric ones, searched by the minimax player at
+fixed depth; the closest to a draw are kept. `check` measures the book by
+playing games from it.
+
+
+| symbol | role |
+|---|---|
+| `canonical` | the smallest image of a position under the 4 symmetries of the initial position |
+| `build` | draw, deduplicate, search at depth 6 then 12, keep the most balanced |
+| `check` | the minimax player against itself from the book and from random openings: Black's score |
+
+
+``` {.cpp .numberLines}
+// opening_book_main.cpp — a book of balanced openings for the matches between
+// networks (alphazero_learn match --book, nnue/alphazero_match.sh BOOK=...).
+//
+// Why: after a random 4-ply opening, Black wins almost every game between two
+// strong players, so a pair of games (one opening, each colour) nearly always
+// ends 1-1 and says nothing about which network is stronger. A balanced
+// opening is one where neither colour is clearly ahead: the colour no longer
+// decides the result, the players do.
+//
+//   opening_book build --player ../config/search_study/nnue_k8_them_spacelite.cfg
+//         [--plies 6] [--candidates 20000] [--pre-depth 6] [--pre-max 6000] [--depth 10] [--target 0] [--max-value 1500]
+//         [--size 1000] [--threads 16] [--seed 1] [--out ../config/openings/balanced.txt]
+//     1. Draws --candidates random openings of --plies plies (uniform random
+//        legal moves; none ends the game), keeping one of each class of
+//        equivalent positions: 4 of the 8 symmetries of the board map the
+//        initial position to itself (identity, 180° rotation, the two diagonal
+//        flips), so up to 4 openings lead to the same game up to symmetry (the
+//        other 4 send the black pieces to the white ones' initial squares).
+//     2. Searches each with the dev player at fixed depth --depth (no clock:
+//        the book is reproducible), from an empty table. The value is turned
+//        into Black's point of view (±30000 = tanh ±1, a value v ≈ the
+//        expected result 2p − 1 of the side to move).
+//     3. Keeps the --size openings whose value is closest to --target, within
+//        ±--max-value, in a random order (so the first openings of the file are
+//        not the most balanced ones only). --target: the value at which Black
+//        scores ½ in actual games, which is not exactly 0 (check --csv).
+//     Book lines: the moves ("a1:b2 a8:b7 ..."), then "# black value V", then
+//     the value histogram of all the candidates in comments at the top.
+//
+//   opening_book check --book FILE --player CFG [--depth 8] [--games 400] [--threads 16]
+//                      [--random-plies 4] [--seed 1] [--csv value_result.csv] [--opponent-depth D2]
+//     The dev player against itself at fixed depth, one game from each of the
+//     first --games openings of the book, then from as many random openings
+//     of --random-plies plies: Black's score in each case. A balanced book
+//     gives Black about 50 %; random openings give Black much more. --csv: the
+//     value of each book opening and Black's result, to calibrate --target
+//     (on a book built with a large --max-value; --random-plies 0 skips the
+//     random openings). --opponent-depth D2: pairs instead, as in the matches
+//     between networks — depth --depth against depth D2, each opening once with
+//     each colour: how often the colour decides the pair, and the score.
+#include "magic.h"
+#include "zobrist.h"
+#include "player.h"
+#include "minmax_nnue_dev_player.h"
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <format>
+#include <atomic>
+#include <cmath>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <mutex>
+#include <random>
+#include <set>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+using std::string, std::vector, std::cerr, std::cout;
+
+namespace {
+
+std::map<string, string> parse_args(int argc, char* argv[], int from) {
+    std::map<string, string> kv;
+    for (int i = from; i < argc; i++) {
+        string k = argv[i];
+        if (k.rfind("--", 0) != 0 || i + 1 >= argc) { cerr << "bad argument " << k << '\n'; std::exit(2); }
+        kv[k.substr(2)] = argv[++i];
+    }
+    return kv;
+}
+string get(const std::map<string, string>& kv, const string& k, const string& def) {
+    auto it = kv.find(k);
+    return it == kv.end() ? def : it->second;
+}
+
+std::unique_ptr<Player> make_dev_player(const string& cfg) {
+    std::ifstream f(cfg);
+    if (!f) { cerr << "cannot open " << cfg << '\n'; std::exit(1); }
+    json j = json::parse(f);
+    j["verbose"] = false;
+    j["nb threads"] = 1;
+    j["tt size"] = 64;
+    auto p = Player::create(j);
+    if (!dynamic_cast<MinMaxNNUE_DevPlayer*>(p.get())) { cerr << cfg << ": not a MinMaxNNUE_DevPlayer\n"; std::exit(1); }
+    return p;
+}
+
+string move_list(const vector<Move>& moves) {
+    std::ostringstream os;
+    for (size_t i = 0; i < moves.size(); i++) os << (i ? " " : "") << moves[i];
+    return os.str();
+}
+
+Move parse_move(const string& s) {
+    auto sq = [&](const string& t) {
+        if (t.size() != 2 || t[0] < 'a' || t[0] > 'h' || t[1] < '1' || t[1] > '8') {
+            cerr << "bad move " << s << '\n';
+            std::exit(1);
+        }
+        return Square((t[1] - '1') * 8 + (t[0] - 'a'));
+    };
+    const auto colon = s.find(':');
+    if (colon == string::npos) { cerr << "bad move " << s << " (expected a1:b2)\n"; std::exit(1); }
+    return Move(sq(s.substr(0, colon)), sq(s.substr(colon + 1)));
+}
+
+// The 4 symmetries of the board that map the initial position to itself:
+// square (file, rank) → itself, (7−f, 7−r), (r, f), (7−r, 7−f).
+uint64_t transform(uint64_t bb, int sym) {
+    uint64_t r = 0;
+    for (; bb; bb &= bb - 1) {
+        const int s = std::countr_zero(bb), f = s & 7, k = s >> 3;
+        int f2 = f, k2 = k;
+        if (sym == 1) { f2 = 7 - f; k2 = 7 - k; }
+        else if (sym == 2) { f2 = k; k2 = f; }
+        else if (sym == 3) { f2 = 7 - k; k2 = 7 - f; }
+        r |= uint64_t(1) << (k2 * 8 + f2);
+    }
+    return r;
+}
+// The smallest (black, white, holes) of the 4 images: equal for equivalent positions
+// (same side to move and scores: the openings all have the same number of plies).
+std::tuple<uint64_t, uint64_t, uint64_t> canonical(const Yolah& y) {
+    std::tuple<uint64_t, uint64_t, uint64_t> best{~0ull, ~0ull, ~0ull};
+    for (int s = 0; s < 4; s++)
+        best = std::min(best, {transform(y.bitboard(Yolah::BLACK), s), transform(y.bitboard(Yolah::WHITE), s),
+                               transform(y.empty_bitboard(), s)});
+    return best;
+}
+
+// A random opening of `plies` plies that does not end the game.
+vector<Move> random_opening(std::mt19937_64& rng, int plies) {
+    for (;;) {
+        Yolah y;
+        vector<Move> res;
+        for (int p = 0; p < plies && !y.game_over(); p++) {
+            Yolah::MoveList moves;
+            y.moves(moves);
+            const Move m = moves[rng() % moves.size()];
+            res.push_back(m);
+            y.play(m);
+        }
+        if (!y.game_over()) return res;
+    }
+}
+
+Yolah after(const vector<Move>& moves) {
+    Yolah y;
+    for (Move m : moves) y.play(m);
+    return y;
+}
+
+// Runs body(i, worker) for i in [0, n) on `threads` threads, each with its own worker index.
+template <class F> void parallel_for(size_t n, int threads, F&& body) {
+    std::atomic<size_t> next{0};
+    vector<std::thread> pool;
+    for (int t = 0; t < threads; t++)
+        pool.emplace_back([&, t] { for (size_t i; (i = next++) < n;) body(i, t); });
+    for (auto& th : pool) th.join();
+}
+
+int build(const std::map<string, string>& kv) {
+    const string cfg = get(kv, "player", "../config/search_study/nnue_k8_them_spacelite.cfg");
+    const int plies = std::stoi(get(kv, "plies", "6"));
+    const size_t nb_candidates = std::stoul(get(kv, "candidates", "20000"));
+    const int depth = std::stoi(get(kv, "depth", "10"));
+    const int pre_depth = std::stoi(get(kv, "pre-depth", "6"));
+    const int pre_max = std::stoi(get(kv, "pre-max", "6000"));
+    const int max_value = std::stoi(get(kv, "max-value", "1500"));
+    const int target = std::stoi(get(kv, "target", "0"));
+    const size_t size = std::stoul(get(kv, "size", "1000"));
+    const int threads = std::stoi(get(kv, "threads", "16"));
+    const uint64_t seed = std::stoull(get(kv, "seed", "1"));
+    const string out = get(kv, "out", "../config/openings/balanced.txt");
+
+    // 1. Candidates, one per symmetry class.
+    std::mt19937_64 rng(seed);
+    vector<vector<Move>> cands;
+    std::set<std::tuple<uint64_t, uint64_t, uint64_t>> seen;
+    size_t draws = 0;
+    while (cands.size() < nb_candidates && draws < 50 * nb_candidates) {
+        draws++;
+        vector<Move> o = random_opening(rng, plies);
+        if (seen.insert(canonical(after(o))).second) cands.push_back(std::move(o));
+    }
+    cerr << cands.size() << " distinct openings of " << plies << " plies (" << draws << " drawn)\n";
+
+    // 2. Their value for Black at fixed depth: first a cheap search at --pre-depth for
+    // all of them, then --depth for those within ±--pre-max only (most random openings
+    // are far from balanced: the shallow search is enough to discard them).
+    vector<std::unique_ptr<Player>> players;
+    for (int t = 0; t < threads; t++) players.push_back(make_dev_player(cfg));
+    std::mutex mu;
+    auto values_at = [&](const vector<vector<Move>>& openings, int d) {
+        vector<int> v(openings.size());
+        std::atomic<size_t> done{0};
+        parallel_for(openings.size(), threads, [&](size_t i, int t) {
+            auto* dev = static_cast<MinMaxNNUE_DevPlayer*>(players[t].get());
+            dev->clear_table();
+            const Yolah y = after(openings[i]);
+            const auto r = dev->search(y, uint8_t(d), 1'000'000'000'000ull);
+            v[i] = y.current_player() == Yolah::BLACK ? r.value : -r.value;
+            const size_t n = ++done;
+            if (n % 10000 == 0) { std::lock_guard lk(mu); cerr << n << "/" << openings.size() << " searched at depth " << d << "\n"; }
+        });
+        return v;
+    };
+    const vector<int> pre_value = values_at(cands, pre_depth);
+    vector<vector<Move>> close;
+    for (size_t i = 0; i < cands.size(); i++) if (std::abs(pre_value[i]) <= pre_max) close.push_back(cands[i]);
+    cerr << close.size() << " within ±" << pre_max << " at depth " << pre_depth << "\n";
+    const vector<int> value = values_at(close, depth);
+
+    // 3. The most balanced ones, in a random order: the closest to --target, the value
+    // at which Black's expected score is ½ (measured with check --csv: not exactly 0).
+    vector<size_t> idx(close.size());
+    for (size_t i = 0; i < idx.size(); i++) idx[i] = i;
+    auto dist = [&](size_t i) { return std::abs(value[i] - target); };
+    std::stable_sort(idx.begin(), idx.end(), [&](size_t a, size_t b) { return dist(a) < dist(b); });
+    vector<size_t> keep;
+    for (size_t i : idx) if (keep.size() < size && dist(i) <= max_value) keep.push_back(i);
+    std::shuffle(keep.begin(), keep.end(), rng);
+
+    // Histogram of the candidates' values (Black's point of view), for the record.
+    std::map<int, int> hist;
+    const int bin = 1500;
+    double mean = 0;
+    for (int v : pre_value) { hist[int(std::floor(double(v) / bin))]++; mean += v; }
+    mean /= std::max<size_t>(1, pre_value.size());
+    int worst = 0;
+    for (size_t i : keep) worst = std::max(worst, dist(i));
+
+    std::ofstream f(out);
+    if (!f) { cerr << "cannot write " << out << '\n'; return 1; }
+    f << "# Balanced openings for the matches between networks (test/opening_book_main.cpp).\n"
+      << "# opening_book build --player " << cfg << " --plies " << plies << " --candidates " << nb_candidates
+      << " --pre-depth " << pre_depth << " --pre-max " << pre_max << " --depth " << depth << " --target " << target << " --max-value " << max_value << " --size " << size << " --seed " << seed << "\n"
+      << "# " << cands.size() << " distinct random openings (up to the 4 symmetries of the initial position), searched by the dev\n"
+      << "# player at depth " << pre_depth << "; the " << close.size() << " within ±" << pre_max << " searched again at depth " << depth << ";\n"
+      << "# kept: the " << keep.size() << " with the value (Black's point of view, ±30000 = tanh ±1) closest to " << target << ",\n"
+      << "# all within " << target << " ± " << worst << ", in a random order. Mean depth-" << pre_depth << " value of the candidates: "
+      << std::lround(mean) << ".\n# Depth-" << pre_depth << " values of the candidates (bins of " << bin << "):\n";
+    for (auto [b, c] : hist)
+        f << std::format("#   [{:+6}, {:+6}) {:6}  {:5.1f} %\n", b * bin, (b + 1) * bin, c, 100.0 * c / pre_value.size());
+    for (size_t i : keep) f << move_list(close[i]) << "  # black value " << value[i] << "\n";
+    cerr << "wrote " << keep.size() << " openings to " << out << " (|value − " << target << "| ≤ " << worst << ", candidates' mean "
+         << std::lround(mean) << ")\n";
+    return 0;
+}
+
+// The openings of a book and their values (the "# black value V" comments; 0 if none).
+vector<vector<Move>> read_book(const string& path, vector<int>* values = nullptr) {
+    std::ifstream f(path);
+    if (!f) { cerr << "cannot open " << path << '\n'; std::exit(1); }
+    vector<vector<Move>> res;
+    for (string line; std::getline(f, line);) {
+        const size_t hash = line.find('#');
+        std::istringstream is(line.substr(0, hash));
+        vector<Move> o;
+        for (string t; is >> t;) o.push_back(parse_move(t));
+        if (o.empty()) continue;
+        res.push_back(std::move(o));
+        if (values) {
+            const size_t k = hash == string::npos ? string::npos : line.find("black value", hash);
+            values->push_back(k == string::npos ? 0 : std::stoi(line.substr(k + 11)));
+        }
+    }
+    return res;
+}
+
+int check(const std::map<string, string>& kv) {
+    const string cfg = get(kv, "player", "../config/search_study/nnue_k8_them_spacelite.cfg");
+    const int depth = std::stoi(get(kv, "depth", "8"));
+    const size_t games = std::stoul(get(kv, "games", "400"));
+    const int threads = std::stoi(get(kv, "threads", "16"));
+    const int random_plies = std::stoi(get(kv, "random-plies", "4"));
+    std::mt19937_64 rng(std::stoull(get(kv, "seed", "1")));
+    vector<int> book_values;
+    vector<vector<Move>> book = read_book(get(kv, "book", "../config/openings/balanced.txt"), &book_values);
+    if (book.size() > games) book.resize(games);
+    vector<vector<Move>> randoms;
+    for (size_t i = 0; i < book.size(); i++) randoms.push_back(random_opening(rng, random_plies));
+
+    vector<std::unique_ptr<Player>> players;
+    for (int t = 0; t < threads; t++) players.push_back(make_dev_player(cfg));
+    // One game of the dev player against itself from each opening: Black's result (1, ½, 0).
+    auto play_all = [&](const vector<vector<Move>>& openings) {
+        vector<double> res(openings.size());
+        parallel_for(openings.size(), threads, [&](size_t i, int t) {
+            auto* dev = static_cast<MinMaxNNUE_DevPlayer*>(players[t].get());
+            dev->clear_table();
+            Yolah y = after(openings[i]);
+            while (!y.game_over()) y.play(dev->search(y, uint8_t(depth), 1'000'000'000'000ull).move);
+            const auto [b, w] = y.score();
+            res[i] = b > w ? 1.0 : (b < w ? 0.0 : 0.5);
+        });
+        return res;
+    };
+    auto report = [&](const char* name, const vector<double>& res) {
+        const double n = double(res.size());
+        double s = 0, s2 = 0;
+        int w = 0, d = 0, l = 0;
+        for (double x : res) { s += x; s2 += x * x; (x == 1 ? w : (x == 0 ? l : d))++; }
+        const double m = s / n, se = std::sqrt(std::max(0.0, s2 / n - m * m) / n);
+        cout << std::format("{:>22}: {} games, Black {}W {}D {}L, Black's score {:.3f} ± {:.3f}\n",
+                            name, res.size(), w, d, l, m, 1.96 * se);
+    };
+    if (kv.contains("opponent-depth")) {
+        // Pairs, as in the matches between networks: A (--depth) against B (--opponent-depth),
+        // each opening once with each colour. How often the colour decides (the pair ends 1-1
+        // with Black winning both games), and A's score, from the book and from random openings.
+        const int depth_b = std::stoi(get(kv, "opponent-depth", "10"));
+        auto pairs = [&](const vector<vector<Move>>& openings) {
+            vector<std::array<double, 2>> res(openings.size());   // Black's result with A black, with A white
+            parallel_for(2 * openings.size(), threads, [&](size_t k, int t) {
+                auto* dev = static_cast<MinMaxNNUE_DevPlayer*>(players[t].get());
+                const size_t i = k / 2;
+                const bool a_black = k % 2 == 0;
+                Yolah y = after(openings[i]);
+                dev->clear_table();
+                while (!y.game_over()) {
+                    const bool a_to_move = (y.current_player() == Yolah::BLACK) == a_black;
+                    dev->clear_table();   // one player, two depths: no table shared between them
+                    y.play(dev->search(y, uint8_t(a_to_move ? depth : depth_b), 1'000'000'000'000ull).move);
+                }
+                const auto [b, w] = y.score();
+                res[i][k % 2] = b > w ? 1.0 : (b < w ? 0.0 : 0.5);
+            });
+            return res;
+        };
+        auto report_pairs = [&](const string& name, const vector<std::array<double, 2>>& res) {
+            int colour = 0, a_both = 0, b_both = 0;
+            double sa = 0;
+            for (auto [ab, aw] : res) {   // A's results: ab with Black, 1 − aw with White
+                sa += ab + (1 - aw);
+                colour += ab == 1 && aw == 1;
+                colour += ab == 0 && aw == 0;
+                a_both += ab == 1 && aw == 0;
+                b_both += ab == 0 && aw == 1;
+            }
+            const double n = 2.0 * res.size(), s_a = sa / n;
+            const double elo = 400 * std::log10(std::clamp(s_a, 1e-3, 1 - 1e-3) / (1 - std::clamp(s_a, 1e-3, 1 - 1e-3)));
+            cout << std::format("{:>22}: {} pairs; colour decides (same colour wins both) {:.1f} %, A wins both {:.1f} %, "
+                                "B wins both {:.1f} %; A's score {:.3f} (Elo {:+.0f})\n",
+                                name, res.size(), 100.0 * colour / res.size(), 100.0 * a_both / res.size(),
+                                100.0 * b_both / res.size(), s_a, elo);
+        };
+        cout << "A = dev player at depth " << depth << ", B = at depth " << depth_b << ", each opening with both colours\n";
+        report_pairs("book", pairs(book));
+        if (random_plies > 0) report_pairs(std::format("random {}-ply openings", random_plies), pairs(randoms));
+        return 0;
+    }
+    cout << "dev player against itself at depth " << depth << ", one game per opening\n";
+    const vector<double> res = play_all(book);
+    report("book", res);
+    if (kv.contains("csv")) {   // value of each opening and Black's result: the calibration of build --target
+        std::ofstream csv(get(kv, "csv", ""));
+        csv << "value,black_result\n";
+        for (size_t i = 0; i < res.size(); i++) csv << book_values[i] << ',' << res[i] << '\n';
+    }
+    if (random_plies > 0) report(std::format("random {}-ply openings", random_plies).c_str(), play_all(randoms));
+    return 0;
+}
+
+} // namespace
+
+int main(int argc, char* argv[]) {
+    magic::init();
+    zobrist::init();
+    if (argc < 2) { cerr << "usage: opening_book build|check [--options]  (see test/opening_book_main.cpp)\n"; return 2; }
+    const auto kv = parse_args(argc, argv, 2);
+    const string cmd = argv[1];
+    if (cmd == "build") return build(kv);
+    if (cmd == "check") return check(kv);
+    cerr << "unknown command " << cmd << '\n';
+    return 2;
+}
+```
+
+
 ### `nnue/alphazero_learn.py` {#sec-src-nnue-alphazero-learn-py}
 
-*950 lines.*
+*969 lines.*
 
 The trainer, which is also the orchestrator: it starts the self-play processes
 and the evaluation thread, trains, exports and checkpoints. Read `main` last:
@@ -5048,7 +5546,7 @@ import torch.nn.functional as F
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(HERE, "../server"))
 sys.path.append(HERE)
-from cnn_resnet_value_policy_chunked import Net  # noqa: E402
+from cnn_resnet_value_policy_chunked import net_from_state_dict  # noqa: E402
 
 # ── sample format: MUST match az::TrainingSample (player/alphazero_selfplay.h) ──
 MAX_NB_MOVES = 75
@@ -5293,18 +5791,13 @@ def load_state_dict(path):
 
 def make_net(sd):
     """
-    Build a Net whose sizes (channels, blocks, heads) are read off the
+    Build a Net whose sizes (channels, blocks, heads, global pooling) are read off the
     state_dict. The parameters of the auxiliary heads (--aux runs) are not
     part of a Net and are ignored.
     """
     from alphazero_aux import base_state_dict
     sd = base_state_dict(sd)
-    C = sd["input_conv.0.weight"].shape[0]
-    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
-    net = Net(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
-              num_actions=sd["policy_fc.weight"].shape[0])
-    net.load_state_dict(sd)
-    return net
+    return net_from_state_dict(sd)[0]
 
 
 def model_paths(work, step):
@@ -5465,7 +5958,7 @@ class Evaluator(threading.Thread):
         cmd = [a.bin, "match", "--config", a.eval_config, "--a", ts_a, "--b", ts_b,
                "--games", str(a.eval_games), "--time", str(int(a.eval_seconds * 1e6)),
                "--opening-plies", str(a.eval_opening_plies), "--seed", str(step + 1),
-               "--out", out]
+               "--out", out] + (["--book", a.eval_book] if a.eval_book else [])
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=self.gpu)
         log(f"evaluation: az_{step} vs az_{opp} ({a.eval_games} games, {a.eval_seconds} s/move)")
         with open(os.path.join(a.work, "logs", "eval.log"), "a") as logf:
@@ -5569,9 +6062,16 @@ def main():
     ap.add_argument("--eval-games", type=int, default=20)
     ap.add_argument("--eval-seconds", type=float, default=2.0)
     ap.add_argument("--eval-opening-plies", type=int, default=4)
+    ap.add_argument("--eval-book", default="",
+                    help="book of balanced openings for the evaluations (config/openings/balanced.txt); "
+                         "empty: random openings of --eval-opening-plies plies")
     ap.add_argument("--eval-opponents", default="previous",
                     help="comma separated: previous (last evaluated model), initial, lag:K")
     ap.add_argument("--keep-all", action="store_true", help="keep every exported model")
+    ap.add_argument("--inherit-warmup", type=int, default=0,
+                    help="new run whose selfplay/ already holds the rows of an earlier run (a grown "
+                         "network, alphazero_grow.py): train this many samples on them at once, then "
+                         "keep the usual pace, as if the run went on (default 0: no burst)")
     ap.add_argument("--max-hours", type=float, default=0, help="stop cleanly after this long (0 = never)")
     ap.add_argument("--train-gpu", type=int, default=0, help="index among the visible GPUs")
     ap.add_argument("--eval-gpu", type=int, default=-1,
@@ -5680,6 +6180,15 @@ def main():
         state.d["samples_trained"] = ckpt["samples_trained"]
         log(f"resumed at step {state.d['step']}, {state.d['samples_trained']:,} samples trained")
     else:
+        # A new run. A state.json without a checkpoint is a leftover of an
+        # earlier run (e.g. a work directory emptied while its job was still
+        # stopping, which then saved its state): its counters and its list of
+        # exported networks would point self-play at networks that no longer
+        # exist. Start from fresh counters.
+        if os.path.exists(state.path):
+            log(f"new run: ignoring the leftover {state.path} (no checkpoint.pt)")
+            os.replace(state.path, state.path + ".stale")
+            state = State(args.work)
         pt0, _ = model_paths(args.work, 0)
         if not os.path.exists(pt0):
             export_model(net, args.work, 0)
@@ -5703,6 +6212,14 @@ def main():
                           dtype=SAMPLE_DTYPE_AUX if args.aux else SAMPLE_DTYPE)
     window.scan()
     log(f"replay: {window.total:,} rows from {window.games:,} games on disk, {window.filled:,} in memory")
+    if ckpt is None and window.total > 0:
+        # A new run started on the rows of an earlier one: the reuse cap
+        # (samples_trained <= reuse·rows) would otherwise let the trainer
+        # go through reuse× all those rows before waiting for self-play.
+        # Count them as already trained on, except --inherit-warmup samples.
+        done = max(0, int(args.reuse * window.total) - args.inherit_warmup)
+        state.d["samples_trained"] = state.d["samples_at_last_export"] = done
+        log(f"inherited rows: {args.inherit_warmup:,} training samples on them before the usual pace")
     make_batch = BatchMaker(device, aux=args.aux, q_weight=args.q_weight)
     if args.q_weight > 0:
         log(f"value target: {1 - args.q_weight:g}·z + {args.q_weight:g}·q (game result blended with the search value)")
@@ -5923,7 +6440,7 @@ if __name__ == "__main__":
 
 ### `nnue/alphazero_aux.py` {#sec-src-nnue-alphazero-aux-py}
 
-*167 lines.*
+*149 lines.*
 
 KataGo's auxiliary heads, adapted to Yolah (@sec-auxiliary): only imported by
 the trainer with `--aux`. The network with the two extra heads, the decoding
@@ -5967,7 +6484,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from cnn_resnet_value_policy_chunked import Net
+from cnn_resnet_value_policy_chunked import Net, net_from_state_dict
 
 # ── targets: the future ownership map of a row (TrainingSampleAux::own) ──────
 OWN_NONE, OWN_MINE, OWN_OPP, OWN_PAST = 0, 1, 2, 3   # as in alphazero_selfplay.h
@@ -6014,27 +6531,13 @@ class AuxNet(Net):
     forward() returns (value, policy) like Net, so an AuxNet can be used
     anywhere a Net is; forward_all() adds the two auxiliary outputs.
     """
-    def __init__(self, channels=256, nb_blocks=30, value_fc_size=256, num_actions=64 * 64):
-        super().__init__(channels=channels, nb_blocks=nb_blocks,
-                         value_fc_size=value_fc_size, num_actions=num_actions)
+    def __init__(self, channels=256, nb_blocks=30, value_fc_size=256, num_actions=64 * 64,
+                 global_pool=False):
+        super().__init__(channels=channels, nb_blocks=nb_blocks, value_fc_size=value_fc_size,
+                         num_actions=num_actions, global_pool=global_pool)
         self.own_conv = nn.Conv2d(channels, 3, kernel_size=1)
         self.score_fc1 = nn.Linear(2 * channels, 256)
         self.score_fc2 = nn.Linear(256, SCORE_BINS)
-
-    def trunk(self, x):
-        x = self.input_conv(x)
-        x = self.res_blocks(x)
-        return torch.relu(self.output_bn(x))                  # (B, C, 8, 8)
-
-    def heads(self, h):
-        """The two heads of Net, verbatim (see Net.forward)."""
-        v = torch.relu(self.value_bn(self.value_conv(h))).flatten(1)
-        v = torch.tanh(self.value_fc2(torch.relu(self.value_fc1(v)))).squeeze(-1)
-        p = torch.relu(self.policy_bn(self.policy_conv(h))).flatten(1)
-        return v, self.policy_fc(p)
-
-    def forward(self, x):
-        return self.heads(self.trunk(x))
 
     def forward_all(self, x):
         h = self.trunk(x)
@@ -6060,11 +6563,7 @@ def make_aux_net(sd):
     network, or a run that did not use --aux) leaves the auxiliary heads at
     their random initialisation — the only keys allowed to be missing.
     """
-    C = sd["input_conv.0.weight"].shape[0]
-    B = sum(1 for k in sd if k.endswith(".conv1.weight"))
-    net = AuxNet(channels=C, nb_blocks=B, value_fc_size=sd["value_fc1.weight"].shape[0],
-                 num_actions=sd["policy_fc.weight"].shape[0])
-    missing, unexpected = net.load_state_dict(sd, strict=False)
+    net, (missing, unexpected) = net_from_state_dict(sd, cls=AuxNet, strict=False)
     bad = [k for k in missing if not is_aux_key(k)] + list(unexpected)
     if bad:
         raise KeyError(f"state_dict does not fit AuxNet: {bad[:5]}")
@@ -6122,9 +6621,9 @@ Self-play search settings (the `weights` key is replaced by `latest.json`).
 ``` {.json .numberLines}
 {
     "name": "AlphaZeroMCTSPlayer",
-    "description": "AlphaZero/KataGo-style MCTS: PUCT with KataGo's exploration terms, graph search (transpositions), LCB move choice, guided by the value/policy ResNet 256×30 (convnet); self-play settings of the learning loop (800/200 simulations, Dirichlet noise, move sampling in the opening, forced playouts) — not meant for competitive play.",
+    "description": "AlphaZero/KataGo-style MCTS: PUCT with KataGo's exploration terms, graph search (transpositions), LCB move choice, guided by the value/policy ResNet 256×30 (convnet); self-play settings of the learning loop (1600/200 simulations, Dirichlet noise, move sampling in the opening, forced playouts) — not meant for competitive play.",
     "microseconds": 0,
-    "nb simulations": 800,
+    "nb simulations": 1600,
     "nb threads": 1,
     "batch size": 8,
     "backend": "torch",
@@ -6371,7 +6870,7 @@ max_hours_for_job() {
 
 ### `nnue/alphazero_learn.sh` {#sec-src-nnue-alphazero-learn-sh}
 
-*133 lines.*
+*150 lines.*
 
 The main SLURM job: 3 GPUs, 32 CPUs, 128 GB, 14 days (sizing:
 @sec-learn-sizing). It compiles for the node, runs the trainer, and stops
@@ -6397,7 +6896,8 @@ cleanly on the time-limit signal.
 #      of this job, trains on the first GPU, exports a new network every
 #      EXPORT_EVERY samples and, every EVAL_HOURS, plays EVAL_GAMES games
 #      (EVAL_SECONDS per move, colours alternated) on the last GPU against the
-#      previously evaluated network.
+#      previously evaluated network, from the balanced openings of EVAL_BOOK
+#      (config/openings/balanced.txt; EVAL_BOOK=none: random 4-ply openings).
 #
 # GPUs: 3 per job (the per-user maximum). The GPU nodes have 2 or 3 cards
 # (A40 or RTX 8000, 48 GB); if a 3-GPU node is long to get, run this job with
@@ -6454,6 +6954,7 @@ EVAL_HOURS="${EVAL_HOURS:-4}"                 # time between evaluations
 EVAL_GAMES="${EVAL_GAMES:-20}"
 EVAL_SECONDS="${EVAL_SECONDS:-2}"
 EVAL_OPPONENTS="${EVAL_OPPONENTS:-previous}"  # previous, initial, lag:K (comma separated)
+EVAL_BOOK="${EVAL_BOOK:-/Yolah/config/openings/balanced.txt}"   # balanced openings; "none" = random ones
 # 1 = train KataGo's auxiliary heads (ownership, score margin) as well; 0 =
 # the plain two-headed training. A run can switch from one job to the next;
 # the extra self-play jobs follow automatically (latest.json).
@@ -6461,6 +6962,13 @@ AUX="${AUX:-0}"
 # Value target = (1 − Q_WEIGHT)·z + Q_WEIGHT·q, q = the search value of the
 # position (already recorded in every row). 0 = the game result alone.
 Q_WEIGHT="${Q_WEIGHT:-0}"
+# Grown network (nnue/alphazero_grow.py, INIT_MODEL = its .pt) started in a
+# NEW work dir: SEED_FROM = the earlier run's work dir, whose selfplay/*.bin
+# are linked into the new one (new run only), so the replay window is full at
+# once; WARMUP_SAMPLES = training samples on those rows before self-play sets
+# the pace (e.g. 8000000 ≈ 1.5 passes over the window).
+SEED_FROM="${SEED_FROM:-}"
+WARMUP_SAMPLES="${WARMUP_SAMPLES:-0}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"                  # anything else for alphazero_learn.py
 RESUBMIT="${RESUBMIT:-0}"                     # 1 = sbatch this script again when the time is up
 
@@ -6474,6 +6982,13 @@ if [[ ! -f "${WORK_DIR}/init_model.pt" ]] && head -c 100 "${INIT_MODEL}" 2>/dev/
     exit 1
 fi
 cp -n "${INIT_MODEL}" "${WORK_DIR}/init_model.pt" 2>/dev/null || true
+if [[ -n "${SEED_FROM}" && ! -f "${WORK_DIR}/checkpoint.pt" ]]; then
+    mkdir -p "${WORK_DIR}/selfplay"
+    # hard links (same file system: no copy, no space); a copy otherwise
+    find "${SEED_FROM}/selfplay" -maxdepth 1 -name '*.bin' -exec cp -ln -t "${WORK_DIR}/selfplay" {} + 2>/dev/null \
+        || find "${SEED_FROM}/selfplay" -maxdepth 1 -name '*.bin' -exec cp -n -t "${WORK_DIR}/selfplay" {} +
+    echo "seeded ${WORK_DIR}/selfplay with $(ls "${WORK_DIR}/selfplay" | wc -l) files of ${SEED_FROM}"
+fi
 MAX_HOURS=$(max_hours_for_job 1200)           # stop 20 min before the limit
 AUX_ARGS=""
 [[ "${AUX}" == "1" ]] && AUX_ARGS="--aux"
@@ -6502,7 +7017,8 @@ start_in_container bash -c "cd /Yolah/nnue && exec python3 -u alphazero_learn.py
     --selfplay-set 'nn cache=${SELFPLAY_NN_CACHE}' --max-window ${MAX_WINDOW} \
     --min-rows ${MIN_ROWS} --export-every ${EXPORT_EVERY} --eval-hours ${EVAL_HOURS} \
     --eval-games ${EVAL_GAMES} --eval-seconds ${EVAL_SECONDS} --eval-opponents ${EVAL_OPPONENTS} \
-    --q-weight ${Q_WEIGHT} --max-hours ${MAX_HOURS} ${AUX_ARGS} ${EXTRA_ARGS}"
+    $([[ "${EVAL_BOOK}" == none ]] || echo "--eval-book ${EVAL_BOOK}") \
+    --q-weight ${Q_WEIGHT} --max-hours ${MAX_HOURS} --inherit-warmup ${WARMUP_SAMPLES} ${AUX_ARGS} ${EXTRA_ARGS}"
 wait_forwarding_signals
 
 echo "[$(date '+%F %T')] === Stopped (exit code ${RC}) ==="
@@ -6517,7 +7033,7 @@ fi
 
 ### `nnue/alphazero_match.sh` {#sec-src-nnue-alphazero-match-sh}
 
-*133 lines.*
+*140 lines.*
 
 A long match between two networks of a run, on its own GPU, with the score's
 95 % confidence interval — the precise measurement the 20-game evaluations
@@ -6534,14 +7050,18 @@ cannot give (@sec-eval).
 #     sbatch alphazero_match.sh                          # latest vs initial, 200 games, 0.5 s/move
 #     sbatch --export=ALL,A=7168,B=4096 alphazero_match.sh
 #     sbatch --export=ALL,GAMES=400,MOVE_SECONDS=1 alphazero_match.sh
+#     sbatch --export=ALL,BOOK=none alphazero_match.sh   # random openings, as before
 #
 # A and B are training steps (the numbers of models/az_<step>), or "latest"
 # (the network self-play is using) or "initial" (step 0). A network whose .ts
 # was pruned by the run is re-traced from its .pt.
 #
 # Both players use config/alphazero_mcts_eval_player.cfg (no noise, no
-# sampling). Games come in pairs: a random opening of OPENING_PLIES plies,
-# played once with each colour. The result — A's wins/draws/losses, score and
+# sampling). Games come in pairs: one opening, played once with each colour.
+# The openings come from BOOK (default config/openings/balanced.txt: balanced
+# openings, test/opening_book_main.cpp, one per pair), or with BOOK=none are
+# random ones of OPENING_PLIES plies — after which Black wins nearly every
+# game, so most pairs end 1-1 and tell little. The result — A's wins/draws/losses, score and
 # Elo difference with a 95 % confidence interval — is printed and appended to
 # WORK_DIR/matches.csv; every game is in WORK_DIR/evals/match_*.json.
 #
@@ -6570,6 +7090,7 @@ GAMES="${GAMES:-200}"             # even: games come in pairs (one opening, both
 # (not SECONDS: that is bash's own counter of seconds since the shell started)
 SECONDS_PER_MOVE="${MOVE_SECONDS:-0.5}"
 OPENING_PLIES="${OPENING_PLIES:-4}"
+BOOK="${BOOK:-/Yolah/config/openings/balanced.txt}"   # inside the container; "none" = random openings
 SEED="${SEED:-${SLURM_JOB_ID:-$$}}"
 JOB="${SLURM_JOB_ID:-$$}"
 
@@ -6593,7 +7114,9 @@ echo "════════════════════════�
 echo "  Job        : ${JOB} on $(hostname), GPU ${CUDA_VISIBLE_DEVICES:-?}"
 echo "  Work dir   : ${WORK_DIR}"
 echo "  Match      : A = ${NAME_A} (${A})  vs  B = ${NAME_B} (${B})"
-echo "  Games      : ${GAMES} (${OPENING_PLIES}-ply random openings, both colours), ${SECONDS_PER_MOVE} s/move"
+if [[ "${BOOK}" == "none" ]]; then BOOK_ARGS=(); OPENINGS="${OPENING_PLIES}-ply random openings"
+else BOOK_ARGS=(--book "${BOOK}"); OPENINGS="openings of ${BOOK}"; fi
+echo "  Games      : ${GAMES} (${OPENINGS}, both colours), ${SECONDS_PER_MOVE} s/move"
 echo "════════════════════════════════════════════════════════════════"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null || true
 
@@ -6630,7 +7153,7 @@ start_in_container ${BUILD_DIR}/alphazero_learn match \
     --config /Yolah/config/alphazero_mcts_eval_player.cfg \
     --a "${MDIR}/${NAME_A}.ts" --b "${MDIR}/${NAME_B}.ts" \
     --games "${GAMES}" --time "${TIME_US}" --opening-plies "${OPENING_PLIES}" \
-    --seed "${SEED}" --out "${OUT}"
+    "${BOOK_ARGS[@]}" --seed "${SEED}" --out "${OUT}"
 wait_forwarding_signals
 rm -rf "${WORK_DIR}/evals/match_${JOB}"
 [[ "${RC}" == "0" ]] || { echo "match failed (exit code ${RC})"; exit "${RC}"; }

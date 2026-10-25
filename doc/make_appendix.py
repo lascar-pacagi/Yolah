@@ -334,7 +334,7 @@ our own move must re-root on a child.
 ]),
 ("The learning loop", """
 The self-play learning loop of @sec-selfplay: the C++ self-play driver and its
-command-line front end, the Python trainer that orchestrates everything, the
+command-line front end, the book of balanced openings of the matches, the Python trainer that orchestrates everything, the
 two search configurations, and the cluster image and job scripts.
 """, [
 
@@ -366,12 +366,25 @@ dropped; finished ones always reach the disk before `run_selfplay` returns.
 
 ("test/alphazero_learn_main.cpp", "cpp", """
 The `alphazero_learn` binary. `selfplay` wraps `run_selfplay` with a signal
-handler; `match` plays two networks against each other with paired random
-openings (@sec-eval) and writes the full record as JSON.
+handler; `match` plays two networks against each other, each opening once with
+each colour — from a book of balanced openings (@sec-learn-book) or random —
+and writes the full record as JSON.
 """, [
  ("`selfplay_main`", "parse options, install SIGINT/SIGTERM, run"),
- ("`match_main`", "A vs B, colours alternated, a random opening per pair of games"),
+ ("`match_main`", "A vs B, colours alternated, one opening per pair of games"),
+ ("`read_book`", "`--book`: one opening per line, every move checked legal"),
  ("`apply_set`", "`--set 'key=value'`: override a key of the JSON config"),
+]),
+
+("test/opening_book_main.cpp", "cpp", """
+The book of balanced openings of the matches (@sec-learn-book): random
+openings, one per class of symmetric ones, searched by the minimax player at
+fixed depth; the closest to a draw are kept. `check` measures the book by
+playing games from it.
+""", [
+ ("`canonical`", "the smallest image of a position under the 4 symmetries of the initial position"),
+ ("`build`", "draw, deduplicate, search at depth 6 then 12, keep the most balanced"),
+ ("`check`", "the minimax player against itself from the book and from random openings: Black's score"),
 ]),
 
 ("nnue/alphazero_learn.py", "python", """

@@ -10,17 +10,23 @@
 //
 //   alphazero_learn match --config ../config/alphazero_mcts_eval_player.cfg
 //         --a new.ts --b old.ts [--games 10] [--time 2000000] [--opening-plies 4]
-//         [--seed 1] [--out result.json] [--set 'key=value' ...]
+//         [--book openings.txt] [--seed 1] [--out result.json] [--set 'key=value' ...]
 //     Plays A against B, alternating colours, and reports A's result. Games
-//     2k and 2k+1 start from the same random opening of --opening-plies plies
-//     (A black in one, white in the other): with deterministic players and no
-//     opening, the 5 games of each colour would be the same game 5 times.
+//     2k and 2k+1 start from the same opening (A black in one, white in the
+//     other): with deterministic players and no opening, the 5 games of each
+//     colour would be the same game 5 times. The opening: a random one of
+//     --opening-plies plies, or with --book the next one of a book of balanced
+//     openings (config/openings/balanced.txt, test/opening_book_main.cpp: one
+//     opening per line, "a1:b2 a8:b7 ...", '#' starts a comment), taken in an
+//     order shuffled by --seed — a different opening for each pair as long as
+//     the book has enough of them.
 //
 // --set overrides any key of the player JSON config ('key=value', value parsed as JSON).
 #include "alphazero_mcts_player.h"
 #include "alphazero_selfplay.h"
 #include "magic.h"
 #include "zobrist.h"
+#include <algorithm>
 #include <atomic>
 #include <csignal>
 #include <format>
@@ -28,6 +34,7 @@
 #include <iostream>
 #include <random>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -88,6 +95,43 @@ int selfplay_main(Args& a) {
     return 0;
 }
 
+Move parse_move(const string& s) {
+    auto sq = [&](const string& t) {
+        if (t.size() != 2 || t[0] < 'a' || t[0] > 'h' || t[1] < '1' || t[1] > '8')
+            throw std::runtime_error("bad move " + s);
+        return Square((t[1] - '1') * 8 + (t[0] - 'a'));
+    };
+    const auto colon = s.find(':');
+    if (colon == string::npos) throw std::runtime_error("bad move " + s + " (expected a1:b2)");
+    return Move(sq(s.substr(0, colon)), sq(s.substr(colon + 1)));
+}
+
+// A book of openings: one per line, '#' starts a comment; every opening legal
+// and not ending the game.
+std::vector<std::vector<Move>> read_book(const string& path) {
+    std::ifstream f(path);
+    if (!f) throw std::runtime_error("cannot open the book " + path);
+    std::vector<std::vector<Move>> book;
+    for (string line; std::getline(f, line);) {
+        std::istringstream is(line.substr(0, line.find('#')));
+        std::vector<Move> o;
+        Yolah y;
+        for (string t; is >> t;) {
+            const Move m = parse_move(t);
+            Yolah::MoveList legal;
+            y.moves(legal);
+            if (std::find(legal.begin(), legal.end(), m) == legal.end()) throw std::runtime_error("illegal move " + t + " in the book " + path + ": " + line);
+            o.push_back(m);
+            y.play(m);
+        }
+        if (o.empty()) continue;
+        if (y.game_over()) throw std::runtime_error("an opening of " + path + " ends the game: " + line);
+        book.push_back(std::move(o));
+    }
+    if (book.empty()) throw std::runtime_error("no opening in " + path);
+    return book;
+}
+
 string move_list(const std::vector<Move>& moves) {
     std::ostringstream os;
     for (size_t i = 0; i < moves.size(); i++) os << (i ? " " : "") << moves[i];
@@ -95,7 +139,7 @@ string move_list(const std::vector<Move>& moves) {
 }
 
 int match_main(Args& a) {
-    string config, model_a, model_b, out;
+    string config, model_a, model_b, out, book_path;
     size_t games = 10, opening_plies = 4;
     uint64_t time_us = 2'000'000, seed = 1;
     std::vector<string> sets;
@@ -107,6 +151,7 @@ int match_main(Args& a) {
         else if (o == "--games") games = std::stoul(a.next(o));
         else if (o == "--time") time_us = std::stoull(a.next(o));
         else if (o == "--opening-plies") opening_plies = std::stoul(a.next(o));
+        else if (o == "--book") book_path = a.next(o);
         else if (o == "--seed") seed = std::stoull(a.next(o));
         else if (o == "--out") out = a.next(o);
         else if (o == "--set") sets.push_back(a.next(o));
@@ -126,12 +171,22 @@ int match_main(Args& a) {
     AlphaZeroMCTSPlayer player_a(cfg_a), player_b(cfg_b);
 
     std::mt19937_64 rng(seed);
+    std::vector<std::vector<Move>> book;
+    std::vector<size_t> order;
+    if (!book_path.empty()) {
+        book = read_book(book_path);
+        for (size_t i = 0; i < book.size(); i++) order.push_back(i);
+        std::shuffle(order.begin(), order.end(), rng);
+        std::cout << "book " << book_path << ": " << book.size() << " openings\n";
+    }
     int wins = 0, draws = 0, losses = 0;
     json records = json::array();
     std::vector<Move> opening;
     for (size_t g = 0; g < games; g++) {
         const bool a_black = (g % 2 == 0);
-        if (g % 2 == 0) {
+        if (g % 2 == 0 && !book.empty()) {
+            opening = book[order[(g / 2) % book.size()]];
+        } else if (g % 2 == 0) {
             // A fresh random opening for the pair (not a finished game).
             for (;;) {
                 Yolah y;
@@ -173,7 +228,7 @@ int match_main(Args& a) {
     }
     const double score = games ? (wins + 0.5 * draws) / games : 0.0;
     json res = {{"a", model_a}, {"b", model_b}, {"games", games}, {"time_us", time_us},
-                {"opening_plies", opening_plies}, {"seed", seed},
+                {"opening_plies", opening_plies}, {"book", book_path}, {"seed", seed},
                 {"wins", wins}, {"draws", draws}, {"losses", losses}, {"score", score},
                 {"records", records}};
     if (!out.empty()) {

@@ -7,14 +7,18 @@
 #     sbatch alphazero_match.sh                          # latest vs initial, 200 games, 0.5 s/move
 #     sbatch --export=ALL,A=7168,B=4096 alphazero_match.sh
 #     sbatch --export=ALL,GAMES=400,MOVE_SECONDS=1 alphazero_match.sh
+#     sbatch --export=ALL,BOOK=none alphazero_match.sh   # random openings, as before
 #
 # A and B are training steps (the numbers of models/az_<step>), or "latest"
 # (the network self-play is using) or "initial" (step 0). A network whose .ts
 # was pruned by the run is re-traced from its .pt.
 #
 # Both players use config/alphazero_mcts_eval_player.cfg (no noise, no
-# sampling). Games come in pairs: a random opening of OPENING_PLIES plies,
-# played once with each colour. The result — A's wins/draws/losses, score and
+# sampling). Games come in pairs: one opening, played once with each colour.
+# The openings come from BOOK (default config/openings/balanced.txt: balanced
+# openings, test/opening_book_main.cpp, one per pair), or with BOOK=none are
+# random ones of OPENING_PLIES plies — after which Black wins nearly every
+# game, so most pairs end 1-1 and tell little. The result — A's wins/draws/losses, score and
 # Elo difference with a 95 % confidence interval — is printed and appended to
 # WORK_DIR/matches.csv; every game is in WORK_DIR/evals/match_*.json.
 #
@@ -43,6 +47,7 @@ GAMES="${GAMES:-200}"             # even: games come in pairs (one opening, both
 # (not SECONDS: that is bash's own counter of seconds since the shell started)
 SECONDS_PER_MOVE="${MOVE_SECONDS:-0.5}"
 OPENING_PLIES="${OPENING_PLIES:-4}"
+BOOK="${BOOK:-/Yolah/config/openings/balanced.txt}"   # inside the container; "none" = random openings
 SEED="${SEED:-${SLURM_JOB_ID:-$$}}"
 JOB="${SLURM_JOB_ID:-$$}"
 
@@ -66,7 +71,9 @@ echo "════════════════════════�
 echo "  Job        : ${JOB} on $(hostname), GPU ${CUDA_VISIBLE_DEVICES:-?}"
 echo "  Work dir   : ${WORK_DIR}"
 echo "  Match      : A = ${NAME_A} (${A})  vs  B = ${NAME_B} (${B})"
-echo "  Games      : ${GAMES} (${OPENING_PLIES}-ply random openings, both colours), ${SECONDS_PER_MOVE} s/move"
+if [[ "${BOOK}" == "none" ]]; then BOOK_ARGS=(); OPENINGS="${OPENING_PLIES}-ply random openings"
+else BOOK_ARGS=(--book "${BOOK}"); OPENINGS="openings of ${BOOK}"; fi
+echo "  Games      : ${GAMES} (${OPENINGS}, both colours), ${SECONDS_PER_MOVE} s/move"
 echo "════════════════════════════════════════════════════════════════"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null || true
 
@@ -103,7 +110,7 @@ start_in_container ${BUILD_DIR}/alphazero_learn match \
     --config /Yolah/config/alphazero_mcts_eval_player.cfg \
     --a "${MDIR}/${NAME_A}.ts" --b "${MDIR}/${NAME_B}.ts" \
     --games "${GAMES}" --time "${TIME_US}" --opening-plies "${OPENING_PLIES}" \
-    --seed "${SEED}" --out "${OUT}"
+    "${BOOK_ARGS[@]}" --seed "${SEED}" --out "${OUT}"
 wait_forwarding_signals
 rm -rf "${WORK_DIR}/evals/match_${JOB}"
 [[ "${RC}" == "0" ]] || { echo "match failed (exit code ${RC})"; exit "${RC}"; }

@@ -16,7 +16,8 @@
 #      of this job, trains on the first GPU, exports a new network every
 #      EXPORT_EVERY samples and, every EVAL_HOURS, plays EVAL_GAMES games
 #      (EVAL_SECONDS per move, colours alternated) on the last GPU against the
-#      previously evaluated network.
+#      previously evaluated network, from the balanced openings of EVAL_BOOK
+#      (config/openings/balanced.txt; EVAL_BOOK=none: random 4-ply openings).
 #
 # GPUs: 3 per job (the per-user maximum). The GPU nodes have 2 or 3 cards
 # (A40 or RTX 8000, 48 GB); if a 3-GPU node is long to get, run this job with
@@ -73,6 +74,7 @@ EVAL_HOURS="${EVAL_HOURS:-4}"                 # time between evaluations
 EVAL_GAMES="${EVAL_GAMES:-20}"
 EVAL_SECONDS="${EVAL_SECONDS:-2}"
 EVAL_OPPONENTS="${EVAL_OPPONENTS:-previous}"  # previous, initial, lag:K (comma separated)
+EVAL_BOOK="${EVAL_BOOK:-/Yolah/config/openings/balanced.txt}"   # balanced openings; "none" = random ones
 # 1 = train KataGo's auxiliary heads (ownership, score margin) as well; 0 =
 # the plain two-headed training. A run can switch from one job to the next;
 # the extra self-play jobs follow automatically (latest.json).
@@ -135,6 +137,7 @@ start_in_container bash -c "cd /Yolah/nnue && exec python3 -u alphazero_learn.py
     --selfplay-set 'nn cache=${SELFPLAY_NN_CACHE}' --max-window ${MAX_WINDOW} \
     --min-rows ${MIN_ROWS} --export-every ${EXPORT_EVERY} --eval-hours ${EVAL_HOURS} \
     --eval-games ${EVAL_GAMES} --eval-seconds ${EVAL_SECONDS} --eval-opponents ${EVAL_OPPONENTS} \
+    $([[ "${EVAL_BOOK}" == none ]] || echo "--eval-book ${EVAL_BOOK}") \
     --q-weight ${Q_WEIGHT} --max-hours ${MAX_HOURS} --inherit-warmup ${WARMUP_SAMPLES} ${AUX_ARGS} ${EXTRA_ARGS}"
 wait_forwarding_signals
 
