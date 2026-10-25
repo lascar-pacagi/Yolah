@@ -35,6 +35,15 @@
 #   YOLAH_SEED=1                       another order of the data (noise of a run)
 #   → variant k8_them_g<groups>[_s<seed>], same step-2 start and lr; the
 #   ablation sets YOLAH_NB_EPOCHS=5 and MODEL_ROOT=…/models_ablation.
+# Step 3, campaign P6 (doc/nnue_roadmap.qmd): fine-tunes spacelite (the repo's
+# models/nnue_persp_k8_them_spacelite_distill.pt; needs CACHE_DIR/space.u8),
+# 5 epochs, lr 1e-4, with
+#   FROM_SPACELITE=1                   nothing new: the fair reference → k8_them_spacelite_cont5
+#   FROM_SPACELITE=1 YOLAH_DIRECT=1    + the direct path of the space features → …_spacelite_d
+#   FROM_SPACELITE=1 YOLAH_QAT=1       quantization-aware training         → …_spacelite_qat
+#   FROM_SPACELITE=1 YOLAH_DIRECT=1 YOLAH_QAT=1                           → …_spacelite_d_qat
+#   (QAT runs in float32, not bf16; not slower: 5.3 ms per 1024-position step on an
+#   RTX 3080 against 9.0 ms in bf16 — the network is too small for bf16 to pay)
 # Each variant writes to its own directory under MODEL_ROOT (the outputs of
 # a variant never overwrite those of another, nor the original models).
 # ────────────────────────────────────────────────────────────────────────────
@@ -64,6 +73,14 @@ CONTINUE="${CONTINUE:-0}"
 YOLAH_SPACE_MASK="${YOLAH_SPACE_MASK:-0}"
 YOLAH_SPACE_GROUPS="${YOLAH_SPACE_GROUPS:-}"      # empty: not the ablation
 YOLAH_SEED="${YOLAH_SEED:-0}"
+FROM_SPACELITE="${FROM_SPACELITE:-0}"
+YOLAH_DIRECT="${YOLAH_DIRECT:-0}"
+YOLAH_QAT="${YOLAH_QAT:-0}"
+if [[ "${FROM_SPACELITE}" == "1" ]]; then
+    YOLAH_PERSP_K=8; YOLAH_PERSP_THEM=1; YOLAH_SPACE_MASK=65278
+    INIT_MODEL_STEP2="${INIT_MODEL_STEP2:-${SRC_DIR}/../models/nnue_persp_k8_them_spacelite_distill.pt}"
+    YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-5}"
+fi
 STEP2=0
 if [[ "${YOLAH_SPACE_MASK}" != "0" || "${CONTINUE}" == "1" || -n "${YOLAH_SPACE_GROUPS}" ]]; then STEP2=1; fi
 if [[ "${STEP2}" == "1" ]]; then
@@ -84,6 +101,11 @@ else case "${YOLAH_SPACE_MASK}" in
     65278|0xfefe|0xFEFE) YOLAH_NAME_SUFFIX="_spacelite" ;;
     *)             YOLAH_NAME_SUFFIX="_space${YOLAH_SPACE_MASK}" ;;
 esac; fi
+if [[ "${FROM_SPACELITE}" == "1" ]]; then
+    if [[ "${YOLAH_DIRECT}" == "0" && "${YOLAH_QAT}" == "0" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_cont5"; fi
+    if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
+    if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
+fi
 
 if [[ "${CONTROL}" == "1" ]]; then
     VARIANT="control193"
@@ -128,6 +150,7 @@ echo "  Models   : ${MODEL_DIR}"
 echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
 echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none}  seed=${YOLAH_SEED}  continue=${CONTINUE}"
+echo "  Step 3   : from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
 echo "════════════════════════════════════════════════════════════════"
 
 singularity exec --nv \
@@ -140,6 +163,8 @@ singularity exec --nv \
     --env "YOLAH_SPACE_MASK=${YOLAH_SPACE_MASK}" \
     --env "YOLAH_SPACE_GROUPS=${YOLAH_SPACE_GROUPS:-0}" \
     --env "YOLAH_SEED=${YOLAH_SEED}" \
+    --env "YOLAH_DIRECT=${YOLAH_DIRECT}" \
+    --env "YOLAH_QAT=${YOLAH_QAT}" \
     --env "YOLAH_NAME_SUFFIX=${YOLAH_NAME_SUFFIX}" \
     --env "YOLAH_PERSP_K=${YOLAH_PERSP_K}" \
     --env "YOLAH_PERSP_THEM=${YOLAH_PERSP_THEM}" \

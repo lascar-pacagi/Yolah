@@ -6,7 +6,7 @@
 //
 //   yolah_tournament --players list.txt [--results games.csv] [--time 1000000]
 //       [--threads 4] [--parallel 6] [--gpu-parallel 1] [--rounds 0]
-//       [--opening-plies 4] [--hours 0] [--seed 1]
+//       [--opening-plies 4] [--book openings.txt] [--hours 0] [--seed 1]
 #include "tournament.h"
 #include "magic.h"
 #include "zobrist.h"
@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
         else if (o == "--gpu-parallel") opt.gpu_parallel = std::stoul(next());
         else if (o == "--rounds") opt.rounds = std::stoul(next());
         else if (o == "--opening-plies") opt.opening_plies = std::stoul(next());
+        else if (o == "--book") opt.book = next();
         else if (o == "--hours") opt.hours = std::stod(next());
         else if (o == "--seed") opt.seed = std::stoull(next());
         else { std::cerr << "unknown option " << o << " (see tournament_main.cpp)\n"; return 2; }

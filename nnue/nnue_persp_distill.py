@@ -28,11 +28,19 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
                           0 corr, 1 qdist, 2 qfirst, 3 qw, 4 late9, 5 mob, 6 infl,
                           7 connect, 8 encircle; 0x1ff = all); needs CACHE/space_all.u8
                           (space_features compute-all). Not with YOLAH_SPACE_MASK.
+    YOLAH_DIRECT          1: the direct path of the space features to each head's value
+                          (step 3, nnue_persp.py; starts at 0)
+    YOLAH_QAT             1: quantization-aware training — the forward pass computes what
+                          the C++ computes (int8 weights, int16 biases, >> 6), the
+                          gradient goes straight through the roundings; in float32
+                          (the bf16 of autocast cannot hold the grid 1/64 exactly)
     YOLAH_SEED            another shuffling of the training data (default 0), to
                           measure the noise between two otherwise identical runs
     YOLAH_NAME_SUFFIX     appended to the model name (default "_space" with a mask,
                           "_g<groups in hex>" with groups)
-After each epoch the validation numbers (overall and per phase) are appended to
+After each epoch the validation numbers (including mse_teacher_quantized: the
+mse against the teacher of the network as the C++ computes it, measured for
+every network, quantization-aware or not) (overall and per phase) are appended to
 /mnt/<model name>.val.jsonl (one JSON object per line), read by ablation.py.
 A NetPersp start with fewer space features keeps its values (init_from_persp:
 the new fc2 columns start at 0).
@@ -69,10 +77,13 @@ PERSP_THEM = os.environ.get("YOLAH_PERSP_THEM", "0") == "1"
 SPACE_MASK = int(os.environ.get("YOLAH_SPACE_MASK", "0"), 0)
 SPACE_GROUPS = int(os.environ.get("YOLAH_SPACE_GROUPS", "0"), 0)
 SEED = int(os.environ.get("YOLAH_SEED", "0"))
+DIRECT = os.environ.get("YOLAH_DIRECT", "0") == "1"
+QAT = os.environ.get("YOLAH_QAT", "0") == "1"
 if SPACE_MASK and SPACE_GROUPS:
     raise SystemExit("YOLAH_SPACE_MASK and YOLAH_SPACE_GROUPS are exclusive")
-NAME_SUFFIX = os.environ.get("YOLAH_NAME_SUFFIX", "_space" if SPACE_MASK else
+NAME_SUFFIX = os.environ.get("YOLAH_NAME_SUFFIX", ("_space" if SPACE_MASK else
                              f"_g{SPACE_GROUPS:03x}" if SPACE_GROUPS else "")
+                             + ("_d" if DIRECT else "") + ("_qat" if QAT else ""))
 MODEL_NAME = f"nnue_persp_k{PERSP_K}{'_them' if PERSP_THEM else ''}{NAME_SUFFIX}_distill"
 LAST_MODEL = f"{MODEL_PATH}{MODEL_NAME}.pt"
 INIT_MODEL = os.environ.get("YOLAH_INIT_MODEL", f"{MODEL_PATH}nnue_193x1024x64x32x1_distill.pt")
@@ -127,7 +138,8 @@ class TrainerDDP:
                                                                     eta_min=LR / 30)
         major, _ = torch.cuda.get_device_capability(gpu_id)
         self.amp_dtype = torch.bfloat16 if major >= 8 else torch.float16
-        self.scaler = torch.amp.GradScaler('cuda', enabled=(self.amp_dtype == torch.float16))
+        self.amp = not QAT          # QAT: float32 (bf16 / fp16 cannot hold the C++ grid exactly)
+        self.scaler = torch.amp.GradScaler('cuda', enabled=(self.amp and self.amp_dtype == torch.float16))
         torch.cuda.set_device(gpu_id)
         torch.cuda.empty_cache()
         self.model = DDP(self.model, device_ids=[gpu_id], gradient_as_bucket_view=True, static_graph=True)
@@ -144,8 +156,12 @@ class TrainerDDP:
         print(f'epoch {epoch + 1} val   [vs teacher] mse per phase: '
               + '  '.join(f'{k} {v:.4f}' for k, v in phases.items() if v is not None), flush=True)
         n = max(m.n, 1)
+        mse_q = m.sse_q.item() / n
+        print(f'epoch {epoch + 1} val   [vs teacher] mse of the quantized network (as in C++): {mse_q:.4f}', flush=True)
         rec = dict(epoch=epoch + 1, model=MODEL_NAME, groups=SPACE_GROUPS, seed=SEED, mask=hex(self.model.module.space_mask),
+                   direct=DIRECT, qat=QAT,
                    n=m.n, loss=m.loss / n, mse_teacher=m.mse_t / n, mse_outcome=m.mse_z / n,
+                   mse_teacher_quantized=mse_q,
                    sign_teacher=m.sign_t / n, phases=phases, phase_n=dict(zip(PHASES, cnt)))
         with open(f"{MODEL_PATH}{MODEL_NAME}.val.jsonl", "a") as f:
             f.write(json.dumps(rec) + "\n")
@@ -168,6 +184,7 @@ class TrainerDDP:
         phase_sse = torch.zeros(len(PHASES), device=self.gpu_id)
         phase_n = torch.zeros(len(PHASES), device=self.gpu_id)
         metrics.phases = (phase_sse, phase_n)
+        metrics.sse_q = torch.zeros((), device=self.gpu_id)   # validation: the quantized network vs the teacher
         it = 0
         loader_iter = iter(loader)
         cpu_cur = next(loader_iter, None)
@@ -185,7 +202,7 @@ class TrainerDDP:
 
                 if train:
                     self.optimizer.zero_grad()
-                with torch.autocast('cuda', dtype=self.amp_dtype):
+                with torch.autocast('cuda', dtype=self.amp_dtype, enabled=self.amp):
                     v_s = self.model(X)
                     loss = self._loss(v_s, z, v_t)
                 if train:
@@ -194,6 +211,16 @@ class TrainerDDP:
                     self.scaler.update()
                     self.model.module.clip()            # int8 trunk weight clamp
                 metrics.update(v_s.float(), z, v_t, loss.item())
+                if not train:                           # the network as the C++ computes it
+                    if QAT:
+                        v_q = v_s.float()
+                    else:
+                        net = self.model.module          # the NetPersp itself, not compiled
+                        net.qat = True
+                        with torch.autocast('cuda', enabled=False):
+                            v_q = net(X).float()
+                        net.qat = False
+                    metrics.sse_q += ((v_q - v_t) ** 2).sum()
                 if not train:                           # mse vs the teacher per phase (free squares)
                     free = 56 - X[:, 128:192].sum(dim=1)
                     ph = (free < 40).long() + (free < 20).long() + (free < 10).long()
@@ -248,7 +275,7 @@ def main(rank, world_size, batch_size, cache_dir):
             print('WARNING: no complete labelled training chunk — label more positions or lower '
                   'YOLAH_CHUNK_SIZE', flush=True)
 
-    net = NetPersp(PERSP_K, PERSP_THEM, space_mask=space_mask)
+    net = NetPersp(PERSP_K, PERSP_THEM, space_mask=space_mask, direct=DIRECT, qat=QAT)
     if os.path.isfile(LAST_MODEL):
         net.init_from_persp(torch.load(LAST_MODEL, map_location='cpu'))
         src = LAST_MODEL
@@ -263,7 +290,8 @@ def main(rank, world_size, batch_size, cache_dir):
         src = 'random init'
     if rank == 0:
         print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, '
-              f'space mask={space_mask:#x}, groups={SPACE_GROUPS:#x}, {net.n_space} space features)', flush=True)
+              f'space mask={space_mask:#x}, groups={SPACE_GROUPS:#x}, {net.n_space} space features, '
+              f'direct path={DIRECT}, quantization-aware={QAT})', flush=True)
         print(net, flush=True)
         print(f'Parameters: {sum(p.numel() for p in net.parameters()):,}', flush=True)
 

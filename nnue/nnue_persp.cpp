@@ -82,6 +82,7 @@ static T* aligned_array(size_t n) {
 
 NNUE_Persp::~NNUE_Persp() {
     free(h1_to_h2); free(h1_to_h2_sparse); free(h2_bias); free(h2_to_h3); free(h3_bias); free(value_weight); free(value_bias);
+    free(direct);
 }
 
 bool NNUE_Persp::is_persp_file(const std::string& filename) {
@@ -171,6 +172,15 @@ void NNUE_Persp::load(const std::string& filename) {
     read_matrix(ifs, k, H3_SIZE, value_weight, false, "w4");
     read_bias(ifs, k, value_bias, "b4");
     if (!ifs) throw std::runtime_error("NNUE_Persp: cannot read " + filename);
+    free(direct);
+    direct = nullptr;
+    if (std::string section; ifs >> section) {      // optional sections after the value heads
+        if (section != "DIRECT" || n_space == 0)
+            throw std::runtime_error("NNUE_Persp: unexpected \"" + section + "\" in " + filename);
+        direct = aligned_array<float>(size_t(k) * n_space);
+        read_matrix(ifs, k, n_space, direct, false, "direct");
+        if (!ifs) throw std::runtime_error("NNUE_Persp: cannot read the direct path of " + filename);
+    }
 }
 
 void NNUE_Persp::init(const Yolah& yolah, int16_t* acc) const {
@@ -246,12 +256,18 @@ float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
         const int16_t* other = acc + (1 - stm) * H1_SIZE;
         for (int i = 0; i < H1_SIZE; i++) { const int16_t v = other[i]; h1[H1_SIZE + i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
     }
+    float direct_sum = 0;   // the direct path: Σ_j direct[b][j] · feature_j / 64
     if (n_space) {
         // the space features, at scale 64 = their integer value (0..64)
         uint8_t f[space::NB_ALL];
         space::compute_groups(yolah.bitboard(stm), yolah.bitboard(1 - stm), yolah.free_squares(), f, space_groups);
         int8_t* s = h1 + h2_inputs;
         for (int j = 0; j < h2_stride - h2_inputs; j++) s[j] = j < n_space ? int8_t(f[space_cols[j]]) : 0;
+        if (direct) {
+            const float* d = direct + b * n_space;
+            for (int j = 0; j < n_space; j++) direct_sum += d[j] * f[space_cols[j]];
+            direct_sum /= FACTOR;
+        }
     }
     const size_t off = size_t(b) * H2_SIZE * h2_stride;
     const int16_t* bias2 = h2_bias + b * H2_SIZE;
@@ -273,5 +289,5 @@ float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     const float* w = value_weight + b * H3_SIZE;
     float s = 0;
     for (int i = 0; i < H3_SIZE; i++) s += w[i] * h3[i];      // h3 at scale 64
-    return std::tanh(s / FACTOR + value_bias[b]);
+    return std::tanh(s / FACTOR + value_bias[b] + direct_sum);
 }

@@ -20,8 +20,10 @@ namespace test {
         size_t   gpu_parallel = 1;          // games involving a GPU player played at the same time
         size_t   rounds = 0;                // 0 = until stopped (signal or hours)
         size_t   opening_plies = 4;         // random plies before each pair of games
+        std::string book;                   // or a book of openings (config/openings/balanced.txt): one per pair
         double   hours = 0;                 // stop after this long (0 = never)
         uint64_t seed = 1;                  // openings: the same for a given (seed, round, pair)
+                                            // (with a book: the book's order shuffled by seed)
     };
     // Returns when all the rounds are played, after `hours`, or on SIGINT /
     // SIGTERM (the games in progress are dropped; the finished ones are in

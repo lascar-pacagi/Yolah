@@ -1,0 +1,18 @@
+# Campaign P6 (doc/nnue_roadmap.qmd, step 3): the network itself, not new features. Four fine-tunings of
+# spacelite, 5 epochs each, lr 1e-4 (nnue_persp_distill.sh FROM_SPACELITE=1):
+#   spacelite_cont5   nothing new: the fair reference (5 more epochs)
+#   spacelite_d       + the direct path of the 14 space features to each head's value (fc2's int8 range
+#                     saturates on the space columns; ~5 ns per evaluation)
+#   spacelite_qat     quantization-aware training: learns the int8 network the C++ runs (spacelite loses
+#                     0.036 of mean |value| to the rounding; a QAT network loses 0, checked bit-exact)
+#   spacelite_d_qat   both
+# Each against spacelite at 1 s and 0.2 s, FROM THE BOOK OF BALANCED OPENINGS (BOOK=, 4000 openings: no
+# opening twice in a task); campaigns before P6 used random 4-ply openings: compare within P6.
+nnue_k8_them_spacelite_cont5 nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_spacelite_cont5 nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_spacelite_d nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_spacelite_d nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_spacelite_qat nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_spacelite_qat nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_spacelite_d_qat nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_spacelite_d_qat nnue_k8_them_spacelite 200000 2000

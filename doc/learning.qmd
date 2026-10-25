@@ -582,9 +582,13 @@ an even game. To find the value that is, 6 000 of the 29 598 openings (all
 values, from −0.58 to +0.54) were played out, minimax against itself at depth
 10, and Black's score was regressed on the depth-12 value (@fig-book, right):
 it reaches 1/2 at **+0.12** (+3 500; 95 % interval of the regression's zero
-+2 500 to +3 900). The book is therefore the 1 000 openings whose value is
-closest to +3 500 — all within 3 500 ± 312 — written in a random order so
-that a short match does not only use the most balanced ones.
++2 500 to +3 900). The book is therefore the openings whose value is closest
+to +3 500, written in a random order so that a short match does not only use
+the most balanced ones. A first version kept 1 000 of them (all within
+3 500 ± 312); the book now has **4 000** (within 3 500 ± 1 198, i.e. ±0.04),
+so that the minimax campaigns, 2 000 pairs per task, never play an opening
+twice. By the slope of the calibration, ±0.04 moves Black's expected score by
+about ±2.5 % at most, and the average stays at ½.
 
 ![Left: the depth-6 value of 200 000 random 6-ply openings for Black, and the depth-12 window the book is taken from. Right: Black's score in 6 000 games of the minimax player against itself at depth 10, by the depth-12 value of the opening; 1/2 is reached at +0.12, not 0.](figs/fig-book.png){#fig-book width=100%}
 
@@ -597,17 +601,19 @@ players.
 **4. Checks.** `opening_book check` plays from the book (and, for comparison,
 from random 4-ply openings) with the minimax player:
 
-| games from 1 000 openings | Black's score (±0.025) |
+| games, minimax against itself | Black's score |
 |---|---|
-| book, minimax vs itself at depth 6 / 8 / 10 / 12 | 0.496 / 0.498 / 0.520 / 0.499 |
-| random 4-ply openings, depth 10 | 0.724 |
+| book of 1 000, 1 000 games at depth 6 / 8 / 10 / 12 (±0.025) | 0.496 / 0.498 / 0.520 / 0.499 |
+| **book of 4 000**, 4 000 games at depth 8 / 10 / 12 (±0.012) | 0.502 / 0.515 / 0.517 |
+| random 4-ply openings, 1 000 games at depth 10 | 0.724 |
 
 | pairs (each opening, both colours) | colour decides the pair | stronger wins both | stronger's score (Elo) |
 |---|---|---|---|
 | depth 8 vs 6, random openings | 30.9 % | 30.9 % | 0.698 (+146) |
 | depth 8 vs 6, **book** | **18.6 %** | **38.2 %** | 0.739 (+180) |
 | depth 10 vs 8, random openings | 26.9 % | 25.9 % | 0.692 (+141) |
-| depth 10 vs 8, **book** | **16.9 %** | **33.1 %** | 0.713 (+158) |
+| depth 10 vs 8, **book** of 1 000 | **16.9 %** | **33.1 %** | 0.713 (+158) |
+| depth 10 vs 8, **book** of 4 000 (2 000 pairs) | **17.4 %** | **33.7 %** | 0.718 (+162) |
 
 "Colour decides" counts the pairs whose two games were won by the same colour.
 With the book their share drops by 40 %, the pairs won twice by the stronger
@@ -622,14 +628,16 @@ the colours of each game).
 random openings as before), and so do the evaluations of the learning job
 (`EVAL_BOOK`, i.e. `--eval-book`; `none` to switch back). Pair $k$ of a match
 plays opening $k$ of the book in an order shuffled by the match's seed, so
-1 000 openings cover 2 000 games without repetition. Changing the openings in
+4 000 openings cover 8 000 games without repetition. The minimax matches of
+`nnue/search_study.sh` take the book with `BOOK=/Yolah/config/openings/balanced.txt`
+(`yolah_tournament --book`), from campaign P6 on. Changing the openings in
 the middle of a run changes the scale of the chained Elo a little (gaps look
 larger, see above): compare evaluations made with the same kind of openings.
 
 ```bash
 cd build
 ./opening_book build --plies 6 --candidates 200000 --pre-depth 6 --pre-max 8000 \
-    --depth 12 --target 3500 --max-value 1500 --size 1000 --threads 18 --seed 1 \
+    --depth 12 --target 3500 --max-value 1500 --size 4000 --threads 18 --seed 1 \
     --out ../config/openings/balanced.txt                      # 25 min on 18 cores
 ./opening_book check --games 1000 --depth 10                   # Black's score from the book
 ./opening_book check --games 1000 --depth 10 --opponent-depth 8  # pairs, as in the matches

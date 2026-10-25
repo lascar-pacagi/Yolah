@@ -2225,6 +2225,246 @@ Une caractéristique trouvée ne sert qu'une fois validée comme les autres : on
 réseau, on réentraîne, puis on la mesure en match.
 
 
+# Améliorer le réseau lui-même : le chemin direct et l'entraînement conscient de la quantification {#sec-etape3}
+
+## Pourquoi changer de cap
+
+Les campagnes P3, P4 et P5 ont cherché le gain dans de **nouvelles entrées** : spacelite (14 space features)
+bat le réseau sans features de 18 Elo, et c'est le meilleur résultat obtenu. Toutes les tentatives suivantes
+ont été neutres ou négatives :
+
+| campagne | réseau, contre spacelite | 1 s | 0,2 s | pourquoi |
+|---|---|---|---|---|
+| P3 | space (+ CORR) | −60 | −64 | CORR coûte 150 ns par évaluation |
+| P4 | g147, g146, g141 (encerclement, connectivité) | −21 à −71 | −20 à −62 | +18 à 24 % de temps par évaluation |
+| P5 | g040 (influence seule) | −4 | 0 | aussi bon, pas meilleur |
+| P5 | g07e (spacelite + influence) | −10 | −9 | l'influence n'ajoute rien à spacelite |
+| P5 | g046 (qdist + qfirst + influence) | −24 | −28 | qdist et qfirst coûtent plus qu'ils n'apportent |
+
+La leçon est toujours la même : **une feature se paie en nanosecondes à chaque évaluation**, et l'erreur de
+validation qu'elle fait gagner ne suffit pas à payer ce coût. L'étape 3 fait donc l'inverse : ne rien ajouter
+aux entrées, et récupérer deux pertes que le réseau actuel subit **sans rien coûter de plus à l'exécution**.
+
+1. **L'arrondi.** Le réseau est entraîné en nombres flottants, puis arrondi en entiers de 8 bits pour le C++.
+   Cet arrondi déforme la valeur : 0,036 d'erreur moyenne sur spacelite, 0,92 au pire, et 9 positions sur
+   2000 dont la valeur change de signe. Le remède est l'**entraînement conscient de la quantification**
+   (*quantization-aware training*, QAT).
+2. **La saturation.** Les space features n'atteignent la valeur qu'à travers fc2, dont les poids sont bornés
+   à $\pm 127/64 \approx \pm 2$ pour tenir en int8. Dans spacelite, pour la colonne QFIRST de l'adversaire,
+   51 des 512 lignes de fc2 sont collées à cette borne (de 3 à 21 pour les autres features), contre 0,3 %
+   des poids pour les colonnes de l'accumulateur : le réseau voudrait donner plus de poids à ces features et
+   ne le peut pas. Le remède est un **chemin direct**, sans borne, des features vers la valeur.
+
+![Le réseau spacelite et le chemin direct ajouté par l'étape 3. Tout ce qui est dans le cadre pointillé est en int8 et subit l'arrondi ; le chemin direct est en float.](figs/fig-nnue-direct.png){#fig-direct width=95%}
+
+## Ce que fait vraiment le C++ : la quantification pas à pas {#sec-quantif}
+
+Pour comprendre le QAT, il faut d'abord voir précisément ce que calcule `NNUE_Persp::value()`
+(`nnue/nnue_persp.cpp`). Tout y est un **entier à l'échelle 64** : l'entier $k$ représente le nombre $k/64$.
+
+**Les poids.** L'export (`export_value_nets.py`) multiplie chaque poids par 64 et l'arrondit à l'entier le
+plus proche, borné à $[-127, 127]$ :
+
+$$
+w = 0{,}3 \;\longrightarrow\; 64 \times 0{,}3 = 19{,}2 \;\longrightarrow\; 19 \;\text{(int8)}, \qquad
+\text{qui vaut } 19/64 = 0{,}296875 .
+$$
+
+L'erreur sur ce poids est petite (0,003), mais fc2 additionne plus de 2000 produits, et chacun porte son
+erreur. Les biais sont arrondis de la même façon, à l'échelle 64 pour fc1 et $64 \times 64 = 4096$ pour fc2 et
+fc3 (ils s'ajoutent à des sommes de produits de deux nombres à l'échelle 64).
+
+**L'accumulateur et $h_1$.** L'accumulateur est la somme des lignes int8 de $W_1$ des entrées actives, plus le
+biais : un entier, sans autre arrondi. $h_1$ est cet entier borné à $[0, 64]$, c'est-à-dire le nombre borné à
+$[0, 1]$. Rien de nouveau ici, à part l'arrondi des poids.
+
+**fc2 et fc3 : le décalage `>> 6`.** Une sortie de fc2 est une somme d'entiers $\sum_i W_i h_i + B$, où $W_i$
+et $h_i$ sont à l'échelle 64 : la somme est donc à l'échelle $64 \times 64$. Pour revenir à l'échelle 64, le
+C++ la **décale de 6 bits vers la droite**, ce qui revient à diviser par 64 en arrondissant **vers le bas** :
+
+```cpp
+outval = _mm256_srai_epi32(outval, SHIFT);                              // ÷ 64, vers le bas
+outval = _mm256_min_epi32(_mm256_max_epi32(outval, zero), factor);     // borné à [0, 64]
+```
+
+Exemple : une somme qui vaut 0,4937 en flottant devient $\lfloor 0{,}4937 \times 64 \rfloor = \lfloor 31{,}6
+\rfloor = 31$, soit 0,484 : l'activation a perdu 0,009. Ce n'est **pas un arrondi au plus proche** : chaque
+neurone de fc2 et de fc3 perd en moyenne une demi-graduation, $1/128$. C'est un **biais systématique** que le
+réseau flottant n'a jamais vu pendant son entraînement.
+
+**La tête de valeur** est en float : $\tanh(w_4 \cdot h_3 + b_4)$, sans arrondi.
+
+Au total, la valeur du C++ s'écarte de celle du réseau entraîné (@fig-qat, à droite) : écart médian 0,012,
+moyen 0,036, plus de 0,1 sur 8,6 % des positions, jusqu'à 0,92 (une position que le réseau float juge
+gagnée à 0,79 vaut −0,13 en C++). Dans les unités de la recherche (×30 000), l'écart moyen fait environ
+1 100 points, du même ordre que les marges des élagages (3 000 par ply pour le *reverse futility pruning*).
+
+## L'entraînement conscient de la quantification (QAT) {#sec-qat}
+
+### L'idée
+
+Puisque le C++ calcule avec des poids arrondis et des activations tronquées, autant **entraîner le réseau
+qui calcule exactement cela**. Le passage avant de l'entraînement simule donc les arrondis du C++ :
+
+- chaque poids est remplacé par $\mathrm{round}(64 w)/64$, borné à $\pm 127/64$ ;
+- chaque biais par son arrondi à l'échelle 64 ou 4096 ;
+- chaque sortie de fc2 et de fc3 par $\lfloor 64 x \rfloor / 64$ avant d'être bornée à $[0, 1]$.
+
+La perte est alors calculée sur la valeur **que le C++ donnera**, et l'optimiseur cherche des poids dont la
+version **arrondie** est bonne, au lieu de chercher de bons poids et de les arrondir après coup. Il peut par
+exemple remonter un biais d'une demi-graduation pour compenser la troncature de la sortie, ou éviter de
+laisser un poids important pile entre deux entiers.
+
+### Le problème : l'arrondi n'a pas de dérivée
+
+L'apprentissage avance en suivant le gradient. Or la fonction $\mathrm{round}$ est un escalier (@fig-qat, à
+gauche) : sa dérivée est nulle partout, sauf aux marches où elle n'existe pas. Un gradient qui traverse un
+arrondi devient nul, et plus rien n'apprend.
+
+La solution standard est l'**estimateur « straight-through »** (STE) : au passage avant on arrondit, au
+passage arrière on fait **comme si l'arrondi était l'identité**. En PyTorch, une ligne suffit :
+
+```python
+# nnue/nnue_persp.py
+def ste(x, xq):
+    """xq dans le passage avant, le gradient de x dans le passage arrière."""
+    return x + (xq - x).detach()
+```
+
+`(xq - x).detach()` est une constante pour le gradient : le résultat vaut `xq` (la valeur arrondie), mais sa
+dérivée par rapport à `x` vaut 1. Les poids « maîtres » restent donc des flottants, que le gradient fait
+bouger par petits pas ; un poids change de valeur effective quand il franchit une marche. Ce sont ces poids
+maîtres que l'export arrondit, exactement comme le passage avant l'a fait.
+
+```python
+def q_weight(w):     # int8 à l'échelle 64, comme export_value_nets.py (arrondi au pair, comme round())
+    return ste(w, torch.clamp(torch.round(w * 64), -127, 127) / 64)
+
+def q_floor(x):      # le >> 6 des sommes int32
+    return ste(x, torch.floor(x * 64) / 64)
+
+# dans forward, si qat :
+h2 = torch.clamp(q_floor(nn.functional.linear(h1, q_weight(fc2.weight), q_bias(fc2.bias, 4096))), 0, 1)
+```
+
+![À gauche : un poids vu par le passage avant (l'escalier de l'arrondi) et par le gradient (l'identité). À droite : la valeur de spacelite sur 2000 positions, réseau float contre réseau int8 du C++ ; c'est cet écart que le QAT supprime.](figs/fig-qat.png){#fig-qat width=100%}
+
+### Deux détails qui comptent
+
+- **Le QAT s'entraîne en float32.** L'entraînement habituel utilise le bf16 (8 bits de mantisse) pour aller
+  plus vite. Le bf16 ne sait pas représenter exactement la grille $1/64$ d'une somme de 2000 produits :
+  l'arrondi simulé serait faux. En float32 (avec les entrées TF32, exactes pour des nombres $q/64$ avec
+  $|q| \le 127$), la simulation est exacte. Et ce n'est pas plus lent : sur une RTX 3080, un pas de 1024
+  positions prend 5,3 ms en float32 contre 9,0 ms en bf16 (le réseau est trop petit pour que le bf16
+  rapporte quelque chose, et les conversions coûtent).
+- **La simulation est vérifiée au bit près.** Un réseau QAT, passé à `check_persp_net.py` (la valeur
+  PyTorch de 2000 positions) puis à `nets_check check_persp` (la valeur C++ des mêmes positions), donne un
+  écart **maximal de 0,00000**. Le même test sur spacelite tel quel, en activant seulement la simulation,
+  donne aussi 0 : ce que le QAT optimise est exactement ce que le joueur exécute.
+
+L'entraîneur mesure maintenant, pour **tous** les réseaux, l'erreur contre le maître du réseau quantifié
+(`mse_teacher_quantized` dans le `.val.jsonl`, ligne « mse of the quantized network (as in C++) » du
+journal) : on compare enfin les réseaux sur ce qui joue, et non sur leur version flottante.
+
+## Le chemin direct des features vers la valeur {#sec-direct}
+
+### Le problème : des poids bornés
+
+Une space feature $f$ (un entier de 0 à 64) entre dans fc2 comme $f/64 \in [0, 1]$, multipliée par des poids
+int8 bornés à $\pm 127/64$. Son effet sur un neurone de fc2 est donc au plus $\approx 2$ graduations sur 64…
+puis ce neurone est borné à $[0, 1]$, multiplié par $w_3$ (int8 lui aussi), borné de nouveau, et seulement
+alors pondéré par $w_4$. Pour qu'un fait simple comme « j'ai 12 coups de plus que l'adversaire » change la
+valeur, il doit traverser trois couches bornées. L'entraînement de spacelite montre qu'il bute sur la borne :
+jusqu'à 51 des 512 lignes de fc2 ont leur poids collé à $\pm 127/64$ pour une même feature, cent fois plus
+souvent que pour les colonnes de l'accumulateur.
+
+### La solution : une somme pondérée ajoutée avant la tanh
+
+On ajoute à chaque tête de phase $b$ une simple combinaison linéaire des features :
+
+$$
+v = \tanh\Big(\underbrace{w_4^{(b)} \cdot h_3 + b_4^{(b)}}_{\text{le réseau}} \;+\; \underbrace{\sum_{j=1}^{14} d_{b,j}\,\frac{f_j}{64}}_{\text{le chemin direct}}\Big)
+$$
+
+C'est l'équivalent du terme PSQT de Stockfish : ce qui est presque linéaire dans une feature passe en ligne
+droite, et le réseau n'a plus qu'à apprendre les corrections non linéaires. Les points importants :
+
+- **8 têtes × 14 features = 112 poids**, en float : aucune borne, aucun arrondi.
+- **Initialisés à 0** : au départ, le nouveau réseau donne exactement les valeurs de spacelite, et le
+  fine-tuning ne peut que partir de là.
+- **Coût quasi nul** : les 14 features sont déjà calculées pour fc2 ; il reste 14 multiplications-additions
+  en float par évaluation, environ 5 ns sur 1 600.
+- **Une tête par phase** : le poids d'une feature peut changer entre l'ouverture et la finale (la mobilité ne
+  pèse pas la même chose avec 50 cases libres qu'avec 10).
+
+Côté code :
+
+```python
+# nnue/nnue_persp.py — NetPersp.forward
+if self.direct is not None:                     # (K, n_space), initialisé à 0
+    v = v + (space.float().unsqueeze(1) * self.direct).sum(dim=2)
+```
+
+```cpp
+// nnue/nnue_persp.cpp — NNUE_Persp::value
+if (direct) {
+    const float* d = direct + b * n_space;
+    for (int j = 0; j < n_space; j++) direct_sum += d[j] * f[space_cols[j]];
+    direct_sum /= FACTOR;
+}
+return std::tanh(s / FACTOR + value_bias[b] + direct_sum);
+```
+
+Le fichier de poids gagne une section facultative `DIRECT` (une matrice $K \times n$ de flottants) après les
+têtes de valeur ; un fichier sans cette section se lit comme avant.
+
+## La campagne P6
+
+Quatre fine-tunings de spacelite, 5 époques chacun, au même taux d'apprentissage (1e-4), pour séparer les
+effets :
+
+| réseau | chemin direct | QAT | ce qu'il mesure |
+|---|---|---|---|
+| `spacelite_cont5` | non | non | **la référence honnête** : 5 époques de plus, rien de nouveau |
+| `spacelite_d` | oui | non | le chemin direct seul |
+| `spacelite_qat` | non | oui | le QAT seul |
+| `spacelite_d_qat` | oui | oui | les deux |
+
+Sans `cont5`, on ne saurait pas si un gain vient de la nouveauté ou simplement de 5 époques d'entraînement
+en plus. Chaque réseau joue contre spacelite à 1 s et à 0,2 s par coup (2000 paires de parties), **depuis le
+livre d'ouvertures équilibrées** (`config/openings/balanced.txt`, 4000 ouvertures : aucune n'est jouée deux
+fois dans une tâche). Les campagnes précédentes utilisaient des ouvertures aléatoires de 4 coups, qui laissent
+la couleur décider d'une paire sur trois environ : les résultats de P6 se comparent entre eux, pas
+directement à ceux de P3 à P5.
+
+**Sur le cluster** (après `git pull`) :
+
+```bash
+cd ~/Yolah/nnue
+sbatch --export=ALL,FROM_SPACELITE=1 nnue_persp_distill.sh                              # → k8_them_spacelite_cont5
+sbatch --export=ALL,FROM_SPACELITE=1,YOLAH_DIRECT=1 nnue_persp_distill.sh               # → k8_them_spacelite_d
+sbatch --export=ALL,FROM_SPACELITE=1,YOLAH_QAT=1 nnue_persp_distill.sh                  # → k8_them_spacelite_qat
+sbatch --export=ALL,FROM_SPACELITE=1,YOLAH_DIRECT=1,YOLAH_QAT=1 nnue_persp_distill.sh   # → k8_them_spacelite_d_qat
+```
+
+Chaque entraînement écrit dans `~/NNUE/DistillationNNUE/models_persp/k8_them_spacelite_<variante>/`; le
+réseau final est `nnue_persp_k8_them_spacelite_<variante>_distill.4.pt` (5 époques, numérotées de 0 à 4).
+Il est ensuite copié dans `models/` sous le nom `nnue_persp_k8_them_spacelite_<variante>_distill.pt`, exporté
+(`export_value_nets.py --persp`) et vérifié (`check_persp_net.py` puis `nets_check check_persp` : écart 0
+pour les deux réseaux QAT). Les matchs :
+
+```bash
+sbatch -p insa-cpu --exclude=crn07,crn14,crn15 --array=1-8 \
+       --export=ALL,BOOK=/Yolah/config/openings/balanced.txt nnue/search_study.sh campaign_P6.txt
+```
+
+**Ce qu'on attend.** Le QAT devrait réduire l'écart entre ce qui est entraîné et ce qui joue à presque rien ;
+sa `mse_teacher_quantized` doit passer sous celle de `cont5`. Le chemin direct devrait abaisser l'erreur de
+tous les réseaux, surtout dans les phases où les features comptent le plus (la fin de partie, d'après les
+mesures du chapitre sur les features). Ni l'un ni l'autre ne ralentit l'évaluation : contrairement à P3, P4 et
+P5, un gain d'erreur devrait donc cette fois se retrouver en Elo, ce que les matchs diront.
+
+
 # Plan et mesure
 
 | Étape | Ce qui change | Code | Calcul | Gain attendu |
@@ -2242,6 +2482,8 @@ ensuite **en jeu** : joueur dev + nouveau réseau contre joueur dev + réseau ac
 plus juste mais deux fois plus lent peut perdre.
 
 Les ouvertures de mesure doivent être **équilibrées**. Noir est avantagé (61 % de victoires dans les parties
-d'auto-apprentissage), et après 4 coups aléatoires la plupart des paires de parties finissent à 1–1, ce qui
-gaspille des parties. Un petit livre
-d'ouvertures dont l'évaluation est proche de 0 (par le ResNet) rendrait chaque mesure moins chère.
+d'auto-apprentissage), et après 4 coups aléatoires une paire de parties sur trois environ est décidée par la
+couleur, ce qui gaspille des parties. Depuis P6, les matchs utilisent un livre de 4000 ouvertures
+équilibrées (`config/openings/balanced.txt`, construit par `test/opening_book_main.cpp` avec le joueur
+minimax et calibré sur des parties : Noir y marque 50 %), avec `BOOK=…` pour `search_study.sh`. Sa
+construction est décrite dans la documentation d'AlphaZero (« A book of balanced openings »).

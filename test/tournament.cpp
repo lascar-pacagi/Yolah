@@ -102,7 +102,11 @@ namespace test {
     // `opening_plies` plies twice, once with each colour — the opening's bias
     // cancels within the pair, and deterministic players do not replay the
     // same game. The openings depend only on (seed, round, pair), so a
-    // resumed tournament plays exactly the games that are missing.
+    // resumed tournament plays exactly the games that are missing. With a
+    // book of balanced openings (`book`, test/opening_book_main.cpp), the
+    // opening of (round, pair) is entry round · pairs + pair of the book in an
+    // order shuffled by the seed — a different opening for every pair of games
+    // until the book is used up (then it starts again).
     //
     // Fairness: every player gets the same time per move and the same number
     // of search threads (overridden in its config). Players that use the GPU
@@ -149,6 +153,40 @@ namespace test {
                 }
                 if (!y.game_over()) return moves;
             }
+        }
+
+        // A book of openings: one per line ("a1:b2 a8:b7 ..."), '#' starts a comment;
+        // every move checked legal, no opening ending the game.
+        std::vector<std::vector<Move>> read_book(const std::string& path) {
+            std::ifstream f(path);
+            if (!f) throw std::invalid_argument("tournament: cannot open the book " + path);
+            std::vector<std::vector<Move>> book;
+            for (std::string line; std::getline(f, line);) {
+                std::istringstream is(line.substr(0, line.find('#')));
+                std::vector<Move> opening;
+                Yolah y;
+                for (std::string t; is >> t;) {
+                    const auto colon = t.find(':');
+                    auto sq = [&](const std::string& s) {
+                        if (s.size() != 2 || s[0] < 'a' || s[0] > 'h' || s[1] < '1' || s[1] > '8')
+                            throw std::invalid_argument("tournament: bad move " + t + " in " + path);
+                        return Square((s[1] - '1') * 8 + (s[0] - 'a'));
+                    };
+                    if (colon == std::string::npos) throw std::invalid_argument("tournament: bad move " + t + " in " + path);
+                    const Move m(sq(t.substr(0, colon)), sq(t.substr(colon + 1)));
+                    Yolah::MoveList legal;
+                    y.moves(legal);
+                    if (std::find(legal.begin(), legal.end(), m) == legal.end())
+                        throw std::invalid_argument("tournament: illegal move " + t + " in " + path + ": " + line);
+                    opening.push_back(m);
+                    y.play(m);
+                }
+                if (opening.empty()) continue;
+                if (y.game_over()) throw std::invalid_argument("tournament: an opening of " + path + " ends the game");
+                book.push_back(std::move(opening));
+            }
+            if (book.empty()) throw std::invalid_argument("tournament: no opening in " + path);
+            return book;
         }
 
         std::string moves_string(const std::vector<Move>& moves) {
@@ -227,6 +265,19 @@ namespace test {
         for (size_t a = 0; a < n; a++)
             for (size_t b = a + 1; b < n; b++) pairs.emplace_back(a, b);
 
+        vector<vector<Move>> book;
+        vector<size_t> book_order;
+        if (!opt.book.empty()) {
+            book = read_book(opt.book);
+            for (size_t i = 0; i < book.size(); i++) book_order.push_back(i);
+            shuffle(book_order.begin(), book_order.end(), mt19937_64(opt.seed));
+            log << format("tournament: {} openings from {}\n", book.size(), opt.book) << flush;
+        }
+        auto opening_of = [&](size_t round, size_t p) {
+            if (book.empty()) return random_opening(opt.seed * 1000003 + round * 7919 + p, opt.opening_plies);
+            return book[book_order[(round * pairs.size() + p) % book.size()]];
+        };
+
         log << format("tournament: {} players, {} pairs, {} games per round, {} µs per move, {} threads per player, "
                        "{} CPU + {} GPU games at a time, {} games already in {}\n",
                        n, pairs.size(), 2 * pairs.size(), opt.microseconds, opt.threads, opt.parallel,
@@ -302,7 +353,7 @@ namespace test {
                 for (size_t p = 0; p < pairs.size(); p++) {
                     const auto [a, b] = pairs[p];
                     if ((uses_gpu(cfgs[a]) || uses_gpu(cfgs[b])) != q.gpu) continue;
-                    const auto opening = random_opening(opt.seed * 1000003 + round * 7919 + p, opt.opening_plies);
+                    const auto opening = opening_of(round, p);
                     for (size_t idx = 0; idx < 2; idx++) {
                         if (done.count({round, p, idx})) continue;
                         all.push_back({round, p, idx, idx == 0 ? a : b, idx == 0 ? b : a, opening, q.gpu});

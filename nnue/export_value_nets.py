@@ -144,10 +144,15 @@ def export_persp(path, out_dir):
             write_bias(f, net.b3.data[k], b16(f"b3[{k}]", SCALE * SCALE))
         write_matrix(f, net.w4.data, as_float)
         write_bias(f, net.b4.data, as_float)
+        if net.direct is not None:          # step 3: the direct path, K × n_space floats
+            f.write("DIRECT\n")
+            write_matrix(f, net.direct.data, as_float)
     space = (f" + {net.n_space} space features (columns {cols[0]}–{cols[-1]})" if net.space_mask >> 16 else
              f" + {net.n_space} space features (mask {net.space_mask:#06x})") if net.n_space else ""
     print(f"{name}: 192 → {net.l1_size}{' ×2 views' if net.them else ''}{space} → {net.k} heads "
-          f"{net.l2_size} → {net.l3_size} → 1 (value heads in float, trunk int8 ×64) → {name}.quantized.txt")
+          f"{net.l2_size} → {net.l3_size} → 1 (value heads in float, trunk int8 ×64)"
+          f"{' + direct path' if net.direct is not None else ''}{' [trained quantization-aware]' if net.qat else ''}"
+          f" → {name}.quantized.txt")
 
 
 def main():

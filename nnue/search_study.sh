@@ -12,6 +12,10 @@
 # physical core, 1 search thread per player, and appends every game to
 # WORK_DIR/search_study/<cand>__vs__<ref>__t<T>.csv (resumable: resubmit the
 # task). Summary: python3 test/search_study_summary.py WORK_DIR/search_study
+# BOOK=/Yolah/config/openings/balanced.txt (path inside the container): the
+# openings come from that book of balanced openings instead (one per round;
+# test/opening_book_main.cpp); default: random 4-ply openings, as for every
+# campaign before P6. Do not mix both in one results file.
 # ────────────────────────────────────────────────────────────────────────────
 #SBATCH --job-name=yolah_search
 #SBATCH --output=yolah_search_%A_%a.out
@@ -23,6 +27,7 @@ set -euo pipefail
 YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"
 WORK_DIR="${WORK_DIR:-${HOME}/SearchStudy}"   # its own builds: never touches the AlphaZero run's
 CAMPAIGN="${1:?campaign file in config/search_study/}"
+BOOK="${BOOK:-}"                                  # empty: random 4-ply openings
 mkdir -p "${WORK_DIR}/search_study"
 source "${YOLAH_DIR}/nnue/alphazero_common.sh"         # SIF, run(), build
 
@@ -38,6 +43,7 @@ LINE=$(grep -v '^#' "${YOLAH_DIR}/config/search_study/${CAMPAIGN}" | grep . | se
 read -r CAND REF T ROUNDS <<< "${LINE}"
 NAME="${CAND}__vs__${REF}__t${T}"
 echo "[$(date '+%F %T')] task ${SLURM_ARRAY_TASK_ID} on $(hostname), CPU:$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2), ${PHYS} physical cores, ${PARALLEL} games at a time"
+echo "  openings: ${BOOK:-random, 4 plies}"
 echo "  ${CAND} vs ${REF}, ${T} µs/move, ${ROUNDS} rounds, Yolah $(git -C "${YOLAH_DIR}" rev-parse --short HEAD 2>/dev/null || echo '?')"
 
 build_alphazero_learn yolah_tournament
@@ -48,7 +54,7 @@ LIST="${WORK_DIR}/search_study/${NAME}.players"
 printf '/Yolah/config/search_study/%s.cfg\n/Yolah/config/search_study/%s.cfg\n' "${CAND}" "${REF}" > "${LIST}"
 start_in_container bash -c "cd /Yolah/config && exec ${BUILD_DIR}/yolah_tournament \
     --players /work/search_study/${NAME}.players --results /work/search_study/${NAME}.csv \
-    --time ${T} --threads 1 --parallel ${PARALLEL} --rounds ${ROUNDS} --opening-plies 4 \
+    --time ${T} --threads 1 --parallel ${PARALLEL} --rounds ${ROUNDS} --opening-plies 4 ${BOOK:+--book ${BOOK}} \
     --seed ${SLURM_ARRAY_TASK_ID}"
 wait_forwarding_signals
 echo "[$(date '+%F %T')] done (exit code ${RC})"

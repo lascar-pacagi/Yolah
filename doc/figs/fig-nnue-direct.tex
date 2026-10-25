@@ -1,0 +1,34 @@
+\documentclass[border=6pt,tikz]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}[node distance=7mm]
+  % the two points of view
+  \node[box,minimum width=24mm] (us) {192 entrées\\[1pt]\scriptsize vue du joueur au trait};
+  \node[box,minimum width=24mm,below=4mm of us] (them) {192 entrées\\[1pt]\scriptsize vue de l'adversaire};
+  \node[boxa,right=9mm of us,minimum width=17mm] (accu) {acc. \textit{us}\\[1pt]1024};
+  \node[boxa,right=9mm of them,minimum width=17mm] (acct) {acc. \textit{them}\\[1pt]1024};
+  \draw[ar] (us) -- node[tiny,above]{$W_1$} (accu);
+  \draw[ar] (them) -- node[tiny,above]{$W_1$} (acct);
+  % space features
+  \node[boxb,below=16mm of acct,minimum width=17mm,xshift=-14mm] (sp) {14 space features\\[1pt]\scriptsize Q1–Q3, QFIRST, QW, LATE9, MOB\\[-1pt]\scriptsize (moi, puis lui), entiers $0..64$};
+  % fc2 per head
+  \node[box,right=14mm of accu,yshift=-10mm,minimum height=38mm,minimum width=14mm] (h2) {fc2\\[2pt]8 têtes\\$\times$ 64};
+  \draw[ar] (accu.east) -- node[tiny,above]{$[0,1]$} (h2.west |- accu.east);
+  \draw[ar] (acct.east) -- node[tiny,above]{$[0,1]$} (h2.west |- acct.east);
+  \draw[ar] (sp.east) -- ++(12mm,0) |- node[tiny,pos=0.75,above]{$f/64$} ([yshift=-14mm]h2.west);
+  \node[box,right=9mm of h2,minimum height=12mm] (h3) {32};
+  \node[boxb,right=22mm of h3,minimum height=16mm,minimum width=20mm] (v) {$\tanh(\;\cdot\;)$\\[2pt]valeur};
+  \draw[ar] (h2) -- node[tiny,above]{$[0,1]$} (h3);
+  \draw[ar] (h3) -- node[tiny,above]{$w_4\cdot h_3 + b_4$} (v);
+  % the direct path
+  \draw[-{Stealth[length=2.6mm]},draw=accent2,line width=1.3pt]
+       (sp.south) -- ++(0,-6mm) -| node[pos=0.25,below,font=\sffamily\small,text=accent2]
+       {chemin direct (nouveau) : \;$+\sum_j d_{b,j}\, f_j/64$\quad 14 poids float par tête, initialisés à 0}
+       (v.south);
+  % the int8 part
+  \begin{scope}[on background layer]
+    \node[fit=(accu)(acct)(h2)(h3),draw=muted,dashed,rounded corners=4pt,inner sep=5pt,
+          label={[tiny]above:int8 à l'échelle 64 : c'est ici que joue l'arrondi (QAT)}] {};
+  \end{scope}
+\end{tikzpicture}
+\end{document}

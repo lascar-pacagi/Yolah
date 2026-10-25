@@ -33,6 +33,10 @@
 // columns themselves (any of the NB_ALL of the ablation: influence,
 // encirclement, ...); value() computes only their groups.
 //
+// Direct path (step 3): optionally, a "DIRECT" section after the value heads,
+// k × n_space floats: value() adds Σ_j direct[b][j] · feature_j / 64 to the
+// head's sum before the tanh (nnue_persp.py, direct=True).
+//
 // Accumulator: 2 × H1_SIZE int16, view v at acc + v · H1_SIZE (v = the colour).
 struct NNUE_Persp {
     static constexpr int INPUT_SIZE = 192;
@@ -61,6 +65,7 @@ struct NNUE_Persp {
     int16_t* h3_bias = nullptr;     // k × H3_SIZE
     float* value_weight = nullptr;  // k × H3_SIZE
     float* value_bias = nullptr;    // k
+    float* direct = nullptr;        // k × n_space, or nullptr: the direct path of the space features
 
     struct Accumulator {
         int16_t* acc;

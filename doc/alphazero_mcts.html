@@ -3383,7 +3383,7 @@ Figure 13: The 20 evaluation games: 10 openings, each played once with each col
 <p>A pair of games tells which network is stronger only when the two games end differently <em>because of the networks</em>. With random openings they often do not: Black wins the game in which A is black and the game in which B is black, the pair ends 1–1, and those two games — two hours of GPU at 1 s per move — have measured nothing. The long matches of October showed it plainly (most pairs 1–1, Black winning almost every game). The cure used by every engine-testing framework is a book of openings in which neither side is clearly ahead. Yolah has no opening theory to borrow one from, so the book is built by search: <code>test/opening_book_main.cpp</code>, written to <code>config/openings/balanced.txt</code>.</p>
 <p><strong>1. Candidates.</strong> 200 000 random openings of 6 plies (3 per side; uniformly random legal moves, none ending the game). Two openings can lead to the same game up to a symmetry: 4 of the 8 symmetries of the board (<a href="#sec-symmetries" class="quarto-xref">Section 6.4.6</a>) map the initial position to itself — the identity, the half turn and the two diagonal flips; the other four send the black pieces to the white ones’ initial squares. Each opening is reduced to the smallest of its 4 images (<code>canonical</code>) and only one opening per class is kept. (That the 4 transformations turn a game into a game was checked on 2 000 random games of 30 plies: the transformed moves are always legal and give the transformed positions; for an axis mirror they never are.)</p>
 <p><strong>2. Values.</strong> Each candidate is searched by the minimax player (the dev player with the <code>spacelite</code> network, one thread) at a <strong>fixed depth</strong> rather than a fixed time, so that the book is reproducible from its command line, which is written in its header. The values are turned to Black’s point of view, on the search’s scale where ±30 000 is tanh ±1. Most random openings are far from balanced (<a href="#fig-book" class="quarto-xref">Figure 14</a>, left): the initial position is worth +0.35 to Black at depth 12, the random openings +0.47 on average, and only 15 % lie within ±0.27. A search at depth 6 (<span class="math inline">\(\approx\)</span> 0.1 s) discards the others — its values correlate at 0.95 with those of depth 10 — and the 29 598 left are searched again at depth 12 (<span class="math inline">\(\approx\)</span> 0.25 s each; 24 minutes on 18 cores in all, two thirds of them for the depth-6 filter).</p>
-<p><strong>3. Calibration.</strong> A first book took the 1 000 openings closest to a value of 0, and was too good for White: from it the minimax player against itself scored only 0.41–0.47 with Black, depending on the depth. A value of 0 is not an even game. To find the value that is, 6 000 of the 29 598 openings (all values, from −0.58 to +0.54) were played out, minimax against itself at depth 10, and Black’s score was regressed on the depth-12 value (<a href="#fig-book" class="quarto-xref">Figure 14</a>, right): it reaches 1/2 at <strong>+0.12</strong> (+3 500; 95 % interval of the regression’s zero +2 500 to +3 900). The book is therefore the 1 000 openings whose value is closest to +3 500 — all within 3 500 ± 312 — written in a random order so that a short match does not only use the most balanced ones.</p>
+<p><strong>3. Calibration.</strong> A first book took the 1 000 openings closest to a value of 0, and was too good for White: from it the minimax player against itself scored only 0.41–0.47 with Black, depending on the depth. A value of 0 is not an even game. To find the value that is, 6 000 of the 29 598 openings (all values, from −0.58 to +0.54) were played out, minimax against itself at depth 10, and Black’s score was regressed on the depth-12 value (<a href="#fig-book" class="quarto-xref">Figure 14</a>, right): it reaches 1/2 at <strong>+0.12</strong> (+3 500; 95 % interval of the regression’s zero +2 500 to +3 900). The book is therefore the openings whose value is closest to +3 500, written in a random order so that a short match does not only use the most balanced ones. A first version kept 1 000 of them (all within 3 500 ± 312); the book now has <strong>4 000</strong> (within 3 500 ± 1 198, i.e. ±0.04), so that the minimax campaigns, 2 000 pairs per task, never play an opening twice. By the slope of the calibration, ±0.04 moves Black’s expected score by about ±2.5 % at most, and the average stays at ½.</p>
 <div id="fig-book" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-book-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -3403,17 +3403,21 @@ Figure 14: Left: the depth-6 value of 200 000 random 6-ply openings for Black, 
 </colgroup>
 <thead>
 <tr class="header">
-<th>games from 1 000 openings</th>
-<th>Black’s score (±0.025)</th>
+<th>games, minimax against itself</th>
+<th>Black’s score</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>book, minimax vs itself at depth 6 / 8 / 10 / 12</td>
+<td>book of 1 000, 1 000 games at depth 6 / 8 / 10 / 12 (±0.025)</td>
 <td>0.496 / 0.498 / 0.520 / 0.499</td>
 </tr>
 <tr class="even">
-<td>random 4-ply openings, depth 10</td>
+<td><strong>book of 4 000</strong>, 4 000 games at depth 8 / 10 / 12 (±0.012)</td>
+<td>0.502 / 0.515 / 0.517</td>
+</tr>
+<tr class="odd">
+<td>random 4-ply openings, 1 000 games at depth 10</td>
 <td>0.724</td>
 </tr>
 </tbody>
@@ -3453,18 +3457,24 @@ Figure 14: Left: the depth-6 value of 200 000 random 6-ply openings for Black, 
 <td>0.692 (+141)</td>
 </tr>
 <tr class="even">
-<td>depth 10 vs 8, <strong>book</strong></td>
+<td>depth 10 vs 8, <strong>book</strong> of 1 000</td>
 <td><strong>16.9 %</strong></td>
 <td><strong>33.1 %</strong></td>
 <td>0.713 (+158)</td>
 </tr>
+<tr class="odd">
+<td>depth 10 vs 8, <strong>book</strong> of 4 000 (2 000 pairs)</td>
+<td><strong>17.4 %</strong></td>
+<td><strong>33.7 %</strong></td>
+<td>0.718 (+162)</td>
+</tr>
 </tbody>
 </table>
 <p>“Colour decides” counts the pairs whose two games were won by the same colour. With the book their share drops by 40 %, the pairs won twice by the stronger player become more frequent, and the same difference of strength shows as a larger score: random openings compress the measured gaps towards 0, by 10–20 % here. The book is calibrated with the minimax player; whether its +0.12 is also the even point for the networks, which see the game differently, is measured for free by every match (<code>evals/match_*.json</code> records the opening and the colours of each game).</p>
-<p><strong>Use.</strong> <code>nnue/alphazero_match.sh</code> uses the book by default (<code>BOOK=none</code>: random openings as before), and so do the evaluations of the learning job (<code>EVAL_BOOK</code>, i.e. <code>--eval-book</code>; <code>none</code> to switch back). Pair <span class="math inline">\(k\)</span> of a match plays opening <span class="math inline">\(k\)</span> of the book in an order shuffled by the match’s seed, so 1 000 openings cover 2 000 games without repetition. Changing the openings in the middle of a run changes the scale of the chained Elo a little (gaps look larger, see above): compare evaluations made with the same kind of openings.</p>
+<p><strong>Use.</strong> <code>nnue/alphazero_match.sh</code> uses the book by default (<code>BOOK=none</code>: random openings as before), and so do the evaluations of the learning job (<code>EVAL_BOOK</code>, i.e. <code>--eval-book</code>; <code>none</code> to switch back). Pair <span class="math inline">\(k\)</span> of a match plays opening <span class="math inline">\(k\)</span> of the book in an order shuffled by the match’s seed, so 4 000 openings cover 8 000 games without repetition. The minimax matches of <code>nnue/search_study.sh</code> take the book with <code>BOOK=/Yolah/config/openings/balanced.txt</code> (<code>yolah_tournament --book</code>), from campaign P6 on. Changing the openings in the middle of a run changes the scale of the chained Elo a little (gaps look larger, see above): compare evaluations made with the same kind of openings.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> build</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./opening_book</span> build <span class="at">--plies</span> 6 <span class="at">--candidates</span> 200000 <span class="at">--pre-depth</span> 6 <span class="at">--pre-max</span> 8000 <span class="dt">\</span></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--depth</span> 12 <span class="at">--target</span> 3500 <span class="at">--max-value</span> 1500 <span class="at">--size</span> 1000 <span class="at">--threads</span> 18 <span class="at">--seed</span> 1 <span class="dt">\</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--depth</span> 12 <span class="at">--target</span> 3500 <span class="at">--max-value</span> 1500 <span class="at">--size</span> 4000 <span class="at">--threads</span> 18 <span class="at">--seed</span> 1 <span class="dt">\</span></span>
 <span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ../config/openings/balanced.txt                      <span class="co"># 25 min on 18 cores</span></span>
 <span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./opening_book</span> check <span class="at">--games</span> 1000 <span class="at">--depth</span> 10                   <span class="co"># Black&#39;s score from the book</span></span>
 <span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="ex">./opening_book</span> check <span class="at">--games</span> 1000 <span class="at">--depth</span> 10 <span class="at">--opponent-depth</span> 8  <span class="co"># pairs, as in the matches</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
