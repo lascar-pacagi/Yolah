@@ -2512,6 +2512,11 @@ niveau de spacelite (un peu au-dessus à 1 s) malgré les dégâts du redémarra
 rien, ni seul (`d` ≈ `cont5`) ni avec le QAT (`d_qat` ≈ `qat`) : il est abandonné, et P7 n'entraîne que des
 réseaux sans chemin direct.
 
+Spacelite lui-même, évalué sur les mêmes positions (`EVAL_MODEL`), a une mse de 0,0702 en float et de
+**0,0824 quantifié** (+17 %, contre +33 % pour `cont5`) : un tirage de quantification plutôt favorable,
+sans plus. La mse quantifiée ne suffit pourtant pas à prédire l'Elo : 0,0936 → 0,0824 vaut 52 Elo
+(`cont5` contre spacelite) quand 0,0824 → 0,0739 n'en vaut que 1 à 15 (`qat` contre spacelite).
+
 **Conséquence pour les campagnes P3 à P5.** Elles comparaient des réseaux entraînés de la même façon (10
 époques depuis k8_them), donc à armes égales pour l'entraînement, mais tous quantifiés après coup : chacun
 portait son propre tirage de quantification. Les écarts nets (g141 −71, space −60) restent des reculs ; les
