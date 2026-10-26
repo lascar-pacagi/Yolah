@@ -2498,6 +2498,20 @@ Les courbes de validation expliquent ce qui se passe. Pour chaque époque, la ms
    quantifiée de 0,074, soit 21 % de moins que `cont5` (0,094), et elle baisse régulièrement à chaque époque.
    Le chemin direct, lui, n'apporte presque rien (0,0702 contre 0,0705 en float).
 
+Les matchs le confirment (contre spacelite, livre d'ouvertures, Elo et intervalle à 95 %) :
+
+| réseau | 0,2 s | 1 s |
+|---|---|---|
+| `cont5` | −56 [−65, −48] (4000 parties) | −52 [−60, −44] (4000) |
+| `d` | −60 [−69, −52] (4000) | −50 [−58, −42] (3842) |
+| `qat` | +1 [−7, +9] (4000) | +15 [+7, +24] (3156) |
+| `d_qat` | +2 [−6, +10] (4000) | +7 [−6, +21] (1238) |
+
+À budget égal, le QAT vaut **55 à 65 Elo** de plus que le fine-tuning ordinaire, et ramène le réseau au
+niveau de spacelite (un peu au-dessus à 1 s) malgré les dégâts du redémarrage. Le chemin direct n'apporte
+rien, ni seul (`d` ≈ `cont5`) ni avec le QAT (`d_qat` ≈ `qat`) : il est abandonné, et P7 n'entraîne que des
+réseaux sans chemin direct.
+
 **Conséquence pour les campagnes P3 à P5.** Elles comparaient des réseaux entraînés de la même façon (10
 époques depuis k8_them), donc à armes égales pour l'entraînement, mais tous quantifiés après coup : chacun
 portait son propre tirage de quantification. Les écarts nets (g141 −71, space −60) restent des reculs ; les
