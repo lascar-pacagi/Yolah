@@ -2544,6 +2544,18 @@ done
 
 Les réseaux finaux sont `models_persp/k8_them[_spacelite][_qat]_az20/…_distill.19.pt`.
 
+**Les variantes déjà testées, refaites en QAT.** P6 a validé le QAT (+55 à +65 Elo contre `cont5` à budget
+égal) : les ensembles de features des campagnes P4–P5 dont l'écart pouvait venir de la loterie sont
+réentraînés de la même façon, en QAT seulement — l'influence seule (g040), spacelite + influence (g07e),
+qdist + qfirst + influence (g046) — pour un tournoi final entre toutes les variantes et `k8_them_az20` :
+
+```bash
+for g in 0x40 0x7e 0x46; do
+    sbatch --dependency=afterok:$J --time=5-00:00:00 \
+           --export=ALL,P7=1,YOLAH_PERSP_THEM=1,YOLAH_SPACE_GROUPS=$g,YOLAH_QAT=1 nnue_persp_distill.sh
+done                                       # → k8_them_g040_qat_az20, k8_them_g07e_qat_az20, k8_them_g046_qat_az20
+```
+
 
 # Plan et mesure
 

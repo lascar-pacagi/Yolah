@@ -52,6 +52,7 @@
 #   P7=1 YOLAH_PERSP_THEM=1                                      → k8_them_az20
 #   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_MASK=65278               → k8_them_spacelite_az20
 #   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_MASK=65278 YOLAH_QAT=1   → k8_them_spacelite_qat_az20
+#   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_GROUPS=0x40 YOLAH_QAT=1  → k8_them_g040_qat_az20 (same for 0x7e, 0x46)
 #   (~3-4 days each: submit with --time=5-00:00:00)
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
