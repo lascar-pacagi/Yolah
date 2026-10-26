@@ -2511,7 +2511,7 @@ et quantifiée de ce réseau sur les mêmes positions de validation dans
 
 Pour trancher, P7 n'enchaîne plus les fine-tunings : chaque réseau est entraîné **20 époques depuis le
 réseau 193 distillé** (lr 3e-4, comme l'étape 1), avec le même budget. Et le maître change : au lieu du
-ResNet supervisé, **le meilleur réseau AlphaZero 256** (az_00229376 par défaut), plus fort en jeu. Sur 2000
+ResNet supervisé, **le dernier réseau AlphaZero 256** (le plus récent `az_*.pt` du run, copié dans le cache pour que l'étiquetage puisse reprendre), plus fort en jeu. Sur 2000
 positions de test, ses valeurs restent très proches de celles de l'ancien maître (corrélation 0,97, même
 signe dans 94 % des cas) mais prédisent mieux le résultat de la partie (mse contre le résultat 0,288 contre
 0,311, mesuré avec az_00205312).
@@ -2534,7 +2534,7 @@ GPU, reprenable) ; `compare_teachers.py` compare enfin les deux maîtres sur les
 phase par phase. Sur le cluster, depuis `~/Yolah` :
 
 ```bash
-sbatch nnue/relabel_teacher.sh                       # TEACHER=…/az_<pas>.pt pour un autre réseau
+sbatch nnue/relabel_teacher.sh       # le dernier az_*.pt du run ; TEACHER=…/az_<pas>.pt pour un autre
 cd nnue
 J=<numéro du job d'étiquetage>
 for e in "" ",YOLAH_SPACE_MASK=65278" ",YOLAH_SPACE_MASK=65278,YOLAH_QAT=1"; do

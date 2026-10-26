@@ -15,7 +15,8 @@
 # Then the P7 trainings read NEW_CACHE (nnue_persp_distill.sh P7=1).
 #
 #     sbatch nnue/relabel_teacher.sh
-#     sbatch --export=ALL,TEACHER=/home/pgarcia/AlphaZeroLearn/work/models/az_00205312.pt nnue/relabel_teacher.sh
+#     (teacher: the latest az_*.pt of the AlphaZero 256 run, named in the log and in
+#      NEW_CACHE/teacher_meta.json; another one: --export=ALL,TEACHER=/path/az_<step>.pt)
 #     sbatch --gres=gpu:2 nnue/relabel_teacher.sh          (two GPUs: half the time)
 #
 # Cost: one forward of the 256x30 ResNet per position, ~10k positions/s on an
@@ -34,12 +35,27 @@ SIF="${SIF:-/home/pgarcia/NNUE/DistillationNNUE/nnue193x1024x64x32x1_distill.sif
 YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"
 OLD_CACHE="${OLD_CACHE:-/home/pgarcia/NNUE/DistillationNNUE/cache}"
 NEW_CACHE="${NEW_CACHE:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"
-TEACHER="${TEACHER:-/home/pgarcia/AlphaZeroLearn/work/models/az_00229376.pt}"
+# Default teacher: the LATEST network of the AlphaZero 256 run (the run prunes its
+# older az_*.pt, so a fixed step may be gone); TEACHER=… for another one.
+# The teacher is copied into NEW_CACHE (teacher_net_<name>): a resubmitted job
+# (resume) labels with that same copy, even after the run has pruned it.
+AZ_MODELS="${AZ_MODELS:-/home/pgarcia/AlphaZeroLearn/work/models}"
+KEPT="$(ls "${NEW_CACHE}"/teacher_net_*.pt 2>/dev/null | head -1 || true)"
+if [[ -z "${TEACHER:-}" && -n "${KEPT}" ]]; then TEACHER="${KEPT}"; fi
+TEACHER="${TEACHER:-$(ls "${AZ_MODELS}"/az_*.pt 2>/dev/null | sort | tail -1)}"
+[[ -n "${TEACHER}" ]] || { echo "no az_*.pt in ${AZ_MODELS}" >&2; exit 1; }
 
 for f in "${SIF}" "${OLD_CACHE}/meta.json" "${TEACHER}"; do
     [[ -e "$f" ]] || { echo "missing: $f" >&2; exit 1; }
 done
 mkdir -p "${NEW_CACHE}"
+if [[ "$(basename "${TEACHER}")" != teacher_net_* ]]; then
+    if [[ -n "${KEPT}" ]]; then
+        echo "${NEW_CACHE} is being labelled with ${KEPT}: remove its teacher_* files to change teacher" >&2; exit 1
+    fi
+    cp "${TEACHER}" "${NEW_CACHE}/teacher_net_$(basename "${TEACHER}")"
+    TEACHER="${NEW_CACHE}/teacher_net_$(basename "${TEACHER}")"
+fi
 for f in "${OLD_CACHE}"/*; do
     b="$(basename "$f")"
     case "$b" in teacher_*) continue ;; esac
@@ -59,9 +75,8 @@ singularity exec --nv \
     --bind "${YOLAH_DIR}:/Yolah" \
     --bind "${NEW_CACHE}:/cache" \
     --bind "${OLD_CACHE}:/old_cache" \
-    --bind "$(dirname "${TEACHER}"):/teacher" \
     "${SIF}" \
-    bash -c "cd /Yolah/nnue && python3 distill_teacher_labels.py /cache --model /teacher/$(basename "${TEACHER}") \
+    bash -c "cd /Yolah/nnue && python3 distill_teacher_labels.py /cache --model /cache/$(basename "${TEACHER}") \
              && python3 compare_teachers.py /old_cache /cache"
 
 echo "[$(date '+%F %T')] === Done: ${NEW_CACHE} ==="
