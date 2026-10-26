@@ -2464,6 +2464,86 @@ tous les réseaux, surtout dans les phases où les features comptent le plus (la
 mesures du chapitre sur les features). Ni l'un ni l'autre ne ralentit l'évaluation : contrairement à P3, P4 et
 P5, un gain d'erreur devrait donc cette fois se retrouver en Elo, ce que les matchs diront.
 
+## Ce que P6 a montré : une loterie de la quantification {#sec-p6-loterie}
+
+Le premier résultat de P6 est une surprise : **`cont5`, qui n'est que spacelite entraîné 5 époques de plus,
+perd 52 Elo contre spacelite** (−52 [−65, −40] à 0,2 s sur 1844 parties, −53 à 1 s ; même configuration de
+recherche, seul le fichier de poids change). Le réseau a pourtant très peu bougé : sur 2000 positions, ses
+valeurs s'écartent de celles de spacelite de 0,033 en moyenne (corrélation 0,995), à peu près l'écart que
+crée déjà la quantification. Les données n'ont pas changé non plus (cache et étiquettes datent d'avant
+l'entraînement de spacelite).
+
+Les courbes de validation expliquent ce qui se passe. Pour chaque époque, la mse contre le maître du réseau
+**float** (celui que PyTorch entraîne) et du réseau **quantifié** (celui que le C++ fait jouer) :
+
+| époque | `cont5` float | `cont5` quantifié | `qat` float = quantifié | `d_qat` |
+|---|---|---|---|---|
+| 1 | 0,0766 | 0,0921 | 0,0797 | 0,0814 |
+| 2 | 0,0759 | 0,0859 | 0,0787 | 0,0783 |
+| 3 | 0,0741 | 0,0940 | 0,0772 | 0,0766 |
+| 4 | 0,0720 | 0,0895 | 0,0751 | 0,0755 |
+| 5 | 0,0705 | 0,0936 | 0,0739 | 0,0740 |
+
+(spacelite finissait son entraînement à 0,0709 en float.) Trois leçons :
+
+1. **Le redémarrage abîme d'abord le réseau.** Repartir à lr 1e-4 avec un Adam neuf fait remonter la mse de
+   spacelite de 0,0709 à 0,0766 ; les 5 époques la ramènent seulement à 0,0705. En float, `cont5` ne gagne
+   rien.
+2. **Ce qui joue est bien moins bon que ce qui est entraîné, et de façon aléatoire.** La quantification ajoute
+   environ 0,02 de mse (+30 %), et ce surcoût saute d'une époque à l'autre (0,086 à 0,094) alors que le
+   réseau float progresse régulièrement. Arrondir 1,3 million de poids au 1/64 près, c'est tirer au sort une
+   petite perturbation : selon le tirage, le réseau joué est bon ou moins bon. Ces variations (±0,004) sont
+   plus grandes que tout le progrès des 5 époques en float (0,006).
+3. **Le QAT supprime la loterie.** Les réseaux entraînés en conscience de la quantification ont une mse
+   quantifiée de 0,074, soit 21 % de moins que `cont5` (0,094), et elle baisse régulièrement à chaque époque.
+   Le chemin direct, lui, n'apporte presque rien (0,0702 contre 0,0705 en float).
+
+**Conséquence pour les campagnes P3 à P5.** Elles comparaient des réseaux entraînés de la même façon (10
+époques depuis k8_them), donc à armes égales pour l'entraînement, mais tous quantifiés après coup : chacun
+portait son propre tirage de quantification. Les écarts nets (g141 −71, space −60) restent des reculs ; les
+écarts de 10 à 25 Elo (g147, g046, g07e, et le +18 de spacelite lui-même) peuvent en partie venir du
+tirage. Pour le mesurer sans rejouer de matchs, l'entraîneur sait maintenant évaluer un réseau existant sans
+l'entraîner (`EVAL_MODEL=… nnue_persp_distill.sh`, avec le masque de son entraînement) : il écrit la mse float
+et quantifiée de ce réseau sur les mêmes positions de validation dans
+`models_persp/eval/<réseau>.eval.jsonl`.
+
+## La campagne P7 : même budget pour tous et un nouveau maître {#sec-p7}
+
+Pour trancher, P7 n'enchaîne plus les fine-tunings : chaque réseau est entraîné **20 époques depuis le
+réseau 193 distillé** (lr 3e-4, comme l'étape 1), avec le même budget. Et le maître change : au lieu du
+ResNet supervisé, **le meilleur réseau AlphaZero 256** (az_00229376 par défaut), plus fort en jeu. Sur 2000
+positions de test, ses valeurs restent très proches de celles de l'ancien maître (corrélation 0,97, même
+signe dans 94 % des cas) mais prédisent mieux le résultat de la partie (mse contre le résultat 0,288 contre
+0,311, mesuré avec az_00205312).
+
+| réseau | features d'espace | QAT |
+|---|---|---|
+| `k8_them_az20` | non | non |
+| `spacelite_az20` | les 14 de spacelite | non |
+| `spacelite_qat_az20` | les 14 de spacelite | oui |
+
+Les matchs (`campaign_P7.txt`, livre d'ouvertures, 1 s et 0,2 s) posent trois questions : les features
+d'espace à budget égal (`spacelite_az20` contre `k8_them_az20`), le QAT à budget égal (`spacelite_qat_az20`
+contre `spacelite_az20`), et le gain de toute la nouvelle chaîne contre le meilleur réseau actuel
+(chacun des deux spacelite contre spacelite).
+
+**Étiqueter avec le nouveau maître** (`nnue/relabel_teacher.sh`) : un nouveau cache `cache_az256` reçoit des
+liens physiques vers les positions, les résultats et les features de l'ancien (rien n'est copié ni
+recalculé), puis `distill_teacher_labels.py` y écrit les valeurs du nouveau maître (environ un jour sur un
+GPU, reprenable) ; `compare_teachers.py` compare enfin les deux maîtres sur les positions de validation,
+phase par phase. Sur le cluster, depuis `~/Yolah` :
+
+```bash
+sbatch nnue/relabel_teacher.sh                       # TEACHER=…/az_<pas>.pt pour un autre réseau
+cd nnue
+J=<numéro du job d'étiquetage>
+for e in "" ",YOLAH_SPACE_MASK=65278" ",YOLAH_SPACE_MASK=65278,YOLAH_QAT=1"; do
+    sbatch --dependency=afterok:$J --time=5-00:00:00 --export=ALL,P7=1,YOLAH_PERSP_THEM=1$e nnue_persp_distill.sh
+done
+```
+
+Les réseaux finaux sont `models_persp/k8_them[_spacelite][_qat]_az20/…_distill.19.pt`.
+
 
 # Plan et mesure
 

@@ -1,0 +1,20 @@
+# Campaign P7 (doc/nnue_roadmap.qmd): after P6 (spacelite fine-tuned 5 more epochs LOST 52 Elo
+# against itself: chained fine-tunings and the quantization of a float network are a lottery),
+# everyone gets the same budget and the new teacher. 20 epochs from the distilled 193 network
+# (lr 3e-4), on the cache labelled by the best AlphaZero 256 network (nnue/relabel_teacher.sh,
+# then nnue_persp_distill.sh P7=1):
+#   k8_them_az20             no space feature
+#   spacelite_az20           + the 14 space features of spacelite
+#   spacelite_qat_az20       the same, trained quantization-aware (what is learnt is what plays)
+# From the book of balanced openings (BOOK=), at 1 s and 0.2 s:
+#   1-2  the space features at equal budget
+#   3-4  QAT at equal budget
+#   5-8  the new pipeline against the current best network (spacelite, old teacher)
+nnue_k8_them_spacelite_az20 nnue_k8_them_az20 1000000 2000
+nnue_k8_them_spacelite_az20 nnue_k8_them_az20 200000 2000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_spacelite_az20 1000000 2000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_spacelite_az20 200000 2000
+nnue_k8_them_spacelite_az20 nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_spacelite_az20 nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_spacelite 1000000 2000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_spacelite 200000 2000

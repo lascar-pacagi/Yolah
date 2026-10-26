@@ -44,6 +44,15 @@
 #   FROM_SPACELITE=1 YOLAH_DIRECT=1 YOLAH_QAT=1                           → …_spacelite_d_qat
 #   (QAT runs in float32, not bf16; not slower: 5.3 ms per 1024-position step on an
 #   RTX 3080 against 9.0 ms in bf16 — the network is too small for bf16 to pay)
+# Campaign P7 (doc/nnue_roadmap.qmd): the same budget for everyone and the new
+# teacher. P7=1: 20 epochs from the distilled 193 network (lr 3e-4, as step 1)
+# instead of chained fine-tunings, on the cache labelled by the best AlphaZero
+# 256 network (CACHE_DIR default …/cache_az256, from nnue/relabel_teacher.sh),
+# variant names …_az20:
+#   P7=1 YOLAH_PERSP_THEM=1                                      → k8_them_az20
+#   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_MASK=65278               → k8_them_spacelite_az20
+#   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_MASK=65278 YOLAH_QAT=1   → k8_them_spacelite_qat_az20
+#   (~3-4 days each: submit with --time=5-00:00:00)
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
 # space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
@@ -82,6 +91,8 @@ YOLAH_SEED="${YOLAH_SEED:-0}"
 FROM_SPACELITE="${FROM_SPACELITE:-0}"
 YOLAH_DIRECT="${YOLAH_DIRECT:-0}"
 YOLAH_QAT="${YOLAH_QAT:-0}"
+P7="${P7:-0}"
+if [[ "${P7}" == "1" ]]; then CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"; fi
 EVAL_MODEL="${EVAL_MODEL:-}"
 if [[ "${FROM_SPACELITE}" == "1" ]]; then
     YOLAH_PERSP_K=8; YOLAH_PERSP_THEM=1; YOLAH_SPACE_MASK=65278
@@ -90,6 +101,7 @@ if [[ "${FROM_SPACELITE}" == "1" ]]; then
 fi
 STEP2=0
 if [[ "${YOLAH_SPACE_MASK}" != "0" || "${CONTINUE}" == "1" || -n "${YOLAH_SPACE_GROUPS}" ]]; then STEP2=1; fi
+if [[ "${P7}" == "1" ]]; then STEP2=0; fi    # P7: from the 193 network, the space columns start at 0 (init_from_nnue193)
 if [[ "${STEP2}" == "1" ]]; then
     # step 2 fine-tunes the trained k8_them network
     INIT_MODEL="${INIT_MODEL_STEP2:-${SRC_DIR}/../models/nnue_persp_k${YOLAH_PERSP_K}$([[ "${YOLAH_PERSP_THEM}" == "1" ]] && echo _them || true)_distill.pt}"
@@ -112,6 +124,11 @@ if [[ "${FROM_SPACELITE}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "0" && "${YOLAH_QAT}" == "0" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_cont5"; fi
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
     if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
+fi
+if [[ "${P7}" == "1" ]]; then
+    if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
+    if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
+    YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_az20"
 fi
 
 if [[ "${CONTROL}" == "1" ]]; then
@@ -161,7 +178,7 @@ echo "  Models   : ${MODEL_DIR}"
 echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
 echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none}  seed=${YOLAH_SEED}  continue=${CONTINUE}"
-echo "  Step 3   : from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
+echo "  Step 3   : P7=${P7}  from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
 echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
 

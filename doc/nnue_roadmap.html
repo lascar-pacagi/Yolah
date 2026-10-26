@@ -2428,6 +2428,8 @@ padding-right: 0.6em;
   <li><a href="#sec-qat" id="toc-sec-qat" class="nav-link" data-scroll-target="#sec-qat"><span class="header-section-number">8.3</span> L’entraînement conscient de la quantification (QAT)</a></li>
   <li><a href="#sec-direct" id="toc-sec-direct" class="nav-link" data-scroll-target="#sec-direct"><span class="header-section-number">8.4</span> Le chemin direct des features vers la valeur</a></li>
   <li><a href="#la-campagne-p6" id="toc-la-campagne-p6" class="nav-link" data-scroll-target="#la-campagne-p6"><span class="header-section-number">8.5</span> La campagne P6</a></li>
+  <li><a href="#sec-p6-loterie" id="toc-sec-p6-loterie" class="nav-link" data-scroll-target="#sec-p6-loterie"><span class="header-section-number">8.6</span> Ce que P6 a montré : une loterie de la quantification</a></li>
+  <li><a href="#sec-p7" id="toc-sec-p7" class="nav-link" data-scroll-target="#sec-p7"><span class="header-section-number">8.7</span> La campagne P7 : même budget pour tous et un nouveau maître</a></li>
   </ul></li>
   <li><a href="#plan-et-mesure" id="toc-plan-et-mesure" class="nav-link" data-scroll-target="#plan-et-mesure"><span class="header-section-number">9</span> Plan et mesure</a></li>
   </ul>
@@ -2451,7 +2453,7 @@ padding-right: 0.6em;
     <div>
     <div class="quarto-title-meta-heading">Date de publication</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">25 octobre 2026</p>
+      <p class="date">26 octobre 2026</p>
     </div>
   </div>
   
@@ -5476,6 +5478,112 @@ v = \tanh\Big(\underbrace{w_4^{(b)} \cdot h_3 + b_4^{(b)}}_{\text{le réseau}} \
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb58"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">-p</span> insa-cpu <span class="at">--exclude</span><span class="op">=</span>crn07,crn14,crn15 <span class="at">--array</span><span class="op">=</span>1-8 <span class="dt">\</span></span>
 <span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>       <span class="at">--export</span><span class="op">=</span>ALL,BOOK=/Yolah/config/openings/balanced.txt nnue/search_study.sh campaign_P6.txt</span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Ce qu’on attend.</strong> Le QAT devrait réduire l’écart entre ce qui est entraîné et ce qui joue à presque rien ; sa <code>mse_teacher_quantized</code> doit passer sous celle de <code>cont5</code>. Le chemin direct devrait abaisser l’erreur de tous les réseaux, surtout dans les phases où les features comptent le plus (la fin de partie, d’après les mesures du chapitre sur les features). Ni l’un ni l’autre ne ralentit l’évaluation : contrairement à P3, P4 et P5, un gain d’erreur devrait donc cette fois se retrouver en Elo, ce que les matchs diront.</p>
+</section>
+<section id="sec-p6-loterie" class="level2" data-number="8.6">
+<h2 data-number="8.6" class="anchored" data-anchor-id="sec-p6-loterie"><span class="header-section-number">8.6</span> Ce que P6 a montré : une loterie de la quantification</h2>
+<p>Le premier résultat de P6 est une surprise : <strong><code>cont5</code>, qui n’est que spacelite entraîné 5 époques de plus, perd 52 Elo contre spacelite</strong> (−52 [−65, −40] à 0,2 s sur 1844 parties, −53 à 1 s ; même configuration de recherche, seul le fichier de poids change). Le réseau a pourtant très peu bougé : sur 2000 positions, ses valeurs s’écartent de celles de spacelite de 0,033 en moyenne (corrélation 0,995), à peu près l’écart que crée déjà la quantification. Les données n’ont pas changé non plus (cache et étiquettes datent d’avant l’entraînement de spacelite).</p>
+<p>Les courbes de validation expliquent ce qui se passe. Pour chaque époque, la mse contre le maître du réseau <strong>float</strong> (celui que PyTorch entraîne) et du réseau <strong>quantifié</strong> (celui que le C++ fait jouer) :</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>époque</th>
+<th><code>cont5</code> float</th>
+<th><code>cont5</code> quantifié</th>
+<th><code>qat</code> float = quantifié</th>
+<th><code>d_qat</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>0,0766</td>
+<td>0,0921</td>
+<td>0,0797</td>
+<td>0,0814</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>0,0759</td>
+<td>0,0859</td>
+<td>0,0787</td>
+<td>0,0783</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>0,0741</td>
+<td>0,0940</td>
+<td>0,0772</td>
+<td>0,0766</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>0,0720</td>
+<td>0,0895</td>
+<td>0,0751</td>
+<td>0,0755</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>0,0705</td>
+<td>0,0936</td>
+<td>0,0739</td>
+<td>0,0740</td>
+</tr>
+</tbody>
+</table>
+<p>(spacelite finissait son entraînement à 0,0709 en float.) Trois leçons :</p>
+<ol type="1">
+<li><strong>Le redémarrage abîme d’abord le réseau.</strong> Repartir à lr 1e-4 avec un Adam neuf fait remonter la mse de spacelite de 0,0709 à 0,0766 ; les 5 époques la ramènent seulement à 0,0705. En float, <code>cont5</code> ne gagne rien.</li>
+<li><strong>Ce qui joue est bien moins bon que ce qui est entraîné, et de façon aléatoire.</strong> La quantification ajoute environ 0,02 de mse (+30 %), et ce surcoût saute d’une époque à l’autre (0,086 à 0,094) alors que le réseau float progresse régulièrement. Arrondir 1,3 million de poids au 1/64 près, c’est tirer au sort une petite perturbation : selon le tirage, le réseau joué est bon ou moins bon. Ces variations (±0,004) sont plus grandes que tout le progrès des 5 époques en float (0,006).</li>
+<li><strong>Le QAT supprime la loterie.</strong> Les réseaux entraînés en conscience de la quantification ont une mse quantifiée de 0,074, soit 21 % de moins que <code>cont5</code> (0,094), et elle baisse régulièrement à chaque époque. Le chemin direct, lui, n’apporte presque rien (0,0702 contre 0,0705 en float).</li>
+</ol>
+<p><strong>Conséquence pour les campagnes P3 à P5.</strong> Elles comparaient des réseaux entraînés de la même façon (10 époques depuis k8_them), donc à armes égales pour l’entraînement, mais tous quantifiés après coup : chacun portait son propre tirage de quantification. Les écarts nets (g141 −71, space −60) restent des reculs ; les écarts de 10 à 25 Elo (g147, g046, g07e, et le +18 de spacelite lui-même) peuvent en partie venir du tirage. Pour le mesurer sans rejouer de matchs, l’entraîneur sait maintenant évaluer un réseau existant sans l’entraîner (<code>EVAL_MODEL=… nnue_persp_distill.sh</code>, avec le masque de son entraînement) : il écrit la mse float et quantifiée de ce réseau sur les mêmes positions de validation dans <code>models_persp/eval/&lt;réseau&gt;.eval.jsonl</code>.</p>
+</section>
+<section id="sec-p7" class="level2" data-number="8.7">
+<h2 data-number="8.7" class="anchored" data-anchor-id="sec-p7"><span class="header-section-number">8.7</span> La campagne P7 : même budget pour tous et un nouveau maître</h2>
+<p>Pour trancher, P7 n’enchaîne plus les fine-tunings : chaque réseau est entraîné <strong>20 époques depuis le réseau 193 distillé</strong> (lr 3e-4, comme l’étape 1), avec le même budget. Et le maître change : au lieu du ResNet supervisé, <strong>le meilleur réseau AlphaZero 256</strong> (az_00229376 par défaut), plus fort en jeu. Sur 2000 positions de test, ses valeurs restent très proches de celles de l’ancien maître (corrélation 0,97, même signe dans 94 % des cas) mais prédisent mieux le résultat de la partie (mse contre le résultat 0,288 contre 0,311, mesuré avec az_00205312).</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>réseau</th>
+<th>features d’espace</th>
+<th>QAT</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>k8_them_az20</code></td>
+<td>non</td>
+<td>non</td>
+</tr>
+<tr class="even">
+<td><code>spacelite_az20</code></td>
+<td>les 14 de spacelite</td>
+<td>non</td>
+</tr>
+<tr class="odd">
+<td><code>spacelite_qat_az20</code></td>
+<td>les 14 de spacelite</td>
+<td>oui</td>
+</tr>
+</tbody>
+</table>
+<p>Les matchs (<code>campaign_P7.txt</code>, livre d’ouvertures, 1 s et 0,2 s) posent trois questions : les features d’espace à budget égal (<code>spacelite_az20</code> contre <code>k8_them_az20</code>), le QAT à budget égal (<code>spacelite_qat_az20</code> contre <code>spacelite_az20</code>), et le gain de toute la nouvelle chaîne contre le meilleur réseau actuel (chacun des deux spacelite contre spacelite).</p>
+<p><strong>Étiqueter avec le nouveau maître</strong> (<code>nnue/relabel_teacher.sh</code>) : un nouveau cache <code>cache_az256</code> reçoit des liens physiques vers les positions, les résultats et les features de l’ancien (rien n’est copié ni recalculé), puis <code>distill_teacher_labels.py</code> y écrit les valeurs du nouveau maître (environ un jour sur un GPU, reprenable) ; <code>compare_teachers.py</code> compare enfin les deux maîtres sur les positions de validation, phase par phase. Sur le cluster, depuis <code>~/Yolah</code> :</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb59"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> nnue/relabel_teacher.sh                       <span class="co"># TEACHER=…/az_&lt;pas&gt;.pt pour un autre réseau</span></span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> nnue</span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a><span class="va">J</span><span class="op">=&lt;</span>numéro <span class="fu">du</span> job d<span class="st">&#39;étiquetage&gt;</span></span>
+<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a><span class="st">for e in &quot;&quot; &quot;,YOLAH_SPACE_MASK=65278&quot; &quot;,YOLAH_SPACE_MASK=65278,YOLAH_QAT=1&quot;; do</span></span>
+<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a><span class="st">    sbatch --dependency=afterok:$J --time=5-00:00:00 --export=ALL,P7=1,YOLAH_PERSP_THEM=1$e nnue_persp_distill.sh</span></span>
+<span id="cb59-6"><a href="#cb59-6" aria-hidden="true" tabindex="-1"></a><span class="st">done</span></span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Les réseaux finaux sont <code>models_persp/k8_them[_spacelite][_qat]_az20/…_distill.19.pt</code>.</p>
 </section>
 </section>
 <section id="plan-et-mesure" class="level1" data-number="9">
