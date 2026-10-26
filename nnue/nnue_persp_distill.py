@@ -38,6 +38,11 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
                           measure the noise between two otherwise identical runs
     YOLAH_NAME_SUFFIX     appended to the model name (default "_space" with a mask,
                           "_g<groups in hex>" with groups)
+    YOLAH_EVAL_ONLY       1: no training — one pass over the validation set with
+                          YOLAH_INIT_MODEL as it is (load_persp: its own K, them, mask,
+                          direct path), logged as epoch 0 to /mnt/<that file's
+                          name>.eval.jsonl: the float AND quantized mse of an already
+                          trained network, on the same validation positions as every run
 After each epoch the validation numbers (including mse_teacher_quantized: the
 mse against the teacher of the network as the C++ computes it, measured for
 every network, quantization-aware or not) (overall and per phase) are appended to
@@ -60,7 +65,7 @@ import numpy as np
 
 from distill_common import (DistillLoader, Metrics, labelled_ranges, open_teacher_labels,
                             read_meta, TEACHER_META)
-from nnue_persp import NetPersp, CACHE_INPUT_SIZE as INPUT_SIZE, SPACE_SIZE
+from nnue_persp import NetPersp, load_persp, CACHE_INPUT_SIZE as INPUT_SIZE, SPACE_SIZE
 
 torch.set_float32_matmul_precision('high')
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -79,6 +84,7 @@ SPACE_GROUPS = int(os.environ.get("YOLAH_SPACE_GROUPS", "0"), 0)
 SEED = int(os.environ.get("YOLAH_SEED", "0"))
 DIRECT = os.environ.get("YOLAH_DIRECT", "0") == "1"
 QAT = os.environ.get("YOLAH_QAT", "0") == "1"
+EVAL_ONLY = os.environ.get("YOLAH_EVAL_ONLY", "0") == "1"
 if SPACE_MASK and SPACE_GROUPS:
     raise SystemExit("YOLAH_SPACE_MASK and YOLAH_SPACE_GROUPS are exclusive")
 NAME_SUFFIX = os.environ.get("YOLAH_NAME_SUFFIX", ("_space" if SPACE_MASK else
@@ -138,7 +144,7 @@ class TrainerDDP:
                                                                     eta_min=LR / 30)
         major, _ = torch.cuda.get_device_capability(gpu_id)
         self.amp_dtype = torch.bfloat16 if major >= 8 else torch.float16
-        self.amp = not QAT          # QAT: float32 (bf16 / fp16 cannot hold the C++ grid exactly)
+        self.amp = not (QAT or model.qat)   # QAT: float32 (bf16 / fp16 cannot hold the C++ grid exactly)
         self.scaler = torch.amp.GradScaler('cuda', enabled=(self.amp and self.amp_dtype == torch.float16))
         torch.cuda.set_device(gpu_id)
         torch.cuda.empty_cache()
@@ -158,12 +164,14 @@ class TrainerDDP:
         n = max(m.n, 1)
         mse_q = m.sse_q.item() / n
         print(f'epoch {epoch + 1} val   [vs teacher] mse of the quantized network (as in C++): {mse_q:.4f}', flush=True)
-        rec = dict(epoch=epoch + 1, model=MODEL_NAME, groups=SPACE_GROUPS, seed=SEED, mask=hex(self.model.module.space_mask),
-                   direct=DIRECT, qat=QAT,
+        rec = dict(epoch=epoch + 1, model=os.path.basename(INIT_MODEL)[:-3] if EVAL_ONLY else MODEL_NAME, groups=SPACE_GROUPS, seed=SEED, mask=hex(self.model.module.space_mask),
+                   direct=self.model.module.direct is not None, qat=bool(self.model.module.qat),
                    n=m.n, loss=m.loss / n, mse_teacher=m.mse_t / n, mse_outcome=m.mse_z / n,
                    mse_teacher_quantized=mse_q,
                    sign_teacher=m.sign_t / n, phases=phases, phase_n=dict(zip(PHASES, cnt)))
-        with open(f"{MODEL_PATH}{MODEL_NAME}.val.jsonl", "a") as f:
+        out = (f"{MODEL_PATH}{os.path.basename(INIT_MODEL)[:-3]}.eval.jsonl" if EVAL_ONLY
+               else f"{MODEL_PATH}{MODEL_NAME}.val.jsonl")
+        with open(out, "a") as f:
             f.write(json.dumps(rec) + "\n")
 
     def _h2d_async(self, batch_cpu):
@@ -212,7 +220,7 @@ class TrainerDDP:
                     self.model.module.clip()            # int8 trunk weight clamp
                 metrics.update(v_s.float(), z, v_t, loss.item())
                 if not train:                           # the network as the C++ computes it
-                    if QAT:
+                    if self.model.module.qat:
                         v_q = v_s.float()
                     else:
                         net = self.model.module          # the NetPersp itself, not compiled
@@ -236,6 +244,13 @@ class TrainerDDP:
                 cpu_cur, gpu_cur = cpu_next, gpu_next
         pbar.close()
         return metrics
+
+    def evaluate(self):
+        """YOLAH_EVAL_ONLY: the validation pass alone, logged as epoch 0."""
+        val_metrics = self._epoch(self.val_loader, False, -1)
+        if self.gpu_id == 0:
+            print(val_metrics.report('eval val  '), flush=True)
+            self._log_val(-1, val_metrics)
 
     def train(self, nb_epochs):
         for epoch in range(nb_epochs):
@@ -276,7 +291,13 @@ def main(rank, world_size, batch_size, cache_dir):
                   'YOLAH_CHUNK_SIZE', flush=True)
 
     net = NetPersp(PERSP_K, PERSP_THEM, space_mask=space_mask, direct=DIRECT, qat=QAT)
-    if os.path.isfile(LAST_MODEL):
+    if EVAL_ONLY:
+        net = load_persp(INIT_MODEL)
+        if net.space_mask != space_mask:
+            raise SystemExit(f"{INIT_MODEL}: space mask {net.space_mask:#x}, the cache columns give "
+                             f"{space_mask:#x}: set YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS as for its training")
+        src = INIT_MODEL + " (evaluation only)"
+    elif os.path.isfile(LAST_MODEL):
         net.init_from_persp(torch.load(LAST_MODEL, map_location='cpu'))
         src = LAST_MODEL
     elif os.path.isfile(INIT_MODEL):
@@ -297,7 +318,10 @@ def main(rank, world_size, batch_size, cache_dir):
 
     gc.disable()
     trainer = TrainerDDP(rank, net, train_loader, val_loader)
-    trainer.train(NB_EPOCHS)
+    if EVAL_ONLY:
+        trainer.evaluate()
+    else:
+        trainer.train(NB_EPOCHS)
     destroy_process_group()
 
 

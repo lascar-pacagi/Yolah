@@ -44,6 +44,12 @@
 #   FROM_SPACELITE=1 YOLAH_DIRECT=1 YOLAH_QAT=1                           → …_spacelite_d_qat
 #   (QAT runs in float32, not bf16; not slower: 5.3 ms per 1024-position step on an
 #   RTX 3080 against 9.0 ms in bf16 — the network is too small for bf16 to pay)
+# Evaluation only (no training): the float AND quantized validation mse of an
+# already trained network, on the validation positions of every run, with the
+# space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
+#   EVAL_MODEL=${HOME}/Yolah/models/nnue_persp_k8_them_spacelite_distill.pt YOLAH_SPACE_MASK=65278
+#   EVAL_MODEL=${HOME}/Yolah/models/nnue_persp_k8_them_g040_distill.pt YOLAH_SPACE_GROUPS=0x40
+#   → MODEL_ROOT/eval/<model name>.eval.jsonl (one line, epoch 0)
 # Each variant writes to its own directory under MODEL_ROOT (the outputs of
 # a variant never overwrite those of another, nor the original models).
 # ────────────────────────────────────────────────────────────────────────────
@@ -76,6 +82,7 @@ YOLAH_SEED="${YOLAH_SEED:-0}"
 FROM_SPACELITE="${FROM_SPACELITE:-0}"
 YOLAH_DIRECT="${YOLAH_DIRECT:-0}"
 YOLAH_QAT="${YOLAH_QAT:-0}"
+EVAL_MODEL="${EVAL_MODEL:-}"
 if [[ "${FROM_SPACELITE}" == "1" ]]; then
     YOLAH_PERSP_K=8; YOLAH_PERSP_THEM=1; YOLAH_SPACE_MASK=65278
     INIT_MODEL_STEP2="${INIT_MODEL_STEP2:-${SRC_DIR}/../models/nnue_persp_k8_them_spacelite_distill.pt}"
@@ -118,6 +125,7 @@ else
     VARIANT="${VARIANT}${YOLAH_NAME_SUFFIX}"
     SCRIPT="nnue_persp_distill.py"
 fi
+if [[ -n "${EVAL_MODEL}" ]]; then VARIANT="eval"; INIT_MODEL="${EVAL_MODEL}"; fi
 MODEL_DIR="${MODEL_ROOT}/${VARIANT}"
 # The rendezvous port of torch.distributed, one per job: several jobs can share a
 # node (with one fixed port, the second one fails with EADDRINUSE).
@@ -140,6 +148,9 @@ if [[ -n "${YOLAH_SPACE_GROUPS}" && "$(( YOLAH_SPACE_GROUPS ))" != "0" ]]; then
 fi
 # The starting weights, copied into the variant's directory (/mnt in the container).
 INIT_NAME="$([[ "${STEP2}" == "1" ]] && echo init_persp.pt || echo init_193_distill.pt)"
+if [[ -n "${EVAL_MODEL}" ]]; then
+    INIT_NAME="$(basename "${EVAL_MODEL}")"; cp "${EVAL_MODEL}" "${MODEL_DIR}/${INIT_NAME}"
+fi
 [[ -e "${MODEL_DIR}/${INIT_NAME}" ]] || cp "${INIT_MODEL}" "${MODEL_DIR}/${INIT_NAME}"
 
 echo "════════════════════════════════════════════════════════════════"
@@ -151,6 +162,7 @@ echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
 echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none}  seed=${YOLAH_SEED}  continue=${CONTINUE}"
 echo "  Step 3   : from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
+echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
 
 singularity exec --nv \
@@ -165,6 +177,7 @@ singularity exec --nv \
     --env "YOLAH_SEED=${YOLAH_SEED}" \
     --env "YOLAH_DIRECT=${YOLAH_DIRECT}" \
     --env "YOLAH_QAT=${YOLAH_QAT}" \
+    --env "YOLAH_EVAL_ONLY=$([[ -n "${EVAL_MODEL}" ]] && echo 1 || echo 0)" \
     --env "YOLAH_NAME_SUFFIX=${YOLAH_NAME_SUFFIX}" \
     --env "YOLAH_PERSP_K=${YOLAH_PERSP_K}" \
     --env "YOLAH_PERSP_THEM=${YOLAH_PERSP_THEM}" \
