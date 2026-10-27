@@ -2550,7 +2550,28 @@ contre `spacelite_az20`), et le gain de toute la nouvelle chaîne contre le meil
 liens physiques vers les positions, les résultats et les features de l'ancien (rien n'est copié ni
 recalculé), puis `distill_teacher_labels.py` y écrit les valeurs du nouveau maître (environ un jour sur un
 GPU, reprenable) ; `compare_teachers.py` compare enfin les deux maîtres sur les positions de validation,
-phase par phase. Sur le cluster, depuis `~/Yolah` :
+phase par phase.
+
+Résultat de l'étiquetage (az_00237568, 988 millions de positions en 17 h sur un GPU), sur les 48,6 millions
+de positions de validation. Jusqu'à 22 cases libres, le résultat de la partie z est exact (étude de fin de
+partie) : dans les deux phases de fin, la mse contre z est l'erreur contre la vérité.
+
+| phase (cases libres) | ancien maître | AZ 256 | écart moyen |
+|---|---|---|---|
+| toutes | 0,2555 | **0,2501** | 0,136 |
+| ouverture 40-56 | **0,4962** | 0,5183 | 0,160 |
+| milieu 20-39 | 0,3221 | **0,2848** | 0,202 |
+| fin 10-19 | 0,0367 | **0,0192** | 0,055 |
+| fin 0-9 | **0,0138** | 0,0552 | 0,046 |
+
+(corrélation 0,95, même signe dans 92 % des cas.) Le nouveau maître est nettement meilleur là où
+l'évaluation compte le plus pour la recherche : −12 % d'erreur en milieu de partie, erreur divisée par deux
+entre 10 et 19 cases libres. Il est quatre fois moins bon dans les toutes dernières positions (0 à 9 cases
+libres), mais la recherche du joueur y atteint presque toujours la fin de partie et n'utilise donc pas
+l'évaluation. En ouverture, z est presque du hasard : une mse un peu plus haute dit surtout que le nouveau
+maître est plus affirmatif, pas qu'il se trompe davantage.
+
+Sur le cluster, depuis `~/Yolah` :
 
 ```bash
 sbatch nnue/relabel_teacher.sh       # le dernier az_*.pt du run ; TEACHER=…/az_<pas>.pt pour un autre
