@@ -4,6 +4,6 @@
 # the book of balanced openings, every player with the same threads and time per move.
 # Weights are relative to config/ (the working directory of the tournament); az256.ts is
 # the latest az_*.ts of the run, copied into TOURNAMENT_DIR by tournament.sh (AZ_LATEST=1).
-nnue_g040_qat_az20.cfg
+nnue_g046_qat_az20.cfg
 az256.cfg
 resnet_supervised.cfg
