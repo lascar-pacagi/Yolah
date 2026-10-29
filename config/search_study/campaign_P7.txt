@@ -10,6 +10,10 @@
 #   1-2  the space features at equal budget
 #   3-4  QAT at equal budget
 #   5-8  the new pipeline against the current best network (spacelite, old teacher)
+# 9-42: with them, a round robin of the 7 networks (+ g040 influence only, g07e and g046 of
+# P4-P5, retrained the same way, all QAT): 1000 rounds for every other pair, at both times.
+# Ratings per time (pooling the per-pair files):
+#   python3 test/tournament_elo.py ~/SearchStudy/search_study/*az20*__t200000.csv --anchor nnue_k8_them_spacelite
 nnue_k8_them_spacelite_az20 nnue_k8_them_az20 1000000 2000
 nnue_k8_them_spacelite_az20 nnue_k8_them_az20 200000 2000
 nnue_k8_them_spacelite_qat_az20 nnue_k8_them_spacelite_az20 1000000 2000
@@ -18,3 +22,37 @@ nnue_k8_them_spacelite_az20 nnue_k8_them_spacelite 1000000 2000
 nnue_k8_them_spacelite_az20 nnue_k8_them_spacelite 200000 2000
 nnue_k8_them_spacelite_qat_az20 nnue_k8_them_spacelite 1000000 2000
 nnue_k8_them_spacelite_qat_az20 nnue_k8_them_spacelite 200000 2000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_g046_qat_az20 1000000 1000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_g046_qat_az20 200000 1000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_g07e_qat_az20 1000000 1000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_g07e_qat_az20 200000 1000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_g040_qat_az20 1000000 1000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_g040_qat_az20 200000 1000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_az20 1000000 1000
+nnue_k8_them_spacelite_qat_az20 nnue_k8_them_az20 200000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_g07e_qat_az20 1000000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_g07e_qat_az20 200000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_g040_qat_az20 1000000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_g040_qat_az20 200000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_spacelite_az20 1000000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_spacelite_az20 200000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_az20 1000000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_az20 200000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_spacelite 1000000 1000
+nnue_k8_them_g046_qat_az20 nnue_k8_them_spacelite 200000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_g040_qat_az20 1000000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_g040_qat_az20 200000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_spacelite_az20 1000000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_spacelite_az20 200000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_az20 1000000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_az20 200000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_spacelite 1000000 1000
+nnue_k8_them_g07e_qat_az20 nnue_k8_them_spacelite 200000 1000
+nnue_k8_them_g040_qat_az20 nnue_k8_them_spacelite_az20 1000000 1000
+nnue_k8_them_g040_qat_az20 nnue_k8_them_spacelite_az20 200000 1000
+nnue_k8_them_g040_qat_az20 nnue_k8_them_az20 1000000 1000
+nnue_k8_them_g040_qat_az20 nnue_k8_them_az20 200000 1000
+nnue_k8_them_g040_qat_az20 nnue_k8_them_spacelite 1000000 1000
+nnue_k8_them_g040_qat_az20 nnue_k8_them_spacelite 200000 1000
+nnue_k8_them_az20 nnue_k8_them_spacelite 1000000 1000
+nnue_k8_them_az20 nnue_k8_them_spacelite 200000 1000

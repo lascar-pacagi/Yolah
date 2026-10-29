@@ -2596,6 +2596,40 @@ for g in 0x40 0x7e 0x46; do
 done                                       # → k8_them_g040_qat_az20, k8_them_g07e_qat_az20, k8_them_g046_qat_az20
 ```
 
+**Les entraînements.** Mse de validation contre le nouveau maître après 20 époques (positions de validation de
+`cache_az256` : ces chiffres ne se comparent pas à ceux de P6, mesurés contre l'ancien maître), et vérification
+des réseaux exportés (`nets_check check_persp`, 2000 positions) :
+
+| réseau | float | quantifié | écart C++ / PyTorch moyen (max) | `value()` |
+|---|---|---|---|---|
+| `k8_them_az20` | 0,0862 | 0,0962 | 0,037 (0,98) | 1370 ns |
+| `spacelite_az20` | **0,0759** | 0,0996 | 0,035 (1,89) | 1670 ns |
+| `spacelite_qat_az20` | 0,0781 | **0,0781** | 0 (0) | 1650 ns |
+| `g040_qat_az20` | 0,0812 | 0,0812 | 0 (0) | 1470 ns |
+| `g07e_qat_az20` | 0,0766 | **0,0766** | 0 (0) | 1750 ns |
+| `g046_qat_az20` | 0,0764 | **0,0764** | 0 (0) | 1680 ns |
+
+(spacelite : 0,037 (0,92), 1680 ns.) La loterie de la quantification est encore plus forte avec ce maître :
+tout au long de l'entraînement, `k8_them_az20` perd de 12 à 75 % de mse à la quantification, `spacelite_az20` de 5
+à 37 %, et sa dernière époque tombe mal (+31 %, un écart max de 1,89 sur 2000 positions). Le QAT ne coûte que
+0,002 de mse float (0,0781 contre 0,0759) et gagne 22 % une fois quantifié. Les features d'espace font
+gagner 10 à 12 % de mse à elles seules (0,076 contre 0,086 en float). Parmi les réseaux QAT, g046 et g07e
+passent devant spacelite (0,0764 et 0,0766 contre 0,0781), alors qu'en P4–P5 spacelite les battait en
+jeu : leurs matchs d'alors étaient brouillés par le tirage de la quantification. Les temps de `value()`
+(±100 ns d'une mesure à l'autre) ne comptent pas le calcul des features elles-mêmes, qui se fait dans la
+recherche : c'est le tournoi qui dira si quelques millièmes de mse valent leur coût.
+
+**Le tournoi.** `campaign_P7.txt` compte 42 matchs : les 8 premiers (2000 rondes) répondent aux trois
+questions ci-dessus ; les 34 suivants (1000 rondes) complètent un tournoi toutes rondes entre les 7 réseaux,
+aux deux cadences. Les classements, par cadence, regroupent les fichiers de chaque paire :
+
+```bash
+sbatch -p insa-cpu --exclude=crn07,crn14,crn15 --array=1-42 \
+       --export=ALL,BOOK=/Yolah/config/openings/balanced.txt nnue/search_study.sh campaign_P7.txt
+python3 test/tournament_elo.py ~/SearchStudy/search_study/*az20*__t200000.csv --anchor nnue_k8_them_spacelite
+python3 test/tournament_elo.py ~/SearchStudy/search_study/*az20*__t1000000.csv --anchor nnue_k8_them_spacelite
+```
+
 
 # Plan et mesure
 

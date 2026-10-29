@@ -2453,7 +2453,7 @@ padding-right: 0.6em;
     <div>
     <div class="quarto-title-meta-heading">Date de publication</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">26 octobre 2026</p>
+      <p class="date">29 octobre 2026</p>
     </div>
   </div>
   
@@ -5544,6 +5544,40 @@ v = \tanh\Big(\underbrace{w_4^{(b)} \cdot h_3 + b_4^{(b)}}_{\text{le réseau}} \
 <li><strong>Ce qui joue est bien moins bon que ce qui est entraîné, et de façon aléatoire.</strong> La quantification ajoute environ 0,02 de mse (+30 %), et ce surcoût saute d’une époque à l’autre (0,086 à 0,094) alors que le réseau float progresse régulièrement. Arrondir 1,3 million de poids au 1/64 près, c’est tirer au sort une petite perturbation : selon le tirage, le réseau joué est bon ou moins bon. Ces variations (±0,004) sont plus grandes que tout le progrès des 5 époques en float (0,006).</li>
 <li><strong>Le QAT supprime la loterie.</strong> Les réseaux entraînés en conscience de la quantification ont une mse quantifiée de 0,074, soit 21 % de moins que <code>cont5</code> (0,094), et elle baisse régulièrement à chaque époque. Le chemin direct, lui, n’apporte presque rien (0,0702 contre 0,0705 en float).</li>
 </ol>
+<p>Les matchs le confirment (contre spacelite, livre d’ouvertures, Elo et intervalle à 95 %) :</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>réseau</th>
+<th>0,2 s</th>
+<th>1 s</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>cont5</code></td>
+<td>−56 [−65, −48] (4000 parties)</td>
+<td>−52 [−60, −44] (4000)</td>
+</tr>
+<tr class="even">
+<td><code>d</code></td>
+<td>−60 [−69, −52] (4000)</td>
+<td>−50 [−58, −42] (3842)</td>
+</tr>
+<tr class="odd">
+<td><code>qat</code></td>
+<td>+1 [−7, +9] (4000)</td>
+<td>+15 [+7, +24] (3156)</td>
+</tr>
+<tr class="even">
+<td><code>d_qat</code></td>
+<td>+2 [−6, +10] (4000)</td>
+<td>+7 [−6, +21] (1238)</td>
+</tr>
+</tbody>
+</table>
+<p>À budget égal, le QAT vaut <strong>55 à 65 Elo</strong> de plus que le fine-tuning ordinaire, et ramène le réseau au niveau de spacelite (un peu au-dessus à 1 s) malgré les dégâts du redémarrage. Le chemin direct n’apporte rien, ni seul (<code>d</code> ≈ <code>cont5</code>) ni avec le QAT (<code>d_qat</code> ≈ <code>qat</code>) : il est abandonné, et P7 n’entraîne que des réseaux sans chemin direct.</p>
+<p>Spacelite lui-même, évalué sur les mêmes positions (<code>EVAL_MODEL</code>), a une mse de 0,0702 en float et de <strong>0,0824 quantifié</strong> (+17 %, contre +33 % pour <code>cont5</code>) : un tirage de quantification plutôt favorable, sans plus. La mse quantifiée ne suffit pourtant pas à prédire l’Elo : 0,0936 → 0,0824 vaut 52 Elo (<code>cont5</code> contre spacelite) quand 0,0824 → 0,0739 n’en vaut que 1 à 15 (<code>qat</code> contre spacelite).</p>
 <p><strong>Conséquence pour les campagnes P3 à P5.</strong> Elles comparaient des réseaux entraînés de la même façon (10 époques depuis k8_them), donc à armes égales pour l’entraînement, mais tous quantifiés après coup : chacun portait son propre tirage de quantification. Les écarts nets (g141 −71, space −60) restent des reculs ; les écarts de 10 à 25 Elo (g147, g046, g07e, et le +18 de spacelite lui-même) peuvent en partie venir du tirage. Pour le mesurer sans rejouer de matchs, l’entraîneur sait maintenant évaluer un réseau existant sans l’entraîner (<code>EVAL_MODEL=… nnue_persp_distill.sh</code>, avec le masque de son entraînement) : il écrit la mse float et quantifiée de ce réseau sur les mêmes positions de validation dans <code>models_persp/eval/&lt;réseau&gt;.eval.jsonl</code>.</p>
 </section>
 <section id="sec-p7" class="level2" data-number="8.7">
@@ -5576,7 +5610,52 @@ v = \tanh\Big(\underbrace{w_4^{(b)} \cdot h_3 + b_4^{(b)}}_{\text{le réseau}} \
 </tbody>
 </table>
 <p>Les matchs (<code>campaign_P7.txt</code>, livre d’ouvertures, 1 s et 0,2 s) posent trois questions : les features d’espace à budget égal (<code>spacelite_az20</code> contre <code>k8_them_az20</code>), le QAT à budget égal (<code>spacelite_qat_az20</code> contre <code>spacelite_az20</code>), et le gain de toute la nouvelle chaîne contre le meilleur réseau actuel (chacun des deux spacelite contre spacelite).</p>
-<p><strong>Étiqueter avec le nouveau maître</strong> (<code>nnue/relabel_teacher.sh</code>) : un nouveau cache <code>cache_az256</code> reçoit des liens physiques vers les positions, les résultats et les features de l’ancien (rien n’est copié ni recalculé), puis <code>distill_teacher_labels.py</code> y écrit les valeurs du nouveau maître (environ un jour sur un GPU, reprenable) ; <code>compare_teachers.py</code> compare enfin les deux maîtres sur les positions de validation, phase par phase. Sur le cluster, depuis <code>~/Yolah</code> :</p>
+<p><strong>Étiqueter avec le nouveau maître</strong> (<code>nnue/relabel_teacher.sh</code>) : un nouveau cache <code>cache_az256</code> reçoit des liens physiques vers les positions, les résultats et les features de l’ancien (rien n’est copié ni recalculé), puis <code>distill_teacher_labels.py</code> y écrit les valeurs du nouveau maître (environ un jour sur un GPU, reprenable) ; <code>compare_teachers.py</code> compare enfin les deux maîtres sur les positions de validation, phase par phase.</p>
+<p>Résultat de l’étiquetage (az_00237568, 988 millions de positions en 17 h sur un GPU), sur les 48,6 millions de positions de validation. Jusqu’à 22 cases libres, le résultat de la partie z est exact (étude de fin de partie) : dans les deux phases de fin, la mse contre z est l’erreur contre la vérité.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>phase (cases libres)</th>
+<th>ancien maître</th>
+<th>AZ 256</th>
+<th>écart moyen</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>toutes</td>
+<td>0,2555</td>
+<td><strong>0,2501</strong></td>
+<td>0,136</td>
+</tr>
+<tr class="even">
+<td>ouverture 40-56</td>
+<td><strong>0,4962</strong></td>
+<td>0,5183</td>
+<td>0,160</td>
+</tr>
+<tr class="odd">
+<td>milieu 20-39</td>
+<td>0,3221</td>
+<td><strong>0,2848</strong></td>
+<td>0,202</td>
+</tr>
+<tr class="even">
+<td>fin 10-19</td>
+<td>0,0367</td>
+<td><strong>0,0192</strong></td>
+<td>0,055</td>
+</tr>
+<tr class="odd">
+<td>fin 0-9</td>
+<td><strong>0,0138</strong></td>
+<td>0,0552</td>
+<td>0,046</td>
+</tr>
+</tbody>
+</table>
+<p>(corrélation 0,95, même signe dans 92 % des cas.) Le nouveau maître est nettement meilleur là où l’évaluation compte le plus pour la recherche : −12 % d’erreur en milieu de partie, erreur divisée par deux entre 10 et 19 cases libres. Il est quatre fois moins bon dans les toutes dernières positions (0 à 9 cases libres), mais la recherche du joueur y atteint presque toujours la fin de partie et n’utilise donc pas l’évaluation. En ouverture, z est presque du hasard : une mse un peu plus haute dit surtout que le nouveau maître est plus affirmatif, pas qu’il se trompe davantage.</p>
+<p>Sur le cluster, depuis <code>~/Yolah</code> :</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb59"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> nnue/relabel_teacher.sh       <span class="co"># le dernier az_*.pt du run ; TEACHER=…/az_&lt;pas&gt;.pt pour un autre</span></span>
 <span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> nnue</span>
 <span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a><span class="va">J</span><span class="op">=&lt;</span>numéro <span class="fu">du</span> job d<span class="st">&#39;étiquetage&gt;</span></span>
@@ -5589,6 +5668,75 @@ v = \tanh\Big(\underbrace{w_4^{(b)} \cdot h_3 + b_4^{(b)}}_{\text{le réseau}} \
 <span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>    <span class="ex">sbatch</span> <span class="at">--dependency</span><span class="op">=</span>afterok:<span class="va">$J</span> <span class="at">--time</span><span class="op">=</span>5-00:00:00 <span class="dt">\</span></span>
 <span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>           <span class="at">--export</span><span class="op">=</span>ALL,P7=1,YOLAH_PERSP_THEM=1,YOLAH_SPACE_GROUPS=<span class="va">$g</span>,YOLAH_QAT=1 nnue_persp_distill.sh</span>
 <span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span>                                       <span class="co"># → k8_them_g040_qat_az20, k8_them_g07e_qat_az20, k8_them_g046_qat_az20</span></span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Les entraînements.</strong> Mse de validation contre le nouveau maître après 20 époques (positions de validation de <code>cache_az256</code> : ces chiffres ne se comparent pas à ceux de P6, mesurés contre l’ancien maître), et vérification des réseaux exportés (<code>nets_check check_persp</code>, 2000 positions) :</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>réseau</th>
+<th>float</th>
+<th>quantifié</th>
+<th>écart C++ / PyTorch moyen (max)</th>
+<th><code>value()</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>k8_them_az20</code></td>
+<td>0,0862</td>
+<td>0,0962</td>
+<td>0,037 (0,98)</td>
+<td>1370 ns</td>
+</tr>
+<tr class="even">
+<td><code>spacelite_az20</code></td>
+<td><strong>0,0759</strong></td>
+<td>0,0996</td>
+<td>0,035 (1,89)</td>
+<td>1670 ns</td>
+</tr>
+<tr class="odd">
+<td><code>spacelite_qat_az20</code></td>
+<td>0,0781</td>
+<td><strong>0,0781</strong></td>
+<td>0 (0)</td>
+<td>1650 ns</td>
+</tr>
+<tr class="even">
+<td><code>g040_qat_az20</code></td>
+<td>0,0812</td>
+<td>0,0812</td>
+<td>0 (0)</td>
+<td>1470 ns</td>
+</tr>
+<tr class="odd">
+<td><code>g07e_qat_az20</code></td>
+<td>0,0766</td>
+<td><strong>0,0766</strong></td>
+<td>0 (0)</td>
+<td>1750 ns</td>
+</tr>
+<tr class="even">
+<td><code>g046_qat_az20</code></td>
+<td>0,0764</td>
+<td><strong>0,0764</strong></td>
+<td>0 (0)</td>
+<td>1680 ns</td>
+</tr>
+</tbody>
+</table>
+<p>(spacelite : 0,037 (0,92), 1680 ns.) La loterie de la quantification est encore plus forte avec ce maître : tout au long de l’entraînement, <code>k8_them_az20</code> perd de 12 à 75 % de mse à la quantification, <code>spacelite_az20</code> de 5 à 37 %, et sa dernière époque tombe mal (+31 %, un écart max de 1,89 sur 2000 positions). Le QAT ne coûte que 0,002 de mse float (0,0781 contre 0,0759) et gagne 22 % une fois quantifié. Les features d’espace font gagner 10 à 12 % de mse à elles seules (0,076 contre 0,086 en float). Parmi les réseaux QAT, g046 et g07e passent devant spacelite (0,0764 et 0,0766 contre 0,0781), alors qu’en P4–P5 spacelite les battait en jeu : leurs matchs d’alors étaient brouillés par le tirage de la quantification. Les temps de <code>value()</code> (±100 ns d’une mesure à l’autre) ne comptent pas le calcul des features elles-mêmes, qui se fait dans la recherche : c’est le tournoi qui dira si quelques millièmes de mse valent leur coût.</p>
+<p><strong>Le tournoi.</strong> <code>campaign_P7.txt</code> compte 42 matchs : les 8 premiers (2000 rondes) répondent aux trois questions ci-dessus ; les 34 suivants (1000 rondes) complètent un tournoi toutes rondes entre les 7 réseaux, aux deux cadences. Les classements, par cadence, regroupent les fichiers de chaque paire :</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb61"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">-p</span> insa-cpu <span class="at">--exclude</span><span class="op">=</span>crn07,crn14,crn15 <span class="at">--array</span><span class="op">=</span>1-42 <span class="dt">\</span></span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a>       <span class="at">--export</span><span class="op">=</span>ALL,BOOK=/Yolah/config/openings/balanced.txt nnue/search_study.sh campaign_P7.txt</span>
+<span id="cb61-3"><a href="#cb61-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> test/tournament_elo.py ~/SearchStudy/search_study/<span class="pp">*</span>az20<span class="pp">*</span>__t200000.csv <span class="at">--anchor</span> nnue_k8_them_spacelite</span>
+<span id="cb61-4"><a href="#cb61-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> test/tournament_elo.py ~/SearchStudy/search_study/<span class="pp">*</span>az20<span class="pp">*</span>__t1000000.csv <span class="at">--anchor</span> nnue_k8_them_spacelite</span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 </section>
 <section id="plan-et-mesure" class="level1" data-number="9">

@@ -3,6 +3,8 @@ tournament_elo.py — Elo ratings from the games of a tournament (Yolah --tourna
 
     python3 tournament_elo.py tournament_games.csv [--anchor random_player] [--bootstrap 200]
                               [--matrix pairs.csv]
+    (several files: their games are pooled, e.g. the per-pair files of a search_study
+     campaign played as a round robin: tournament_elo.py ~/SearchStudy/search_study/*az20*__t200000.csv)
 
 Model (Bradley–Terry with Elo scaling): player i scores against player j,
 in expectation,
@@ -73,14 +75,14 @@ def fit(players, games_idx, weights=None, iters=200, prior=2.0):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("games")
+    ap.add_argument("games", nargs="+", help="games CSV file(s), pooled")
     ap.add_argument("--anchor", default=None, help="player rated 0 (default: the mean is 0)")
     ap.add_argument("--bootstrap", type=int, default=200)
     ap.add_argument("--matrix", default=None, help="write the pairwise scores to this CSV")
     ap.add_argument("--prior", type=float, default=2.0, help="virtual draws per player against the mean")
     args = ap.parse_args()
 
-    games = load(args.games)
+    games = [g for path in args.games for g in load(path)]
     if not games:
         sys.exit("no games")
     players = sorted({p for g in games for p in g[:2]})
