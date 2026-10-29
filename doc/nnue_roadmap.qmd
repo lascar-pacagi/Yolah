@@ -2630,6 +2630,24 @@ python3 test/tournament_elo.py ~/SearchStudy/search_study/*az20*__t200000.csv --
 python3 test/tournament_elo.py ~/SearchStudy/search_study/*az20*__t1000000.csv --anchor nnue_k8_them_spacelite
 ```
 
+**Résultat du tournoi** (50 000 parties par cadence, livre d'ouvertures, Elo contre spacelite, intervalle à 95 %) :
+
+| réseau | features | mse | 0,2 s | 1 s |
+|---|---|---|---|---|
+| `g046_qat_az20` | qdist + qfirst + influence | 0,0764 | +72 [+65, +77] | **+66** [+61, +70] |
+| `g040_qat_az20` | l'influence seule | 0,0812 | +70 [+64, +75] | +59 [+53, +64] |
+| `g07e_qat_az20` | spacelite + influence | 0,0766 | **+74** [+68, +79] | +59 [+53, +64] |
+| `spacelite_qat_az20` | spacelite | 0,0781 | +69 [+64, +73] | +54 [+49, +59] |
+| `spacelite_az20` | spacelite, sans QAT | 0,0759 / 0,0996 | +47 [+42, +52] | +30 [+26, +36] |
+| `k8_them_az20` | aucune | 0,0862 / 0,0962 | +23 [+17, +29] | +13 [+7, +19] |
+
+À budget égal, chaque étape apporte sa part (0,2 s / 1 s) : le nouveau maître et l'entraînement long +23 / +13,
+les features d'espace +24 / +17, le QAT +22 / +24. À 0,2 s, les quatre réseaux QAT sont à égalité ; à 1 s,
+`g046` passe devant (+7 sur `g040` et `g07e`, +12 sur `spacelite_qat`). Les features qui comptent sont
+l'influence, présente dans les trois premiers, et les distances de dame (qdist, qfirst) ; le reste de
+spacelite n'apporte rien de plus. Au total, **le meilleur réseau P7 gagne environ 70 Elo sur spacelite**, le
+meilleur réseau d'avant P7, et `g046_qat_az20` devient le réseau du joueur dev.
+
 
 # Plan et mesure
 

@@ -5737,6 +5737,70 @@ v = \tanh\Big(\underbrace{w_4^{(b)} \cdot h_3 + b_4^{(b)}}_{\text{le réseau}} \
 <span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a>       <span class="at">--export</span><span class="op">=</span>ALL,BOOK=/Yolah/config/openings/balanced.txt nnue/search_study.sh campaign_P7.txt</span>
 <span id="cb61-3"><a href="#cb61-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> test/tournament_elo.py ~/SearchStudy/search_study/<span class="pp">*</span>az20<span class="pp">*</span>__t200000.csv <span class="at">--anchor</span> nnue_k8_them_spacelite</span>
 <span id="cb61-4"><a href="#cb61-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> test/tournament_elo.py ~/SearchStudy/search_study/<span class="pp">*</span>az20<span class="pp">*</span>__t1000000.csv <span class="at">--anchor</span> nnue_k8_them_spacelite</span></code></pre></div><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Résultat du tournoi</strong> (50 000 parties par cadence, livre d’ouvertures, Elo contre spacelite, intervalle à 95 %) :</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>réseau</th>
+<th>features</th>
+<th>mse</th>
+<th>0,2 s</th>
+<th>1 s</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>g046_qat_az20</code></td>
+<td>qdist + qfirst + influence</td>
+<td>0,0764</td>
+<td>+72 [+65, +77]</td>
+<td><strong>+66</strong> [+61, +70]</td>
+</tr>
+<tr class="even">
+<td><code>g040_qat_az20</code></td>
+<td>l’influence seule</td>
+<td>0,0812</td>
+<td>+70 [+64, +75]</td>
+<td>+59 [+53, +64]</td>
+</tr>
+<tr class="odd">
+<td><code>g07e_qat_az20</code></td>
+<td>spacelite + influence</td>
+<td>0,0766</td>
+<td><strong>+74</strong> [+68, +79]</td>
+<td>+59 [+53, +64]</td>
+</tr>
+<tr class="even">
+<td><code>spacelite_qat_az20</code></td>
+<td>spacelite</td>
+<td>0,0781</td>
+<td>+69 [+64, +73]</td>
+<td>+54 [+49, +59]</td>
+</tr>
+<tr class="odd">
+<td><code>spacelite_az20</code></td>
+<td>spacelite, sans QAT</td>
+<td>0,0759 / 0,0996</td>
+<td>+47 [+42, +52]</td>
+<td>+30 [+26, +36]</td>
+</tr>
+<tr class="even">
+<td><code>k8_them_az20</code></td>
+<td>aucune</td>
+<td>0,0862 / 0,0962</td>
+<td>+23 [+17, +29]</td>
+<td>+13 [+7, +19]</td>
+</tr>
+</tbody>
+</table>
+<p>À budget égal, chaque étape apporte sa part (0,2 s / 1 s) : le nouveau maître et l’entraînement long +23 / +13, les features d’espace +24 / +17, le QAT +22 / +24. À 0,2 s, les quatre réseaux QAT sont à égalité ; à 1 s, <code>g046</code> passe devant (+7 sur <code>g040</code> et <code>g07e</code>, +12 sur <code>spacelite_qat</code>). Les features qui comptent sont l’influence, présente dans les trois premiers, et les distances de dame (qdist, qfirst) ; le reste de spacelite n’apporte rien de plus. Au total, <strong>le meilleur réseau P7 gagne environ 70 Elo sur spacelite</strong>, le meilleur réseau d’avant P7, et <code>g046_qat_az20</code> devient le réseau du joueur dev.</p>
 </section>
 </section>
 <section id="plan-et-mesure" class="level1" data-number="9">
