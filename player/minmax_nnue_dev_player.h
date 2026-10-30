@@ -130,6 +130,8 @@ struct SearchTracer;   // player/search_trace.h, only used by the search_trace e
 struct MinMaxNNUE_DevOptions {
     bool pvs = true;                 // ["pvs"] null windows for all moves but the first
     int  aspiration_window = 300;    // ["aspiration window"] half width at the root, 0 = full window
+    double aspiration_k = 0;         // ["aspiration k"] > 0: adaptive half width, k × the mean change of value between depths (at least "aspiration window")
+    double aspiration_grow = 1.5;    // ["aspiration grow"] adaptive windows: factor of the half width after each failure
     bool history = true;             // ["history"] quiet moves ordered by their history of cutoffs
     bool countermove = true;         // ["countermove"] the move that refuted the opponent's last move
     bool root_ordering = true;       // ["root ordering"] root moves: best first, then by subtree size
@@ -308,6 +310,9 @@ private:
         // Countermove: for each opponent move (from, to), the last move that
         // refuted it (caused a cutoff right after it).
         Move countermoves[SQUARE_NB][SQUARE_NB]{};
+        // Adaptive aspiration windows: decaying sums of |v_d − v_{d−1}| and
+        // of their count, over the iterations of this game's searches.
+        double asp_sum = 0, asp_n = 0;
     };
     const size_t nb_threads;
     std::vector<std::unique_ptr<Worker>> workers;

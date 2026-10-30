@@ -1,0 +1,9 @@
+# Campaign A1 (search, adaptive aspiration windows, 2026-10-30): with the fixed ±300 half width, half the
+# iterations fail (median |v_d − v_{d−1}| ≈ 630, p90 ≈ 4600) and 45 % of the nodes are in failed attempts.
+# "aspiration k": half width = k × the decaying mean change of value between depths (at least 300), re-centred
+# on the fail-soft value after a failure, ×1.5 per failure. search_bench depth 12 (g046, 1 thread): k 1.25
+# −17 % nodes (−19 % warm), k 2 −7 % (−21 % warm). Against g046 as it is. BOOK=balanced.
+g046_asp_k125 nnue_k8_them_g046_qat_az20 200000 1000
+g046_asp_k2 nnue_k8_them_g046_qat_az20 200000 1000
+g046_asp_k125 nnue_k8_them_g046_qat_az20 1000000 1000
+g046_asp_k2 nnue_k8_them_g046_qat_az20 1000000 1000

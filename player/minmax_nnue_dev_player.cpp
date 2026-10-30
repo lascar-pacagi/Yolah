@@ -1618,6 +1618,16 @@ void MinMaxNNUE_DevPlayer::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
 // first depths (unstable values) nor once a game result is in sight
 // (|v| > WIN: exact scores, no point in a window).
 //
+// Adaptive windows ("aspiration k" > 0; 2026-10-30): with ±300, half the
+// iterations failed (the median change of value between two depths is ~630,
+// p90 ~4600) and 45 % of the nodes were in failed attempts. δ is k times the
+// mean |v_d − v_{d−1}| this thread has seen (decaying by 0.9 per iteration,
+// kept from one move of the game to the next), at least "aspiration window".
+// After a failure the window is re-centred on the fail-soft value v (the
+// result is at most / at least v, often far beyond the old bound): fail low
+// α = v − δ and β = (α + β) / 2, fail high β = v + δ; δ grows by "aspiration
+// grow". search_bench depth 12 (g046, 1 thread): k 1.25–2 −22 % nodes.
+//
 // FIX (A): when the clock stops an iteration, its best move so far is kept if
 // one was completely searched: the first move searched is the previous best
 // (the table's move), so a different move found by the deeper search beat it.
@@ -1647,6 +1657,8 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
     for (int d = 1; d <= max_depth && d < 64; d++) {
         if (s.id > 0 && ((d + SKIP_PHASE[k]) / SKIP_SIZE[k]) % 2 == 1 && d < max_depth) continue;
         int delta = options.aspiration_window;
+        const bool adaptive = options.aspiration_k > 0;
+        if (adaptive && s.w->asp_n > 0) delta = std::max(delta, int(options.aspiration_k * s.w->asp_sum / s.w->asp_n));
         int alpha = -INFINITE, beta = INFINITE;
         if (delta > 0 && d >= 4 && std::abs(value) < WIN) {
             alpha = std::max(value - delta, -INFINITE);
@@ -1664,15 +1676,26 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
             }
             if (v <= alpha && alpha > -INFINITE) {          // fail low: widen downwards
                 TR(ITER_RESULT, d, v, m.raw(), 1);
-                alpha = std::max(alpha - delta, -INFINITE);
-                delta *= 2;
+                if (adaptive) {
+                    beta = (alpha + beta) / 2;
+                    alpha = std::max(v - delta, -INFINITE);
+                    delta = int(delta * options.aspiration_grow);
+                } else {
+                    alpha = std::max(alpha - delta, -INFINITE);
+                    delta *= 2;
+                }
                 continue;
             }
             if (v >= beta && beta < INFINITE) {             // fail high: widen upwards
                 TR(ITER_RESULT, d, v, m.raw(), 2);
                 if (m != Move::none()) res = m;             // already known better than before
-                beta = std::min(beta + delta, INFINITE);
-                delta *= 2;
+                if (adaptive) {
+                    beta = std::min(v + delta, INFINITE);
+                    delta = int(delta * options.aspiration_grow);
+                } else {
+                    beta = std::min(beta + delta, INFINITE);
+                    delta *= 2;
+                }
                 continue;
             }
             TR(ITER_RESULT, d, v, m.raw(), 0);
@@ -1680,6 +1703,10 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
             if (tracer) trace_pv(__LINE__, yolah, hash, d);
 #endif
             res = m;
+            if (d >= 4 && depth > 0 && std::abs(v) < WIN && std::abs(value) < WIN) {
+                s.w->asp_sum = 0.9 * s.w->asp_sum + std::abs(v - value);
+                s.w->asp_n   = 0.9 * s.w->asp_n + 1;
+            }
             depth = uint8_t(d);
             value = v;
             break;
@@ -1748,6 +1775,8 @@ json MinMaxNNUE_DevPlayer::config() {
     j["weights"] = nnue_q_parameters_filename;
     j["pvs"] = options.pvs;
     j["aspiration window"] = options.aspiration_window;
+    j["aspiration k"] = options.aspiration_k;
+    j["aspiration grow"] = options.aspiration_grow;
     j["history"] = options.history;
     j["countermove"] = options.countermove;
     j["root ordering"] = options.root_ordering;
