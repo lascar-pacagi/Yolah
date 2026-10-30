@@ -1019,11 +1019,11 @@ function renderBoard(q, frames, hover) {
     [["coup", "coup en cours"], ["best", "meilleurs coups"], ["pv", "variation principale"]].map(([k, n]) =>
       `<button class="${ui.boardMode === k ? "on" : ""}" data-m="${k}">${n}</button>`).join("") +
     (ui.boardMode !== "coup" ? `<label class=dim style="align-self:center;margin-left:6px" title="Sinon : l'état à l'instant courant"><input type=checkbox id="bfinal"${ui.branchFinal ? " checked" : ""}> fin du nœud</label>` : "");
-  for (const b of $("boardmode").querySelectorAll("button")) b.onclick = () => { ui.boardMode = b.dataset.m; render(true); };
-  if ($("bfinal")) $("bfinal").onchange = ev => { ui.branchFinal = ev.target.checked; render(); };
+  for (const b of $("boardmode").querySelectorAll("button")) b.onclick = () => { ui.boardMode = b.dataset.m; refreshView(); };
+  if ($("bfinal")) $("bfinal").onchange = ev => { ui.branchFinal = ev.target.checked; refreshView(); };
   const mover = (pos.ply - 1) & 1;
   $("boardcap").className = "cap" + (hover ? " hovercap" : "");
-  $("boardcap").innerHTML = q < 0 ? "racine" : (hover ? "aperçu (survol) · clic = y aller · " : "") +
+  $("boardcap").innerHTML = q < 0 ? "racine" : (hover ? "aperçu (survol ; Maj enfoncée = figé ; Échap = fin) · clic = y aller · " : "") +
     `nœud #${q} · ${pos.ply & 1 ? "○ blanc" : "● noir"} au trait`;
   renderEval(q, st, pos);
   $("movecap").innerHTML = (last ? `<span style="color:#e2b93d">■</span> joué : ${mover ? "○" : "●"} ${mvStr(last)}` : "") +
@@ -1136,14 +1136,23 @@ function previewNode(q) {
   hoverRaf = requestAnimationFrame(() => {
     if (ui.hoverQ === null) renderBoard(T.own[cur], framesAt(cur));
     else renderBoard(ui.hoverQ, null, true);
-    if (ui.tab === "branche") renderTab();
+    if (ui.tab === "branche" || ui.tab === "coups" || ui.tab === "tt") renderTab();
   });
 }
 $("tree").addEventListener("mouseover", ev => {
+  if (ev.shiftKey && ui.hoverQ !== null) return;                     // Shift held: the preview stays
   const row = ev.target.closest(".row"); if (!row) return;
   const q = +row.dataset.q; previewNode(q >= 0 ? q : null);
 });
-$("tree").addEventListener("mouseleave", () => previewNode(null));
+// The preview stays while the mouse goes from the tree to the right column (board,
+// summary, tabs), so that they can be used; it ends when the mouse leaves both, or Escape.
+$("tree").addEventListener("mouseleave", ev => { if (!(ev.relatedTarget && $("right").contains(ev.relatedTarget))) previewNode(null); });
+$("right").addEventListener("mouseleave", ev => { if (!(ev.relatedTarget && $("tree").contains(ev.relatedTarget))) previewNode(null); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && ui.hoverQ !== null) previewNode(null); });
+// redraw the board and the tab without leaving the preview (render() ends it)
+function refreshView() {
+  if (ui.hoverQ !== null) { renderBoard(ui.hoverQ, null, true); renderTab(); } else render();
+}
 
 // ── transposition table ──
 // The entry of a position after event t, from the trace's probes and stores (entries
@@ -1171,7 +1180,7 @@ function ttStateAt(key, t) {
 const TABS = [["branche", "Branche"], ["coups", "Coups"], ["tt", "TT"], ["hist", "Historique"], ["iter", "Itérations"], ["stats", "Stats"], ["arrets", "Points d'arrêt"], ["valid", "Validation"], ["aide", "Aide"]];
 function renderTabs() {
   $("tabs").innerHTML = TABS.map(([k, n]) => `<button class="${ui.tab === k ? "on" : ""}" data-k="${k}">${n}</button>`).join("");
-  for (const b of $("tabs").children) b.onclick = () => { ui.tab = b.dataset.k; renderTabs(); renderTab(); };
+  for (const b of $("tabs").children) b.onclick = () => { ui.tab = b.dataset.k; renderTabs(); renderTab(); };  // keeps the preview
 }
 function renderTab() {
   const f = { branche: tabBranch, coups: tabMoves, tt: tabTT, hist: tabHistory, iter: tabIters, stats: tabStats, arrets: tabBps, aide: tabHelp, valid: tabValidation }[ui.tab];
@@ -1257,7 +1266,7 @@ function pvText(pv, ply0, links) {
   }).join(" ") + `</span>`;
 }
 function tabBranch() {
-  const q = ui.hoverQ !== null ? ui.hoverQ : T.own[cur];
+  const q = viewQ();
   if (q < 0) return "<div class=dim>Pas de nœud courant.</div>";
   const nd = T.nd, t = branchTime(q), pos = posOf(q), side = pos.ply & 1 ? "○ blanc" : "● noir";
   const B = branchOf(q, t), pv = pvOf(q, t), BB = ["", "≤", "≥", "="];
@@ -1296,17 +1305,19 @@ function tabBranch() {
     `Survol d'une ligne : flèche sur le plateau. Clic : aller à la recherche du coup. Le plateau peut montrer les 3 meilleurs coups ou la variation principale (boutons sous le plateau).</div>`;
 }
 function afterBranch() {
-  for (const b of $("tabbody").querySelectorAll(".seg button")) b.onclick = () => { ui.branchFinal = b.dataset.f === "1"; render(); };
+  for (const b of $("tabbody").querySelectorAll(".seg button")) b.onclick = () => { ui.branchFinal = b.dataset.f === "1"; refreshView(); };
   for (const a of $("tabbody").querySelectorAll(".pvline a")) a.onclick = () => go(T.nd.enter[+a.dataset.q]);
-  const q = ui.hoverQ !== null ? ui.hoverQ : T.own[cur]; if (q < 0) return;
+  const q = viewQ(); if (q < 0) return;
   for (const tr of $("tabbody").querySelectorAll("tr[data-r]")) {
     tr.onmouseenter = () => { $("board").innerHTML = boardSvg(posOf(q), { next: +tr.dataset.r, size: 32 }); };
     tr.onmouseleave = () => { if (ui.hoverQ !== null) renderBoard(ui.hoverQ, null, true); else render(true); };
     tr.onclick = () => { if (tr.dataset.ev) go(+tr.dataset.ev); };
   }
 }
+// the node the tabs show: the previewed one (tree hover), else the cursor's
+const viewQ = () => ui.hoverQ !== null ? ui.hoverQ : T.own[cur];
 function tabMoves() {
-  const q = T.own[cur];
+  const q = viewQ();
   if (q < 0) return "<div class=dim>Pas de nœud courant.</div>";
   const M = nodeMoves(q, cur), nd = T.nd;
   const all = new Map();
@@ -1340,17 +1351,17 @@ function tabMoves() {
   return h + "</table><div class=help>Clic : aller au début de la recherche de ce coup. Survol : flèche sur le plateau.</div>";
 }
 function afterMoves() {
-  const q = T.own[cur]; if (q < 0) return;
+  const q = viewQ(); if (q < 0) return;
   for (const tr of $("tabbody").querySelectorAll("tr[data-r]")) {
     tr.onmouseenter = () => { const pos = posOf(q); $("board").innerHTML = boardSvg(pos, { next: +tr.dataset.r, size: 32 }); };
-    tr.onmouseleave = () => render(true);
+    tr.onmouseleave = () => { if (ui.hoverQ !== null) renderBoard(ui.hoverQ, null, true); else render(true); };
     tr.onclick = () => { if (tr.dataset.ev) go(+tr.dataset.ev); else { ui.inspect = { q, r: +tr.dataset.r }; ui.tab = "tt"; renderTabs(); renderTab(); } };
   }
 }
 
 // ── TT tab ──
 function tabTT() {
-  const q = T.own[cur];
+  const q = viewQ();
   if (q < 0) return "<div class=dim>Pas de nœud courant.</div>";
   const nd = T.nd, B = ["", "≤", "≥", "="];
   let key = hkey(nd.hlo[q], nd.hhi[q]), title = "la position du nœud courant";
@@ -1494,6 +1505,7 @@ function tabHelp() {
   <kbd>n</kbd>/<kbd>N</kbd> itération suivante/précédente · <kbd>Home</kbd>/<kbd>End</kbd> · <kbd>espace</kbd> lecture · <kbd>[</kbd>/<kbd>]</kbd> recherche précédente/suivante d'une partie. Bouton « Comment enregistrer une trace ? » en haut : toutes les options et les tailles.<br>
   <b>Arbre</b> : clic sur un nœud = aller à son entrée, Maj+clic = à son retour ; ▸ déplie. Badges : <span class="badge b-lmr">LMR</span> recherche réduite, <span class="badge b-nw">nulle</span> fenêtre nulle (PVS), <span class="badge b-rs">re-rech.</span> re-recherche pleine fenêtre, <span class="badge b-full">pleine</span>, <span class="badge b-mpc">MPC↑</span>/<span class="badge b-mpc">MPC↓</span> Multi-ProbCut (même position, moins profond), <span class="badge b-proxy">proxy</span> témoin de la coupe proxy. Résultat : ≤ borne supérieure, ≥ borne inférieure, = exacte ; puis la raison du retour (TT, éval, RFP, MPC, proxy, cut@i = β-coupure au coup i, tous = aucun coup n'a coupé).<br>
   <b>Plateau et jauge</b> : survoler une ligne de l'arbre montre ce nœud (position, dernier coup, valeurs) sans déplacer le curseur ; le cadre bleu pointillé signale l'aperçu. La jauge à côté du plateau met sur une même échelle, du point de vue du joueur au trait au nœud : la fenêtre [α, β] (bande bleue, un trait si fenêtre nulle), α courant (tirets), la valeur statique du réseau (◆), le résultat (● exact, ▲ borne inférieure, ▼ borne supérieure) et la borne de la table (à droite).<br>
+  <b>Aperçu</b> : le survol d'une ligne de l'arbre montre ce nœud dans le plateau, la jauge et les onglets Branche, Coups et TT ; il reste quand la souris passe de l'arbre à la colonne de droite. Pour traverser d'autres lignes sans changer de nœud, garder <b>Maj</b> enfoncée. Échap ou sortir des deux colonnes : retour au nœud courant ; clic sur la ligne : y aller.<br>
   <b>Branche</b> (onglet) : pour le nœud courant (ou survolé), le meilleur coup, les coups cherchés classés (valeurs exactes par ordre décroissant, puis les bornes : ≥ coupure, ≤ n'a pas battu α ; la borne vient de la fenêtre de la dernière recherche du coup), la variation principale (meilleur coup, puis le meilleur coup du nœud qui l'a cherché en dernier, etc.) et ce que le nœud écrit dans la table. « instant » : ce qui est connu au curseur ; « fin du nœud » : quand il retourne. Sous le plateau, « meilleurs coups » dessine les 3 premiers et « variation principale » la VP numérotée (bleu : noir joue, blanc : blanc joue).<br>
   <b>Valeurs</b> : unités de la recherche, ±${T.C.WIN} = tanh ±1 du réseau ; « gain +k » = partie gagnée de k points (au-delà de toute évaluation).<br>
   <b>Enregistrer une trace</b> (dans <code>build/</code>) :
