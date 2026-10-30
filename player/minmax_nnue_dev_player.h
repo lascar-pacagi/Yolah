@@ -131,6 +131,7 @@ struct MinMaxNNUE_DevOptions {
     bool pvs = true;                 // ["pvs"] null windows for all moves but the first
     int  aspiration_window = 300;    // ["aspiration window"] half width at the root, 0 = full window
     double aspiration_k = 0;         // ["aspiration k"] > 0: adaptive half width, k × the mean change of value between depths (at least "aspiration window")
+    int  tempo = 0;                  // ["tempo"] added to the network's value for the side to move (values: ±30000 = tanh ±1)
     double aspiration_grow = 1.5;    // ["aspiration grow"] adaptive windows: factor of the half width after each failure
     bool history = true;             // ["history"] quiet moves ordered by their history of cutoffs
     bool countermove = true;         // ["countermove"] the move that refuted the opponent's last move

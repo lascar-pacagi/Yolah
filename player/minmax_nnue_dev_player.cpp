@@ -1150,8 +1150,24 @@ static int round_to_grain(int v, int grain) {
     return std::clamp(q * grain, -heuristic::MAX_VALUE, int(heuristic::MAX_VALUE));
 }
 
+// Tempo ("tempo", off): a constant for the side to move. The value oscillates
+// between odd and even depths (2026-10-30, search_bench depth 12, mean change
+// for the root's side: −2400, +2350, −2160 from depth 1→2, 2→3, 3→4, still
+// ±500 at 8→9). Tempo 1500–2000 (before the tanh) removes the mean
+// oscillation at depths 1–4 but changes nothing else: the median change
+// between depths does not fall (1326 → 1670), failed aspiration attempts
+// neither (4896 → 5105), nodes ±2 %. The oscillation is a mean; what makes the
+// windows fail is the spread from position to position.
 int MinMaxNNUE_DevPlayer::network_value(const Yolah& yolah, Search& s) {
-    return round_to_grain(raw_network_value(yolah, s), options.eval_grain);
+    int v = raw_network_value(yolah, s);
+    if (options.tempo) {
+        // Added before the tanh (to the logit), not to the value: near ±WIN a
+        // constant would flatten the differences between won positions (and a
+        // value of WIN would pass for a finished game). Near 0 both are the same.
+        const double x = std::clamp(double(v) / WIN, -0.999999, 0.999999);
+        v = std::clamp(int(std::lround(std::tanh(std::atanh(x) + double(options.tempo) / WIN) * WIN)), -WIN + 1, WIN - 1);
+    }
+    return round_to_grain(v, options.eval_grain);
 }
 
 int MinMaxNNUE_DevPlayer::raw_network_value(const Yolah& yolah, Search& s) {
@@ -1777,6 +1793,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["aspiration window"] = options.aspiration_window;
     j["aspiration k"] = options.aspiration_k;
     j["aspiration grow"] = options.aspiration_grow;
+    j["tempo"] = options.tempo;
     j["history"] = options.history;
     j["countermove"] = options.countermove;
     j["root ordering"] = options.root_ordering;
