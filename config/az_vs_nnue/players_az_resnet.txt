@@ -1,0 +1,6 @@
+# AlphaZero 256 against its starting point, the supervised ResNet, alone (same MCTS,
+# same GPU, same threads and time per move): does the gap seen in players.txt depend
+# on the search budget? Give TOURNAMENT_DIR the az256.ts (and az256.name) of the first
+# tournament before the job starts, so that both tournaments play the same network.
+az256.cfg
+resnet_supervised.cfg
