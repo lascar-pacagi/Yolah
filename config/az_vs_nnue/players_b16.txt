@@ -1,0 +1,6 @@
+# NNUE g046 (16 threads) against AlphaZero 256 and the supervised ResNet with 256 descents in flight
+# (16 threads × batch 16) instead of 1024 (16 × 64): mcts_bench 762533 (L40S, 1 s) shows no throughput
+# gain beyond ~256 for AZ 256, and AZ − ResNet went from ≈ −20 (1024 in flight) to +6 (256, 4 × 64).
+nnue_g046_qat_az20.cfg
+az256_b16.cfg
+resnet_supervised_b16.cfg
