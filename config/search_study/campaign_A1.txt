@@ -3,7 +3,15 @@
 # "aspiration k": half width = k × the decaying mean change of value between depths (at least 300), re-centred
 # on the fail-soft value after a failure, ×1.5 per failure. search_bench depth 12 (g046, 1 thread): k 1.25
 # −17 % nodes (−19 % warm), k 2 −7 % (−21 % warm). Against g046 as it is. BOOK=balanced.
+# Lines 5-8: the Yolah table ("yolah table", player/search_table.h): the reference table refuses a non-exact
+# store at equal depth (aspiration / PVS re-searches lose their tighter bound and their cut move); the Yolah
+# table keeps both bounds and the tightest of each. search_bench depth 12 (13.76 M / warm 14.10 M): Yolah table
+# −21 % (warm −17 %), with k 1.25 −14 % (warm −23 %).
 g046_asp_k125 nnue_k8_them_g046_qat_az20 200000 1000
 g046_asp_k2 nnue_k8_them_g046_qat_az20 200000 1000
 g046_asp_k125 nnue_k8_them_g046_qat_az20 1000000 1000
 g046_asp_k2 nnue_k8_them_g046_qat_az20 1000000 1000
+g046_ytable nnue_k8_them_g046_qat_az20 200000 1000
+g046_ytable_k125 nnue_k8_them_g046_qat_az20 200000 1000
+g046_ytable nnue_k8_them_g046_qat_az20 1000000 1000
+g046_ytable_k125 nnue_k8_them_g046_qat_az20 1000000 1000
