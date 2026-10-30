@@ -103,6 +103,13 @@ td.r, th.r { text-align: right; }
 #evaltext .kv2 { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin-top: 4px; font-variant-numeric: tabular-nums; }
 #evaltext .kv2 > div:nth-child(odd) { color: var(--dim); white-space: nowrap; }
 #evaltext .sym { display: inline-block; width: 12px; text-align: center; }
+#boardmode { display: flex; gap: 2px; margin-top: 3px; font-size: 11px; }
+#boardmode button { padding: 0 6px; font-size: 11px; }
+#boardmode button.on, .seg button.on { background: var(--accent); color: #0b0d12; }
+.seg { display: inline-flex; gap: 2px; } .seg button { padding: 0 6px; font-size: 11px; }
+.brhead { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; margin: 6px 0; font-variant-numeric: tabular-nums; }
+.brhead > div:nth-child(odd) { color: var(--dim); }
+.pvline a { cursor: pointer; } .pvline a:hover { text-decoration: underline; }
 #side { flex: 1 1 180px; min-width: 180px; }
 .cap { color: var(--dim); font-size: 11px; margin: 2px 0; }
 #line { font-size: 11px; margin-top: 4px; line-height: 1.6; }
@@ -202,7 +209,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
     </div>
     <div class="col" id="right">
       <div class="box" id="boardrow">
-        <div><div class="cap" id="boardcap"></div><div class="board" id="board"></div><div class="cap" id="movecap"></div></div>
+        <div><div class="cap" id="boardcap"></div><div class="board" id="board"></div><div class="cap" id="movecap"></div><div id="boardmode"></div></div>
         <div id="evalpanel"></div>
         <div id="side"><div class="cap">plateau de la partie (racine)</div><div class="board" id="rootboard"></div><div id="line"></div></div>
       </div>
@@ -224,7 +231,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
 // ═══════════════════════════════════════════════════════════════════════════
 let T = null;            // the loaded trace
 let cur = 0;             // current event
-const ui = { tab: "coups", expanded: new Set(), bps: new Map(), evBps: new Set(), playing: null, inspect: null, hoverQ: null };
+const ui = { boardMode: "coup", branchFinal: false, tab: "branche", expanded: new Set(), bps: new Map(), evBps: new Set(), playing: null, inspect: null, hoverQ: null };
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
@@ -958,6 +965,22 @@ function boardSvg(pos, opts = {}) {
     s += arrow(opts.last, "#e2b93d", "ahr");
   }
   if (opts.next) s += ring(mvFrom(opts.next), "#5aa9ff") + ring(mvTo(opts.next), "#5aa9ff") + arrow(opts.next, "#5aa9ff", "ah");
+  // extra arrows (best moves, principal variation): {r, col, label}, drawn last to first
+  if (opts.arrows) {
+    let lab = "";
+    opts.arrows.forEach((A, k) => {
+      if (!A.r) return;
+      const mk = `ax${opts.id || ""}${k}`;
+      s += `<defs><marker id="${mk}" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="${A.col}"/></marker></defs>`;
+      const [x1, y1] = xy(mvFrom(A.r)), [x2, y2] = xy(mvTo(A.r));
+      s += `<line x1="${x1 + S / 2}" y1="${y1 + S / 2}" x2="${x2 + S / 2}" y2="${y2 + S / 2}" stroke="${A.col}" stroke-width="${A.w || 3}" opacity=".9" marker-end="url(#${mk})"/>`;
+      if (A.label !== undefined) {
+        const cx = x1 + S / 2 + (x2 - x1) * 0.42, cy = y1 + S / 2 + (y2 - y1) * 0.42;
+        lab += `<circle cx="${cx}" cy="${cy}" r="8" fill="${A.col}" stroke="#0008"/><text x="${cx}" y="${cy + 3.5}" font-size="10" font-weight="700" text-anchor="middle" fill="#000">${A.label}</text>`;
+      }
+    });
+    s += lab;
+  }
   return s + "</svg>";
 }
 // hover = true: a preview of node q (the mouse is over its row in the tree), at the
@@ -977,14 +1000,35 @@ function renderBoard(q, frames, hover) {
   const flash = !hover && q !== ui.boardNode && last !== 0 && !ui.playingFast;
   if (!hover) ui.boardNode = q;
   $("boardrow").classList.toggle("hover", !!hover);
-  $("board").innerHTML = boardSvg(pos, { last, next, flash, size: 32 });
+  let arrows = null, modeCap = "";
+  if (q >= 0 && ui.boardMode !== "coup") {
+    const tB = branchTime(q);
+    if (ui.boardMode === "best") {
+      const B = branchOf(q, tB), top = B.ranked.slice(0, 3), cols = ["#57c27a", "#a3d977", "#e2b93d"];
+      arrows = top.map((m, k) => ({ r: m.r, col: cols[k], label: k + 1, w: 4 - k })).reverse();
+      modeCap = top.length ? "meilleurs : " + top.map((m, k) => `<span style="color:${cols[k]}">${k + 1}. ${mvStr(m.r)} ${m.b} ${valStr(m.v)}</span>`).join(" · ") : "<span class=dim>aucun coup cherché</span>";
+    } else {
+      const pv = pvOf(q, tB);
+      arrows = pv.filter(x => x.move).map((x, k) => ({ r: x.move, col: ((pos.ply + k) & 1) ? "#e8e8e8" : "#5aa9ff", label: k + 1 })).reverse();
+      modeCap = pv.length ? "VP : " + pvText(pv, pos.ply) : "<span class=dim>pas de variation</span>";
+    }
+    next = 0;
+  }
+  $("board").innerHTML = boardSvg(pos, { last, next, flash, size: 32, arrows });
+  $("boardmode").innerHTML = `<span class=dim style="align-self:center">plateau :</span>` +
+    [["coup", "coup en cours"], ["best", "meilleurs coups"], ["pv", "variation principale"]].map(([k, n]) =>
+      `<button class="${ui.boardMode === k ? "on" : ""}" data-m="${k}">${n}</button>`).join("") +
+    (ui.boardMode !== "coup" ? `<label class=dim style="align-self:center;margin-left:6px" title="Sinon : l'état à l'instant courant"><input type=checkbox id="bfinal"${ui.branchFinal ? " checked" : ""}> fin du nœud</label>` : "");
+  for (const b of $("boardmode").querySelectorAll("button")) b.onclick = () => { ui.boardMode = b.dataset.m; render(true); };
+  if ($("bfinal")) $("bfinal").onchange = ev => { ui.branchFinal = ev.target.checked; render(); };
   const mover = (pos.ply - 1) & 1;
   $("boardcap").className = "cap" + (hover ? " hovercap" : "");
   $("boardcap").innerHTML = q < 0 ? "racine" : (hover ? "aperçu (survol) · clic = y aller · " : "") +
     `nœud #${q} · ${pos.ply & 1 ? "○ blanc" : "● noir"} au trait`;
   renderEval(q, st, pos);
   $("movecap").innerHTML = (last ? `<span style="color:#e2b93d">■</span> joué : ${mover ? "○" : "●"} ${mvStr(last)}` : "") +
-    (next ? `${last ? " · " : ""}<span style="color:#5aa9ff">■</span> ${nextWhat} : ${mvStr(next)}` : "");
+    (next ? `${last ? " · " : ""}<span style="color:#5aa9ff">■</span> ${nextWhat} : ${mvStr(next)}` : "") +
+    (modeCap ? `<div>${modeCap}</div>` : "");
   const S = G && G.H.searches[G.k], prevMove = S && S.ply > 0 ? G.H.game[S.ply - 1] : 0;
   $("rootboard").innerHTML = boardSvg(rootPosition(), { size: 19, id: "r", last: prevMove, next: q >= 0 ? firstMoveOf(q) : 0 });
   // the line from the root: each move clickable (jump to that node's entry)
@@ -1092,6 +1136,7 @@ function previewNode(q) {
   hoverRaf = requestAnimationFrame(() => {
     if (ui.hoverQ === null) renderBoard(T.own[cur], framesAt(cur));
     else renderBoard(ui.hoverQ, null, true);
+    if (ui.tab === "branche") renderTab();
   });
 }
 $("tree").addEventListener("mouseover", ev => {
@@ -1123,15 +1168,15 @@ function ttStateAt(key, t) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Tabs
 // ═══════════════════════════════════════════════════════════════════════════
-const TABS = [["coups", "Coups"], ["tt", "TT"], ["hist", "Historique"], ["iter", "Itérations"], ["stats", "Stats"], ["arrets", "Points d'arrêt"], ["valid", "Validation"], ["aide", "Aide"]];
+const TABS = [["branche", "Branche"], ["coups", "Coups"], ["tt", "TT"], ["hist", "Historique"], ["iter", "Itérations"], ["stats", "Stats"], ["arrets", "Points d'arrêt"], ["valid", "Validation"], ["aide", "Aide"]];
 function renderTabs() {
   $("tabs").innerHTML = TABS.map(([k, n]) => `<button class="${ui.tab === k ? "on" : ""}" data-k="${k}">${n}</button>`).join("");
   for (const b of $("tabs").children) b.onclick = () => { ui.tab = b.dataset.k; renderTabs(); renderTab(); };
 }
 function renderTab() {
-  const f = { coups: tabMoves, tt: tabTT, hist: tabHistory, iter: tabIters, stats: tabStats, arrets: tabBps, aide: tabHelp, valid: tabValidation }[ui.tab];
+  const f = { branche: tabBranch, coups: tabMoves, tt: tabTT, hist: tabHistory, iter: tabIters, stats: tabStats, arrets: tabBps, aide: tabHelp, valid: tabValidation }[ui.tab];
   $("tabbody").innerHTML = f ? f() : "";
-  const after = { coups: afterMoves, tt: afterTT, hist: afterHistory, iter: afterIters, arrets: afterBps, valid: afterValidation }[ui.tab];
+  const after = { branche: afterBranch, coups: afterMoves, tt: afterTT, hist: afterHistory, iter: afterIters, arrets: afterBps, valid: afterValidation }[ui.tab];
   if (after) after();
 }
 
@@ -1157,6 +1202,108 @@ function nodeMoves(q, t) {
     return false;
   });
   return { info, order, scores, childEvals, gen, lmp };
+}
+// ── branch summary: what the node found (best move, values of the moves, the
+// principal variation below it, what it writes to the table) ──
+// The value of a move is for the side to move at the node; its bound comes from
+// the window of the LAST search of that move: v inside (a, b) = exact, v ≤ a =
+// upper bound (failed low: at most v), v ≥ b = lower bound (cut: at least v).
+// t: the instant (the cursor) or, with "fin du nœud", the node's return.
+function branchTime(q) { const x = T.nd.exit[q]; return ui.branchFinal ? (x >= 0 ? x : T.nEv - 1) : cur; }
+function branchOf(q, t) {
+  const M = nodeMoves(q, t), E = T.E, rows = [];
+  let bestMove = 0, bestV = null;
+  ownForward(q, t, e => {
+    if (T.type[e] === E.MOVE_DONE) { const v = arg(e, 2), best = arg(e, 3), alpha = arg(e, 4); if (v > best && v > alpha) { bestMove = arg(e, 1); bestV = v; } }
+    return false;
+  });
+  for (const [r, m] of M.info) {
+    if (m.v === undefined) continue;
+    const c = m.calls.length ? m.calls[m.calls.length - 1] : null;
+    const b = !c ? "?" : m.v <= c.a ? "≤" : m.v >= c.b ? "≥" : "=";
+    rows.push({ r, v: m.v, b, i: m.i, cut: !!m.cut, call: c, calls: m.calls, ev: m.ev, best: r === bestMove });
+  }
+  const pri = { "=": 0, "≥": 1, "?": 2, "≤": 3 };
+  // exact values first, then lower bounds (the cut), then upper bounds (failed low), each by value
+  const ranked = rows.slice().sort((x, y) => pri[x.b] - pri[y.b] || y.v - x.v);
+  const nGen = M.scores ? M.scores.length : null;
+  const pruned = [...M.info.values()].filter(m => m.v === undefined && m.proxy).length;
+  return { ranked, bestMove, bestV, nGen, pruned, lmp: M.lmp, M };
+}
+// the principal variation below q: the best move, the node that searched it last, its best move…
+function pvOf(q, t) {
+  const nd = T.nd, out = [];
+  for (let x = q, k = 0; x >= 0 && k < 64 && nd.enter[x] <= t; k++) {
+    const B = branchOf(x, t);
+    if (!B.bestMove) {
+      const fin = nd.exit[x] >= 0 && nd.exit[x] <= t;
+      out.push({ move: 0, node: x, end: fin ? reasonShort(x)[0] || reasonText(x) : "en cours" });
+      break;
+    }
+    const row = B.ranked.find(m => m.r === B.bestMove);
+    let ch = -1;
+    for (let c = nd.first[x]; c >= 0; c = nd.next[c]) if (nd.ply[c] > nd.ply[x] && nd.move[c] === B.bestMove && nd.enter[c] <= t) ch = c;
+    out.push({ move: B.bestMove, v: row ? row.v : B.bestV, b: row ? row.b : "?", node: x, child: ch });
+    x = ch;
+  }
+  return out;
+}
+function pvText(pv, ply0, links) {
+  return `<span class=pvline>` + pv.map((x, k) => {
+    if (!x.move) return `<span class=dim>(${esc(x.end)})</span>`;
+    const side = (ply0 + k) & 1 ? "○" : "●";
+    const lbl = `${side} ${mvStr(x.move)}`;
+    return links && x.child >= 0 ? `<a data-q="${x.child}">${lbl}</a>` : lbl;
+  }).join(" ") + `</span>`;
+}
+function tabBranch() {
+  const q = ui.hoverQ !== null ? ui.hoverQ : T.own[cur];
+  if (q < 0) return "<div class=dim>Pas de nœud courant.</div>";
+  const nd = T.nd, t = branchTime(q), pos = posOf(q), side = pos.ply & 1 ? "○ blanc" : "● noir";
+  const B = branchOf(q, t), pv = pvOf(q, t), BB = ["", "≤", "≥", "="];
+  const fin = nd.exit[q] >= 0 && nd.exit[q] <= t, started = nd.enter[q] <= t;
+  const when = ui.branchFinal ? "à la fin du nœud" : "à l'instant courant";
+  // what the node writes to the table (its tt_store events), past or future
+  const stores = [];
+  ownForward(q, nd.exit[q] >= 0 ? nd.exit[q] : T.nEv - 1, e => { if (T.type[e] === T.E.TT_STORE) stores.push(e); return false; });
+  const storeTxt = stores.length ? stores.map(e => {
+    const a = i => arg(e, i), kept = !(a(10) === a(0) && a(11) === a(1) && a(12) === a(2)), fut = e > cur;
+    return `<span class="${fut ? "dim" : ""}">prof. ${a(0)} <b>${BB[a(1)]} ${valStr(a(2))}</b> ${a(3) ? mvStr(a(3)) : "sans coup"}` +
+      (kept ? ` → <span class=warn>refusée</span> (reste prof. ${a(10)} ${BB[a(11)]} ${valStr(a(12))})` : " → écrite") + (fut ? " · plus tard" : "") + `</span>`;
+  }).join("<br>") : `<span class=dim>${nd.exit[q] >= 0 ? "rien (" + reasonText(q) + ")" : "pas encore"}</span>`;
+  let h = `<div class="legend">Résumé de la branche du nœud <b>#${q}</b>${ui.hoverQ !== null ? " (survolé)" : ""}, ${when} ` +
+    `<span class=seg><button data-f="0" class="${ui.branchFinal ? "" : "on"}">instant</button><button data-f="1" class="${ui.branchFinal ? "on" : ""}">fin du nœud</button></span>. ` +
+    `Valeurs pour ${side} (au trait au nœud). Borne d'un coup : celle de sa dernière recherche (= exacte, ≥ au moins : coupure, ≤ au plus : n'a pas battu α).</div>`;
+  h += `<div class="brhead">` +
+    `<div>fenêtre</div><div>${winStr(nd.alpha[q], nd.beta[q])} ${nd.beta[q] - nd.alpha[q] === 1 ? "<span class=dim>nulle</span>" : "PV"} · d${nd.depth[q]}</div>` +
+    `<div>meilleur coup</div><div>${!started ? "<span class=dim>pas encore cherché</span>" : B.bestMove ? `<b>${mvStr(B.bestMove)}</b> ${valStr(B.bestV)}` + (B.ranked.find(m => m.best)?.b === "≥" ? " <span class=good>(≥ β : coupure)</span>" : "") : `<span class=dim>aucun coup &gt; α${B.ranked.length ? " (meilleur " + valStr(B.ranked.reduce((m, x) => Math.max(m, x.v), -1e9)) + ")" : ""}</span>`}</div>` +
+    `<div>résultat</div><div>${fin ? `${nd.value[q] <= nd.alpha[q] ? "≤" : nd.value[q] >= nd.beta[q] ? "≥" : "="} ${valStr(nd.value[q])} <span class=dim>${reasonText(q)}</span>` : `<span class=dim>${started ? "en cours" : "—"}</span>`}</div>` +
+    `<div>écrit dans la TT</div><div>${storeTxt}</div>` +
+    `<div>variation principale</div><div>${pv.length && pv[0].move ? pvText(pv, pos.ply, true) : "<span class=dim>—</span>"}</div>` +
+    `<div>coups</div><div>${B.ranked.length} cherché${B.ranked.length > 1 ? "s" : ""}${B.nGen !== null ? ` sur ${B.nGen}` : ""}` +
+      `${B.pruned ? ` · ${B.pruned} coupé${B.pruned > 1 ? "s" : ""} par proxy` : ""}${B.lmp !== null ? ` · LMP après ${B.lmp}` : ""}</div>` +
+    `</div>`;
+  if (!B.ranked.length) return h;
+  h += `<table class="t"><tr><th class=r>rang</th><th>coup</th><th class=r>valeur</th><th>borne</th><th class=r>n°</th><th>dernière recherche</th><th>toutes</th></tr>`;
+  B.ranked.forEach((m, k) => {
+    const bcls = m.b === "=" ? "good" : m.b === "≥" ? "warn" : "dim";
+    const c = m.call, calls = m.calls.map(c => `<span class="badge ${KINDCLS[c.kind]}" title="${esc(KINDTIP[c.kind])}">${KIND[c.kind]} d${c.d}→${valStr(c.v)}</span>`).join(" ");
+    h += `<tr class="click" data-r="${m.r}" data-ev="${m.ev ?? ""}"><td class=r>${m.b === "=" ? k + 1 : ""}</td><td>${m.best ? "★ " : ""}<b>${mvStr(m.r)}</b>${m.cut ? " <span class=good>✂</span>" : ""}</td>` +
+      `<td class=r><b>${valStr(m.v)}</b></td><td class=${bcls}>${m.b === "=" ? "= exacte" : m.b === "≥" ? "≥ au moins" : m.b === "≤" ? "≤ au plus" : "?"}</td><td class=r>${m.i}</td>` +
+      `<td>${c ? `<span class=dim>${winStr(c.a, c.b)} d${c.d}</span>` : ""}</td><td>${calls}</td></tr>`;
+  });
+  return h + `</table><div class=help>Rang : seulement les valeurs exactes, par ordre décroissant ; les bornes suivent (elles ne disent pas où est la vraie valeur). ★ meilleur coup du nœud. ` +
+    `Survol d'une ligne : flèche sur le plateau. Clic : aller à la recherche du coup. Le plateau peut montrer les 3 meilleurs coups ou la variation principale (boutons sous le plateau).</div>`;
+}
+function afterBranch() {
+  for (const b of $("tabbody").querySelectorAll(".seg button")) b.onclick = () => { ui.branchFinal = b.dataset.f === "1"; render(); };
+  for (const a of $("tabbody").querySelectorAll(".pvline a")) a.onclick = () => go(T.nd.enter[+a.dataset.q]);
+  const q = ui.hoverQ !== null ? ui.hoverQ : T.own[cur]; if (q < 0) return;
+  for (const tr of $("tabbody").querySelectorAll("tr[data-r]")) {
+    tr.onmouseenter = () => { $("board").innerHTML = boardSvg(posOf(q), { next: +tr.dataset.r, size: 32 }); };
+    tr.onmouseleave = () => { if (ui.hoverQ !== null) renderBoard(ui.hoverQ, null, true); else render(true); };
+    tr.onclick = () => { if (tr.dataset.ev) go(+tr.dataset.ev); };
+  }
 }
 function tabMoves() {
   const q = T.own[cur];
@@ -1347,6 +1494,7 @@ function tabHelp() {
   <kbd>n</kbd>/<kbd>N</kbd> itération suivante/précédente · <kbd>Home</kbd>/<kbd>End</kbd> · <kbd>espace</kbd> lecture · <kbd>[</kbd>/<kbd>]</kbd> recherche précédente/suivante d'une partie. Bouton « Comment enregistrer une trace ? » en haut : toutes les options et les tailles.<br>
   <b>Arbre</b> : clic sur un nœud = aller à son entrée, Maj+clic = à son retour ; ▸ déplie. Badges : <span class="badge b-lmr">LMR</span> recherche réduite, <span class="badge b-nw">nulle</span> fenêtre nulle (PVS), <span class="badge b-rs">re-rech.</span> re-recherche pleine fenêtre, <span class="badge b-full">pleine</span>, <span class="badge b-mpc">MPC↑</span>/<span class="badge b-mpc">MPC↓</span> Multi-ProbCut (même position, moins profond), <span class="badge b-proxy">proxy</span> témoin de la coupe proxy. Résultat : ≤ borne supérieure, ≥ borne inférieure, = exacte ; puis la raison du retour (TT, éval, RFP, MPC, proxy, cut@i = β-coupure au coup i, tous = aucun coup n'a coupé).<br>
   <b>Plateau et jauge</b> : survoler une ligne de l'arbre montre ce nœud (position, dernier coup, valeurs) sans déplacer le curseur ; le cadre bleu pointillé signale l'aperçu. La jauge à côté du plateau met sur une même échelle, du point de vue du joueur au trait au nœud : la fenêtre [α, β] (bande bleue, un trait si fenêtre nulle), α courant (tirets), la valeur statique du réseau (◆), le résultat (● exact, ▲ borne inférieure, ▼ borne supérieure) et la borne de la table (à droite).<br>
+  <b>Branche</b> (onglet) : pour le nœud courant (ou survolé), le meilleur coup, les coups cherchés classés (valeurs exactes par ordre décroissant, puis les bornes : ≥ coupure, ≤ n'a pas battu α ; la borne vient de la fenêtre de la dernière recherche du coup), la variation principale (meilleur coup, puis le meilleur coup du nœud qui l'a cherché en dernier, etc.) et ce que le nœud écrit dans la table. « instant » : ce qui est connu au curseur ; « fin du nœud » : quand il retourne. Sous le plateau, « meilleurs coups » dessine les 3 premiers et « variation principale » la VP numérotée (bleu : noir joue, blanc : blanc joue).<br>
   <b>Valeurs</b> : unités de la recherche, ±${T.C.WIN} = tanh ±1 du réseau ; « gain +k » = partie gagnée de k points (au-delà de toute évaluation).<br>
   <b>Enregistrer une trace</b> (dans <code>build/</code>) :
   <pre class="mono">make search_trace
