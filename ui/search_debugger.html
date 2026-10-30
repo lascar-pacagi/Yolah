@@ -232,7 +232,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
 // ═══════════════════════════════════════════════════════════════════════════
 let T = null;            // the loaded trace
 let cur = 0;             // current event
-const ui = { boardMode: "coup", branchFinal: false, tab: "branche", expanded: new Set(), bps: new Map(), evBps: new Set(), playing: null, inspect: null, hoverQ: null };
+const ui = { openQ: null, boardMode: "coup", branchFinal: false, tab: "branche", expanded: new Set(), bps: new Map(), evBps: new Set(), playing: null, inspect: null, hoverQ: null };
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
@@ -684,7 +684,7 @@ function bpHit(e) {
 }
 
 // ── stepping ──
-function go(t) { cur = Math.max(0, Math.min(T.nEv - 1, t)); render(); }
+function go(t) { ui.openQ = null; cur = Math.max(0, Math.min(T.nEv - 1, t)); render(); }
 // Step over: the next (previous) event of the same frame, skipping the subtrees
 // of the calls it makes. After a RETURN (forward) the frame is the caller's,
 // before an ENTER (backward) too.
@@ -927,7 +927,12 @@ function renderTree() {
 }
 $("tree").addEventListener("click", ev => {
   const tw = ev.target.closest("[data-tw]");
-  if (tw && tw.textContent) { const q = +tw.dataset.tw; ui.expanded.has(q) ? ui.expanded.delete(q) : ui.expanded.add(q); renderTree(); return; }
+  if (tw && tw.textContent) {
+    const q = +tw.dataset.tw;
+    if (ui.expanded.has(q)) { ui.expanded.delete(q); if (ui.openQ === q) ui.openQ = null; }
+    else { ui.expanded.add(q); ui.openQ = q; }           // the last opened node: shown until a click elsewhere
+    renderTree(); ui.hoverQ = undefined; previewNode(ui.openQ); return;
+  }
   const row = ev.target.closest(".row"); if (!row) return;
   const q = +row.dataset.q;
   if (row.dataset.it !== undefined) return go(T.iters[+row.dataset.it].ev);
@@ -1025,7 +1030,7 @@ function renderBoard(q, frames, hover) {
   if ($("bfinal")) $("bfinal").onchange = ev => { ui.branchFinal = ev.target.checked; refreshView(); };
   const mover = (pos.ply - 1) & 1;
   $("boardcap").className = "cap" + (hover ? " hovercap" : "");
-  $("boardcap").innerHTML = q < 0 ? "racine" : (hover ? "aperçu (survol ; Maj enfoncée = figé ; Échap = fin) · clic = y aller · " : "") +
+  $("boardcap").innerHTML = q < 0 ? "racine" : (hover ? (q === ui.openQ ? "dernier nœud ouvert (Échap ou un clic ailleurs = retour au curseur) · " : "aperçu (survol ; Maj enfoncée = figé ; Échap = fin) · clic = y aller · ") : "") +
     `nœud #${q} · ${pos.ply & 1 ? "○ blanc" : "● noir"} au trait`;
   renderEval(q, st, pos);
   $("movecap").innerHTML = (last ? `<span style="color:#e2b93d">■</span> joué : ${mover ? "○" : "●"} ${mvStr(last)}` : "") +
@@ -1131,6 +1136,7 @@ function renderEval(q, st, pos) {
 let hoverRaf = 0;
 function previewNode(q) {
   if (!T || ui.playing) return;
+  if (q === null) q = ui.openQ;                     // no row under the mouse: the last opened node, if any
   if (q !== null && q === T.own[cur]) q = null;
   if (q === ui.hoverQ) return;
   ui.hoverQ = q;
@@ -1150,7 +1156,7 @@ $("tree").addEventListener("mouseover", ev => {
 // summary, tabs), so that they can be used; it ends when the mouse leaves both, or Escape.
 $("tree").addEventListener("mouseleave", ev => { if (!(ev.relatedTarget && $("right").contains(ev.relatedTarget))) previewNode(null); });
 $("right").addEventListener("mouseleave", ev => { if (!(ev.relatedTarget && $("tree").contains(ev.relatedTarget))) previewNode(null); });
-document.addEventListener("keydown", ev => { if (ev.key === "Escape" && ui.hoverQ !== null) previewNode(null); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && (ui.hoverQ !== null || ui.openQ !== null)) { ui.openQ = null; previewNode(null); } });
 // redraw the board and the tab without leaving the preview (render() ends it)
 function refreshView() {
   if (ui.hoverQ !== null) { renderBoard(ui.hoverQ, null, true); renderTab(); } else render();
@@ -1282,7 +1288,7 @@ function tabBranch() {
     return `<span class="${fut ? "dim" : ""}">prof. ${a(0)} <b>${BB[a(1)]} ${valStr(a(2))}</b> ${a(3) ? mvStr(a(3)) : "sans coup"}` +
       (kept ? ` → <span class=warn>refusée</span> (reste prof. ${a(10)} ${BB[a(11)]} ${valStr(a(12))})` : " → écrite") + (fut ? " · plus tard" : "") + `</span>`;
   }).join("<br>") : `<span class=dim>${nd.exit[q] >= 0 ? "rien (" + reasonText(q) + ")" : "pas encore"}</span>`;
-  let h = `<div class="legend">Résumé de la branche du nœud <b>#${q}</b>${ui.hoverQ !== null ? " (survolé)" : ""}, ${when} ` +
+  let h = `<div class="legend">Résumé de la branche du nœud <b>#${q}</b>${ui.hoverQ !== null ? (q === ui.openQ ? " (dernier nœud ouvert)" : " (survolé)") : ""}, ${when} ` +
     `<span class=seg><button data-f="0" class="${ui.branchFinal ? "" : "on"}">instant</button><button data-f="1" class="${ui.branchFinal ? "on" : ""}">fin du nœud</button></span>. ` +
     `Valeurs pour ${side} (au trait au nœud). Borne d'un coup : celle de sa dernière recherche (= exacte, ≥ au moins : coupure, ≤ au plus : n'a pas battu α).</div>`;
   h += `<div class="brhead">` +
@@ -1507,6 +1513,7 @@ function tabHelp() {
   <kbd>n</kbd>/<kbd>N</kbd> itération suivante/précédente · <kbd>Home</kbd>/<kbd>End</kbd> · <kbd>espace</kbd> lecture · <kbd>[</kbd>/<kbd>]</kbd> recherche précédente/suivante d'une partie. Bouton « Comment enregistrer une trace ? » en haut : toutes les options et les tailles.<br>
   <b>Arbre</b> : clic sur un nœud = aller à son entrée, Maj+clic = à son retour ; ▸ déplie. Badges : <span class="badge b-lmr">LMR</span> recherche réduite, <span class="badge b-nw">nulle</span> fenêtre nulle (PVS), <span class="badge b-rs">re-rech.</span> re-recherche pleine fenêtre, <span class="badge b-full">pleine</span>, <span class="badge b-mpc">MPC↑</span>/<span class="badge b-mpc">MPC↓</span> Multi-ProbCut (même position, moins profond), <span class="badge b-proxy">proxy</span> témoin de la coupe proxy. Résultat : ≤ borne supérieure, ≥ borne inférieure, = exacte ; puis la raison du retour (TT, éval, RFP, MPC, proxy, cut@i = β-coupure au coup i, tous = aucun coup n'a coupé).<br>
   <b>Plateau et jauge</b> : survoler une ligne de l'arbre montre ce nœud (position, dernier coup, valeurs) sans déplacer le curseur ; le cadre bleu pointillé signale l'aperçu. La jauge à côté du plateau met sur une même échelle, du point de vue du joueur au trait au nœud : la fenêtre [α, β] (bande bleue, un trait si fenêtre nulle), α courant (tirets), la valeur statique du réseau (◆), le résultat (● exact, ▲ borne inférieure, ▼ borne supérieure) et la borne de la table (à droite).<br>
+  <b>Dernier nœud ouvert</b> : déplier un nœud de l'arbre (▸) le montre dans la colonne de droite (plateau, jauge, Branche, Coups, TT) jusqu'au prochain déplacement du curseur ou Échap ; le survol d'une autre ligne le remplace le temps du survol.<br>
   <b>Aperçu</b> : le survol d'une ligne de l'arbre montre ce nœud dans le plateau, la jauge et les onglets Branche, Coups et TT ; il reste quand la souris passe de l'arbre à la colonne de droite. Pour traverser d'autres lignes sans changer de nœud, garder <b>Maj</b> enfoncée. Échap ou sortir des deux colonnes : retour au nœud courant ; clic sur la ligne : y aller.<br>
   <b>Branche</b> (onglet) : pour le nœud courant (ou survolé), le meilleur coup, les coups cherchés classés (valeurs exactes par ordre décroissant, puis les bornes : ≥ coupure, ≤ n'a pas battu α ; la borne vient de la fenêtre de la dernière recherche du coup), la variation principale (meilleur coup, puis le meilleur coup du nœud qui l'a cherché en dernier, etc.) et ce que le nœud écrit dans la table. « instant » : ce qui est connu au curseur ; « fin du nœud » : quand il retourne. Sous le plateau, « meilleurs coups » dessine les 3 premiers et « variation principale » la VP numérotée (bleu : noir joue, blanc : blanc joue).<br>
   <b>Valeurs</b> : unités de la recherche, ±${T.C.WIN} = tanh ±1 du réseau ; « gain +k » = partie gagnée de k points (au-delà de toute évaluation).<br>
@@ -1527,10 +1534,12 @@ function render(light) {
   $("scrub").value = cur;
   $("evpos").textContent = `${cur} / ${T.nEv - 1}`;
   updateCode(frames);
-  if (light) { renderBoard(q, frames); return; }
+  if (ui.openQ !== null && ui.openQ !== q) ui.hoverQ = ui.openQ;   // the last opened node stays in the right column
+  const board = () => ui.hoverQ !== null ? renderBoard(ui.hoverQ, null, true) : renderBoard(q, frames);
+  if (light) { board(); return; }
   $("desc").innerHTML = describe(cur);
   renderStack(frames);
-  renderBoard(q, frames);
+  board();
   renderTree();
   renderTab();
 }
