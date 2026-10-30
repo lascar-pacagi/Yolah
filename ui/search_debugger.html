@@ -93,8 +93,17 @@ td.r, th.r { text-align: right; }
 .dim { color: var(--dim); } .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
 /* right */
 #right { display: flex; flex-direction: column; min-height: 0; }
-#boardrow { display: flex; gap: 12px; padding: 6px 8px; align-items: flex-start; }
-#side { flex: 1; min-width: 0; }
+#boardrow { display: flex; flex-wrap: wrap; gap: 12px; padding: 6px 8px; align-items: flex-start; outline: 2px dashed transparent; outline-offset: -2px; }
+#boardrow.hover { outline-color: var(--accent); }
+.cap.hovercap { color: var(--accent); }
+#evalpanel { display: flex; gap: 6px; align-items: flex-start; min-width: 0; }
+#evalpanel svg { display: block; flex: none; }
+#evaltext { font-size: 11px; line-height: 1.45; min-width: 150px; max-width: 230px; }
+#evaltext .big { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.15; }
+#evaltext .kv2 { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+#evaltext .kv2 > div:nth-child(odd) { color: var(--dim); white-space: nowrap; }
+#evaltext .sym { display: inline-block; width: 12px; text-align: center; }
+#side { flex: 1 1 180px; min-width: 180px; }
 .cap { color: var(--dim); font-size: 11px; margin: 2px 0; }
 #line { font-size: 11px; margin-top: 4px; line-height: 1.6; }
 #line a { color: var(--text); text-decoration: none; background: var(--panel2); border-radius: 3px; padding: 0 3px; cursor: pointer; }
@@ -194,6 +203,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
     <div class="col" id="right">
       <div class="box" id="boardrow">
         <div><div class="cap" id="boardcap"></div><div class="board" id="board"></div><div class="cap" id="movecap"></div></div>
+        <div id="evalpanel"></div>
         <div id="side"><div class="cap">plateau de la partie (racine)</div><div class="board" id="rootboard"></div><div id="line"></div></div>
       </div>
       <div class="box" id="nodeinfo"></div>
@@ -214,7 +224,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
 // ═══════════════════════════════════════════════════════════════════════════
 let T = null;            // the loaded trace
 let cur = 0;             // current event
-const ui = { tab: "coups", expanded: new Set(), bps: new Map(), evBps: new Set(), playing: null, inspect: null };
+const ui = { tab: "coups", expanded: new Set(), bps: new Map(), evBps: new Set(), playing: null, inspect: null, hoverQ: null };
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
@@ -950,22 +960,29 @@ function boardSvg(pos, opts = {}) {
   if (opts.next) s += ring(mvFrom(opts.next), "#5aa9ff") + ring(mvTo(opts.next), "#5aa9ff") + arrow(opts.next, "#5aa9ff", "ah");
   return s + "</svg>";
 }
-function renderBoard(q, frames) {
+// hover = true: a preview of node q (the mouse is over its row in the tree), at the
+// current event: its state as of now, no move in progress, the cursor does not move.
+function renderBoard(q, frames, hover) {
   const nd = T.nd;
   const pos = q >= 0 ? posOf(q) : rootPosition();
-  const st = q >= 0 ? frames[0].state : null;
+  const st = q < 0 ? null : hover ? (nd.enter[q] <= cur ? frameState(q, cur) : null) : frames[0].state;
   const last = q >= 0 && nd.parent[q] >= 0 && nd.ply[q] > nd.ply[nd.parent[q]] ? nd.move[q] : 0;
   let next = 0, nextWhat = "";
   const t = T.type[cur], E = T.E;
-  if (t === E.PROXY) { next = arg(cur, 0); nextWhat = "témoin proxy"; }
+  if (hover) {}
+  else if (t === E.PROXY) { next = arg(cur, 0); nextWhat = "témoin proxy"; }
   else if (st && st.i >= 0 && !st.done) { next = st.move; nextWhat = "coup n° " + st.i + " en cours"; }
   else if (t === E.MOVE_DONE || t === E.CUTOFF) { next = arg(cur, 1); nextWhat = "coup n° " + arg(cur, 0) + " fini"; }
   // flash the move just played when the position changes (stepping into a child, or back to it)
-  const flash = q !== ui.boardNode && last !== 0 && !ui.playingFast;
-  ui.boardNode = q;
+  const flash = !hover && q !== ui.boardNode && last !== 0 && !ui.playingFast;
+  if (!hover) ui.boardNode = q;
+  $("boardrow").classList.toggle("hover", !!hover);
   $("board").innerHTML = boardSvg(pos, { last, next, flash, size: 32 });
   const mover = (pos.ply - 1) & 1;
-  $("boardcap").innerHTML = q < 0 ? "racine" : `position du nœud #${q} · ${pos.ply & 1 ? "○ blanc" : "● noir"} au trait`;
+  $("boardcap").className = "cap" + (hover ? " hovercap" : "");
+  $("boardcap").innerHTML = q < 0 ? "racine" : (hover ? "aperçu (survol) · clic = y aller · " : "") +
+    `nœud #${q} · ${pos.ply & 1 ? "○ blanc" : "● noir"} au trait`;
+  renderEval(q, st, pos);
   $("movecap").innerHTML = (last ? `<span style="color:#e2b93d">■</span> joué : ${mover ? "○" : "●"} ${mvStr(last)}` : "") +
     (next ? `${last ? " · " : ""}<span style="color:#5aa9ff">■</span> ${nextWhat} : ${mvStr(next)}` : "");
   const S = G && G.H.searches[G.k], prevMove = S && S.ply > 0 ? G.H.game[S.ply - 1] : 0;
@@ -990,14 +1007,98 @@ function renderBoard(q, frames) {
     `<div>score</div><div>${pos.score[0]}–${pos.score[1]} · ${free} cases libres</div>` +
     `<div>ply</div><div>${nd.ply[q] - nd.ply[0]} depuis la racine (${nd.ply[q]} dans la partie)</div>` +
     `<div>profondeur</div><div>${nd.depth[q]}</div>` +
-    `<div>fenêtre</div><div>${winStr(nd.alpha[q], nd.beta[q])}${nd.beta[q] - nd.alpha[q] === 1 ? " <span class=dim>nulle</span>" : " <span class=dim>PV</span>"}</div>` +
-    `<div>α courant</div><div>${st ? valStr(st.alpha) : ""}${st && st.best !== null ? " · meilleur " + valStr(st.best) : ""}</div>` +
-    `<div>NNUE</div><div><b>${valStr(nd.nnue[q])}</b> <span class=dim>(tanh ${(nd.nnue[q] / T.C.WIN).toFixed(3)})</span></div>` +
-    `<div>TT</div><div>${tt.entry ? `prof. ${tt.entry.depth} ${B[tt.entry.bound]} ${valStr(tt.entry.value)} ${mvStr(tt.entry.move)}` : "<span class=dim>rien</span>"}</div>` +
-    `<div>résultat</div><div>${nd.exit[q] >= 0 && nd.exit[q] <= cur ? valStr(nd.value[q]) + " — " + reasonText(q) : "<span class=warn>en cours</span>"}</div>` +
+    `<div>sous-arbre</div><div>${fmtN(nd.sub[q])} nœud${nd.sub[q] > 1 ? "s" : ""}</div>` +
     `<div>hash</div><div class="mono small">${hkey(nd.hlo[q], nd.hhi[q])} ${okHash ? "<span class=good title='le hash recalculé ici depuis la position est celui de la trace'>✓</span>" : "<span class=bad>≠ position !</span>"}</div>` +
     `</div>`;
 }
+
+// ── evaluation panel: the node's values on one scale ──
+// Every value of a node is for the side to move at that node (negamax): the
+// window, the network's static value, the result, the table's bound. The gauge
+// puts them on the network's scale (±WIN = tanh ±1; game results beyond, at the ends).
+function evalGauge(q, st, res, ttE) {
+  const nd = T.nd, Wn = T.C.WIN, INF = T.C.INFINITE;
+  const Hh = 8 * 32 + 16, top = 10, bot = Hh - 10, lim = Wn * 1.12, X = 30, Wd = 16;
+  const y = v => { const c = v >= INF ? lim : v <= -INF ? -lim : v > Wn ? Wn * 1.06 : v < -Wn ? -Wn * 1.06 : v;
+                   return top + (lim - c) / (2 * lim) * (bot - top); };
+  let s = `<svg width="64" height="${Hh}" viewBox="0 0 64 ${Hh}" xmlns="http://www.w3.org/2000/svg">`;
+  s += `<rect x="${X}" y="${y(Wn)}" width="${Wd}" height="${y(0) - y(Wn)}" fill="var(--good)" opacity=".13"/>`;
+  s += `<rect x="${X}" y="${y(0)}" width="${Wd}" height="${y(-Wn) - y(0)}" fill="var(--bad)" opacity=".13"/>`;
+  s += `<rect x="${X}" y="${y(Wn)}" width="${Wd}" height="${y(-Wn) - y(Wn)}" fill="none" stroke="var(--line)"/>`;
+  for (const [v, l] of [[Wn, "+1"], [Wn / 2, ".5"], [0, "0"], [-Wn / 2, "−.5"], [-Wn, "−1"]]) {
+    s += `<line x1="${X - 3}" x2="${X}" y1="${y(v)}" y2="${y(v)}" stroke="var(--dim)"/>`;
+    s += `<text x="${X - 5}" y="${y(v) + 3}" font-size="9" text-anchor="end" fill="var(--dim)">${l}</text>`;
+  }
+  // the window [α, β] (a null window is a line)
+  const a = nd.alpha[q], b = nd.beta[q];
+  if (b - a <= 1) s += `<line x1="${X - 2}" x2="${X + Wd + 2}" y1="${y(b)}" y2="${y(b)}" stroke="var(--accent)" stroke-width="3"/>`;
+  else s += `<rect x="${X - 2}" y="${y(b)}" width="${Wd + 4}" height="${Math.max(1, y(a) - y(b))}" fill="var(--accent)" opacity=".28" stroke="var(--accent)"/>`;
+  // α now (raised by the moves already searched)
+  if (st && st.alpha > a) s += `<line x1="${X - 4}" x2="${X + Wd + 4}" y1="${y(st.alpha)}" y2="${y(st.alpha)}" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+  // the table's bound (right side)
+  if (ttE) { const yy = y(ttE.value), sym = ["", "≤", "≥", "="][ttE.bound];
+    s += `<line x1="${X + Wd}" x2="${X + Wd + 7}" y1="${yy}" y2="${yy}" stroke="var(--tt)" stroke-width="2"/><text x="${X + Wd + 8}" y="${yy + 3}" font-size="10" fill="var(--tt)">${sym}</text>`; }
+  // the network's static value: a diamond
+  { const yy = y(nd.nnue[q]), cx = X + Wd / 2;
+    s += `<path d="M${cx - 6},${yy} L${cx},${yy - 6} L${cx + 6},${yy} L${cx},${yy + 6} z" fill="var(--warn)" stroke="var(--bg)"/>`; }
+  // the result: a dot (exact) or a triangle pointing where the true value lies
+  if (res) { const yy = y(res.v), cx = X + Wd / 2, c = res.final ? "var(--curtext)" : "var(--dim)";
+    s += res.bound === "=" ? `<circle cx="${cx}" cy="${yy}" r="4.5" fill="${c}" stroke="var(--bg)"/>`
+      : res.bound === "≥" ? `<path d="M${cx - 5},${yy + 4} L${cx + 5},${yy + 4} L${cx},${yy - 5} z" fill="${c}" stroke="var(--bg)"/>`
+      : `<path d="M${cx - 5},${yy - 4} L${cx + 5},${yy - 4} L${cx},${yy + 5} z" fill="${c}" stroke="var(--bg)"/>`; }
+  return s + "</svg>";
+}
+function renderEval(q, st, pos) {
+  if (q < 0) { $("evalpanel").innerHTML = ""; return; }
+  const nd = T.nd, Wn = T.C.WIN;
+  const v0 = nd.nnue[q], side = pos.ply & 1 ? "○ blanc" : "● noir";
+  const flip = (nd.ply[q] - nd.ply[0]) & 1, rootSide = nd.ply[0] & 1 ? "○ blanc" : "● noir";
+  const done = nd.exit[q] >= 0 && nd.exit[q] <= cur, started = nd.enter[q] <= cur;
+  let res = null;
+  if (nd.exit[q] >= 0) { const v = nd.value[q];
+    res = { v, final: done, bound: v <= nd.alpha[q] ? "≤" : v >= nd.beta[q] ? "≥" : "=" }; }
+  const inv = { "≤": "≥", "≥": "≤", "=": "=" };
+  const tt = ttStateAt(hkey(nd.hlo[q], nd.hhi[q]), cur).entry;
+  const B = ["", "≤", "≥", "="];
+  const col = v => v > 0 ? "var(--good)" : v < 0 ? "var(--bad)" : "var(--text)";
+  const par = nd.parent[q], moved = par >= 0 && nd.ply[q] > nd.ply[par];
+  const k = nd.kind[q];
+  let h = `<div class="big" style="color:${col(v0)}">${valStr(v0)}</div>` +
+    `<div class=dim>NNUE statique · tanh ${(v0 / Wn).toFixed(3)} · pour ${side} (au trait)</div>` +
+    (flip ? `<div class=dim>pour la racine (${rootSide}) : <span style="color:${col(-v0)}">${valStr(-v0)}</span></div>` : "") +
+    `<div class="kv2">` +
+    `<div><span class=sym style="color:var(--accent)">▮</span>fenêtre</div><div>${winStr(nd.alpha[q], nd.beta[q])} <span class=dim>${nd.beta[q] - nd.alpha[q] === 1 ? "nulle" : "PV"}</span></div>` +
+    (st ? `<div><span class=sym style="color:var(--accent)">┄</span>α courant</div><div>${valStr(st.alpha)}${st.best !== null ? ` <span class=dim>· meilleur ${valStr(st.best)}</span>` : ""}</div>` : "") +
+    `<div><span class=sym style="color:var(--curtext)">${res ? (res.bound === "=" ? "●" : res.bound === "≥" ? "▲" : "▼") : "·"}</span>résultat</div><div>` +
+      (done ? `<b>${res.bound} ${valStr(res.v)}</b> <span class=dim>${reasonText(q)}</span>`
+       : started ? `<span class=warn>en cours</span>` + (res ? ` <span class=dim>(plus tard ${res.bound} ${valStr(res.v)})</span>` : "")
+       : `<span class=dim>pas encore cherché${res ? ` (plus tard ${res.bound} ${valStr(res.v)})` : ""}</span>`) + `</div>` +
+    (moved && res ? `<div>pour le parent</div><div>${done ? "" : "<span class=dim>"}${inv[res.bound]} ${valStr(-res.v)}${done ? "" : "</span>"} <span class=dim>après ${mvStr(nd.move[q])}</span></div>` : "") +
+    `<div><span class=sym style="color:var(--tt)">≷</span>TT</div><div>${tt ? `prof. ${tt.depth} ${B[tt.bound]} ${valStr(tt.value)}${tt.move ? " " + mvStr(tt.move) : " <span class=dim>sans coup</span>"}` : "<span class=dim>rien</span>"}</div>` +
+    `<div>profondeur</div><div>d${nd.depth[q]}${k ? ` <span class="badge ${KINDCLS[k]}">${KIND[k]}</span>` : ""}${nd.idx[q] >= 0 ? ` <span class=dim>coup n° ${nd.idx[q]}</span>` : ""}</div>` +
+    `<div>sous-arbre</div><div>${fmtN(nd.sub[q])} n.</div>` +
+    `</div>` +
+    `<div class=dim style="margin-top:4px"><span style="color:var(--warn)">◆</span> NNUE · ▮ fenêtre · ●▲▼ résultat · <span style="color:var(--tt)">≤≥</span> table</div>`;
+  $("evalpanel").innerHTML = evalGauge(q, st, res, tt) + `<div id="evaltext">${h}</div>`;
+}
+// hovering a row of the tree previews its node in the board area (the cursor stays)
+let hoverRaf = 0;
+function previewNode(q) {
+  if (!T || ui.playing) return;
+  if (q !== null && q === T.own[cur]) q = null;
+  if (q === ui.hoverQ) return;
+  ui.hoverQ = q;
+  cancelAnimationFrame(hoverRaf);
+  hoverRaf = requestAnimationFrame(() => {
+    if (ui.hoverQ === null) renderBoard(T.own[cur], framesAt(cur));
+    else renderBoard(ui.hoverQ, null, true);
+  });
+}
+$("tree").addEventListener("mouseover", ev => {
+  const row = ev.target.closest(".row"); if (!row) return;
+  const q = +row.dataset.q; previewNode(q >= 0 ? q : null);
+});
+$("tree").addEventListener("mouseleave", () => previewNode(null));
 
 // ── transposition table ──
 // The entry of a position after event t, from the trace's probes and stores (entries
@@ -1245,6 +1346,7 @@ function tabHelp() {
   <kbd>F8</kbd>/<kbd>c</kbd> continuer jusqu'au point d'arrêt · <kbd>Maj+F8</kbd>/<kbd>C</kbd> en arrière ·
   <kbd>n</kbd>/<kbd>N</kbd> itération suivante/précédente · <kbd>Home</kbd>/<kbd>End</kbd> · <kbd>espace</kbd> lecture · <kbd>[</kbd>/<kbd>]</kbd> recherche précédente/suivante d'une partie. Bouton « Comment enregistrer une trace ? » en haut : toutes les options et les tailles.<br>
   <b>Arbre</b> : clic sur un nœud = aller à son entrée, Maj+clic = à son retour ; ▸ déplie. Badges : <span class="badge b-lmr">LMR</span> recherche réduite, <span class="badge b-nw">nulle</span> fenêtre nulle (PVS), <span class="badge b-rs">re-rech.</span> re-recherche pleine fenêtre, <span class="badge b-full">pleine</span>, <span class="badge b-mpc">MPC↑</span>/<span class="badge b-mpc">MPC↓</span> Multi-ProbCut (même position, moins profond), <span class="badge b-proxy">proxy</span> témoin de la coupe proxy. Résultat : ≤ borne supérieure, ≥ borne inférieure, = exacte ; puis la raison du retour (TT, éval, RFP, MPC, proxy, cut@i = β-coupure au coup i, tous = aucun coup n'a coupé).<br>
+  <b>Plateau et jauge</b> : survoler une ligne de l'arbre montre ce nœud (position, dernier coup, valeurs) sans déplacer le curseur ; le cadre bleu pointillé signale l'aperçu. La jauge à côté du plateau met sur une même échelle, du point de vue du joueur au trait au nœud : la fenêtre [α, β] (bande bleue, un trait si fenêtre nulle), α courant (tirets), la valeur statique du réseau (◆), le résultat (● exact, ▲ borne inférieure, ▼ borne supérieure) et la borne de la table (à droite).<br>
   <b>Valeurs</b> : unités de la recherche, ±${T.C.WIN} = tanh ±1 du réseau ; « gain +k » = partie gagnée de k points (au-delà de toute évaluation).<br>
   <b>Enregistrer une trace</b> (dans <code>build/</code>) :
   <pre class="mono">make search_trace
@@ -1257,6 +1359,7 @@ function tabHelp() {
 // ═══════════════════════════════════════════════════════════════════════════
 function render(light) {
   if (!T) return;
+  ui.hoverQ = null;
   const q = T.own[cur];
   const frames = framesAt(cur);
   $("scrub").value = cur;
