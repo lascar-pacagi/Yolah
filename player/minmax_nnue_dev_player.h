@@ -342,13 +342,15 @@ private:
         bool proxy_off = false;                    // during a proxy cut verification: no proxy cut inside
     };
 
-    // Evaluation cache (D): one entry per slot, the newest wins. 32 bits of
-    // the hash check the position (the other bits choose the slot). Each entry
+    // Evaluation cache (D): one entry per slot, the newest wins. The low bits
+    // of the hash choose the slot, its 47 high bits check the position (the
+    // ones above the slot bits really do: 44 of them with the 2^20 slots of
+    // the default, a wrong position about once in 1.8e13 probes). Each entry
     // is ONE 64-bit word, read and written atomically (L: the threads share
     // the cache; a torn entry — the key of one position with the value of
     // another — is impossible):
-    //     bits 63..32: key (high 32 bits of the hash)
-    //     bits 31..16: value (int16)
+    //     bits 63..17: key (bits 63..17 of the hash)
+    //     bits 16..1 : value (int16)
     //     bit  0     : used
     std::vector<std::atomic<uint64_t>> eval_cache;
     // The exact endgame solver (G), with its own table, kept between moves.

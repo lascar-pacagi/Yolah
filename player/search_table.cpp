@@ -28,8 +28,9 @@ void SearchTable::clear() {
 const SearchTable::Entry* SearchTable::probe(uint64_t hash) const {
     const Cluster& c = clusters[hash & mask];
     const uint32_t k = key_of(hash);
+    const uint16_t k16 = key16_of(hash);
     for (const Entry& e : c.entries) {
-        if (e.key32 == k) return &e;
+        if (e.key32 == k && e.key16 == k16) return &e;
     }
     return nullptr;
 }
@@ -37,12 +38,13 @@ const SearchTable::Entry* SearchTable::probe(uint64_t hash) const {
 void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move) {
     Cluster& c = clusters[hash & mask];
     const uint32_t k = key_of(hash);
+    const uint16_t k16 = key16_of(hash);
     // The slot: this position's entry if there is one; otherwise the least
     // useful: an empty slot or an unreachable position (more free squares than
     // the root), else the shallowest entry.
     Entry* slot = nullptr;
     for (Entry& e : c.entries) {
-        if (e.key32 == k) { slot = &e; break; }
+        if (e.key32 == k && e.key16 == k16) { slot = &e; break; }
     }
     bool same = slot != nullptr;
     if (!same) {
@@ -67,6 +69,7 @@ void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta,
         // beat alpha, has none to give, and the old one still orders well).
         if (!same) slot->move = Move::none();
         slot->key32 = k;
+        slot->key16 = k16;
         slot->lower = -NO_BOUND;
         slot->upper = NO_BOUND;
         slot->depth = uint8_t(depth);

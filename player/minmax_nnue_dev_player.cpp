@@ -1114,18 +1114,19 @@ Move MinMaxNNUE_DevPlayer::tt_move(uint64_t hash) const {
 int MinMaxNNUE_DevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash) {
     s.nb_evals++;
     std::atomic<uint64_t>* e = nullptr;
-    const uint64_t key = hash & 0xFFFFFFFF00000000ULL;
+    constexpr uint64_t KEY_MASK = ~uint64_t(0) << 17;   // bits 63..17 (see eval_cache)
+    const uint64_t key = hash & KEY_MASK;
     if (!eval_cache.empty()) {
         e = &eval_cache[hash & (eval_cache.size() - 1)];
         const uint64_t word = e->load(std::memory_order_relaxed);
-        if ((word & 1) && (word & 0xFFFFFFFF00000000ULL) == key) {
+        if ((word & 1) && (word & KEY_MASK) == key) {
             s.nb_eval_hits++;
-            TR(EVAL, int16_t(uint16_t(word >> 16)), 1);
-            return int16_t(uint16_t(word >> 16));
+            TR(EVAL, int16_t(uint16_t(word >> 1)), 1);
+            return int16_t(uint16_t(word >> 1));
         }
     }
     const int v = network_value(yolah, s);
-    if (e) e->store(key | (uint64_t(uint16_t(int16_t(v))) << 16) | 1, std::memory_order_relaxed);
+    if (e) e->store(key | (uint64_t(uint16_t(int16_t(v))) << 1) | 1, std::memory_order_relaxed);
     TR(EVAL, v, 0);
     return v;
 }
@@ -1597,7 +1598,7 @@ void MinMaxNNUE_DevPlayer::update_history(Search& s, uint8_t player, Move m, int
 void MinMaxNNUE_DevPlayer::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     if (yolah.game_over() || depth == 0) return;
     const Move m = tt_move(hash);
-    if (m == Move::none()) return;
+    if (m == Move::none() || !is_legal(yolah, m)) return;   // a collision can bring another position's move
     auto player = yolah.current_player();
     cout << m << ' ';
     yolah.play(m);

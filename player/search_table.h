@@ -22,19 +22,27 @@
 //
 // Layout: clusters of 4 entries of 16 bytes = 64 bytes, one cache line,
 // aligned: a probe touches a single line. The cluster is chosen by the low
-// bits of the hash, the entry is checked with its high 32 bits.
+// bits of the hash, the entry is checked with bits 63..16 (key32, key16).
+// Only the key bits above the cluster bits tell the positions of a cluster
+// apart (and key_of forces bit 32): 39 of them with the 2^24 clusters of a
+// 1 GB table, 4 entries per probe → a wrong position about once in 1.4e11
+// probes (31 bits before key16: once in 5e8, every 20 moves or so at 16
+// threads and 1 s).
+// A wrong entry (also a torn one: lazy SMP writes entries without locks) can
+// bring the move of another position: users check that it is legal.
 class SearchTable {
 public:
     static constexpr int16_t NO_BOUND = 32767;   // "no lower/upper bound known"
 
     struct Entry {
-        uint32_t key32;     // high 32 bits of the hash (0 = empty slot, see store)
+        uint32_t key32;     // bits 63..32 of the hash (0 = empty slot, see store)
         Move     move;      // best move found, or Move::none()
         int16_t  lower;     // value ≥ lower (−NO_BOUND: nothing known)
         int16_t  upper;     // value ≤ upper (+NO_BOUND: nothing known)
         uint8_t  depth;     // depth of the searches that proved the bounds
         uint8_t  free;      // number of free squares of the position
-        uint8_t  padding[4];
+        uint16_t key16;     // bits 31..16 of the hash
+        uint8_t  padding[2];
     };
     static_assert(sizeof(Entry) == 16);
     static constexpr int CLUSTER_SIZE = 4;
@@ -71,6 +79,7 @@ private:
     uint64_t mask = 0;      // number of clusters − 1 (a power of two)
     uint8_t  root_free = 64;
     static uint32_t key_of(uint64_t hash) { return uint32_t(hash >> 32) | 1; }  // never 0
+    static uint16_t key16_of(uint64_t hash) { return uint16_t(hash >> 16); }
 };
 
 #endif
