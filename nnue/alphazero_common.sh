@@ -46,7 +46,7 @@ build_alphazero_learn() {
     local targets="${*:-alphazero_learn}"
     mkdir -p "${WORK_DIR}/build"
     echo "[$(date '+%F %T')] === Building ${targets} in ${BUILD_DIR} ==="
-    run bash -c "set -e
+    run bash -c "set -eo pipefail
         exec 9> /work/build/.lock_${CPU_TAG}
         flock 9
         mkdir -p ${BUILD_DIR}
