@@ -69,6 +69,10 @@ public:
     // The slot store() writes for this position: its entry, or the one it
     // evicts (for the search debugger: the entry before and after a store).
     const Entry* slot(uint64_t hash) const;
+    // Among entries of equal worth (same depth), replace the one with the most
+    // free squares — the oldest: written at a shallower ply, an earlier
+    // iteration or move — instead of always the first ("table tiebreak").
+    bool tiebreak = false;
     void prefetch(uint64_t hash) const { __builtin_prefetch(&clusters[hash & mask]); }
     Move get_move(uint64_t hash) const {
         const Entry* e = probe(hash);

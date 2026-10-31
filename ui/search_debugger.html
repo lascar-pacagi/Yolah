@@ -1683,7 +1683,9 @@ function validateTrace() {
     "null move": false, "pass rule": false, "articulation ordering": false, "articulation lmr": false, "territory ordering": 1,
     "fast influence": true, "proxy cut": 1, "proxy rank": 0, "proxy delta": 0, "proxy witness": 0, "proxy multi c": 1, "proxy multi m": 1,
     "proxy diverse": false, "proxy second": -1, "proxy prefilter": 0, "proxy weval": 0, "proxy verify": 0, "proxy lazy": 0, "proxy first": false,
-    "proxy tail": 0, probcut: 0, staged: true, "endgame root": 0, "endgame tree": 0, "eval grain": 1, "history prior": "" };
+    "proxy tail": 0, probcut: 0, staged: true, "endgame root": 0, "endgame tree": 0, "eval grain": 1, "history prior": "",
+    "root fix": false, "aspiration keep beta": false, "aspiration stats depth": 4, "aspiration center 2": false,
+    "pvs research high": false, "tt cut pv": true, "table tiebreak": false, "proxy after tt": false, "lmr territory": true };
   const notAssumed = Object.entries(assumed).filter(([k, v]) => cfg[k] !== undefined && cfg[k] !== v).map(([k]) => k);
   const lmrBase = cfg["lmr base"], lmrDiv = cfg["lmr divisor"];
   const lmrTable = (d, n) => Math.trunc(1024 * (lmrBase + Math.log(d) * Math.log(n) / lmrDiv));

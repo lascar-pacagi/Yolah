@@ -4,6 +4,7 @@
 #include "heuristic.h"
 #include "transposition_table.h"
 #include "search_table.h"
+#include <array>
 #include <memory>
 #include <atomic>
 #include <vector>
@@ -133,6 +134,22 @@ struct MinMaxNNUE_DevOptions {
     double aspiration_k = 0;         // ["aspiration k"] > 0: adaptive half width, k × the mean change of value between depths (at least "aspiration window")
     int  tempo = 0;                  // ["tempo"] added to the network's value for the side to move (values: ±30000 = tanh ±1)
     double aspiration_grow = 1.5;    // ["aspiration grow"] adaptive windows: factor of the half width after each failure
+    // Campaign A2 (2026-10-31, from an audit of the aspiration failures; all off by default):
+    bool root_fix = false;           // ["root fix"] root order after a FAILED attempt: fail low keeps the order (the
+                                     //   previous best stays first), fail high only brings the new best to the front;
+                                     //   the nodes of a move are summed over the attempts of a depth
+    bool aspiration_keep_beta = false; // ["aspiration keep beta"] adaptive windows: a fail low does not lower beta
+    int  aspiration_stats_depth = 4; // ["aspiration stats depth"] adaptive windows: |v_d − v_{d−1}| counted from this depth
+    bool aspiration_center2 = false; // ["aspiration center 2"] window centred on (v_{d−1} + v_{d−2}) / 2 (odd/even effect)
+    bool pvs_research_high = false;  // ["pvs research high"] PV nodes: full-window re-search also when the null window
+                                     //   gave ≥ beta (Stockfish today), not only alpha < v < beta
+    bool tt_cut_pv = true;           // ["tt cut pv"] false: at PV nodes, the table cuts only with an exact value or a
+                                     //   proven result (Stockfish: no table cut at PV nodes)
+    bool table_tiebreak = false;     // ["table tiebreak"] Yolah table: among entries of equal depth, replace the one
+                                     //   with the most free squares (the oldest), not always slot 0
+    bool proxy_after_tt = false;     // ["proxy after tt"] staged: the proxy test comes after the table's move
+    bool lmr_territory = true;       // ["lmr territory"] false: LMR adjusted by the history only (the move score
+                                     //   also holds the territory term at depth ≥ "territory depth")
     bool history = true;             // ["history"] quiet moves ordered by their history of cutoffs
     bool countermove = true;         // ["countermove"] the move that refuted the opponent's last move
     bool root_ordering = true;       // ["root ordering"] root moves: best first, then by subtree size
@@ -328,6 +345,9 @@ private:
         int     id      = 0;      // thread number, 0 = the main thread
         Worker* w       = nullptr;
         uint64_t nb_evals = 0, nb_eval_hits = 0;
+        // Aspiration statistics (search_bench): root attempts, failed ones,
+        // fail highs right after a fail low, nodes spent in failed attempts.
+        uint64_t asp_attempts = 0, asp_failed = 0, asp_rebounds = 0, asp_failed_nodes = 0;
         uint8_t depth   = 0;
         int16_t value   = 0;
         Move move       = Move::none();
@@ -362,6 +382,7 @@ private:
     // The exact endgame solver (G), with its own table, kept between moves.
     EndgameSolver endgame;
     uint64_t nb_evals = 0, nb_eval_hits = 0;
+    std::array<uint64_t, 4> asp_stats{};
 
     bool stopped() const { return stop.load(std::memory_order_relaxed); }
     int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
@@ -418,6 +439,8 @@ public:
     Result search(const Yolah&, uint8_t max_depth, uint64_t microseconds);
     // Leaf evaluations and how many came from the cache, since the start.
     std::pair<uint64_t, uint64_t> eval_stats() const { return {nb_evals, nb_eval_hits}; }
+    // Summed over the searches since construction: attempts, failed, rebounds, nodes in failed attempts.
+    std::array<uint64_t, 4> aspiration_stats() const { return asp_stats; }
     void clear_table(bool keep_ordering = false);   // forget everything: table, history, countermoves (reproducible
                                                     // benchmarks); keep_ordering: keep history and countermoves
     std::string info() override;

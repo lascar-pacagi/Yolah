@@ -51,7 +51,8 @@ const SearchTable::Entry* SearchTable::slot(uint64_t hash) const {
     };
     const Entry* s = &c.entries[0];
     for (const Entry& e : c.entries) {
-        if (worth(e) < worth(*s)) s = &e;
+        const int we = worth(e), ws = worth(*s);
+        if (we < ws || (tiebreak && we == ws && e.free > s->free)) s = &e;
     }
     return s;
 }

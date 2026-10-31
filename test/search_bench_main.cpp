@@ -401,6 +401,10 @@ namespace {
             const auto [evals, hits] = s.dev->eval_stats();
             if (evals) cout << std::format("leaf evaluations: {}, from the evaluation cache: {} ({:.1f}%)\n",
                                            evals, hits, 100.0 * hits / evals);
+            const auto a = s.dev->aspiration_stats();
+            if (a[0]) cout << std::format("aspiration: {} root attempts, {} failed ({:.1f}%), {} fail highs right after a fail low, "
+                                          "{:.1f}% of the nodes in failed attempts\n", a[0], a[1], 100.0 * a[1] / a[0], a[2],
+                                          100.0 * a[3] / std::max<uint64_t>(1, total_nodes));
         }
         cout << std::format("total: {} positions, {} nodes, {:.2f} s, {:.0f} knodes/s, mean depth {:.2f}\n",
                             n, total_nodes, total_time, total_nodes / std::max(total_time, 1e-9) / 1000, total_depth / n);

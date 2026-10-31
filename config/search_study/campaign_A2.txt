@@ -1,0 +1,23 @@
+# Campaign A2 (search, 2026-10-31): changes from an audit of the aspiration failures, against the new reference
+# g046_ytable_k125 (Yolah table + aspiration k 1.25: +10.7 [+3.9, +17.5] against g046 at 1 s, A1b). BOOK=balanced.
+# Measured on the trace (25 searches): the fail-soft value of a failed attempt sits on the old bound (median gap 0),
+# 41 % of the fail lows are followed by a fail high, and after 20 of 81 fail lows the root order lost its first move.
+# search_bench depth 12, 209 positions (cold / warm; node counts move ±15 % with any change of the tree, the failure
+# counts are steadier). Reference: 11.82 M / 10.88 M nodes, 36.5 % / 33.5 % failed attempts, 201 / 230 rebounds.
+#   rootfix  ("root fix": fail low keeps the root order, fail high only brings the new best first): 11.48 M / 11.03 M
+#   keepbeta ("aspiration keep beta": a fail low does not lower beta): 11.30 M / 9.09 M, rebounds 51 / 52
+#   combo    (rootfix + keepbeta + grow 2 + statistics from depth 2): 10.75 M / 13.00 M, failed 24.1 % / 25.9 %, rebounds 30 / 29
+#   lmrhist  ("lmr territory" off: the territory term no longer changes the LMR): 10.43 M (−12 %)
+#   ttpv     ("tt cut pv" off: no table cut at PV nodes but exact values / proven results): 12.86 M (+9 %)
+# Not in the campaign (bench): pvs research high (no change: 11.84 M), table tiebreak (no change at 200 MB; +5 % nodes
+# with a 2 MB table), proxy after tt (+9.5 % nodes, more failures), aspiration center 2 (warm +25 % nodes).
+a2_rootfix g046_ytable_k125 200000 1000
+a2_rootfix g046_ytable_k125 1000000 1000
+a2_keepbeta g046_ytable_k125 200000 1000
+a2_keepbeta g046_ytable_k125 1000000 1000
+a2_combo g046_ytable_k125 200000 1000
+a2_combo g046_ytable_k125 1000000 1000
+a2_lmrhist g046_ytable_k125 200000 1000
+a2_lmrhist g046_ytable_k125 1000000 1000
+a2_ttpv g046_ytable_k125 200000 1000
+a2_ttpv g046_ytable_k125 1000000 1000

@@ -359,6 +359,15 @@ unique_ptr<Player> Player::create(const json& j) {
              options.aspiration_k = j.value("aspiration k", options.aspiration_k);
              options.aspiration_grow = j.value("aspiration grow", options.aspiration_grow);
              options.tempo = j.value("tempo", options.tempo);
+             options.root_fix = j.value("root fix", options.root_fix);
+             options.aspiration_keep_beta = j.value("aspiration keep beta", options.aspiration_keep_beta);
+             options.aspiration_stats_depth = j.value("aspiration stats depth", options.aspiration_stats_depth);
+             options.aspiration_center2 = j.value("aspiration center 2", options.aspiration_center2);
+             options.pvs_research_high = j.value("pvs research high", options.pvs_research_high);
+             options.tt_cut_pv = j.value("tt cut pv", options.tt_cut_pv);
+             options.table_tiebreak = j.value("table tiebreak", options.table_tiebreak);
+             options.proxy_after_tt = j.value("proxy after tt", options.proxy_after_tt);
+             options.lmr_territory = j.value("lmr territory", options.lmr_territory);
              options.history = j.value("history", options.history);
              options.countermove = j.value("countermove", options.countermove);
              options.root_ordering = j.value("root ordering", options.root_ordering);

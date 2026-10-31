@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector>
 #include <tuple>
+#include <utility>
 #include "game.h"
 #include <fstream>
 #include <string>
@@ -26,7 +27,7 @@ struct NNUE_Quantized {
     alignas(64) int8_t h1_to_h2_sparse[H1_SIZE * H2_SIZE];
     bool sparse = false;
     alignas(64) int16_t h3_bias[H3_SIZE];
-    alignas(64) int8_t h2_to_h3[H1_SIZE * H2_SIZE];
+    alignas(64) int8_t h2_to_h3[H2_SIZE * H3_SIZE];
     alignas(64) int16_t output_bias[OUTPUT_SIZE + 1]{};
     alignas(64) int8_t h3_to_output[H3_SIZE * OUTPUT_SIZE];
     // Value networks (1 output): the value head is kept in FLOAT. It is not
@@ -46,6 +47,11 @@ struct NNUE_Quantized {
         ~Accumulator() {
             free(acc);
         }
+        // Owns its buffer: movable, not copyable (a copy would free it twice).
+        Accumulator(const Accumulator&) = delete;
+        Accumulator& operator=(const Accumulator&) = delete;
+        Accumulator(Accumulator&& o) noexcept : acc(o.acc) { o.acc = nullptr; }
+        Accumulator& operator=(Accumulator&& o) noexcept { std::swap(acc, o.acc); return *this; }
     };
     NNUE_Quantized() = default;
     NNUE_Quantized(const std::string& nnue_parameters_filename) {
