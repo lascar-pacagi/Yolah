@@ -1,0 +1,10 @@
+# Campaign A1b (confirmation of A1, 2026-10-31). A1 against g046 (2000 games per line, 0.2 s / 1 s): aspiration
+# k 1.25 −9.2 / +9.2, k 2 −11.5 / −6.8, Yolah table −8.3 / −6.9, Yolah table + k 1.25 +10.3 / +13.0 [+3.6, +22.5]:
+# only the combination wins (≈ +12 on 4000 games, best of 8 lines). BOOK=balanced.
+# Line 1 extends the A1 match at 1 s from 1000 to 2000 rounds (same results file; seed 8 = its A1 task, so the
+# book order is the same and the new rounds take the next openings). Line 2: the same pair at 3 s.
+# Lines 3-4: the Yolah table's share once the aspiration is adaptive (Yolah table + k 1.25 against k 1.25).
+g046_ytable_k125 nnue_k8_them_g046_qat_az20 1000000 2000 8
+g046_ytable_k125 nnue_k8_them_g046_qat_az20 3000000 500
+g046_ytable_k125 g046_asp_k125 200000 1000
+g046_ytable_k125 g046_asp_k125 1000000 1000

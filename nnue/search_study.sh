@@ -6,8 +6,10 @@
 #
 #     sbatch -p insa-cpu --exclude=crn14,crn15 --array=1-N nnue/search_study.sh campaign_Y1.txt
 #
-# Campaign file (config/search_study/): CANDIDATE REFERENCE TIME_US ROUNDS per
-# line, the configurations being config/search_study/<name>.cfg. Each task
+# Campaign file (config/search_study/): CANDIDATE REFERENCE TIME_US ROUNDS [SEED]
+# per line, the configurations being config/search_study/<name>.cfg (SEED,
+# default the task number: to extend a match of another campaign, give the
+# seed of its task so that the book order stays the same). Each task
 # plays ROUNDS rounds (one random opening, both colours) with one game per
 # physical core, 1 search thread per player, and appends every game to
 # WORK_DIR/search_study/<cand>__vs__<ref>__t<T>.csv (resumable: resubmit the
@@ -40,7 +42,7 @@ PHYS=$(lscpu -p=CPU,Core,Socket | grep -v '^#' | awk -F, -v allowed="$(grep Cpus
 PARALLEL=$(( ${SLURM_CPUS_PER_TASK:-24} < PHYS ? ${SLURM_CPUS_PER_TASK:-24} : PHYS ))
 
 LINE=$(grep -v '^#' "${YOLAH_DIR}/config/search_study/${CAMPAIGN}" | grep . | sed -n "${SLURM_ARRAY_TASK_ID}p")
-read -r CAND REF T ROUNDS <<< "${LINE}"
+read -r CAND REF T ROUNDS SEED <<< "${LINE}"
 NAME="${CAND}__vs__${REF}__t${T}"
 echo "[$(date '+%F %T')] task ${SLURM_ARRAY_TASK_ID} on $(hostname), CPU:$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2), ${PHYS} physical cores, ${PARALLEL} games at a time"
 echo "  openings: ${BOOK:-random, 4 plies}"
@@ -55,6 +57,6 @@ printf '/Yolah/config/search_study/%s.cfg\n/Yolah/config/search_study/%s.cfg\n' 
 start_in_container bash -c "cd /Yolah/config && exec ${BUILD_DIR}/yolah_tournament \
     --players /work/search_study/${NAME}.players --results /work/search_study/${NAME}.csv \
     --time ${T} --threads 1 --parallel ${PARALLEL} --rounds ${ROUNDS} --opening-plies 4 ${BOOK:+--book ${BOOK}} \
-    --seed ${SLURM_ARRAY_TASK_ID}"
+    --seed ${SEED:-${SLURM_ARRAY_TASK_ID}}"
 wait_forwarding_signals
 echo "[$(date '+%F %T')] done (exit code ${RC})"
