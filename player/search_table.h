@@ -66,6 +66,9 @@ public:
     // fail-soft value v ≤ alpha is an upper bound, v ≥ beta a lower bound,
     // and in between both.
     void store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move);
+    // The slot store() writes for this position: its entry, or the one it
+    // evicts (for the search debugger: the entry before and after a store).
+    const Entry* slot(uint64_t hash) const;
     void prefetch(uint64_t hash) const { __builtin_prefetch(&clusters[hash & mask]); }
     Move get_move(uint64_t hash) const {
         const Entry* e = probe(hash);

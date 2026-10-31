@@ -35,28 +35,32 @@ const SearchTable::Entry* SearchTable::probe(uint64_t hash) const {
     return nullptr;
 }
 
-void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move) {
-    Cluster& c = clusters[hash & mask];
+const SearchTable::Entry* SearchTable::slot(uint64_t hash) const {
+    const Cluster& c = clusters[hash & mask];
     const uint32_t k = key_of(hash);
     const uint16_t k16 = key16_of(hash);
-    // The slot: this position's entry if there is one; otherwise the least
-    // useful: an empty slot or an unreachable position (more free squares than
-    // the root), else the shallowest entry.
-    Entry* slot = nullptr;
-    for (Entry& e : c.entries) {
-        if (e.key32 == k && e.key16 == k16) { slot = &e; break; }
+    // This position's entry if there is one; otherwise the least useful: an
+    // empty slot or an unreachable position (more free squares than the
+    // root), else the shallowest entry.
+    for (const Entry& e : c.entries) {
+        if (e.key32 == k && e.key16 == k16) return &e;
     }
-    bool same = slot != nullptr;
-    if (!same) {
-        auto worth = [&](const Entry& e) {
-            if (e.key32 == 0 || e.free > root_free) return -1;   // empty or garbage
-            return int(e.depth);
-        };
-        slot = &c.entries[0];
-        for (Entry& e : c.entries) {
-            if (worth(e) < worth(*slot)) slot = &e;
-        }
+    auto worth = [&](const Entry& e) {
+        if (e.key32 == 0 || e.free > root_free) return -1;   // empty or garbage
+        return int(e.depth);
+    };
+    const Entry* s = &c.entries[0];
+    for (const Entry& e : c.entries) {
+        if (worth(e) < worth(*s)) s = &e;
     }
+    return s;
+}
+
+void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move) {
+    const uint32_t k = key_of(hash);
+    const uint16_t k16 = key16_of(hash);
+    Entry* slot = const_cast<Entry*>(this->slot(hash));
+    const bool same = slot->key32 == k && slot->key16 == k16;
     // A deeper result of the same position replaces the bounds; a shallower
     // one does not overwrite them (it only brings a move if there was none).
     if (same && depth < slot->depth) {

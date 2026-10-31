@@ -1056,6 +1056,25 @@ MinMaxNNUE_DevPlayer::TTView MinMaxNNUE_DevPlayer::tt_probe(uint64_t hash) const
 // `value` (≤ alpha: upper bound, ≥ beta: lower bound, between: exact).
 void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move) {
     if (yolah_table) {
+#ifdef YOLAH_SEARCH_TRACE
+        if (tracer) {
+            const SearchTable::Entry* e = yolah_table->slot(hash);
+            auto ykey = [](uint64_t key32, uint64_t key16) { return key32 << 16 | key16; };
+            const SearchTable::Entry old = *e;
+            uint64_t old_hash = 0;
+            if (old.key32 != 0 && yolah_table->probe(hash) == e) old_hash = hash;   // this position's entry
+            else if (old.key32 != 0) {
+                auto it = tracer->hash_of_ykey.find(ykey(old.key32, old.key16));
+                old_hash = it != tracer->hash_of_ykey.end() ? it->second : ykey(old.key32, old.key16);
+            }
+            yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move);
+            tracer->hash_of_ykey[ykey(e->key32, e->key16)] = hash;
+            TR(YT_STORE, depth, alpha, beta, value, move.raw(), int32_t(uint32_t(old_hash)), int32_t(uint32_t(old_hash >> 32)),
+               old.key32 ? int(old.depth) : -1, int(old.lower), int(old.upper), old.move.raw(),
+               int(e->depth), int(e->lower), int(e->upper), e->move.raw());
+            return;
+        }
+#endif
         yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move);
         return;
     }
@@ -1683,7 +1702,7 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         [[maybe_unused]] int attempt = 0;
         for (;;) {
             Move m;
-            TR(ITER, d, alpha, beta, attempt++);
+            TR(ITER, d, alpha, beta, attempt++, delta);
             const int v = root_search(yolah, s, hash, alpha, beta, d, m);
             if (stopped()) {
                 TR(ITER_RESULT, d, v, m.raw(), 3);

@@ -249,6 +249,25 @@ function valStr(v) {
   return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v);
 }
 const winStr = (a, b) => "[" + valStr(a) + ", " + valStr(b) + "]";
+// A table entry's interval [lower, upper] (±32767: no bound): = v, ≥ v, ≤ v or [lower, upper].
+const NOB = 32767;
+function ivStr(lo, up) {
+  if (lo === up) return "= " + valStr(lo);
+  if (lo <= -NOB && up >= NOB) return "rien";
+  if (up >= NOB) return "≥ " + valStr(lo);
+  if (lo <= -NOB) return "≤ " + valStr(up);
+  return winStr(lo, up);
+}
+// A Yolah-table store at the same depth whose result contradicts the entry's bounds
+// (pruning makes searches of the same depth disagree): SearchTable::store keeps the new result alone.
+function ytCross(e) {
+  const a = i => arg(e, i), q = T.own[e];
+  if (a(7) < 0 || a(0) !== a(7) || q < 0 || hkey(a(5), a(6)) !== hkey(T.nd.hlo[q], T.nd.hhi[q])) return false;
+  const v = a(3), lo = v > a(1) ? Math.max(a(8), v) : a(8), up = v < a(2) ? Math.min(a(9), v) : a(9);
+  return lo > up;
+}
+// The reference table's (bound, value) as an interval.
+const boundIv = (b, v) => [b & 2 ? v : -NOB, b & 1 ? v : NOB];
 
 // ── Game (for the boards) and Zobrist hashing (checked against the trace) ──
 // cells: 0 black, 1 white, 2 hole, 3 free; the same numbers as Yolah::get.
@@ -406,11 +425,13 @@ function index(H, W) {
       else if (t === E.COUNTER) counterEv.push(e);
       else if (t === E.KILLER) { const ply = W[a]; if (!killerEv.has(ply)) killerEv.set(ply, []); killerEv.get(ply).push(e); }
       else if (t === E.STOPPED) stopped = true;
-      if ((t === E.TT_PROBE || t === E.TT_STORE) && c >= 0) {
+      if ((t === E.TT_PROBE || t === E.TT_STORE || t === E.YT_STORE) && c >= 0) {
         const key = hkey(nd.hlo[c], nd.hhi[c]);
         if (!ttMap.has(key)) ttMap.set(key, []); ttMap.get(key).push(e);
-        if (t === E.TT_STORE && W[a + 6] > 0) {                                  // the slot held another position: evicted
-          const ok = hkey(W[a + 4], W[a + 5]);
+        // the slot held another position: evicted
+        const ev = t === E.TT_STORE ? (W[a + 6] > 0 ? [W[a + 4], W[a + 5]] : null) : t === E.YT_STORE ? (W[a + 7] >= 0 ? [W[a + 5], W[a + 6]] : null) : null;
+        if (ev) {
+          const ok = hkey(ev[0], ev[1]);
           if (ok !== key) { if (!ttMap.has(ok)) ttMap.set(ok, []); ttMap.get(ok).push(e); }
         }
       }
@@ -501,7 +522,7 @@ const STATS = [
   ["eval", "évaluations"], ["cached", "  depuis le cache"], ["leaf", "feuilles (profondeur 0)"], ["rfp", "tests RFP"], ["rfpcut", "  coupures RFP"],
   ["mpc", "essais MPC"], ["mpccut", "  coupures MPC"], ["proxy", "essais proxy"], ["proxycut", "  coupures proxy"],
   ["cut", "β-coupures (boucle)"], ["cut0", "  au 1er coup"], ["all", "nœuds tous-coups"], ["lmr", "recherches réduites (LMR)"],
-  ["nw", "fenêtres nulles"], ["rs", "re-recherches"], ["lmp", "élagages LMP"], ["store", "écritures TT"],
+  ["nw", "fenêtres nulles"], ["rs", "re-recherches"], ["lmp", "élagages LMP"], ["store", "écritures TT"], ["ycross", "  contredisant l'entrée (table Yolah)"],
 ];
 function statInc(e, s) {
   const E = T.E, t = T.type[e];
@@ -517,6 +538,7 @@ function statInc(e, s) {
   else if (t === E.CALL) { const k = arg(e, 0); if (k === 1) s[16]++; else if (k === 2) s[17]++; else if (k === 3) s[18]++; }
   else if (t === E.LMP) s[19]++;
   else if (t === E.TT_STORE) s[20]++;
+  else if (t === E.YT_STORE) { s[20]++; if (ytCross(e)) s[21]++; }
   else if (t === E.RETURN) {
     const q = T.own[e]; if (q < 0) return;
     const r = T.nd.reason[q];
@@ -845,6 +867,17 @@ function describe(e) {
       else if (a(10) === a(0) && a(11) === a(1) && a(12) === a(2)) s += `Remplace l'entrée de cette position (avant : prof. ${a(6)} ${B[a(7)]} ${valStr(a(8))}).`;
       else s += `<span class=warn>Refusée</span> : l'entrée de cette position est gardée (prof. ${a(10)} ${B[a(11)]} ${valStr(a(12))}).`;
       break; }
+    case E.YT_STORE: {
+      const asked = a(3) <= a(1) ? "≤ (borne sup.)" : a(3) >= a(2) ? "≥ (borne inf.)" : "= (exacte)";
+      s = `tt_store (table Yolah) : profondeur ${a(0)}, fenêtre ${winStr(a(1), a(2))}, ${asked} ${valStr(a(3))}, ${a(4) ? "coup " + mvStr(a(4)) : "sans coup"}. `;
+      const after = `prof. ${a(11)} <b>${ivStr(a(12), a(13))}</b>`;
+      if (a(7) < 0) s += `Case vide : ${after}.`;
+      else if (hkey(a(5), a(6)) !== (q >= 0 ? hkey(nd.hlo[q], nd.hhi[q]) : "")) s += `<span class=warn>Remplace l'entrée d'une autre position</span> (prof. ${a(7)}) : ${after}.`;
+      else if (a(0) < a(7)) s += `<span class=warn>Moins profond</span> que l'entrée (prof. ${a(7)} ${ivStr(a(8), a(9))}) : bornes gardées.`;
+      else if (a(0) > a(7)) s += `Plus profond : remplace prof. ${a(7)} ${ivStr(a(8), a(9))} → ${after}.`;
+      else if (ytCross(e)) s += `<span class=bad>Contredit l'entrée</span> de même profondeur (${ivStr(a(8), a(9))}) : remplacée par le nouveau résultat seul → ${after}.`;
+      else s += `Même profondeur : ${ivStr(a(8), a(9))} fusionné → ${after}` + (a(12) > a(8) && a(8) > -NOB || a(13) < a(9) && a(9) < NOB ? " <span class=good>(resserré)</span>" : "") + ".";
+      break; }
     case E.CHILD_EVALS: s = `(Débogueur) valeur NNUE de chacun des ${a(0)} enfants, calculée à part : la recherche ne la voit pas. Voir l'onglet « Coups ».`; break;
     case E.STOPPED: s = "<span class=bad>Enregistrement plein : la recherche a été arrêtée ici.</span>"; break;
     default: s = name;
@@ -1087,8 +1120,10 @@ function evalGauge(q, st, res, ttE) {
   // α now (raised by the moves already searched)
   if (st && st.alpha > a) s += `<line x1="${X - 4}" x2="${X + Wd + 4}" y1="${y(st.alpha)}" y2="${y(st.alpha)}" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3 2"/>`;
   // the table's bound (right side)
-  if (ttE) { const yy = y(ttE.value), sym = ["", "≤", "≥", "="][ttE.bound];
-    s += `<line x1="${X + Wd}" x2="${X + Wd + 7}" y1="${yy}" y2="${yy}" stroke="var(--tt)" stroke-width="2"/><text x="${X + Wd + 8}" y="${yy + 3}" font-size="10" fill="var(--tt)">${sym}</text>`; }
+  if (ttE) {
+    const marks = ttE.lower === ttE.upper ? [[ttE.lower, "="]] : [[ttE.lower, "≥"], [ttE.upper, "≤"]].filter(([v]) => Math.abs(v) < NOB);
+    for (const [v, sym] of marks) { const yy = y(v);
+      s += `<line x1="${X + Wd}" x2="${X + Wd + 7}" y1="${yy}" y2="${yy}" stroke="var(--tt)" stroke-width="2"/><text x="${X + Wd + 8}" y="${yy + 3}" font-size="10" fill="var(--tt)">${sym}</text>`; } }
   // the network's static value: a diamond
   { const yy = y(nd.nnue[q]), cx = X + Wd / 2;
     s += `<path d="M${cx - 6},${yy} L${cx},${yy - 6} L${cx + 6},${yy} L${cx},${yy + 6} z" fill="var(--warn)" stroke="var(--bg)"/>`; }
@@ -1125,7 +1160,7 @@ function renderEval(q, st, pos) {
        : started ? `<span class=warn>en cours</span>` + (res ? ` <span class=dim>(plus tard ${res.bound} ${valStr(res.v)})</span>` : "")
        : `<span class=dim>pas encore cherché${res ? ` (plus tard ${res.bound} ${valStr(res.v)})` : ""}</span>`) + `</div>` +
     (moved && res ? `<div>pour le parent</div><div>${done ? "" : "<span class=dim>"}${inv[res.bound]} ${valStr(-res.v)}${done ? "" : "</span>"} <span class=dim>après ${mvStr(nd.move[q])}</span></div>` : "") +
-    `<div><span class=sym style="color:var(--tt)">≷</span>TT</div><div>${tt ? `prof. ${tt.depth} ${B[tt.bound]} ${valStr(tt.value)}${tt.move ? " " + mvStr(tt.move) : " <span class=dim>sans coup</span>"}` : "<span class=dim>rien</span>"}</div>` +
+    `<div><span class=sym style="color:var(--tt)">≷</span>TT</div><div>${tt ? `prof. ${tt.depth} ${ivStr(tt.lower, tt.upper)}${tt.move ? " " + mvStr(tt.move) : " <span class=dim>sans coup</span>"}` : "<span class=dim>rien</span>"}</div>` +
     `<div>profondeur</div><div>d${nd.depth[q]}${k ? ` <span class="badge ${KINDCLS[k]}">${KIND[k]}</span>` : ""}${nd.idx[q] >= 0 ? ` <span class=dim>coup n° ${nd.idx[q]}</span>` : ""}</div>` +
     `<div>sous-arbre</div><div>${fmtN(nd.sub[q])} n.</div>` +
     `</div>` +
@@ -1173,10 +1208,13 @@ function ttStateAt(key, t) {
     if (e > t) break;
     const q = T.own[e], mine = q >= 0 && hkey(T.nd.hlo[q], T.nd.hhi[q]) === key;
     if (T.type[e] === E.TT_PROBE) {
-      entry = arg(e, 0) ? { depth: arg(e, 1), bound: (arg(e, 2) > -32767 ? 2 : 0) | (arg(e, 3) < 32767 ? 1 : 0), value: arg(e, 2) > -32767 ? arg(e, 2) : arg(e, 3), move: arg(e, 4) } : null;
+      entry = arg(e, 0) ? { depth: arg(e, 1), lower: arg(e, 2), upper: arg(e, 3), move: arg(e, 4) } : null;
       known = true; hist.push({ e, what: "probe" });
+    } else if (mine && T.type[e] === E.YT_STORE) {
+      entry = { depth: arg(e, 11), lower: arg(e, 12), upper: arg(e, 13), move: arg(e, 14) }; known = true; hist.push({ e, what: "store" });
     } else if (mine) {
-      entry = { depth: arg(e, 10), bound: arg(e, 11), value: arg(e, 12), move: arg(e, 13) }; known = true; hist.push({ e, what: "store" });
+      const [lower, upper] = boundIv(arg(e, 11), arg(e, 12));
+      entry = { depth: arg(e, 10), lower, upper, move: arg(e, 13) }; known = true; hist.push({ e, what: "store" });
     } else { entry = null; known = true; hist.push({ e, what: "evicted" }); }
   }
   return { entry, known, hist, all: L };
@@ -1282,9 +1320,15 @@ function tabBranch() {
   const when = ui.branchFinal ? "à la fin du nœud" : "à l'instant courant";
   // what the node writes to the table (its tt_store events), past or future
   const stores = [];
-  ownForward(q, nd.exit[q] >= 0 ? nd.exit[q] : T.nEv - 1, e => { if (T.type[e] === T.E.TT_STORE) stores.push(e); return false; });
+  ownForward(q, nd.exit[q] >= 0 ? nd.exit[q] : T.nEv - 1, e => { if (T.type[e] === T.E.TT_STORE || T.type[e] === T.E.YT_STORE) stores.push(e); return false; });
   const storeTxt = stores.length ? stores.map(e => {
-    const a = i => arg(e, i), kept = !(a(10) === a(0) && a(11) === a(1) && a(12) === a(2)), fut = e > cur;
+    const a = i => arg(e, i), fut = e > cur;
+    if (T.type[e] === T.E.YT_STORE) {
+      const asked = a(3) <= a(1) ? "≤" : a(3) >= a(2) ? "≥" : "=";
+      return `<span class="${fut ? "dim" : ""}">prof. ${a(0)} <b>${asked} ${valStr(a(3))}</b> ${a(4) ? mvStr(a(4)) : "sans coup"} → entrée prof. ${a(11)} <b>${ivStr(a(12), a(13))}</b>` +
+        (ytCross(e) ? ` <span class=bad>contredit ${ivStr(a(8), a(9))}</span>` : "") + (fut ? " · plus tard" : "") + `</span>`;
+    }
+    const kept = !(a(10) === a(0) && a(11) === a(1) && a(12) === a(2));
     return `<span class="${fut ? "dim" : ""}">prof. ${a(0)} <b>${BB[a(1)]} ${valStr(a(2))}</b> ${a(3) ? mvStr(a(3)) : "sans coup"}` +
       (kept ? ` → <span class=warn>refusée</span> (reste prof. ${a(10)} ${BB[a(11)]} ${valStr(a(12))})` : " → écrite") + (fut ? " · plus tard" : "") + `</span>`;
   }).join("<br>") : `<span class=dim>${nd.exit[q] >= 0 ? "rien (" + reasonText(q) + ")" : "pas encore"}</span>`;
@@ -1380,13 +1424,19 @@ function tabTT() {
   const st = ttStateAt(key, cur);
   let h = `<div class="legend">Entrée de la table pour <b>${title}</b> (hash ${key}) à l'instant courant, reconstruite à partir des sondes et écritures de la trace.` +
     ` Choisir un coup dans l'onglet « Coups » (sans recherche) ou un nœud dans l'arbre pour voir une autre position.</div>`;
-  h += st.entry ? `<div style="font-size:14px;margin:6px 0">profondeur <b>${st.entry.depth}</b> · ${B[st.entry.bound]} <b>${valStr(st.entry.value)}</b> · coup <b>${mvStr(st.entry.move)}</b></div>`
+  h += st.entry ? `<div style="font-size:14px;margin:6px 0">profondeur <b>${st.entry.depth}</b> · <b>${ivStr(st.entry.lower, st.entry.upper)}</b> · coup <b>${mvStr(st.entry.move)}</b></div>`
     : `<div style="margin:6px 0" class=dim>${st.known ? "Pas d'entrée pour cette position (ou évincée)." : "Jamais sondée ni écrite jusqu'ici dans la trace" + (T.H.warm ? " (une entrée laissée par les recherches d'échauffement est possible)" : "") + "."}</div>`;
   h += `<table class="t"><tr><th>év.</th><th>quand</th><th>quoi</th><th>détails</th></tr>`;
   for (const e of st.all) {
     const qq = T.own[e], mine = qq >= 0 && hkey(nd.hlo[qq], nd.hhi[qq]) === key, fut = e > cur, a = i => arg(e, i);
     let what, det;
     if (T.type[e] === T.E.TT_PROBE) { what = "sonde"; det = a(0) ? `trouvée : prof. ${a(1)} [${valStr(a(2))}, ${valStr(a(3))}] ${mvStr(a(4))}` : "absente"; }
+    else if (mine && T.type[e] === T.E.YT_STORE) {
+      what = "écriture";
+      det = `demandée : prof. ${a(0)} fenêtre ${winStr(a(1), a(2))} valeur ${valStr(a(3))} ${mvStr(a(4))} → ` +
+        (a(7) >= 0 && hkey(a(5), a(6)) === key ? `avant prof. ${a(7)} ${ivStr(a(8), a(9))}, ` : "") + `<b>prof. ${a(11)} ${ivStr(a(12), a(13))}</b>` +
+        (ytCross(e) ? ` <span class=bad>(contradiction : l'ancienne borne est jetée)</span>` : "");
+    }
     else if (mine) {
       what = "écriture"; const kept = !(a(10) === a(0) && a(11) === a(1) && a(12) === a(2));
       det = `demandée : prof. ${a(0)} ${B[a(1)]} ${valStr(a(2))} ${mvStr(a(3))}` + (kept ? ` → <span class=warn>refusée</span>, reste prof. ${a(10)} ${B[a(11)]} ${valStr(a(12))}` : " → écrite");
@@ -1633,7 +1683,7 @@ function validateTrace() {
     "null move": false, "pass rule": false, "articulation ordering": false, "articulation lmr": false, "territory ordering": 1,
     "fast influence": true, "proxy cut": 1, "proxy rank": 0, "proxy delta": 0, "proxy witness": 0, "proxy multi c": 1, "proxy multi m": 1,
     "proxy diverse": false, "proxy second": -1, "proxy prefilter": 0, "proxy weval": 0, "proxy verify": 0, "proxy lazy": 0, "proxy first": false,
-    "proxy tail": 0, probcut: 0, staged: true, "yolah table": false, "endgame root": 0, "endgame tree": 0, "eval grain": 1, "history prior": "" };
+    "proxy tail": 0, probcut: 0, staged: true, "endgame root": 0, "endgame tree": 0, "eval grain": 1, "history prior": "" };
   const notAssumed = Object.entries(assumed).filter(([k, v]) => cfg[k] !== undefined && cfg[k] !== v).map(([k]) => k);
   const lmrBase = cfg["lmr base"], lmrDiv = cfg["lmr divisor"];
   const lmrTable = (d, n) => Math.trunc(1024 * (lmrBase + Math.log(d) * Math.log(n) / lmrDiv));
@@ -1701,12 +1751,24 @@ function validateTrace() {
         for (let i = 0; i < arr.length; i++) { let b = i; for (let j = i + 1; j < arr.length; j++) if (arr[j][1] > arr[b][1]) b = j; [arr[i], arr[b]] = [arr[b], arr[i]]; order.push(arr[i][0]); }
         root.order = order;
       } else if (t === E.ITER) {
-        const d = a(0), al = a(1), be = a(2), att = a(3);
+        const d = a(0), al = a(1), be = a(2), att = a(3), dl = nargs(e) > 4 ? a(4) : null;
+        const adaptive = cfg["aspiration k"] > 0;
         if (att === 0) {
-          const v = root.lastOk ? root.lastOk.v : 0;
+          const v = root.lastOk ? root.lastOk.v : 0, d0 = adaptive ? dl : cfg["aspiration window"];
           const asp = cfg["aspiration window"] > 0 && d >= 4 && Math.abs(v) < W;
-          ck("fenêtre d'aspiration de départ", asp ? al === Math.max(v - cfg["aspiration window"], -INF) && be === Math.min(v + cfg["aspiration window"], INF) : al === -INF && be === INF, e, () => `${winStr(al, be)} (valeur précédente ${v})`);
-          root.delta = cfg["aspiration window"];
+          if (adaptive) ck("aspiration adaptative : δ de départ ≥ « aspiration window »", dl >= cfg["aspiration window"], e, () => `δ ${dl}`);
+          ck("fenêtre d'aspiration de départ", asp ? al === Math.max(v - d0, -INF) && be === Math.min(v + d0, INF) : al === -INF && be === INF, e, () => `${winStr(al, be)} (valeur précédente ${v}, δ ${d0})`);
+          root.delta = d0;
+        } else if (adaptive) {
+          // SearchTable-era windows: fail low α = v − δ, β = (α + β) / 2; fail high β = v + δ; δ × "aspiration grow"
+          const pr = root.prevIter, dp = root.delta;
+          let wa = pr.alpha, wb = pr.beta;
+          if (pr.outcome === 1) { wb = Math.trunc((pr.alpha + pr.beta) / 2); wa = Math.max(pr.v - dp, -INF); }
+          else if (pr.outcome === 2) wb = Math.min(pr.v + dp, INF);
+          const dw = Math.trunc(dp * cfg["aspiration grow"]);
+          ck("aspiration adaptative : fenêtre recentrée sur la valeur de l'échec, δ × croissance", al === wa && be === wb && d === pr.d && dl === dw, e,
+            () => `${winStr(al, be)} δ ${dl} attendu ${winStr(wa, wb)} δ ${dw}`);
+          root.delta = dl;
         } else {
           const pr = root.prevIter;
           let wa = pr.alpha, wb = pr.beta;
@@ -1723,10 +1785,14 @@ function validateTrace() {
           ck("issue de l'itération (OK / échec bas / échec haut)", oc === want, e, () => `${oc} ≠ ${want}`);
           ck("coup de l'itération = meilleur coup de root_search", rq >= 0 && st.get(rq) === undefined && root.rootBest === m, e, () => `${mvStr(m)} ≠ ${mvStr(root.rootBest)}`);
         }
-        root.prevIter = { d, alpha: root.cur.alpha, beta: root.cur.beta, outcome: oc };
+        root.prevIter = { d, alpha: root.cur.alpha, beta: root.cur.beta, outcome: oc, v };
         if (oc === 0) root.lastOk = { d, v, m };
       } else if (t === E.PV) {
-        ck("variante principale : commence par le coup de l'itération", a(0) === 0 || a(1) === root.lastOk.m, e, "PV[0] ≠ coup");
+        // The Yolah table keeps a deeper entry of the root (written while searching the previous move of the game):
+        // a shallower store does not replace its move, and the PV read from the table starts with that move.
+        const rq = root.lastRoot, ent = rq >= 0 ? ttStateAt(hkey(nd.hlo[rq], nd.hhi[rq]), e).entry : null;
+        const deeper = cfg["yolah table"] && ent && ent.depth > root.lastOk.d;
+        ck("variante principale : commence par le coup de l'itération (sauf entrée plus profonde de la table Yolah)", a(0) === 0 || a(1) === root.lastOk.m || deeper, e, "PV[0] ≠ coup");
       }
       continue;
     }
@@ -1740,7 +1806,7 @@ function validateTrace() {
           const lastStore = pred.hist.length ? pred.hist[pred.hist.length - 1] : null;
           if (lastStore && lastStore.what !== "probe") {
             if (lastStore.what === "evicted") ck("sonde TT = reconstruction de la page (entrée évincée → absente)", !a(0), e, "trouvée alors qu'évincée");
-            else { const en = pred.entry, lo = en.bound & 2 ? en.value : -32767, up = en.bound & 1 ? en.value : 32767;
+            else { const en = pred.entry, lo = en.lower, up = en.upper;
               ck("sonde TT = reconstruction de la page (dernière écriture)", a(0) === 1 && a(1) === en.depth && a(2) === lo && a(3) === up && a(4) === en.move, e,
                 () => `lu prof. ${a(1)} [${a(2)}, ${a(3)}] ${mvStr(a(4))}, attendu prof. ${en.depth} [${lo}, ${up}] ${mvStr(en.move)}`); }
           } }
@@ -1890,6 +1956,23 @@ function validateTrace() {
           ck("écriture TT : entrée laissée (remplacement de TranspositionTableEntry::save)", ok, e, "incohérent");
         }
         S.stores.push([a(2), a(3)]);
+        break; }
+      case E.YT_STORE: {
+        ck("écriture TT (table Yolah) : profondeur et fenêtre du nœud", a(0) === depth && a(1) === nd.alpha[q] && a(2) === beta, e,
+          () => `prof. ${a(0)} ${winStr(a(1), a(2))} ≠ ${depth} ${winStr(nd.alpha[q], beta)}`);
+        // the entry left in the slot: SearchTable::store
+        const al = a(1), be = a(2), v = a(3), m = a(4), same = a(7) >= 0 && hkey(a(5), a(6)) === hkey(nd.hlo[q], nd.hhi[q]);
+        let want;
+        if (same && a(0) < a(7)) want = [a(7), a(8), a(9), a(10) !== 0 ? a(10) : m];
+        else {
+          const base = same && a(0) === a(7) ? [a(8), a(9)] : [-NOB, NOB];
+          let lo = v > al ? Math.max(base[0], v) : base[0], up = v < be ? Math.min(base[1], v) : base[1];
+          if (lo > up) { lo = v > al ? v : -NOB; up = v < be ? v : NOB; }
+          want = [a(0), lo, up, m !== 0 ? m : (same ? a(10) : 0)];
+        }
+        ck("écriture TT (table Yolah) : entrée laissée (fusion de SearchTable::store)", a(11) === want[0] && a(12) === want[1] && a(13) === want[2] && a(14) === want[3], e,
+          () => `prof. ${a(11)} ${ivStr(a(12), a(13))} ${mvStr(a(14))} ≠ prof. ${want[0]} ${ivStr(want[1], want[2])} ${mvStr(want[3])}`);
+        S.stores.push([a(3), a(4)]);
         break; }
       case E.RETURN: {
         const v = a(0), r = nd.reason[q];

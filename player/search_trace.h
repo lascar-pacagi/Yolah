@@ -18,7 +18,7 @@
 struct SearchTracer {
     enum Event : int32_t {
         SEARCH = 1,     // a search starts                     (root ply, nb moves)
-        ITER,           // root_search called by the deepening  (depth, alpha, beta, attempt)
+        ITER,           // root_search called by the deepening  (depth, alpha, beta, attempt, δ: current half width)
         ITER_RESULT,    // its result                           (depth, value, move, outcome 0 ok 1 fail low 2 fail high 3 stopped)
         PV,             // the principal variation from the table (n, moves...)
         ROOT_ORDER,     // root moves after the iteration        (n, (move, nodes)...)
@@ -46,12 +46,14 @@ struct SearchTracer {
                         //                                        new: depth, bound, value, move)
         CHILD_EVALS,    // the network's value of every child    (n, (move, value for the node)...)
         STOPPED,        // the recording is full: the search was stopped
+        YT_STORE,       // tt_store, Yolah table                 (depth, alpha, beta, value, move; old: hash lo, hi, depth
+                        //                                        (−1: empty), lower, upper, move; new: depth, lower, upper, move)
         NB_EVENTS
     };
     static constexpr const char* EVENT_NAMES[NB_EVENTS] = {
         "", "SEARCH", "ITER", "ITER_RESULT", "PV", "ROOT_ORDER", "ENTER", "RETURN", "TT_PROBE", "EVAL", "RFP", "MPC",
         "MPC_RESULT", "PROXY", "PROXY_RESULT", "GEN", "SCORES", "MOVE", "CALL", "CALL_RESULT", "MOVE_DONE", "LMP",
-        "CUTOFF", "KILLER", "HISTORY", "COUNTER", "TT_STORE", "CHILD_EVALS", "STOPPED"};
+        "CUTOFF", "KILLER", "HISTORY", "COUNTER", "TT_STORE", "CHILD_EVALS", "STOPPED", "YT_STORE"};
 
     std::vector<int32_t> words;
     size_t max_words = size_t(1) << 26;    // 256 MB of events, then the search is stopped
@@ -63,6 +65,8 @@ struct SearchTracer {
     // The full hash of the positions stored in the table, by their 32-bit key
     // (what the table compares): to name the position an entry was evicted for.
     std::unordered_map<uint32_t, uint64_t> hash_of_key;
+    // The same for the Yolah table (SearchTable), by its key32 << 16 | key16.
+    std::unordered_map<uint64_t, uint64_t> hash_of_ykey;
 
     bool on() const { return !full; }
     void push(int32_t w) { words.push_back(w); }
