@@ -28,7 +28,11 @@ std::string BatchingEvaluator::info() const {
 
 void BatchingEvaluator::reload(const std::string& weights_filename) {
     // Serialise with the worker: no batch may be running while weights change.
-    std::lock_guard lock(mutex);
+    // The worker releases the mutex while the backend evaluates, so holding it
+    // is not enough: wait for the batch in flight to end (the worker cannot
+    // start another one while we hold the mutex).
+    std::unique_lock lock(mutex);
+    cv_idle.wait(lock, [&] { return !evaluating; });
     impl->reload(weights_filename);
 }
 
@@ -45,7 +49,9 @@ void BatchingEvaluator::evaluate(std::span<const Request> in, std::span<Result> 
     ++waiting_clients;
     cv_worker.notify_one();
     cv_clients.wait(lock, [&] { return job.done; });
-    --waiting_clients;
+    // (waiting_clients was decremented by the worker when the job was done:
+    // decremented here, after the wake-up, the worker could already be
+    // deciding on the next batch with the finished clients still counted.)
 }
 
 void BatchingEvaluator::worker_loop() {
@@ -80,9 +86,12 @@ void BatchingEvaluator::worker_loop() {
 
         // Run the backend without holding the lock so clients can keep queueing.
         if (!batch_in.empty()) {
+            evaluating = true;
             lock.unlock();
             impl->evaluate(batch_in, std::span<Result>(batch_out.data(), batch_in.size()));
             lock.lock();
+            evaluating = false;
+            cv_idle.notify_all();
         }
 
         size_t offset = 0;
@@ -91,6 +100,7 @@ void BatchingEvaluator::worker_loop() {
             offset += j->in.size();
             j->done = true;
         }
+        waiting_clients -= taken.size();
         cv_clients.notify_all();
     }
 }

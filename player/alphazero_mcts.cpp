@@ -132,8 +132,9 @@ float Search::terminal_value(const Yolah& state) {
 // ── construction / node table ──────────────────────────────────────────────
 Search::Search(nn::Evaluator& evaluator, const SearchParams& params, std::pmr::memory_resource* memory)
     : evaluator(evaluator), prm(params), alloc(memory),
-      rng(params.seed ? params.seed : 0x2545F4914F6CDD1Dull),
-      base_seed(params.seed ? params.seed : std::random_device{}()) {
+      base_seed(params.seed ? params.seed
+                            : (uint64_t(std::random_device{}()) << 32 | std::random_device{}())),
+      rng((base_seed ^ 0x2545F4914F6CDD1Dull) | 1) {
     if (prm.microseconds == 0 && prm.nb_simulations == 0)
         throw std::invalid_argument("az::Search: either microseconds or nb_simulations must be > 0");
     prm.nb_threads = std::max<size_t>(1, prm.nb_threads);
@@ -391,7 +392,10 @@ uint32_t Search::select_child(const Node& node, bool is_root) const {
                 q = (child->w.load(std::memory_order_relaxed) - static_cast<float>(cp)) / (cn + cp);
         }
         float score = q + explore_scaling * p / (1.0f + n_eff);
-        if (forced && n_eff > 0 && static_cast<float>(n_eff) < std::sqrt(forced_scale * p))
+        // (n > 0: a COMPLETED visit. With n + pending, a child chosen once in
+        // this batch got the bonus at once, and the next descents of the batch
+        // rode along on the same unevaluated leaf, backing up its value again.)
+        if (forced && n > 0 && static_cast<float>(n_eff) < std::sqrt(forced_scale * p))
             score += 1e6f;
         if (score > best_score) { best_score = score; best = i; }
     }
@@ -680,7 +684,10 @@ SearchResult Search::search(const Yolah& state) {
 
 // Play values of the root's moves: the edge visits, with the forced playouts
 // taken back out (KataGo's getReducedPlaySelectionWeight) and the LCB bonus
-// applied. They serve both as the training target π and as the move choice.
+// applied: the greedy move choice. Before the LCB step they are copied to
+// `target`: the training target π and the opening-phase sampling (the LCB
+// gives its winner up to 25× another child's value — it says which move to
+// play, not how the visits were distributed).
 void Search::root_play_values(std::vector<ChildStat>& children) const {
     const size_t nb = children.size();
     if (nb == 0) return;
@@ -722,6 +729,8 @@ void Search::root_play_values(std::vector<ChildStat>& children) const {
             c.play_value = std::min(c.play_value, std::ceil(std::max(0.0f, wanted)));
         }
     }
+
+    for (ChildStat& c : children) c.target = c.play_value;
 
     // ── 3. LCB: give the best lower bound enough play value to be chosen ──
     if (!prm.use_lcb || total <= 0.0f) return;
@@ -802,13 +811,13 @@ SearchResult Search::make_result(const Yolah& state, double seconds, uint64_t si
     });
     if (res.children.empty()) return res;   // terminal root
 
-    // Training target π: the play values, normalised. If the search could not
-    // complete a single simulation, fall back to the priors.
+    // Training target π: the play values before the LCB step, normalised. If
+    // the search could not complete a single simulation, fall back to the priors.
     float total = 0.0f;
-    for (const ChildStat& c : res.children) total += c.play_value;
+    for (const ChildStat& c : res.children) total += c.target;
     res.policy.resize(res.children.size());
     for (size_t i = 0; i < res.children.size(); i++)
-        res.policy[i] = total > 0 ? res.children[i].play_value / total : res.children[i].prior;
+        res.policy[i] = total > 0 ? res.children[i].target / total : res.children[i].prior;
 
     // Move choice: the best play value or, in the self-play opening phase, a
     // sample ∝ π^(1/τ).
@@ -817,7 +826,7 @@ SearchResult Search::make_result(const Yolah& state, double seconds, uint64_t si
         std::vector<double> weights(res.children.size());
         double sum = 0.0;
         for (size_t i = 0; i < weights.size(); i++) {
-            weights[i] = std::pow(static_cast<double>(res.children[i].play_value), 1.0 / prm.temperature);
+            weights[i] = std::pow(static_cast<double>(res.children[i].target), 1.0 / prm.temperature);
             sum += weights[i];
         }
         double r = (w.prng.rand<uint64_t>() >> 11) * 0x1.0p-53 * sum;

@@ -486,7 +486,8 @@ class TrainerDDP:
             self._validate(epoch)
             if self.gpu_id == 0 and epoch % self.save_every == 0:
                 self._save_checkpoint(epoch)
-        self._save_checkpoint(nb_epochs - 1)
+        if self.gpu_id == 0:
+            self._save_checkpoint(nb_epochs - 1)   # the final model (rank 0 only)
 
 
 def main(rank, world_size, batch_size, cache_dir):

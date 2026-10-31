@@ -201,7 +201,9 @@ struct ChildStat {
     uint32_t visits;    // edge visits N(s,a), before any pruning
     float q;            // Q(s,a) for the side to move at the root, ∈ [-1, 1]
     float q2;           // mean of Q² over the child's visits (for the LCB variance)
-    float play_value;   // visits after policy target pruning / LCB adjustment
+    float play_value;   // visits after policy target pruning / LCB adjustment (the greedy move choice)
+    float target;       // visits after policy target pruning only: the training target π and the
+                        // opening-phase sampling (KataGo extracts the policy target without LCB)
     float lcb;          // Q(s,a) − lcb_stdevs · σ(Q), or -2 if not computed
 };
 
@@ -307,8 +309,12 @@ private:
     std::chrono::steady_clock::time_point deadline;
     uint64_t sim_budget = 0;               // simulations for the current search (playout cap)
     bool     full_search = true;           // false = fast search: no noise, no forced playouts
-    PRNG     rng;                          // search-level PRNG (playout cap randomization)
+    // base_seed first: rng is initialised from it (members are initialised in
+    // declaration order). With seed 0 both used to differ only in base_seed:
+    // rng started from a constant, so every self-play game drew the same
+    // sequence of full / fast searches.
     uint64_t base_seed;
+    PRNG     rng;                          // search-level PRNG (playout cap randomization)
     uint64_t search_counter = 0;
 };
 

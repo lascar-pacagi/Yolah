@@ -32,8 +32,10 @@ void ResNetTorch::load(const std::string& module_filename) {
     module.eval();
     if (fp16) module.to(torch::kHalf);
     filename = module_filename;
-    // Warm up cuDNN / the executor on the shapes the search is likely to use.
+    // Warm up cuDNN / the executor on the shapes the search is likely to use,
+    // in the mode evaluate() runs in.
     torch::NoGradGuard no_grad;
+    c10::InferenceMode inference;
     for (int64_t n : {int64_t(1), int64_t(8), int64_t(32), int64_t(128), int64_t(preferred_batch)}) {
         torch::Tensor x = torch::zeros({n, PLANES, 8, 8}, torch::TensorOptions().dtype(fp16 ? torch::kHalf : torch::kFloat32).device(device));
         module.forward({x});

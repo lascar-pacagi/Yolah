@@ -73,6 +73,10 @@ private:
     size_t queued_positions = 0;
     size_t waiting_clients = 0;
     bool stop = false;
+    // The backend is running a batch (the mutex is released meanwhile):
+    // reload() waits for the end of it.
+    bool evaluating = false;
+    std::condition_variable cv_idle;
     std::thread worker;
 
     // Scratch owned by the worker.

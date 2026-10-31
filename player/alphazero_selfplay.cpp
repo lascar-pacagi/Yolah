@@ -211,10 +211,13 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                              params.playout_cap_fast_prob, model.step, evaluator.info(),
                              model.aux ? "on" : "off") << std::flush;
 
-    auto game_loop = [&] {
+    auto game_loop = [&](size_t index) {
         std::pmr::synchronized_pool_resource memory;
         {
-            Search search(evaluator, params, &memory);
+            // A fixed seed (reproducible runs) still differs from game to game.
+            SearchParams game_params = params;
+            if (game_params.seed) game_params.seed += index + 1;
+            Search search(evaluator, game_params, &memory);
             uint64_t seen = generation.load();
             while (!halt.load()) {
                 if (opt.max_games && games_started.fetch_add(1) >= opt.max_games) break;
@@ -269,7 +272,7 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
     };
 
     std::vector<std::jthread> threads;
-    for (size_t i = 0; i < nb_games; i++) threads.emplace_back(game_loop);
+    for (size_t i = 0; i < nb_games; i++) threads.emplace_back(game_loop, i);
 
     // Supervisor: hot-swap the network, flush old samples, report.
     const double start = now_seconds();

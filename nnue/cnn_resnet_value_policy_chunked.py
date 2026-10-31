@@ -460,6 +460,12 @@ class Net(nn.Module):
     def forward(self, x):
         return self.heads(self.trunk(x))
 
+    def clip(self):
+        # No-op: kept so the training loop can call model.clip() uniformly
+        # across networks (the NNUE variants clamp weights here for int8
+        # quantization; this CNN does not need it).
+        pass
+
 
 def net_from_state_dict(sd, cls=None, strict=True):
     """
@@ -473,12 +479,6 @@ def net_from_state_dict(sd, cls=None, strict=True):
                        num_actions=sd["policy_fc.weight"].shape[0],
                        global_pool="value_gp_fc.weight" in sd)
     return net, net.load_state_dict(sd, strict=strict)
-
-    def clip(self):
-        # No-op: kept so the training loop can call model.clip() uniformly
-        # across networks (the NNUE variants clamp weights here for int8
-        # quantization; this CNN does not need it).
-        pass
 
 
 # ── Training configuration ──────────────────────────────────────────────────
@@ -805,7 +805,8 @@ class TrainerDDP:
             self._validate(epoch)
             if self.gpu_id == 0 and epoch % self.save_every == 0:
                 self._save_checkpoint(epoch)
-        self._save_checkpoint(nb_epochs - 1)    # always save the final model
+        if self.gpu_id == 0:
+            self._save_checkpoint(nb_epochs - 1)    # always save the final model (rank 0 only)
 
 
 def main(rank, world_size, batch_size, cache_dir):

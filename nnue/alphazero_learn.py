@@ -281,6 +281,9 @@ class BatchMaker:
         # π was quantised to 16 bits per move: renormalise so it sums to 1.
         probs = torch.from_numpy(rows["prob"].astype(np.float32)).to(dev)
         probs = probs / probs.sum(1, keepdim=True).clamp_min(1.0)
+        # Number of legal moves per row (--legal-softmax): actions[:, :nb_moves]
+        # are the legal moves, the rest is padding.
+        self.nb_moves = torch.from_numpy(rows["nb_moves"].astype(np.int64)).to(dev)
         z = torch.from_numpy(rows["z"].astype(np.float32)).to(dev)
         if self.q_weight > 0:
             # root_q is the value the full search found for this position,
@@ -377,6 +380,7 @@ class State:
     def __init__(self, work):
         self.path = os.path.join(work, "state.json")
         self.lock = threading.Lock()
+        self.in_match = set()     # steps whose .ts a running match needs (not saved)
         self.d = {"step": 0, "samples_trained": 0, "exports": [0], "pending_evals": [],
                   "evaluated": [0], "elo": {"0": 0.0}}
         if os.path.exists(self.path):
@@ -483,6 +487,16 @@ class Evaluator(threading.Thread):
         return ts
 
     def run_match(self, step, opp):
+        a = self.args
+        with self.state.lock:     # cleanup_models must not delete these .ts meanwhile
+            self.state.in_match = {step, opp}
+        try:
+            return self._run_match(step, opp)
+        finally:
+            with self.state.lock:
+                self.state.in_match = set()
+
+    def _run_match(self, step, opp):
         a = self.args
         ts_a = self.ensure_ts(step)
         ts_b = self.ensure_ts(opp)
@@ -612,6 +626,8 @@ def main():
     ap.add_argument("--amp", choices=["auto", "bf16", "fp16"], default="auto",
                     help="mixed precision of the trainer (auto: bf16 on Ampere+, fp16 before)")
     # KataGo's auxiliary heads (alphazero_aux.py). Off: everything as before.
+    ap.add_argument("--legal-softmax", action="store_true",
+                    help="policy loss: softmax over the legal moves only (as the search), not the 4096 logits")
     ap.add_argument("--aux", action="store_true",
                     help="train the ownership and score-margin heads (self-play records their targets)")
     ap.add_argument("--own-weight", type=float, default=1.5,
@@ -659,6 +675,12 @@ def main():
         src_sd = load_state_dict(args.init_model)
     else:
         src_sd = ckpt["model"]
+        if bool(ckpt.get("aux", False)) != args.aux and ckpt.get("ema") is not None:
+            # Variant switch (below): the weight average restarts from the new
+            # network, so start from the average (the exported weights), not
+            # from the last SGD step's raw weights.
+            src_sd = {k[7:]: v for k, v in ckpt["ema"].items() if k.startswith("module.")}
+            log("variant switch: starting from the weight average (EMA)")
     # Variant: with --aux the network carries the auxiliary heads. A run can
     # switch between the variants from one job to the next: the shared
     # parameters are kept, the auxiliary heads start from scratch (or are
@@ -779,7 +801,7 @@ def main():
             return
         with state.lock:
             evaluated = list(state.d["evaluated"])
-            live = {0, state.d["exports"][-1], *state.d["pending_evals"]}
+            live = {0, state.d["exports"][-1], *state.d["pending_evals"], *state.in_match}
             keep_pt = live | set(evaluated)
             keep_ts = live | set(evaluated[-1:])
             exports = list(state.d["exports"])
@@ -858,7 +880,14 @@ def main():
         # Policy: cross-entropy with the soft target π, -Σ_a π(a) log p(a|s).
         # The softmax runs over the 4096 logits; π lives on the legal moves
         # only (sparse: `actions` are their indices, the padding has π = 0).
-        logp = F.log_softmax(logits.float(), dim=1).gather(1, actions)
+        if args.legal_softmax:
+            # Softmax over the legal moves only, as the search does
+            # (Search::priors_from_logits): the illegal logits get no gradient.
+            legal = logits.float().gather(1, actions)
+            pad = torch.arange(actions.size(1), device=device)[None, :] >= make_batch.nb_moves[:, None]
+            logp = F.log_softmax(legal.masked_fill(pad, float("-inf")), dim=1).masked_fill(pad, 0.0)
+        else:
+            logp = F.log_softmax(logits.float(), dim=1).gather(1, actions)
         p_loss = -(probs * logp).sum(1).mean()
         # Value: squared error against the game result z ∈ {-1, 0, +1}.
         v_loss = F.mse_loss(v, z)
