@@ -382,11 +382,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     const Move tt_move = tt.move;
     if (tt.found) {
         s.nb_hits++;
-        // ("tt cut pv" off: at PV nodes only an exact value or a proven result
-        // cuts; the bounds mostly come from non-PV searches, with their pruning)
-        if (tt.depth >= depth && (options.tt_cut_pv || beta - alpha == 1 || tt.lower == tt.upper
+        // ("tt cut pv" off: at PV nodes only an exact value — unless "tt cut pv
+        // exact" is off too — or a proven result cuts; the bounds mostly come
+        // from non-PV searches, with their pruning. "tt depth asym": a lower
+        // bound must come from a strictly deeper search.)
+        if (tt.depth >= depth && (options.tt_cut_pv || beta - alpha == 1
+                                  || (options.tt_cut_pv_exact && tt.lower == tt.upper)
                                   || tt.lower > WIN || tt.upper < -WIN)) {
-            if (tt.lower >= beta) return TRET(tt.lower);
+            if (tt.lower >= beta && (!options.tt_depth_asym || tt.depth > depth)) return TRET(tt.lower);
             if (tt.upper <= alpha) return TRET(tt.upper);
             if (tt.lower == tt.upper) return TRET(tt.lower);
         }
@@ -419,6 +422,9 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    near game results (|beta| ≥ WIN): a proven win must stay proven.
     const bool pv_node = beta - alpha > 1;
     const bool prunable = !pv_node && std::abs(beta) < WIN;
+    // "tt pv": a position searched as a PV node before keeps PV treatment
+    // (no reverse futility pruning, PV reductions), even with a null window.
+    const bool tt_pv = options.tt_pv && yolah_table && (pv_node || (tt.found && tt.pv));
     int static_eval = 0;
     if (prunable && ((options.rfp_depth > 0 && depth <= options.rfp_depth) || (options.null_move && depth >= 3)
                      || (options.proxy_cut == 1 && depth >= options.proxy_depth)
@@ -429,9 +435,9 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //     is above beta by a margin that a shallow search will hardly lose,
     //     trust it and cut. The margin grows with the depth: the deeper the
     //     search, the more the value may still change.
-    if (prunable && depth <= options.rfp_depth)
+    if (prunable && !tt_pv && depth <= options.rfp_depth)
         TR(RFP, static_eval, options.rfp_margin * depth, beta, static_eval - options.rfp_margin * depth >= beta);
-    if (prunable && depth <= options.rfp_depth && static_eval - options.rfp_margin * depth >= beta) {
+    if (prunable && !tt_pv && depth <= options.rfp_depth && static_eval - options.rfp_margin * depth >= beta) {
         return TRET(static_eval);
     }
     // O. Multi-ProbCut (Buro) without its regression, tuned by hand as
@@ -901,7 +907,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         // scores[i] is now m's score: special move (killer, countermove), articulation or history
         const bool tactical = options.articulation_lmr && is_articulation_move(yolah, m);
         const int r = tactical || !generated ? 0          // (the first move is never reduced anyway)
-                    : late_move_reduction_of(depth, i, beta - alpha > 1, scores[i] >= SCORE_COUNTER,
+                    : late_move_reduction_of(depth, i, beta - alpha > 1 || tt_pv, scores[i] >= SCORE_COUNTER,
                                              scores[i] >= SCORE_ARTICULATION ? 0
                                              : options.lmr_territory || !options.history ? scores[i]
                                              : s.w->history[yolah.current_player()][m.from_sq()][m.to_sq()]);
@@ -921,7 +927,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 if (v >= beta) {
                     // Beta cutoff: the opponent will not allow this position.
                     TR(CUTOFF, int(i), m.raw(), v, beta);
-                    tt_store(hash, yolah, depth, alpha_orig, beta, v, m);
+                    tt_store(hash, yolah, depth, alpha_orig, beta, v, m, tt_pv);
                     // Killer moves: quiet moves that cut at the same ply in a
                     // sibling node, tried early. FIX (A): only cutting moves
                     // (the reference also stored the best move of nodes without
@@ -956,7 +962,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     }
     // No cutoff: exact value if a move raised alpha, otherwise only an upper
     // bound (all the moves failed low against the window we were given).
-    tt_store(hash, yolah, depth, alpha_orig, beta, best, best_move);
+    tt_store(hash, yolah, depth, alpha_orig, beta, best, best_move, tt_pv);
     return TRET(best);
 }
 
@@ -1068,7 +1074,7 @@ MinMaxNNUE_DevPlayer::TTView MinMaxNNUE_DevPlayer::tt_probe(uint64_t hash) const
     TTView view;
     if (yolah_table) {
         if (const SearchTable::Entry* e = yolah_table->probe(hash)) {
-            view = {true, e->move, e->depth, e->lower, e->upper};
+            view = {true, e->move, e->depth, e->lower, e->upper, e->pv != 0};
         }
         return view;
     }
@@ -1087,7 +1093,8 @@ MinMaxNNUE_DevPlayer::TTView MinMaxNNUE_DevPlayer::tt_probe(uint64_t hash) const
 
 // The result of a search of `depth` with the window (alpha, beta): fail-soft
 // `value` (≤ alpha: upper bound, ≥ beta: lower bound, between: exact).
-void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move) {
+void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move,
+                                    bool pv) {
     if (yolah_table) {
 #ifdef YOLAH_SEARCH_TRACE
         if (tracer) {
@@ -1100,7 +1107,7 @@ void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth
                 auto it = tracer->hash_of_ykey.find(ykey(old.key32, old.key16));
                 old_hash = it != tracer->hash_of_ykey.end() ? it->second : ykey(old.key32, old.key16);
             }
-            yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move);
+            yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv);
             tracer->hash_of_ykey[ykey(e->key32, e->key16)] = hash;
             TR(YT_STORE, depth, alpha, beta, value, move.raw(), int32_t(uint32_t(old_hash)), int32_t(uint32_t(old_hash >> 32)),
                old.key32 ? int(old.depth) : -1, int(old.lower), int(old.upper), old.move.raw(),
@@ -1108,7 +1115,7 @@ void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth
             return;
         }
 #endif
-        yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move);
+        yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv);
         return;
     }
     const Bound b = value >= beta ? BOUND_LOWER : value > alpha ? BOUND_EXACT : BOUND_UPPER;
@@ -1368,7 +1375,7 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         tracer->ev_list(__LINE__, SearchTracer::ROOT_ORDER, body);
     }
 #endif
-    tt_store(hash, yolah, depth, alpha_orig, beta, best, res);
+    tt_store(hash, yolah, depth, alpha_orig, beta, best, res, true);
     return TRET(best);
 }
 
@@ -1879,6 +1886,9 @@ json MinMaxNNUE_DevPlayer::config() {
     j["aspiration center 2"] = options.aspiration_center2;
     j["pvs research high"] = options.pvs_research_high;
     j["tt cut pv"] = options.tt_cut_pv;
+    j["tt cut pv exact"] = options.tt_cut_pv_exact;
+    j["tt pv"] = options.tt_pv;
+    j["tt depth asym"] = options.tt_depth_asym;
     j["table tiebreak"] = options.table_tiebreak;
     j["proxy after tt"] = options.proxy_after_tt;
     j["lmr territory"] = options.lmr_territory;

@@ -145,6 +145,14 @@ struct MinMaxNNUE_DevOptions {
                                      //   gave ≥ beta (Stockfish today), not only alpha < v < beta
     bool tt_cut_pv = true;           // ["tt cut pv"] false: at PV nodes, the table cuts only with an exact value or a
                                      //   proven result (Stockfish: no table cut at PV nodes)
+    bool tt_cut_pv_exact = true;     // ["tt cut pv exact"] with "tt cut pv" false: false = not even an exact value cuts
+                                     //   at PV nodes (with the Yolah table, lower == upper can be two merged bounds
+                                     //   of non-PV searches), only a proven result
+    bool tt_pv = false;              // ["tt pv"] Yolah table: entries remember that their position was searched as a
+                                     //   PV node (Stockfish's ttPv); at such a node, even with a null window: no
+                                     //   reverse futility pruning, LMR as at PV nodes
+    bool tt_depth_asym = false;      // ["tt depth asym"] a table cut on a lower bound (≥ beta) needs a strictly
+                                     //   deeper entry, an upper bound or exact value the same depth (Stockfish)
     bool table_tiebreak = false;     // ["table tiebreak"] Yolah table: among entries of equal depth, replace the one
                                      //   with the most free squares (the oldest), not always slot 0
     bool proxy_after_tt = false;     // ["proxy after tt"] staged: the proxy test comes after the table's move
@@ -278,9 +286,11 @@ private:
         Move move = Move::none();
         int  depth = 0;
         int  lower = -32767, upper = 32767;   // value ∈ [lower, upper]
+        bool pv = false;                      // searched as a PV node ("tt pv", Yolah table only)
     };
     TTView tt_probe(uint64_t hash) const;
-    void   tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move);
+    void   tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move,
+                    bool pv = false);
     Move   tt_move(uint64_t hash) const;
     size_t nb_moves_at_full_depth;
     uint8_t late_move_reduction;

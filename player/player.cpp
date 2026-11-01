@@ -365,6 +365,9 @@ unique_ptr<Player> Player::create(const json& j) {
              options.aspiration_center2 = j.value("aspiration center 2", options.aspiration_center2);
              options.pvs_research_high = j.value("pvs research high", options.pvs_research_high);
              options.tt_cut_pv = j.value("tt cut pv", options.tt_cut_pv);
+             options.tt_cut_pv_exact = j.value("tt cut pv exact", options.tt_cut_pv_exact);
+             options.tt_pv = j.value("tt pv", options.tt_pv);
+             options.tt_depth_asym = j.value("tt depth asym", options.tt_depth_asym);
              options.table_tiebreak = j.value("table tiebreak", options.table_tiebreak);
              options.proxy_after_tt = j.value("proxy after tt", options.proxy_after_tt);
              options.lmr_territory = j.value("lmr territory", options.lmr_territory);

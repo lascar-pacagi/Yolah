@@ -42,7 +42,8 @@ public:
         uint8_t  depth;     // depth of the searches that proved the bounds
         uint8_t  free;      // number of free squares of the position
         uint16_t key16;     // bits 31..16 of the hash
-        uint8_t  padding[2];
+        uint8_t  pv;        // 1: searched as a PV node at least once ("tt pv")
+        uint8_t  padding;
     };
     static_assert(sizeof(Entry) == 16);
     static constexpr int CLUSTER_SIZE = 4;
@@ -64,8 +65,9 @@ public:
     const Entry* probe(uint64_t hash) const;
     // What a search of `depth` with the window (alpha, beta) found: a
     // fail-soft value v ≤ alpha is an upper bound, v ≥ beta a lower bound,
-    // and in between both.
-    void store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move);
+    // and in between both. `pv`: the search was at a PV node (sticky while
+    // the entry holds this position).
+    void store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move, bool pv = false);
     // The slot store() writes for this position: its entry, or the one it
     // evicts (for the search debugger: the entry before and after a store).
     const Entry* slot(uint64_t hash) const;

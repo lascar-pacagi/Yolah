@@ -57,7 +57,7 @@ const SearchTable::Entry* SearchTable::slot(uint64_t hash) const {
     return s;
 }
 
-void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move) {
+void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move, bool pv) {
     const uint32_t k = key_of(hash);
     const uint16_t k16 = key16_of(hash);
     Entry* slot = const_cast<Entry*>(this->slot(hash));
@@ -66,13 +66,14 @@ void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta,
     // one does not overwrite them (it only brings a move if there was none).
     if (same && depth < slot->depth) {
         if (slot->move == Move::none()) slot->move = move;
+        slot->pv |= pv;
         return;
     }
     if (!same || depth > slot->depth) {
         // A new position, or a deeper search of this one: fresh bounds. But
         // the best move of this position is kept (an all-node, where no move
         // beat alpha, has none to give, and the old one still orders well).
-        if (!same) slot->move = Move::none();
+        if (!same) slot->move = Move::none(), slot->pv = 0;
         slot->key32 = k;
         slot->key16 = k16;
         slot->lower = -NO_BOUND;
@@ -93,6 +94,7 @@ void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta,
         slot->upper = int16_t(value < beta  ? value : NO_BOUND);
     }
     if (move != Move::none()) slot->move = move;
+    slot->pv |= pv;
 }
 
 double SearchTable::load() const {

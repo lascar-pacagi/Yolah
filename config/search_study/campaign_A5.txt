@@ -1,0 +1,15 @@
+# Campaign A5 (search, 2026-11-01): what Stockfish does with its table, against a3_rootlmr_ttpv (A3: +22.4
+# [+15.9, +29.0] against g046_ytable_k125 at 1 s; A4 checks it). BOOK=balanced.
+# Stockfish (search.cpp, 2026-09): no table cut at all at PV nodes; at non-PV nodes a lower bound must be strictly
+# deeper; ttPv: entries remember a PV search, such positions keep a PV treatment (no RFP, smaller LMR).
+# search_bench depth 12, 209 positions, cold (node counts move ±15 % with any change of the tree):
+#   a3_rootlmr_ttpv 11.75 M nodes, 36.1 % failed attempts, 200 rebounds
+#   noexact  ("tt cut pv exact" off: at PV nodes only proven results cut): 11.72 M, 35.7 %, 203
+#   ttpvflag ("tt pv"): 12.60 M (+7 %), 35.7 %, 191
+#   asym     ("tt depth asym"): 10.01 M (−15 %), 34.7 %, 172
+a5_noexact a3_rootlmr_ttpv 200000 1000
+a5_noexact a3_rootlmr_ttpv 1000000 1000
+a5_ttpvflag a3_rootlmr_ttpv 200000 1000
+a5_ttpvflag a3_rootlmr_ttpv 1000000 1000
+a5_asym a3_rootlmr_ttpv 200000 1000
+a5_asym a3_rootlmr_ttpv 1000000 1000
