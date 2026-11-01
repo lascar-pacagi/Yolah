@@ -1,0 +1,10 @@
+# Campaign A4 (search, 2026-11-01): a3_rootlmr_ttpv as the new reference? BOOK=balanced.
+# A3 against g046_ytable_k125 at 1 s (4000 games): rootfix +9.8 [+3.1, +16.5], lmrhist +6.5 [−0.3, +13.3],
+# rootlmr +12.5 [+5.8, +19.3] (0.2 s: +13.2), rootlmr_ttpv +22.4 [+15.9, +29.0] (fewer lost pairs, more drawn ones).
+# A1b 3 s, g046_ytable_k125 against g046: +6.3 [−2.6, +15.1] (2000 games).
+# Line 1: the share of "tt cut pv" off, directly (rootlmr_ttpv against rootlmr). Lines 2-3: rootlmr_ttpv against
+# g046_ytable_k125 at 0.2 s and 3 s. Line 4: the whole gain of A1-A3 against g046.
+a3_rootlmr_ttpv a3_rootlmr 1000000 2000
+a3_rootlmr_ttpv g046_ytable_k125 200000 1000
+a3_rootlmr_ttpv g046_ytable_k125 3000000 500
+a3_rootlmr_ttpv nnue_k8_them_g046_qat_az20 1000000 1000
