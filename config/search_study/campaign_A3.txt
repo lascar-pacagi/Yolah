@@ -1,0 +1,13 @@
+# Campaign A3 (search, 2026-11-01): confirmation of A2, against g046_ytable_k125. BOOK=balanced.
+# A2 (2000 games per line, 0.2 s / 1 s; combined ≈ inverse-variance mean of both): rootfix +9.4 / +8.3 (≈ +8.8
+# [+1.7, +15.9]), lmrhist +5.7 / +10.1 (≈ +8.2 [+1.0, +15.4]), ttpv +4.5 / +7.5 (≈ +6.2), combo −1.2 / +4.9,
+# keepbeta −2.4 / −6.8 (dropped, with grow 2). Best 2 of 5 lines: their scores are flattered, hence the confirmation.
+# A1b 3 s: g046_ytable_k125 +5.6 [−7.0, +18.2] against g046 (1000 games).
+# Lines 1-2 extend the A2 matches at 1 s from 1000 to 2000 rounds (same results files; seeds = their A2 tasks).
+# Line 6 extends the A1b match at 3 s from 500 to 1000 rounds (seed = its A1b task).
+a2_rootfix g046_ytable_k125 1000000 2000 2
+a2_lmrhist g046_ytable_k125 1000000 2000 8
+a3_rootlmr g046_ytable_k125 1000000 2000
+a3_rootlmr_ttpv g046_ytable_k125 1000000 2000
+a3_rootlmr g046_ytable_k125 200000 1000
+g046_ytable_k125 nnue_k8_them_g046_qat_az20 3000000 1000 2
