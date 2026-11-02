@@ -277,6 +277,21 @@ if(ENABLE_TORCH)
     target_link_libraries(search_bench PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# Training data from games of the dev player, for the distillation loop
+# (test/selfplay_label_main.cpp, nnue/distill_loop.sh):
+#   ./selfplay_label --player ../config/search_study/dev_final.cfg --out games.bin --first-game 0 --games 1000
+add_executable(selfplay_label test/selfplay_label_main.cpp)
+target_compile_options(selfplay_label PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(selfplay_label PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_link_libraries(selfplay_label PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(selfplay_label PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(selfplay_label PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # The search debugger (test/search_trace_main.cpp): records every step of the
 # dev player's search for ui/search_debugger.html. `make search_trace`.
 #   ./search_trace --positions ../test/bench_positions.txt --index 40 --depth 7 --out trace.ytrace

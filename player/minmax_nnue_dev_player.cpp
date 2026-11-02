@@ -359,6 +359,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
 // tighter bounds to the transposition table and to the aspiration windows.
 int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, int beta, int depth) {
     ++s.nb_nodes;
+    if (options.max_nodes > 0 && s.id == 0 && s.nb_nodes >= options.max_nodes) stop = true;
     TR(ENTER, 0, alpha, beta, depth, yolah.nb_plies(), s.played[yolah.nb_plies() - 1].raw(),
        int32_t(uint32_t(hash)), int32_t(uint32_t(hash >> 32)), trace_value(yolah));
 #ifdef YOLAH_SEARCH_TRACE
@@ -963,6 +964,13 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     // No cutoff: exact value if a move raised alpha, otherwise only an upper
     // bound (all the moves failed low against the window we were given).
     tt_store(hash, yolah, depth, alpha_orig, beta, best, best_move, tt_pv);
+    if (recorder && options.record_depth > 0 && s.id == 0 && depth >= options.record_depth
+        && alpha_orig < best && best < beta && beta - alpha_orig > 1 && !stopped()) {
+        const auto [bs, ws] = yolah.score();
+        recorder->push_back({yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE), yolah.empty_bitboard(),
+                             yolah.nb_plies(), uint8_t(bs), uint8_t(ws), uint8_t(depth),
+                             int16_t(std::clamp(best, -32767, 32767))});
+    }
     return TRET(best);
 }
 
@@ -1897,6 +1905,8 @@ json MinMaxNNUE_DevPlayer::config() {
     j["root ordering"] = options.root_ordering;
     j["lazy accumulator"] = options.lazy_accumulator;
     j["eval cache"] = options.eval_cache_bits;
+    j["max nodes"] = options.max_nodes;
+    j["record depth"] = options.record_depth;
     j["lmr"] = options.lmr;
     j["lmr base"] = options.lmr_base;
     j["lmr divisor"] = options.lmr_divisor;

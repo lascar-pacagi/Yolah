@@ -376,6 +376,8 @@ unique_ptr<Player> Player::create(const json& j) {
              options.root_ordering = j.value("root ordering", options.root_ordering);
              options.lazy_accumulator = j.value("lazy accumulator", options.lazy_accumulator);
              options.eval_cache_bits = j.value("eval cache", options.eval_cache_bits);
+             options.max_nodes = j.value("max nodes", options.max_nodes);
+             options.record_depth = j.value("record depth", options.record_depth);
              options.sparse_h1 = j.value("sparse h1", options.sparse_h1);
              options.history_prior = j.value("history prior", options.history_prior);
              options.history_prior_mode = j.value("history prior mode", options.history_prior_mode);

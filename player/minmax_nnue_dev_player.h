@@ -254,6 +254,10 @@ struct MinMaxNNUE_DevOptions {
     double endgame_root_time = 0.5;  // ["endgame root time"] share of the thinking time given to that proof
     int  endgame_tree = 0;           // ["endgame tree"] solve exactly the nodes with at most this many
                                      //   free squares (0 = never)
+    uint64_t max_nodes = 0;          // ["max nodes"] stop a search once the main thread has visited this
+                                     //   many nodes (0 = no limit): the same depth on any machine (data generation)
+    int  record_depth = 0;           // ["record depth"] with a recorder set: record the PV nodes of the main
+                                     //   thread whose value is exact and whose depth is at least this (0 = off)
 };
 
 class MinMaxNNUE_DevPlayer : public Player {
@@ -436,6 +440,18 @@ public:
         }
     };
     CutStats* cut_stats = nullptr;   // when set, every search counts its cutoffs there
+    // Data generation (test/selfplay_label_main.cpp): the PV nodes of the main
+    // thread with an exact value (alpha < v < beta) searched to at least
+    // "record depth", in the order they were finished. The value is for the
+    // side to move, at the node's depth.
+    struct NodeRecord {
+        uint64_t black, white, empty;          // empty: the holes
+        uint16_t ply;                          // its parity: the side to move
+        uint8_t  black_score, white_score;
+        uint8_t  depth;
+        int16_t  value;
+    };
+    std::vector<NodeRecord>* recorder = nullptr;
     // The search debugger's recorder (test/search_trace_main.cpp): only read by
     // a build with YOLAH_SEARCH_TRACE, where every step of the search is recorded.
     SearchTracer* tracer = nullptr;
