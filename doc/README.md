@@ -7,6 +7,14 @@ window, symmetries, evaluation matches, cluster sizing, KataGo's auxiliary
 heads), a code map, a parameter reference, the measurements, and an
 appendix with the complete annotated source of every file involved.
 
+`minmax_nnue_dev_player.html` — the final minimax NNUE dev player
+(`config/search_study/dev_final.cfg`), self-contained HTML with diagrams and
+interactive widgets: the search (iterative deepening, aspiration windows,
+negamax and its pruning, move ordering, the Yolah table, lazy SMP), the
+evaluation cache and lazy accumulators, the NNUE network and its SIMD forward
+pass, and its training (distillation, quantization-aware training, export).
+Written by hand, not rendered by Quarto.
+
 ## Rendering
 
 Needs [Quarto](https://quarto.org) and a LaTeX install (TeX Live with

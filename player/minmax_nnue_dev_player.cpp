@@ -152,7 +152,7 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
     //
     //     thread 0 (main) : depth 1 2 3 4 5 6 7 8 …   ← its result is played
     //     thread 1        : depth 1   3   5   7 …     (skips some depths,
-    //     thread 2        : depth   2 3     6 7 …      see iterative_deepening)
+    //     thread 2        : depth 1     4 5     8 …    see iterative_deepening)
     //            ╲   │   ╱
     //       shared transposition table
     //
