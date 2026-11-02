@@ -250,34 +250,36 @@ void Yolah::play(Move m) {
 <script type="text/x-code" data-lang="cpp" data-title="pseudo-code · the final player in one page">
 Move play(position):
     clock: stop = true after 1 s
-    start the helper threads: the same loop below, sharing the table   // 6  lazy SMP
-    history /= 2                                         // 3.8  keep half of what earlier moves learnt
-    for d = 1, 2, 3, ...:                                 // 2.2  iterative deepening
-        window = d >= 4 ? [v - δ, v + δ] : (-∞, +∞)       // 2.2  adaptive aspiration window
+    start the helper threads: the same loop, sharing the table              // 6    lazy SMP
+    history /= 2                                                            // 3.8  keep half of what earlier moves learnt
+    for d = 1, 2, 3, ...:                                                   // 2.2  iterative deepening
+        window = d >= 4 ? [v - δ, v + δ] : (-∞, +∞)                         // 2.2  adaptive aspiration window
         repeat:
-            v = root_search(window, d)                    // 2.3  every root move, best first
+            v = root_search(window, d)                                      // 2.3  every root move, best first
             if v fails low or high: widen the window, retry
         until v inside the window
         remember the best move, update δ statistics
     return the best move of the last completed (or interrupted but usable) iteration
 
-int negamax(pos, α, β, depth):                            // 3
-    if game over: return exact score ± WIN               // 3.1
-    entry = table.probe(pos)                              // 3.1, 5, 6
-    if entry deep enough and its bound decides: return it  (at PV nodes only exact values)
-    if depth <= 0: return evaluate(pos)                   // 3.2, 7, 8  the NNUE
+int negamax(pos, α, β, depth):                                              // 3
+    if game over: return exact score ± WIN                                  // 3.1
+    entry = table.probe(pos)                                                // 3.1, 5, 6
+    if entry deep enough and its bound decides: return it                   // 3.1  at PV nodes only exact values
+    if depth <= 0: return evaluate(pos)                                     // 3.2, 7, 8  the NNUE
     if null window (non-PV node):
-        e = evaluate(pos)                                 // 3.3  static value
-        if depth <= 4 and e - 3000·depth >= β: return e    // 3.3  reverse futility pruning
-        if depth >= 5 and e >= β and negamax(pos, depth·0.4) >= β + m: return β   // 3.4 MPC, m = 4000 + 500·(depth − depth·0.4)
-                     or e <= α and negamax(pos, depth·0.4) <= α − m: return α
-        if depth >= 4 and e >= β: best ordinary move at reduced depth >= β ? cut        // 3.6 proxy cut
-    search the table's move first; generate the others only if it does not cut      // 3.5
-    for each move, best score first:                      // 4  table move, killers, countermove, history + territory
-        if non-PV, depth <= 3 and enough moves tried: stop    // 3.7 late move pruning
-        r = reduction(depth, move number, history)       // 3.7 LMR
-        v = search_move(move, r)                          // 2.4  reduced → null window → full window
-        if v >= β: store, update killers / history / countermove, return v   // 3.8
+        e = evaluate(pos)                                                   // 3.3  static value
+        if depth <= 4 and e - 3000·depth >= β: return e                     // 3.3  reverse futility pruning
+        d' = 0.4·depth,  m = 4000 + 500·(depth − d')                        // 3.4  MPC
+        if depth >= 5 and e >= β and negamax(pos, d') >= β + m: return β    // 3.4
+                   or e <= α and negamax(pos, d') <= α − m: return α        // 3.4
+        if depth >= 4 and e >= β and best ordinary move,                    // 3.6  proxy cut
+               searched at reduced depth, gives v >= β: return v            // 3.6
+    search the table's move first, generate the others if it does not cut   // 3.5
+    for each move, best score first:                                        // 4    table move, killers, countermove, history + territory
+        if non-PV, depth <= 3 and enough moves tried: stop                  // 3.7  late move pruning
+        r = reduction(depth, move number, history)                          // 3.7  LMR
+        v = search_move(move, r)                                            // 2.4  reduced → null window → full window
+        if v >= β: store, update killers / history / countermove, return v  // 3.8
     store the result in the table, return the best value
 </script>
 
