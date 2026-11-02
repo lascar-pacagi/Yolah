@@ -364,8 +364,9 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         Yolah::MoveList moves;
         yolah.moves(moves);
         int scores[Yolah::MAX_NB_MOVES];
-        score_moves(yolah, s, tt_move(hash), moves, scores, 63);
+        score_moves(yolah, s, tt_move(hash), moves, scores, 63);   // a score per move (section 4.1)
         s.root_moves.clear();
+        // pick_move (4.1): the best-scored remaining move, so the list ends up sorted
         for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
     for (int d = 1; d <= max_depth && d < 64; d++) {
