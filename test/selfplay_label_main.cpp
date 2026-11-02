@@ -15,7 +15,7 @@
 //     and depth, the move played;
 //   • up to --tree-per-search positions of each search's tree (kind 1): PV
 //     nodes with an exact value searched to at least --record-depth plies,
-//     drawn at random, each position once per game;
+//     drawn at random, each position once per game, with their best move;
 //
 // and for all of them the game's result z for the side to move, and with at
 // most --exact-free free squares the exact result (win / draw / loss) by the
@@ -60,7 +60,7 @@ struct Record {
     uint16_t ply;                   // its parity: the side to move
     uint8_t  black_score, white_score;
     int16_t  value;                 // the search's value for the side to move (±30000 = tanh ±1; beyond: a proven result)
-    uint16_t move;                  // kind 0: the move played (Move::raw); kind 1: 0
+    uint16_t move;                  // kind 0: the move played; kind 1: the node's best move (Move::raw)
     uint8_t  depth;                 // depth of the search that gave the value
     uint8_t  kind;                  // 0 = a position of the game, 1 = a node of a search tree
     int8_t   z;                     // the game's result for the side to move: 1, 0, −1
@@ -249,6 +249,7 @@ int main(int argc, char* argv[]) {
                     t.black_score = nd.black_score; t.white_score = nd.white_score;
                     t.value = nd.value;
                     t.depth = nd.depth;
+                    t.move = nd.move;
                     t.kind = 1;
                     const Yolah ty = position_of(t);
                     if (ty.game_over() || !seen.insert(zobrist::hash(ty)).second) continue;

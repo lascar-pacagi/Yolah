@@ -15,9 +15,10 @@ and for the loop:
     search.f16    (N,)     the search target for the side to move: the exact
                            result (−1, 0, 1) when the solver gave it, else the
                            search value / 30000 (a proven result: ±1)
-    policy.u2     (N,)     the move played, as a policy index from·64 + to
-                           (nn::action_index); 65535 = none (a tree node, a
-                           pass, an old position)
+    policy.u2     (N,)     the move played (a position of a game) or the best
+                           move (a tree node), as a policy index from·64 + to
+                           (nn::action_index); 65535 = none (a pass, an old
+                           position)
     kind.u1       (N,)     0 a position of a game, 1 a node of a search tree,
                            2 an old position (--old-cache)
     depth.u1      (N,)     depth of the search that gave the value (0: old)
@@ -69,7 +70,7 @@ def policy_index(rec):
     m = rec["move"].astype(np.int64)
     frm, to = m & 63, m >> 6
     p = frm * 64 + to
-    ok = (rec["kind"] == 0) & (frm != to)          # a1→a1: the pass (Move::none)
+    ok = frm != to                                 # a1→a1: the pass (Move::none)
     return np.where(ok, p, NO_POLICY).astype(np.uint16)
 
 

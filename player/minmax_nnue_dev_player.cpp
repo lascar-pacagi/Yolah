@@ -969,7 +969,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         const auto [bs, ws] = yolah.score();
         recorder->push_back({yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE), yolah.empty_bitboard(),
                              yolah.nb_plies(), uint8_t(bs), uint8_t(ws), uint8_t(depth),
-                             int16_t(std::clamp(best, -32767, 32767))});
+                             int16_t(std::clamp(best, -32767, 32767)), best_move.raw()});
     }
     return TRET(best);
 }

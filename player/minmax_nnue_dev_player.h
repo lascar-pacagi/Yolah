@@ -443,13 +443,14 @@ public:
     // Data generation (test/selfplay_label_main.cpp): the PV nodes of the main
     // thread with an exact value (alpha < v < beta) searched to at least
     // "record depth", in the order they were finished. The value is for the
-    // side to move, at the node's depth.
+    // side to move, at the node's depth; the move is the node's best move.
     struct NodeRecord {
         uint64_t black, white, empty;          // empty: the holes
         uint16_t ply;                          // its parity: the side to move
         uint8_t  black_score, white_score;
         uint8_t  depth;
         int16_t  value;
+        uint16_t move;                         // the best move found (Move::raw)
     };
     std::vector<NodeRecord>* recorder = nullptr;
     // The search debugger's recorder (test/search_trace_main.cpp): only read by

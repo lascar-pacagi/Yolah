@@ -11,9 +11,9 @@ Targets
   value   (1 − q)·z + q·s: z the game's result, s the search target of the cache
           (the exact result near the end, else the dev player's search value;
           the old teacher's value on the old positions)
-  policy  cross-entropy with the move the dev player played (one-hot), only on
-          the positions of the games (no policy for the tree nodes, the
-          passes and the old positions)
+  policy  cross-entropy with the move the dev player played (one-hot) or, for
+          a node of a search tree, its best move (no policy for the passes and
+          the old positions)
 Each batch takes one random symmetry of the board per row (the move index
 through the same symmetry, alphazero_learn.symmetry_tables). The positions are
 read by chunks of consecutive rows (loop_prepare.py mixed the games and the
