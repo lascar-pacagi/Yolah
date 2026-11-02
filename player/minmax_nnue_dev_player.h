@@ -131,11 +131,11 @@ struct SearchTracer;   // player/search_trace.h, only used by the search_trace e
 struct MinMaxNNUE_DevOptions {
     bool pvs = true;                 // ["pvs"] null windows for all moves but the first
     int  aspiration_window = 300;    // ["aspiration window"] half width at the root, 0 = full window
-    double aspiration_k = 0;         // ["aspiration k"] > 0: adaptive half width, k × the mean change of value between depths (at least "aspiration window")
+    double aspiration_k = 1.25;      // ["aspiration k"] > 0: adaptive half width, k × the mean change of value between depths (at least "aspiration window")
     int  tempo = 0;                  // ["tempo"] added to the network's value for the side to move (values: ±30000 = tanh ±1)
     double aspiration_grow = 1.5;    // ["aspiration grow"] adaptive windows: factor of the half width after each failure
     // Campaign A2 (2026-10-31, from an audit of the aspiration failures; all off by default):
-    bool root_fix = false;           // ["root fix"] root order after a FAILED attempt: fail low keeps the order (the
+    bool root_fix = true;            // ["root fix"] root order after a FAILED attempt: fail low keeps the order (the
                                      //   previous best stays first), fail high only brings the new best to the front;
                                      //   the nodes of a move are summed over the attempts of a depth
     bool aspiration_keep_beta = false; // ["aspiration keep beta"] adaptive windows: a fail low does not lower beta
@@ -143,7 +143,7 @@ struct MinMaxNNUE_DevOptions {
     bool aspiration_center2 = false; // ["aspiration center 2"] window centred on (v_{d−1} + v_{d−2}) / 2 (odd/even effect)
     bool pvs_research_high = false;  // ["pvs research high"] PV nodes: full-window re-search also when the null window
                                      //   gave ≥ beta (Stockfish today), not only alpha < v < beta
-    bool tt_cut_pv = true;           // ["tt cut pv"] false: at PV nodes, the table cuts only with an exact value or a
+    bool tt_cut_pv = false;          // ["tt cut pv"] false: at PV nodes, the table cuts only with an exact value or a
                                      //   proven result (Stockfish: no table cut at PV nodes)
     bool tt_cut_pv_exact = true;     // ["tt cut pv exact"] with "tt cut pv" false: false = not even an exact value cuts
                                      //   at PV nodes (with the Yolah table, lower == upper can be two merged bounds
@@ -156,7 +156,7 @@ struct MinMaxNNUE_DevOptions {
     bool table_tiebreak = false;     // ["table tiebreak"] Yolah table: among entries of equal depth, replace the one
                                      //   with the most free squares (the oldest), not always slot 0
     bool proxy_after_tt = false;     // ["proxy after tt"] staged: the proxy test comes after the table's move
-    bool lmr_territory = true;       // ["lmr territory"] false: LMR adjusted by the history only (the move score
+    bool lmr_territory = false;      // ["lmr territory"] false: LMR adjusted by the history only (the move score
                                      //   also holds the territory term at depth ≥ "territory depth")
     bool history = true;             // ["history"] quiet moves ordered by their history of cutoffs
     bool countermove = true;         // ["countermove"] the move that refuted the opponent's last move
@@ -247,7 +247,7 @@ struct MinMaxNNUE_DevOptions {
     int  history_prior_weight = 100; // ["history prior weight"] percent of the prior's scores
     int  eval_grain = 1;             // ["eval grain"] network values rounded to a multiple of this (1 = exact)
     bool staged = true;              // ["staged"] table's move first, the others generated only if needed
-    bool yolah_table = false;        // ["yolah table"] SearchTable instead of the reference's table
+    bool yolah_table = true;         // ["yolah table"] SearchTable instead of the reference's table
                                      //   (−15 ± 23 Elo at 0.2 s/move: the table is hardly loaded there)
     int  endgame_root = 0;           // ["endgame root"] try to prove the result at the root with at most
                                      //   this many free squares (0 = never)

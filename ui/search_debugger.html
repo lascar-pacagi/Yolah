@@ -836,11 +836,14 @@ function describe(e) {
     case E.ITER: s = `Approfondissement itératif : root_search à la profondeur <b>${a(0)}</b>, fenêtre ${winStr(a(1), a(2))}` + (a(3) ? ` — tentative ${a(3) + 1} (fenêtre d'aspiration élargie)` : (a(1) > -32000 ? " (fenêtre d'aspiration ±δ autour de la valeur précédente)" : " (fenêtre complète)")) + "."; break;
     case E.ITER_RESULT: s = `Profondeur ${a(0)} : valeur ${valStr(a(1))}, meilleur coup ${a(2) === 0 && a(3) === 1 ? "aucun (tous ≤ α)" : mvStr(a(2))} → ` + ["<span class=good>résultat accepté</span>", "<span class=bad>échec bas (valeur ≤ α) : on élargit vers le bas</span>", "<span class=warn>échec haut (valeur ≥ β) : on élargit vers le haut</span>", "arrêté"][a(3)]; break;
     case E.PV: s = `Variante principale lue dans la table : ${Array.from({length: a(0)}, (_, i) => mvStr(a(1 + i))).join(" ")}`; break;
-    case E.ROOT_ORDER: s = `Racine réordonnée pour l'itération suivante : le meilleur coup d'abord, puis par taille de sous-arbre. ` + Array.from({length: Math.min(8, a(0))}, (_, i) => `${mvStr(a(1 + 2 * i))} (${fmtN(a(2 + 2 * i))})`).join(", ") + (a(0) > 8 ? "…" : ""); break;
+    case E.ROOT_ORDER: s = `Racine réordonnée pour l'itération suivante : le meilleur coup d'abord, puis par taille de sous-arbre` +
+      (T.H.config["root fix"] ? " (« root fix » : après un échec bas l'ordre est gardé, après un échec haut seul le nouveau meilleur coup passe devant ; nœuds cumulés sur les tentatives de la profondeur)" : "") + ". " + Array.from({length: Math.min(8, a(0))}, (_, i) => `${mvStr(a(1 + 2 * i))} (${fmtN(a(2 + 2 * i))})`).join(", ") + (a(0) > 8 ? "…" : ""); break;
     case E.ENTER: s = (a(0) ? "Entrée dans <b>root_search</b>" : `Entrée dans <b>negamax</b> après ${mvStr(a(5))}`) + ` — profondeur ${a(3)}, fenêtre ${winStr(a(1), a(2))}` + (a(2) - a(1) === 1 ? " (fenêtre nulle : la question est seulement « ≥ β ? »)" : " (nœud PV)") + `, ply ${a(4)}. Valeur statique NNUE de la position : ${valStr(a(8))}.` + (q >= 0 && nd.kind[q] ? ` Appel de type <b>${KIND[nd.kind[q]]}</b> : ${KINDTIP[nd.kind[q]]}.` : ""); break;
     case E.RETURN: s = `Retour de la valeur <b>${valStr(a(0))}</b>` + (q >= 0 ? boundText(a(0), nd.alpha[q], nd.beta[q]) + ` — ${reasonText(q)}` : ""); break;
     case E.TT_PROBE: s = a(0) ? `Table de transposition : <b>trouvée</b>, profondeur ${a(1)}, valeur dans [${valStr(a(2))}, ${valStr(a(3))}], coup ${mvStr(a(4))}.` +
-      (q >= 0 ? (a(1) >= nd.depth[q] ? (a(2) >= nd.beta[q] ? " Borne inférieure ≥ β : <span class=good>coupure</span>." : a(3) <= nd.alpha[q] ? " Borne supérieure ≤ α : <span class=good>coupure</span>." : a(2) === a(3) ? " Valeur exacte : <span class=good>retour</span>." : " Profondeur suffisante mais bornes pas assez fortes pour couper : le coup de la table sera essayé en premier.") : ` Profondeur ${a(1)} < ${nd.depth[q]} demandée : pas de coupure, mais son coup sera essayé en premier.`) : "")
+      (q >= 0 && a(1) >= nd.depth[q] && T.H.config["tt cut pv"] === false && nd.beta[q] - nd.alpha[q] > 1 && !(T.H.config["tt cut pv exact"] !== false && a(2) === a(3)) && !(a(2) > T.C.WIN || a(3) < -T.C.WIN)
+        ? " <b>Nœud PV</b> : la table ne coupe pas ici (« tt cut pv » désactivé : ses bornes viennent surtout de recherches non-PV, avec leurs élagages) ; seul son coup sert, essayé en premier."
+      : q >= 0 ? (a(1) >= nd.depth[q] ? (a(2) >= nd.beta[q] ? " Borne inférieure ≥ β : <span class=good>coupure</span>." : a(3) <= nd.alpha[q] ? " Borne supérieure ≤ α : <span class=good>coupure</span>." : a(2) === a(3) ? " Valeur exacte : <span class=good>retour</span>." : " Profondeur suffisante mais bornes pas assez fortes pour couper : le coup de la table sera essayé en premier.") : ` Profondeur ${a(1)} < ${nd.depth[q]} demandée : pas de coupure, mais son coup sera essayé en premier.`) : "")
       : "Table de transposition : position <b>absente</b>."; break;
     case E.EVAL: s = `evaluate() : valeur du réseau ${valStr(a(0))}` + (a(1) ? " <span class=dim>(depuis le cache d'évaluation)</span>" : " (calculée : accumulateurs paresseux + réseau)") + "."; break;
     case E.RFP: s = `Reverse futility pruning : statique ${valStr(a(0))} − marge ${a(1)} = ${valStr(a(0) - a(1))} ${a(3) ? "≥" : "<"} β = ${valStr(a(2))} → ` + (a(3) ? "<span class=good>coupure</span>" : "pas de coupure"); break;
@@ -1684,8 +1687,11 @@ function validateTrace() {
     "fast influence": true, "proxy cut": 1, "proxy rank": 0, "proxy delta": 0, "proxy witness": 0, "proxy multi c": 1, "proxy multi m": 1,
     "proxy diverse": false, "proxy second": -1, "proxy prefilter": 0, "proxy weval": 0, "proxy verify": 0, "proxy lazy": 0, "proxy first": false,
     "proxy tail": 0, probcut: 0, staged: true, "endgame root": 0, "endgame tree": 0, "eval grain": 1, "history prior": "",
-    "root fix": false, "aspiration keep beta": false, "aspiration stats depth": 4, "aspiration center 2": false,
-    "pvs research high": false, "tt cut pv": true, "tt cut pv exact": true, "tt pv": false, "tt depth asym": false, "table tiebreak": false, "proxy after tt": false, "lmr territory": true };
+    "aspiration keep beta": false, "aspiration stats depth": 4, "aspiration center 2": false,
+    "pvs research high": false, "tt pv": false, "table tiebreak": false, "proxy after tt": false };
+  // modelled below: "root fix", "tt cut pv", "tt cut pv exact", "tt depth asym", "lmr territory" (old configs: absent = the old defaults)
+  const rootFix = !!cfg["root fix"], lmrTerr = cfg["lmr territory"] !== false, cutPV = cfg["tt cut pv"] !== false,
+        cutPVExact = cfg["tt cut pv exact"] !== false, depthAsym = !!cfg["tt depth asym"];
   const notAssumed = Object.entries(assumed).filter(([k, v]) => cfg[k] !== undefined && cfg[k] !== v).map(([k]) => k);
   const lmrBase = cfg["lmr base"], lmrDiv = cfg["lmr divisor"];
   const lmrTable = (d, n) => Math.trunc(1024 * (lmrBase + Math.log(d) * Math.log(n) / lmrDiv));
@@ -1698,7 +1704,7 @@ function validateTrace() {
   };
   const full = !!(T.H.full || T.stopped);
   const st = new Map();                     // node → its state while it runs
-  const root = { orderFromScores: null, order: null, lastRoot: -1, iterDelta: null, lastOk: null, prevIter: null };
+  const root = { orderFromScores: null, order: null, lastRoot: -1, iterDelta: null, lastOk: null, prevIter: null, acc: new Map() };
   let enters = 0, roots = 0;
   const incoming = q => { for (let x = q; x >= 0; x = nd.parent[x]) { const p = nd.parent[x]; if (p >= 0 && nd.ply[x] > nd.ply[p]) return nd.move[x]; } return 0; };
   let terrChecks = 0;
@@ -1755,6 +1761,7 @@ function validateTrace() {
       } else if (t === E.ITER) {
         const d = a(0), al = a(1), be = a(2), att = a(3), dl = nargs(e) > 4 ? a(4) : null;
         const adaptive = cfg["aspiration k"] > 0;
+        if (att === 0) root.acc = new Map();     // "root fix": nodes summed over the attempts of a depth
         if (att === 0) {
           const v = root.lastOk ? root.lastOk.v : 0, d0 = adaptive ? dl : cfg["aspiration window"];
           const asp = cfg["aspiration window"] > 0 && d >= 4 && Math.abs(v) < W;
@@ -1878,7 +1885,10 @@ function validateTrace() {
         else if (!S.arr) { wantM = S.tt ? S.tt.move : undefined; wantS = C.SCORE_TT; ck("étape 1 : seul le coup de la table, au rang 0", i === 0 && S.gen === 1, e, "incohérent"); }
         else { const A = S.arr; let b = i; for (let j = i + 1; j < A.length; j++) if (A[j][1] > A[b][1]) b = j; [A[i], A[b]] = [A[b], A[i]]; wantM = A[i][0]; wantS = A[i][1]; }
         ck(isRoot ? "ordre des coups de la racine (ordre de l'itération précédente)" : "coup choisi = meilleur score restant (sélection de pick_move)", m === wantM && sc === wantS, e, () => `${mvStr(m)} (${sc}) ≠ ${wantM !== undefined ? mvStr(wantM) : "?"} (${wantS})`);
-        const special = !isRoot && sc >= C.SCORE_COUNTER, hist = isRoot ? sc : sc >= C.SCORE_ARTICULATION ? 0 : sc;
+        const special = !isRoot && sc >= C.SCORE_COUNTER;
+        // ("lmr territory" off: the history alone, without the territory term of the move score)
+        const hist = isRoot ? sc : sc >= C.SCORE_ARTICULATION ? 0
+                   : lmrTerr || !cfg.history ? sc : historyAt(e)[(S.pos.ply & 1) * 4096 + mvFrom(m) * 64 + mvTo(m)];
         // (as the code: "PV" with the CURRENT α, beta − alpha > 1, updated by the loop — not the window the node got)
         const wantR = !isRoot && !S.arr ? 0 : lmrRed(depth, i, isRoot || beta - S.alpha > 1, special, hist);
         ck("réduction LMR = formule (table ln·ln, PV, coup spécial, historique)", r === wantR && a(4) === 0, e, () => `${r} ≠ ${wantR}`);
@@ -1981,9 +1991,13 @@ function validateTrace() {
         if (full && nd.exit[q] === e && e > T.nEv - 50) break;
         if (r === R.OVER) ck("partie finie : vraiment finie (JS) et valeur = score", S.gameOver && v === gameValue(S.pos), e, () => `${v}`);
         else ck("partie non finie là où la recherche continue", !S.gameOver, e, "partie finie non détectée");
-        if (r === R.TT) { const x = S.tt, al = nd.alpha[q];
-          const want = x.lower >= beta ? x.lower : x.upper <= al ? x.upper : x.lower === x.upper ? x.lower : null;
-          ck("coupure TT : profondeur suffisante et borne qui conclut", x.found && x.depth >= depth && v === want, e, "incohérent"); }
+        if (S.tt) { const x = S.tt, al = nd.alpha[q];
+          // the cut the code takes: "tt cut pv" off → at PV nodes only an exact value (unless "tt cut pv exact" is off)
+          // or a proven result; "tt depth asym" → a lower bound from a strictly deeper entry
+          const may = x.found && x.depth >= depth && (cutPV || beta - al === 1 || (cutPVExact && x.lower === x.upper) || x.lower > W || x.upper < -W);
+          const want = !may ? null : x.lower >= beta && (!depthAsym || x.depth > depth) ? x.lower : x.upper <= al ? x.upper : x.lower === x.upper ? x.lower : null;
+          if (r === R.TT) ck("coupure TT : permise ici (profondeur, nœud PV, borne qui conclut)", want !== null && v === want, e, "incohérent");
+          else if (r !== R.OVER) ck("coupure TT : prise chaque fois qu'elle est permise", want === null, e, () => `entrée prof. ${x.depth} ${ivStr(x.lower, x.upper)} non utilisée`); }
         if (r === R.LEAF) ck("feuille : profondeur ≤ 0, valeur = évaluation", depth <= 0 && v === S.evals[S.evals.length - 1], e, "incohérent");
         if (r === R.RFP) ck("RFP : valeur rendue = valeur statique", v === S.evals[0], e, "incohérent");
         if (r === R.MPCH) ck("MPC↑ : rend β", v === beta, e, "incohérent");
@@ -2015,10 +2029,13 @@ function validateTrace() {
         // nodes of each root move = sizes of its subtrees (the page's counts)
         const sizes = new Map();
         for (let c = nd.first[q]; c >= 0; c = nd.next[c]) sizes.set(nd.move[c], (sizes.get(nd.move[c]) || 0) + nd.sub[c]);
-        for (const [m, nn] of list) if (sizes.has(m)) ck("nœuds de chaque coup racine = taille de ses sous-arbres (page)", sizes.get(m) === nn, e, () => `${mvStr(m)} ${nn} ≠ ${sizes.get(m)}`);
-        // best move first, then by subtree size (stable)
+        if (rootFix) { for (const [m, nn] of sizes) root.acc.set(m, (root.acc.get(m) || 0) + nn); for (const [m] of list) sizes.set(m, root.acc.get(m) || 0); }
+        for (const [m, nn] of list) if (sizes.has(m)) ck("nœuds de chaque coup racine = taille de ses sous-arbres (page" + (rootFix ? ", sommés sur les tentatives de la profondeur)" : ")"), sizes.get(m) === nn, e, () => `${mvStr(m)} ${nn} ≠ ${sizes.get(m)}`);
+        // best move first, then by subtree size (stable); "root fix": a fail low keeps the order, a fail high only brings the new best first
         const prevOrder = root.order.slice(), best = S.bestMove;
-        const want = prevOrder.map(m => [m, list.find(x => x[0] === m)[1]]).sort((x, y) => ((x[0] === best) !== (y[0] === best)) ? (x[0] === best ? -1 : 1) : y[1] - x[1]);
+        const want = rootFix && !best ? prevOrder.map(m => [m])
+                   : rootFix && S.best >= beta ? [[best], ...prevOrder.filter(m => m !== best).map(m => [m])]
+                   : prevOrder.map(m => [m, list.find(x => x[0] === m)[1]]).sort((x, y) => ((x[0] === best) !== (y[0] === best)) ? (x[0] === best ? -1 : 1) : y[1] - x[1]);
         ck("racine réordonnée : meilleur coup d'abord puis par taille", want.every((x, i) => x[0] === list[i][0]), e, "ordre différent");
         root.order = list.map(x => x[0]);
         break; }
