@@ -1,0 +1,1212 @@
+<title>Yolah MCTS Player Internals</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a sticky table of contents on the left (wide screens), one reading column of ~70 characters,
+   code, diagrams and widgets allowed to run wider than the text column. */
+:root {
+  --paper: #f3f5f7;
+  --panel: #ffffff;
+  --ink: #17202b;
+  --ink-2: #4b5667;
+  --ink-3: #7a8494;
+  --rule: #d8dde4;
+  --accent: #2c55c9;
+  --accent-soft: #e3e9fa;
+  --black-pc: #c0701a;
+  --black-soft: #f6e3cc;
+  --white-pc: #117f74;
+  --white-soft: #cfeee9;
+  --hole: #4d5563;
+  --neutral: #b7bec9;
+  --good: #2e8a3e;
+  --bad: #c2412d;
+  --code-bg: #111821;
+  --code-ink: #dbe2ea;
+  --code-dim: #7f8b9b;
+  --code-kw: #ff9e64;
+  --code-ty: #7dcfff;
+  --code-fn: #9ece6a;
+  --code-num: #e0af68;
+  --code-str: #c3e88d;
+  --code-com: #6c7a8c;
+  --code-pre: #bb9af7;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Literata", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --measure: 70ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+    --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+    --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+    --code-bg: #0a0f15; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+  --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+  --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+  --code-bg: #0a0f15; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.62;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.page { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 1050px) { .page { grid-template-columns: minmax(0, 1fr); gap: 0; } nav.toc { display: none; } }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; max-height: 100vh; overflow-y: auto; padding: 28px 0 40px; font-family: var(--font-display); font-size: 13.5px; }
+nav.toc .toc-title { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+nav.toc ol ol { padding-left: 14px; margin: 2px 0 6px; }
+nav.toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 2px 8px; border-left: 2px solid transparent; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-left-color: var(--accent); outline: none; }
+nav.toc ol ol a { font-size: 12.5px; color: var(--ink-3); }
+main { min-width: 0; padding-top: 28px; }
+.col { max-width: var(--measure); }
+.wide { max-width: 980px; }
+header.hero { padding: 24px 0 8px; border-bottom: 1px solid var(--rule); margin-bottom: 32px; }
+.eyebrow { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 5vw, 54px); line-height: 1.04; letter-spacing: -.02em; margin: 10px 0 14px; text-wrap: balance; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; margin: 0 0 20px; }
+h2 { font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -.01em; line-height: 1.15; margin: 64px 0 14px; padding-top: 18px; border-top: 3px solid var(--ink); text-wrap: balance; }
+h2 .num, h3 .num { color: var(--accent); margin-right: .4em; font-variant-numeric: tabular-nums; }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 21px; margin: 40px 0 8px; text-wrap: balance; }
+h4 { font-family: var(--font-display); font-weight: 700; font-size: 16px; margin: 24px 0 4px; color: var(--ink-2); }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+code, kbd { font-family: var(--font-mono); font-size: .84em; background: var(--accent-soft); padding: .08em .32em; border-radius: 4px; }
+ul, ol { padding-left: 1.3em; margin: 0 0 14px; }
+li { margin: 3px 0; }
+.note { border-left: 3px solid var(--accent); padding: 8px 14px; background: var(--panel); margin: 18px 0; font-size: 15.5px; color: var(--ink-2); }
+.note strong { color: var(--ink); }
+table { border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.tbl { overflow-x: auto; margin: 14px 0 20px; }
+th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-display); font-weight: 700; font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); border-bottom: 2px solid var(--ink); }
+td code { white-space: nowrap; }
+.num-r { text-align: right; padding-right: 16px; }
+.formula { font-family: var(--font-mono); font-size: 15px; background: var(--panel); border: 1px solid var(--rule); padding: 10px 14px; margin: 12px 0 18px; overflow-x: auto; white-space: pre; line-height: 1.5; }
+figure { margin: 22px 0 26px; }
+figcaption { font-family: var(--font-display); font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+figure.code { margin: 16px 0 22px; max-width: 980px; }
+figure.code .code-head { font-family: var(--font-mono); font-size: 12px; color: var(--code-dim); background: var(--code-bg); padding: 8px 14px 0; border-radius: 8px 8px 0 0; }
+figure.code pre { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 10px 14px 14px; border-radius: 0 0 8px 8px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.55; tab-size: 4; }
+figure.code pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+.hljs-keyword, .hljs-built_in { color: var(--code-kw); }
+.hljs-type { color: var(--code-ty); }
+.hljs-title, .hljs-title.function_ { color: var(--code-fn); }
+.hljs-number, .hljs-literal { color: var(--code-num); }
+.hljs-string { color: var(--code-str); }
+.hljs-comment { color: var(--code-com); font-style: italic; }
+.hljs-meta, .hljs-meta .hljs-keyword { color: var(--code-pre); }
+.diagram { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 18px 0 8px; }
+.diagram svg { display: block; max-width: none; }
+.diagram svg text { font-family: var(--font-display); fill: var(--ink); }
+.widget { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 20px 0 8px; max-width: 980px; }
+.widget-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.widget-title { font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: .03em; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font-family: var(--font-display); font-weight: 600; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+button.primary:hover { color: var(--panel); filter: brightness(1.08); }
+label { font-family: var(--font-display); font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+input[type=range] { accent-color: var(--accent); width: 150px; }
+.readout { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); background: var(--paper); border-radius: 6px; padding: 8px 12px; margin-top: 10px; white-space: pre-wrap; overflow-x: auto; }
+.log { font-family: var(--font-display); font-size: 14px; color: var(--ink); min-height: 2.8em; margin-top: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: var(--font-display); font-size: 12.5px; color: var(--ink-2); margin-top: 10px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+.twocol { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; align-items: start; }
+.twocol > * { min-width: 0; }
+.board-wrap { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.board-wrap > * { min-width: 0; }
+.tag { display: inline-block; font-family: var(--font-display); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); vertical-align: 2px; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 18px 0 8px; max-width: 980px; }
+.stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.stat b { display: block; font-family: var(--font-display); font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat span { font-family: var(--font-display); font-size: 12.5px; color: var(--ink-3); }
+details.mobile-toc { display: none; margin: 8px 0 20px; font-family: var(--font-display); font-size: 14px; }
+@media (max-width: 1050px) { details.mobile-toc { display: block; } }
+details.mobile-toc summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+details.mobile-toc ol { columns: 1; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="page">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol id="toc-list"></ol>
+</nav>
+<main>
+<header class="hero">
+  <div class="eyebrow">Yolah · AlphaZero MCTS · ResNet 256×30 (player/alphazero_mcts.*, config/az_vs_nnue/az256.cfg)</div>
+  <h1>Yolah MCTS Player Internals</h1>
+  <p class="lede">How the Yolah Monte-Carlo tree search player chooses a move: the value/policy ResNet that guides it, one simulation from the root to a leaf and back, KataGo's exploration formula, the search graph that shares one node per position, the batching that keeps a GPU busy, and the refinements at the root. Every part is shown with its code.</p>
+  <div class="stat-row">
+    <div class="stat"><b>35 M</b><span>network parameters, 256 channels × 30 blocks</span></div>
+    <div class="stat"><b>4096</b><span>policy logits: from · 64 + to</span></div>
+    <div class="stat"><b>8–10 k</b><span>positions per second on an RTX 3080 (fp16, batch 256)</span></div>
+    <div class="stat"><b>16 × 16</b><span>threads × batch of the strongest setting</span></div>
+  </div>
+</header>
+<details class="mobile-toc"><summary>Contents</summary><ol id="toc-list-m"></ol></details>
+
+<section id="s1">
+<h2><span class="num">1</span>The player at a glance</h2>
+<div class="col">
+<p>The minimax dev player looks at millions of positions per move and judges each with a small, fast network. The MCTS player does the opposite: it looks at a few thousand positions, and asks a large network two questions about each one. <strong>Who is winning here?</strong> (the value head) and <strong>which moves deserve a look?</strong> (the policy head). The search grows a graph of positions from the root, one simulation at a time, spending its visits on the moves the policy recommends and the values confirm.</p>
+<p>The algorithm is AlphaZero's, with the refinements of KataGo: a log-scaled exploration coefficient scaled again by how much the values disagree, a first-play-urgency rule for the moves not yet tried, a lower confidence bound for the move played, forced playouts and policy target pruning for self-play. On top of that comes one Yolah-specific change: since a position can be reached by many move orders and never repeats, the search stores one node per distinct position and shares it between all the paths that reach it.</p>
+<p>All code excerpts are the real code of the repository. When an excerpt was condensed, its title says so.</p>
+</div>
+
+<h3 id="s1-mcts"><span class="num">1.1</span>Monte-Carlo tree search with a network</h3>
+<div class="col">
+<p>A <strong>simulation</strong> starts at the root and walks down the graph. At each position already in the graph it chooses one move by the PUCT rule (section 3), a balance between the moves that look good so far and the moves the policy likes but that have few visits. When it reaches a position that is not in the graph yet, the <strong>leaf</strong>, it asks the network for the leaf's value and the priors of its moves, adds the leaf to the graph, and sends the value back up along the path: every position on the way gets one more visit and the value, with the sign of the player to move there.</p>
+<p>After thousands of simulations, the visits concentrate on the best moves. The move played is the one the search trusts most (section 6.4). The distribution of the root's visits is the search's improved policy: it is what self-play training uses as the policy target.</p>
+</div>
+<div class="diagram wide" id="d-sim"></div>
+
+<h3 id="s1-flow"><span class="num">1.2</span>From a position to a move</h3>
+<div class="col">
+<p>The diagram follows one call of <code>play()</code>. Several search threads run the same loop, each gathering a batch of leaves; the batching evaluator merges their batches into one network call on the GPU.</p>
+</div>
+<div class="diagram wide" id="d-flow"></div>
+
+<h3 id="s1-map"><span class="num">1.3</span>The code map</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>File</th><th>What it holds</th><th>Main functions</th></tr></thead>
+<tbody>
+<tr><td><code>player/alphazero_mcts.{h,cpp}</code></td><td>the search: graph, PUCT, batching of leaves, root refinements</td><td><code>search</code>, <code>run_worker</code>, <code>select_child</code>, <code>backup</code>, <code>root_play_values</code>, <code>make_result</code></td></tr>
+<tr><td><code>player/alphazero_mcts_player.{h,cpp}</code></td><td>the <code>Player</code> wrapper: JSON keys, backend choice, batching wrapper</td><td><code>play</code>, <code>reload_weights</code>, <code>config</code></td></tr>
+<tr><td><code>player/nn_cache.h</code></td><td>the cache of network outputs, keyed by the position's hash</td><td><code>lookup</code>, <code>store</code></td></tr>
+<tr><td><code>nnue/nn_evaluator.h</code></td><td>the seam between the search and the network: requests, results, encoding</td><td><code>Evaluator::evaluate</code>, <code>encode_planes</code>, <code>make_evaluator</code></td></tr>
+<tr><td><code>nnue/batched_evaluator.{h,cpp}</code></td><td>merges the calls of several threads into one batch</td><td><code>BatchingEvaluator::evaluate</code>, the worker loop</td></tr>
+<tr><td><code>nnue/resnet_torch.{h,cpp}</code></td><td>the GPU backend (libtorch, TorchScript, fp16)</td><td><code>ResNetTorch::evaluate</code></td></tr>
+<tr><td><code>nnue/resnet.{h,cpp}</code></td><td>the CPU backend (Eigen, OpenMP, folded BatchNorm)</td><td><code>ResNetCPU::evaluate</code></td></tr>
+<tr><td><code>nnue/cnn_resnet_value_policy_chunked.py</code></td><td>the network in PyTorch, supervised training</td><td><code>Net</code>, <code>ResBlock</code></td></tr>
+<tr><td><code>player/alphazero_selfplay.{h,cpp}</code>, <code>nnue/alphazero_learn.py</code></td><td>the self-play learning loop</td><td>self-play driver, trainer</td></tr>
+</tbody></table></div>
+
+<h3 id="s1-pseudo"><span class="num">1.4</span>The whole search in forty lines</h3>
+<div class="col">
+<p>The pseudo-code leaves out the threads, the virtual loss and the batching (section 5); the rest is what the code does.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="pseudo-code · one search">
+Move search(Position root_pos) {
+    root = table.lookup(key(root_pos)) or new node;               // reuse the graph of the last move (4.4)
+    if (root not expanded) expand(root, network(root_pos));
+    add Dirichlet noise to the root priors;                       // self-play only (6.1)
+    while (time or simulations left) {
+        node = root; pos = root_pos; path = [root];
+        while (node is expanded) {                                // 1. descent
+            edge = argmax over the edges of node of               // PUCT (3.2)
+                   Q(child) + c(node) · P(edge) · √W(node) / (1 + N(edge));
+            pos.play(edge.move);
+            node = edge.child or table.get_or_create(key(pos));   // one node per position (4)
+            path.push(node);
+        }
+        if (pos.game_over()) v = exact result for the player to move;
+        else {
+            (v, logits) = cache.lookup(pos) or network(pos);      // 2. evaluate (5.4)
+            expand(node, softmax(legal logits), v);               // 3. expand
+        }
+        for (node in path, from the leaf up) {                    // 4. back up, negamax signs
+            v = -v;                                               // W: for the player who moved in
+            node.N += 1; node.W += v; node.W2 += v * v;
+            edge into node.N += 1;
+        }
+    }
+    play values = root edge visits, forced playouts pruned (6.3);
+    return the child with the best lower confidence bound (6.4);
+}
+</script>
+
+<h3 id="s1-options"><span class="num">1.5</span>Three configurations</h3>
+<div class="col">
+<p>The same search runs in three settings. The competitive one plays the matches against the other players; the evaluation one plays the progress matches of the learning loops; the self-play one produces the training games of the AlphaZero loop, with noise and sampling.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Key</th><th>Competitive (<code>az_vs_nnue/*_b16.cfg</code>)</th><th>Evaluation (<code>alphazero_mcts_eval_player.cfg</code>)</th><th>Self-play (<code>alphazero_mcts_selfplay_player.cfg</code>)</th></tr></thead>
+<tbody>
+<tr><td>budget</td><td>time (1 s in the matches)</td><td>time (1–2 s)</td><td>1600 simulations, fast moves 200 (the last runs: 2400 / 400)</td></tr>
+<tr><td><code>nb threads</code> × <code>batch size</code></td><td>16 × 16</td><td>4 × 32</td><td>1 × 8 per game, many games sharing one GPU</td></tr>
+<tr><td><code>backend</code></td><td colspan="3">torch, cuda, fp16 (the CPU backend exists, about 50 times slower)</td></tr>
+<tr><td>PUCT</td><td colspan="3"><code>cpuct exploration</code> 1.0, <code>log</code> 0.45, <code>base</code> 500, <code>utility stdev scale</code> 0.85</td></tr>
+<tr><td>FPU</td><td colspan="3"><code>fpu reduction</code> 0.2, <code>root fpu reduction</code> 0.1</td></tr>
+<tr><td><code>graph search</code>, <code>reuse tree</code></td><td colspan="3">on</td></tr>
+<tr><td><code>use lcb</code></td><td>on</td><td>on</td><td>on (move choice), off for the policy target</td></tr>
+<tr><td><code>dirichlet epsilon</code></td><td>0</td><td>0</td><td>0.25 (α = 0.3)</td></tr>
+<tr><td><code>temperature</code></td><td>0</td><td>0</td><td>1 until ply 20</td></tr>
+<tr><td><code>forced playouts k</code></td><td>0</td><td>0</td><td>2</td></tr>
+<tr><td><code>playout cap fast prob</code></td><td>0</td><td>0</td><td>0.75</td></tr>
+<tr><td><code>nn cache</code></td><td>64 MB</td><td>64 MB</td><td>16 MB</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s2">
+<h2><span class="num">2</span>The network</h2>
+<div class="col">
+<p>The network is a residual convolutional network with two heads, in the style of AlphaZero. It is large next to the NNUE of the minimax player (35 million parameters against 1.3 million) and evaluated far less often: about 4.5 billion operations per position, done in batches on a GPU.</p>
+</div>
+
+<h3 id="s2-input"><span class="num">2.1</span>Inputs: four planes</h3>
+<div class="col">
+<p>The network sees four 8×8 binary planes: the black stones, the white stones, the holes, and a constant plane that is 1 everywhere when white is to move. The score is not an input: the number of holes gives the sum of the two scores, not their split, and the network learns what it needs from the board alone.</p>
+<p>The planes are written in the order of the training cache, element <em>i</em> of a plane being bit 63 − <em>i</em> of the bitboard. Rank 8 lands on the top row, as usual, but the files come out mirrored (H on the left). Nothing in the network minds, since convolutions learn whatever labelling they are shown; what matters is that the C++ encoder and the Python training code agree bit for bit.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="nnue/nn_evaluator.h · encode_planes">
+inline void encode_planes(const Yolah& y, float* out) {
+    const uint64_t bbs[3] = { y.bitboard(Yolah::BLACK), y.bitboard(Yolah::WHITE), y.empty_bitboard() };
+    for (int c = 0; c < 3; c++) {
+        const uint64_t bb = bbs[c];
+        float* plane = out + c * PLANE_CELLS;
+        for (int i = 0; i < PLANE_CELLS; i++) {
+            plane[i] = static_cast<float>((bb >> (63 - i)) & 1);
+        }
+    }
+    const float turn = (y.current_player() == Yolah::WHITE) ? 1.0f : 0.0f;
+    float* plane = out + 3 * PLANE_CELLS;
+    for (int i = 0; i < PLANE_CELLS; i++) {
+        plane[i] = turn;
+    }
+}
+</script>
+
+<h3 id="s2-arch"><span class="num">2.2</span>Architecture</h3>
+<div class="col">
+<p>A stem convolution lifts the 4 planes to 256 channels; 30 residual blocks follow, each two 3×3 convolutions with BatchNorm and ReLU before each convolution (pre-activation, ResNet v2); a final BatchNorm and ReLU closes the trunk. Both heads read the same 256 × 8 × 8 feature map.</p>
+</div>
+<div class="diagram wide" id="d-net"></div>
+<script type="text/x-code" data-lang="python" data-title="nnue/cnn_resnet_value_policy_chunked.py · ResBlock.forward and Net.heads (excerpt: no global pooling)">
+class ResBlock(nn.Module):
+    def forward(self, x):
+        residual = x
+        x = self.conv1(torch.relu(self.bn1(x)))
+        x = self.conv2(torch.relu(self.bn2(x)))
+        return x + residual
+
+class Net(nn.Module):
+    def heads(self, x):
+        # Value head: (B,C,8,8) → (B,1,8,8) → (B,64) → (B,fc) → (B,1) → (B,)
+        v = torch.relu(self.value_bn(self.value_conv(x)))
+        v = v.flatten(1)
+        v = self.value_fc1(v)
+        # Policy head: (B,C,8,8) → (B,2,8,8) → (B,128) → (B, NUM_ACTIONS)
+        p = torch.relu(self.policy_bn(self.policy_conv(x)))
+        p = p.flatten(1)
+        p = self.policy_fc(p)                         # raw logits (no softmax)
+        v = torch.relu(v)
+        v = torch.tanh(self.value_fc2(v)).squeeze(-1) # tanh → (-1,1)
+        return v, p
+</script>
+<div class="col">
+<p>The <strong>value</strong> is the expected result for the side to move, in (−1, 1): +1 a win, 0 a draw, −1 a loss. The <strong>policy</strong> is a vector of 4096 logits, one per pair of squares, indexed by 64 · from + to with the true square numbers. About three quarters of these pairs are never legal; training never targets them and the search ignores them.</p>
+</div>
+
+<h3 id="s2-policy"><span class="num">2.3</span>From logits to priors</h3>
+<div class="col">
+<p>The evaluator returns the logits of exactly the legal moves, in the order of <code>Yolah::moves</code>. The search turns them into priors with a softmax over those moves only, with an optional temperature (1 in every configuration).</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · priors_from_logits">
+void Search::priors_from_logits(const nn::Result& result, size_t nb_moves, float* priors) const {
+    // Softmax over the legal moves only, with the policy temperature.
+    float max_logit = -std::numeric_limits<float>::infinity();
+    for (size_t m = 0; m < nb_moves; m++) max_logit = std::max(max_logit, result.logits[m]);
+    float sum = 0.0f;
+    const float inv_t = 1.0f / prm.policy_temperature;
+    for (size_t m = 0; m < nb_moves; m++) {
+        priors[m] = std::exp((result.logits[m] - max_logit) * inv_t);
+        sum += priors[m];
+    }
+    for (size_t m = 0; m < nb_moves; m++) priors[m] /= sum;
+}
+</script>
+
+<h3 id="s2-backends"><span class="num">2.4</span>Two backends behind one interface</h3>
+<div class="col">
+<p>The search never touches the network directly. It calls <code>nn::Evaluator::evaluate</code> with a span of requests (a position and its legal moves) and receives a span of results (a value and the logits of the legal moves). Two backends implement it:</p>
+<ul>
+<li><code>nn::ResNetTorch</code> loads a TorchScript export (<code>.ts</code>) and runs it with libtorch on the GPU, in fp16. On an RTX 3080 it evaluates 8 000 to 10 000 positions per second at batch 256. It is the backend of every match and of self-play.</li>
+<li><code>nn::ResNetCPU</code> loads a binary export in which each BatchNorm is folded into the convolution before it, and runs the convolutions with Eigen and OpenMP: 130 to 160 positions per second at batch 32. It exists for machines without a GPU and for testing.</li>
+</ul>
+<p>The JSON key <code>backend</code> picks one; with more than one search thread, the player wraps it in a <code>BatchingEvaluator</code> (section 5.3).</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts_player.cpp · constructor (excerpt)">
+// Backend, then the batching wrapper when several search threads share it.
+std::unique_ptr<nn::Evaluator> backend = nn::make_evaluator(j);
+if (p.batch_size == 0) p.batch_size = backend->preferred_batch_size();
+if (p.nb_threads > 1) {
+    const size_t merged = j.value("merged batch size", p.batch_size * p.nb_threads);
+    net = std::make_unique<nn::BatchingEvaluator>(std::move(backend), p.nb_threads, merged);
+} else {
+    net = std::move(backend);
+}
+searcher = std::make_unique<az::Search>(*net, p, &memory);
+</script>
+</section>
+
+<section id="s3">
+<h2><span class="num">3</span>One simulation</h2>
+<div class="col">
+<p>A simulation is a descent, an evaluation, an expansion and a backup. This section follows one simulation in a single thread; section 5 shows how many of them run at once.</p>
+</div>
+
+<h3 id="s3-stats"><span class="num">3.1</span>What a node and an edge hold</h3>
+<div class="col">
+<p>The graph has two kinds of objects. A <strong>node</strong> is a position: its visit count N, the sum W of the values backed up through it and the sum W2 of their squares, the network's value at the position, and its edges. An <strong>edge</strong> is a move from a node: its prior P, a pointer to the successor node (created on the first descent through the edge), and the edge's own visit count. The difference between the node's N and the edge's N matters as soon as a position has several parents (section 4).</p>
+<p>W is stored for the player who moved <em>into</em> the node. Then W(child) / N(child) is directly the Q that PUCT needs at the parent: the value of the move for the player choosing it.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · Edge and Node (excerpt)">
+struct Search::Edge {
+    Move  action = Move::none();        // move leading to the successor
+    float prior  = 0.0f;                // P(s,a) from the policy head
+    std::atomic<Search::Node*> child{nullptr};   // successor, created on first descent
+    std::atomic<uint32_t> n{0};         // edge visits: this parent's share of the child
+    std::atomic<uint32_t> pending{0};   // in-flight visits through this edge
+};
+
+struct Search::Node {
+    std::atomic<uint32_t> n{0};         // completed visits N(s), from every parent
+    std::atomic<uint32_t> pending{0};   // in-flight visits (virtual loss), each counted as a loss
+    std::atomic<float>    w{0.0f};      // Σ backed-up values for the player who moved INTO this node
+    std::atomic<float>    w2{0.0f};     // Σ of their squares (sign-free: stdev of the subgraph's values)
+    std::atomic<uint8_t>  state{UNEXPANDED};
+    uint32_t mark = 0;                  // garbage collection: last mark_counter that reached it
+    float    net_v = 0.0f;              // network value at this node (player to move here)
+    std::pmr::vector<Edge> children;
+};
+</script>
+
+<h3 id="s3-puct"><span class="num">3.2</span>Choosing a move: PUCT in KataGo's form</h3>
+<div class="col">
+<p>At an expanded node the descent takes the edge with the highest score:</p>
+</div>
+<div class="formula">score(a) = Q(a) + c(s) · P(a) · √(W(s) + 0.01) / (1 + N(a))
+
+c(s)   = [ c + c_log · log((W(s) + c_base) / c_base) ] · fσ(s)
+         c = 1, c_log = 0.45, c_base = 500
+W(s)   = Σ_a N(a): the visits of the node's edges (with the pending ones, 5.2)</div>
+<div class="col">
+<p>The first term is <strong>exploitation</strong>: the average value of the successor. The second is <strong>exploration</strong>: large for a move with a high prior and few visits, shrinking like 1 / N(a) as the move is visited, growing like √W(s) as its siblings are. A move with a 30 % prior is visited again and again unless its value turns out bad; a move with a 1 % prior needs its siblings to collect many visits before it gets one.</p>
+<p>AlphaZero uses a constant c. KataGo adds the log term, which raises c slowly as the node gets more visits (1.0 at 0 visits, 1.49 at 1000, 2.37 at 10 000), so a well explored node keeps looking at its alternatives, and the factor fσ of section 3.3.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · select_child (excerpt: root noise and forced playouts left out, see 6)">
+uint32_t Search::select_child(const Node& node, bool is_root) const {
+    const auto& children = node.children;
+    const uint32_t nb = static_cast<uint32_t>(children.size());
+    const uint32_t n_parent = node.n.load(std::memory_order_relaxed);
+
+    // Total weight of the edges leaving this node (KataGo's totalChildWeight —
+    // the node's own visit is not part of it) and prior mass of the moves that
+    // have been tried at least once.
+    float total_child_weight = 0.0f, visited_mass = 0.0f;
+    for (uint32_t i = 0; i < nb; i++) {
+        const Edge& e = children[i];
+        const uint32_t w = e.n.load(std::memory_order_relaxed) + e.pending.load(std::memory_order_relaxed);
+        total_child_weight += static_cast<float>(w);
+        if (w > 0) visited_mass += e.prior;
+    }
+
+    const float cpuct = prm.cpuct_exploration + prm.cpuct_exploration_log *
+        std::log((total_child_weight + prm.cpuct_exploration_base) / prm.cpuct_exploration_base);
+    // The √W of the PUCT formula, with KataGo's offset keeping it positive at W = 0.
+    const float explore_scaling = cpuct * utility_stdev_factor(node, n_parent)
+                                * std::sqrt(total_child_weight + 0.01f);
+    const float fpu = fpu_value(node, n_parent, visited_mass, is_root);
+
+    uint32_t best = 0;
+    float best_score = -std::numeric_limits<float>::infinity();
+    for (uint32_t i = 0; i < nb; i++) {
+        const Edge& e = children[i];
+        const uint32_t n_eff = e.n.load(std::memory_order_relaxed) + e.pending.load(std::memory_order_relaxed);
+        // Q comes from the child NODE — everything the search knows about that
+        // position, whichever parent paid for it — while the PUCT denominator
+        // is this EDGE's own visit count.
+        float q = fpu;
+        const Node* child = e.child.load(std::memory_order_acquire);
+        if (child) {
+            const uint32_t cn = child->n.load(std::memory_order_relaxed);
+            const uint32_t cp = child->pending.load(std::memory_order_relaxed);
+            // Every pending visit is counted as a loss (-1): the virtual loss.
+            if (cn + cp > 0)
+                q = (child->w.load(std::memory_order_relaxed) - static_cast<float>(cp)) / (cn + cp);
+        }
+        float score = q + explore_scaling * e.prior / (1.0f + n_eff);
+        if (score > best_score) { best_score = score; best = i; }
+    }
+    return best;
+}
+</script>
+<div class="widget" id="w-puct">
+  <div class="widget-head">
+    <div class="widget-title">How PUCT spends its visits</div>
+    <div class="controls">
+      <button id="pu-run" type="button" class="primary">Run 200 simulations</button>
+      <button id="pu-step" type="button">One simulation</button>
+      <button id="pu-reset" type="button">Reset</button>
+    </div>
+  </div>
+  <div class="controls" style="margin-bottom:6px">
+    <label for="pu-c">c <input id="pu-c" type="range" min="0.2" max="3" step="0.1" value="1"> <span id="pu-cv">1.0</span></label>
+    <label for="pu-log"><input id="pu-log" type="checkbox" checked> log term (KataGo)</label>
+    <label for="pu-fpu">FPU reduction <input id="pu-fpu" type="range" min="0" max="0.6" step="0.05" value="0.2"> <span id="pu-fpuv">0.20</span></label>
+  </div>
+  <div class="col" style="font-size:14.5px;color:var(--ink-2)">Five moves with a fixed prior P and a fixed true value; every visit of a move returns its true value plus noise. Q is the running average, U the exploration term, the score their sum. The bold row is the move the next simulation takes.</div>
+  <div style="overflow-x:auto"><svg id="pu-svg" width="900" height="250" viewBox="0 0 900 250" role="img" aria-label="PUCT visits"></svg></div>
+  <div class="readout" id="pu-out"></div>
+</div>
+
+<h3 id="s3-stdev"><span class="num">3.3</span>Exploring where the values disagree: fσ</h3>
+<div class="col">
+<p>The second KataGo factor scales the exploration by the standard deviation of the values backed up through the node, against a prior of 0.40:</p>
+</div>
+<div class="formula">fσ(s) = 1 + 0.85 · (stdev(s) / 0.40 − 1)</div>
+<div class="col">
+<p>Where the backed-up values agree (a position whose outcome is settled, stdev near 0), fσ falls to 0.15 and the search exploits; where they disagree (a sharp position, stdev 0.6), fσ rises to 1.43 and the search looks wider. The stdev is regularised towards the prior with a weight of two visits, so a node with few visits keeps fσ near 1. Node W2, the sum of the squared values, is what makes this possible; the sign of the values does not matter in a square, so W2 is the same at every ply.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · utility_stdev_factor">
+float Search::utility_stdev_factor(const Node& node, uint32_t visits) const {
+    if (prm.cpuct_utility_stdev_scale <= 0.0f) return 1.0f;
+    const float prior = prm.cpuct_utility_stdev_prior;
+    float stdev = prior;
+    if (visits > 1) {
+        const float n = static_cast<float>(visits);
+        // The sign of the mean is irrelevant here, only its square is used.
+        const float mean    = node.w.load(std::memory_order_relaxed) / n;
+        const float mean_sq = mean * mean;
+        // Relaxed reads of w and w2 can be slightly out of step; clamp so that
+        // the variance never comes out negative.
+        const float sq_avg  = std::max(node.w2.load(std::memory_order_relaxed) / n, mean_sq);
+        const float pw = prm.cpuct_utility_stdev_prior_weight;
+        stdev = std::sqrt(std::max(0.0f,
+            ((mean_sq + prior * prior) * pw + sq_avg * n) / (pw + n - 1.0f) - mean_sq));
+    }
+    return 1.0f + prm.cpuct_utility_stdev_scale * (stdev / prior - 1.0f);
+}
+</script>
+
+<h3 id="s3-fpu"><span class="num">3.4</span>Moves not tried yet: first play urgency</h3>
+<div class="col">
+<p>A move without visits has no Q. Taking 0 would make every untried move of a lost position look attractive, and the search would spread over all of them. KataGo's first play urgency gives it the value of the parent, lowered in proportion to how much of the policy has already been tried:</p>
+</div>
+<div class="formula">FPU      = baseline − reduction · √m           reduction = 0.2 (root: 0.1)
+baseline = m · Q(parent) + (1 − m) · v_net(parent)
+m        = prior mass of the moves already visited</div>
+<div class="col">
+<p>At a fresh node (nothing tried, m = 0) an untried move is worth the network's value of the parent. Once the moves covering 80 % of the policy have been tried, the next one is worth the parent's average lowered by 0.2 · √0.8 ≈ 0.18: a move the policy did not like has to be good to be preferred to the known ones. At the root the reduction is halved, so the search looks a little wider there.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · fpu_value (excerpt: the options not used are left out)">
+float Search::fpu_value(const Node& node, uint32_t visits, float visited_policy_mass, bool is_root) const {
+    // Everything here is from the point of view of the player to move at
+    // `node`: node.w is for the player who moved into it, hence the sign flip,
+    // and node.net_v is the network's value for the player to move.
+    const float parent_q = visits > 0 ? -node.w.load(std::memory_order_relaxed) / visits : node.net_v;
+    const float avg_weight = std::min(1.0f, visited_policy_mass);
+    const float baseline = avg_weight * parent_q + (1.0f - avg_weight) * node.net_v;
+    const float reduction = (is_root ? prm.root_fpu_reduction : prm.fpu_reduction) * std::sqrt(visited_policy_mass);
+    return baseline - reduction;
+}
+</script>
+
+<h3 id="s3-backup"><span class="num">3.5</span>Expansion and backup</h3>
+<div class="col">
+<p>At the leaf, the network's value v is for the player to move there. The leaf's W is for the player who moved into it, so the leaf receives −v, its parent +v, and so on, the sign flipping at every ply: the negamax convention. Each node on the path gets one more visit, and so does each edge taken. A finished game is scored exactly (+1, 0, −1 by the final score) and backed up the same way, without a network call.</p>
+</div>
+<div class="diagram wide" id="d-backup"></div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · expand and backup">
+void Search::expand(Node& node, const Yolah::MoveList& moves, const float* priors, float value) {
+    const size_t nb = moves.size();
+    node.children.reserve(nb);
+    for (size_t m = 0; m < nb; m++) node.children.emplace_back(moves[m], priors[m]);
+    node.net_v = value;
+    node.state.store(EXPANDED, std::memory_order_release);   // publishes the edges
+}
+
+void Search::backup(const PathStep* path, size_t length, float leaf_value) {
+    // The leaf's value is for the player to move at the leaf; a node's W is
+    // for the player who moved into it, hence the initial sign flip, and one
+    // more flip per ply on the way up (negamax).
+    float v = -leaf_value;
+    // Σ v² is the same at every ply: the negamax flip disappears in the square.
+    const float v2 = leaf_value * leaf_value;
+    for (size_t i = length; i-- > 0;) {
+        Node* node = path[i].node;
+        node->w.fetch_add(v, std::memory_order_relaxed);
+        node->w2.fetch_add(v2, std::memory_order_relaxed);
+        node->n.fetch_add(1, std::memory_order_relaxed);
+        node->pending.fetch_sub(1, std::memory_order_relaxed);
+        if (Edge* e = path[i].edge) {
+            e->n.fetch_add(1, std::memory_order_relaxed);
+            e->pending.fetch_sub(1, std::memory_order_relaxed);
+        }
+        v = -v;
+    }
+}
+</script>
+<div class="col">
+<p>A pass is an ordinary move here: the side that cannot move plays the pass move (index 0, A1 → A1, never a real move), the turn changes, and the signs keep alternating with the plies.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="num">4</span>A graph, not a tree</h2>
+<div class="col">
+<p>In Yolah, every move turns the square the stone leaves into a hole. The number of holes grows by exactly one per move, so a position can never come back: the positions form a directed acyclic graph. At the same time, the four stones of a side move independently, so move orders commute and the same position is reached along many paths. A tree search would build one copy of a position per path; the search stores one node per distinct position instead.</p>
+</div>
+
+<h3 id="s4-share"><span class="num">4.1</span>One node per position</h3>
+<div class="diagram wide" id="d-graph"></div>
+<div class="col">
+<p>The nodes live in a hash table of 64 shards, each a mutex and an <code>unordered_map</code> from the position key to the node. When a descent takes an edge whose successor does not exist yet, it looks the position up under the shard lock: either another path already created it, and the edge is linked to the existing node (a transposition), or a new node is created. Nodes are created lazily, one per descent: at 400 simulations the search allocates about 400 nodes, where an eager expansion of every child would allocate about 20 000.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · run_worker, the descent through an expanded node (excerpt: the tree mode is left out)">
+if (st == EXPANDED) {
+    Edge& e = node->children[select_child(*node, node == root_node)];
+    const uint8_t mover = state.current_player();
+    state.play(e.action);
+    hash = zobrist::update(hash, mover, e.action);
+    e.pending.fetch_add(1, std::memory_order_relaxed);
+    Node* child = e.child.load(std::memory_order_acquire);
+    if (!child) {
+        // Link the edge to its successor, sharing the node with every other
+        // path that reaches the same position.
+        const uint64_t key = node_key(hash, state);
+        Shard& sh = shards[key % NB_SHARDS];
+        std::unique_lock lock(sh.mutex);
+        child = e.child.load(std::memory_order_acquire);
+        if (!child) {
+            auto [it, inserted] = sh.nodes.try_emplace(key, nullptr);
+            if (inserted) it->second = new_node();
+            else          transpositions.fetch_add(1, std::memory_order_relaxed);
+            child = it->second;
+            e.child.store(child, std::memory_order_release);
+        }
+    }
+    child->pending.fetch_add(1, std::memory_order_relaxed);
+    path[len++] = {child, &e};
+    node = child;
+    continue;
+}
+</script>
+
+<h3 id="s4-qn"><span class="num">4.2</span>Q from the node, N from the edge</h3>
+<div class="col">
+<p>A shared node accumulates the visits of all its parents. PUCT then reads two different counts. Q is the <strong>node's</strong> average: everything the search knows about the position, whichever parent paid for it. The visit count in the exploration term is the <strong>edge's</strong>: how much of this parent's exploration has gone into the move. A position refuted under one parent is refuted under every parent at once, and a parent does not stop exploring a move just because another parent visited the same position often. This is KataGo's graph search with every visit weighted 1.</p>
+</div>
+
+<h3 id="s4-key"><span class="num">4.3</span>The node key</h3>
+<div class="col">
+<p>The Zobrist hash covers the board and the side to move: exactly what the network sees, which is why the network cache keys on it alone. It does not cover how the points scored so far split between the players. Two positions with the same board can differ there (a pass scores nothing), and the final result depends on the split, so the node key mixes black's score into the hash.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · node_key">
+uint64_t node_key(uint64_t zobrist_hash, const Yolah& state) {
+    return zobrist_hash ^ mix(uint64_t(state.score().first) + 1);
+}
+</script>
+
+<h3 id="s4-reuse"><span class="num">4.4</span>Keeping the graph from one move to the next</h3>
+<div class="col">
+<p>At the next move, the position to search is usually already in the graph: two plies deeper, after the opponent's reply. The node table makes reuse a single lookup: if the key is there, that node becomes the root with all its statistics, however deep it was. Then a mark-and-sweep pass frees every node the new root cannot reach.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · reuse (graph mode), mark and collect">
+bool Search::reuse(const Yolah& state, uint64_t key) {
+    if (!root) return false;
+    // The node table is the whole tree-reuse mechanism: whatever depth the
+    // position sat at in the old graph, its statistics are right there.
+    Node* node = lookup(key);
+    if (!node) return false;
+    root = node;
+    root_state = state;
+    root_key = key;
+    collect(root);                 // drop everything the new root cannot reach
+    return true;
+}
+
+void Search::mark(Node* node) {
+    if (!node || node->mark == mark_counter) return;
+    node->mark = mark_counter;
+    if (node->state.load(std::memory_order_relaxed) != EXPANDED) return;
+    for (Edge& e : node->children) mark(e.child.load(std::memory_order_relaxed));
+}
+
+void Search::collect(Node* keep) {
+    ++mark_counter;
+    mark(keep);
+    for (Shard& sh : shards)
+        for (auto it = sh.nodes.begin(); it != sh.nodes.end();)
+            if (it->second->mark != mark_counter) { alloc.delete_object(it->second); it = sh.nodes.erase(it); }
+            else ++it;
+}
+</script>
+
+<h3 id="s4-measure"><span class="num">4.5</span>What sharing buys</h3>
+<div class="col">
+<p>Measured with the CPU backend, one thread, 3200 simulations on four positions: in tree mode 7 to 20 % of the leaves are transpositions. The tree search evaluates them again for free from the network cache, which refreshes a path but brings no new information. The graph search links to the existing node and goes on to a position nobody has evaluated. Per simulation it is 5 to 15 % slower (each simulation now costs a real network call), but it examines 20 to 25 % more distinct positions for the same simulation count, about 4 to 8 % more per second, and every shared node pools the statistics of all its parents.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Position</th><th class="num-r">Graph: distinct positions</th><th class="num-r">Tree: network calls + cache hits</th><th class="num-r">Graph sims/s</th><th class="num-r">Tree sims/s</th></tr></thead>
+<tbody>
+<tr><td>ply 0</td><td class="num-r">3195</td><td class="num-r">2552 + 646</td><td class="num-r">156</td><td class="num-r">181</td></tr>
+<tr><td>ply 10</td><td class="num-r">3195</td><td class="num-r">2630 + 570</td><td class="num-r">155</td><td class="num-r">178</td></tr>
+<tr><td>ply 17</td><td class="num-r">3141</td><td class="num-r">2632 + 515</td><td class="num-r">159</td><td class="num-r">175</td></tr>
+<tr><td>ply 19</td><td class="num-r">3175</td><td class="num-r">2947 + 231</td><td class="num-r">156</td><td class="num-r">162</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s5">
+<h2><span class="num">5</span>Many simulations at once</h2>
+<div class="col">
+<p>A GPU computes a batch of 256 positions in barely more time than one. A single simulation at a time would leave it idle almost always. The search therefore runs several threads, each gathering a batch of leaves before one network call, and a batching evaluator merges the threads' batches into a larger one.</p>
+</div>
+
+<h3 id="s5-loop"><span class="num">5.1</span>Gather, evaluate, expand</h3>
+<div class="col">
+<p>Each thread repeats three steps until the clock or the simulation budget runs out:</p>
+<ol>
+<li><strong>Gather</strong> up to <code>batch size</code> leaves: descend, as in section 3, but do not wait for the network at the leaf. Mark it EXPANDING and start the next descent. A finished game is backed up at once; a leaf found in the network cache is expanded at once (5.4).</li>
+<li><strong>Evaluate</strong> the batch with one call to the evaluator.</li>
+<li><strong>Expand</strong> each leaf with its priors, store the output in the cache, and back up every descent along its own path.</li>
+</ol>
+<p>Two descents of the same batch can reach the same leaf, under graph search even through different parents. Each descent keeps its own path, and the leaf's value is backed up once per descent.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · run_worker, evaluate and expand (excerpt)">
+// ── 2. evaluate ──
+const size_t nb = w.leaves.size();
+if (nb > 0) {
+    for (Worker::Leaf& leaf : w.leaves)
+        w.requests.push_back({&leaf.state, leaf.moves.begin(), static_cast<uint16_t>(leaf.moves.size())});
+    evaluator.evaluate(w.requests, std::span<nn::Result>(w.results.data(), nb));
+    // ── 3. expand ... ──
+    for (size_t i = 0; i < nb; i++) {
+        Worker::Leaf& leaf = w.leaves[i];
+        const nn::Result& r = w.results[i];
+        priors_from_logits(r, leaf.moves.size(), priors);
+        cache->store(leaf.hash, leaf.moves.size(), r.value, priors);
+        expand(*leaf.node, leaf.moves, priors, r.value);
+    }
+    // ── ... and back up, once per descent, along its own path ──
+    for (size_t d = 0; d < w.descents.size(); d++) {
+        const Worker::Descent& desc = w.descents[d];
+        backup(w.path(d), desc.path_len, w.results[desc.leaf].value);
+    }
+    simulations.fetch_add(w.descents.size(), std::memory_order_relaxed);
+}
+</script>
+
+<h3 id="s5-vloss"><span class="num">5.2</span>Virtual loss and collisions</h3>
+<div class="col">
+<p>Without a correction, all the descents of a batch would follow the same path to the same leaf: nothing changes in the statistics until the network answers. Each descent therefore adds a <strong>pending visit</strong> to every node and edge on its path, and PUCT counts each pending visit as a visit that returned a loss (−1 in the node's Q, +1 in the edge's N). The next descent sees the path as worse and more visited, and goes elsewhere. The backup turns each pending visit into a real one with the network's value.</p>
+<p>A descent that reaches a leaf another thread is already evaluating is a <strong>collision</strong>. It is undone (its pending visits removed), and after <code>batch size</code> collisions the batch is closed early. A descent that reaches a leaf of its own batch rides along on the same evaluation.</p>
+</div>
+<div class="note"><strong>The price of descents in flight.</strong> With 16 threads × batch 64, up to 1024 descents are pending at once, and the virtual losses distort the statistics more and more. In a tournament at 1 s per move on crn25 (L40S), the MCTS players with 16 × 16 (256 in flight) scored about 56 Elo more against the NNUE player g046 than the same players with 16 × 64; the GPU throughput was not the limit. 16 × 16 is the competitive setting since.</div>
+
+<h3 id="s5-batch"><span class="num">5.3</span>The batching evaluator</h3>
+<div class="col">
+<p>Each thread hands its batch to the <code>BatchingEvaluator</code> and blocks. One worker thread launches a merged batch as soon as the queued positions reach the merged size (threads × batch), or every thread is waiting, or 500 µs have passed with something queued. It runs the backend once and scatters the results back. A thread whose descents all collided joins with an empty request, a barrier: it wakes up after the next batch, when the leaves it collided with are expanded.</p>
+</div>
+<div class="diagram wide" id="d-batch"></div>
+<script type="text/x-code" data-lang="cpp" data-title="nnue/batched_evaluator.cpp · the worker loop (excerpt)">
+// Take whole jobs (FIFO) until the next one would overflow max_batch.
+std::vector<Job*> taken;
+batch_in.clear();
+while (!queue.empty()) {
+    Job* j = queue.front();
+    if (!taken.empty() && batch_in.size() + j->in.size() > max_batch) break;
+    taken.push_back(j);
+    batch_in.insert(batch_in.end(), j->in.begin(), j->in.end());
+    queued_positions -= j->in.size();
+    queue.pop_front();
+}
+// Run the backend without holding the lock so clients can keep queueing.
+if (!batch_in.empty()) {
+    evaluating = true;
+    lock.unlock();
+    impl->evaluate(batch_in, std::span<Result>(batch_out.data(), batch_in.size()));
+    lock.lock();
+    evaluating = false;
+    cv_idle.notify_all();
+}
+size_t offset = 0;
+for (Job* j : taken) {
+    std::copy_n(batch_out.begin() + offset, j->in.size(), j->out.begin());
+    offset += j->in.size();
+    j->done = true;
+}
+waiting_clients -= taken.size();
+cv_clients.notify_all();
+</script>
+
+<h3 id="s5-cache"><span class="num">5.4</span>The network cache</h3>
+<div class="col">
+<p>The network's output depends only on the board and the side to move, so it is cached under the Zobrist hash: the value and the priors of the legal moves, stored as 16-bit fixed point. The table is direct-mapped (always overwrite), lock-striped, and checks the number of legal moves as well as the key. It catches the transpositions the node table missed (positions freed by the garbage collection) and survives from one move to the next and from one game to the next. It is cleared when the weights change.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/nn_cache.h · lookup">
+bool lookup(uint64_t key, size_t nb_moves, float& value, float* priors) {
+    if (table.empty()) return false;
+    const Entry& e = table[key & mask];
+    std::lock_guard lock(locks[key & (locks.size() - 1)]);
+    if (e.key != key || e.nb_moves != nb_moves) {
+        misses.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
+    value = e.value;
+    for (size_t m = 0; m < nb_moves; m++) priors[m] = e.priors[m] * (1.0f / 65535.0f);
+    hits.fetch_add(1, std::memory_order_relaxed);
+    return true;
+}
+</script>
+</section>
+
+<section id="s6">
+<h2><span class="num">6</span>At the root</h2>
+<div class="col">
+<p>Four things happen at the root and nowhere else. Two of them only in self-play: the noise and the forced playouts, which make the search try moves the network underrates. Two always: the pruning of the play values, and the choice of the move by a lower confidence bound.</p>
+</div>
+
+<h3 id="s6-noise"><span class="num">6.1</span>Dirichlet noise</h3>
+<div class="col">
+<p>In self-play the root priors are mixed with Dirichlet noise: P' = 0.75 · P + 0.25 · Dir(0.3). The noise is drawn once per search, only on full searches (6.5), and is off in matches.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · apply_root_noise">
+void Search::apply_root_noise(Worker& w) {
+    root_priors.clear();
+    if (!full_search || prm.dirichlet_epsilon <= 0.0f || root->children.empty()) return;
+    std::mt19937_64 gen(w.prng.rand<uint64_t>());
+    std::gamma_distribution<float> gamma(prm.dirichlet_alpha, 1.0f);
+    const size_t nb = root->children.size();
+    root_priors.resize(nb);
+    float sum = 0.0f;
+    for (size_t i = 0; i < nb; i++) { root_priors[i] = gamma(gen); sum += root_priors[i]; }
+    for (size_t i = 0; i < nb; i++) {
+        const float noise = sum > 0.0f ? root_priors[i] / sum : 1.0f / nb;
+        root_priors[i] = (1.0f - prm.dirichlet_epsilon) * root->children[i].prior + prm.dirichlet_epsilon * noise;
+    }
+}
+</script>
+
+<h3 id="s6-forced"><span class="num">6.2</span>Forced playouts</h3>
+<div class="col">
+<p>Noise makes a move interesting; one bad evaluation would then be enough for PUCT to drop it. KataGo forces every root move that has been visited at least once up to √(k · P · W) visits, with k = 2 in self-play: with W = 1600 root visits, a move with a prior of 5 % gets at least √(2 · 0.05 · 1600) ≈ 13 visits.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · select_child, the forced playouts (excerpt)">
+const bool forced = is_root && full_search && prm.forced_playouts_k > 0.0f;
+const float forced_scale = forced ? prm.forced_playouts_k * total_child_weight : 0.0f;
+// ... in the loop over the children:
+float score = q + explore_scaling * p / (1.0f + n_eff);
+// (n > 0: a COMPLETED visit. With n + pending, a child chosen once in
+// this batch got the bonus at once, and the next descents of the batch
+// rode along on the same unevaluated leaf, backing up its value again.)
+if (forced && n > 0 && static_cast<float>(n_eff) < std::sqrt(forced_scale * p))
+    score += 1e6f;
+</script>
+
+<h3 id="s6-prune"><span class="num">6.3</span>Policy target pruning</h3>
+<div class="col">
+<p>The forced visits must not end up in the training target, or the network would learn to like the moves the noise picked. After the search, the <strong>play values</strong> start as the root's edge visits. For every move other than the best one, the code inverts the PUCT formula: how many visits would PUCT have given this move, at most, for its score to stay below the best move's? The visits beyond that count are removed. A move whose value alone beats the best move's score keeps all its visits. These pruned values, normalised, are the policy target π.</p>
+</div>
+<div class="formula">E          = c(root) · fσ(root) · √(W + 0.01)
+best_score = Q(best) + E · P(best) / (1 + N(best))
+wanted(a)  = E · P(a) / (best_score − Q(a)) − 1
+play(a)    = min(N(a), ⌈wanted(a)⌉)</div>
+
+<h3 id="s6-lcb"><span class="num">6.4</span>The move played: a lower confidence bound</h3>
+<div class="col">
+<p>The most visited move is usually the best, but a move with fewer visits and a clearly better Q may be better still. KataGo plays the move with the best lower confidence bound Q − 5 · σ(Q), among the moves with at least 20 % of the best move's visits. σ(Q) comes from the child's W2: the spread of the values backed up through it, divided by the square root of its visits. The winner's play value is raised just enough to beat the others, so the move with the highest play value is the move played. π is copied before this step: the LCB says which move to play, not how the visits were spread.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · root_play_values, the LCB (excerpt)">
+for (size_t i = 0; i < nb; i++) {
+    ChildStat& c = children[i];
+    if (c.visits == 0) { c.lcb = -2.0f; radius[i] = 2.0f * prm.lcb_stdevs; continue; }
+    const float n = static_cast<float>(c.visits);
+    const float mean_sq = c.q * c.q;
+    float sq_avg = std::max(c.q2, mean_sq + 1e-8f);
+    // A prior saying the variance could be as large as the whole utility
+    // range (radius 1), with a weight that vanishes as the visits grow.
+    const float prior_w = 1.0f / (n * n);
+    sq_avg = (sq_avg * n + (sq_avg + 1.0f) * prior_w) / (n + prior_w);
+    const float weight_sum = n + prior_w;
+    const float ess = weight_sum * weight_sum / (n + prior_w * prior_w);
+    const float var = std::max(0.0f, sq_avg - mean_sq);
+    radius[i] = std::sqrt(var / ess) * prm.lcb_stdevs;
+    c.lcb = c.q - radius[i];
+    if (c.play_value > 0.0f && c.play_value >= prm.min_visit_prop_for_lcb * best_play) {
+        if (c.lcb > best_lcb) { best_lcb = c.lcb; best_lcb_index = i; }
+    }
+}
+</script>
+
+<h3 id="s6-cap"><span class="num">6.5</span>Self-play: playout cap randomization and temperature</h3>
+<div class="col">
+<p>Self-play needs many games for the value head and good searches for the policy target. KataGo's playout cap randomization gives both: each move is a <strong>full</strong> search (1600 simulations, noise, forced playouts, π recorded) with probability 0.25, and a <strong>fast</strong> search (200 simulations, no noise, no π) otherwise. Only the full searches produce policy targets; all the positions get the game's result. In the first 20 plies the move is drawn with probability proportional to π (temperature 1), so that the games differ; after that the best move is played.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · search, the playout cap">
+full_search = true;
+sim_budget = prm.nb_simulations;
+if (prm.nb_simulations && prm.nb_simulations_fast && prm.playout_cap_fast_prob > 0.0f) {
+    const float u = (rng.rand<uint64_t>() >> 11) * 0x1.0p-53f;
+    if (u < prm.playout_cap_fast_prob) {
+        full_search = false;
+        sim_budget = prm.nb_simulations_fast;
+    }
+}
+</script>
+</section>
+
+<section id="s7">
+<h2><span class="num">7</span>Strength</h2>
+<div class="col">
+<p>The network of the competitive player came from two sources. The supervised ResNet was trained on the engine games of <code>data/games</code> (the result for the value, the move played for the policy); the AlphaZero 256 run then trained it further by self-play for about four weeks on the cluster. The measured results, at 1 s per move with the balanced opening book:</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Match</th><th class="num-r">Elo</th><th>Setting</th></tr></thead>
+<tbody>
+<tr><td>AlphaZero 256 (az_00229376) vs the supervised ResNet, the run's start</td><td class="num-r">+17 [+5, +29]</td><td>800 games, evaluation setting, 75 % draws</td></tr>
+<tr><td>AlphaZero 256 vs the NNUE player g046 (minimax)</td><td class="num-r">+58</td><td>16 × 16, crn25, 357 games (three-player tournament)</td></tr>
+<tr><td>Supervised ResNet vs the NNUE player g046</td><td class="num-r">+56</td><td>same tournament</td></tr>
+<tr><td>16 × 64 instead of 16 × 16 (both MCTS players)</td><td class="num-r">about −50</td><td>against g046, same time</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The self-play run moved the network little: about +17 Elo over weeks of GPU time. The distillation loop (its own document) takes the other road: games of the minimax dev player, searched deep, label positions on which the ResNet is trained, and the ResNet then teaches the NNUE.</p>
+</div>
+</section>
+<footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
+Repository state: commit 96c1670. Speeds: CPU backend on a desktop CPU under WSL2, GPU backend on an RTX 3080; matches on the cluster (crn25: 2× EPYC 9534 and an L40S), 95 % intervals.
+</footer>
+</main>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker>
+    <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+    <marker id="arr-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--good)"/></marker>
+  </defs>
+</svg>
+<style>
+.dg-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+.dg-box.k-acc { fill: var(--accent-soft); stroke: var(--accent); }
+.dg-box.k-b { fill: var(--black-soft); stroke: var(--black-pc); }
+.dg-box.k-w { fill: var(--white-soft); stroke: var(--white-pc); }
+.dg-box.k-good { fill: var(--paper); stroke: var(--good); stroke-width: 1.6; }
+.dg-box.k-dim { fill: var(--panel); stroke: var(--rule); stroke-dasharray: 4 3; }
+.dg-t { font-size: 13px; font-weight: 700; fill: var(--ink); }
+.dg-s { font-size: 11.5px; fill: var(--ink-2); }
+.dg-m { font-family: var(--font-mono) !important; font-size: 11px; fill: var(--ink-2); }
+.dg-a { stroke: var(--ink-3); stroke-width: 1.4; fill: none; marker-end: url(#arr); }
+.dg-a.acc { stroke: var(--accent); marker-end: url(#arr-acc); }
+.dg-a.good { stroke: var(--good); marker-end: url(#arr-good); }
+.dg-a.dash { stroke-dasharray: 5 4; }
+.dg-lbl { font-size: 11px; fill: var(--ink-3); font-weight: 600; }
+.dg-ret { font-size: 11px; fill: var(--good); font-weight: 700; }
+.cells { display: grid; gap: 2px; font-family: var(--font-mono); font-size: 10.5px; margin: 4px 0 10px; }
+.cell { min-width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; color: var(--ink); font-variant-numeric: tabular-nums; padding: 0 2px; }
+.cell.z { color: var(--ink-3); }
+.cell.hl { background: var(--accent-soft); border-color: var(--accent); }
+.cell.ok { background: var(--white-soft); border-color: var(--white-pc); }
+.cell.wt { background: var(--black-soft); border-color: var(--black-pc); }
+.reg-row { display: flex; gap: 8px; align-items: center; }
+.reg-name { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); width: 120px; flex: none; text-align: right; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* ── code blocks ─────────────────────────────────────────────────────────── */
+document.querySelectorAll('script[type="text/x-code"]').forEach(sc => {
+  const fig = document.createElement("figure");
+  fig.className = "code";
+  const head = document.createElement("div");
+  head.className = "code-head";
+  head.textContent = sc.dataset.title || "";
+  const pre = document.createElement("pre");
+  const code = document.createElement("code");
+  code.className = "language-" + (sc.dataset.lang || "cpp");
+  code.textContent = sc.textContent.replace(/^\n/, "").replace(/\s+$/, "");
+  pre.appendChild(code);
+  fig.appendChild(head);
+  fig.appendChild(pre);
+  sc.replaceWith(fig);
+  try { if (window.hljs) window.hljs.highlightElement(code); } catch (e) { /* plain text */ }
+});
+
+/* ── table of contents ───────────────────────────────────────────────────── */
+(function toc() {
+  const lists = [$("toc-list"), $("toc-list-m")];
+  const label = h => { const n = h.querySelector(".num"); return n ? n.textContent + "  " + h.textContent.slice(n.textContent.length) : h.textContent; };
+  document.querySelectorAll("main section").forEach(sec => {
+    const h2 = sec.querySelector("h2");
+    if (!h2) return;
+    lists.forEach(list => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "#" + sec.id;
+      a.textContent = label(h2);
+      li.appendChild(a);
+      const subs = sec.querySelectorAll("h3[id]");
+      if (subs.length) {
+        const ol = document.createElement("ol");
+        subs.forEach(h3 => {
+          const l2 = document.createElement("li");
+          const a2 = document.createElement("a");
+          a2.href = "#" + h3.id;
+          a2.textContent = label(h3);
+          l2.appendChild(a2);
+          ol.appendChild(l2);
+        });
+        li.appendChild(ol);
+      }
+      list.appendChild(li);
+    });
+  });
+})();
+
+/* ── SVG diagram helpers ─────────────────────────────────────────────────── */
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function B(x, y, w, h, title, sub, kind) {
+  let s = `<rect class="dg-box ${kind || ""}" x="${x}" y="${y}" width="${w}" height="${h}" rx="7"/>`;
+  const lines = sub ? (Array.isArray(sub) ? sub : [sub]) : [];
+  const total = 16 + lines.length * 14;
+  let ty = y + h / 2 - total / 2 + 12;
+  s += `<text class="dg-t" x="${x + w / 2}" y="${ty}" text-anchor="middle">${esc(title)}</text>`;
+  lines.forEach((l, i) => { s += `<text class="dg-s" x="${x + w / 2}" y="${ty + 15 + i * 14}" text-anchor="middle">${esc(l)}</text>`; });
+  return s;
+}
+function A(x1, y1, x2, y2, cls, label, lx, ly) {
+  let s = `<path class="dg-a ${cls || ""}" d="M${x1},${y1} L${x2},${y2}"/>`;
+  if (label) s += `<text class="dg-lbl" x="${lx ?? (x1 + x2) / 2 + 4}" y="${ly ?? (y1 + y2) / 2 - 4}">${esc(label)}</text>`;
+  return s;
+}
+function P(d, cls) { return `<path class="dg-a ${cls || ""}" d="${d}"/>`; }
+function T(x, y, text, cls, anchor) { return `<text class="${cls || "dg-s"}" x="${x}" y="${y}" text-anchor="${anchor || "start"}">${esc(text)}</text>`; }
+function svg(id, w, h, body, label) {
+  const el = $(id);
+  if (el) el.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label || id)}">${body}</svg>`;
+}
+
+/* small tree helpers */
+function C(x, y, r, kind, label) {
+  const fill = kind === "acc" ? "var(--accent-soft)" : kind === "new" ? "var(--white-soft)" : kind === "dim" ? "var(--panel)" : "var(--paper)";
+  const stroke = kind === "acc" ? "var(--accent)" : kind === "new" ? "var(--white-pc)" : "var(--ink-3)";
+  let s = `<circle cx="${x}" cy="${y}" r="${r}" style="fill:${fill};stroke:${stroke};stroke-width:1.4${kind === "dim" ? ";stroke-dasharray:3 3" : ""}"/>`;
+  if (label) s += `<text class="dg-m" x="${x}" y="${y + 4}" text-anchor="middle">${esc(label)}</text>`;
+  return s;
+}
+function L(x1, y1, x2, y2, cls) { return `<path class="dg-a ${cls || ""}" style="marker-end:none" d="M${x1},${y1} L${x2},${y2}"/>`; }
+
+/* 1.1 one simulation */
+(function () {
+  let s = "";
+  const panels = [
+    ["1. descent", "PUCT picks one edge per level"],
+    ["2. evaluate", "the network: value v, priors P"],
+    ["3. expand", "the leaf joins the graph"],
+    ["4. back up", "N + 1 and ±v on the path"]];
+  panels.forEach((p, k) => {
+    const ox = 10 + k * 212;
+    s += T(ox, 20, p[0].toUpperCase(), "dg-lbl");
+    s += T(ox, 36, p[1], "dg-s");
+    const nodes = [[ox + 95, 70], [ox + 45, 135], [ox + 145, 135], [ox + 115, 200], [ox + 175, 200]];
+    const on = k === 0 ? [0, 2, 4] : [0, 2, 4];
+    s += L(nodes[0][0], nodes[0][1] + 13, nodes[1][0], nodes[1][1] - 13, "");
+    s += L(nodes[0][0], nodes[0][1] + 13, nodes[2][0], nodes[2][1] - 13, k === 0 || k === 3 ? "acc" : "");
+    s += L(nodes[2][0], nodes[2][1] + 13, nodes[3][0], nodes[3][1] - 13, "");
+    s += L(nodes[2][0], nodes[2][1] + 13, nodes[4][0], nodes[4][1] - 13, k === 0 || k === 3 ? "acc" : "");
+    nodes.forEach((n, i) => {
+      let kind = "";
+      if (i === 4) kind = k === 0 ? "dim" : k === 1 ? "acc" : "new";
+      else if (on.includes(i) && (k === 0 || k === 3)) kind = "acc";
+      s += C(n[0], n[1], 13, kind, i === 0 ? "root" : "");
+    });
+    if (k === 1) { s += T(nodes[4][0] - 30, 236, "v = +0.3 for the", "dg-s"); s += T(nodes[4][0] - 30, 250, "player to move", "dg-s"); }
+    if (k === 2) { [-28, 0, 28].forEach(dx => { s += L(nodes[4][0], nodes[4][1] + 13, nodes[4][0] + dx, 240, "dash"); s += C(nodes[4][0] + dx, 246, 6, "dim", ""); }); s += T(ox + 20, 270, "edges with priors, no nodes yet", "dg-s"); }
+    if (k === 3) {
+      s += T(nodes[4][0] - 18, nodes[4][1] + 32, "W += −0.3", "dg-ret");
+      s += T(nodes[2][0] + 18, nodes[2][1] + 4, "W += +0.3", "dg-ret");
+      s += T(nodes[0][0] + 18, nodes[0][1] + 4, "W += −0.3", "dg-ret");
+    }
+  });
+  svg("d-sim", 860, 285, s, "one simulation");
+})();
+
+/* 1.2 flow */
+(function () {
+  let s = "";
+  s += B(20, 20, 260, 50, "play(position)", "AlphaZeroMCTSPlayer::play", "");
+  s += A(150, 70, 150, 92);
+  s += B(20, 92, 260, 62, "Search::search", ["reuse the graph (4.4), expand the root,", "noise, playout cap (6)"], "");
+  s += A(150, 154, 150, 176);
+  s += B(20, 176, 260, 50, "16 threads: run_worker", "until the clock stops them", "k-acc");
+  s += A(150, 226, 150, 248);
+  s += B(20, 248, 260, 62, "root_play_values", ["pruned visits → π (6.3),", "LCB → the move (6.4)"], "");
+  s += B(340, 130, 250, 150, "", null, "k-dim");
+  s += T(352, 150, "ONE THREAD, REPEATED", "dg-lbl");
+  s += B(355, 160, 220, 34, "gather 16 leaves", "descents + virtual loss (3, 5.2)", "");
+  s += B(355, 202, 220, 34, "evaluate the batch", "one call, blocks (5.3)", "k-b");
+  s += B(355, 244, 220, 30, "expand, back up", null, "");
+  s += P("M280,201 L339,201", "");
+  s += B(610, 150, 230, 62, "BatchingEvaluator", ["merges the 16 batches", "up to 256 positions"], "k-b");
+  s += A(575, 219, 609, 190, "acc");
+  s += A(725, 212, 725, 250);
+  s += B(610, 250, 230, 50, "ResNetTorch (GPU, fp16)", "256 × 30, value + 4096 logits", "k-acc");
+  s += B(610, 40, 230, 50, "NNCache", "a hit skips the network (5.4)", "k-w");
+  s += P("M575,177 C600,177 590,65 609,65", "dash");
+  svg("d-flow", 860, 320, s, "from a position to a move");
+})();
+
+/* 2.2 network */
+(function () {
+  let s = "";
+  s += B(10, 110, 100, 60, "4 planes", "8 × 8 each", "");
+  s += A(110, 140, 130, 140);
+  s += B(130, 110, 120, 60, "stem", ["conv 3×3 → 256", "BN, ReLU"], "");
+  s += A(250, 140, 270, 140);
+  s += B(270, 96, 170, 88, "30 residual blocks", ["BN, ReLU, conv 3×3", "BN, ReLU, conv 3×3", "+ input"], "k-acc");
+  s += A(440, 140, 460, 140);
+  s += B(460, 110, 100, 60, "BN, ReLU", "256 × 8 × 8", "");
+  s += A(560, 130, 600, 64); s += A(560, 150, 600, 216);
+  s += B(600, 20, 250, 80, "value head", ["conv 1×1 → 1, BN, ReLU (64)", "fc 64 → 256, ReLU", "fc 256 → 1, tanh"], "k-b");
+  s += B(600, 180, 250, 80, "policy head", ["conv 1×1 → 2, BN, ReLU (128)", "fc 128 → 4096", "logits: from · 64 + to"], "k-w");
+  s += T(10, 290, "about 35 M parameters, 4.5 GFLOP per position; the policy fc (524 k weights) costs less than one block", "dg-s");
+  svg("d-net", 860, 300, s, "network architecture");
+})();
+
+/* 3.5 backup */
+(function () {
+  let s = "";
+  const xs = [80, 300, 520, 740], who = ["black to move", "white to move", "black to move", "white to move (leaf)"];
+  const w = ["+0.3", "−0.3", "+0.3", "−0.3"];
+  xs.forEach((x, i) => {
+    s += C(x, 70, 22, i === 3 ? "acc" : "", i === 0 ? "root" : "");
+    s += T(x, 112, who[i], "dg-s", "middle");
+    s += T(x, 132, "W += " + w[i], "dg-ret", "middle");
+    if (i < 3) s += A(x + 24, 70, xs[i + 1] - 26, 70, "");
+  });
+  s += T(740, 30, "network: v = +0.3 for white", "dg-t", "middle");
+  s += T(20, 170, "W is for the player who moved INTO the node: the leaf gets −v, then the sign flips at every ply.", "dg-s");
+  s += T(20, 188, "At the root, Q of a move = W(child) / N(child): the value for black, who chooses the move.", "dg-s");
+  svg("d-backup", 900, 200, s, "backup signs");
+})();
+
+/* 4.1 graph */
+(function () {
+  let s = "";
+  s += T(20, 20, "TREE: one node per path", "dg-lbl");
+  s += T(470, 20, "GRAPH: one node per position", "dg-lbl");
+  const tree = [[200, 50, "P"], [110, 120, "a"], [290, 120, "b"], [70, 190, "ab"], [150, 190, "…"], [250, 190, "…"], [330, 190, "ba"]];
+  [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]].forEach(([a, b]) => { s += L(tree[a][0], tree[a][1] + 16, tree[b][0], tree[b][1] - 16, ""); });
+  tree.forEach((n, i) => { s += C(n[0], n[1], 16, i === 3 || i === 6 ? "new" : "", n[2]); });
+  s += T(70, 232, "same position, two nodes,", "dg-s"); s += T(70, 246, "statistics split in two", "dg-s");
+  const g = [[640, 50, "P"], [550, 120, "a"], [730, 120, "b"], [640, 190, "ab"]];
+  s += L(640, 66, 550, 104, ""); s += L(640, 66, 730, 104, "");
+  s += L(550, 136, 640, 174, "acc"); s += L(730, 136, 640, 174, "acc");
+  g.forEach((n, i) => { s += C(n[0], n[1], 16, i === 3 ? "acc" : "", n[2]); });
+  s += T(578, 166, "edge a→ab: N = 7", "dg-m", "end"); s += T(702, 166, "edge b→ab: N = 3", "dg-m");
+  s += T(640, 228, "node ab: N = 10, Q from all 10", "dg-ret", "middle");
+  s += T(640, 252, "PUCT at a: Q(ab) from the node (10 visits),", "dg-s", "middle");
+  s += T(640, 268, "N from the edge (7)", "dg-s", "middle");
+  svg("d-graph", 860, 280, s, "tree versus graph");
+})();
+
+/* 5.3 batching */
+(function () {
+  let s = "";
+  for (let t = 0; t < 5; t++) {
+    const y = 20 + t * 46;
+    s += B(20, y, 170, 36, t < 4 ? `thread ${t}` : "…", t < 4 ? (t === 2 ? "all collisions: empty request" : "16 leaves") : "16 threads", t === 2 ? "k-dim" : "");
+    s += A(190, y + 18, 299, 130, t === 2 ? "dash" : "");
+  }
+  s += B(300, 90, 220, 80, "queue (FIFO)", ["launch when 256 queued,", "or every thread waits,", "or 500 µs passed"], "k-b");
+  s += A(520, 130, 579, 130, "acc");
+  s += B(580, 100, 260, 60, "one backend call", "up to 256 positions on the GPU", "k-acc");
+  s += P("M710,160 L710,270 L105,270 L105,257", "good");
+  s += T(330, 296, "results scattered back, the threads released (the empty request: a barrier)", "dg-ret");
+  svg("d-batch", 860, 312, s, "batching evaluator");
+})();
+
+/* 3.2 PUCT widget */
+(function () {
+  if (!$("pu-svg")) return;
+  const MOVES = [
+    { name: "e2-e5", p: 0.40, v: 0.10 },
+    { name: "c3-c7", p: 0.25, v: 0.25 },
+    { name: "f1-b5", p: 0.20, v: -0.20 },
+    { name: "a2-a6", p: 0.10, v: 0.05 },
+    { name: "h3-d7", p: 0.05, v: 0.40 }];
+  let st, seed;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const gauss = () => { const u = Math.max(1e-9, rnd()), v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  function reset() { seed = 12345; st = { n: MOVES.map(() => 0), w: MOVES.map(() => 0), sims: 0, netv: 0.05 }; render(); }
+  function scores() {
+    const c = parseFloat($("pu-c").value), useLog = $("pu-log").checked, red = parseFloat($("pu-fpu").value);
+    const W = st.n.reduce((a, b) => a + b, 0);
+    const cp = c + (useLog ? 0.45 * Math.log((W + 500) / 500) : 0);
+    const E = cp * Math.sqrt(W + 0.01);
+    let mass = 0; MOVES.forEach((m, i) => { if (st.n[i] > 0) mass += m.p; });
+    let pq = W > 0 ? 0 : st.netv;
+    if (W > 0) { let sw = 0; st.w.forEach(x => { sw += x; }); pq = sw / W; }
+    const base = Math.min(1, mass) * pq + (1 - Math.min(1, mass)) * st.netv;
+    const fpu = base - red * Math.sqrt(mass);
+    return MOVES.map((m, i) => {
+      const q = st.n[i] > 0 ? st.w[i] / st.n[i] : fpu;
+      const u = E * m.p / (1 + st.n[i]);
+      return { q, u, score: q + u, fpu: st.n[i] === 0 };
+    });
+  }
+  function step() {
+    const sc = scores();
+    let b = 0; sc.forEach((x, i) => { if (x.score > sc[b].score) b = i; });
+    const val = Math.max(-1, Math.min(1, MOVES[b].v + 0.35 * gauss()));
+    st.n[b] += 1; st.w[b] += val; st.sims += 1;
+  }
+  function render() {
+    $("pu-cv").textContent = parseFloat($("pu-c").value).toFixed(1);
+    $("pu-fpuv").textContent = parseFloat($("pu-fpu").value).toFixed(2);
+    const sc = scores();
+    let b = 0; sc.forEach((x, i) => { if (x.score > sc[b].score) b = i; });
+    const W = st.n.reduce((a, c) => a + c, 0);
+    let s = "";
+    const cols = [["move", 20], ["P", 110], ["true v", 165], ["N", 235], ["Q", 290], ["U", 350], ["score", 410], ["share of the visits", 490]];
+    cols.forEach(c => { s += `<text x="${c[1]}" y="20" style="font-family:var(--font-display);font-size:11.5px;font-weight:700;fill:var(--ink-3)">${c[0].toUpperCase()}</text>`; });
+    MOVES.forEach((m, i) => {
+      const y = 50 + i * 38, x = sc[i];
+      const wt = i === b ? "700" : "400";
+      const t = (xx, text, col) => `<text x="${xx}" y="${y}" style="font-family:var(--font-mono);font-size:12.5px;font-weight:${wt};fill:${col || "var(--ink)"}">${text}</text>`;
+      s += t(20, m.name) + t(110, m.p.toFixed(2)) + t(165, (m.v >= 0 ? "+" : "") + m.v.toFixed(2), "var(--ink-2)") + t(235, st.n[i]);
+      s += t(290, (x.q >= 0 ? "+" : "") + x.q.toFixed(2) + (x.fpu ? "*" : ""), x.fpu ? "var(--ink-3)" : "var(--ink)") + t(350, x.u.toFixed(2)) + t(410, x.score.toFixed(2), i === b ? "var(--accent)" : "var(--ink)");
+      const share = W ? st.n[i] / W : 0;
+      s += `<rect x="490" y="${y - 12}" width="380" height="14" rx="3" style="fill:var(--paper);stroke:var(--rule)"/>`;
+      s += `<rect x="490" y="${y - 12}" width="${380 * share}" height="14" rx="3" style="fill:${i === b ? "var(--accent)" : "var(--neutral)"}"/>`;
+      s += `<text x="${495 + 380 * share}" y="${y}" style="font-family:var(--font-mono);font-size:11px;fill:var(--ink-2)">${(100 * share).toFixed(0)} %</text>`;
+    });
+    s += `<text x="20" y="242" style="font-family:var(--font-display);font-size:11.5px;fill:var(--ink-3)">* no visit yet: Q is the first play urgency value</text>`;
+    $("pu-svg").innerHTML = s;
+    const c = parseFloat($("pu-c").value) + ($("pu-log").checked ? 0.45 * Math.log((W + 500) / 500) : 0);
+    let most = 0; st.n.forEach((x, i) => { if (x > st.n[most]) most = i; });
+    const hd = MOVES.length - 1;
+    const note = st.sims === 0 ? "The best move, h3-d7 (true value +0.40), has only a 5 % prior."
+      : st.n[hd] <= 2 ? `h3-d7, the best move (true value +0.40), has ${st.n[hd]} visit${st.n[hd] === 1 ? "" : "s"}: with a 5 % prior, one unlucky first value is enough for PUCT to leave it aside. Forced playouts (6.2) exist for this; a larger c explores it sooner.`
+      : `h3-d7, the best move (true value +0.40, prior 5 %), now has ${st.n[hd]} visits: its exploration term made it worth a try, its values kept it.`;
+    $("pu-out").textContent = `${st.sims} simulations. c(s) = ${c.toFixed(3)}, √(W + 0.01) = ${Math.sqrt(W + 0.01).toFixed(2)}. Most visited: ${MOVES[most].name}. Next simulation: ${MOVES[b].name}.\n${note}`;
+  }
+  $("pu-run").onclick = () => { for (let k = 0; k < 200; k++) step(); render(); };
+  $("pu-step").onclick = () => { step(); render(); };
+  $("pu-reset").onclick = reset;
+  ["pu-c", "pu-fpu", "pu-log"].forEach(id => $(id).addEventListener("input", render));
+  reset();
+})();
+
+const rerender = () => (window.__rerender || []).forEach(f => { try { f(); } catch (e) { /* ignore */ } });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender); } catch (e) { /* old browsers */ }
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+

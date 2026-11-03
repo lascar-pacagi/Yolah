@@ -1,0 +1,999 @@
+<title>Yolah Distillation Loop Internals</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a sticky table of contents on the left (wide screens), one reading column of ~70 characters,
+   code, diagrams and widgets allowed to run wider than the text column. */
+:root {
+  --paper: #f3f5f7;
+  --panel: #ffffff;
+  --ink: #17202b;
+  --ink-2: #4b5667;
+  --ink-3: #7a8494;
+  --rule: #d8dde4;
+  --accent: #2c55c9;
+  --accent-soft: #e3e9fa;
+  --black-pc: #c0701a;
+  --black-soft: #f6e3cc;
+  --white-pc: #117f74;
+  --white-soft: #cfeee9;
+  --hole: #4d5563;
+  --neutral: #b7bec9;
+  --good: #2e8a3e;
+  --bad: #c2412d;
+  --code-bg: #111821;
+  --code-ink: #dbe2ea;
+  --code-dim: #7f8b9b;
+  --code-kw: #ff9e64;
+  --code-ty: #7dcfff;
+  --code-fn: #9ece6a;
+  --code-num: #e0af68;
+  --code-str: #c3e88d;
+  --code-com: #6c7a8c;
+  --code-pre: #bb9af7;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Literata", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --measure: 70ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+    --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+    --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+    --code-bg: #0a0f15; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+  --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+  --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+  --code-bg: #0a0f15; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.62;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.page { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 1050px) { .page { grid-template-columns: minmax(0, 1fr); gap: 0; } nav.toc { display: none; } }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; max-height: 100vh; overflow-y: auto; padding: 28px 0 40px; font-family: var(--font-display); font-size: 13.5px; }
+nav.toc .toc-title { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+nav.toc ol ol { padding-left: 14px; margin: 2px 0 6px; }
+nav.toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 2px 8px; border-left: 2px solid transparent; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-left-color: var(--accent); outline: none; }
+nav.toc ol ol a { font-size: 12.5px; color: var(--ink-3); }
+main { min-width: 0; padding-top: 28px; }
+.col { max-width: var(--measure); }
+.wide { max-width: 980px; }
+header.hero { padding: 24px 0 8px; border-bottom: 1px solid var(--rule); margin-bottom: 32px; }
+.eyebrow { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 5vw, 54px); line-height: 1.04; letter-spacing: -.02em; margin: 10px 0 14px; text-wrap: balance; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; margin: 0 0 20px; }
+h2 { font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -.01em; line-height: 1.15; margin: 64px 0 14px; padding-top: 18px; border-top: 3px solid var(--ink); text-wrap: balance; }
+h2 .num, h3 .num { color: var(--accent); margin-right: .4em; font-variant-numeric: tabular-nums; }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 21px; margin: 40px 0 8px; text-wrap: balance; }
+h4 { font-family: var(--font-display); font-weight: 700; font-size: 16px; margin: 24px 0 4px; color: var(--ink-2); }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+code, kbd { font-family: var(--font-mono); font-size: .84em; background: var(--accent-soft); padding: .08em .32em; border-radius: 4px; }
+ul, ol { padding-left: 1.3em; margin: 0 0 14px; }
+li { margin: 3px 0; }
+.note { border-left: 3px solid var(--accent); padding: 8px 14px; background: var(--panel); margin: 18px 0; font-size: 15.5px; color: var(--ink-2); }
+.note strong { color: var(--ink); }
+table { border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.tbl { overflow-x: auto; margin: 14px 0 20px; }
+th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-display); font-weight: 700; font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); border-bottom: 2px solid var(--ink); }
+td code { white-space: nowrap; }
+.num-r { text-align: right; padding-right: 16px; }
+.formula { font-family: var(--font-mono); font-size: 15px; background: var(--panel); border: 1px solid var(--rule); padding: 10px 14px; margin: 12px 0 18px; overflow-x: auto; white-space: pre; line-height: 1.5; }
+figure { margin: 22px 0 26px; }
+figcaption { font-family: var(--font-display); font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+figure.code { margin: 16px 0 22px; max-width: 980px; }
+figure.code .code-head { font-family: var(--font-mono); font-size: 12px; color: var(--code-dim); background: var(--code-bg); padding: 8px 14px 0; border-radius: 8px 8px 0 0; }
+figure.code pre { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 10px 14px 14px; border-radius: 0 0 8px 8px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.55; tab-size: 4; }
+figure.code pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+.hljs-keyword, .hljs-built_in { color: var(--code-kw); }
+.hljs-type { color: var(--code-ty); }
+.hljs-title, .hljs-title.function_ { color: var(--code-fn); }
+.hljs-number, .hljs-literal { color: var(--code-num); }
+.hljs-string { color: var(--code-str); }
+.hljs-comment { color: var(--code-com); font-style: italic; }
+.hljs-meta, .hljs-meta .hljs-keyword { color: var(--code-pre); }
+.diagram { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 18px 0 8px; }
+.diagram svg { display: block; max-width: none; }
+.diagram svg text { font-family: var(--font-display); fill: var(--ink); }
+.widget { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 20px 0 8px; max-width: 980px; }
+.widget-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.widget-title { font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: .03em; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font-family: var(--font-display); font-weight: 600; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+button.primary:hover { color: var(--panel); filter: brightness(1.08); }
+label { font-family: var(--font-display); font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+input[type=range] { accent-color: var(--accent); width: 150px; }
+.readout { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); background: var(--paper); border-radius: 6px; padding: 8px 12px; margin-top: 10px; white-space: pre-wrap; overflow-x: auto; }
+.log { font-family: var(--font-display); font-size: 14px; color: var(--ink); min-height: 2.8em; margin-top: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: var(--font-display); font-size: 12.5px; color: var(--ink-2); margin-top: 10px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+.twocol { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; align-items: start; }
+.twocol > * { min-width: 0; }
+.board-wrap { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.board-wrap > * { min-width: 0; }
+.tag { display: inline-block; font-family: var(--font-display); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); vertical-align: 2px; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 18px 0 8px; max-width: 980px; }
+.stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.stat b { display: block; font-family: var(--font-display); font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat span { font-family: var(--font-display); font-size: 12.5px; color: var(--ink-3); }
+details.mobile-toc { display: none; margin: 8px 0 20px; font-family: var(--font-display); font-size: 14px; }
+@media (max-width: 1050px) { details.mobile-toc { display: block; } }
+details.mobile-toc summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+details.mobile-toc ol { columns: 1; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="page">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol id="toc-list"></ol>
+</nav>
+<main>
+<header class="hero">
+  <div class="eyebrow">Yolah · distillation loop · dev player → ResNet → NNUE (nnue/distill_loop.sh)</div>
+  <h1>Yolah Distillation Loop Internals</h1>
+  <p class="lede">How the two Yolah players improve each other, round after round: the minimax dev player plays games and labels the positions with its search, the value/policy ResNet of the MCTS player learns from them, the ResNet becomes the teacher of the NNUE, and the dev player plays the next round with the new NNUE. Every stage is shown with its code and its targets.</p>
+  <div class="stat-row">
+    <div class="stat"><b>200 k</b><span>games of the dev player per round</span></div>
+    <div class="stat"><b>650 k</b><span>search nodes per move (0.5 s on an i7)</span></div>
+    <div class="stat"><b>~210</b><span>labelled positions per game, tree nodes included</span></div>
+    <div class="stat"><b>~100 M</b><span>positions in a round's training cache</span></div>
+  </div>
+</header>
+<details class="mobile-toc"><summary>Contents</summary><ol id="toc-list-m"></ol></details>
+
+<section id="s1">
+<h2><span class="num">1</span>The loop at a glance</h2>
+<div class="col">
+<p>Two players share one game. The <strong>dev player</strong> is a minimax search with a small NNUE network at the leaves; it searches to depth 20 in half a second. The <strong>MCTS player</strong> is guided by a large value/policy ResNet; it sees few positions but judges each one better. Until now each player was trained on its own: the NNUE by distillation of a fixed ResNet, the ResNet by AlphaZero self-play, which gained about 17 Elo over weeks of GPU time.</p>
+<p>The distillation loop connects them. A deep search is a much better label than the result of a self-play game: it is precise for the position itself, it is available for every position the search looked at, and the dev player produces it cheaply on CPUs. Each round, the dev player's games label tens of millions of positions; the ResNet learns from these labels; the ResNet, now better, re-labels the positions as the NNUE's teacher; the NNUE learns, and the dev player plays the next round with it. Both players are measured after each round, against the previous round and against round 0.</p>
+</div>
+
+<h3 id="s1-round"><span class="num">1.1</span>One round</h3>
+<div class="diagram wide" id="d-round"></div>
+<div class="col">
+<p>Round r starts from the networks NNUE<sub>r</sub> and ResNet<sub>r</sub> and ends with NNUE<sub>r+1</sub> and ResNet<sub>r+1</sub>. Round 0 starts from the NNUE g046 (the network of the final dev player) and the latest network of the AlphaZero 256 run.</p>
+</div>
+
+<h3 id="s1-map"><span class="num">1.2</span>The code map</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>File</th><th>Stage</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>nnue/distill_loop.sh</code></td><td>all</td><td>submits a round (one SLURM job per stage, with dependencies) and runs each stage in the container</td></tr>
+<tr><td><code>test/selfplay_label_main.cpp</code></td><td>gen</td><td>plays the games, records the positions and the tree nodes, solves the endgames</td></tr>
+<tr><td><code>player/minmax_nnue_dev_player.{h,cpp}</code></td><td>gen</td><td>the options <code>"max nodes"</code> and <code>"record depth"</code>, the recorder</td></tr>
+<tr><td><code>nnue/loop_prepare.py</code></td><td>prepare</td><td>the training cache: the games of the window of rounds, the old positions</td></tr>
+<tr><td><code>nnue/space_features</code> (<code>compute-all</code>)</td><td>prepare</td><td>the space features of every position, for the NNUE</td></tr>
+<tr><td><code>nnue/loop_resnet.py</code></td><td>resnet</td><td>fine-tunes the ResNet, exports it</td></tr>
+<tr><td><code>nnue/distill_teacher_labels.py</code></td><td>resnet</td><td>the new ResNet's value for every position of the cache</td></tr>
+<tr><td><code>nnue/loop_blend.py</code></td><td>resnet</td><td>the NNUE's teacher: ResNet value, search value, exact result</td></tr>
+<tr><td><code>nnue/nnue_persp_distill.py</code>, <code>distill_common.py</code></td><td>nnue</td><td>distils the NNUE (quantization-aware), <code>DistillLoader</code></td></tr>
+<tr><td><code>nnue/export_value_nets.py</code></td><td>nnue</td><td>the integer weights file of the dev player</td></tr>
+<tr><td><code>test/tournament_main.cpp</code>, <code>nnue/alphazero_match.sh</code></td><td>eval</td><td>the matches of the two players</td></tr>
+<tr><td><code>nnue/loop_progress.py</code></td><td>summary</td><td>Elo of every round, <code>progress.csv</code></td></tr>
+</tbody></table></div>
+
+<h3 id="s1-settings"><span class="num">1.3</span>The settings</h3>
+<div class="col">
+<p>Every setting is an environment variable of <code>distill_loop.sh</code>, read at submission and passed on to every job and to the next rounds.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Variable</th><th class="num-r">Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>GAMES</code>, <code>GAMES_PER_TASK</code></td><td class="num-r">200000, 4000</td><td>games per round, games per array task (50 tasks)</td></tr>
+<tr><td><code>THROTTLE</code>, <code>GEN_CPUS</code>, <code>GEN_MEM</code></td><td class="num-r">8, 16, 8G</td><td>tasks at a time, logical CPUs and memory per task (one game per physical core)</td></tr>
+<tr><td><code>GEN_EXCLUDE</code></td><td class="num-r">the Xeons</td><td>nodes the generation avoids (the EPYCs crn12, crn13, crn25 remain)</td></tr>
+<tr><td><code>MAX_NODES</code></td><td class="num-r">650000</td><td>search nodes per move</td></tr>
+<tr><td><code>RECORD_DEPTH</code>, <code>TREE_PER_SEARCH</code></td><td class="num-r">10, 8</td><td>tree nodes: minimum remaining depth, at most this many per search</td></tr>
+<tr><td><code>EXACT_FREE</code>, <code>EXACT_MS</code></td><td class="num-r">22, 300</td><td>solve positions with at most 22 free squares, 300 ms each</td></tr>
+<tr><td><code>RANDOM_PLIES</code>, <code>BOOK</code></td><td class="num-r">2, balanced.txt</td><td>random plies after the book opening</td></tr>
+<tr><td><code>WINDOW</code>, <code>PREV_FRACTION</code></td><td class="num-r">2, 0.5</td><td>previous rounds in the cache, fraction of their games</td></tr>
+<tr><td><code>OLD_CACHE</code>, <code>OLD_POSITIONS</code>, <code>OLD_ROUNDS</code></td><td class="num-r">cache_az256, 50 M, 3</td><td>old positions: 50 M at round 0, fewer each round, none from round 3</td></tr>
+<tr><td><code>RESNET_EPOCHS</code>, <code>RESNET_LR</code>, <code>Q_WEIGHT</code></td><td class="num-r">1, 5e-5, 0.7</td><td>ResNet fine-tuning; value target (1 − q) · z + q · s</td></tr>
+<tr><td><code>SEARCH_WEIGHT</code></td><td class="num-r">0.5</td><td>NNUE teacher (1 − w) · ResNet + w · search</td></tr>
+<tr><td><code>NNUE_EPOCHS</code>, <code>NNUE_LR</code>, <code>NNUE_ALPHA</code></td><td class="num-r">2, 1e-4, 0.8</td><td>NNUE distillation; loss α · teacher + (1 − α) · result</td></tr>
+<tr><td><code>EVAL_NNUE_ROUNDS</code>, <code>EVAL_RESNET_GAMES</code></td><td class="num-r">1000, 400</td><td>pairs of games of the NNUE match, games of the ResNet match (1 s per move)</td></tr>
+<tr><td><code>AUTO</code>, <code>MAX_ROUND</code>, <code>KEEP_DATA</code></td><td class="num-r">1, 10, 0</td><td>submit the next round automatically, up to round 9; delete the data out of use</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s2">
+<h2><span class="num">2</span>Generating the games</h2>
+<div class="col">
+<p>The generator <code>selfplay_label</code> plays games of the dev player against itself, one game per thread, one thread per physical core. Each game writes all its records in one block at the end.</p>
+</div>
+
+<h3 id="s2-nodes"><span class="num">2.1</span>A node limit, not a clock</h3>
+<div class="col">
+<p>A search limited by time reaches different depths on different machines: the same task would produce better labels on a fast node than on a slow one. The option <code>"max nodes"</code> stops the search after a fixed number of nodes of the main thread instead. With 650 000 nodes, a move takes 0.5 s on an i7-12700K and reaches the same depth on every machine; only the time changes. The generator also sets one search thread per game and a 64 MB table.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax, the node limit">
+++s.nb_nodes;
+if (options.max_nodes > 0 && s.id == 0 && s.nb_nodes >= options.max_nodes) stop = true;
+</script>
+<script type="text/x-code" data-lang="cpp" data-title="test/selfplay_label_main.cpp · the player's configuration">
+json cfg = json::parse(std::ifstream(a["player"]));
+cfg["microseconds"] = 0;                 // no clock: the node limit stops each search
+cfg["nb threads"] = 1;
+cfg["max nodes"] = max_nodes;
+cfg["record depth"] = record_depth;
+cfg["tt size"] = std::stoul(get("tt", "64"));
+cfg["verbose"] = false;
+</script>
+
+<h3 id="s2-open"><span class="num">2.2</span>Openings</h3>
+<div class="col">
+<p>A search with a node limit and a cleared table is deterministic: the same start gives the same game. The diversity comes from the start alone. Each game takes one of the 4000 balanced openings of the book (6 plies each), then plays 2 random plies. The game number seeds both, so a game played again after an interruption is the same game. There are millions of possible starts; among 200 000 games, about 1 % repeat a start.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="test/selfplay_label_main.cpp · the opening of game g">
+std::mt19937_64 rng(seed * 0x9E3779B97F4A7C15ULL ^ (uint64_t(g) + 1) * 0xD1B54A32D192ED03ULL);
+// The opening: a book line, then random plies (again if the game ended).
+Yolah y;
+for (;;) {
+    y = Yolah();
+    if (!book.empty()) for (Move m : book[rng() % book.size()]) y.play(m);
+    for (int i = 0; i < random_plies && !y.game_over(); i++) {
+        Yolah::MoveList moves;
+        y.moves(moves);
+        y.play(moves[rng() % moves.size()]);
+    }
+    if (!y.game_over()) break;
+}
+dev->clear_table();
+</script>
+
+<h3 id="s2-record"><span class="num">2.3</span>The record</h3>
+<div class="col">
+<p>Every labelled position is a 40-byte record: the position (three bitboards, the ply, the scores), the search's value and depth, a move, its kind, the game's result and the exact result.</p>
+</div>
+<div class="diagram wide" id="d-record"></div>
+<script type="text/x-code" data-lang="cpp" data-title="test/selfplay_label_main.cpp · Record">
+struct Record {
+    uint64_t black, white, empty;   // empty: the holes
+    uint16_t ply;                   // its parity: the side to move
+    uint8_t  black_score, white_score;
+    int16_t  value;                 // the search's value for the side to move (±30000 = tanh ±1; beyond: a proven result)
+    uint16_t move;                  // kind 0: the move played; kind 1: the node's best move (Move::raw)
+    uint8_t  depth;                 // depth of the search that gave the value
+    uint8_t  kind;                  // 0 = a position of the game, 1 = a node of a search tree
+    int8_t   z;                     // the game's result for the side to move: 1, 0, −1
+    int8_t   exact;                 // the exact result for the side to move: 1, 0, −1, or EXACT_UNKNOWN
+    uint32_t game;
+};
+static_assert(sizeof(Record) == 40);
+</script>
+
+<h3 id="s2-tree"><span class="num">2.4</span>Positions from inside the search</h3>
+<div class="col">
+<p>A game gives about 47 positions where the player searched. The search itself evaluated millions of others, and some of them carry a label as good as the root's. With <code>"record depth"</code> set and a recorder attached, the main thread records a node at the end of <code>negamax</code> when three conditions hold:</p>
+<ul>
+<li>the node is a <strong>PV node</strong>: its window was wider than a null window (β − α > 1);</li>
+<li>its value is <strong>exact</strong>: strictly inside the window (α &lt; v &lt; β), not a bound from a cutoff;</li>
+<li>it was searched to a remaining depth of at least 10 plies, and the search was not stopped meanwhile.</li>
+</ul>
+<p>Such a node has a value searched almost as deep as the root's, and a best move.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax, after the final table store">
+tt_store(hash, yolah, depth, alpha_orig, beta, best, best_move, tt_pv);
+if (recorder && options.record_depth > 0 && s.id == 0 && depth >= options.record_depth
+    && alpha_orig < best && best < beta && beta - alpha_orig > 1 && !stopped()) {
+    const auto [bs, ws] = yolah.score();
+    recorder->push_back({yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE), yolah.empty_bitboard(),
+                         yolah.nb_plies(), uint8_t(bs), uint8_t(ws), uint8_t(depth),
+                         int16_t(std::clamp(best, -32767, 32767)), best_move.raw()});
+}
+</script>
+<div class="col">
+<p>After each search the generator shuffles the recorded nodes and keeps up to 8 of them, each position at most once per game (a hash set). Finished positions are skipped. In practice a search yields about 4.4 such nodes on average, about 206 per game.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="test/selfplay_label_main.cpp · one move of a game">
+nodes.clear();
+const auto r = dev->search(y, 63, 0);
+Record root = record_of(y);
+root.value = r.value;
+root.depth = r.depth;
+root.move = r.move.raw();
+root.kind = 0;
+recs.push_back(root);
+seen.insert(zobrist::hash(y));
+// A random sample of the search tree's exact PV nodes, new to this game.
+std::shuffle(nodes.begin(), nodes.end(), rng);
+size_t taken = 0;
+for (const auto& nd : nodes) {
+    if (taken == tree_per_search) break;
+    Record t{};
+    t.black = nd.black; t.white = nd.white; t.empty = nd.empty; t.ply = nd.ply;
+    t.black_score = nd.black_score; t.white_score = nd.white_score;
+    t.value = nd.value;
+    t.depth = nd.depth;
+    t.move = nd.move;
+    t.kind = 1;
+    const Yolah ty = position_of(t);
+    if (ty.game_over() || !seen.insert(zobrist::hash(ty)).second) continue;
+    recs.push_back(t);
+    taken++;
+}
+y.play(r.move);
+</script>
+
+<h3 id="s2-exact"><span class="num">2.5</span>The result and the exact result</h3>
+<div class="col">
+<p>When the game is over, every record gets the result z for its side to move. Every record with at most 22 free squares also goes to the endgame solver, with a watchdog thread that stops it after 300 ms; a solved position gets its exact result (win, draw or loss), the others keep <code>EXACT_UNKNOWN</code>. About 35 % of the records are solved, and fewer than 0.3 % run out of time.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="test/selfplay_label_main.cpp · solve and the end of a game">
+int8_t solve(EndgameSolver& solver, const Yolah& y, int ms) {
+    std::atomic_bool stop{false};
+    std::mutex m;
+    std::condition_variable cv;
+    bool finished = false;
+    std::thread dog([&] {
+        std::unique_lock lk(m);
+        if (!cv.wait_for(lk, std::chrono::milliseconds(ms), [&] { return finished; })) stop = true;
+    });
+    const EndgameSolver::Result r = solver.solve(y, true, &stop);
+    { std::lock_guard lk(m); finished = true; }
+    cv.notify_one();
+    dog.join();
+    return r.complete ? int8_t(sign(r.value)) : EXACT_UNKNOWN;
+}
+
+// The result, for each record's side to move; the exact one near the end.
+const auto [bs, ws] = y.score();
+const int black_result = sign(int(bs) - int(ws));
+for (Record& rc : recs) {
+    rc.game = g;
+    rc.z = int8_t((rc.ply & 1) == Yolah::BLACK ? black_result : -black_result);
+    const Yolah ry = position_of(rc);
+    if (std::popcount(ry.free_squares()) <= exact_free) {
+        rc.exact = solve(solver, ry, exact_ms);
+    } else {
+        rc.exact = EXACT_UNKNOWN;
+    }
+}
+</script>
+
+<h3 id="s2-resume"><span class="num">2.6</span>Writing and resuming</h3>
+<div class="col">
+<p>Each game is written with one <code>fwrite</code> under a mutex, then flushed. A task stopped by its time limit or by a preemption starts again where it was: the last game of the file is the only one that can be incomplete, so it is cut off and played again, under the same number and therefore identically.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="test/selfplay_label_main.cpp · resume">
+uint32_t resume(const string& path, uint32_t first_game) {
+    if (!std::filesystem::exists(path)) return first_game;
+    const auto size = std::filesystem::file_size(path);
+    size_t n = size / sizeof(Record);
+    if (n == 0) { std::filesystem::resize_file(path, 0); return first_game; }
+    std::vector<Record> recs(n);
+    {
+        std::ifstream f(path, std::ios::binary);
+        f.read((char*)recs.data(), n * sizeof(Record));
+    }
+    // Games are written whole, one after the other: the last one is the only
+    // one that can be incomplete.
+    const uint32_t last = recs.back().game;
+    while (n > 0 && recs[n - 1].game == last) n--;
+    std::filesystem::resize_file(path, n * sizeof(Record));
+    return last;
+}
+</script>
+
+<h3 id="s2-speed"><span class="num">2.7</span>Speed</h3>
+<div class="col">
+<p>With a fixed node count, the time per game measures the CPU. One game per physical core (the logical CPUs of hyperthreading are not used):</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>CPU</th><th>Node</th><th class="num-r">Seconds per game and core</th><th class="num-r">Task of 4000 games (8 cores)</th></tr></thead>
+<tbody>
+<tr><td>Intel i7-12700K</td><td>desktop</td><td class="num-r">14.5</td><td class="num-r">2.0 h</td></tr>
+<tr><td>AMD EPYC 9534 (Zen 4)</td><td>crn25</td><td class="num-r">13.5–17</td><td class="num-r">1.9–2.4 h</td></tr>
+<tr><td>AMD EPYC 7702P (Zen 2)</td><td>crn13</td><td class="num-r">27</td><td class="num-r">3.7 h</td></tr>
+<tr><td>Intel Xeon E5-2698 v3 (Haswell)</td><td>crn16</td><td class="num-r">48</td><td class="num-r">6.7 h</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The generation therefore runs on the EPYCs only (<code>GEN_EXCLUDE</code>). A game writes about 253 records, 10 KB: a round of 200 000 games is 2 GB of records.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="num">3</span>The training cache</h2>
+<div class="col">
+<p><code>loop_prepare.py</code> turns the records into a cache in the layout of <code>preprocess_nnue.py</code>, so that the labelling script, the space features and the NNUE trainer read it as they read every other cache, plus a few files of the loop.</p>
+</div>
+
+<h3 id="s3-files"><span class="num">3.1</span>The files</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>File</th><th>Type</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td><code>inputs.u8</code></td><td>(N, 193) uint8</td><td>black, white, holes (64 bits each, MSB first), side to move</td></tr>
+<tr><td><code>values.i8</code></td><td>int8</td><td>z, the game's result for the side to move (the exact result for a solved tree node)</td></tr>
+<tr><td><code>search.f16</code></td><td>float16</td><td>s, the search target: the exact result if known, else the search value / 30000 (±1 for a proven result); the old label for an old position</td></tr>
+<tr><td><code>policy.u2</code></td><td>uint16</td><td>the move: from · 64 + to; 65535 = none (a pass, an old position)</td></tr>
+<tr><td><code>kind.u1</code>, <code>depth.u1</code></td><td>uint8</td><td>0 a game position, 1 a tree node, 2 an old position; the search depth</td></tr>
+<tr><td><code>exact.u1</code></td><td>uint8</td><td>1: s is a certain result (solver or proof)</td></tr>
+<tr><td><code>zmask.u1</code></td><td>uint8</td><td>1: z is the position's own result (3.4)</td></tr>
+<tr><td><code>meta.json</code></td><td>JSON</td><td>sizes, sources, seeds</td></tr>
+<tr><td><code>teacher_values.f16</code>, <code>teacher_resnet.f16</code></td><td>float16</td><td>written later (5): the NNUE's teacher, the ResNet's value</td></tr>
+<tr><td><code>space_all.u8</code></td><td>(N, 92) uint8</td><td>the space features (<code>space_features compute-all</code>)</td></tr>
+</tbody></table></div>
+<script type="text/x-code" data-lang="python" data-title="nnue/loop_prepare.py · board_rows, search_target, policy_index">
+def board_rows(rec):
+    """(n, 193) uint8 rows: the 3 bitboards MSB first (byte i = bit 63 − i), then the turn."""
+    n = len(rec)
+    out = np.empty((n, ROW), np.uint8)
+    for k, name in enumerate(("black", "white", "empty")):
+        b = rec[name].astype(">u8").view(np.uint8).reshape(n, 8)
+        out[:, 64 * k:64 * (k + 1)] = np.unpackbits(b, axis=1)
+    out[:, 192] = rec["ply"] & 1
+    return out
+
+
+def search_target(rec):
+    v = rec["value"].astype(np.float32)
+    t = np.where(np.abs(v) > WIN, np.sign(v), v / WIN)
+    exact = rec["exact"] != EXACT_UNKNOWN
+    t[exact] = rec["exact"][exact]
+    return t.astype(np.float16)
+
+
+def policy_index(rec):
+    m = rec["move"].astype(np.int64)
+    frm, to = m & 63, m >> 6
+    p = frm * 64 + to
+    ok = frm != to                                 # a1→a1: the pass (Move::none)
+    return np.where(ok, p, NO_POLICY).astype(np.uint16)
+</script>
+
+<h3 id="s3-path"><span class="num">3.2</span>Tree nodes that the game played</h3>
+<div class="col">
+<p>About 19 % of the tree nodes are positions the game reached later: the search predicted the line, and the game followed it. Each is then twice in the records, once as a tree node with a shallower search, once as a game position. The tree copy is dropped; the game's record is kept.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/loop_prepare.py · drop_tree_on_path">
+def drop_tree_on_path(rec):
+    """Without the tree nodes that are also a position played in the same game."""
+    key = np.empty(len(rec), [("game", "<u4"), ("black", "<u8"), ("white", "<u8"), ("empty", "<u8"), ("ply", "<u2")])
+    for f in key.dtype.names:
+        key[f] = rec[f]
+    _, ids = np.unique(key, return_inverse=True)
+    ids = ids.ravel()
+    played = np.zeros(ids.max() + 1, bool)
+    played[ids[rec["kind"] == 0]] = True
+    drop = (rec["kind"] == 1) & played[ids]
+    return rec[~drop]
+</script>
+
+<h3 id="s3-zmask"><span class="num">3.3</span>When the game's result is not the position's</h3>
+<div class="col">
+<p>For a position of the game, z is the result of the game played from it. For a tree node off the game's path, z is the result of another position: the game never went there. The measure, on 192 games where the solver gives the truth (at most 22 free squares):</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Positions with a known exact result</th><th class="num-r">n</th><th class="num-r">z = exact</th><th class="num-r">MSE(z, exact)</th><th class="num-r">MSE(s, exact)</th></tr></thead>
+<tbody>
+<tr><td>game positions</td><td class="num-r">3 997</td><td class="num-r">100 %</td><td class="num-r">0.000</td><td class="num-r">0.001</td></tr>
+<tr><td>tree nodes on the game's path</td><td class="num-r">3 793</td><td class="num-r">100 %</td><td class="num-r">0.000</td><td class="num-r">0.002</td></tr>
+<tr><td>tree nodes off the path</td><td class="num-r">9 466</td><td class="num-r">91 %</td><td class="num-r">0.092</td><td class="num-r">0.032</td></tr>
+<tr><td>… with 18 to 22 free squares</td><td class="num-r">4 885</td><td class="num-r"></td><td class="num-r">0.125</td><td class="num-r">0.053</td></tr>
+<tr><td>… more than 11 plies below the root</td><td class="num-r">3 448</td><td class="num-r">82 %</td><td class="num-r">0.180</td><td class="num-r">0.043</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>Off the path, z is three times further from the truth than the search value, and the gap grows with the free squares and the distance from the root. These nodes are 81 % of the tree nodes. <code>zmask.u1</code> marks them: 0 for a tree node off the path without an exact result. Both trainers then leave z out on those rows. A solved tree node takes z = the exact result and keeps zmask = 1.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/loop_prepare.py · main, the rows of a block of records (excerpt)">
+solved = r["exact"] != EXACT_UNKNOWN
+values[pos:pos + k] = np.where((r["kind"] == 1) & solved, r["exact"], r["z"])
+zmask[pos:pos + k] = (r["kind"] == 0) | solved
+search[pos:pos + k] = search_target(r)
+policy[pos:pos + k] = policy_index(r)
+kind[pos:pos + k] = r["kind"]
+depth[pos:pos + k] = r["depth"]
+exact[pos:pos + k] = (r["exact"] != EXACT_UNKNOWN) | (np.abs(r["value"].astype(np.int32)) > WIN)
+</script>
+
+<h3 id="s3-window"><span class="num">3.4</span>A window of rounds</h3>
+<div class="col">
+<p>Training on the games of one round only would make each network forget what the previous rounds taught it. The cache of round r holds three sources:</p>
+<ul>
+<li>all the games of round r;</li>
+<li>half of the games of each of the 2 previous rounds, drawn at random, whole games;</li>
+<li>positions of <code>cache_az256</code>, the old distillation cache: positions of the engine games of <code>data/games</code> with their real result z and, as their label, the value of the AlphaZero 256 ResNet. 50 M at round 0, then 50 · (1 − r/3) M: 33 M, 17 M, and none from round 3. They are taken in random blocks of 4096 consecutive positions.</li>
+</ul>
+<p>The games of a round are deleted when the round leaves the window; the cache of a round is deleted as soon as the round is trained.</p>
+</div>
+<div class="diagram wide" id="d-window"></div>
+<script type="text/x-code" data-lang="bash" data-title="nnue/distill_loop.sh · prepare (excerpt)">
+N_OLD=$(( ROUND >= OLD_ROUNDS ? 0 : OLD_POSITIONS * (OLD_ROUNDS - ROUND) / OLD_ROUNDS ))
+PREV=""
+for (( p = ROUND - 1; p >= 0 && p >= ROUND - WINDOW; p-- )); do
+    PREV+=" --prev /work/round_$(printf '%03d' "${p}")"
+done
+run_old bash -c "set -e; cd /Yolah/nnue && python3 loop_prepare.py /work/${RD}${PREV} \
+    --prev-fraction ${PREV_FRACTION} --old-cache /old --old-positions ${N_OLD} --seed ${ROUND}"
+</script>
+<div class="col">
+<p>The rows are written by blocks of 4096: blocks of new records and old blocks, in a random order. The trainers read the cache by chunks of consecutive rows and keep its last 5 % for validation, so the validation set holds all the sources.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="num">4</span>Improving the ResNet</h2>
+<div class="col">
+<p><code>loop_resnet.py</code> fine-tunes ResNet<sub>r</sub> on the round's cache for one epoch and exports ResNet<sub>r+1</sub>. It is the network of the MCTS player, with both its heads trained.</p>
+</div>
+
+<h3 id="s4-targets"><span class="num">4.1</span>The targets</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Positions</th><th>Value target (MSE)</th><th>Policy target (cross-entropy)</th></tr></thead>
+<tbody>
+<tr><td>game positions</td><td>0.3 · z + 0.7 · s</td><td>the move played</td></tr>
+<tr><td>tree nodes off the path, unsolved</td><td>s</td><td>the node's best move</td></tr>
+<tr><td>solved positions (game or tree)</td><td>the exact result (z and s are both exact)</td><td>the move played or the best move</td></tr>
+<tr><td>old positions (<code>cache_az256</code>)</td><td>0.3 · z + 0.7 · old label</td><td>none</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The result z brings the truth of the whole game: noisy for one position, but unbiased. The search value s is precise for the position but biased by the NNUE that produced it. The blend keeps both. The policy target is one-hot: the search's choice. The tree nodes multiply the policy targets by five.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/loop_resnet.py · Data.chunk and the value target">
+def chunk(self, lo, hi):
+    """rows, z, s, policy; z = s where z is not the position's result (the target is then s)."""
+    z, s = self.z[lo:hi].astype(np.float32), self.s[lo:hi].astype(np.float32)
+    if self.zmask is not None:
+        z = np.where(self.zmask[lo:hi] == 1, z, s)
+    return np.ascontiguousarray(self.inputs[lo:hi]), z, s, self.policy[lo:hi].astype(np.int64)
+
+# Batches.__call__
+target = torch.from_numpy((1.0 - self.q) * z + self.q * s).to(dev)
+</script>
+
+<h3 id="s4-train"><span class="num">4.2</span>Training</h3>
+<div class="col">
+<p>Each row of a batch gets one of the 8 symmetries of the board, drawn at random, and the move index goes through the same symmetry (<code>alphazero_learn.symmetry_tables</code>). The optimiser is AdamW (learning rate 5·10⁻⁵, weight decay 10⁻⁴, batch 1024), with a linear warm-up over 500 steps then a cosine down to a tenth, gradients clipped at 5, bf16 on the GPU. The cache is read by chunks of 4 M rows in a random order, each chunk shuffled. The exported network is the exponential average of the weights (decay 0.999).</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/loop_resnet.py · Batches.__call__ and losses (condensed)">
+planes = torch.cat([rows[:, :192].view(B, 3, 64).float(),
+                    rows[:, 192].float().view(B, 1, 1).expand(B, 1, 64)], dim=1)
+target = torch.from_numpy((1.0 - self.q) * z + self.q * s).to(dev)
+pol = torch.from_numpy(pol).to(dev)
+has = pol != NO_POLICY
+pol = torch.where(has, pol, torch.zeros_like(pol))
+if augment:
+    sym = torch.randint(0, 8, (B,), device=dev)
+    planes = planes.gather(2, self.src[sym].unsqueeze(1).expand(B, 4, 64))
+    pol = self.act[sym, pol]
+
+# losses
+v_loss = F.mse_loss(v, target)
+logp = F.log_softmax(logits.float(), dim=1).gather(1, pol.unsqueeze(1)).squeeze(1)
+p_loss = -(logp * has).sum() / has.sum().clamp_min(1)
+loss = v_loss + a.policy_weight * p_loss
+</script>
+<div class="col">
+<p>Before and after the epoch, the validation part gives the MSE against the value target, the MSE against z, the policy cross-entropy and the policy top-1 accuracy (<code>resnet_log.jsonl</code>). The export writes <code>az_&lt;r+1&gt;.pt</code> and its TorchScript <code>.ts</code>, the file the MCTS player loads.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="num">5</span>The NNUE's teacher</h2>
+<div class="col">
+<p>The NNUE learns from a teacher value per position. It is made in two steps, right after the ResNet's training.</p>
+<ol>
+<li><code>distill_teacher_labels.py</code> runs ResNet<sub>r+1</sub> on every position of the cache, old ones included: v<sub>R</sub>.</li>
+<li><code>loop_blend.py</code> mixes it with the search target: teacher = ½ · v<sub>R</sub> + ½ · s, or the exact result where it is known.</li>
+</ol>
+<p>The search sees far, but through the eyes of NNUE<sub>r</sub>; the ResNet is a richer static judge, without search. The mean of the two corrects part of the bias of each. Where the exact result is known, the network should learn the truth, not an estimate of it. On the old positions, s is the old label of the AlphaZero 256 ResNet, so their teacher is the mean of the new and the old ResNet.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/loop_blend.py · main (excerpt)">
+resnet = np.memmap(tr, np.float16, "r", shape=(n,))
+search = np.memmap(os.path.join(a.cache, "search.f16"), np.float16, "r", shape=(n,))
+is_exact = np.memmap(os.path.join(a.cache, "exact.u1"), np.uint8, "r", shape=(n,))
+out = np.memmap(tv, np.float16, "r+", shape=(n,))
+w = a.search_weight
+for lo in range(0, n, step):
+    hi = min(n, lo + step)
+    r = resnet[lo:hi].astype(np.float32)
+    s = search[lo:hi].astype(np.float32)
+    t = (1.0 - w) * r + w * s
+    exact = is_exact[lo:hi] == 1
+    t[exact] = s[exact]
+    out[lo:hi] = t.astype(np.float16)
+</script>
+<div class="col">
+<p>The ResNet's own labels stay in <code>teacher_resnet.f16</code>, so the blend can be made again with another weight. <code>blend_meta.json</code> records the distance between the ResNet and the search, and between the ResNet and the exact results: a measure of the ResNet's errors on the truth.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="num">6</span>Distilling the NNUE</h2>
+<div class="col">
+<p>NNUE<sub>r+1</sub> starts from NNUE<sub>r</sub>, with the same architecture (perspective network, 8 phase heads, the space features of groups 0x46), and trains for 2 epochs at a learning rate of 10⁻⁴, quantization-aware: the forward pass rounds the weights and activations as the C++ integer code does, so the exported network plays as it was trained.</p>
+</div>
+
+<h3 id="s6-loss"><span class="num">6.1</span>The loss</h3>
+<div class="formula">L = 0.8 · (v − teacher)² + 0.2 · (v − z)²</div>
+<div class="col">
+<p>A weighted sum of two squared errors has its minimum where a single squared error to the weighted mean of the targets has it: the NNUE learns the value 0.8 · teacher + 0.2 · z. With v<sub>R</sub> = 0.40 and s = 0.20, the teacher is 0.30; if the game was won (z = +1), the NNUE aims at 0.8 · 0.30 + 0.2 · 1 = 0.44.</p>
+<p>Where z is not the position's result (zmask = 0), the loader replaces z by the teacher. The loss becomes 0.8 · (v − teacher)² + 0.2 · (v − teacher)² = (v − teacher)²: the teacher alone.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/distill_common.py · DistillLoader, zmask (excerpt)">
+zpath = os.path.join(cache_dir, "zmask.u1")
+self.zmask = np.memmap(zpath, dtype=np.uint8, mode='r', shape=(len(values),)) if os.path.exists(zpath) else None
+# ... _producer, for each chunk:
+val = np.array(self.values[start:end])
+tea = np.array(self.teacher[start:end])
+if self.zmask is not None:
+    val = np.where(np.array(self.zmask[start:end]) == 1, val.astype(np.float32), tea.astype(np.float32))
+</script>
+<script type="text/x-code" data-lang="python" data-title="nnue/nnue_persp_distill.py · _loss">
+def _loss(v_s, z, v_t):
+    return ALPHA * nn.functional.mse_loss(v_s, v_t) + (1.0 - ALPHA) * nn.functional.mse_loss(v_s, z)
+</script>
+
+<h3 id="s6-targets"><span class="num">6.2</span>All the targets</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Positions</th><th>ResNet value</th><th>NNUE teacher</th><th>What the NNUE learns</th></tr></thead>
+<tbody>
+<tr><td>game positions</td><td>0.3 z + 0.7 s</td><td>½ v<sub>R</sub> + ½ s</td><td>0.8 · teacher + 0.2 z</td></tr>
+<tr><td>tree nodes off the path, unsolved</td><td>s</td><td>½ v<sub>R</sub> + ½ s</td><td>teacher</td></tr>
+<tr><td>solved positions</td><td>exact</td><td>exact</td><td>exact</td></tr>
+<tr><td>old positions</td><td>0.3 z + 0.7 · old label</td><td>½ v<sub>R</sub> + ½ · old label</td><td>0.8 · teacher + 0.2 z</td></tr>
+</tbody></table></div>
+<div class="widget" id="w-tgt">
+  <div class="widget-head">
+    <div class="widget-title">The targets of one position</div>
+    <div class="controls">
+      <select id="tg-kind" aria-label="kind of position">
+        <option value="game">game position</option>
+        <option value="tree">tree node off the path</option>
+        <option value="old">old position (cache_az256)</option>
+      </select>
+      <label for="tg-solved"><input id="tg-solved" type="checkbox"> exact result known</label>
+    </div>
+  </div>
+  <div class="controls">
+    <label for="tg-s"><span id="tg-slabel">s (search)</span> <input id="tg-s" type="range" min="-1" max="1" step="0.05" value="0.2"> <span id="tg-sv"></span></label>
+    <label for="tg-r">v<sub>R</sub> (new ResNet) <input id="tg-r" type="range" min="-1" max="1" step="0.05" value="0.4"> <span id="tg-rv"></span></label>
+    <label for="tg-z">z <select id="tg-z"><option value="1">+1</option><option value="0">0</option><option value="-1">−1</option></select></label>
+    <label for="tg-x">exact <select id="tg-x"><option value="1">+1</option><option value="0">0</option><option value="-1">−1</option></select></label>
+  </div>
+  <div style="overflow-x:auto"><svg id="tg-svg" width="900" height="170" viewBox="0 0 900 170" role="img" aria-label="targets on the value axis"></svg></div>
+  <div class="readout" id="tg-out"></div>
+</div>
+
+<h3 id="s6-export"><span class="num">6.3</span>Export</h3>
+<div class="col">
+<p>The last epoch's checkpoint is exported by <code>export_value_nets.py --persp</code> into <code>nnue.quantized.txt</code>, the integer weights file. The dev player of round r+1 is <code>dev_final.cfg</code> with these weights: the search is unchanged from round to round, only the network changes.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="num">7</span>Measuring the progress</h2>
+<div class="col">
+<p>After each round both players play two matches, against the previous round and against round 0, at 1 s per move, from the balanced openings, each opening played with both colours:</p>
+<ul>
+<li>the dev player with NNUE<sub>r+1</sub> against NNUE<sub>r</sub> and NNUE<sub>0</sub>: 1000 pairs of games on 32 cores (<code>yolah_tournament</code>);</li>
+<li>the MCTS player with ResNet<sub>r+1</sub> against ResNet<sub>r</sub> and ResNet<sub>0</sub>: 400 games on a GPU, in the evaluation setting (4 threads × batch 32, <code>alphazero_match.sh</code>).</li>
+</ul>
+<p><code>loop_progress.py</code> gathers them in <code>progress.csv</code>: for the NNUE, the Elo with a pentanomial interval (the pairs of games as the unit, which removes the colour's share of the noise); for the ResNet, the Elo of <code>alphazero_match.sh</code>. The matches against round 0 add up the rounds; the matches against the previous round say whether the last one still helped.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/loop_progress.py · nnue_rows (excerpt)">
+pairs = defaultdict(list)
+for g in csv.DictReader(open(path)):
+    r = float(g["result"])
+    pairs[(g["round"], g["pair"])].append(r if g["black"] == cand else 1.0 - r)
+counts = [0] * 5
+for p in pairs.values():
+    if len(p) == 2:
+        counts[int(round(2 * sum(p)))] += 1
+n = sum(counts)
+s = sum(k * c for k, c in enumerate(counts)) / (4.0 * n)
+var = sum(c * (k / 4.0 - s) ** 2 for k, c in enumerate(counts)) / n
+se = math.sqrt(var / n)
+</script>
+</section>
+
+<section id="s8">
+<h2><span class="num">8</span>On the cluster</h2>
+<div class="col">
+<p><code>distill_loop.sh r</code>, run on the login node, submits round r as a chain of SLURM jobs; each job runs the same script with its stage. The C++ is compiled on the node (<code>-march=native</code>) inside the AlphaZero container, under a lock shared by the jobs.</p>
+</div>
+<div class="diagram wide" id="d-jobs"></div>
+<div class="tbl wide"><table>
+<thead><tr><th>Stage</th><th>Resources</th><th>Waits for</th><th>Writes</th></tr></thead>
+<tbody>
+<tr><td>gen</td><td>CPU array of 50 tasks, 8 at a time, 16 CPUs, 8 GB, 24 h each</td><td>–</td><td><code>round_r/games/task_*.bin</code></td></tr>
+<tr><td>prepare</td><td>CPU, 16 CPUs, 96 GB</td><td>every gen task</td><td><code>round_r/cache/</code></td></tr>
+<tr><td>resnet</td><td>1 GPU, 64 GB</td><td>prepare</td><td><code>resnet/models/az_r+1</code>, <code>round_r+1/resnet.*</code>, the teacher</td></tr>
+<tr><td>nnue</td><td>1 GPU, 64 GB</td><td>resnet</td><td><code>round_r+1/nnue.*</code>, <code>players/nnue_r+1.cfg</code></td></tr>
+<tr><td>eval_nnue</td><td>CPU, 32 CPUs, 2 tasks</td><td>nnue</td><td><code>eval/nnue_r+1__vs__nnue_*.csv</code></td></tr>
+<tr><td>eval_resnet</td><td>1 GPU, 2 tasks</td><td>resnet</td><td><code>resnet/matches.csv</code></td></tr>
+<tr><td>summary</td><td>CPU, 1 CPU</td><td>both evaluations (ended, even badly)</td><td><code>progress.csv</code></td></tr>
+<tr><td>next</td><td>CPU, 1 CPU</td><td>nnue</td><td>deletes round r's cache and round r − 2's games, submits round r + 1</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The next round starts as soon as NNUE<sub>r+1</sub> exists: its generation runs while the evaluations of round r are still playing. Everything lives in <code>LOOP_DIR</code> (<code>~/DistillLoop</code>): the networks of every round are kept, the games of the last three rounds, the cache of the current round. A gen task that stops is resumed by submitting it again; <code>jobs.txt</code> lists the job numbers of every round.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Item</th><th class="num-r">Size</th></tr></thead>
+<tbody>
+<tr><td>a game</td><td class="num-r">≈ 253 records, 10 KB</td></tr>
+<tr><td>the games of a round (200 000)</td><td class="num-r">≈ 50 M records, 2 GB</td></tr>
+<tr><td>after the tree nodes on the path are dropped</td><td class="num-r">≈ 42 M positions</td></tr>
+<tr><td>a round's cache (round, half of 2 rounds, old positions)</td><td class="num-r">≈ 100 M positions, 30 GB</td></tr>
+<tr><td>generation on 8 EPYC tasks (64 cores)</td><td class="num-r">≈ 15–24 h per round</td></tr>
+</tbody></table></div>
+</section>
+<footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
+Repository state: commit 96c1670. Measurements of the targets on 192 games generated on an i7-12700K; generation speeds from round 0 on the cluster.
+</footer>
+</main>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker>
+    <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+    <marker id="arr-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--good)"/></marker>
+  </defs>
+</svg>
+<style>
+.dg-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+.dg-box.k-acc { fill: var(--accent-soft); stroke: var(--accent); }
+.dg-box.k-b { fill: var(--black-soft); stroke: var(--black-pc); }
+.dg-box.k-w { fill: var(--white-soft); stroke: var(--white-pc); }
+.dg-box.k-good { fill: var(--paper); stroke: var(--good); stroke-width: 1.6; }
+.dg-box.k-dim { fill: var(--panel); stroke: var(--rule); stroke-dasharray: 4 3; }
+.dg-t { font-size: 13px; font-weight: 700; fill: var(--ink); }
+.dg-s { font-size: 11.5px; fill: var(--ink-2); }
+.dg-m { font-family: var(--font-mono) !important; font-size: 11px; fill: var(--ink-2); }
+.dg-a { stroke: var(--ink-3); stroke-width: 1.4; fill: none; marker-end: url(#arr); }
+.dg-a.acc { stroke: var(--accent); marker-end: url(#arr-acc); }
+.dg-a.good { stroke: var(--good); marker-end: url(#arr-good); }
+.dg-a.dash { stroke-dasharray: 5 4; }
+.dg-lbl { font-size: 11px; fill: var(--ink-3); font-weight: 600; }
+.dg-ret { font-size: 11px; fill: var(--good); font-weight: 700; }
+.cells { display: grid; gap: 2px; font-family: var(--font-mono); font-size: 10.5px; margin: 4px 0 10px; }
+.cell { min-width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; color: var(--ink); font-variant-numeric: tabular-nums; padding: 0 2px; }
+.cell.z { color: var(--ink-3); }
+.cell.hl { background: var(--accent-soft); border-color: var(--accent); }
+.cell.ok { background: var(--white-soft); border-color: var(--white-pc); }
+.cell.wt { background: var(--black-soft); border-color: var(--black-pc); }
+.reg-row { display: flex; gap: 8px; align-items: center; }
+.reg-name { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); width: 120px; flex: none; text-align: right; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* ── code blocks ─────────────────────────────────────────────────────────── */
+document.querySelectorAll('script[type="text/x-code"]').forEach(sc => {
+  const fig = document.createElement("figure");
+  fig.className = "code";
+  const head = document.createElement("div");
+  head.className = "code-head";
+  head.textContent = sc.dataset.title || "";
+  const pre = document.createElement("pre");
+  const code = document.createElement("code");
+  code.className = "language-" + (sc.dataset.lang || "cpp");
+  code.textContent = sc.textContent.replace(/^\n/, "").replace(/\s+$/, "");
+  pre.appendChild(code);
+  fig.appendChild(head);
+  fig.appendChild(pre);
+  sc.replaceWith(fig);
+  try { if (window.hljs) window.hljs.highlightElement(code); } catch (e) { /* plain text */ }
+});
+
+/* ── table of contents ───────────────────────────────────────────────────── */
+(function toc() {
+  const lists = [$("toc-list"), $("toc-list-m")];
+  const label = h => { const n = h.querySelector(".num"); return n ? n.textContent + "  " + h.textContent.slice(n.textContent.length) : h.textContent; };
+  document.querySelectorAll("main section").forEach(sec => {
+    const h2 = sec.querySelector("h2");
+    if (!h2) return;
+    lists.forEach(list => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "#" + sec.id;
+      a.textContent = label(h2);
+      li.appendChild(a);
+      const subs = sec.querySelectorAll("h3[id]");
+      if (subs.length) {
+        const ol = document.createElement("ol");
+        subs.forEach(h3 => {
+          const l2 = document.createElement("li");
+          const a2 = document.createElement("a");
+          a2.href = "#" + h3.id;
+          a2.textContent = label(h3);
+          l2.appendChild(a2);
+          ol.appendChild(l2);
+        });
+        li.appendChild(ol);
+      }
+      list.appendChild(li);
+    });
+  });
+})();
+
+/* ── SVG diagram helpers ─────────────────────────────────────────────────── */
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function B(x, y, w, h, title, sub, kind) {
+  let s = `<rect class="dg-box ${kind || ""}" x="${x}" y="${y}" width="${w}" height="${h}" rx="7"/>`;
+  const lines = sub ? (Array.isArray(sub) ? sub : [sub]) : [];
+  const total = 16 + lines.length * 14;
+  let ty = y + h / 2 - total / 2 + 12;
+  s += `<text class="dg-t" x="${x + w / 2}" y="${ty}" text-anchor="middle">${esc(title)}</text>`;
+  lines.forEach((l, i) => { s += `<text class="dg-s" x="${x + w / 2}" y="${ty + 15 + i * 14}" text-anchor="middle">${esc(l)}</text>`; });
+  return s;
+}
+function A(x1, y1, x2, y2, cls, label, lx, ly) {
+  let s = `<path class="dg-a ${cls || ""}" d="M${x1},${y1} L${x2},${y2}"/>`;
+  if (label) s += `<text class="dg-lbl" x="${lx ?? (x1 + x2) / 2 + 4}" y="${ly ?? (y1 + y2) / 2 - 4}">${esc(label)}</text>`;
+  return s;
+}
+function P(d, cls) { return `<path class="dg-a ${cls || ""}" d="${d}"/>`; }
+function T(x, y, text, cls, anchor) { return `<text class="${cls || "dg-s"}" x="${x}" y="${y}" text-anchor="${anchor || "start"}">${esc(text)}</text>`; }
+function svg(id, w, h, body, label) {
+  const el = $(id);
+  if (el) el.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label || id)}">${body}</svg>`;
+}
+
+/* 1.1 one round */
+(function () {
+  let s = "";
+  s += B(10, 20, 240, 64, "1. gen (CPU, 50 tasks)", ["dev player + NNUE_r, 200 k games,", "650 k nodes per move"], "k-b");
+  s += A(130, 84, 130, 110);
+  s += B(10, 110, 240, 64, "records", ["game positions, tree nodes,", "z, exact result ≤ 22 free"], "");
+  s += A(130, 174, 130, 200);
+  s += B(10, 200, 240, 64, "2. prepare (CPU)", ["cache: round r + ½ of r−1, r−2", "+ old positions; zmask"], "");
+  s += A(250, 232, 290, 232);
+  s += B(290, 200, 240, 64, "3. resnet (GPU)", ["ResNet_r → ResNet_r+1", "value 0.3 z + 0.7 s, policy"], "k-w");
+  s += A(410, 200, 410, 174);
+  s += B(290, 110, 240, 64, "teacher", ["ResNet_r+1 labels the cache:", "½ v_R + ½ s, or exact"], "k-w");
+  s += A(530, 142, 570, 142);
+  s += B(570, 110, 280, 64, "4. nnue (GPU)", ["NNUE_r → NNUE_r+1, QAT,", "0.8 teacher + 0.2 z"], "k-b");
+  s += A(710, 110, 710, 84);
+  s += B(570, 20, 280, 64, "round r + 1", ["dev player with NNUE_r+1", "plays the next games"], "k-acc");
+  s += P("M570,52 L251,52", "acc");
+  s += T(360, 46, "next round", "dg-lbl");
+  s += B(570, 200, 280, 64, "5. eval (CPU + GPU)", ["NNUE_r+1 vs NNUE_r and NNUE_0,", "ResNet_r+1 vs ResNet_r and ResNet_0"], "k-dim");
+  s += A(710, 174, 710, 199, "dash");
+  svg("d-round", 860, 280, s, "one round of the loop");
+})();
+
+/* 2.3 record layout */
+(function () {
+  let s = "";
+  const rows = [
+    [34, 34, [["black", 8, "u64, bit = square"], ["white", 8, "u64"], ["empty", 8, "u64: the holes"]]],
+    [50, 116, [["ply", 2, "u16"], ["black score", 1, ""], ["white score", 1, ""], ["value", 2, "i16, ±30000"], ["move", 2, "Move::raw"], ["depth", 1, ""], ["kind", 1, "0 / 1"], ["z", 1, "±1, 0"], ["exact", 1, "or −128"], ["game", 4, "u32"]]]];
+  s += T(10, 16, "40 bytes, little-endian, one flat array per task file", "dg-lbl");
+  let byte = 0;
+  rows.forEach(([u, y, f]) => {
+    let x = 10;
+    f.forEach(r => {
+      const kind = ["value", "depth"].includes(r[0]) ? "k-acc" : ["z", "exact"].includes(r[0]) ? "k-w" : ["move", "kind"].includes(r[0]) ? "k-b" : "";
+      s += `<rect class="dg-box ${kind}" x="${x}" y="${y}" width="${r[1] * u}" height="52" rx="4"/>`;
+      const words = r[0].split(" ");
+      if (words.length === 2 && r[1] === 1) {
+        s += `<text class="dg-t" x="${x + r[1] * u / 2}" y="${y + 22}" text-anchor="middle" style="font-size:11px">${esc(words[0])}</text>`;
+        s += `<text class="dg-t" x="${x + r[1] * u / 2}" y="${y + 36}" text-anchor="middle" style="font-size:11px">${esc(words[1])}</text>`;
+      } else {
+        s += `<text class="dg-t" x="${x + r[1] * u / 2}" y="${y + 23}" text-anchor="middle" style="font-size:12px">${esc(r[0])}</text>`;
+        if (r[2]) s += `<text class="dg-s" x="${x + r[1] * u / 2}" y="${y + 40}" text-anchor="middle" style="font-size:10.5px">${esc(r[2])}</text>`;
+      }
+      s += `<text class="dg-m" x="${x + 2}" y="${y - 3}" style="font-size:9.5px">${byte}</text>`;
+      byte += r[1]; x += r[1] * u;
+    });
+  });
+  s += T(10, 192, "blue: the search; orange: the move and the kind; green: the results. The ply's parity gives the side to move.", "dg-s");
+  svg("d-record", 860, 204, s, "record layout");
+})();
+
+/* 3.4 window */
+(function () {
+  let s = "";
+  const rounds = [0, 1, 2, 3, 4];
+  const X = m => 120 + m * 6.2;   // millions of positions → x
+  s += T(10, 18, "THE CACHE OF EACH ROUND (millions of positions)", "dg-lbl");
+  rounds.forEach((r, i) => {
+    const y = 30 + i * 40;
+    s += T(10, y + 18, `round ${r}`, "dg-t");
+    let x = 0;
+    const parts = [[42, `round ${r}`, "var(--accent-soft)", "var(--accent)"]];
+    for (let p = r - 1; p >= 0 && p >= r - 2; p--) parts.push([21, `½ r${p}`, "var(--white-soft)", "var(--white-pc)"]);
+    const old = r >= 3 ? 0 : 50 * (3 - r) / 3;
+    if (old > 0) parts.push([old, `az256 ${old.toFixed(0)} M`, "var(--black-soft)", "var(--black-pc)"]);
+    parts.forEach(pt => {
+      s += `<rect x="${X(x)}" y="${y}" width="${pt[0] * 6.2}" height="26" rx="3" style="fill:${pt[2]};stroke:${pt[3]}"/>`;
+      s += `<text class="dg-s" x="${X(x) + pt[0] * 3.1}" y="${y + 17}" text-anchor="middle">${esc(pt[1])}</text>`;
+      x += pt[0];
+    });
+    s += T(X(x) + 8, y + 17, `${x.toFixed(0)} M`, "dg-m");
+  });
+  svg("d-window", 860, 236, s, "window of rounds");
+})();
+
+/* 8 jobs */
+(function () {
+  let s = "";
+  s += B(10, 70, 120, 50, "gen", "array 0–49 %8", "k-b");
+  s += A(130, 95, 160, 95);
+  s += B(160, 70, 120, 50, "prepare", "CPU", "");
+  s += A(280, 95, 310, 95);
+  s += B(310, 70, 120, 50, "resnet", "GPU", "k-w");
+  s += A(430, 95, 460, 95);
+  s += B(460, 70, 120, 50, "nnue", "GPU", "k-b");
+  s += A(370, 120, 370, 170);
+  s += B(300, 170, 140, 44, "eval_resnet", "2 tasks, GPU", "k-dim");
+  s += A(520, 120, 520, 170);
+  s += B(460, 170, 120, 44, "eval_nnue", "2 tasks, CPU", "k-dim");
+  s += P("M440,214 L440,240 L639,240", "dash"); s += P("M580,192 L620,192 L620,240", "dash");
+  s += B(640, 218, 130, 44, "summary", "afterany", "");
+  s += A(580, 95, 639, 95, "acc");
+  s += B(640, 70, 170, 50, "next", ["clean, submit r + 1"], "k-acc");
+  s += P("M725,70 L725,30 L70,30 L70,69", "acc");
+  s += T(300, 24, "round r + 1: the same chain", "dg-lbl");
+  s += T(10, 140, "solid arrows: afterok", "dg-lbl");
+  s += T(10, 156, "dashed: afterany", "dg-lbl");
+  svg("d-jobs", 840, 275, s, "SLURM jobs of a round");
+})();
+
+/* 6.2 targets widget */
+(function () {
+  if (!$("tg-svg")) return;
+  function render() {
+    const kind = $("tg-kind").value, solved = $("tg-solved").checked && kind !== "old";
+    $("tg-solved").disabled = kind === "old";
+    const s = parseFloat($("tg-s").value), r = parseFloat($("tg-r").value), z0 = parseFloat($("tg-z").value), x = parseFloat($("tg-x").value);
+    $("tg-sv").textContent = (s >= 0 ? "+" : "") + s.toFixed(2);
+    $("tg-rv").textContent = (r >= 0 ? "+" : "") + r.toFixed(2);
+    $("tg-slabel").textContent = kind === "old" ? "old label" : "s (search)";
+    const sEff = solved ? x : s;                       // search.f16 holds the exact result
+    const zEff = kind === "tree" && solved ? x : z0;   // a solved tree node takes z = exact
+    const zmask = kind !== "tree" || solved;
+    const resZ = zmask ? zEff : sEff;
+    const resnet = 0.3 * resZ + 0.7 * sEff;
+    const teacher = solved ? sEff : 0.5 * r + 0.5 * sEff;
+    const nnZ = zmask ? zEff : teacher;
+    const nnue = 0.8 * teacher + 0.2 * nnZ;
+    const X0 = 60, X1 = 860, Xv = v => X0 + (v + 1) / 2 * (X1 - X0);
+    let g = `<line x1="${X0}" y1="120" x2="${X1}" y2="120" style="stroke:var(--ink-3)"/>`;
+    [-1, -0.5, 0, 0.5, 1].forEach(t => { g += `<line x1="${Xv(t)}" y1="115" x2="${Xv(t)}" y2="125" style="stroke:var(--ink-3)"/><text x="${Xv(t)}" y="142" text-anchor="middle" style="font-family:var(--font-mono);font-size:11px;fill:var(--ink-3)">${t}</text>`; });
+    const mark = (v, y, col, label) => `<circle cx="${Xv(v)}" cy="${y}" r="6" style="fill:${col}"/><text x="${Xv(v) + 10}" y="${y + 4}" style="font-family:var(--font-display);font-size:12px;font-weight:700;fill:${col}">${label}</text>`;
+    g += mark(zEff, 104, "var(--ink-3)", zmask ? "z" : "z (not used)");
+    g += mark(sEff, 84, "var(--ink-2)", kind === "old" ? "old label" : "s");
+    if (!solved) g += mark(r, 64, "var(--white-pc)", "v_R");
+    g += mark(resnet, 40, "var(--black-pc)", "ResNet target");
+    g += mark(nnue, 18, "var(--accent)", "NNUE target");
+    $("tg-svg").innerHTML = g;
+    const f = v => (v >= 0 ? "+" : "") + v.toFixed(3);
+    $("tg-out").textContent =
+      `zmask = ${zmask ? 1 : 0}${solved ? ", exact result known: s = z = exact" : ""}\n` +
+      `ResNet value target  = 0.3 · ${zmask ? "z" : "s"} + 0.7 · s = ${f(resnet)}\n` +
+      `NNUE teacher         = ${solved ? "exact" : "½ v_R + ½ s"} = ${f(teacher)}\n` +
+      `NNUE learns          = 0.8 · teacher + 0.2 · ${zmask ? "z" : "teacher"} = ${f(nnue)}`;
+  }
+  ["tg-kind", "tg-solved", "tg-s", "tg-r", "tg-z", "tg-x"].forEach(id => $(id).addEventListener("input", render));
+  render();
+})();
+
+const rerender = () => (window.__rerender || []).forEach(f => { try { f(); } catch (e) { /* ignore */ } });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender); } catch (e) { /* old browsers */ }
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+

@@ -15,6 +15,24 @@ evaluation cache and lazy accumulators, the NNUE network and its SIMD forward
 pass, and its training (distillation, quantization-aware training, export).
 Written by hand, not rendered by Quarto.
 
+`alphazero_mcts_player.html` — the MCTS player with the value/policy ResNet,
+in the same style: the network and its backends, one simulation (PUCT in
+KataGo's form, the utility-stdev factor, first play urgency, backup), the
+search graph (one node per position, Q from the node and N from the edge, the
+node key, tree reuse), the batching of leaves and of threads, the network
+cache, the root refinements (noise, forced playouts, policy target pruning,
+LCB) and the measured strength.
+
+`distillation_loop.html` — the distillation loop of `nnue/distill_loop.sh`, in
+the same style: the games of the dev player (node limit, openings, the 40-byte
+records, the tree nodes, the exact results), the training cache (the tree
+nodes on the game's path, `zmask`, the window of rounds), the ResNet's
+targets and training, the NNUE's teacher and distillation, the evaluation
+matches and the SLURM jobs of a round.
+
+Both reuse the CSS and the script framework of `minmax_nnue_dev_player.html`
+(code blocks, contents, diagram helpers).
+
 ## Rendering
 
 Needs [Quarto](https://quarto.org) and a LaTeX install (TeX Live with
