@@ -65,6 +65,7 @@ GAMES="${GAMES:-200000}"                          # games per round
 GAMES_PER_TASK="${GAMES_PER_TASK:-4000}"
 THROTTLE="${THROTTLE:-8}"                         # gen tasks at a time (scontrol update JobId=… ArrayTaskThrottle=N)
 GEN_CPUS="${GEN_CPUS:-16}"                        # logical CPUs per gen task (one game per physical core)
+GEN_MEM="${GEN_MEM:-8G}"                          # per gen task (8 games: 64 MB tables each, the solver, the network)
 MAX_NODES="${MAX_NODES:-650000}"                  # ≈ 0.5 s on an i7-12700K
 RECORD_DEPTH="${RECORD_DEPTH:-10}"
 TREE_PER_SEARCH="${TREE_PER_SEARCH:-8}"
@@ -165,7 +166,7 @@ submit)
     cpu=(-p insa-cpu --exclude="${EXCLUDE}")
     gpu=(-p insa-gpu --gres=gpu:1)
     j_gen=$(sbatch "${common[@]}" -p insa-cpu --exclude="${GEN_EXCLUDE}" --export=ALL,STAGE=gen,ROUND=${ROUND},LOOP_DIR=${LOOP_DIR} \
-        --array=0-$(( TASKS - 1 ))%${THROTTLE} --cpus-per-task="${GEN_CPUS}" --mem=24G --time=24:00:00 \
+        --array=0-$(( TASKS - 1 ))%${THROTTLE} --cpus-per-task="${GEN_CPUS}" --mem="${GEN_MEM}" --time=24:00:00 \
         --signal=B:USR1@300 --job-name="dl${R}_gen" --output="${L}/${R}_gen_%A_%a.out" "${SCRIPT}")
     j_prep=$(sbatch "${common[@]}" "${cpu[@]}" --export=ALL,STAGE=prepare,ROUND=${ROUND},LOOP_DIR=${LOOP_DIR} \
         --dependency=afterok:${j_gen} --cpus-per-task=16 --mem=96G --time=12:00:00 \
