@@ -10,7 +10,9 @@ fine-tuned on the round's cache (loop_prepare.py).
 Targets
   value   (1 − q)·z + q·s: z the game's result, s the search target of the cache
           (the exact result near the end, else the dev player's search value;
-          the old teacher's value on the old positions)
+          the old teacher's value on the old positions); s alone where z is
+          not the position's result (zmask.u1 = 0: a tree node off the game's
+          path)
   policy  cross-entropy with the move the dev player played (one-hot) or, for
           a node of a search tree, its best move (no policy for the passes and
           the old positions)
@@ -51,11 +53,16 @@ class Data:
         self.z = mm("values.i8", np.int8, (self.n,))
         self.s = mm("search.f16", np.float16, (self.n,))
         self.policy = mm("policy.u2", np.uint16, (self.n,))
+        zpath = os.path.join(cache, "zmask.u1")
+        self.zmask = mm("zmask.u1", np.uint8, (self.n,)) if os.path.exists(zpath) else None
         self.n_train = int(0.95 * self.n)
 
     def chunk(self, lo, hi):
-        return (np.ascontiguousarray(self.inputs[lo:hi]), self.z[lo:hi].astype(np.float32),
-                self.s[lo:hi].astype(np.float32), self.policy[lo:hi].astype(np.int64))
+        """rows, z, s, policy; z = s where z is not the position's result (the target is then s)."""
+        z, s = self.z[lo:hi].astype(np.float32), self.s[lo:hi].astype(np.float32)
+        if self.zmask is not None:
+            z = np.where(self.zmask[lo:hi] == 1, z, s)
+        return np.ascontiguousarray(self.inputs[lo:hi]), z, s, self.policy[lo:hi].astype(np.int64)
 
 
 class Batches:

@@ -24,6 +24,14 @@ and for the loop:
     depth.u1      (N,)     depth of the search that gave the value (0: old)
     exact.u1      (N,)     1: search.f16 is the exact result (the solver, or a
                            result the search proved)
+    zmask.u1      (N,)     1: z is the position's result (a position of the
+                           game, an old position, or a solved tree node, whose
+                           z is then the exact result); 0: a node of a search
+                           tree off the game's path, whose z is the result of
+                           another position (the trainers then leave z out)
+
+The tree nodes that are positions of their own game (the game went there: 19 %
+of them) are dropped, the game's record (a deeper search) is kept.
 
 --old-cache: N positions of an older cache (inputs.u8, values.i8 and its teacher
 labels teacher_values.f16 as the search target), in random blocks of --block
@@ -74,6 +82,20 @@ def policy_index(rec):
     return np.where(ok, p, NO_POLICY).astype(np.uint16)
 
 
+def drop_tree_on_path(rec):
+    """Without the tree nodes that are also a position played in the same game."""
+    key = np.empty(len(rec), [("game", "<u4"), ("black", "<u8"), ("white", "<u8"), ("empty", "<u8"), ("ply", "<u2")])
+    for f in key.dtype.names:
+        key[f] = rec[f]
+    _, ids = np.unique(key, return_inverse=True)
+    ids = ids.ravel()
+    played = np.zeros(ids.max() + 1, bool)
+    played[ids[rec["kind"] == 0]] = True
+    drop = (rec["kind"] == 1) & played[ids]
+    print(f"{drop.sum():,} of {(rec['kind'] == 1).sum():,} tree nodes are positions of their game: dropped", flush=True)
+    return rec[~drop]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("round_dir")
@@ -88,6 +110,7 @@ def main():
     if not files:
         raise SystemExit(f"no games in {a.round_dir}/games")
     rec = np.concatenate([np.fromfile(f, RECORD) for f in files])
+    rec = drop_tree_on_path(rec)
     n_games = len(np.unique(rec["game"]))
     n_new = len(rec)
     print(f"{len(files)} files, {n_games:,} games, {n_new:,} positions "
@@ -125,6 +148,7 @@ def main():
     kind = mm("kind.u1", np.uint8, (n,))
     depth = mm("depth.u1", np.uint8, (n,))
     exact = mm("exact.u1", np.uint8, (n,))
+    zmask = mm("zmask.u1", np.uint8, (n,))
     pos = 0
     for j, b in enumerate(order):
         src, s = blocks[b]
@@ -132,7 +156,9 @@ def main():
             r = rec[s:s + a.block]
             k = len(r)
             inputs[pos:pos + k] = board_rows(r)
-            values[pos:pos + k] = r["z"]
+            solved = r["exact"] != EXACT_UNKNOWN
+            values[pos:pos + k] = np.where((r["kind"] == 1) & solved, r["exact"], r["z"])
+            zmask[pos:pos + k] = (r["kind"] == 0) | solved
             search[pos:pos + k] = search_target(r)
             policy[pos:pos + k] = policy_index(r)
             kind[pos:pos + k] = r["kind"]
@@ -147,11 +173,12 @@ def main():
             kind[pos:pos + k] = 2
             depth[pos:pos + k] = 0
             exact[pos:pos + k] = 0
+            zmask[pos:pos + k] = 1
         pos += k
         if j % 2000 == 0:
             print(f"  {pos:,} / {n:,}", flush=True)
     assert pos == n
-    for m in (inputs, values, search, policy, kind, depth, exact):
+    for m in (inputs, values, search, policy, kind, depth, exact, zmask):
         m.flush()
     meta = {"n_positions": n, "n_games": n_games,
             "inputs": {"path": "inputs.u8", "dtype": "uint8", "shape": [n, ROW]},

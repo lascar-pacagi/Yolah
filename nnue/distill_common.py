@@ -180,6 +180,10 @@ class DistillLoader:
     space features, space.u8), appended to the columns of X unscaled.
     Only chunks whose teacher labels are complete are used (`ranges`), so a
     partially labelled cache trains on the labelled part.
+    A cache with zmask.u1 (loop_prepare.py: 0 where the game's result is not
+    the position's, a node of a search tree off the game's path) gets z = v_t
+    on those rows: the outcome term then pulls towards the teacher, the loss
+    is the teacher's alone there.
     """
 
     def __init__(self, cache_dir, inputs, values, teacher, ranges, lo, hi, batch_size,
@@ -187,6 +191,8 @@ class DistillLoader:
                  pin_memory=True, queue_depth=BATCH_QUEUE_DEPTH, extra=None, seed=0):
         self.inputs, self.values, self.teacher = inputs, values, teacher
         self.extra = extra
+        zpath = os.path.join(cache_dir, "zmask.u1")
+        self.zmask = np.memmap(zpath, dtype=np.uint8, mode='r', shape=(len(values),)) if os.path.exists(zpath) else None
         self.seed = seed        # another order of the chunks and positions (0: the historical one)
         self.batch_size, self.rank, self.world_size = batch_size, rank, world_size
         self.scale, self.chunk_size, self.shuffle = scale, chunk_size, shuffle
@@ -220,6 +226,8 @@ class DistillLoader:
                 val = np.array(self.values[start:end])
                 tea = np.array(self.teacher[start:end])
                 ext = np.array(self.extra[start:end]) if self.extra is not None else None
+                if self.zmask is not None:
+                    val = np.where(np.array(self.zmask[start:end]) == 1, val.astype(np.float32), tea.astype(np.float32))
                 if self.shuffle:
                     rng = np.random.default_rng((self.epoch * 1_000_003 + start + self.seed * 7_919_993) & 0xFFFFFFFF)
                     perm = rng.permutation(self.chunk_size)
