@@ -18,8 +18,10 @@
 #              round_<r>/games/task_<i>.bin. A task stopped (time limit,
 #              preemption) starts again where it was: resubmit it.
 #   prepare    CPU: the training cache round_<r>/cache (loop_prepare.py: the
-#              games + OLD_POSITIONS positions of OLD_CACHE), its space
-#              features (space_features compute-all)
+#              games of round r, PREV_FRACTION of the games of each of the
+#              WINDOW rounds before, and positions of OLD_CACHE: OLD_POSITIONS
+#              at round 0, fewer each round, none from round OLD_ROUNDS on),
+#              its space features (space_features compute-all)
 #   resnet     GPU: ResNet_r fine-tuned on the cache → ResNet_{r+1}
 #              (loop_resnet.py), which labels the cache
 #              (distill_teacher_labels.py); the NNUE's target is then the
@@ -30,17 +32,21 @@
 #   eval_resnet GPU: the MCTS player with ResNet_{r+1} against ResNet_r and ResNet_0
 #              (alphazero_match.sh)
 #   summary    LOOP_DIR/progress.csv (loop_progress.py)
-#   next       (AUTO=1, after nnue) deletes round r's positions (games and
-#              cache; KEEP_DATA=1 keeps them) and submits round r + 1, until
-#              MAX_ROUND
+#   next       (AUTO=1, after nnue) deletes round r's cache and the games of
+#              the round that leaves the window (r − WINDOW + 1 is the oldest
+#              round r + 1 reads; KEEP_DATA=1 keeps everything) and submits
+#              round r + 1, until MAX_ROUND
 #
 # Round 0 is created from INIT_NNUE (the g046 network) and INIT_RESNET (the
 # latest network of the AlphaZero 256 run). Everything lives in LOOP_DIR; the
 # networks of every round are kept (round_<r>/nnue.*, round_<r>/resnet.*,
-# resnet/models/az_<r>.*), the positions of the current round only.
+# resnet/models/az_<r>.*), the games of the last WINDOW + 1 rounds, the cache
+# of the current round only.
 #
-# Sizes: a game ≈ 250 positions × 40 bytes ≈ 10 KB (500 k games: 5 GB); the
-# cache ≈ 250 bytes per position (+ the old positions): 40–50 GB per round.
+# Sizes: a game ≈ 250 positions × 40 bytes ≈ 10 KB (200 k games: 2 GB); the
+# cache ≈ 300 bytes per position: about 100 M positions (round r ≈ 42 M after
+# the tree nodes on the games' paths are dropped, half of each of the 2 rounds
+# before, the OLD_CACHE part), 30 GB.
 # ────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -55,7 +61,7 @@ EXCLUDE="${EXCLUDE:-crn04,crn07,crn14,crn15}"
 # CPU's speed: 48 s per game and core on crn16's E5-2698 v3, 14.5 s on an
 # i7-12700K): the Xeons out, the EPYCs (crn12, crn13, crn25) in.
 GEN_EXCLUDE="${GEN_EXCLUDE:-crn01,crn02,crn03,crn04,crn07,crn14,crn15,crn16}"
-GAMES="${GAMES:-500000}"                          # games per round
+GAMES="${GAMES:-200000}"                          # games per round
 GAMES_PER_TASK="${GAMES_PER_TASK:-4000}"
 THROTTLE="${THROTTLE:-8}"                         # gen tasks at a time (scontrol update JobId=… ArrayTaskThrottle=N)
 GEN_CPUS="${GEN_CPUS:-16}"                        # logical CPUs per gen task (one game per physical core)
@@ -67,7 +73,10 @@ EXACT_MS="${EXACT_MS:-300}"
 RANDOM_PLIES="${RANDOM_PLIES:-2}"
 BOOK="${BOOK:-/Yolah/config/openings/balanced.txt}"
 OLD_CACHE="${OLD_CACHE:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"
-OLD_POSITIONS="${OLD_POSITIONS:-50000000}"
+OLD_POSITIONS="${OLD_POSITIONS:-50000000}"         # at round 0; × (1 − r / OLD_ROUNDS) at round r
+OLD_ROUNDS="${OLD_ROUNDS:-3}"                     # no OLD_CACHE position from this round on
+WINDOW="${WINDOW:-2}"                             # previous rounds whose games are in the cache
+PREV_FRACTION="${PREV_FRACTION:-0.5}"             # of their games (drawn at random, whole games)
 RESNET_EPOCHS="${RESNET_EPOCHS:-1}"
 RESNET_LR="${RESNET_LR:-5e-5}"
 Q_WEIGHT="${Q_WEIGHT:-0.7}"                       # ResNet value target: (1 − q)·z + q·search
@@ -212,8 +221,14 @@ gen)
 prepare)
     header
     rm -rf "${LOOP_DIR}/${RD}/cache"
-    run_old bash -c "set -e; cd /Yolah/nnue && python3 loop_prepare.py /work/${RD} --old-cache /old \
-        --old-positions ${OLD_POSITIONS} --seed ${ROUND}"
+    N_OLD=$(( ROUND >= OLD_ROUNDS ? 0 : OLD_POSITIONS * (OLD_ROUNDS - ROUND) / OLD_ROUNDS ))
+    PREV=""
+    for (( p = ROUND - 1; p >= 0 && p >= ROUND - WINDOW; p-- )); do
+        PREV+=" --prev /work/round_$(printf '%03d' "${p}")"
+    done
+    echo "  round ${ROUND}: ${N_OLD} positions of ${OLD_CACHE}, previous rounds:${PREV:- none}"
+    run_old bash -c "set -e; cd /Yolah/nnue && python3 loop_prepare.py /work/${RD}${PREV} \
+        --prev-fraction ${PREV_FRACTION} --old-cache /old --old-positions ${N_OLD} --seed ${ROUND}"
     build_alphazero_learn space_features
     run bash -c "${BUILD_DIR}/space_features compute-all /work/${RD}/cache --threads ${SLURM_CPUS_PER_TASK:-16}"
     du -sh "${LOOP_DIR}/${RD}/games" "${LOOP_DIR}/${RD}/cache"
@@ -290,9 +305,16 @@ summary)
 next)
     header
     if [[ "${KEEP_DATA}" != "1" ]]; then
-        du -sh "${LOOP_DIR}/${RD}/games" "${LOOP_DIR}/${RD}/cache" 2>/dev/null || true
-        rm -rf "${LOOP_DIR}/${RD}/games" "${LOOP_DIR}/${RD}/cache"
-        echo "deleted the positions of round ${ROUND}"
+        du -sh "${LOOP_DIR}/${RD}/cache" 2>/dev/null || true
+        rm -rf "${LOOP_DIR}/${RD}/cache"
+        echo "deleted the cache of round ${ROUND}"
+        OUT=$(( ROUND - WINDOW ))                  # round r + 1 reads the games of r + 1 − WINDOW .. r
+        if (( OUT >= 0 )); then
+            OD="round_$(printf '%03d' "${OUT}")"
+            du -sh "${LOOP_DIR}/${OD}/games" 2>/dev/null || true
+            rm -rf "${LOOP_DIR}/${OD}/games"
+            echo "deleted the games of round ${OUT} (out of the window)"
+        fi
     fi
     cd "${YOLAH_DIR}"
     STAGE=submit ROUND=$(( ROUND + 1 )) bash "${SCRIPT}" $(( ROUND + 1 ))

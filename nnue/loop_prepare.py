@@ -2,9 +2,12 @@
 loop_prepare.py — the training cache of one round of the distillation loop
 (nnue/distill_loop.sh), from the games of test/selfplay_label_main.cpp.
 
-    python3 loop_prepare.py ROUND_DIR [--old-cache DIR --old-positions N] [--block 4096] [--seed 0]
+    python3 loop_prepare.py ROUND_DIR [--prev DIR ...] [--prev-fraction 0.5]
+                            [--old-cache DIR --old-positions N] [--block 4096] [--seed 0]
 
-Reads ROUND_DIR/games/*.bin (40-byte records) and writes ROUND_DIR/cache/, in
+Reads ROUND_DIR/games/*.bin (40-byte records), and --prev-fraction of the
+games of each --prev round (the previous rounds of the window, games drawn at
+random, whole), and writes ROUND_DIR/cache/, in
 the layout of preprocess_nnue.py, so that distill_teacher_labels.py,
 space_features compute-all and nnue_persp_distill.py read it as they are:
 
@@ -33,7 +36,8 @@ and for the loop:
 The tree nodes that are positions of their own game (the game went there: 19 %
 of them) are dropped, the game's record (a deeper search) is kept.
 
---old-cache: N positions of an older cache (inputs.u8, values.i8 and its teacher
+--old-cache: N positions of an older cache (the loop gives fewer each round,
+none after a few rounds) (inputs.u8, values.i8 and its teacher
 labels teacher_values.f16 as the search target), in random blocks of --block
 consecutive positions (whole games, mostly), so that the network does not
 forget them. The rows of the new games and the old blocks are mixed by blocks
@@ -96,9 +100,28 @@ def drop_tree_on_path(rec):
     return rec[~drop]
 
 
+def load_games(round_dir, fraction, rng):
+    """The records of round_dir's games, without the tree nodes on the game's path; a fraction of the games, drawn at random."""
+    files = sorted(glob.glob(os.path.join(round_dir, "games", "*.bin")))
+    if not files:
+        raise SystemExit(f"no games in {round_dir}/games")
+    rec = drop_tree_on_path(np.concatenate([np.fromfile(f, RECORD) for f in files]))
+    games = np.unique(rec["game"])
+    if fraction < 1.0:
+        keep = rng.choice(games, size=int(round(fraction * len(games))), replace=False)
+        rec = rec[np.isin(rec["game"], keep)]
+        games = keep
+    print(f"{round_dir}: {len(files)} files, {len(games):,} games ({fraction:g} of them), {len(rec):,} positions "
+          f"({(rec['kind'] == 0).sum():,} of the games, {(rec['kind'] == 1).sum():,} of the trees, "
+          f"{(rec['exact'] != EXACT_UNKNOWN).sum():,} solved)", flush=True)
+    return rec, len(games), len(files)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("round_dir")
+    ap.add_argument("--prev", action="append", default=[])
+    ap.add_argument("--prev-fraction", type=float, default=0.5)
     ap.add_argument("--old-cache", default="")
     ap.add_argument("--old-positions", type=int, default=0)
     ap.add_argument("--block", type=int, default=4096)
@@ -106,16 +129,12 @@ def main():
     a = ap.parse_args()
     rng = np.random.default_rng(a.seed)
 
-    files = sorted(glob.glob(os.path.join(a.round_dir, "games", "*.bin")))
-    if not files:
-        raise SystemExit(f"no games in {a.round_dir}/games")
-    rec = np.concatenate([np.fromfile(f, RECORD) for f in files])
-    rec = drop_tree_on_path(rec)
-    n_games = len(np.unique(rec["game"]))
+    # Each round's game numbers start at 0: the rounds are read one by one.
+    parts = [load_games(a.round_dir, 1.0, rng)] + [load_games(d, a.prev_fraction, rng) for d in a.prev]
+    rec = np.concatenate([p[0] for p in parts])
+    n_games = sum(p[1] for p in parts)
+    files = sum(p[2] for p in parts)
     n_new = len(rec)
-    print(f"{len(files)} files, {n_games:,} games, {n_new:,} positions "
-          f"({(rec['kind'] == 0).sum():,} of the games, {(rec['kind'] == 1).sum():,} of the trees, "
-          f"{(rec['exact'] != EXACT_UNKNOWN).sum():,} solved)", flush=True)
 
     old = None
     n_old = 0
@@ -184,8 +203,9 @@ def main():
             "inputs": {"path": "inputs.u8", "dtype": "uint8", "shape": [n, ROW]},
             "values": {"path": "values.i8", "dtype": "int8", "shape": [n]},
             "input_size": ROW, "value_perspective": "current_player", "value_range": [-1, 0, 1],
-            "loop": {"new_positions": n_new, "old_positions": n_old, "old_cache": a.old_cache,
-                     "files": len(files), "block": a.block, "seed": a.seed}}
+            "loop": {"new_positions": n_new, "round_positions": len(parts[0][0]), "prev": a.prev,
+                     "prev_fraction": a.prev_fraction, "old_positions": n_old, "old_cache": a.old_cache,
+                     "files": files, "block": a.block, "seed": a.seed}}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2)
     print(f"wrote {out}: {n:,} positions", flush=True)
