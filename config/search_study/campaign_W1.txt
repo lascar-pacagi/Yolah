@@ -1,0 +1,14 @@
+# Campaign W1 (NNUE, 2026-11-03): a first layer of 512 instead of 1024. The accumulator update (11 % of a game)
+# and fc2 (most of the forward pass, 37 %) read half as many values; nets_check on 2000 positions:
+# value() 1145 ns against 1663 ns, update() 73 ns against 161 ns (a 512 test network, g046's space columns).
+# Networks (nnue_persp_distill.sh, P7 protocol: cache_az256, 20 epochs, lr 3e-4, QAT, g046 features), both
+# from PyTorch's random initialisation (a 512 network cannot start from the 193 network):
+#   w1_l512_scratch  k8_them_g046_qat_l512_scratch_az20
+#   w1_scratch       k8_them_g046_qat_scratch_az20 (1024): the same start, separates width from start
+# Same search for all (dev_final). BOOK=balanced.
+w1_l512_scratch dev_final 200000 1000
+w1_l512_scratch dev_final 1000000 1000
+w1_l512_scratch w1_scratch 200000 1000
+w1_l512_scratch w1_scratch 1000000 1000
+w1_scratch dev_final 200000 1000
+w1_scratch dev_final 1000000 1000

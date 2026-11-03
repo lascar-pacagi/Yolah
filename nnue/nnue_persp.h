@@ -37,18 +37,24 @@
 // k × n_space floats: value() adds Σ_j direct[b][j] · feature_j / 64 to the
 // head's sum before the tanh (nnue_persp.py, direct=True).
 //
-// Accumulator: 2 × H1_SIZE int16, view v at acc + v · H1_SIZE (v = the colour).
+// First layer: h1 = 1024 or 512 values per view (the l1 of the weights file);
+// the kernels are compiled for each size.
+//
+// Accumulator: 2 × H1_SIZE int16 (the largest size), view v at acc + v · h1_size
+// (v = the colour).
 struct NNUE_Persp {
     static constexpr int INPUT_SIZE = 192;
-    static constexpr int H1_SIZE = 1024;
+    static constexpr int H1_SIZE = 1024;              // the largest first layer
+    static constexpr int H1_SMALL = 512;              // the other one
     static constexpr int H2_SIZE = 64;
     static constexpr int H3_SIZE = 32;
     static constexpr int ACC_SIZE = 2 * H1_SIZE;      // int16 per accumulator (both views)
     static constexpr int MAX_HOLES = 56;
 
     int k = 1;                // number of phase heads
+    int h1_size = H1_SIZE;    // values of the first layer per view (H1_SIZE or H1_SMALL)
     bool them = false;        // fc2 reads [us, them] (2 · H1_SIZE inputs) instead of us
-    int h2_inputs = H1_SIZE;  // h1 values read by fc2 (H1_SIZE or 2 · H1_SIZE)
+    int h2_inputs = H1_SIZE;  // h1 values read by fc2 (h1_size or 2 · h1_size)
     static constexpr int MAX_SPACE = 96;              // space columns, padded (space::NB_ALL = 92)
     int n_space = 0;          // space columns read by fc2
     int space_cols[MAX_SPACE]{};  // their columns in space::compute_groups (0..NB_ALL − 1)
@@ -107,6 +113,12 @@ struct NNUE_Persp {
     void play(uint8_t player, Move m, Accumulator& a) const { play(player, m, a.acc); }
     void undo(uint8_t player, Move m, Accumulator& a) const { undo(player, m, a.acc); }
     float value(const Accumulator& a, const Yolah& yolah) const { return value(a.acc, yolah); }
+
+private:
+    template<int H> void init_n(const Yolah& yolah, int16_t* acc) const;
+    template<int H> void update_n(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m) const;
+    template<int H, int SIGN> void play_n(uint8_t player, Move m, int16_t* acc) const;
+    template<int H> float value_n(const int16_t* acc, const Yolah& yolah) const;
 };
 
 #endif

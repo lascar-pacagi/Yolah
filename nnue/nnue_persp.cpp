@@ -125,7 +125,7 @@ void NNUE_Persp::load(const std::string& filename) {
     int l1, l2, l3, t;
     if (!(ifs >> tag >> k >> t >> l1 >> l2 >> l3) || (tag != "PERSP" && tag != "PERSPS" && tag != "PERSPC"))
         throw std::runtime_error("NNUE_Persp: " + filename + " is not a PERSP weights file");
-    if (l1 != H1_SIZE || l2 != H2_SIZE || l3 != H3_SIZE || k < 1)
+    if ((l1 != H1_SIZE && l1 != H1_SMALL) || l2 != H2_SIZE || l3 != H3_SIZE || k < 1)
         throw std::runtime_error("NNUE_Persp: unsupported sizes in " + filename);
     n_space = 0;
     space_groups = 0;
@@ -142,11 +142,12 @@ void NNUE_Persp::load(const std::string& filename) {
     }
     for (int j = 0; j < n_space; j++) space_groups |= 1u << space::group_of(space_cols[j]);
     them = t != 0;
-    h2_inputs = them ? 2 * H1_SIZE : H1_SIZE;
+    h1_size = l1;
+    h2_inputs = them ? 2 * h1_size : h1_size;
     h2_stride = h2_inputs + (n_space + 31) / 32 * 32;
     // fc1 is stored (out, in) by PyTorch: transposed into one row per input.
-    read_matrix(ifs, H1_SIZE, INPUT_SIZE, input_to_h1, true, "fc1");
-    read_bias(ifs, H1_SIZE, h1_bias, "fc1");
+    read_matrix(ifs, h1_size, INPUT_SIZE, input_to_h1, true, "fc1");
+    read_bias(ifs, h1_size, h1_bias, "fc1");
     h1_to_h2 = aligned_array<int8_t>(size_t(k) * H2_SIZE * h2_stride);
     h2_bias = aligned_array<int16_t>(size_t(k) * H2_SIZE);
     h2_to_h3 = aligned_array<int8_t>(size_t(k) * H3_SIZE * H2_SIZE);
@@ -183,16 +184,17 @@ void NNUE_Persp::load(const std::string& filename) {
     }
 }
 
-void NNUE_Persp::init(const Yolah& yolah, int16_t* acc) const {
+template<int H>
+void NNUE_Persp::init_n(const Yolah& yolah, int16_t* acc) const {
     const uint64_t pieces[2] = { yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE) };
     const uint64_t holes = yolah.empty_bitboard();
     for (int v : { Yolah::BLACK, Yolah::WHITE }) {
-        int16_t* a = acc + v * H1_SIZE;
-        for (int j = 0; j < H1_SIZE; j++) a[j] = h1_bias[j];
+        int16_t* a = acc + v * H;
+        for (int j = 0; j < H; j++) a[j] = h1_bias[j];
         auto add = [&](uint64_t bb, int plane) {
             for (; bb; bb &= bb - 1) {
-                const int8_t* w = input_to_h1 + (plane + row(v, std::countr_zero(bb))) * H1_SIZE;
-                for (int j = 0; j < H1_SIZE; j++) a[j] += w[j];
+                const int8_t* w = input_to_h1 + (plane + row(v, std::countr_zero(bb))) * H;
+                for (int j = 0; j < H; j++) a[j] += w[j];
             }
         };
         add(pieces[v], 0);          // mine
@@ -201,60 +203,71 @@ void NNUE_Persp::init(const Yolah& yolah, int16_t* acc) const {
     }
 }
 
-void NNUE_Persp::update(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m) const {
+void NNUE_Persp::init(const Yolah& yolah, int16_t* acc) const {
+    if (h1_size == H1_SMALL) init_n<H1_SMALL>(yolah, acc);
+    else init_n<H1_SIZE>(yolah, acc);
+}
+
+template<int H>
+void NNUE_Persp::update_n(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m) const {
     if (m == Move::none()) {        // a pass: no feature changes, only the view that value() reads
-        memcpy(out, in, ACC_SIZE * sizeof(int16_t));
+        memcpy(out, in, 2 * H * sizeof(int16_t));
         return;
     }
     for (int v : { Yolah::BLACK, Yolah::WHITE }) {
         const int plane = v == player ? 0 : 64;
         const int from = row(v, m.from_sq()), to = row(v, m.to_sq());
-        const int8_t* __restrict w_from = input_to_h1 + (plane + from) * H1_SIZE;
-        const int8_t* __restrict w_to   = input_to_h1 + (plane + to) * H1_SIZE;
-        const int8_t* __restrict w_hole = input_to_h1 + (128 + from) * H1_SIZE;
-        const int16_t* __restrict a = in + v * H1_SIZE;
-        int16_t* __restrict b = out + v * H1_SIZE;
-        for (int j = 0; j < H1_SIZE; j++) b[j] = int16_t(a[j] - w_from[j] + w_to[j] + w_hole[j]);
+        const int8_t* __restrict w_from = input_to_h1 + (plane + from) * H;
+        const int8_t* __restrict w_to   = input_to_h1 + (plane + to) * H;
+        const int8_t* __restrict w_hole = input_to_h1 + (128 + from) * H;
+        const int16_t* __restrict a = in + v * H;
+        int16_t* __restrict b = out + v * H;
+        for (int j = 0; j < H; j++) b[j] = int16_t(a[j] - w_from[j] + w_to[j] + w_hole[j]);
+    }
+}
+
+void NNUE_Persp::update(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m) const {
+    if (h1_size == H1_SMALL) update_n<H1_SMALL>(in, out, player, m);
+    else update_n<H1_SIZE>(in, out, player, m);
+}
+
+// play (SIGN = 1) or undo (SIGN = −1) the move m by `player`, in place.
+template<int H, int SIGN>
+void NNUE_Persp::play_n(uint8_t player, Move m, int16_t* acc) const {
+    if (m == Move::none()) return;
+    for (int v : { Yolah::BLACK, Yolah::WHITE }) {
+        const int plane = v == player ? 0 : 64;
+        const int from = row(v, m.from_sq()), to = row(v, m.to_sq());
+        const int8_t* w_from = input_to_h1 + (plane + from) * H;
+        const int8_t* w_to   = input_to_h1 + (plane + to) * H;
+        const int8_t* w_hole = input_to_h1 + (128 + from) * H;
+        int16_t* a = acc + v * H;
+        for (int j = 0; j < H; j++) a[j] += SIGN * (-w_from[j] + w_to[j] + w_hole[j]);
     }
 }
 
 void NNUE_Persp::play(uint8_t player, Move m, int16_t* acc) const {
-    if (m == Move::none()) return;
-    for (int v : { Yolah::BLACK, Yolah::WHITE }) {
-        const int plane = v == player ? 0 : 64;
-        const int from = row(v, m.from_sq()), to = row(v, m.to_sq());
-        const int8_t* w_from = input_to_h1 + (plane + from) * H1_SIZE;
-        const int8_t* w_to   = input_to_h1 + (plane + to) * H1_SIZE;
-        const int8_t* w_hole = input_to_h1 + (128 + from) * H1_SIZE;
-        int16_t* a = acc + v * H1_SIZE;
-        for (int j = 0; j < H1_SIZE; j++) a[j] += -w_from[j] + w_to[j] + w_hole[j];
-    }
+    if (h1_size == H1_SMALL) play_n<H1_SMALL, 1>(player, m, acc);
+    else play_n<H1_SIZE, 1>(player, m, acc);
 }
 
 void NNUE_Persp::undo(uint8_t player, Move m, int16_t* acc) const {
-    if (m == Move::none()) return;
-    for (int v : { Yolah::BLACK, Yolah::WHITE }) {
-        const int plane = v == player ? 0 : 64;
-        const int from = row(v, m.from_sq()), to = row(v, m.to_sq());
-        const int8_t* w_from = input_to_h1 + (plane + from) * H1_SIZE;
-        const int8_t* w_to   = input_to_h1 + (plane + to) * H1_SIZE;
-        const int8_t* w_hole = input_to_h1 + (128 + from) * H1_SIZE;
-        int16_t* a = acc + v * H1_SIZE;
-        for (int j = 0; j < H1_SIZE; j++) a[j] += w_from[j] - w_to[j] - w_hole[j];
-    }
+    if (h1_size == H1_SMALL) play_n<H1_SMALL, -1>(player, m, acc);
+    else play_n<H1_SIZE, -1>(player, m, acc);
 }
 
-float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
+template<int H>
+float NNUE_Persp::value_n(const int16_t* acc, const Yolah& yolah) const {
     const int stm = yolah.current_player();
     const int b = bucket(yolah);
     alignas(64) int8_t h1[2 * H1_SIZE + MAX_SPACE];
     alignas(64) int8_t h2[H2_SIZE];
     alignas(64) int8_t h3[H3_SIZE];
-    const int16_t* us = acc + stm * H1_SIZE;
-    for (int i = 0; i < H1_SIZE; i++) { const int16_t v = us[i]; h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
+    const int16_t* us = acc + stm * H;
+    for (int i = 0; i < H; i++) { const int16_t v = us[i]; h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
     if (them) {
-        const int16_t* other = acc + (1 - stm) * H1_SIZE;
-        for (int i = 0; i < H1_SIZE; i++) { const int16_t v = other[i]; h1[H1_SIZE + i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
+        const int16_t* other = acc + (1 - stm) * H;
+        for (int i = 0; i < H; i++) { const int16_t v = other[i]; h1[H + i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
     }
     float direct_sum = 0;   // the direct path: Σ_j direct[b][j] · feature_j / 64
     if (n_space) {
@@ -275,19 +288,24 @@ float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
         if (sparse) sparse_nnue::matvec<H2_SIZE, N>(h1_to_h2_sparse + off, h1, h2, bias2);
         else matvec<H2_SIZE, N>(h1_to_h2 + off, h1, h2, bias2);
     };
+    // h2_stride: h1 or 2 · h1, plus 0 to 96 space columns
     switch (h2_stride) {
-        case H1_SIZE:          fc2.template operator()<H1_SIZE>(); break;
-        case H1_SIZE + 32:     fc2.template operator()<H1_SIZE + 32>(); break;
-        case H1_SIZE + 64:     fc2.template operator()<H1_SIZE + 64>(); break;
-        case H1_SIZE + 96:     fc2.template operator()<H1_SIZE + 96>(); break;
-        case 2 * H1_SIZE:      fc2.template operator()<2 * H1_SIZE>(); break;
-        case 2 * H1_SIZE + 32: fc2.template operator()<2 * H1_SIZE + 32>(); break;
-        case 2 * H1_SIZE + 64: fc2.template operator()<2 * H1_SIZE + 64>(); break;
-        default:               fc2.template operator()<2 * H1_SIZE + 96>(); break;
+        case H:          fc2.template operator()<H>(); break;
+        case H + 32:     fc2.template operator()<H + 32>(); break;
+        case H + 64:     fc2.template operator()<H + 64>(); break;
+        case H + 96:     fc2.template operator()<H + 96>(); break;
+        case 2 * H:      fc2.template operator()<2 * H>(); break;
+        case 2 * H + 32: fc2.template operator()<2 * H + 32>(); break;
+        case 2 * H + 64: fc2.template operator()<2 * H + 64>(); break;
+        default:         fc2.template operator()<2 * H + 96>(); break;
     }
     matvec<H3_SIZE, H2_SIZE>(h2_to_h3 + b * H3_SIZE * H2_SIZE, h2, h3, h3_bias + b * H3_SIZE);
     const float* w = value_weight + b * H3_SIZE;
     float s = 0;
     for (int i = 0; i < H3_SIZE; i++) s += w[i] * h3[i];      // h3 at scale 64
     return std::tanh(s / FACTOR + value_bias[b] + direct_sum);
+}
+
+float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
+    return h1_size == H1_SMALL ? value_n<H1_SMALL>(acc, yolah) : value_n<H1_SIZE>(acc, yolah);
 }

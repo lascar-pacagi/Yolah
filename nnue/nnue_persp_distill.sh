@@ -54,6 +54,14 @@
 #   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_MASK=65278 YOLAH_QAT=1   → k8_them_spacelite_qat_az20
 #   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_GROUPS=0x40 YOLAH_QAT=1  → k8_them_g040_qat_az20 (same for 0x7e, 0x46)
 #   (~3-4 days each: submit with --time=5-00:00:00)
+# Width of the first layer and random start (with P7=1, the P7 protocol otherwise):
+#   YOLAH_L1_SIZE=512                  512 values per view instead of 1024      → …_l512…
+#   SCRATCH=1                          no starting weights: PyTorch's random
+#                                      initialisation instead of the 193 network → …_scratch…
+#   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_GROUPS=0x46 YOLAH_QAT=1 YOLAH_L1_SIZE=512 SCRATCH=1
+#                                                      → k8_them_g046_qat_l512_scratch_az20
+#   (the same without YOLAH_L1_SIZE: k8_them_g046_qat_scratch_az20, the 1024 network
+#   under the same conditions; a 512 network cannot start from the 193 network)
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
 # space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
@@ -93,6 +101,8 @@ FROM_SPACELITE="${FROM_SPACELITE:-0}"
 YOLAH_DIRECT="${YOLAH_DIRECT:-0}"
 YOLAH_QAT="${YOLAH_QAT:-0}"
 P7="${P7:-0}"
+YOLAH_L1_SIZE="${YOLAH_L1_SIZE:-1024}"
+SCRATCH="${SCRATCH:-0}"
 if [[ "${P7}" == "1" ]]; then CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"; fi
 EVAL_MODEL="${EVAL_MODEL:-}"
 if [[ "${FROM_SPACELITE}" == "1" ]]; then
@@ -126,10 +136,18 @@ if [[ "${FROM_SPACELITE}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
     if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
 fi
+WIDTH_SUFFIX=""
+if [[ "${YOLAH_L1_SIZE}" != "1024" ]]; then
+    if [[ "${SCRATCH}" != "1" ]]; then echo "YOLAH_L1_SIZE=${YOLAH_L1_SIZE} needs SCRATCH=1 (the starting networks have 1024)" >&2; exit 1; fi
+    WIDTH_SUFFIX="_l${YOLAH_L1_SIZE}"
+fi
+if [[ "${SCRATCH}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_scratch"; fi
 if [[ "${P7}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
     if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
-    YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_az20"
+    YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}${WIDTH_SUFFIX}_az20"
+else
+    YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}${WIDTH_SUFFIX}"
 fi
 
 if [[ "${CONTROL}" == "1" ]]; then
@@ -150,10 +168,12 @@ MODEL_DIR="${MODEL_ROOT}/${VARIANT}"
 YOLAH_DDP_PORT="${YOLAH_DDP_PORT:-$(( 20000 + ${SLURM_JOB_ID:-$$} % 40000 ))}"
 mkdir -p "${MODEL_DIR}"
 
-for f in "${SIF}" "${CACHE_DIR}/meta.json" "${CACHE_DIR}/teacher_meta.json" "${INIT_MODEL}" \
+if [[ "${SCRATCH}" == "1" ]]; then INIT_MODEL="none"; fi
+for f in "${SIF}" "${CACHE_DIR}/meta.json" "${CACHE_DIR}/teacher_meta.json" \
          "${SRC_DIR}/${SCRIPT}" "${SRC_DIR}/nnue_persp.py" "${SRC_DIR}/distill_common.py"; do
     [[ -e "$f" ]] || { echo "missing: $f" >&2; exit 1; }
 done
+[[ "${INIT_MODEL}" == "none" || -e "${INIT_MODEL}" ]] || { echo "missing: ${INIT_MODEL}" >&2; exit 1; }
 if [[ "${YOLAH_SPACE_MASK}" != "0" ]]; then
     for f in "${CACHE_DIR}/space.u8" "${CACHE_DIR}/space_meta.json"; do
         [[ -e "$f" ]] || { echo "missing: $f (run nnue/space_features.sh first)" >&2; exit 1; }
@@ -169,7 +189,8 @@ INIT_NAME="$([[ "${STEP2}" == "1" ]] && echo init_persp.pt || echo init_193_dist
 if [[ -n "${EVAL_MODEL}" ]]; then
     INIT_NAME="$(basename "${EVAL_MODEL}")"; cp "${EVAL_MODEL}" "${MODEL_DIR}/${INIT_NAME}"
 fi
-[[ -e "${MODEL_DIR}/${INIT_NAME}" ]] || cp "${INIT_MODEL}" "${MODEL_DIR}/${INIT_NAME}"
+if [[ "${SCRATCH}" == "1" ]]; then INIT_NAME="none"
+else [[ -e "${MODEL_DIR}/${INIT_NAME}" ]] || cp "${INIT_MODEL}" "${MODEL_DIR}/${INIT_NAME}"; fi
 
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job      : ${SLURM_JOB_ID:-(local)} on $(hostname)"
@@ -180,6 +201,7 @@ echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
 echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none}  seed=${YOLAH_SEED}  continue=${CONTINUE}"
 echo "  Step 3   : P7=${P7}  from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
+echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}"
 echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
 
@@ -189,7 +211,8 @@ singularity exec --nv \
     --bind "${SRC_DIR}:/work" \
     --env "YOLAH_CACHE_DIR=/cache" \
     --env "YOLAH_MODEL_DIR=/mnt/" \
-    --env "YOLAH_INIT_MODEL=/mnt/${INIT_NAME}" \
+    --env "YOLAH_INIT_MODEL=$([[ "${INIT_NAME}" == "none" ]] && echo none || echo "/mnt/${INIT_NAME}")" \
+    --env "YOLAH_L1_SIZE=${YOLAH_L1_SIZE}" \
     --env "YOLAH_SPACE_MASK=${YOLAH_SPACE_MASK}" \
     --env "YOLAH_SPACE_GROUPS=${YOLAH_SPACE_GROUPS:-0}" \
     --env "YOLAH_SEED=${YOLAH_SEED}" \

@@ -34,6 +34,10 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
                           the C++ computes (int8 weights, int16 biases, >> 6), the
                           gradient goes straight through the roundings; in float32
                           (the bf16 of autocast cannot hold the grid 1/64 exactly)
+    YOLAH_L1_SIZE         values of the first layer per view (default 1024; the C++
+                          NNUE_Persp reads 1024 or 512)
+    YOLAH_INIT_MODEL=none no starting weights: the network starts from PyTorch's random
+                          initialisation (seeded by YOLAH_SEED)
     YOLAH_SEED            another shuffling of the training data (default 0), to
                           measure the noise between two otherwise identical runs
     YOLAH_NAME_SUFFIX     appended to the model name (default "_space" with a mask,
@@ -79,6 +83,7 @@ CHUNK_SIZE = int(os.environ.get("YOLAH_CHUNK_SIZE", str(2048 * 2048)))
 MODEL_PATH = os.environ.get("YOLAH_MODEL_DIR", "/mnt/")
 PERSP_K    = int(os.environ.get("YOLAH_PERSP_K", "8"))
 PERSP_THEM = os.environ.get("YOLAH_PERSP_THEM", "0") == "1"
+L1_SIZE    = int(os.environ.get("YOLAH_L1_SIZE", "1024"))
 SPACE_MASK = int(os.environ.get("YOLAH_SPACE_MASK", "0"), 0)
 SPACE_GROUPS = int(os.environ.get("YOLAH_SPACE_GROUPS", "0"), 0)
 SEED = int(os.environ.get("YOLAH_SEED", "0"))
@@ -290,7 +295,8 @@ def main(rank, world_size, batch_size, cache_dir):
             print('WARNING: no complete labelled training chunk — label more positions or lower '
                   'YOLAH_CHUNK_SIZE', flush=True)
 
-    net = NetPersp(PERSP_K, PERSP_THEM, space_mask=space_mask, direct=DIRECT, qat=QAT)
+    torch.manual_seed(SEED)         # the random initialisation (YOLAH_INIT_MODEL=none)
+    net = NetPersp(PERSP_K, PERSP_THEM, l1_size=L1_SIZE, space_mask=space_mask, direct=DIRECT, qat=QAT)
     if EVAL_ONLY:
         net = load_persp(INIT_MODEL)
         if net.space_mask != space_mask:
@@ -307,10 +313,12 @@ def main(rank, world_size, batch_size, cache_dir):
         else:
             net.init_from_nnue193(sd)
         src = INIT_MODEL
+    elif INIT_MODEL == "none":
+        src = f'random init (seed {SEED})'
     else:
-        src = 'random init'
+        raise SystemExit(f"{INIT_MODEL}: no such file (YOLAH_INIT_MODEL=none for a random start)")
     if rank == 0:
-        print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, '
+        print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, l1={L1_SIZE}, '
               f'space mask={space_mask:#x}, groups={SPACE_GROUPS:#x}, {net.n_space} space features, '
               f'direct path={DIRECT}, quantization-aware={QAT})', flush=True)
         print(net, flush=True)
