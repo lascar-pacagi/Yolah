@@ -354,6 +354,12 @@ private:
     struct RootMove {
         Move     move;
         uint64_t nodes = 0;       // size of its subtree in the last iteration
+        // Its last search (root log): fail-soft value, against the alpha it
+        // was searched with, the reduction, the last stage of search_move.
+        int      value = 0, alpha = 0;
+        uint8_t  reduction = 0, stage = 0;
+        uint8_t  rank = 0;        // its place in the last attempt
+        uint8_t  rank_start = 0;  // its place at the start of the depth (the first attempt)
     };
 
     // Everything one thread needs during one search (L: one per thread).
@@ -382,6 +388,7 @@ private:
         Accumulator accs[Yolah::MAX_NB_PLIES + 1];
         bool acc_ok[Yolah::MAX_NB_PLIES + 1]{};
         bool proxy_off = false;                    // during a proxy cut verification: no proxy cut inside
+        uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
     };
 
     // Evaluation cache (D): one entry per slot, the newest wins. The low bits
@@ -455,6 +462,22 @@ public:
         uint16_t move;                         // the best move found (Move::raw)
     };
     std::vector<NodeRecord>* recorder = nullptr;
+    // Root log (search_bench run --rootlog): after each completed depth of the
+    // main thread, one record per root move, in the order of the last attempt.
+    // value ≤ alpha: upper bound (fail soft), value ≥ beta: lower bound,
+    // between: exact. sigma: the mean |v_d − v_{d−1}| of the adaptive windows
+    // before this depth (0 if none yet).
+    struct RootRecord {
+        int      tag;                          // root_log_tag (the bench position)
+        uint8_t  depth, attempts, rank, rank_start, reduction, stage;
+        uint16_t move;                         // Move::raw
+        uint64_t nodes;
+        int      value, alpha, beta;           // the move's value, the alpha it was searched with, the window's beta
+        int      iter_value;                   // the value of the depth
+        double   sigma;
+    };
+    std::vector<RootRecord>* root_log = nullptr;
+    int root_log_tag = 0;
     // The search debugger's recorder (test/search_trace_main.cpp): only read by
     // a build with YOLAH_SEARCH_TRACE, where every step of the search is recorded.
     SearchTracer* tracer = nullptr;

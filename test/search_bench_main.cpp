@@ -26,6 +26,7 @@
 //
 //   search_bench run --player ../config/mm_nnue_dev_player.cfg --positions bench_positions.txt
 //                    (--depth D | --time MICROSECONDS) [--csv out.csv] [--compare ref.csv] [--limit N] [--warm 1]
+//                    [--rootlog roots.csv]
 //       Searches every position from an empty transposition table and prints,
 //       per position, the depth reached, the value, the move, the nodes and the
 //       time; then the totals. --depth: time to depth (the work to reach the
@@ -34,6 +35,13 @@
 //       and moves, and the ratio of nodes and times. --warm 1 (dev player):
 //       the history and countermoves are kept from one position to the next
 //       (the positions follow the games: as in a game, not from scratch).
+//       --rootlog (dev player, main thread): after each completed depth, one
+//       line per root move: its rank in the last attempt and at the start of
+//       the depth, reduction, last stage of the move's search (1 reduced,
+//       2 null window, 3 full re-search, 4 full window), nodes, fail-soft
+//       value and the alpha it was searched with (value ≤ alpha: upper bound),
+//       the window's beta, the depth's value and the mean change of value of
+//       the adaptive windows (nnue/root_surprise.py).
 //
 //   search_bench cutstats --player CFG --cache DIR --depth D --out stats.bin [--stride S] [--offset K]
 //       The cutoff statistics of the dev player's searches (step T, the
@@ -374,9 +382,25 @@ namespace {
         cout << std::format("{:>4} {:>4} {:>5} {:>7} {:>6} {:>12} {:>9} {:>10}{}\n", "pos", "ply", "depth", "value", "move",
                             "nodes", "seconds", "knodes/s", ref.empty() ? "" : "   ref nodes  ref s  same");
         const bool warm = a.get("warm", "0") == "1";
+        std::ofstream rootlog;
+        std::vector<MinMaxNNUE_DevPlayer::RootRecord> roots;
+        if (a.has("rootlog")) {
+            if (!s.dev) { cerr << "--rootlog: dev player only\n"; return 1; }
+            rootlog.open(a.get("rootlog"));
+            rootlog << "pos,depth,attempts,rank,rank_start,reduction,stage,move,nodes,value,alpha,beta,iter_value,sigma\n";
+            s.dev->root_log = &roots;
+        }
         for (const auto& [i, position] : positions) {
             s.clear(warm);
+            if (s.dev) s.dev->root_log_tag = int(i);
             auto r = s.search(position, depth, us);
+            for (const auto& q : roots) {
+                rootlog << q.tag << ',' << int(q.depth) << ',' << int(q.attempts) << ',' << int(q.rank) << ','
+                        << int(q.rank_start) << ',' << int(q.reduction) << ',' << int(q.stage) << ','
+                        << move_str(Move(q.move)) << ',' << q.nodes << ',' << q.value << ',' << q.alpha << ','
+                        << q.beta << ',' << q.iter_value << ',' << q.sigma << '\n';
+            }
+            roots.clear();
             const string mv = move_str(r.move);
             total_nodes += r.nb_nodes; total_time += r.seconds; total_depth += r.depth;
             if (csv.is_open()) {

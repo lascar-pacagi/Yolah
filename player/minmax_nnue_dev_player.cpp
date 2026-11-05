@@ -320,6 +320,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
     }
     yolah.play(m);
     int v = alpha + 1;                    // "might beat alpha" until a search says otherwise
+    s.last_stage = 1;
     if (reduction > 0) {                  // late move: reduced search first
         const int d = depth - 1 - reduction;
         TR(CALL, 1, alpha, options.pvs ? alpha + 1 : beta, d);
@@ -331,17 +332,20 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
         if (options.pvs && i > 0) {
             TR(CALL, 2, alpha, alpha + 1, depth - 1);
             v = -negamax(yolah, s, child, -(alpha + 1), -alpha, depth - 1);       // null window
+            s.last_stage = 2;
             TR(CALL_RESULT, 2, v);
             // ("pvs research high": also when the null window says ≥ beta at a PV
             // node: that lower bound comes from a non-PV search, with its pruning)
             if (v > alpha && (v < beta || (options.pvs_research_high && beta - alpha > 1)) && !stopped()) {
                 TR(CALL, 3, alpha, beta, depth - 1);
                 v = -negamax(yolah, s, child, -beta, -alpha, depth - 1);          // exact value
+                s.last_stage = 3;
                 TR(CALL_RESULT, 3, v);
             }
         } else {
             TR(CALL, 4, alpha, beta, depth - 1);
             v = -negamax(yolah, s, child, -beta, -alpha, depth - 1);
+            s.last_stage = 4;
             TR(CALL_RESULT, 4, v);
         }
     }
@@ -1342,6 +1346,7 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         TR(MOVE, int(i), rm.move.raw(), s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()], r, 0);
         const int v = search_move(yolah, s, hash, rm.move, i, r, alpha, beta, depth);
         TR(MOVE_DONE, int(i), rm.move.raw(), v, best, alpha);
+        rm.value = v; rm.alpha = alpha; rm.reduction = uint8_t(r); rm.stage = s.last_stage; rm.rank = uint8_t(i);
         if (options.root_fix && !options.root_nodes_last) rm.nodes += s.nb_nodes - nodes_before;   // summed over the attempts of this depth
         else rm.nodes = s.nb_nodes - nodes_before;
         if (stopped()) return TRET(best);
@@ -1756,6 +1761,8 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         if (adaptive && s.w->asp_n > 0) delta = std::max(delta, int(options.aspiration_k * s.w->asp_sum / s.w->asp_n));
         int alpha = -INFINITE, beta = INFINITE;
         if (options.root_fix) for (RootMove& rm : s.root_moves) rm.nodes = 0;
+        for (size_t i = 0; i < s.root_moves.size(); i++) s.root_moves[i].rank_start = uint8_t(i);
+        const double sigma = s.w->asp_n > 0 ? s.w->asp_sum / s.w->asp_n : 0;
         // ("aspiration center 2": between the last two depths, against the odd/even swing)
         const int center = options.aspiration_center2 && have_prev && std::abs(value_prev) < WIN ? (value + value_prev) / 2 : value;
         if (delta > 0 && d >= 4 && std::abs(value) < WIN) {
@@ -1763,9 +1770,11 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
             beta  = std::min(center + delta, INFINITE);
         }
         [[maybe_unused]] int attempt = 0;
+        int nb_attempts = 0;
         int last_outcome = 0;
         for (;;) {
             Move m;
+            nb_attempts++;
             TR(ITER, d, alpha, beta, attempt++, delta);
             const uint64_t nodes_before = s.nb_nodes;
             s.asp_attempts++;
@@ -1811,6 +1820,12 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
             if (tracer) trace_pv(__LINE__, yolah, hash, d);
 #endif
             res = m;
+            if (root_log && s.id == 0) {
+                for (const RootMove& rm : s.root_moves) {
+                    root_log->push_back({root_log_tag, uint8_t(d), uint8_t(nb_attempts), rm.rank, rm.rank_start, rm.reduction,
+                                         rm.stage, rm.move.raw(), rm.nodes, rm.value, rm.alpha, beta, v, sigma});
+                }
+            }
             if (d >= options.aspiration_stats_depth && depth > 0 && std::abs(v) < WIN && std::abs(value) < WIN) {
                 s.w->asp_sum = 0.9 * s.w->asp_sum + std::abs(v - value);
                 s.w->asp_n   = 0.9 * s.w->asp_n + 1;
