@@ -1371,6 +1371,20 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         // only the new best comes to the front.
         auto it = std::find_if(s.root_moves.begin(), s.root_moves.end(), [&](const RootMove& rm) { return rm.move == res; });
         std::rotate(s.root_moves.begin(), it, it + 1);
+    } else if (options.root_ordering && options.root_order_gap) {
+        // "root order gap": the sum of the two ranks, ties by nodes
+        const size_t n = s.root_moves.size();
+        std::vector<size_t> by_nodes(n), by_value(n), score(n, 0);
+        for (size_t i = 0; i < n; i++) by_nodes[i] = by_value[i] = i;
+        std::stable_sort(by_nodes.begin(), by_nodes.end(), [&](size_t a, size_t b) { return s.root_moves[a].nodes > s.root_moves[b].nodes; });
+        std::stable_sort(by_value.begin(), by_value.end(), [&](size_t a, size_t b) { return s.root_moves[a].value > s.root_moves[b].value; });
+        for (size_t r = 0; r < n; r++) { score[by_nodes[r]] += r; score[by_value[r]] += r; }
+        std::vector<std::pair<size_t, RootMove>> keyed;
+        for (size_t i = 0; i < n; i++) keyed.push_back({s.root_moves[i].move == res ? 0 : 1 + score[i], s.root_moves[i]});
+        std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) {
+            return a.first != b.first ? a.first < b.first : a.second.nodes > b.second.nodes;
+        });
+        for (size_t i = 0; i < n; i++) s.root_moves[i] = keyed[i].second;
     } else if (options.root_ordering) {
         std::stable_sort(s.root_moves.begin(), s.root_moves.end(),
                          [&](const RootMove& a, const RootMove& b) {
@@ -1907,6 +1921,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["tempo"] = options.tempo;
     j["root fix"] = options.root_fix;
     j["root nodes last"] = options.root_nodes_last;
+    j["root order gap"] = options.root_order_gap;
     j["aspiration keep beta"] = options.aspiration_keep_beta;
     j["aspiration stats depth"] = options.aspiration_stats_depth;
     j["aspiration center 2"] = options.aspiration_center2;

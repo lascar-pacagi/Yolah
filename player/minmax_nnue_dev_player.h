@@ -138,6 +138,8 @@ struct MinMaxNNUE_DevOptions {
     bool root_fix = true;            // ["root fix"] root order after a FAILED attempt: fail low keeps the order (the
                                      //   previous best stays first), fail high only brings the new best to the front;
                                      //   the nodes of a move are summed over the attempts of a depth
+    bool root_order_gap = false;     // ["root order gap"] after a completed root search, the moves after the best by
+                                     //   (rank by nodes + rank by fail-soft value) (root log: fewer far misses)
     bool root_nodes_last = false;    // ["root nodes last"] with "root fix": the nodes of a move are those of the last
                                      //   attempt only (summed, the moves before a fail-high cut count twice)
     bool aspiration_keep_beta = false; // ["aspiration keep beta"] adaptive windows: a fail low does not lower beta

@@ -1,0 +1,9 @@
+# Campaign R1 (search, root order, 2026-11-05): the root log (search_bench run --rootlog, nnue/root_surprise.py,
+# depth 12) places the next best move among the others by the size of its subtree (top 3 56-61 %, mean rank
+# 8.5-10.1) or by its fail-soft value (top 3 48-51 %, mean rank 6.1-6.2: fewer far misses); the sum of the two
+# ranks 60-61 %, mean rank 5.0-5.6. "root order gap": the moves after the best by that sum. search_bench nodes
+# against dev_final: depth 12 ×0.930 cold, ×0.928 warm; depth 14 ×0.776 cold, ×0.692 warm, but position 93
+# alone (12.7 M nodes → 2.3 M) makes most of it: geometric mean ×0.958, 95 positions better, 83 worse.
+# BOOK=balanced.
+r1_order_gap dev_final 200000 1000
+r1_order_gap dev_final 1000000 1000
