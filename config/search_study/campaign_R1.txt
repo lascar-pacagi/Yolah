@@ -4,6 +4,13 @@
 # ranks 60-61 %, mean rank 5.0-5.6. "root order gap": the moves after the best by that sum. search_bench nodes
 # against dev_final: depth 12 ×0.930 cold, ×0.928 warm; depth 14 ×0.776 cold, ×0.692 warm, but position 93
 # alone (12.7 M nodes → 2.3 M) makes most of it: geometric mean ×0.958, 95 positions better, 83 worse.
+# Without position 93, depth 14: ×0.931 cold, ×0.979 warm.
+# "root close full" 2: the 2 moves after the first with the best fail-soft values of the last search are not
+# reduced at the root (37-43 % of the new best moves had been rejected by the reduced search alone). Depth 14
+# nodes: geometric mean ×1.046 cold, ×0.993 warm (without position 93 ×0.986 / ×1.059): about the same cost,
+# its gain, if any, is in the moves found earlier, which only games measure. With "root order gap" too: ×1.015 / ×0.951.
 # BOOK=balanced.
 r1_order_gap dev_final 200000 1000
 r1_order_gap dev_final 1000000 1000
+r1_close2 dev_final 200000 1000
+r1_close2 dev_final 1000000 1000

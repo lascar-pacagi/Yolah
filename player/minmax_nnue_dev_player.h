@@ -140,6 +140,8 @@ struct MinMaxNNUE_DevOptions {
                                      //   the nodes of a move are summed over the attempts of a depth
     bool root_order_gap = false;     // ["root order gap"] after a completed root search, the moves after the best by
                                      //   (rank by nodes + rank by fail-soft value) (root log: fewer far misses)
+    int  root_close_full = 0;        // ["root close full"] > 0: at the root, the N moves (after the first) with the best
+                                     //   fail-soft values of the last search are not reduced
     bool root_nodes_last = false;    // ["root nodes last"] with "root fix": the nodes of a move are those of the last
                                      //   attempt only (summed, the moves before a fail-high cut count twice)
     bool aspiration_keep_beta = false; // ["aspiration keep beta"] adaptive windows: a fail low does not lower beta

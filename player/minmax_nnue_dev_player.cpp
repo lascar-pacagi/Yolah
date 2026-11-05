@@ -1336,11 +1336,23 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         score_moves(yolah, s, tt_move(hash), moves, scores, 63);
         for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
+    // "root close full": the moves closest to the best in the last search (their
+    // values are read before this search overwrites them)
+    bool close[Yolah::MAX_NB_MOVES]{};
+    if (options.root_close_full > 0 && s.root_moves.size() > 1) {
+        std::vector<size_t> idx;
+        for (size_t i = 1; i < s.root_moves.size(); i++) idx.push_back(i);
+        const size_t k = std::min(idx.size(), size_t(options.root_close_full));
+        std::partial_sort(idx.begin(), idx.begin() + k, idx.end(),
+                          [&](size_t a, size_t b) { return s.root_moves[a].value > s.root_moves[b].value; });
+        for (size_t j = 0; j < k; j++) close[idx[j]] = true;
+    }
     for (size_t i = 0; i < s.root_moves.size(); i++) {
         RootMove& rm = s.root_moves[i];
         const uint64_t nodes_before = s.nb_nodes;
         // The root is a PV node; no killers there, the history still speaks.
-        const int r = options.articulation_lmr && is_articulation_move(yolah, rm.move) ? 0
+        const int r = close[i] ? 0
+                    : options.articulation_lmr && is_articulation_move(yolah, rm.move) ? 0
                     : late_move_reduction_of(depth, i, true, false,
                                              s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()]);
         TR(MOVE, int(i), rm.move.raw(), s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()], r, 0);
@@ -1922,6 +1934,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["root fix"] = options.root_fix;
     j["root nodes last"] = options.root_nodes_last;
     j["root order gap"] = options.root_order_gap;
+    j["root close full"] = options.root_close_full;
     j["aspiration keep beta"] = options.aspiration_keep_beta;
     j["aspiration stats depth"] = options.aspiration_stats_depth;
     j["aspiration center 2"] = options.aspiration_center2;

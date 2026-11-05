@@ -362,6 +362,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.root_fix = j.value("root fix", options.root_fix);
              options.root_nodes_last = j.value("root nodes last", options.root_nodes_last);
              options.root_order_gap = j.value("root order gap", options.root_order_gap);
+             options.root_close_full = j.value("root close full", options.root_close_full);
              options.aspiration_keep_beta = j.value("aspiration keep beta", options.aspiration_keep_beta);
              options.aspiration_stats_depth = j.value("aspiration stats depth", options.aspiration_stats_depth);
              options.aspiration_center2 = j.value("aspiration center 2", options.aspiration_center2);
