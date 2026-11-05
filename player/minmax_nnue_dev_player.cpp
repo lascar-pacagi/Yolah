@@ -1342,7 +1342,7 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         TR(MOVE, int(i), rm.move.raw(), s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()], r, 0);
         const int v = search_move(yolah, s, hash, rm.move, i, r, alpha, beta, depth);
         TR(MOVE_DONE, int(i), rm.move.raw(), v, best, alpha);
-        if (options.root_fix) rm.nodes += s.nb_nodes - nodes_before;   // summed over the attempts of this depth
+        if (options.root_fix && !options.root_nodes_last) rm.nodes += s.nb_nodes - nodes_before;   // summed over the attempts of this depth
         else rm.nodes = s.nb_nodes - nodes_before;
         if (stopped()) return TRET(best);
         if (v > best) {
@@ -1889,6 +1889,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["aspiration grow"] = options.aspiration_grow;
     j["tempo"] = options.tempo;
     j["root fix"] = options.root_fix;
+    j["root nodes last"] = options.root_nodes_last;
     j["aspiration keep beta"] = options.aspiration_keep_beta;
     j["aspiration stats depth"] = options.aspiration_stats_depth;
     j["aspiration center 2"] = options.aspiration_center2;
