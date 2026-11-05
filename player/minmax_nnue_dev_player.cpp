@@ -1759,6 +1759,8 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         int delta = options.aspiration_window;
         const bool adaptive = options.aspiration_k > 0;
         if (adaptive && s.w->asp_n > 0) delta = std::max(delta, int(options.aspiration_k * s.w->asp_sum / s.w->asp_n));
+        if (adaptive && options.aspiration_last > 0 && have_prev && std::abs(value) < WIN && std::abs(value_prev) < WIN)
+            delta = std::max(delta, int(options.aspiration_last * std::abs(value - value_prev)));
         int alpha = -INFINITE, beta = INFINITE;
         if (options.root_fix) for (RootMove& rm : s.root_moves) rm.nodes = 0;
         for (size_t i = 0; i < s.root_moves.size(); i++) s.root_moves[i].rank_start = uint8_t(i);
@@ -1908,6 +1910,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["aspiration keep beta"] = options.aspiration_keep_beta;
     j["aspiration stats depth"] = options.aspiration_stats_depth;
     j["aspiration center 2"] = options.aspiration_center2;
+    j["aspiration last"] = options.aspiration_last;
     j["pvs research high"] = options.pvs_research_high;
     j["tt cut pv"] = options.tt_cut_pv;
     j["tt cut pv exact"] = options.tt_cut_pv_exact;

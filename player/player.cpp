@@ -364,6 +364,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.aspiration_keep_beta = j.value("aspiration keep beta", options.aspiration_keep_beta);
              options.aspiration_stats_depth = j.value("aspiration stats depth", options.aspiration_stats_depth);
              options.aspiration_center2 = j.value("aspiration center 2", options.aspiration_center2);
+             options.aspiration_last = j.value("aspiration last", options.aspiration_last);
              options.pvs_research_high = j.value("pvs research high", options.pvs_research_high);
              options.tt_cut_pv = j.value("tt cut pv", options.tt_cut_pv);
              options.tt_cut_pv_exact = j.value("tt cut pv exact", options.tt_cut_pv_exact);

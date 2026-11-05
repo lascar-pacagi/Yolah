@@ -143,6 +143,8 @@ struct MinMaxNNUE_DevOptions {
     bool aspiration_keep_beta = false; // ["aspiration keep beta"] adaptive windows: a fail low does not lower beta
     int  aspiration_stats_depth = 4; // ["aspiration stats depth"] adaptive windows: |v_d − v_{d−1}| counted from this depth
     bool aspiration_center2 = false; // ["aspiration center 2"] window centred on (v_{d−1} + v_{d−2}) / 2 (odd/even effect)
+    double aspiration_last = 0;      // ["aspiration last"] > 0, adaptive windows: half width at least this × |v_{d−1} − v_{d−2}|
+                                     //   (after a surprise the next depth often fails: root log, nnue/root_surprise.py)
     bool pvs_research_high = false;  // ["pvs research high"] PV nodes: full-window re-search also when the null window
                                      //   gave ≥ beta (Stockfish today), not only alpha < v < beta
     bool tt_cut_pv = false;          // ["tt cut pv"] false: at PV nodes, the table cuts only with an exact value or a
