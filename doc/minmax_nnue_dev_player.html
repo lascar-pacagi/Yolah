@@ -313,7 +313,7 @@ int negamax(pos, α, β, depth):                                              //
 <tr><td rowspan="3">Evaluation</td><td><code>lazy accumulator</code></td><td>on</td><td>7.2</td></tr>
 <tr><td><code>eval cache</code></td><td>20 (2<sup>20</sup> entries, 8 MB)</td><td>7.1</td></tr>
 <tr><td><code>sparse h1</code></td><td>on</td><td>8.7</td></tr>
-<tr><td>Network</td><td><code>weights</code></td><td><code>nnue_persp_k8_them_g046_qat_az20_distill.quantized.txt</code></td><td>8, 9</td></tr>
+<tr><td>Network</td><td><code>weights</code></td><td><code>nnue_persp_k8_them_g046_qat_scratch_az20_distill.quantized.txt</code></td><td>8, 9</td></tr>
 </tbody></table></div>
 </section>
 <section id="s2">
@@ -1904,6 +1904,7 @@ def export_persp(path, out_dir):
 <tr><td>Root fix + LMR on history alone + no table cut at PV nodes</td><td class="num-r">+22.4 (1 s)</td><td>Yolah table + aspiration k 1.25</td></tr>
 <tr><td>Lazy SMP, 4 threads (an early version of the player)</td><td class="num-r">+84</td><td>the same player with 1 thread (61.8 %)</td></tr>
 <tr><td><strong>Final player</strong></td><td class="num-r"><strong>+18.8</strong> [+9.0, +28.6]</td><td>g046 before campaigns A1–A5 (1 s, 2000 games)</td></tr>
+<tr><td>The same network retrained from a random start (g046_qat_scratch_az20, validation mse 0.0735 against 0.0764)</td><td class="num-r">+12.3 [+2.4, +22.3] (1 s), +15.5 [+4.5, +26.5] (0.2 s)</td><td>the final player above, with the g046 network (2000 games each); this network is now the one of the final player</td></tr>
 </tbody></table></div>
 <div class="col">
 <p>Against the MCTS players at one second per move (before campaigns A1–A5), the g046 network in this search was level with the AlphaZero 256 network (+1 [−15, +17] for AlphaZero over 1273 games) when the MCTS players kept 1024 descents in flight, and about 35 Elo behind both MCTS players with 256 descents in flight, a setting that suits them better.</p>

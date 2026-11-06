@@ -9,8 +9,8 @@
 # reduced at the root (37-43 % of the new best moves had been rejected by the reduced search alone). Depth 14
 # nodes: geometric mean ×1.046 cold, ×0.993 warm (without position 93 ×0.986 / ×1.059): about the same cost,
 # its gain, if any, is in the moves found earlier, which only games measure. With "root order gap" too: ×1.015 / ×0.951.
-# BOOK=balanced.
-r1_order_gap dev_final 200000 1000
-r1_order_gap dev_final 1000000 1000
-r1_close2 dev_final 200000 1000
-r1_close2 dev_final 1000000 1000
+# BOOK=balanced. Reference: dev_final at the time, now dev_final_g046; the results files of these games are named __vs__dev_final. Lines 2-4 were never played (abandoned 2026-11-06).
+r1_order_gap dev_final_g046 200000 1000
+r1_order_gap dev_final_g046 1000000 1000
+r1_close2 dev_final_g046 200000 1000
+r1_close2 dev_final_g046 1000000 1000
