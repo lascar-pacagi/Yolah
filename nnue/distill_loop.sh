@@ -56,11 +56,11 @@ LOOP_DIR="${LOOP_DIR:-${HOME}/DistillLoop}"
 export WORK_DIR="${LOOP_DIR}"                     # alphazero_common.sh: /work in the container
 
 # ── settings (sbatch --export / environment) ────────────────────────────────
-EXCLUDE="${EXCLUDE:-crn04,crn07,crn14,crn15}"
+EXCLUDE="${EXCLUDE:-crn04,crn05,crn07,crn13,crn14,crn15}"
 # The gen stage only (a search has a fixed number of nodes, its time is the
 # CPU's speed: 48 s per game and core on crn16's E5-2698 v3, 14.5 s on an
 # i7-12700K): the Xeons out, the EPYCs (crn12, crn13, crn25) in.
-GEN_EXCLUDE="${GEN_EXCLUDE:-crn01,crn02,crn03,crn04,crn05,crn07,crn14,crn15,crn16}"
+GEN_EXCLUDE="${GEN_EXCLUDE:-crn01,crn02,crn03,crn04,crn05,crn07,crn13,crn14,crn15,crn16}"
 GAMES="${GAMES:-200000}"                          # games per round
 GAMES_PER_TASK="${GAMES_PER_TASK:-4000}"
 THROTTLE="${THROTTLE:-8}"                         # gen tasks at a time (scontrol update JobId=… ArrayTaskThrottle=N)
