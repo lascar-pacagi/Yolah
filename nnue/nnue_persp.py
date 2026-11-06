@@ -51,6 +51,18 @@ w3, and is not limited by the int8 range of fc2 (|w| ≤ 127/64), which the
 space columns of spacelite hit (up to 75 of 512 rows). In C++ it costs one
 multiply-add per feature, in float ("DIRECT" section of the weights file).
 
+First layer per phase (fc1_buckets=N > 1): N sets of fc1 weights and biases, the
+set chosen by the holes as for the heads (bucket = holes · N // 57), for both
+views. All the sets are computed here and the right one is kept; in a C++ player
+only the active one would be: updating the accumulator would read as many rows as
+now, with a refresh when the position changes set. fc1 is (N · l1) × 192 in the
+file, the N sets one after the other. Random start only.
+
+Squared outputs (square=True): w3 reads [h2, h2²] instead of h2, so 2 · l2 inputs;
+in QAT h2² is floor(h2 · h2 · 64) / 64, the (x · x) >> 6 of h2 as integers 0..64.
+l2 = 32 with square has the w3 of l2 = 64, with half of fc2. Random start only.
+No C++ for these two yet (export_value_nets.py refuses them).
+
 Quantization-aware training (qat=True): the forward pass computes what the
 C++ computes (nnue_persp.cpp), not the float network:
     weights   round(w · 64) / 64, clamped to ±127/64          (int8 at scale 64)
@@ -120,18 +132,19 @@ def space_columns(mask):
 
 class NetPersp(nn.Module):
     def __init__(self, k=8, them=False, l1_size=1024, l2_size=64, l3_size=32, space_mask=0,
-                 direct=False, qat=False):
+                 direct=False, qat=False, fc1_buckets=1, square=False):
         super().__init__()
         self.k, self.them = k, them
         self.l1_size, self.l2_size, self.l3_size = l1_size, l2_size, l3_size
         self.space_mask = int(space_mask)
         self.n_space = len(space_columns(self.space_mask))
-        self.fc1 = nn.Linear(INPUT_SIZE, l1_size)
+        self.fc1_buckets, self.square = int(fc1_buckets), bool(square)
+        self.fc1 = nn.Linear(INPUT_SIZE, l1_size * self.fc1_buckets)
         self.fc2 = nn.Linear(l1_size * (2 if them else 1) + self.n_space, l2_size * k)
         # One (l3 × l2) matrix and one (l3) value head per phase, initialised like nn.Linear.
-        fc3 = [nn.Linear(l2_size, l3_size) for _ in range(k)]
+        fc3 = [nn.Linear(l2_size * (2 if self.square else 1), l3_size) for _ in range(k)]
         fc4 = [nn.Linear(l3_size, 1) for _ in range(k)]
-        self.w3 = nn.Parameter(torch.stack([m.weight.data for m in fc3]))           # (K, l3, l2)
+        self.w3 = nn.Parameter(torch.stack([m.weight.data for m in fc3]))           # (K, l3, l2 or 2 · l2)
         self.b3 = nn.Parameter(torch.stack([m.bias.data for m in fc3]))             # (K, l3)
         self.w4 = nn.Parameter(torch.stack([m.weight.data[0] for m in fc4]))        # (K, l3)
         self.b4 = nn.Parameter(torch.stack([m.bias.data[0] for m in fc4]))          # (K,)
@@ -151,6 +164,8 @@ class NetPersp(nn.Module):
         # and a buffer to save it with the weights.
         self.qat = bool(qat)
         self.register_buffer("qat_t", torch.tensor(int(self.qat), dtype=torch.long))
+        self.register_buffer("fc1_buckets_t", torch.tensor(self.fc1_buckets, dtype=torch.long))
+        self.register_buffer("square_t", torch.tensor(int(self.square), dtype=torch.long))
 
     def perspective(self, x):
         """Cache batch (bs, 193) → (us, them, bucket)."""
@@ -173,13 +188,23 @@ class NetPersp(nn.Module):
         else:
             w1, b1, w2, b2, w3, b3 = self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias, self.w3, self.b3
             act = lambda t: t      # noqa: E731
-        h1 = torch.clamp(nn.functional.linear(us, w1, b1), 0.0, 1.0)
+        h1 = nn.functional.linear(us, w1, b1)
+        h1t = nn.functional.linear(them, w1, b1) if self.them else None
+        if self.fc1_buckets > 1:     # the set of the position's phase
+            ib = bucket_of(x[:, 128:192].sum(dim=1).round().long(), self.fc1_buckets)
+            ib = ib.view(-1, 1, 1).expand(-1, 1, self.l1_size)
+            h1 = h1.view(-1, self.fc1_buckets, self.l1_size).gather(1, ib).squeeze(1)
+            if self.them:
+                h1t = h1t.view(-1, self.fc1_buckets, self.l1_size).gather(1, ib).squeeze(1)
+        h1 = torch.clamp(h1, 0.0, 1.0)
         if self.them:
-            h1 = torch.cat([h1, torch.clamp(nn.functional.linear(them, w1, b1), 0.0, 1.0)], dim=1)
+            h1 = torch.cat([h1, torch.clamp(h1t, 0.0, 1.0)], dim=1)
         if self.n_space:
             space = (x[:, self.space_idx] / SPACE_SCALE).to(h1.dtype)
             h1 = torch.cat([h1, space], dim=1)
         h2 = torch.clamp(act(nn.functional.linear(h1, w2, b2)), 0.0, 1.0).view(-1, self.k, self.l2_size)  # (bs, K, l2)
+        if self.square:
+            h2 = torch.cat([h2, act(h2 * h2)], dim=2)                                                # (bs, K, 2 · l2)
         h3 = torch.clamp(act(torch.einsum('bki,koi->bko', h2, w3) + b3), 0.0, 1.0)                     # (bs, K, l3)
         v = (h3 * self.w4).sum(dim=2) + self.b4                                                      # (bs, K)
         if self.direct is not None:
@@ -201,6 +226,8 @@ class NetPersp(nn.Module):
         turn row; every head gets a copy of fc2–fc4, and the "them" half of fc2
         starts at 0. The new network then gives exactly the old one's values on
         the positions with black to move."""
+        if self.fc1_buckets > 1 or self.square:
+            raise ValueError("first layer per phase, squared outputs: random start only")
         sd = {(k[7:] if k.startswith("module.") else k): v.float() for k, v in sd.items()}
         if sd["fc1.weight"].shape != (self.l1_size, CACHE_INPUT_SIZE):
             raise ValueError(f"fc1 {tuple(sd['fc1.weight'].shape)}: not a 193 → {self.l1_size} network")
@@ -225,6 +252,7 @@ class NetPersp(nn.Module):
         sd = {(k[7:] if k.startswith("module.") else k): v.float() for k, v in sd.items()}
         k, them, l1, l2, l3, mask = config_of(sd)
         if (k, them, l1, l2, l3) != (self.k, self.them, self.l1_size, self.l2_size, self.l3_size) \
+                or int(sd.get("fc1_buckets_t", 1)) != self.fc1_buckets or bool(sd.get("square_t", 0)) != self.square \
                 or mask & ~self.space_mask:
             raise ValueError(f"init_from_persp: source K={k} them={them} mask={mask:#x} does not fit "
                              f"K={self.k} them={self.them} mask={self.space_mask:#x}")
@@ -248,7 +276,9 @@ def config_of(sd):
     quantization-aware: sd["qat_t"])."""
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
     k, l3, l2 = sd["w3"].shape
-    l1 = sd["fc1.weight"].shape[0]
+    if "square_t" in sd and int(sd["square_t"]):
+        l2 //= 2
+    l1 = sd["fc1.weight"].shape[0] // (int(sd["fc1_buckets_t"]) if "fc1_buckets_t" in sd else 1)
     if "space_cols_t" in sd:
         mask = sum(1 << int(c) for c in sd["space_cols_t"])
     else:
@@ -266,10 +296,14 @@ def load_persp(path, map_location="cpu"):
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
     k, them, l1, l2, l3, mask = config_of(sd)
     net = NetPersp(k, them, l1, l2, l3, mask, direct="direct" in sd,
-                   qat=bool(sd["qat_t"]) if "qat_t" in sd else False)
+                   qat=bool(sd["qat_t"]) if "qat_t" in sd else False,
+                   fc1_buckets=int(sd["fc1_buckets_t"]) if "fc1_buckets_t" in sd else 1,
+                   square=bool(sd["square_t"]) if "square_t" in sd else False)
     # networks saved before step 2 / before the ablation / before step 3 lack these buffers: take the new network's
     sd.setdefault("space_mask_t", net.space_mask_t)
     sd.setdefault("space_cols_t", net.space_cols_t)
     sd.setdefault("qat_t", net.qat_t)
+    sd.setdefault("fc1_buckets_t", net.fc1_buckets_t)
+    sd.setdefault("square_t", net.square_t)
     net.load_state_dict(sd)
     return net

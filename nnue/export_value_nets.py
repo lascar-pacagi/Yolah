@@ -122,6 +122,8 @@ def export_persp(path, out_dir):
     from nnue_persp import load_persp
     name = os.path.splitext(os.path.basename(path))[0]
     net = load_persp(path)
+    if net.fc1_buckets > 1 or net.square:
+        raise SystemExit(f"{path}: first layer per phase or squared outputs: no C++ for them yet")
     from nnue_persp import space_columns
     cols = space_columns(net.space_mask)
     w8 = lambda what: quantizer(SCALE, -127, 127, f"{name} {what}")                    # int8 weights

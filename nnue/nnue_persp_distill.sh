@@ -62,6 +62,10 @@
 #                                                      → k8_them_g046_qat_l512_scratch_az20
 #   (the same without YOLAH_L1_SIZE: k8_them_g046_qat_scratch_az20, the 1024 network
 #   under the same conditions; a 512 network cannot start from the 193 network)
+# Architecture (SCRATCH=1 needed; validation only, no C++ for the last two yet):
+#   YOLAH_L2_SIZE=32                   32 outputs of fc2 per head instead of 64  → …_l232…
+#   YOLAH_L2_SQUARE=1                  w3 reads [h2, h2²]                        → …_sq…
+#   YOLAH_INPUT_BUCKETS=4              4 sets of fc1 weights by phase            → …_ib4…
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
 # space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
@@ -103,6 +107,9 @@ YOLAH_QAT="${YOLAH_QAT:-0}"
 P7="${P7:-0}"
 YOLAH_L1_SIZE="${YOLAH_L1_SIZE:-1024}"
 SCRATCH="${SCRATCH:-0}"
+YOLAH_L2_SIZE="${YOLAH_L2_SIZE:-64}"
+YOLAH_L2_SQUARE="${YOLAH_L2_SQUARE:-0}"
+YOLAH_INPUT_BUCKETS="${YOLAH_INPUT_BUCKETS:-1}"
 if [[ "${P7}" == "1" ]]; then CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"; fi
 EVAL_MODEL="${EVAL_MODEL:-}"
 if [[ "${FROM_SPACELITE}" == "1" ]]; then
@@ -141,6 +148,12 @@ if [[ "${YOLAH_L1_SIZE}" != "1024" ]]; then
     if [[ "${SCRATCH}" != "1" ]]; then echo "YOLAH_L1_SIZE=${YOLAH_L1_SIZE} needs SCRATCH=1 (the starting networks have 1024)" >&2; exit 1; fi
     WIDTH_SUFFIX="_l${YOLAH_L1_SIZE}"
 fi
+if [[ "${YOLAH_L2_SIZE}" != "64" || "${YOLAH_L2_SQUARE}" == "1" || "${YOLAH_INPUT_BUCKETS}" != "1" ]] && [[ "${SCRATCH}" != "1" ]]; then
+    echo "YOLAH_L2_SIZE, YOLAH_L2_SQUARE, YOLAH_INPUT_BUCKETS need SCRATCH=1" >&2; exit 1
+fi
+if [[ "${YOLAH_L2_SIZE}" != "64" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_l2${YOLAH_L2_SIZE}"; fi
+if [[ "${YOLAH_L2_SQUARE}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_sq"; fi
+if [[ "${YOLAH_INPUT_BUCKETS}" != "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ib${YOLAH_INPUT_BUCKETS}"; fi
 if [[ "${SCRATCH}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_scratch"; fi
 if [[ "${P7}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
@@ -201,7 +214,8 @@ echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
 echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none}  seed=${YOLAH_SEED}  continue=${CONTINUE}"
 echo "  Step 3   : P7=${P7}  from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
-echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}"
+echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}  input buckets=${YOLAH_INPUT_BUCKETS}"
+echo "  Layer 2  : ${YOLAH_L2_SIZE}  square=${YOLAH_L2_SQUARE}"
 echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
 
@@ -213,6 +227,9 @@ singularity exec --nv \
     --env "YOLAH_MODEL_DIR=/mnt/" \
     --env "YOLAH_INIT_MODEL=$([[ "${INIT_NAME}" == "none" ]] && echo none || echo "/mnt/${INIT_NAME}")" \
     --env "YOLAH_L1_SIZE=${YOLAH_L1_SIZE}" \
+    --env "YOLAH_L2_SIZE=${YOLAH_L2_SIZE}" \
+    --env "YOLAH_L2_SQUARE=${YOLAH_L2_SQUARE}" \
+    --env "YOLAH_INPUT_BUCKETS=${YOLAH_INPUT_BUCKETS}" \
     --env "YOLAH_SPACE_MASK=${YOLAH_SPACE_MASK}" \
     --env "YOLAH_SPACE_GROUPS=${YOLAH_SPACE_GROUPS:-0}" \
     --env "YOLAH_SEED=${YOLAH_SEED}" \

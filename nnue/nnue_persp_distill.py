@@ -36,6 +36,10 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
                           (the bf16 of autocast cannot hold the grid 1/64 exactly)
     YOLAH_L1_SIZE         values of the first layer per view (default 1024; the C++
                           NNUE_Persp reads 1024 or 512)
+    YOLAH_L2_SIZE         outputs of fc2 per head (default 64)
+    YOLAH_L2_SQUARE       1: w3 reads [h2, h2²] (nnue_persp.py; random start, no C++ yet)
+    YOLAH_INPUT_BUCKETS   N > 1: N sets of fc1 weights by phase (nnue_persp.py; random
+                          start, no C++ yet)
     YOLAH_INIT_MODEL=none no starting weights: the network starts from PyTorch's random
                           initialisation (seeded by YOLAH_SEED)
     YOLAH_SEED            another shuffling of the training data (default 0), to
@@ -84,6 +88,9 @@ MODEL_PATH = os.environ.get("YOLAH_MODEL_DIR", "/mnt/")
 PERSP_K    = int(os.environ.get("YOLAH_PERSP_K", "8"))
 PERSP_THEM = os.environ.get("YOLAH_PERSP_THEM", "0") == "1"
 L1_SIZE    = int(os.environ.get("YOLAH_L1_SIZE", "1024"))
+L2_SIZE    = int(os.environ.get("YOLAH_L2_SIZE", "64"))
+L2_SQUARE  = os.environ.get("YOLAH_L2_SQUARE", "0") == "1"
+INPUT_BUCKETS = int(os.environ.get("YOLAH_INPUT_BUCKETS", "1"))
 SPACE_MASK = int(os.environ.get("YOLAH_SPACE_MASK", "0"), 0)
 SPACE_GROUPS = int(os.environ.get("YOLAH_SPACE_GROUPS", "0"), 0)
 SEED = int(os.environ.get("YOLAH_SEED", "0"))
@@ -296,7 +303,8 @@ def main(rank, world_size, batch_size, cache_dir):
                   'YOLAH_CHUNK_SIZE', flush=True)
 
     torch.manual_seed(SEED)         # the random initialisation (YOLAH_INIT_MODEL=none)
-    net = NetPersp(PERSP_K, PERSP_THEM, l1_size=L1_SIZE, space_mask=space_mask, direct=DIRECT, qat=QAT)
+    net = NetPersp(PERSP_K, PERSP_THEM, l1_size=L1_SIZE, l2_size=L2_SIZE, space_mask=space_mask, direct=DIRECT, qat=QAT,
+                   fc1_buckets=INPUT_BUCKETS, square=L2_SQUARE)
     if EVAL_ONLY:
         net = load_persp(INIT_MODEL)
         if net.space_mask != space_mask:
@@ -318,7 +326,8 @@ def main(rank, world_size, batch_size, cache_dir):
     else:
         raise SystemExit(f"{INIT_MODEL}: no such file (YOLAH_INIT_MODEL=none for a random start)")
     if rank == 0:
-        print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, l1={L1_SIZE}, '
+        print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, l1={L1_SIZE}, l2={L2_SIZE}, square={L2_SQUARE}, '
+              f'input buckets={INPUT_BUCKETS}, '
               f'space mask={space_mask:#x}, groups={SPACE_GROUPS:#x}, {net.n_space} space features, '
               f'direct path={DIRECT}, quantization-aware={QAT})', flush=True)
         print(net, flush=True)
