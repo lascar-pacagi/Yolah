@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yolah App Guide</title>
+<style>
+:root {
+  --paper: #f3f5f7; --panel: #ffffff; --ink: #17202b; --ink-2: #4b5667; --ink-3: #7a8494; --rule: #d8dde4;
+  --accent: #b9771e; --accent-soft: #f6e6cc; --blue: #2c6fc9; --blue-soft: #dfeafa; --green: #2e8a3e; --green-soft: #dcf0df;
+  --red: #c2412d; --code-bg: #111821; --code-ink: #dbe2ea; --code-com: #7b8a9c;
+  --font-display: "Helvetica Neue", Arial, sans-serif; --font-body: Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+    --accent: #f2b45a; --accent-soft: #3a2a12; --blue: #84a2ff; --blue-soft: #1d2a4a; --green: #5cc46c; --green-soft: #15301b;
+    --red: #ef6f5a; --code-bg: #0a0f15; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+  --accent: #f2b45a; --accent-soft: #3a2a12; --blue: #84a2ff; --blue-soft: #1d2a4a; --green: #5cc46c; --green-soft: #15301b;
+  --red: #ef6f5a; --code-bg: #0a0f15; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.62; margin: 0; padding: 0 16px 64px; }
+.page { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 48px; max-width: 1240px; margin: 0 auto; }
+@media (max-width: 1000px) { .page { grid-template-columns: minmax(0, 1fr); gap: 0; } nav.toc { display: none; } }
+nav.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 28px 0 40px; font-family: var(--font-display); font-size: 13.5px; }
+nav.toc .t { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; }
+nav.toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 3px 8px; border-left: 2px solid transparent; }
+nav.toc a:hover { color: var(--accent); border-left-color: var(--accent); }
+main { min-width: 0; padding-top: 28px; }
+.col { max-width: 72ch; }
+.wide { max-width: 980px; }
+header { padding: 24px 0 8px; border-bottom: 1px solid var(--rule); margin-bottom: 28px; }
+.eyebrow { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(32px, 5vw, 50px); line-height: 1.05; letter-spacing: -.02em; margin: 10px 0 14px; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; }
+h2 { font-family: var(--font-display); font-weight: 800; font-size: 28px; line-height: 1.15; margin: 60px 0 14px; padding-top: 16px; border-top: 3px solid var(--ink); }
+h2 .n, h3 .n { color: var(--accent); margin-right: .35em; }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 20px; margin: 34px 0 8px; }
+p, li { max-width: 72ch; }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--accent-soft); padding: .08em .3em; border-radius: 4px; }
+pre { background: var(--code-bg); color: var(--code-ink); font-family: var(--font-mono); font-size: 13.5px; line-height: 1.55; padding: 16px 18px; border-radius: 10px; overflow-x: auto; max-width: 980px; }
+pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+pre .c { color: var(--code-com); }
+table { border-collapse: collapse; margin: 16px 0; font-size: 15px; width: 100%; max-width: 980px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-display); font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+td code { white-space: nowrap; }
+figure { margin: 22px 0; max-width: 980px; }
+figure img { width: 100%; border-radius: 10px; border: 1px solid var(--rule); display: block; }
+figcaption { font-size: 14.5px; color: var(--ink-2); margin-top: 8px; font-family: var(--font-display); }
+svg.d { width: 100%; height: auto; display: block; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; }
+svg.d text { font-family: var(--font-display); fill: var(--ink); }
+svg.d .s { font-size: 12px; fill: var(--ink-2); }
+svg.d .b { fill: var(--panel); stroke: var(--ink-3); stroke-width: 1.3; }
+svg.d .ba { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg.d .bb { fill: var(--blue-soft); stroke: var(--blue); stroke-width: 1.5; }
+svg.d .bg { fill: var(--green-soft); stroke: var(--green); stroke-width: 1.5; }
+svg.d .l { stroke: var(--ink-2); stroke-width: 1.5; fill: none; }
+svg.d .la { stroke: var(--accent); stroke-width: 2; fill: none; }
+.note { border-left: 4px solid var(--blue); background: var(--blue-soft); padding: 10px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; max-width: 72ch; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 980px; }
+@media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0 .35em; background: var(--panel); }
+</style>
+</head>
+<body>
+<div class="page">
+<nav class="toc">
+  <div class="t">Contents</div>
+  <ol>
+    <li><a href="#build">1. Build and run</a></li>
+    <li><a href="#tour">2. A tour of the application</a></li>
+    <li><a href="#arch">3. Architecture</a></li>
+    <li><a href="#sdl">4. SDL3 in five ideas</a></li>
+    <li><a href="#frame">5. One frame</a></li>
+    <li><a href="#draw">6. Drawing shapes</a></li>
+    <li><a href="#text">7. Drawing text</a></li>
+    <li><a href="#ui">8. Immediate-mode widgets</a></li>
+    <li><a href="#board">9. The board</a></li>
+    <li><a href="#ai">10. The AIs and the analysis</a></li>
+    <li><a href="#themes">11. Themes and sprites</a></li>
+    <li><a href="#fx">12. Animations and effects</a></li>
+    <li><a href="#tests">13. Screenshots and tests</a></li>
+    <li><a href="#next">14. What comes next</a></li>
+  </ol>
+</nav>
+<main>
+<header>
+  <div class="eyebrow">app/yolah_app.cpp</div>
+  <h1>The Yolah application, and SDL3 from scratch</h1>
+  <p class="lede">How the graphical application is built: one C++ file in tagged sections, the SDL3 window and renderer, vector drawing with triangles, text with stb_truetype, immediate-mode widgets, the AIs thinking in background threads, and the files that define themes, sprites and the AI roster.</p>
+</header>
+
+<section id="build">
+<h2><span class="n">1</span>Build and run</h2>
+<div class="col">
+<p>The application lives in <code>app/</code>. It needs SDL3 and the engine of the repository; nothing else. SDL3 was compiled into <code>~/opt/SDL3</code>; on a machine without it, CMake downloads and compiles it (it takes a minute).</p>
+</div>
+<pre><code>cmake -S app -B app/build -DCMAKE_BUILD_TYPE=Release
+cmake --build app/build -j
+./app/build/yolah_app
+
+<span class="c"># optional: the ResNet players (MCTS ResNet, AlphaZero) on the GPU with libtorch</span>
+cmake -S app -B app/build -DYOLAH_APP_TORCH=ON -DCMAKE_PREFIX_PATH=&lt;libtorch&gt;</code></pre>
+<div class="col">
+<table>
+<tr><th>Path</th><th>Content</th></tr>
+<tr><td><code>app/yolah_app.cpp</code></td><td>the whole application (~2 800 lines)</td></tr>
+<tr><td><code>app/CMakeLists.txt</code></td><td>SDL3 (installed or downloaded), the engine as a static library, the executable</td></tr>
+<tr><td><code>app/third_party/</code></td><td><code>stb_image.h</code>, <code>stb_image_write.h</code>, <code>stb_truetype.h</code>: single-header libraries, public domain</td></tr>
+<tr><td><code>app/assets/fonts/</code></td><td>Lato (interface) and Comfortaa (titles), OFL licence</td></tr>
+<tr><td><code>app/assets/ai_roster.json</code></td><td>the AIs offered, weakest first, and the analysis engine</td></tr>
+<tr><td><code>app/assets/themes/*.json</code></td><td>one file per board theme</td></tr>
+<tr><td><code>app/assets/sprites/sprites.json</code></td><td>the piece sprites; PNG files may replace the drawings</td></tr>
+</table>
+<p>Inside the file, every section starts with a tag. Search for it to jump there: <code>@@CONFIG</code>, <code>@@UTIL</code>, <code>@@ENGINE</code>, <code>@@AI</code>, <code>@@DRAW</code>, <code>@@TEXT</code>, <code>@@THEME</code>, <code>@@SPRITE</code>, <code>@@FX</code>, <code>@@UI</code>, <code>@@BOARD</code>, <code>@@APP</code>, <code>@@SCENE_MENU</code>, <code>@@SCENE_SETUP</code>, <code>@@SCENE_GAME</code>, <code>@@SCENE_THEMES</code>, <code>@@SCENE_RULES</code>, <code>@@SCENE_PUZZLES</code>, <code>@@SCENE_EDITOR</code>, <code>@@MAIN</code>. The table of contents at the top of the file lists them with one line each.</p>
+<p>Keyboard in a game: <kbd>H</kbd> hint, <kbd>E</kbd> evaluation bar, <kbd>U</kbd> or <kbd>Backspace</kbd> undo, <kbd>F</kbd> flip the board, <kbd>Space</kbd> pause (two AIs), <kbd>Esc</kbd> menu.</p>
+</div>
+</section>
+
+<section id="tour">
+<h2><span class="n">2</span>A tour of the application</h2>
+<div class="grid2">
+<figure><img src="figs/app_menu.png" alt="Main menu"><figcaption>The menu: the sprites of all the players drift around the title.</figcaption></figure>
+<figure><img src="figs/app_setup.png" alt="Choice of the players"><figcaption>Choosing the players: a human or one of the AIs, ranked from the weakest; an unavailable AI says why when hovered.</figcaption></figure>
+</div>
+<figure><img src="figs/app_game.png" alt="A game"><figcaption>A game: evaluation bar on the left, the hint (green arrow and the chance of winning of the side to move), the analysis tab with depth, nodes and the principal variation. The human's pieces carry a star and a pulsing halo; each AI has its emblem.</figcaption></figure>
+<figure><img src="figs/app_themes.png" alt="Themes and sprites"><figcaption>Themes and sprites: five board themes, the sprite of every player on both stones, and the PNG export.</figcaption></figure>
+</section>
+
+<section id="arch">
+<h2><span class="n">3</span>Architecture</h2>
+<div class="col"><p>The file reads from the bottom up: small tools first, then the engine wrapper and the AIs, then drawing, then the scenes that use all of it, and at the very end the four functions SDL calls.</p></div>
+<svg class="d" viewBox="0 0 960 430" role="img" aria-label="Architecture">
+  <text x="20" y="30" font-weight="700">yolah_app.cpp</text>
+  <rect class="ba" x="20" y="44" width="600" height="44" rx="8"/><text x="36" y="71">@@MAIN  SDL_AppInit · SDL_AppEvent · SDL_AppIterate · SDL_AppQuit</text>
+  <rect class="ba" x="20" y="98" width="600" height="56" rx="8"/><text x="36" y="122">@@SCENE_*  menu · setup · game · themes · rules · puzzles · editor</text><text class="s" x="36" y="142">each scene: a function called every frame (logic, layout, drawing)</text>
+  <rect class="b" x="20" y="164" width="190" height="56" rx="8"/><text x="34" y="188">@@APP</text><text class="s" x="34" y="207">state, settings, scenes</text>
+  <rect class="b" x="225" y="164" width="190" height="56" rx="8"/><text x="239" y="188">@@BOARD</text><text class="s" x="239" y="207">squares, pieces, mouse</text>
+  <rect class="b" x="430" y="164" width="190" height="56" rx="8"/><text x="444" y="188">@@UI · @@FX</text><text class="s" x="444" y="207">widgets, animations</text>
+  <rect class="b" x="20" y="230" width="190" height="56" rx="8"/><text x="34" y="254">@@THEME · @@SPRITE</text><text class="s" x="34" y="273">board textures, pieces</text>
+  <rect class="b" x="225" y="230" width="190" height="56" rx="8"/><text x="239" y="254">@@TEXT</text><text class="s" x="239" y="273">stb_truetype atlases</text>
+  <rect class="b" x="430" y="230" width="190" height="56" rx="8"/><text x="444" y="254">@@DRAW</text><text class="s" x="444" y="273">SDL_RenderGeometry</text>
+  <rect class="bb" x="20" y="296" width="290" height="56" rx="8"/><text x="34" y="320">@@AI</text><text class="s" x="34" y="339">roster, AiAgent, Analyzer (threads)</text>
+  <rect class="bb" x="330" y="296" width="290" height="56" rx="8"/><text x="344" y="320">@@ENGINE</text><text class="s" x="344" y="339">Match: moves, passes, undo, score</text>
+  <rect class="b" x="20" y="362" width="600" height="44" rx="8"/><text x="36" y="389">@@UTIL · @@CONFIG  vectors, colours, easing, noise, files, paths</text>
+  <rect class="bg" x="680" y="98" width="260" height="120" rx="8"/><text x="696" y="124">assets/</text>
+  <text class="s" x="696" y="146">ai_roster.json</text><text class="s" x="696" y="164">themes/*.json</text><text class="s" x="696" y="182">sprites/sprites.json (+ PNG)</text><text class="s" x="696" y="200">fonts/*.ttf</text>
+  <rect class="bb" x="680" y="262" width="260" height="120" rx="8"/><text x="696" y="288">engine (static library)</text>
+  <text class="s" x="696" y="310">game/  rules, bitboards</text><text class="s" x="696" y="328">player/  the AI players</text><text class="s" x="696" y="346">nnue/  networks, ResNet</text><text class="s" x="696" y="364">config/, models/  configs, weights</text>
+  <path class="la" d="M620 190 L680 160"/><path class="la" d="M620 324 L680 322"/>
+</svg>
+
+<h3><span class="n">3.1</span>Scenes</h3>
+<div class="col">
+<p>A scene is one screen. The <code>App</code> holds <code>Scene scene</code>, and <code>SDL_AppIterate</code> calls the function of the current scene once per frame. Changing screen is <code>a.go(Scene::Setup)</code>: it remembers the time (for a fade-in) and, when leaving a game, stops the AIs. A scene function does three things in order: react to the input, compute where things go from the window size, and draw. Nothing is kept between frames except the state the scene really owns (<code>App::game</code>, <code>App::setup</code>).</p>
+</div>
+
+<h3><span class="n">3.2</span>Threads</h3>
+<div class="col"><p>Drawing happens on the main thread, 60 times per second. An AI may think for seconds, so it must not run there: the window would freeze. Each search runs in its own thread, and so does the analysis.</p></div>
+<svg class="d" viewBox="0 0 960 250" role="img" aria-label="Threads">
+  <text x="20" y="34" font-weight="700">main thread</text>
+  <line class="l" x1="140" y1="30" x2="940" y2="30"/>
+  <g font-size="11"><rect class="ba" x="150" y="18" width="30" height="24" rx="4"/><rect class="ba" x="200" y="18" width="30" height="24" rx="4"/><rect class="ba" x="250" y="18" width="30" height="24" rx="4"/><rect class="ba" x="300" y="18" width="30" height="24" rx="4"/><rect class="ba" x="350" y="18" width="30" height="24" rx="4"/><rect class="ba" x="400" y="18" width="30" height="24" rx="4"/><rect class="ba" x="450" y="18" width="30" height="24" rx="4"/><rect class="ba" x="500" y="18" width="30" height="24" rx="4"/><rect class="ba" x="550" y="18" width="30" height="24" rx="4"/><rect class="ba" x="600" y="18" width="30" height="24" rx="4"/></g>
+  <text class="s" x="650" y="22">frames: poll the AI, draw</text>
+  <text x="20" y="104" font-weight="700">AiAgent</text>
+  <rect class="bb" x="200" y="86" width="380" height="30" rx="6"/><text class="s" x="214" y="106">Player::play(position)  —  token 7</text>
+  <path class="la" d="M200 42 L200 86"/><text class="s" x="206" y="66">think(pos, 7)</text>
+  <path class="la" d="M580 86 L600 42"/><text class="s" x="590" y="66">poll(7) → move</text>
+  <text x="20" y="174" font-weight="700">Analyzer</text>
+  <rect class="bg" x="150" y="156" width="110" height="30" rx="6"/><rect class="bg" x="266" y="156" width="110" height="30" rx="6"/><rect class="bg" x="382" y="156" width="110" height="30" rx="6"/>
+  <text class="s" x="160" y="176">search 120 ms</text><text class="s" x="276" y="176">search 120 ms</text><text class="s" x="392" y="176">search 120 ms</text>
+  <text class="s" x="150" y="210">after each slice: value, depth, best move, principal variation → snapshot (mutex)</text>
+  <text class="s" x="150" y="230">a new position: stop() then analyse(): at most one slice to wait</text>
+</svg>
+<div class="col">
+<p><b>Tokens.</b> Every position gets a number, <code>game.token</code>, incremented by each move and each undo. A search is started for a token and its result is only accepted for that same token: if the human undoes a move while the AI thinks, the late answer is ignored. The same goes for the analysis snapshot: the evaluation bar only uses a snapshot whose token is the current one.</p>
+<p><b>The graveyard.</b> A search cannot be killed safely. When it is no longer wanted, its thread is moved to <code>g_graveyard</code>, finishes on its own, and is joined later (every frame for the finished ones, all of them when the application quits). The dev player can also be told to stop at once through its <code>stop_flag()</code>.</p>
+<p><b>One search at a time per player.</b> An engine player is not made for two simultaneous searches: a mutex in <code>AiAgent::Shared</code> makes a new search wait until the abandoned one has finished.</p>
+</div>
+</section>
+
+<section id="sdl">
+<h2><span class="n">4</span>SDL3 in five ideas</h2>
+<h3><span class="n">4.1</span>SDL owns the loop</h3>
+<div class="col">
+<p>With <code>#define SDL_MAIN_USE_CALLBACKS 1</code> before <code>#include &lt;SDL3/SDL_main.h&gt;</code>, there is no <code>main()</code> to write. The program gives SDL four functions, and SDL calls them. This is the structure SDL3 recommends: the same code works on desktop, phones and the web.</p>
+</div>
+<svg class="d" viewBox="0 0 960 170" role="img" aria-label="SDL callbacks">
+  <rect class="ba" x="20" y="60" width="160" height="50" rx="8"/><text x="38" y="90">SDL_AppInit</text>
+  <rect class="bb" x="260" y="20" width="200" height="50" rx="8"/><text x="278" y="50">SDL_AppEvent ×n</text>
+  <rect class="bb" x="260" y="100" width="200" height="50" rx="8"/><text x="278" y="130">SDL_AppIterate</text>
+  <rect class="ba" x="560" y="60" width="160" height="50" rx="8"/><text x="578" y="90">SDL_AppQuit</text>
+  <path class="la" d="M180 85 L260 45"/><path class="l" d="M360 70 L360 100"/><path class="l" d="M470 125 C520 125 520 45 470 45"/>
+  <text class="s" x="490" y="90">each frame</text>
+  <path class="la" d="M460 125 L560 85"/><text class="s" x="740" y="80">a callback returned</text><text class="s" x="740" y="98">SDL_APP_SUCCESS or _FAILURE</text>
+</svg>
+<pre><code>SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]);   <span class="c">// create the window; *appstate = our App</span>
+SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event);        <span class="c">// one event: mouse, keyboard, window</span>
+SDL_AppResult SDL_AppIterate(void* appstate);                        <span class="c">// one frame: logic + drawing</span>
+void          SDL_AppQuit(void* appstate, SDL_AppResult result);     <span class="c">// clean up</span></code></pre>
+<div class="col"><p>Each returns <code>SDL_APP_CONTINUE</code> to go on. The <code>appstate</code> pointer is ours: the <code>App</code> object, created in <code>SDL_AppInit</code> and deleted in <code>SDL_AppQuit</code>.</p></div>
+
+<h3><span class="n">4.2</span>A window and a renderer</h3>
+<pre><code>SDL_Init(SDL_INIT_VIDEO);
+SDL_CreateWindowAndRenderer("Yolah", 1600, 900, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY, &amp;window, &amp;renderer);
+SDL_SetRenderVSync(renderer, 1);                          <span class="c">// present at the screen's rate (no tearing, no wasted CPU)</span>
+SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND); <span class="c">// colours with alpha are transparent</span></code></pre>
+<div class="col"><p>The <em>renderer</em> is SDL's 2D drawing API, running on the GPU (OpenGL here, Direct3D or Metal elsewhere) or in software. Everything is drawn into a hidden image; <code>SDL_RenderPresent</code> shows it at the end of the frame.</p></div>
+
+<h3><span class="n">4.3</span>Events and coordinates</h3>
+<div class="col">
+<p>Mouse events give window coordinates; on a high-density screen (a "Retina" display) one window unit is two pixels. <code>SDL_ConvertEventToRenderCoordinates(renderer, event)</code>, called first in <code>SDL_AppEvent</code>, converts them to rendering pixels, the unit of all the drawing code. The application keeps an <code>Input</code> structure: mouse position, button held, pressed or released this frame, wheel, keys pressed. Events fill it; <code>SDL_AppIterate</code> reads it and clears the "this frame" parts at its end.</p>
+</div>
+<pre><code>case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    if (e-&gt;button.button == SDL_BUTTON_LEFT) { a-&gt;in.down = true; a-&gt;in.pressed = true; }
+    break;
+case SDL_EVENT_KEY_DOWN:
+    if (!e-&gt;key.repeat) a-&gt;in.keys.push_back(e-&gt;key.key);   <span class="c">// SDLK_ESCAPE, SDLK_H...</span>
+    break;</code></pre>
+
+<h3><span class="n">4.4</span>Textures</h3>
+<div class="col">
+<p>A texture is an image stored on the graphics card. Two kinds are used. <b>Static</b> textures are filled once from pixels in memory with <code>SDL_UpdateTexture</code>: the glyph atlases, the board patterns, PNG sprites. <b>Target</b> textures (<code>SDL_TEXTUREACCESS_TARGET</code>) can be drawn into: <code>SDL_SetRenderTarget(renderer, tex)</code> redirects the drawing, which is how the sprites are exported to PNG. <code>SDL_RenderTexture(renderer, tex, src, dst)</code> draws the rectangle <code>src</code> of a texture into <code>dst</code>; colour and alpha modulation (<code>SDL_SetTextureColorMod</code>) tint it.</p>
+</div>
+
+<h3><span class="n">4.5</span>Small services</h3>
+<div class="col">
+<ul>
+<li><code>SDL_GetPrefPath("Yolah", "YolahApp")</code>: a per-user folder where the settings are saved (<code>~/.local/share/Yolah/YolahApp/</code> on Linux).</li>
+<li><code>SDL_GetBasePath()</code>: the executable's folder, searched first for <code>assets/</code>, so that a copied application finds its files.</li>
+<li><code>SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER)</code>: the hand shown over anything clickable.</li>
+<li><code>SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen")</code>: no window at all, used by the screenshot mode.</li>
+<li><code>SDL_GetTicksNS()</code>: a clock in nanoseconds, the time base of every animation.</li>
+</ul>
+</div>
+</section>
+
+<section id="frame">
+<h2><span class="n">5</span>One frame</h2>
+<pre><code>SDL_AppResult SDL_AppIterate(void* appstate) {
+    App* a = static_cast&lt;App*&gt;(appstate);
+    a-&gt;dt = now - a-&gt;time; a-&gt;time = now;                     <span class="c">// seconds since the last frame</span>
+    SDL_GetRenderOutputSize(a-&gt;renderer, &amp;a-&gt;w, &amp;a-&gt;h);       <span class="c">// the window may have been resized</span>
+    a-&gt;s = std::min(a-&gt;w / 1600.0f, a-&gt;h / 900.0f);           <span class="c">// scale: lengths are written for 1600 × 900</span>
+    SDL_RenderClear(a-&gt;renderer);
+    switch (a-&gt;scene) { case Scene::Menu: scene_menu(*a); break; ... }
+    <span class="c">// toast message, fade-in, cursor</span>
+    SDL_RenderPresent(a-&gt;renderer);
+    a-&gt;in.pressed = a-&gt;in.released = false; a-&gt;in.keys.clear();  <span class="c">// "this frame" input consumed</span>
+    return SDL_APP_CONTINUE;
+}</code></pre>
+<div class="col">
+<p><b>Scale.</b> The layout is designed for 1600 × 900. Every length is multiplied by <code>a.s</code>, so the whole interface grows and shrinks with the window. Textures that depend on a size (the board pattern) are generated for the real pixel size and cached, so they stay sharp.</p>
+<p><b>Time, not frames.</b> Animations depend on <code>a.time</code> and <code>a.dt</code> in seconds, never on a frame count: they last the same on a 60 Hz and a 144 Hz screen.</p>
+</div>
+</section>
+
+<section id="draw">
+<h2><span class="n">6</span>Drawing shapes</h2>
+<div class="col">
+<p>SDL's renderer draws rectangles and lines without anti-aliasing, and textures. For rounded buttons, round pieces and soft shadows, the application uses <code>SDL_RenderGeometry</code>: a list of triangles whose vertices each carry a position and a colour; the colours are interpolated across each triangle, so gradients come for free.</p>
+<p>A shape is a <em>fan</em>: a centre vertex and a closed outline. To smooth the edge, each outline vertex is copied one pixel further out with alpha 0, and a thin ring of triangles joins the two outlines: the edge fades over one pixel instead of being a staircase. With a fringe of 30 pixels instead of 1, the same function draws a soft shadow.</p>
+</div>
+<svg class="d" viewBox="0 0 960 260" role="img" aria-label="Anti-aliased fan">
+  <g transform="translate(140,130)">
+    <polygon points="0,-100 87,-50 87,50 0,100 -87,50 -87,-50" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+    <polygon points="0,-112 97,-56 97,56 0,112 -97,56 -97,-56" fill="none" stroke="var(--ink-3)" stroke-dasharray="4 3"/>
+    <g class="l"><line x1="0" y1="0" x2="0" y2="-100"/><line x1="0" y1="0" x2="87" y2="-50"/><line x1="0" y1="0" x2="87" y2="50"/><line x1="0" y1="0" x2="0" y2="100"/><line x1="0" y1="0" x2="-87" y2="50"/><line x1="0" y1="0" x2="-87" y2="-50"/></g>
+    <circle cx="0" cy="0" r="4" fill="var(--ink)"/>
+  </g>
+  <text x="270" y="60">centre + outline: triangles (c, p<tspan baseline-shift="sub" font-size="10">i</tspan>, p<tspan baseline-shift="sub" font-size="10">i+1</tspan>)</text>
+  <text x="270" y="86" class="s">dashed: the outline pushed out along the normals, alpha 0</text>
+  <text x="270" y="106" class="s">the band between the two outlines fades the edge (anti-aliasing)</text>
+  <text x="270" y="126" class="s">each vertex has its own colour: vertical gradients, lit discs</text>
+  <text x="270" y="170">draw::fan(centre, colour, outline, colours, feather)</text>
+  <text x="270" y="194" class="s">round_box, circle, circle_lit, poly, line, arrow: an outline + fan()</text>
+  <text x="270" y="214" class="s">shadow: the box shrunk by blur/2, feather = blur</text>
+  <text x="270" y="234" class="s">ring, round_frame, vignette: two outlines joined by quads</text>
+</svg>
+<pre><code>draw::round_box({x, y, w, h}, 10 * s, top_colour, bottom_colour);    <span class="c">// a button</span>
+draw::shadow({x, y + 8 * s, w, h}, 16 * s, 28 * s, hex(0x000000, 90));  <span class="c">// its shadow (drawn first)</span>
+draw::circle_lit(c, r, light, hex(0x5b6170), hex(0x0a0c11));         <span class="c">// a black stone lit from the top left</span>
+draw::arrow(from, to, width, colour);                                 <span class="c">// the hint</span></code></pre>
+<div class="col"><p>The board itself is not drawn with triangles: its squares are a texture computed pixel by pixel (section 11), once per theme and size.</p></div>
+</section>
+
+<section id="text">
+<h2><span class="n">7</span>Drawing text</h2>
+<div class="col">
+<p>SDL3 does not draw text by itself. The application reads the <code>.ttf</code> files with <code>stb_truetype.h</code>, a single public-domain header. For each font and each pixel size used, it draws all the needed characters once into one texture, an <em>atlas</em>, and remembers where each one is. Drawing a string is then one <code>SDL_RenderTexture</code> per character, from its place in the atlas to its place on screen.</p>
+</div>
+<svg class="d" viewBox="0 0 960 200" role="img" aria-label="Glyph atlas">
+  <rect class="b" x="20" y="20" width="240" height="160" rx="6"/>
+  <g font-size="22"><text x="34" y="52">A B C D E F G</text><text x="34" y="86">a b c d é è à</text><text x="34" y="120">0 1 2 3 → • ≈</text><text x="34" y="154">ê ç ô û ' « »</text></g>
+  <rect x="58" y="32" width="18" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <text x="290" y="60">atlas: one texture per (font, size)</text>
+  <text x="290" y="84" class="s">white pixels, alpha = how much of the pixel the glyph covers</text>
+  <text x="290" y="104" class="s">tinted at draw time by SDL_SetTextureColorMod / AlphaMod</text>
+  <path class="la" d="M76 45 C 200 10, 560 40, 640 110"/>
+  <text x="600" y="140" font-size="36" font-weight="700">Bonjour</text>
+  <text x="600" y="170" class="s">stbtt_GetPackedQuad: source and destination rectangle of each glyph</text>
+</svg>
+<div class="col">
+<p>The characters packed are ASCII, Latin-1 (all French accents) and a few symbols (→, •, ≈, …). A character outside that list shows as <code>?</code>; to add one, append its code point to the list in <code>TextEngine::load</code>, provided the font contains it (Lato has no ⇄ or ▶, for instance). The text is UTF-8 in the source: <code>"\xC3\xA9"</code> is é. Small sizes are packed with 2× horizontal oversampling, which keeps them sharp.</p>
+</div>
+<pre><code>a.text.draw(Font::Bold, 19 * s, "Minimax NNUE dev", {x, y}, pal::text);            <span class="c">// top-left at (x, y)</span>
+a.text.draw(Font::Title, 140 * s, "YOLAH", {cx, y}, colour, Align::Center);
+float w = a.text.width(Font::Regular, 16 * s, label);
+a.text.paragraph(Font::Regular, 14 * s, description, box, pal::dim);                 <span class="c">// wrapped in box</span></code></pre>
+</section>
+
+<section id="ui">
+<h2><span class="n">8</span>Immediate-mode widgets</h2>
+<div class="col">
+<p>There are no button objects. A scene says, every frame, "a button here, with this label", and the same call draws it and returns <code>true</code> on the frame it is clicked:</p>
+</div>
+<pre><code>if (a.ui.button("start", {x, y, 200 * s, 50 * s}, "Commencer", Style::Primary)) a.start_game();
+a.ui.toggle("t_eval", box, "Barre d'évaluation", a.settings.show_eval);     <span class="c">// flips the bool when clicked</span>
+a.settings.time_index = a.ui.segmented("time", box, TIME_LABELS, a.settings.time_index);</code></pre>
+<div class="col">
+<p>This style ("immediate mode") suits a game well: the interface is always exactly the current state, with nothing to keep in sync. The only memory is a float per widget id for the animations (hover glow, press, the sliding highlight of a segmented choice), kept in a map and eased towards its target each frame by <code>Ui::anim</code>. A widget is "clicked" when the button is released over it. <code>ui.blocked</code> makes widgets ignore the mouse while a modal box (the end of a game) is open, and <code>ui.hovering</code> asks for the hand cursor.</p>
+</div>
+</section>
+
+<section id="board">
+<h2><span class="n">9</span>The board</h2>
+<div class="col">
+<p>The engine numbers the squares 0 (a1) to 63 (h8): file = <code>s % 8</code>, rank = <code>s / 8</code>. On screen, rank 8 is at the top; flipped, the board turns by 180°. <code>BoardView::square(s)</code> gives the screen box of a square and <code>BoardView::at(point)</code> the square under the mouse; everything else uses these two.</p>
+</div>
+<svg class="d" viewBox="0 0 960 220" role="img" aria-label="Board coordinates">
+  <g transform="translate(30,20)">
+    <rect x="0" y="0" width="180" height="180" fill="var(--accent-soft)" stroke="var(--ink-3)"/>
+    <g class="s"><text x="4" y="16">a8 = 56</text><text x="120" y="16">h8 = 63</text><text x="4" y="174">a1 = 0</text><text x="124" y="174">h1 = 7</text></g>
+    <text x="40" y="100" font-size="13">normal</text>
+  </g>
+  <g transform="translate(240,20)">
+    <rect x="0" y="0" width="180" height="180" fill="var(--blue-soft)" stroke="var(--ink-3)"/>
+    <g class="s"><text x="4" y="16">h1 = 7</text><text x="120" y="16">a1 = 0</text><text x="4" y="174">h8 = 63</text><text x="120" y="174">a8 = 56</text></g>
+    <text x="40" y="100" font-size="13">flipped</text>
+  </g>
+  <text x="460" y="50">column = flipped ? 7 − file : file</text>
+  <text x="460" y="76">row    = flipped ? rank : 7 − rank</text>
+  <text x="460" y="112" class="s">The board texture is drawn rotated by 180° when flipped</text>
+  <text x="460" y="132" class="s">(SDL_RenderTextureRotated), the pieces through square().</text>
+  <text x="460" y="166" class="s">A human playing White alone gets White at the bottom.</text>
+</svg>
+<h3><span class="n">9.1</span>Drawing order</h3>
+<div class="col">
+<ol>
+<li>shadow and frame (rounded boxes with gradients), the squares texture, the coordinates;</li>
+<li>the last move (both squares tinted), the holes (dark rounded pits, each growing in when it opens);</li>
+<li>the selection and the legal destinations (dots; a ring under the mouse);</li>
+<li>the pieces, except the one that is moving or dragged;</li>
+<li>the principal variation (numbered arrows), the hint (pulsing arrow and its label);</li>
+<li>the moving piece, then the dragged piece: they pass over everything.</li>
+</ol>
+</div>
+<h3><span class="n">9.2</span>Playing a move</h3>
+<div class="col">
+<p>A human clicks a piece then a destination, or drags the piece; <code>BoardView::input</code> returns the move if it is legal. The move is applied to the <code>Match</code> at once, and the board only <em>shows</em> it moving: <code>BoardView::anim</code> remembers the move and its start time, and for 0.34 s the piece is drawn between the two squares, lifted along a sine arc, while the hole appears behind it with debris. The next AI search waits for the animation to finish. A side that cannot move passes automatically after 0.8 s, with a message.</p>
+</div>
+</section>
+
+<section id="ai">
+<h2><span class="n">10</span>The AIs and the analysis</h2>
+<h3><span class="n">10.1</span>The roster</h3>
+<div class="col"><p><code>assets/ai_roster.json</code> lists the AIs from the weakest to the strongest. The application never builds a player itself: it reads the same <code>.cfg</code> files as the tournaments and gives them to <code>Player::create</code> (<code>player/player.cpp</code>).</p></div>
+<pre><code>{ "id": "resnet", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif (CPU)", "elo": 2150,
+  "sprite": "resnet", "config": "az_vs_nnue/resnet_supervised.cfg",
+  "description": "Recherche Monte Carlo guidée par un réseau convolutif...",
+  "overrides": { "backend": "cpu", "weights": "../nnue/cnn_resnet_256x30_value_policy.bin", "nb threads": 8 },
+  "torch overrides": { "backend": "torch", "weights": "../nnue/cnn_resnet_256x30_value_policy.ts" } }</code></pre>
+<div class="col">
+<table>
+<tr><th>Key</th><th>Meaning</th></tr>
+<tr><td><code>config</code></td><td>a file of <code>config/</code>; <code>"microseconds"</code> is replaced by the time per move chosen in the application, <code>"nb threads"</code> is capped to the cores minus two</td></tr>
+<tr><td><code>overrides</code></td><td>keys that replace those of the <code>.cfg</code>; <code>torch overrides</code> only in a <code>-DYOLAH_APP_TORCH=ON</code> build</td></tr>
+<tr><td><code>weights</code> paths</td><td><code>"../x"</code> is relative to <code>config/</code> (the convention of the <code>.cfg</code> files), anything else to the repository; a missing file makes the AI unavailable, and <code>missing hint</code> says what to do</td></tr>
+<tr><td><code>elo</code></td><td>indicative: only the order matters for now (it is the order of the list)</td></tr>
+<tr><td><code>analysis</code></td><td>the engine of the evaluation bar, the hint and the variation (the dev player)</td></tr>
+</table>
+<p>The ResNet players need libtorch only for the GPU. Without it they use the CPU backend (<code>nn::ResNetCPU</code>, weights exported by <code>nnue/resnet_export.py</code>), much slower, so weaker at equal time. AlphaZero is unavailable until its latest network is copied into <code>models/</code> and exported.</p>
+</div>
+<h3><span class="n">10.2</span>The analysis engine</h3>
+<div class="col">
+<p>Whatever the players are, the <code>Analyzer</code> searches the current position with the dev minimax player, in slices of 120 ms (each slice restarts the iterative deepening; the transposition table makes the restart cheap), for up to 20 seconds, and publishes after each slice the value, the depth, the best move and the principal variation. The dev player was given one small public function for this, <code>principal_variation(position, max_len)</code>, which follows the best moves stored in its table.</p>
+<p><b>Values.</b> The engine's value is for the side to move; the application turns it to Black's point of view. Below 30 000 in absolute value, it is the network's <code>tanh</code> × 30 000, an expected result between −1 and 1: the bar gives Black the share <code>(1 + v / 30000) / 2</code>, and the label shows that chance in percent for the side ahead. Above 30 000 the result is proven: 30 000 + the final score difference, shown as "Gain +3".</p>
+</div>
+</section>
+
+<section id="themes">
+<h2><span class="n">11</span>Themes and sprites</h2>
+<h3><span class="n">11.1</span>A theme</h3>
+<pre><code>{ "id": "bois", "name": "Bois précieux", "pattern": "wood", "pattern strength": 0.75, "seed": 3,
+  "light": "#e8c99b", "dark": "#a8703f",
+  "frame top": "#5b371d", "frame bottom": "#2f1b0d", "frame line": "#e2b77d", "coordinates": "#f1dcb8",
+  "hole": "#1c120b", "hole rim": "#6d4626",
+  "background top": "#2b2621", "background bottom": "#110e0b",
+  "last move": "#ffd76a70", "selection": "#7fd1ff90", "legal move": "#20140c80", "hint": "#5ee08a", "accent": "#f2b45a" }</code></pre>
+<div class="col">
+<p>Colours are <code>#rrggbb</code> or <code>#rrggbbaa</code> (with transparency). To create a theme, copy a file of <code>assets/themes/</code>, change <code>id</code>, <code>name</code> and the colours: it appears in the list at the next start (files are sorted by name, hence the number prefixes). The <code>pattern</code> picks the texture of the squares, computed by <code>make_board_texture</code> from value noise and fractal noise (<code>fbm</code>):</p>
+<table>
+<tr><th>pattern</th><th>how it is made</th></tr>
+<tr><td><code>wood</code></td><td>growth rings: a sine across the grain, bent by low-frequency noise, plus fine fibres; horizontal and vertical grain alternate</td></tr>
+<tr><td><code>marble</code></td><td>soft veins: a sine bent by strong turbulence, sharpened, over cloudy noise</td></tr>
+<tr><td><code>stone</code></td><td>fractal noise and a few bright specks</td></tr>
+<tr><td><code>neon</code></td><td>glowing edges around each square</td></tr>
+<tr><td><code>flat</code></td><td>almost plain</td></tr>
+</table>
+<p>Each square gets a small bevel (lighter top-left edge, darker bottom-right) that makes the board look carved. <code>seed</code> changes the random pattern, <code>pattern strength</code> its contrast.</p>
+</div>
+<h3><span class="n">11.2</span>A sprite</h3>
+<pre><code>{ "id": "dev", "name": "Minimax NNUE dev", "emblem": "bolt",
+  "ring top": "#fff1a0", "ring bottom": "#d39b12", "emblem color": "#ffe14d", "tier": 6 }</code></pre>
+<div class="col">
+<p>A piece is a stone, black or white depending on the side, lit from the top left; a metal ring whose colour tells the strength (bronze, silver, gold, violet, diamond); <code>tier</code> small pips; an emblem drawn by code (<code>star</code>, <code>dice</code>, <code>branch</code>, <code>tree</code>, <code>hex</code>, <code>prism</code>, <code>bolt</code>, <code>eye</code>, <code>crown</code>, <code>heart</code>, <code>shield</code>, <code>dot</code>), darker on the white stone; and, for the human, a pulsing halo (<code>"halo": true</code>). <code>"image": "file.png"</code> replaces the whole drawing with a picture of this folder.</p>
+<p>The button <i>Exporter les sprites en PNG</i> (Themes and sprites screen) renders every sprite on both stones into 256 × 256 images in <code>assets/sprites/export/</code>: a starting point to paint one's own. The editor (next steps) will change these files from the application.</p>
+</div>
+</section>
+
+<section id="fx">
+<h2><span class="n">12</span>Animations and effects</h2>
+<div class="col">
+<p>Two kinds of motion. <b>Tweens</b> compute a value from the time elapsed since a start, through an easing curve: the sliding piece (<code>ease_in_out_cubic</code>), a hole growing in (<code>ease_out_back</code>, which overshoots a little), the menu buttons, the evaluation bar (eased towards its target every frame). <b>Effects</b> are small objects with a life of their own:</p>
+</div>
+<pre><code>struct Effect {
+    virtual ~Effect() = default;
+    virtual bool update(float dt) = 0;       <span class="c">// false: finished, removed</span>
+    virtual void draw(TextEngine&amp; text) = 0;
+};
+a.fx.add(std::make_unique&lt;FloatText&gt;(position, "+1", colour, size));</code></pre>
+<div class="col">
+<p>The application has <code>Debris</code> (a hole opens), <code>FloatText</code> (the +1 of a move), <code>Ripple</code> (a piece lands) and <code>Confetti</code> (a won game). This interface is the hook for the effects to come (puzzle effects, special squares): a new effect is a new class with these two functions, added to <code>a.fx</code>.</p>
+</div>
+</section>
+
+<section id="tests">
+<h2><span class="n">13</span>Screenshots and tests</h2>
+<div class="col"><p>The application can render without a window and save a picture, which is how the images of this page were made and how a change can be checked without clicking:</p></div>
+<pre><code>./yolah_app --screenshot menu.bmp --scene menu
+./yolah_app --screenshot game.bmp --scene game --black human --white dev --plies 16 --tab 1 --hint --frames 220
+./yolah_app --screenshot end.bmp --scene game --black basic_minmax --white dev --time 0 --frames 2500   <span class="c"># a whole AI game</span></code></pre>
+<div class="col">
+<p><code>--screenshot</code> switches to SDL's <code>offscreen</code> video driver and the <code>software</code> renderer, draws <code>--frames</code> frames (enough for the AIs or the analysis to work) and saves the last one. Other options: <code>--size WxH</code>, <code>--theme ID</code>, <code>--scene setup|themes|rules|puzzles|editor</code>, <code>--verbose</code> (the AI players print to the terminal). Test runs do not overwrite the user's settings.</p>
+</div>
+</section>
+
+<section id="next">
+<h2><span class="n">14</span>What comes next</h2>
+<div class="col">
+<ul>
+<li><b>Rules as a game.</b> An interactive tutorial: step-by-step lessons on the board (move like a queen, the hole left behind, passing, counting), each with a small exercise.</li>
+<li><b>Puzzle editor.</b> Paint holes, place the 4 pieces of each side, choose the sprites of the players, of the holes and of the empty squares, the side to move, the opposing AI and the background image; puzzles saved as JSON files.</li>
+<li><b>Levels.</b> Sequences of puzzles, created by any user, with progress.</li>
+<li><b>Effects.</b> New <code>Effect</code> classes, attached to puzzles or squares.</li>
+<li><b>Fewer than 4 pieces.</b> The engine assumes exactly 4 pieces per side (<code>Yolah::moves</code> takes four squares from the bitboard). Puzzles with fewer pieces need a generalised move generation, measured for speed and checked with every AI. The networks have only seen 4 against 4 positions from real games: on unusual positions their evaluations are less reliable, the search compensates partly.</li>
+</ul>
+</div>
+</section>
+</main>
+</div>
+</body>
+</html>

@@ -23,6 +23,13 @@ node key, tree reuse), the batching of leaves and of threads, the network
 cache, the root refinements (noise, forced playouts, policy target pruning,
 LCB) and the measured strength.
 
+`yolah_app.html` — the graphical application of `app/` (SDL3), and a
+beginner's tutorial of SDL3 through it: build, architecture and threads, the
+SDL callbacks, one frame, vector drawing with `SDL_RenderGeometry`, text with
+stb_truetype, immediate-mode widgets, the board, the AI roster and the
+analysis engine, the theme and sprite files, effects, the screenshot mode.
+Screenshots in `figs/app_*.png` (made with `yolah_app --screenshot`).
+
 `distillation_loop.html` — the distillation loop of `nnue/distill_loop.sh`, in
 the same style: the games of the dev player (node limit, openings, the 40-byte
 records, the tree nodes, the exact results), the training cache (the tree
