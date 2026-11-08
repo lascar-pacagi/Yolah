@@ -61,6 +61,9 @@ EXCLUDE="${EXCLUDE:-crn04,crn05,crn07,crn13,crn14,crn15}"
 # CPU's speed: 48 s per game and core on crn16's E5-2698 v3, 14.5 s on an
 # i7-12700K): the Xeons out, the EPYCs (crn12, crn13, crn25) in.
 GEN_EXCLUDE="${GEN_EXCLUDE:-crn01,crn02,crn03,crn04,crn05,crn07,crn13,crn14,crn15,crn16}"
+# The GPU stages (resnet, nnue, eval_resnet). crn22 refuses containers ("Failed to create user
+# namespace: Permission denied", 2026-11-07: nnue and eval_resnet of round 0 failed there in 2 s).
+GPU_EXCLUDE="${GPU_EXCLUDE:-crn22}"
 GAMES="${GAMES:-200000}"                          # games per round
 GAMES_PER_TASK="${GAMES_PER_TASK:-4000}"
 THROTTLE="${THROTTLE:-8}"                         # gen tasks at a time (scontrol update JobId=… ArrayTaskThrottle=N)
@@ -164,7 +167,7 @@ submit)
     L="${LOOP_DIR}/logs"
     common=(--parsable)
     cpu=(-p insa-cpu --exclude="${EXCLUDE}")
-    gpu=(-p insa-gpu --gres=gpu:1)
+    gpu=(-p insa-gpu --gres=gpu:1 --exclude="${GPU_EXCLUDE}")
     j_gen=$(sbatch "${common[@]}" -p insa-cpu --exclude="${GEN_EXCLUDE}" --export=ALL,STAGE=gen,ROUND=${ROUND},LOOP_DIR=${LOOP_DIR} \
         --array=0-$(( TASKS - 1 ))%${THROTTLE} --cpus-per-task="${GEN_CPUS}" --mem="${GEN_MEM}" --time=24:00:00 \
         --signal=B:USR1@300 --job-name="dl${R}_gen" --output="${L}/${R}_gen_%A_%a.out" "${SCRIPT}")

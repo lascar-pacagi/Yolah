@@ -54,6 +54,8 @@
 #   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_MASK=65278 YOLAH_QAT=1   → k8_them_spacelite_qat_az20
 #   P7=1 YOLAH_PERSP_THEM=1 YOLAH_SPACE_GROUPS=0x40 YOLAH_QAT=1  → k8_them_g040_qat_az20 (same for 0x7e, 0x46)
 #   (~3-4 days each: submit with --time=5-00:00:00)
+# On crn25 (L40S), torch does not see the GPU in this image (2026-11-06: "Cannot access accelerator
+# device"); the AlphaZero image, used by the distill loop, trains there: SIF=$HOME/AlphaZeroLearn/alphazero_learn.sif
 # Width of the first layer and random start (with P7=1, the P7 protocol otherwise):
 #   YOLAH_L1_SIZE=512                  512 values per view instead of 1024      → …_l512…
 #   SCRATCH=1                          no starting weights: PyTorch's random
@@ -84,6 +86,8 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G
 #SBATCH --time=72:00:00
+# crn22 refuses containers (user namespace, 2026-11-07); an --exclude on the command line replaces this one.
+#SBATCH --exclude=crn22
 
 set -euo pipefail
 
