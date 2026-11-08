@@ -1,0 +1,28 @@
+{
+  // The pieces of each player: stone (black or white, given by the side),
+  // ring (the metal tells the strength), tier pips, emblem drawn by code
+  // (star, dice, branch, tree, hex, prism, bolt, eye, crown, heart, shield,
+  // dot, none), halo (pulsing, for the human).
+  // "image": "file.png" (in this folder) replaces the drawing; the exported
+  // PNGs (Themes and sprites > Export) are a good starting point.
+  "sprites": [
+    { "id": "human", "name": "Joueur humain", "emblem": "star", "ring top": "#b9f6ff", "ring bottom": "#2fb7d6",
+      "emblem color": "#7ff0ff", "tier": 0, "halo": true, "halo color": "#5ee7ff" },
+    { "id": "monte_carlo", "name": "Monte Carlo", "emblem": "dice", "ring top": "#d79a6a", "ring bottom": "#7a4524",
+      "emblem color": "#ffd3ad", "tier": 1 },
+    { "id": "mcts", "name": "MCTS", "emblem": "tree", "ring top": "#e0ac7d", "ring bottom": "#8a5530",
+      "emblem color": "#ffe0bf", "tier": 2 },
+    { "id": "basic_minmax", "name": "Minimax basique", "emblem": "branch", "ring top": "#e9edf2", "ring bottom": "#7f8a97",
+      "emblem color": "#e9edf2", "tier": 3 },
+    { "id": "nnue193", "name": "Minimax NNUE (ancien)", "emblem": "hex", "ring top": "#d6e6ff", "ring bottom": "#5d7fb3",
+      "emblem color": "#bcd6ff", "tier": 4 },
+    { "id": "features", "name": "Minimax Features", "emblem": "prism", "ring top": "#ffe9a8", "ring bottom": "#b8862c",
+      "emblem color": "#ffd76a", "tier": 5 },
+    { "id": "dev", "name": "Minimax NNUE dev", "emblem": "bolt", "ring top": "#fff1a0", "ring bottom": "#d39b12",
+      "emblem color": "#ffe14d", "tier": 6 },
+    { "id": "resnet", "name": "MCTS ResNet", "emblem": "eye", "ring top": "#e5cfff", "ring bottom": "#7a49c9",
+      "emblem color": "#d6b8ff", "tier": 7 },
+    { "id": "alphazero", "name": "AlphaZero", "emblem": "crown", "ring top": "#ffffff", "ring bottom": "#7fd9ff",
+      "emblem color": "#ffe27a", "tier": 8, "halo": false }
+  ]
+}

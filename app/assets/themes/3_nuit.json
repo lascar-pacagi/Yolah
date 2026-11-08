@@ -1,0 +1,6 @@
+{ "id": "nuit", "name": "Néon nuit", "pattern": "neon", "pattern strength": 0.9, "seed": 5,
+  "light": "#25305a", "dark": "#161d3d",
+  "frame top": "#131833", "frame bottom": "#070a1a", "frame line": "#4cf2ff", "coordinates": "#8fe9ff",
+  "hole": "#020309", "hole rim": "#ff4fd8",
+  "background top": "#120f2e", "background bottom": "#04030d",
+  "last move": "#ff4fd855", "selection": "#4cf2ff80", "legal move": "#4cf2ffaa", "hint": "#7dff9b", "accent": "#4cf2ff" }

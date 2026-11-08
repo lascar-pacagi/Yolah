@@ -1,0 +1,6 @@
+{ "id": "bois", "name": "Bois précieux", "pattern": "wood", "pattern strength": 0.75, "seed": 3,
+  "light": "#e8c99b", "dark": "#a8703f",
+  "frame top": "#5b371d", "frame bottom": "#2f1b0d", "frame line": "#e2b77d", "coordinates": "#f1dcb8",
+  "hole": "#1c120b", "hole rim": "#6d4626",
+  "background top": "#2b2621", "background bottom": "#110e0b",
+  "last move": "#ffd76a70", "selection": "#7fd1ff90", "legal move": "#20140c80", "hint": "#5ee08a", "accent": "#f2b45a" }

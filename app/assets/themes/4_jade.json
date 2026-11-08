@@ -1,0 +1,6 @@
+{ "id": "jade", "name": "Jardin de jade", "pattern": "stone", "pattern strength": 0.55, "seed": 21,
+  "light": "#d6e6c9", "dark": "#6e9a6c",
+  "frame top": "#2f4a37", "frame bottom": "#15241a", "frame line": "#c8e0a8", "coordinates": "#e2f0cf",
+  "hole": "#0e1a12", "hole rim": "#4c6b52",
+  "background top": "#1c2a22", "background bottom": "#08100b",
+  "last move": "#f6e27a70", "selection": "#9fe7ff90", "legal move": "#13261a80", "hint": "#ffd36b", "accent": "#a8e07d" }

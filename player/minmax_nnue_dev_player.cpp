@@ -1729,6 +1729,19 @@ void MinMaxNNUE_DevPlayer::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     print_pv(yolah, zobrist::update(hash, player, m), depth - 1);
 }
 
+std::vector<Move> MinMaxNNUE_DevPlayer::principal_variation(Yolah yolah, int max_len) const {
+    std::vector<Move> pv;
+    uint64_t hash = zobrist::hash(yolah);
+    while (int(pv.size()) < max_len && !yolah.game_over()) {
+        const Move m = tt_move(hash);
+        if (m == Move::none() || !is_legal(yolah, m)) break;
+        pv.push_back(m);
+        hash = zobrist::update(hash, yolah.current_player(), m);
+        yolah.play(m);
+    }
+    return pv;
+}
+
 // ─── Iterative deepening with aspiration windows ─────────────────────────────
 // Depth 1, 2, 3… until the clock stops it. Each iteration fills the table
 // with best moves that order the next one, so the deeper searches cost much

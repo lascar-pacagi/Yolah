@@ -1,0 +1,6 @@
+{ "id": "ardoise", "name": "Ardoise et cuivre", "pattern": "stone", "pattern strength": 0.7, "seed": 33,
+  "light": "#6b737e", "dark": "#434a54",
+  "frame top": "#7a4a2a", "frame bottom": "#3d2312", "frame line": "#e19b62", "coordinates": "#f0c39b",
+  "hole": "#0d0f12", "hole rim": "#c27a45",
+  "background top": "#22252b", "background bottom": "#0b0c0f",
+  "last move": "#e19b6270", "selection": "#9fd4ff90", "legal move": "#0d0f12a0", "hint": "#7cf29a", "accent": "#e19b62" }

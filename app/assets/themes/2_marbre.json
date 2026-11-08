@@ -1,0 +1,6 @@
+{ "id": "marbre", "name": "Marbre et or", "pattern": "marble", "pattern strength": 0.8, "seed": 11,
+  "light": "#f1efea", "dark": "#a9b0b8",
+  "frame top": "#3b3f47", "frame bottom": "#1c1f25", "frame line": "#d8b55e", "coordinates": "#e9d8a6",
+  "hole": "#14161b", "hole rim": "#5a606b",
+  "background top": "#262a33", "background bottom": "#0e1015",
+  "last move": "#e8c45a70", "selection": "#6fb7ff90", "legal move": "#1a1f2a80", "hint": "#3fd27a", "accent": "#d8b55e" }

@@ -501,6 +501,9 @@ public:
     std::array<uint64_t, 4> aspiration_stats() const { return asp_stats; }
     void clear_table(bool keep_ordering = false);   // forget everything: table, history, countermoves (reproducible
                                                     // benchmarks); keep_ordering: keep history and countermoves
+    // The principal variation of the last search, read from the table (at most
+    // max_len moves; it stops at a missing or illegal move). For the GUI (app/).
+    std::vector<Move> principal_variation(Yolah, int max_len) const;
     std::string info() override;
     json config() override;
 };
