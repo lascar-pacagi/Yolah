@@ -58,6 +58,7 @@
 //   --level ID            puzzles scene: the puzzles of a level
 //   --ptab N              puzzles scene: 0 play, 1 edit the levels
 //   --puzzle ID           play a puzzle (--no-intro: skip its introduction)
+//   --scene studio        the workshop (--tab 1: the boards; --art ID: open a drawing)
 //   --black ID --white ID players of the game scene (human or an AI id)
 //   --plies N             random moves played before the game scene starts
 //   --hint                show the hint (game scene)
@@ -96,6 +97,7 @@
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -250,6 +252,16 @@ std::string strf(const char* format, ...) {
     return buf;
 }
 
+// A file name from a title: lower case letters, digits and '_'.
+std::string slug(const std::string& name) {
+    std::string out;
+    for (unsigned char c : name) {
+        if (std::isalnum(c)) out += char(std::tolower(c));
+        else if ((c == ' ' || c == '-' || c == '_') && !out.empty() && out.back() != '_') out += '_';
+    }
+    while (!out.empty() && out.back() == '_') out.pop_back();
+    return out.empty() ? "puzzle" : out;
+}
 std::optional<std::string> read_file(const fs::path& p) {
     std::ifstream f(p, std::ios::binary);
     if (!f) return std::nullopt;
@@ -1120,6 +1132,10 @@ struct Theme {
     Rgba accent = hex(0xf2b45a);
     float strength = 0.5f;   // how visible the pattern is
     float seed = 1;
+    // Drawings of the workshop (@@ART ids, "" = none): the light and dark
+    // squares, the holes and the frame, instead of the procedural ones.
+    std::string tile_light, tile_dark, hole_art, frame_art;
+    std::string file;        // its file in assets/themes (the board editor rewrites it)
 };
 
 Theme parse_theme(const json& j) {
@@ -1144,7 +1160,25 @@ Theme parse_theme(const json& j) {
     t.accent = jcolor(j, "accent", t.accent);
     t.strength = jnum(j, "pattern strength", t.strength);
     t.seed = jnum(j, "seed", t.seed);
+    t.tile_light = jstr(j, "tile light");
+    t.tile_dark = jstr(j, "tile dark");
+    t.hole_art = jstr(j, "hole art");
+    t.frame_art = jstr(j, "frame art");
     return t;
+}
+json theme_to_json(const Theme& t) {
+    json j = {{"id", t.id}, {"name", t.name}, {"pattern", t.pattern}, {"pattern strength", t.strength}, {"seed", t.seed},
+              {"light", color_string(t.light)}, {"dark", color_string(t.dark)}, {"frame top", color_string(t.frame_top)},
+              {"frame bottom", color_string(t.frame_bottom)}, {"frame line", color_string(t.frame_line)},
+              {"coordinates", color_string(t.coords)}, {"hole", color_string(t.hole)}, {"hole rim", color_string(t.hole_rim)},
+              {"background top", color_string(t.bg_top)}, {"background bottom", color_string(t.bg_bottom)},
+              {"last move", color_string(t.last_move)}, {"selection", color_string(t.select)},
+              {"legal move", color_string(t.legal)}, {"hint", color_string(t.hint)}, {"accent", color_string(t.accent)}};
+    if (!t.tile_light.empty()) j["tile light"] = t.tile_light;
+    if (!t.tile_dark.empty()) j["tile dark"] = t.tile_dark;
+    if (!t.hole_art.empty()) j["hole art"] = t.hole_art;
+    if (!t.frame_art.empty()) j["frame art"] = t.frame_art;
+    return j;
 }
 
 std::vector<Theme> load_themes(const fs::path& dir) {
@@ -1156,7 +1190,7 @@ std::vector<Theme> load_themes(const fs::path& dir) {
     std::sort(files.begin(), files.end());
     for (auto& f : files) {
         json j = load_json(f);
-        if (j.is_object()) themes.push_back(parse_theme(j));
+        if (j.is_object()) { themes.push_back(parse_theme(j)); themes.back().file = f.filename().string(); }
     }
     // "order" in the files would be nicer; the file names start with a number.
     if (themes.empty()) themes.push_back(Theme{});
@@ -1245,6 +1279,7 @@ private:
 // same size as the stone). The editor will change these files.
 struct SpriteDef {
     std::string id = "default", name = "Pion", emblem = "none", image, category;
+    std::string art;         // a pixel-art sprite of the workshop (@@ART): drawn instead
     Rgba ring_top = hex(0xcfd6df), ring_bottom = hex(0x7d8794), emblem_color = hex(0xffffff);
     int tier = 0;            // 0..8: pips under the emblem
     bool halo = false;       // pulsing halo (the human player)
@@ -1570,13 +1605,255 @@ void draw_emblem(const std::string& e, V2 c, float s, Rgba col, Rgba under = {0,
     }
 }
 
+
+// ─── @@ART ──────────────────────────────────────────────────────────────────
+// Pixel art made in the workshop (@@SCENE_STUDIO): pieces, decorations, board
+// squares, holes and board frames, each with its animations. A drawing is a
+// square of size × size pixels; an animation is a list of such frames played
+// at `fps` frames per second, in a loop or once.
+//
+//   assets/art/<id>.json   {"name", "kind", "size", "on stone",
+//                           "animations": [{"name", "fps", "loop", "frames"}]}
+//   assets/art/<id>.png    the frames: one row per animation (in the order of
+//                           the JSON), one column per frame
+//
+// On screen the frames are drawn from one texture with SDL_SCALEMODE_NEAREST:
+// each pixel becomes a crisp square, whatever the zoom (pixel art blurred by
+// a linear filter looks wrong).
+struct ArtKind {
+    const char* id;
+    const char* label;
+    std::vector<std::pair<const char*, const char*>> anims;   // (name, label); the first one is the default
+};
+const std::vector<ArtKind> ART_KINDS = {
+    {"piece", "Pion", {{"idle", "Repos"}, {"move", "D\xC3\xA9placement"}, {"blocked", "Bloqu\xC3\xA9"}, {"win", "Victoire"}}},
+    {"decor", "D\xC3\xA9" "cor", {{"idle", "Animation"}}},
+    {"tile", "Case", {{"idle", "Case"}}},
+    {"hole", "Trou", {{"idle", "Trou"}, {"open", "Apparition"}}},
+    {"frame", "Cadre", {{"idle", "Cadre"}}},
+};
+const ArtKind& art_kind(const std::string& id) {
+    for (auto& k : ART_KINDS)
+        if (id == k.id) return k;
+    return ART_KINDS[0];
+}
+
+// A pixel: 0xAABBGGRR, i.e. the bytes R, G, B, A in memory (stb_image's
+// order, SDL_PIXELFORMAT_ABGR8888 on little-endian machines).
+using Pixel = uint32_t;
+inline Pixel pack(Rgba c) { return Pixel(c.r) | Pixel(c.g) << 8 | Pixel(c.b) << 16 | Pixel(c.a) << 24; }
+inline Rgba unpack(Pixel p) { return {uint8_t(p), uint8_t(p >> 8), uint8_t(p >> 16), uint8_t(p >> 24)}; }
+
+struct ArtAnim {
+    std::string name;
+    float fps = 8;
+    bool loop = true;
+    std::vector<std::vector<Pixel>> frames;   // size × size each
+    double duration() const { return frames.empty() ? 0 : frames.size() / std::max(0.1f, fps); }
+};
+
+struct Art {
+    std::string id, name = "Nouveau dessin", kind = "piece";
+    int size = 32;
+    bool on_stone = true;          // a piece: drawn on the stone of its side (black or white)
+    std::vector<ArtAnim> anims;
+    SDL_Texture* tex = nullptr;    // the frames, rebuilt when `dirty`
+    bool dirty = true;
+    int cols = 1;                  // frames per row in the texture
+
+    ArtAnim* anim(const std::string& n) {
+        for (auto& a : anims)
+            if (a.name == n) return &a;
+        return nullptr;
+    }
+    const ArtAnim* anim(const std::string& n) const { return const_cast<Art*>(this)->anim(n); }
+    // Every animation of its kind, with at least one frame for the first one.
+    void complete() {
+        for (auto& [n, label] : art_kind(kind).anims)
+            if (!anim(n)) anims.push_back(ArtAnim{n});
+        auto& first = *anim(art_kind(kind).anims[0].first);
+        if (first.frames.empty()) first.frames.push_back(std::vector<Pixel>(size_t(size) * size, 0));
+        // Animations of another kind (the kind changed) are kept but unused.
+    }
+    void update_texture() {
+        if (!dirty && tex) return;
+        if (tex) SDL_DestroyTexture(tex);
+        cols = 1;
+        for (auto& a : anims) cols = std::max(cols, int(a.frames.size()));
+        int rows = std::max(1, int(anims.size()));
+        std::vector<Pixel> sheet(size_t(cols) * size * rows * size, 0);
+        for (int r = 0; r < int(anims.size()); r++)
+            for (int c = 0; c < int(anims[r].frames.size()); c++)
+                for (int y = 0; y < size; y++)
+                    std::memcpy(&sheet[(size_t(r) * size + y) * cols * size + size_t(c) * size], &anims[r].frames[c][size_t(y) * size], size * sizeof(Pixel));
+        tex = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, cols * size, rows * size);
+        SDL_UpdateTexture(tex, nullptr, sheet.data(), cols * size * int(sizeof(Pixel)));
+        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
+        dirty = false;
+    }
+    // The frame of animation `n` shown `t` seconds after it started (its row
+    // and column in the texture), falling back to the first animation when
+    // `n` has no frame; nullopt when there is nothing to draw.
+    std::optional<SDL_FRect> frame_rect(const std::string& n, double t) {
+        const ArtAnim* a = anim(n);
+        if (!a || a->frames.empty()) a = anim(art_kind(kind).anims[0].first);
+        if (!a || a->frames.empty()) return std::nullopt;
+        int k = int(std::floor(std::max(0.0, t) * a->fps));
+        int nf = int(a->frames.size());
+        k = a->loop ? k % nf : std::min(k, nf - 1);
+        update_texture();
+        int row = int(a - anims.data());
+        return SDL_FRect{float(k * size), float(row * size), float(size), float(size)};
+    }
+};
+
+// A decoration placed on a puzzle's board.
+struct PlacedDecor {
+    std::string art;                  // a "decor" drawing
+    float x = 4, y = 4, scale = 1;    // its centre, in squares from the top-left corner of the board (a8 side); its size in squares
+};
+
+// All the drawings, by id (loaded at start, changed by the workshop).
+std::map<std::string, std::unique_ptr<Art>> g_arts;
+Art* find_art(const std::string& id) {
+    auto it = g_arts.find(id);
+    return it == g_arts.end() ? nullptr : it->second.get();
+}
+
+// Draws frame `t` of animation `n` of `art` in box `b`.
+void draw_art(Art& art, const std::string& n, double t, Box b, float alpha = 1, bool flip_h = false) {
+    auto src = art.frame_rect(n, t);
+    if (!src) return;
+    SDL_FRect dst = b.frect();
+    SDL_SetTextureAlphaModFloat(art.tex, alpha);
+    SDL_RenderTextureRotated(draw::R, art.tex, &*src, &dst, 0, nullptr, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+}
+// A board frame: the drawing cut in 3 × 3 (SDL_RenderTexture9Grid): the
+// corners keep their shape, the edges stretch along the frame, the centre
+// (under the board) fills the rest; `border` is the frame's thickness on screen.
+void draw_art_frame(Art& art, double t, Box b, float border) {
+    auto src = art.frame_rect("idle", t);
+    if (!src) return;
+    float third = art.size / 3.0f;
+    SDL_FRect dst = b.frect();
+    SDL_SetTextureAlphaModFloat(art.tex, 1);
+    SDL_RenderTexture9Grid(draw::R, art.tex, &*src, third, third, third, third, border / third, &dst);
+}
+
+const fs::path& art_dir() {
+    static fs::path d;
+    d = g_paths.assets / "art";
+    return d;
+}
+
+bool load_art(const std::string& id, Art& out) {
+    json j = load_json(art_dir() / (id + ".json"));
+    if (!j.is_object()) return false;
+    out.id = id;
+    out.name = jstr(j, "name", id);
+    out.kind = jstr(j, "kind", "piece");
+    out.size = std::clamp(int(jnum(j, "size", 32)), 4, 128);
+    out.on_stone = j.value("on stone", true);
+    int w = 0, h = 0, n = 0;
+    unsigned char* px = stbi_load((art_dir() / (id + ".png")).string().c_str(), &w, &h, &n, 4);
+    if (j.contains("animations") && j["animations"].is_array()) {
+        int row = 0;
+        for (auto& e : j["animations"]) {
+            ArtAnim a;
+            a.name = jstr(e, "name", "idle");
+            a.fps = std::clamp(jnum(e, "fps", 8), 0.5f, 60.0f);
+            a.loop = e.value("loop", true);
+            int nf = int(jnum(e, "frames", 0));
+            for (int c = 0; c < nf; c++) {
+                std::vector<Pixel> f(size_t(out.size) * out.size, 0);
+                if (px)
+                    for (int y = 0; y < out.size; y++)
+                        for (int x = 0; x < out.size; x++) {
+                            int sx = c * out.size + x, sy = row * out.size + y;
+                            if (sx < w && sy < h) std::memcpy(&f[size_t(y) * out.size + x], px + (size_t(sy) * w + sx) * 4, 4);
+                        }
+                a.frames.push_back(std::move(f));
+            }
+            out.anims.push_back(std::move(a));
+            row++;
+        }
+    }
+    if (px) stbi_image_free(px);
+    out.complete();
+    out.dirty = true;
+    return true;
+}
+
+bool save_art(Art& art) {
+    if (art.id.empty()) {
+        std::string base = slug(art.name), id = base;
+        for (int k = 2; fs::exists(art_dir() / (id + ".json")); k++) id = base + "_" + std::to_string(k);
+        art.id = id;
+    }
+    int cols = 1, rows = std::max(1, int(art.anims.size()));
+    for (auto& a : art.anims) cols = std::max(cols, int(a.frames.size()));
+    std::vector<Pixel> sheet(size_t(cols) * art.size * rows * art.size, 0);
+    json anims = json::array();
+    for (int r = 0; r < int(art.anims.size()); r++) {
+        auto& a = art.anims[r];
+        anims.push_back({{"name", a.name}, {"fps", a.fps}, {"loop", a.loop}, {"frames", a.frames.size()}});
+        for (int c = 0; c < int(a.frames.size()); c++)
+            for (int y = 0; y < art.size; y++)
+                std::memcpy(&sheet[(size_t(r) * art.size + y) * cols * art.size + size_t(c) * art.size], &a.frames[c][size_t(y) * art.size], art.size * sizeof(Pixel));
+    }
+    std::error_code ec;
+    fs::create_directories(art_dir(), ec);
+    bool ok = stbi_write_png((art_dir() / (art.id + ".png")).string().c_str(), cols * art.size, rows * art.size, 4, sheet.data(), cols * art.size * 4) != 0;
+    json j = {{"name", art.name}, {"kind", art.kind}, {"size", art.size}, {"on stone", art.on_stone}, {"animations", anims}};
+    return ok && write_file(art_dir() / (art.id + ".json"), j.dump(2));
+}
+
+void load_all_arts() {
+    std::error_code ec;
+    for (auto& e : fs::directory_iterator(art_dir(), ec)) {
+        if (e.path().extension() != ".json") continue;
+        auto art = std::make_unique<Art>();
+        std::string id = e.path().stem().string();
+        if (load_art(id, *art)) g_arts[id] = std::move(art);
+    }
+}
+// The drawings of a kind, by name.
+std::vector<Art*> arts_of(const std::string& kind) {
+    std::vector<Art*> v;
+    for (auto& [id, a] : g_arts)
+        if (a->kind == kind) v.push_back(a.get());
+    std::sort(v.begin(), v.end(), [](Art* x, Art* y) { return x->name < y->name; });
+    return v;
+}
+// The pieces of the workshop are sprites too ("art:<id>", category
+// "Mes dessins"): the sprite picker, the themes scene and the puzzles use
+// them like the others.
+void register_art_sprites(std::vector<SpriteDef>& sprites) {
+    sprites.erase(std::remove_if(sprites.begin(), sprites.end(), [](const SpriteDef& sp) { return !sp.art.empty(); }), sprites.end());
+    for (Art* a : arts_of("piece")) {
+        SpriteDef sp;
+        sp.id = "art:" + a->id;
+        sp.name = a->name;
+        sp.category = "Mes dessins";
+        sp.art = a->id;
+        sp.emblem = "none";
+        sprites.push_back(sp);
+    }
+}
+
 // Draws a piece of `side` with sprite `sp`, centred at c, radius r.
 // lift: 0 on the board, up to 1 when picked up (bigger, higher shadow).
 // time: seconds, for the halo's pulse.
 // halo: force the pulsing halo (the human player, whatever the sprite).
-void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1, bool halo = false) {
+// state, state_t: a drawing of the workshop plays its animation `state`
+// ("idle", "move", "blocked", "win"), started `state_t` seconds ago (the
+// other sprites ignore them).
+void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1, bool halo = false,
+                const char* state = "idle", double state_t = -1) {
     using namespace draw;
     r *= 1 + 0.08f * lift;
+    Art* art = sp.art.empty() ? nullptr : find_art(sp.art);
     // Shadow.
     float soff = r * (0.10f + 0.25f * lift);
     circle(c + V2{soff * 0.4f, soff}, r * (1.0f + 0.05f * lift), hex(0x000000, uint8_t(110 * alpha)), hex(0x000000, 0), r * 0.35f);
@@ -1588,6 +1865,18 @@ void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, do
         SDL_FRect dst{c.x - r, c.y - r, 2 * r, 2 * r};
         SDL_SetTextureAlphaModFloat(sp.texture, alpha);
         SDL_RenderTexture(R, sp.texture, nullptr, &dst);
+        return;
+    }
+    if (art) {
+        double t = state_t >= 0 ? state_t : time;
+        if (art->on_stone) {   // the stone tells the side; the drawing sits on it
+            V2 light = c + V2{-r * 0.35f, -r * 0.4f};
+            if (side == BLACK) circle_lit(c, r, light, with_alpha(hex(0x5b6170), alpha), with_alpha(hex(0x0a0c11), alpha));
+            else circle_lit(c, r, light, with_alpha(hex(0xffffff), alpha), with_alpha(hex(0xb9bec8), alpha));
+            draw_art(*art, state, t, {c.x - r * 0.78f, c.y - r * 0.78f, r * 1.56f, r * 1.56f}, alpha);
+        } else {
+            draw_art(*art, state, t, {c.x - r * 1.1f, c.y - r * 1.1f, r * 2.2f, r * 2.2f}, alpha);
+        }
         return;
     }
     // The stone: lit from the top left.
@@ -2010,6 +2299,9 @@ public:
         std::string hint_label;
         std::vector<Move> pv;     // drawn as faint numbered arrows (analysis tab)
         bool human_turn = false;
+        int winner = -1;          // the game is over and this side won: its pieces play "win"
+        const std::map<int, std::string>* tiles = nullptr;          // a puzzle's special squares
+        const std::vector<PlacedDecor>* decor = nullptr;            // a puzzle's decorations
     };
 
     void draw(TextEngine& text, BoardTextures& textures, const Theme& t, const Yolah& pos, const Look& look, double now, float s) {
@@ -2018,13 +2310,29 @@ public:
         // Frame and shadow.
         Box frame = area.inset(-26 * s);
         shadow({frame.x, frame.y + 14 * s, frame.w, frame.h}, 22 * s, 46 * s, hex(0x000000, 150));
-        round_box(frame, 22 * s, t.frame_top, t.frame_bottom);
-        round_frame(frame.inset(6 * s), 17 * s, std::max(1.0f, 1.5f * s), with_alpha(t.frame_line, 0.55f));
-        round_frame(area.inset(-3 * s), 4 * s, std::max(1.0f, 2 * s), with_alpha(hex(0x000000), 0.35f));
+        if (Art* fa = t.frame_art.empty() ? nullptr : find_art(t.frame_art)) {
+            draw_art_frame(*fa, now, frame, 26 * s);
+        } else {
+            round_box(frame, 22 * s, t.frame_top, t.frame_bottom);
+            round_frame(frame.inset(6 * s), 17 * s, std::max(1.0f, 1.5f * s), with_alpha(t.frame_line, 0.55f));
+            round_frame(area.inset(-3 * s), 4 * s, std::max(1.0f, 2 * s), with_alpha(hex(0x000000), 0.35f));
+        }
         // The squares (flipped boards rotate the texture by 180°).
         SDL_Texture* tex = textures.get(t, int(area.w));
         SDL_FRect dst = area.frect();
         SDL_RenderTextureRotated(R, tex, nullptr, &dst, flipped ? 180.0 : 0.0, nullptr, SDL_FLIP_NONE);
+        // Squares drawn in the workshop: the theme's, then the puzzle's special ones.
+        Art* tl = t.tile_light.empty() ? nullptr : find_art(t.tile_light);
+        Art* td = t.tile_dark.empty() ? nullptr : find_art(t.tile_dark);
+        for (int s2 = 0; s2 < 64; s2++) {
+            Art* ta = (sq_file(s2) + sq_rank(s2)) % 2 == 1 ? tl : td;   // a1 is dark
+            if (look.tiles) {
+                auto it = look.tiles->find(s2);
+                if (it != look.tiles->end())
+                    if (Art* pa = find_art(it->second)) ta = pa;
+            }
+            if (ta) draw_art(*ta, "idle", now, square(s2));
+        }
         // Coordinates in the frame.
         if (look.coords) {
             float fs = 15 * s;
@@ -2047,6 +2355,13 @@ public:
             if (now < hole_since[s2]) continue;
             draw_hole(square(s2), t, k, s, look.hole_style, now, s2);
         }
+        // Decorations (a puzzle's), above the squares and the holes, below the pieces.
+        if (look.decor)
+            for (auto& d : *look.decor)
+                if (Art* da = find_art(d.art)) {
+                    float x = flipped ? 8 - d.x : d.x, y = flipped ? 8 - d.y : d.y, w = d.scale * q;
+                    draw_art(*da, "idle", now + d.x * 0.37 + d.y * 0.61, {area.x + x * q - w / 2, area.y + y * q - w / 2, w, w});
+                }
         // Selection and legal moves.
         const int me = pos.current_player();
         int sel = drag_from >= 0 ? drag_from : selected;
@@ -2062,13 +2377,23 @@ public:
             rect(square(hover_sq), with_alpha(t.select, 0.45f));
         }
         // Pieces (the one moving or dragged is drawn last, above everything).
+        const uint64_t taken = pos.bitboard(BLACK) | pos.bitboard(WHITE) | pos.empty_bitboard();
+        auto blocked = [&](int s2) {   // no free square around: the piece cannot move
+            for (int df = -1; df <= 1; df++)
+                for (int dr = -1; dr <= 1; dr++) {
+                    int f = sq_file(s2) + df, r = sq_rank(s2) + dr;
+                    if ((df || dr) && f >= 0 && f < 8 && r >= 0 && r < 8 && !(taken >> (r * 8 + f) & 1)) return false;
+                }
+            return true;
+        };
         for (int side : {BLACK, WHITE}) {
             uint64_t bb = pos.bitboard(side);
             for (int s2 = 0; s2 < 64; s2++) {
                 if (!(bb >> s2 & 1)) continue;
                 if (anim.active && now < anim.t0 + anim.dur && s2 == anim.m.to_sq()) continue;
                 if (dragging && s2 == drag_from) continue;
-                draw_piece(*look.sprite[side], side, center(s2), q * 0.4f, 0, now, 1, look.halo[side]);
+                const char* st = look.winner == side ? "win" : blocked(s2) ? "blocked" : "idle";
+                draw_piece(*look.sprite[side], side, center(s2), q * 0.4f, 0, now, 1, look.halo[side], st, now + s2 * 0.29);
             }
         }
         // Principal variation: numbered faint arrows.
@@ -2100,7 +2425,7 @@ public:
             V2 a = center(anim.m.from_sq()), b = center(anim.m.to_sq());
             V2 p = a + (b - a) * k;
             float lift = std::sin(k * float(M_PI));
-            draw_piece(*look.sprite[anim.side], anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now, 1, look.halo[anim.side]);
+            draw_piece(*look.sprite[anim.side], anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now, 1, look.halo[anim.side], "move", now - anim.t0);
         }
         // The dragged piece follows the mouse.
         if (dragging && drag_from >= 0 && (pos.bitboard(me) >> drag_from & 1))
@@ -2113,6 +2438,15 @@ private:
     // "void", "ice" or "bush" (HOLE_STYLES); k: its size while it opens.
     void draw_hole(Box b, const Theme& t, float k, float s, const std::string& style, double now, int sq) {
         using namespace draw;
+        // A drawing: the puzzle's ("art:<id>"), or the theme's for the default style.
+        std::string art_id = style.rfind("art:", 0) == 0 ? style.substr(4) : (style == "pit" ? t.hole_art : "");
+        if (Art* ha = art_id.empty() ? nullptr : find_art(art_id)) {
+            double age = now - hole_since[sq];
+            const ArtAnim* open = ha->anim("open");
+            if (open && !open->frames.empty() && age < open->duration()) draw_art(*ha, "open", age, b);
+            else draw_art(*ha, "idle", now + sq * 0.23, b);
+            return;
+        }
         Box h = b.inset(b.w * 0.07f);
         V2 c = h.center();
         h = {c.x - h.w * 0.5f * k, c.y - h.h * 0.5f * k, h.w * k, h.h * k};
@@ -2189,6 +2523,10 @@ struct Puzzle {
     int margin = 1;                 // win by at least this many points
     int time_index = 1;             // index in TIMES
     std::string theme, hole_style = "pit", sprite_black, sprite_white, background;
+    // Drawings of the workshop placed on this puzzle's board.
+    std::map<int, std::string> tiles;   // square → a "tile" drawing over it
+    using Decor = PlacedDecor;
+    std::vector<Decor> decor;
     Puzzle() {
         // The starting position of the game.
         Yolah y;
@@ -2208,7 +2546,17 @@ json puzzle_to_json(const Puzzle& p) {
     return {{"name", p.name}, {"text", p.text}, {"board", rows}, {"to move", p.to_move == BLACK ? "black" : "white"},
             {"player", p.human == BLACK ? "black" : "white"}, {"opponent", p.opponent}, {"margin", p.margin},
             {"time index", p.time_index}, {"theme", p.theme}, {"hole style", p.hole_style},
-            {"sprite black", p.sprite_black}, {"sprite white", p.sprite_white}, {"background", p.background}};
+            {"sprite black", p.sprite_black}, {"sprite white", p.sprite_white}, {"background", p.background},
+            {"tiles", [&] {
+                 json t = json::object();
+                 for (auto& [sq, id] : p.tiles) t[std::string{char('a' + sq % 8), char('1' + sq / 8)}] = id;
+                 return t;
+             }()},
+            {"decor", [&] {
+                 json d = json::array();
+                 for (auto& e : p.decor) d.push_back({{"art", e.art}, {"x", e.x}, {"y", e.y}, {"scale", e.scale}});
+                 return d;
+             }()}};
 }
 Puzzle puzzle_from_json(const json& j, const std::string& id) {
     Puzzle p;
@@ -2233,6 +2581,13 @@ Puzzle puzzle_from_json(const json& j, const std::string& id) {
     p.sprite_black = jstr(j, "sprite black");
     p.sprite_white = jstr(j, "sprite white");
     p.background = jstr(j, "background");
+    if (j.contains("tiles") && j["tiles"].is_object())
+        for (auto& [k, v] : j["tiles"].items())
+            if (k.size() == 2 && k[0] >= 'a' && k[0] <= 'h' && k[1] >= '1' && k[1] <= '8' && v.is_string())
+                p.tiles[(k[1] - '1') * 8 + (k[0] - 'a')] = v.get<std::string>();
+    if (j.contains("decor") && j["decor"].is_array())
+        for (auto& e : j["decor"])
+            if (e.is_object()) p.decor.push_back({jstr(e, "art"), jnum(e, "x", 4), jnum(e, "y", 4), jnum(e, "scale", 1)});
     return p;
 }
 Yolah puzzle_position(const Puzzle& p) {
@@ -2253,16 +2608,6 @@ std::string puzzle_problem(const Puzzle& p) {
     if (p.count('W') != 4) return strf("Il faut exactement 4 pions blancs (il y en a %d).", p.count('W'));
     if (puzzle_position(p).game_over()) return "Personne ne peut bouger : la partie serait d\xC3\xA9j\xC3\xA0 finie.";
     return "";
-}
-// A file name from a title: lower case letters, digits and '_'.
-std::string slug(const std::string& name) {
-    std::string out;
-    for (unsigned char c : name) {
-        if (std::isalnum(c)) out += char(std::tolower(c));
-        else if ((c == ' ' || c == '-' || c == '_') && !out.empty() && out.back() != '_') out += '_';
-    }
-    while (!out.empty() && out.back() == '_') out.pop_back();
-    return out.empty() ? "puzzle" : out;
 }
 std::vector<std::string> json_files(const fs::path& dir) {   // file names without ".json"
     std::vector<std::string> ids;
@@ -2351,7 +2696,7 @@ std::vector<std::string> list_backgrounds() {
 }
 
 // ─── @@APP ──────────────────────────────────────────────────────────────────
-enum class Scene { Menu, Setup, Game, Themes, Tutorial, Puzzles, Editor };
+enum class Scene { Menu, Setup, Game, Themes, Tutorial, Puzzles, Editor, Studio };
 
 // Saved in the preferences folder (settings.json).
 struct Settings {
@@ -2495,6 +2840,36 @@ struct App {
         std::string new_level;            // the level the new puzzle goes into
         float new_scroll = 0;
     } editor;
+
+    // The workshop (@@SCENE_STUDIO): pixel drawings and board themes.
+    struct StudioState {
+        int tab = 0;                      // 0 drawings, 1 boards
+        // Drawings.
+        Art edit;                         // the drawing being edited (a copy: g_arts changes on saving)
+        bool loaded = false, modified = false;
+        std::string anim = "idle";        // the animation being edited
+        int frame = 0;
+        int tool = 0;                     // STUDIO_TOOLS
+        bool mirror = false, grid = true, onion = true, playing = true;
+        Rgba color = hex(0xf2b45a);
+        float hue = 36, sat = 0.63f, val = 0.95f;   // the colour in HSV (the picker's state)
+        std::vector<std::vector<ArtAnim>> undo, redo;
+        bool stroke = false;              // the button went down on the canvas
+        int last_x = -1, last_y = -1, start_x = 0, start_y = 0;
+        std::vector<Pixel> before;        // the frame when a line / rectangle started
+        std::string drag;                 // the colour picker part being dragged
+        bool new_open = false;            // the "new drawing" dialog
+        int new_kind = 0, new_size = 2;
+        bool confirm_delete = false;
+        float list_scroll = 0;
+        std::string back_to_theme;        // opened from the board editor: return there after
+        // Boards.
+        Theme theme;                      // the theme being edited (a copy)
+        bool theme_loaded = false, theme_modified = false, confirm_theme_delete = false;
+        int color_slot = 0;               // the colour the picker edits
+        double tex_changed = -1, tex_built = 0;   // the board texture follows the colours, at most 5 times a second
+        BoardView board;
+    } studio;
 
     // The puzzles and levels (@@SCENE_PUZZLES).
     struct PuzzlesState {
@@ -2785,9 +3160,10 @@ void scene_menu(App& a) {
         {"Puzzles et qu\xC3\xAA" "tes", [&] { a.go(Scene::Puzzles); }, Style::Normal},
         {"\xC3\x89" "diteur de puzzles", [&] { a.go(Scene::Editor); }, Style::Normal},
         {"Th\xC3\xA8mes et sprites", [&] { a.go(Scene::Themes); }, Style::Normal},
+        {"Atelier : dessins et plateaux", [&] { a.go(Scene::Studio); }, Style::Normal},
         {"Quitter", [&] { SDL_Event e{}; e.type = SDL_EVENT_QUIT; SDL_PushEvent(&e); }, Style::Ghost},
     };
-    float bw = 440 * s, bh = 58 * s, gap = 14 * s, y = 310 * s;
+    float bw = 440 * s, bh = 54 * s, gap = 12 * s, y = 296 * s;
     for (size_t i = 0; i < items.size(); i++) {
         float appear = ease_out_cubic(float((a.time - a.scene_t0) * 3 - i * 0.12f));
         Box b{a.w * 0.5f - bw / 2, y + i * (bh + gap) + (1 - appear) * 30 * s, bw, bh};
@@ -3247,7 +3623,15 @@ void scene_game(App& a) {
     BoardView::Look look;
     look.sprite[BLACK] = &a.game_sprite(BLACK);
     look.sprite[WHITE] = &a.game_sprite(WHITE);
-    if (g.puzzle_mode) look.hole_style = g.puzzle.hole_style;
+    if (g.puzzle_mode) {
+        look.hole_style = g.puzzle.hole_style;
+        look.tiles = &g.puzzle.tiles;
+        look.decor = &g.puzzle.decor;
+    }
+    if (g.match.over()) {
+        int sb = g.match.score(BLACK), sw = g.match.score(WHITE);
+        look.winner = sb > sw ? BLACK : sw > sb ? WHITE : -1;
+    }
     look.halo[BLACK] = g.slot[BLACK].human();
     look.halo[WHITE] = g.slot[WHITE].human();
     look.coords = a.settings.show_coords;
@@ -4359,6 +4743,8 @@ void scene_editor(App& a) {
     look.sprite[WHITE] = &sw;
     look.halo[p.human] = true;
     look.hole_style = p.hole_style;
+    look.tiles = &p.tiles;
+    look.decor = &p.decor;
     ed.board.draw(a.text, a.board_textures, a.theme_or(p.theme), shown, look, a.time, s);
     if (hover_sq >= 0) draw::round_frame(ed.board.square(hover_sq).inset(2 * s), 6 * s, 3 * s, hex(0xffd36b, 220));
     std::string problem = puzzle_problem(p);
@@ -4401,10 +4787,12 @@ void scene_editor(App& a) {
     int ti = a.ui.cycler("ed_theme", {x, y, w, 34 * s}, "Plateau", th_names, th_idx);
     p.theme = ti == 0 ? "" : a.themes[ti - 1].id;
     y += 40 * s;
-    std::vector<std::string> hs_names;
+    std::vector<std::string> hs_names, hs_ids;
     int hs_idx = 0;
-    for (size_t i = 0; i < HOLE_STYLES.size(); i++) { hs_names.push_back(HOLE_STYLES[i].second); if (HOLE_STYLES[i].first == p.hole_style) hs_idx = int(i); }
-    p.hole_style = HOLE_STYLES[a.ui.cycler("ed_holes", {x, y, w, 34 * s}, "Trous", hs_names, hs_idx)].first;
+    for (auto& [id, name] : HOLE_STYLES) { hs_ids.push_back(id); hs_names.push_back(name); }
+    for (Art* ha : arts_of("hole")) { hs_ids.push_back("art:" + ha->id); hs_names.push_back(ha->name + " (dessin)"); }
+    for (size_t i = 0; i < hs_ids.size(); i++) if (hs_ids[i] == p.hole_style) hs_idx = int(i);
+    p.hole_style = hs_ids[a.ui.cycler("ed_holes", {x, y, w, 34 * s}, "Trous", hs_names, hs_idx)];
     y += 40 * s;
     std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Aucune"};
     int bg_idx = 0;
@@ -4552,6 +4940,937 @@ void scene_editor(App& a) {
     }
 }
 
+// ─── @@SCENE_STUDIO ─────────────────────────────────────────────────────────
+// The workshop. Tab "Dessins": a pixel-art editor (pencil, eraser, fill,
+// colour picker, line, rectangle, mirror, undo) for the drawings of @@ART,
+// with their animations (frames, speed, loop, onion skin, preview), and the
+// import of any image (file dialog or drag and drop). Tab "Plateaux": the
+// board themes (assets/themes): colours, pattern, and the drawings used for
+// the squares, the holes and the frame, on a live board.
+
+// Colours: HSV (h in degrees, s and v in [0, 1]) ↔ RGB.
+Rgba hsv_to_rgb(float h, float s, float v, uint8_t a = 255) {
+    h = std::fmod(std::fmod(h, 360.0f) + 360.0f, 360.0f);
+    float c = v * s, x = c * (1 - std::abs(std::fmod(h / 60.0f, 2.0f) - 1)), m = v - c;
+    float r = 0, g = 0, b = 0;
+    if (h < 60) r = c, g = x;
+    else if (h < 120) r = x, g = c;
+    else if (h < 180) g = c, b = x;
+    else if (h < 240) g = x, b = c;
+    else if (h < 300) r = x, b = c;
+    else r = c, b = x;
+    return {uint8_t((r + m) * 255 + 0.5f), uint8_t((g + m) * 255 + 0.5f), uint8_t((b + m) * 255 + 0.5f), a};
+}
+void rgb_to_hsv(Rgba c, float& h, float& s, float& v) {
+    float r = c.r / 255.0f, g = c.g / 255.0f, b = c.b / 255.0f;
+    float mx = std::max({r, g, b}), mn = std::min({r, g, b}), d = mx - mn;
+    v = mx;
+    s = mx > 0 ? d / mx : 0;
+    if (d <= 0) return;   // grey: keep the hue
+    if (mx == r) h = 60 * std::fmod((g - b) / d, 6.0f);
+    else if (mx == g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+    if (h < 0) h += 360;
+}
+
+// A quad with one colour per corner (SDL_RenderGeometry interpolates them).
+void quad(Box b, Rgba tl, Rgba tr, Rgba br, Rgba bl) {
+    SDL_Vertex v[4] = {{{b.x, b.y}, fcolor(tl), {0, 0}}, {{b.right(), b.y}, fcolor(tr), {0, 0}},
+                       {{b.right(), b.bottom()}, fcolor(br), {0, 0}}, {{b.x, b.bottom()}, fcolor(bl), {0, 0}}};
+    int idx[6] = {0, 1, 2, 0, 2, 3};
+    SDL_RenderGeometry(draw::R, nullptr, v, 4, idx, 6);
+}
+// A checkerboard: what transparent pixels look like in image editors.
+void checker(Box b, float cell) {
+    draw::rect(b, hex(0x9aa1ab));
+    int nx = int(std::ceil(b.w / cell)), ny = int(std::ceil(b.h / cell));
+    for (int y = 0; y < ny; y++)
+        for (int x = (y % 2); x < nx; x += 2)
+            draw::rect({b.x + x * cell, b.y + y * cell, std::min(cell, b.right() - (b.x + x * cell)), std::min(cell, b.bottom() - (b.y + y * cell))}, hex(0xc9ced6));
+}
+
+// The colour picker: a saturation × value square, a hue bar and an opacity
+// bar. `drag` remembers which part the mouse is dragging (it may leave it).
+bool color_picker(App& a, Box b, Rgba& col, float& hue, float& sat, float& val, std::string& drag, const std::string& id) {
+    const float s = a.s;
+    const float bar = 18 * s, gap = 10 * s;
+    Box sv{b.x, b.y, b.w, b.h - 2 * (bar + gap)};
+    Box hb{b.x, sv.bottom() + gap, b.w, bar}, ab{b.x, hb.bottom() + gap, b.w, bar};
+    Rgba pure = hsv_to_rgb(hue, 1, 1);
+    quad(sv, hex(0xffffff), pure, pure, hex(0xffffff));
+    quad(sv, hex(0x000000, 0), hex(0x000000, 0), hex(0x000000), hex(0x000000));
+    for (int i = 0; i < 6; i++)
+        quad({hb.x + hb.w * i / 6, hb.y, hb.w / 6 + 0.5f, hb.h}, hsv_to_rgb(i * 60.0f, 1, 1), hsv_to_rgb((i + 1) * 60.0f, 1, 1),
+             hsv_to_rgb((i + 1) * 60.0f, 1, 1), hsv_to_rgb(i * 60.0f, 1, 1));
+    checker(ab, ab.h / 2);
+    Rgba opaque = col;
+    opaque.a = 255;
+    quad(ab, with_alpha(opaque, 0), opaque, opaque, with_alpha(opaque, 0));
+    // Markers.
+    V2 m{sv.x + sat * sv.w, sv.y + (1 - val) * sv.h};
+    draw::ring(m, 7 * s, 2 * s, hex(0xffffff));
+    draw::ring(m, 9 * s, 1 * s, hex(0x000000, 160));
+    for (auto [bx, t] : {std::pair<Box, float>{hb, hue / 360}, {ab, col.a / 255.0f}}) {
+        float x = bx.x + t * bx.w;
+        draw::round_frame({x - 4 * s, bx.y - 3 * s, 8 * s, bx.h + 6 * s}, 3 * s, 2 * s, hex(0xffffff));
+    }
+    // Input.
+    if (a.in.pressed && !a.ui.blocked) {
+        if (sv.contains(a.in.mouse)) drag = id + "sv";
+        else if (hb.contains(a.in.mouse)) drag = id + "h";
+        else if (ab.contains(a.in.mouse)) drag = id + "a";
+    }
+    if (!a.in.down) {
+        if (drag.rfind(id, 0) == 0) drag.clear();
+        return false;
+    }
+    float fx = clamp01((a.in.mouse.x - b.x) / b.w);
+    if (drag == id + "sv") { sat = fx; val = 1 - clamp01((a.in.mouse.y - sv.y) / sv.h); }
+    else if (drag == id + "h") hue = fx * 359.9f;
+    else if (drag == id + "a") col.a = uint8_t(fx * 255 + 0.5f);
+    else return false;
+    uint8_t al = col.a;
+    col = hsv_to_rgb(hue, sat, val, al);
+    return true;
+}
+
+// 32 colours to start with (dark to light, by hue), then transparent.
+const std::vector<uint32_t> STUDIO_PALETTE = {
+    0x0b0d12, 0x262b36, 0x4a5262, 0x7d8696, 0xb3bac6, 0xe6e9ee, 0xffffff, 0x5a2e1c,
+    0x8a4b2a, 0xc47a3f, 0xf2b45a, 0xffe08a, 0x7a1f2b, 0xc2343f, 0xff6b6b, 0xff9ec0,
+    0x6b2a7d, 0xa654c7, 0xd59bf0, 0x1f2d6b, 0x3456c2, 0x5ea2ff, 0x5ee7ff, 0x0f5a5a,
+    0x1f9a8a, 0x4ade80, 0xb6f27a, 0x2b4a1c, 0x4f7f2a, 0x8fb83f, 0xf0e2c0, 0x9c7a54};
+
+const std::vector<std::pair<const char*, const char*>> STUDIO_TOOLS = {
+    {"Crayon", "P"}, {"Gomme", "E"}, {"Remplir", "F"}, {"Pipette", "I"}, {"Ligne", "L"}, {"Rectangle", "R"}};
+
+// ── the drawing being edited ──
+ArtAnim& studio_anim(App& a) {
+    auto& st = a.studio;
+    st.edit.complete();
+    ArtAnim* an = st.edit.anim(st.anim);
+    if (!an) { st.anim = art_kind(st.edit.kind).anims[0].first; an = st.edit.anim(st.anim); }
+    return *an;
+}
+// The frame being edited (an animation without frames gets one).
+std::vector<Pixel>& studio_frame(App& a) {
+    auto& st = a.studio;
+    ArtAnim& an = studio_anim(a);
+    if (an.frames.empty()) an.frames.push_back(std::vector<Pixel>(size_t(st.edit.size) * st.edit.size, 0));
+    st.frame = std::clamp(st.frame, 0, int(an.frames.size()) - 1);
+    return an.frames[st.frame];
+}
+void studio_push_undo(App& a) {
+    auto& st = a.studio;
+    st.undo.push_back(st.edit.anims);
+    if (st.undo.size() > 60) st.undo.erase(st.undo.begin());
+    st.redo.clear();
+    st.modified = true;
+    st.edit.dirty = true;
+}
+void studio_changed(App& a) { a.studio.edit.dirty = true; a.studio.modified = true; }
+
+void studio_save(App& a) {
+    auto& st = a.studio;
+    if (!st.loaded) return;
+    if (!save_art(st.edit)) { a.notify("Impossible d'enregistrer le dessin."); return; }
+    auto copy = std::make_unique<Art>();
+    load_art(st.edit.id, *copy);
+    if (Art* old = find_art(st.edit.id); old && old->tex) SDL_DestroyTexture(old->tex);
+    g_arts[st.edit.id] = std::move(copy);
+    register_art_sprites(a.sprites);
+    st.modified = false;
+}
+void studio_open(App& a, const std::string& id) {
+    auto& st = a.studio;
+    if (st.modified) studio_save(a);
+    Art* src = find_art(id);
+    if (!src) return;
+    if (st.edit.tex) SDL_DestroyTexture(st.edit.tex);
+    st.edit = Art{};
+    load_art(id, st.edit);
+    st.loaded = true;
+    st.modified = false;
+    st.anim = art_kind(st.edit.kind).anims[0].first;
+    st.frame = 0;
+    st.undo.clear();
+    st.redo.clear();
+    st.confirm_delete = false;
+}
+void studio_new(App& a, const std::string& kind, int size) {
+    auto& st = a.studio;
+    if (st.modified) studio_save(a);
+    if (st.edit.tex) SDL_DestroyTexture(st.edit.tex);
+    st.edit = Art{};
+    st.edit.kind = kind;
+    st.edit.size = size;
+    st.edit.name = std::string(art_kind(kind).label) + " " + std::to_string(arts_of(kind).size() + 1);
+    st.edit.on_stone = kind == "piece";
+    st.edit.complete();
+    st.loaded = true;
+    st.anim = art_kind(kind).anims[0].first;
+    st.frame = 0;
+    st.undo.clear();
+    st.redo.clear();
+    studio_save(a);   // it appears at once in the list
+}
+
+// Pixel operations on one frame (size × size).
+void plot(std::vector<Pixel>& f, int n, int x, int y, Pixel c, bool mirror) {
+    if (x >= 0 && y >= 0 && x < n && y < n) f[size_t(y) * n + x] = c;
+    if (mirror && n - 1 - x != x && y >= 0 && y < n && n - 1 - x >= 0 && n - 1 - x < n) f[size_t(y) * n + (n - 1 - x)] = c;
+}
+void plot_line(std::vector<Pixel>& f, int n, int x0, int y0, int x1, int y1, Pixel c, bool mirror) {
+    int dx = std::abs(x1 - x0), dy = -std::abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+    for (;;) {   // Bresenham
+        plot(f, n, x0, y0, c, mirror);
+        if (x0 == x1 && y0 == y1) break;
+        int e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+}
+void plot_rect(std::vector<Pixel>& f, int n, int x0, int y0, int x1, int y1, Pixel c, bool mirror) {
+    plot_line(f, n, x0, y0, x1, y0, c, mirror);
+    plot_line(f, n, x1, y0, x1, y1, c, mirror);
+    plot_line(f, n, x1, y1, x0, y1, c, mirror);
+    plot_line(f, n, x0, y1, x0, y0, c, mirror);
+}
+void flood_fill(std::vector<Pixel>& f, int n, int x, int y, Pixel c) {
+    if (x < 0 || y < 0 || x >= n || y >= n) return;
+    Pixel target = f[size_t(y) * n + x];
+    if (target == c) return;
+    std::vector<std::pair<int, int>> todo = {{x, y}};
+    while (!todo.empty()) {
+        auto [px, py] = todo.back();
+        todo.pop_back();
+        if (px < 0 || py < 0 || px >= n || py >= n || f[size_t(py) * n + px] != target) continue;
+        f[size_t(py) * n + px] = c;
+        todo.insert(todo.end(), {{px + 1, py}, {px - 1, py}, {px, py + 1}, {px, py - 1}});
+    }
+}
+// An image (w × h RGBA) fitted into an n × n frame, centred, its proportions
+// kept: each pixel of the frame averages the pixels it covers (weighted by
+// their opacity), or takes the nearest one when the image is smaller.
+std::vector<Pixel> fit_image(const unsigned char* px, int w, int h, int x0, int ww, int n) {
+    std::vector<Pixel> f(size_t(n) * n, 0);
+    float k = float(n) / std::max(ww, h);
+    int dw = std::max(1, int(ww * k + 0.5f)), dh = std::max(1, int(h * k + 0.5f));
+    int ox = (n - dw) / 2, oy = (n - dh) / 2;
+    for (int y = 0; y < dh; y++)
+        for (int x = 0; x < dw; x++) {
+            int sx0 = int(x / k), sx1 = std::max(sx0 + 1, int((x + 1) / k)), sy0 = int(y / k), sy1 = std::max(sy0 + 1, int((y + 1) / k));
+            double r = 0, g = 0, b = 0, al = 0;
+            int cnt = 0;
+            for (int sy = sy0; sy < std::min(sy1, h); sy++)
+                for (int sx = sx0; sx < std::min(sx1, ww); sx++) {
+                    const unsigned char* p = px + (size_t(sy) * w + x0 + sx) * 4;
+                    double wa = p[3] / 255.0;
+                    r += p[0] * wa; g += p[1] * wa; b += p[2] * wa; al += wa;
+                    cnt++;
+                }
+            if (!cnt || al <= 0) continue;
+            Rgba c{uint8_t(r / al + 0.5), uint8_t(g / al + 0.5), uint8_t(b / al + 0.5), uint8_t(al / cnt * 255 + 0.5)};
+            f[size_t(oy + y) * n + ox + x] = pack(c);
+        }
+    return f;
+}
+// Imports an image into the current animation: a strip of square frames
+// (width = k × height) replaces its frames, any other image replaces the
+// current frame.
+void studio_import(App& a, const std::string& path) {
+    auto& st = a.studio;
+    int w, h, n;
+    unsigned char* px = stbi_load(path.c_str(), &w, &h, &n, 4);
+    if (!px) { a.notify("Image illisible : " + fs::path(path).filename().string()); return; }
+    studio_push_undo(a);
+    ArtAnim& an = studio_anim(a);
+    if (w > h && w % h == 0 && w / h <= 64) {
+        an.frames.clear();
+        for (int k = 0; k < w / h; k++) an.frames.push_back(fit_image(px, w, h, k * h, h, st.edit.size));
+        st.frame = 0;
+        a.notify(strf("%d images import\xC3\xA9" "es dans l'animation", w / h));
+    } else {
+        studio_frame(a) = fit_image(px, w, h, 0, w, st.edit.size);
+        a.notify("Image import\xC3\xA9" "e dans l'image courante");
+    }
+    stbi_image_free(px);
+    studio_changed(a);
+}
+// Draws frame k of animation index ai of an art in a box.
+void draw_art_frame_k(Art& art, int ai, int k, Box b, float alpha = 1) {
+    if (ai < 0 || ai >= int(art.anims.size()) || k < 0 || k >= int(art.anims[ai].frames.size())) return;
+    art.update_texture();
+    SDL_FRect src{float(k * art.size), float(ai * art.size), float(art.size), float(art.size)}, dst = b.frect();
+    SDL_SetTextureAlphaModFloat(art.tex, alpha);
+    SDL_RenderTexture(draw::R, art.tex, &src, &dst);
+}
+// A small preview of a drawing, as it is used: a piece on a square, a
+// square, a hole, a frame around squares, a decoration.
+void art_preview(App& a, Art& art, Box b, const std::string& anim, double t) {
+    const Theme& th = a.theme();
+    draw::rect(b, th.light);
+    if (art.kind == "piece") {
+        SpriteDef sp;
+        sp.art = art.id;
+        float r = std::min(b.h * 0.4f, b.w * 0.18f);
+        // The art may not be saved yet: draw it from the copy.
+        V2 c1{b.x + b.w * 0.3f, b.center().y}, c2{b.x + b.w * 0.7f, b.center().y};
+        for (auto [c, side] : {std::pair<V2, int>{c1, BLACK}, {c2, WHITE}}) {
+            draw::circle(c + V2{r * 0.06f, r * 0.12f}, r, hex(0x000000, 90), hex(0x000000, 0), r * 0.3f);
+            if (art.on_stone) {
+                V2 light = c + V2{-r * 0.35f, -r * 0.4f};
+                if (side == BLACK) draw::circle_lit(c, r, light, hex(0x5b6170), hex(0x0a0c11));
+                else draw::circle_lit(c, r, light, hex(0xffffff), hex(0xb9bec8));
+                draw_art(art, anim, t, {c.x - r * 0.78f, c.y - r * 0.78f, r * 1.56f, r * 1.56f});
+            } else {
+                draw_art(art, anim, t, {c.x - r * 1.1f, c.y - r * 1.1f, r * 2.2f, r * 2.2f});
+            }
+        }
+    } else if (art.kind == "tile" || art.kind == "hole") {
+        float q = b.h / 3;
+        for (int y = 0; y < 3; y++)
+            for (int x = 0; x < 6 && b.x + x * q < b.right(); x++) {
+                Box c{b.x + x * q, b.y + y * q, q, q};
+                draw::rect(c, (x + y) % 2 ? th.dark : th.light);
+                if (art.kind == "tile" || (x + y) % 3 == 1) draw_art(art, anim, t + x * 0.3, c);
+            }
+    } else if (art.kind == "frame") {
+        draw::rect(b, hex(0x0f141c));
+        Box inner = b.inset(b.h * 0.18f);
+        draw_art_frame(art, t, inner.inset(-b.h * 0.12f), b.h * 0.12f);
+        float q = inner.h / 4;
+        for (int y = 0; y < 4; y++)
+            for (int x = 0; x * q < inner.w - 0.5f; x++)
+                draw::rect({inner.x + x * q, inner.y + y * q, std::min(q, inner.right() - inner.x - x * q), q}, (x + y) % 2 ? th.dark : th.light);
+    } else {
+        float q = b.h / 3;
+        for (int y = 0; y < 3; y++)
+            for (int x = 0; x * q < b.w; x++) draw::rect({b.x + x * q, b.y + y * q, std::min(q, b.right() - b.x - x * q), q}, (x + y) % 2 ? th.dark : th.light);
+        draw_art(art, anim, t, {b.center().x - b.h * 0.45f, b.y + b.h * 0.05f, b.h * 0.9f, b.h * 0.9f});
+    }
+}
+
+// ── tab "Dessins" ──
+void studio_drawings(App& a) {
+    const float s = a.s;
+    auto& st = a.studio;
+    if (!st.loaded) {
+        auto all = arts_of("piece");
+        if (all.empty())
+            for (auto& k : ART_KINDS) { auto v = arts_of(k.id); if (!v.empty()) { all = v; break; } }
+        if (!all.empty()) studio_open(a, all.front()->id);
+        else studio_new(a, "piece", 32);
+    }
+    Art& art = st.edit;
+    const int n = art.size;
+    const bool modal = st.new_open;
+    a.ui.blocked = modal;
+    const bool typing = !a.ui.focus.empty();
+    const SDL_Keymod mods = SDL_GetModState();
+    const bool ctrl = mods & SDL_KMOD_CTRL;
+
+    const float margin = 26 * s, top = 150 * s;
+    Box lib{margin, top, 270 * s, a.h - top - margin};
+    Box tools{lib.right() + 16 * s, top, 118 * s, a.h - top - margin};
+    Box right{a.w - margin - 380 * s, top, 380 * s, a.h - top - margin};
+    Box mid{tools.right() + 16 * s, top, right.x - tools.right() - 32 * s, a.h - top - margin};
+
+    // ── the library ──
+    a.ui.panel(lib);
+    Box list{lib.x + 8 * s, lib.y + 12 * s, lib.w - 16 * s, lib.h - 140 * s};
+    if (a.ui.hover(list)) st.list_scroll = std::max(0.0f, st.list_scroll - a.in.wheel * 40 * s);
+    float y = list.y - st.list_scroll;
+    std::string open_id;
+    draw::clip(&list);
+    for (auto& k : ART_KINDS) {
+        auto v = arts_of(k.id);
+        a.text.draw(Font::Bold, 13 * s, strf("%s (%zu)", k.label, v.size()), {list.x + 6 * s, y + 6 * s}, a.theme().accent);
+        y += 28 * s;
+        for (Art* x : v) {
+            Box r{list.x, y, list.w, 40 * s};
+            bool cur = x->id == art.id;
+            bool h = a.ui.hover(r) && list.contains(a.in.mouse);
+            if (h) a.ui.hovering = true;
+            draw::round_box(r, 8 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.28f : (h ? 0.08f : 0.0f)));
+            Box th{r.x + 6 * s, r.y + 4 * s, 32 * s, 32 * s};
+            checker(th, 8 * s);
+            Art& shown = cur ? art : *x;
+            draw_art(shown, "idle", a.time, th);
+            a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, cur ? art.name : x->name, {th.right() + 10 * s, r.y + 11 * s}, pal::text);
+            if (h && a.in.released && !cur) open_id = x->id;
+            y += 42 * s;
+        }
+        y += 6 * s;
+    }
+    draw::clip(nullptr);
+    st.list_scroll = std::clamp(st.list_scroll, 0.0f, std::max(0.0f, y + st.list_scroll - list.y - list.h));
+    float bw = (lib.w - 30 * s) / 2;
+    if (a.ui.button("st_new", {lib.x + 10 * s, lib.bottom() - 120 * s, lib.w - 20 * s, 42 * s}, "+ Nouveau dessin", Style::Primary, true, 15)) {
+        st.new_open = true;
+        for (size_t i = 0; i < ART_KINDS.size(); i++) if (art.kind == ART_KINDS[i].id) st.new_kind = int(i);
+    }
+    if (a.ui.button("st_dup", {lib.x + 10 * s, lib.bottom() - 70 * s, bw, 40 * s}, "Dupliquer", Style::Normal, true, 14)) {
+        studio_save(a);
+        Art copy = art;
+        copy.tex = nullptr;
+        copy.id.clear();
+        copy.name += " (copie)";
+        if (st.edit.tex) SDL_DestroyTexture(st.edit.tex);
+        st.edit = copy;
+        st.edit.dirty = true;
+        studio_save(a);
+        a.notify("Copie : " + st.edit.name);
+    }
+    if (a.ui.button("st_del", {lib.x + 20 * s + bw, lib.bottom() - 70 * s, bw, 40 * s}, st.confirm_delete ? "Confirmer ?" : "Supprimer", Style::Danger, true, 14)) {
+        if (!st.confirm_delete) st.confirm_delete = true;
+        else {
+            std::error_code ec;
+            fs::remove(art_dir() / (art.id + ".json"), ec);
+            fs::remove(art_dir() / (art.id + ".png"), ec);
+            if (Art* old = find_art(art.id); old && old->tex) SDL_DestroyTexture(old->tex);
+            g_arts.erase(art.id);
+            register_art_sprites(a.sprites);
+            a.notify("Dessin supprim\xC3\xA9 : " + art.name);
+            st.loaded = false;
+            st.modified = false;
+            st.confirm_delete = false;
+            return;
+        }
+    }
+
+    // ── tools ──
+    a.ui.panel(tools);
+    float ty = tools.y + 10 * s;
+    for (size_t i = 0; i < STUDIO_TOOLS.size(); i++) {
+        Box r{tools.x + 8 * s, ty, tools.w - 16 * s, 38 * s};
+        if (a.ui.button("tool_" + std::to_string(i), r, strf("%s (%s)", STUDIO_TOOLS[i].first, STUDIO_TOOLS[i].second), int(i) == st.tool ? Style::Primary : Style::Normal, true, 13)) st.tool = int(i);
+        ty += 42 * s;
+    }
+    ty += 8 * s;
+    auto small_toggle = [&](const char* id, const char* label, bool& v) {
+        Box r{tools.x + 8 * s, ty, tools.w - 16 * s, 30 * s};
+        if (a.ui.button(id, r, label, v ? Style::Primary : Style::Ghost, true, 12)) v = !v;
+        ty += 34 * s;
+    };
+    small_toggle("st_mirror", "Miroir", st.mirror);
+    small_toggle("st_grid", "Grille", st.grid);
+    small_toggle("st_onion", "Pelure", st.onion);
+    ty += 8 * s;
+    auto action_button = [&](const char* id, const char* label) {
+        Box r{tools.x + 8 * s, ty, tools.w - 16 * s, 30 * s};
+        ty += 34 * s;
+        return a.ui.button(id, r, label, Style::Normal, true, 12);
+    };
+    if (action_button("st_undo", "Annuler") || (!typing && ctrl && a.in.key(SDLK_Z) && !(mods & SDL_KMOD_SHIFT))) {
+        if (!st.undo.empty()) { st.redo.push_back(art.anims); art.anims = st.undo.back(); st.undo.pop_back(); studio_changed(a); }
+    }
+    if (action_button("st_redo", "R\xC3\xA9tablir") || (!typing && ctrl && (a.in.key(SDLK_Y) || (a.in.key(SDLK_Z) && (mods & SDL_KMOD_SHIFT))))) {
+        if (!st.redo.empty()) { st.undo.push_back(art.anims); art.anims = st.redo.back(); st.redo.pop_back(); studio_changed(a); }
+    }
+    std::vector<Pixel>& fr = studio_frame(a);
+    if (action_button("st_fliph", "Retourner H")) {
+        studio_push_undo(a);
+        for (int yy = 0; yy < n; yy++) std::reverse(fr.begin() + size_t(yy) * n, fr.begin() + size_t(yy + 1) * n);
+    }
+    if (action_button("st_flipv", "Retourner V")) {
+        studio_push_undo(a);
+        for (int yy = 0; yy < n / 2; yy++) std::swap_ranges(fr.begin() + size_t(yy) * n, fr.begin() + size_t(yy + 1) * n, fr.begin() + size_t(n - 1 - yy) * n);
+    }
+    if (action_button("st_rot", "Tourner")) {
+        studio_push_undo(a);
+        std::vector<Pixel> r(fr.size());
+        for (int yy = 0; yy < n; yy++)
+            for (int xx = 0; xx < n; xx++) r[size_t(xx) * n + (n - 1 - yy)] = fr[size_t(yy) * n + xx];
+        fr = r;
+    }
+    if (action_button("st_clear", "Effacer")) { studio_push_undo(a); std::fill(fr.begin(), fr.end(), 0); }
+    if (action_button("st_import", "Importer\xE2\x80\xA6")) a.choose_image("studio-import");
+    for (auto& [purpose, path] : a.in.files) {
+        if (purpose == "dialog-error") a.notify("Pas de s\xC3\xA9lecteur de fichiers ici : glissez l'image sur la fen\xC3\xAAtre.");
+        else if (purpose == "studio-import" || purpose == "drop") studio_import(a, path);
+    }
+    if (!typing && !ctrl)
+        for (size_t i = 0; i < STUDIO_TOOLS.size(); i++)
+            if (a.in.key(SDL_Keycode(std::tolower(STUDIO_TOOLS[i].second[0])))) st.tool = int(i);
+
+    // ── canvas ── (the frame again: an import may have replaced the frames)
+    std::vector<Pixel>& frc = studio_frame(a);
+    ArtAnim& an = studio_anim(a);
+    const int ai = int(&an - art.anims.data());
+    const float strip_h = 150 * s;
+    float C = std::floor(std::min(mid.w, mid.h - strip_h - 16 * s) / n) * n;
+    float cell = C / n;
+    Box canvas{std::floor(mid.x + (mid.w - C) / 2), mid.y, C, C};
+    draw::shadow({canvas.x, canvas.y + 8 * s, canvas.w, canvas.h}, 6 * s, 24 * s, hex(0x000000, 120));
+    checker(canvas, std::max(cell, 8 * s));
+    if (st.onion && st.frame > 0) draw_art_frame_k(art, ai, st.frame - 1, canvas, 0.3f);
+    draw_art_frame_k(art, ai, st.frame, canvas);
+    if (st.grid && cell >= 6 * s) {
+        for (int i = 1; i < n; i++) {
+            Rgba gc = hex(0x000000, i % 8 == 0 ? 90 : 40);
+            draw::rect({canvas.x + i * cell, canvas.y, 1, canvas.h}, gc);
+            draw::rect({canvas.x, canvas.y + i * cell, canvas.w, 1}, gc);
+        }
+    }
+    if (st.mirror) draw::rect({canvas.center().x - 1, canvas.y, 2, canvas.h}, hex(0x5ee7ff, 160));
+    if (art.kind == "frame") {   // the 3 × 3 cut of a frame
+        for (int i = 1; i <= 2; i++) {
+            draw::rect({canvas.x + canvas.w * i / 3, canvas.y, 1, canvas.h}, hex(0xff9ec0, 160));
+            draw::rect({canvas.x, canvas.y + canvas.h * i / 3, canvas.w, 1}, hex(0xff9ec0, 160));
+        }
+    }
+    int px = int(std::floor((a.in.mouse.x - canvas.x) / cell)), py = int(std::floor((a.in.mouse.y - canvas.y) / cell));
+    bool on = !modal && canvas.contains(a.in.mouse);
+    if (on) {
+        a.ui.hovering = true;
+        draw::rect({canvas.x + px * cell, canvas.y + py * cell, cell, cell}, with_alpha(st.tool == 1 ? hex(0xffffff) : st.color, 0.5f));
+        draw::round_frame({canvas.x + px * cell, canvas.y + py * cell, cell, cell}, 1, std::max(1.0f, s), hex(0xffffff, 200));
+    }
+    const bool erase = st.tool == 1 || a.in.rdown;
+    const Pixel paint = erase ? 0 : pack(st.color);
+    if (on && (a.in.pressed || a.in.rpressed)) {
+        st.stroke = true;
+        if (st.tool == 3) {   // colour picker
+            Pixel c = frc[size_t(py) * n + px];
+            if (c >> 24) { st.color = unpack(c); rgb_to_hsv(st.color, st.hue, st.sat, st.val); }
+            st.stroke = false;
+        } else {
+            studio_push_undo(a);
+            st.start_x = st.last_x = px;
+            st.start_y = st.last_y = py;
+            st.before = frc;
+            if (st.tool == 2 && !a.in.rpressed) { flood_fill(frc, n, px, py, paint); st.stroke = false; }
+            else if (st.tool <= 1 || a.in.rpressed) plot(frc, n, px, py, paint, st.mirror);
+        }
+    }
+    if (st.stroke && (a.in.down || a.in.rdown)) {
+        int cx = std::clamp(px, 0, n - 1), cy = std::clamp(py, 0, n - 1);
+        if (st.tool <= 1 || st.tool == 2 || st.tool == 3 || a.in.rdown) {
+            if (cx != st.last_x || cy != st.last_y) plot_line(frc, n, st.last_x, st.last_y, cx, cy, paint, st.mirror);
+        } else {
+            frc = st.before;
+            if (st.tool == 4) plot_line(frc, n, st.start_x, st.start_y, cx, cy, paint, st.mirror);
+            else plot_rect(frc, n, st.start_x, st.start_y, cx, cy, paint, st.mirror);
+        }
+        st.last_x = cx;
+        st.last_y = cy;
+        studio_changed(a);
+    }
+    if (!a.in.down && !a.in.rdown) st.stroke = false;
+
+    // ── animation strip ──
+    Box strip{mid.x, canvas.bottom() + 16 * s, mid.w, mid.bottom() - canvas.bottom() - 16 * s};
+    a.ui.panel(strip, 12);
+    const ArtKind& kind = art_kind(art.kind);
+    std::vector<std::string> anim_labels;
+    int anim_sel = 0;
+    for (size_t i = 0; i < kind.anims.size(); i++) {
+        anim_labels.push_back(kind.anims[i].second);
+        if (st.anim == kind.anims[i].first) anim_sel = int(i);
+    }
+    float aw = std::min(strip.w - 350 * s, 120 * s * anim_labels.size());
+    int ns = a.ui.segmented("st_anim", {strip.x + 10 * s, strip.y + 10 * s, aw, 32 * s}, anim_labels, anim_sel, 13);
+    if (ns != anim_sel) { st.anim = kind.anims[ns].first; st.frame = 0; }
+    // Speed and loop.
+    std::vector<std::string> fps_names;
+    const std::vector<float> FPS = {1, 2, 4, 6, 8, 10, 12, 15, 20, 24, 30};
+    int fi = 0;
+    for (size_t i = 0; i < FPS.size(); i++) { fps_names.push_back(strf("%g img/s", FPS[i])); if (std::abs(FPS[i] - an.fps) < 0.01f) fi = int(i); }
+    int nf = a.ui.cycler("st_fps", {strip.right() - 330 * s, strip.y + 10 * s, 222 * s, 32 * s}, "Vitesse", fps_names, fi, 13);
+    if (nf != fi) { an.fps = FPS[nf]; studio_changed(a); }
+    if (a.ui.button("st_loop", {strip.right() - 100 * s, strip.y + 10 * s, 90 * s, 32 * s}, an.loop ? "En boucle" : "Une fois", an.loop ? Style::Primary : Style::Normal, true, 12)) { an.loop = !an.loop; studio_changed(a); }
+    // Frames.
+    float fx = strip.x + 10 * s, fy = strip.y + 52 * s, fs = strip.h - 62 * s;
+    for (int k = 0; k < int(an.frames.size()); k++) {
+        Box r{fx + k * (fs + 6 * s), fy, fs, fs};
+        if (r.right() > strip.right() - 250 * s) break;
+        bool cur = k == st.frame, h = a.ui.hover(r);
+        if (h) a.ui.hovering = true;
+        checker(r, 6 * s);
+        draw_art_frame_k(art, ai, k, r);
+        draw::round_frame(r, 4 * s, cur ? 3 * s : 1, cur ? a.theme().accent : with_alpha(hex(0xffffff), h ? 0.5f : 0.15f));
+        a.text.draw(Font::Bold, 11 * s, std::to_string(k + 1), {r.x + 4 * s, r.y + 2 * s}, hex(0x10141c));
+        if (h && a.in.released) st.frame = k;
+    }
+    Box fb{strip.right() - 240 * s, fy, 230 * s, fs};
+    float bw3 = (fb.w - 12 * s) / 3, bh2 = (fb.h - 6 * s) / 2;
+    if (a.ui.button("st_fadd", {fb.x, fb.y, bw3, bh2}, "+ Vide", Style::Normal, true, 12)) {
+        studio_push_undo(a);
+        an.frames.insert(an.frames.begin() + st.frame + 1, std::vector<Pixel>(size_t(n) * n, 0));
+        st.frame++;
+    }
+    if (a.ui.button("st_fdup", {fb.x + bw3 + 6 * s, fb.y, bw3, bh2}, "+ Copie", Style::Normal, true, 12)) {
+        studio_push_undo(a);
+        an.frames.insert(an.frames.begin() + st.frame + 1, an.frames[st.frame]);
+        st.frame++;
+    }
+    if (a.ui.button("st_fdel", {fb.x + 2 * (bw3 + 6 * s), fb.y, bw3, bh2}, "Retirer", Style::Danger, an.frames.size() > 1 || ai > 0, 12)) {
+        studio_push_undo(a);
+        an.frames.erase(an.frames.begin() + st.frame);
+        st.frame = std::max(0, st.frame - 1);
+    }
+    if (a.ui.button("st_fl", {fb.x, fb.y + bh2 + 6 * s, bw3, bh2}, "\xE2\x86\x90", Style::Ghost, st.frame > 0, 14)) {
+        studio_push_undo(a);
+        std::swap(an.frames[st.frame], an.frames[st.frame - 1]);
+        st.frame--;
+    }
+    if (a.ui.button("st_fr", {fb.x + bw3 + 6 * s, fb.y + bh2 + 6 * s, bw3, bh2}, "\xE2\x86\x92", Style::Ghost, st.frame + 1 < int(an.frames.size()), 14)) {
+        studio_push_undo(a);
+        std::swap(an.frames[st.frame], an.frames[st.frame + 1]);
+        st.frame++;
+    }
+    if (a.ui.button("st_play", {fb.x + 2 * (bw3 + 6 * s), fb.y + bh2 + 6 * s, bw3, bh2}, st.playing ? "Pause" : "Lire", Style::Ghost, true, 12)) st.playing = !st.playing;
+    if (!typing && !modal) {
+        if (a.in.key(SDLK_LEFT) && !an.frames.empty()) st.frame = (st.frame + int(an.frames.size()) - 1) % int(an.frames.size());
+        if (a.in.key(SDLK_RIGHT) && !an.frames.empty()) st.frame = (st.frame + 1) % int(an.frames.size());
+        if (a.in.key(SDLK_SPACE)) st.playing = !st.playing;
+    }
+
+    // ── right panel ──
+    a.ui.panel(right);
+    float x = right.x + 18 * s, w = right.w - 36 * s;
+    y = right.y + 12 * s;
+    a.text.draw(Font::Bold, 12 * s, st.modified ? "Nom  \xE2\x80\xA2 modifi\xC3\xA9 (enregistr\xC3\xA9 en changeant de dessin)" : "Nom", {x, y}, pal::dim);
+    if (a.ui.text_field("st_name", {x, y + 16 * s, w, 34 * s}, art.name, "Nom du dessin", 15)) st.modified = true;
+    y += 58 * s;
+    std::vector<std::string> kinds;
+    int ki = 0;
+    for (size_t i = 0; i < ART_KINDS.size(); i++) { kinds.push_back(ART_KINDS[i].label); if (art.kind == ART_KINDS[i].id) ki = int(i); }
+    int nk = a.ui.cycler("st_kind", {x, y, w, 30 * s}, "Type", kinds, ki, 13);
+    if (nk != ki) {   // new animations may be added: the references above are stale, next frame
+        studio_push_undo(a);
+        art.kind = ART_KINDS[nk].id;
+        art.complete();
+        st.anim = art_kind(art.kind).anims[0].first;
+        st.frame = 0;
+        a.ui.blocked = false;
+        return;
+    }
+    const std::vector<int> SIZES = {16, 24, 32, 48, 64};
+    std::vector<std::string> size_names;
+    int si = 0;
+    for (size_t i = 0; i < SIZES.size(); i++) { size_names.push_back(strf("%d px", SIZES[i])); if (SIZES[i] == n) si = int(i); }
+    int nsz = a.ui.cycler("st_size", {x, y + 36 * s, w, 30 * s}, "Taille", size_names, si, 13);
+    if (nsz != si) {   // every frame resampled (nearest pixel)
+        studio_push_undo(a);
+        int m = SIZES[nsz];
+        for (auto& an2 : art.anims)
+            for (auto& f : an2.frames) {
+                std::vector<Pixel> g(size_t(m) * m);
+                for (int yy = 0; yy < m; yy++)
+                    for (int xx = 0; xx < m; xx++) g[size_t(yy) * m + xx] = f[size_t(yy * n / m) * n + xx * n / m];
+                f = g;
+            }
+        art.size = m;
+        studio_changed(a);
+        a.ui.blocked = false;
+        return;   // the canvas uses the old size this frame
+    }
+    y += 74 * s;
+    if (art.kind == "piece") {
+        if (a.ui.toggle("st_stone", {x, y, w, 28 * s}, "Sur la pierre (noire ou blanche)", art.on_stone, 14)) studio_changed(a);
+        y += 34 * s;
+    } else {
+        const char* help = art.kind == "frame" ? "Le cadre est coup\xC3\xA9 en 3 \xC3\x97 3 : coins, bords, centre."
+                         : art.kind == "hole" ? "\xC2\xAB Apparition \xC2\xBB : jou\xC3\xA9" "e une fois quand le trou se creuse."
+                         : art.kind == "tile" ? "Une case du plateau (claire, fonc\xC3\xA9" "e ou sp\xC3\xA9" "ciale)."
+                         : "Pos\xC3\xA9 sur le plateau ou autour, dans l'\xC3\xA9" "diteur de puzzles.";
+        a.text.draw(Font::Regular, 12 * s, help, {x, y + 6 * s}, pal::faint);
+        y += 34 * s;
+    }
+    // Colour.
+    Box cp{x, y, w - 70 * s, 168 * s};
+    color_picker(a, cp, st.color, st.hue, st.sat, st.val, st.drag, "st");
+    Box cur{cp.right() + 12 * s, y, 58 * s, 58 * s};
+    checker(cur, 8 * s);
+    draw::rect(cur, st.color);
+    a.text.draw(Font::Regular, 11 * s, color_string(st.color), {cur.center().x, cur.bottom() + 4 * s}, pal::dim, Align::Center);
+    y += 176 * s;
+    const int PC = 11;
+    float sw = (w - (PC - 1) * 4 * s) / PC;
+    for (size_t i = 0; i <= STUDIO_PALETTE.size(); i++) {
+        Box c{x + (i % PC) * (sw + 4 * s), y + (i / PC) * (sw + 4 * s), sw, sw};
+        bool transparent = i == STUDIO_PALETTE.size();
+        if (transparent) { checker(c, sw / 4); }
+        else draw::round_box(c, 4 * s, hex(STUDIO_PALETTE[i]));
+        bool h = a.ui.hover(c);
+        if (h) { a.ui.hovering = true; draw::round_frame(c, 4 * s, 2 * s, hex(0xffffff)); }
+        if (h && a.in.released) {
+            st.color = transparent ? Rgba{0, 0, 0, 0} : hex(STUDIO_PALETTE[i]);
+            rgb_to_hsv(st.color, st.hue, st.sat, st.val);
+            if (transparent) st.tool = 1;
+        }
+    }
+    y += float((STUDIO_PALETTE.size() + PC) / PC) * (sw + 4 * s) + 6 * s;
+    // Preview.
+    Box pv{x, y, w, std::max(60 * s, right.bottom() - y - 70 * s)};
+    double t = st.playing ? a.time : st.frame / std::max(0.1f, an.fps) + 0.001;
+    if (!an.loop && st.playing) t = std::fmod(a.time, an.duration() + 0.8);
+    art_preview(a, art, pv, st.anim, t);
+    draw::round_frame(pv, 6 * s, 1, pal::panel_border);
+    if (a.ui.button("st_save", {x, right.bottom() - 58 * s, w, 44 * s}, "Enregistrer", Style::Primary, true, 16)) {
+        studio_save(a);
+        a.notify("Enregistr\xC3\xA9 : assets/art/" + art.id + ".png");
+    }
+    if (!typing && ctrl && a.in.key(SDLK_S)) { studio_save(a); a.notify("Enregistr\xC3\xA9"); }
+    a.ui.blocked = false;
+
+    if (!open_id.empty()) studio_open(a, open_id);
+
+    // ── the "new drawing" dialog ──
+    if (st.new_open) {
+        draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 160));
+        Box d{a.w * 0.5f - 330 * s, a.h * 0.5f - 160 * s, 660 * s, 320 * s};
+        a.ui.panel(d, 20, hex(0x1a202b));
+        a.text.draw(Font::Black, 24 * s, "Nouveau dessin", {d.x + 26 * s, d.y + 22 * s}, pal::text);
+        std::vector<std::string> kl;
+        for (auto& k : ART_KINDS) kl.push_back(k.label);
+        a.text.draw(Font::Regular, 15 * s, "Type", {d.x + 26 * s, d.y + 82 * s}, pal::dim);
+        st.new_kind = a.ui.segmented("nw_kind", {d.x + 120 * s, d.y + 74 * s, d.w - 146 * s, 36 * s}, kl, st.new_kind, 14);
+        a.text.draw(Font::Regular, 15 * s, "Taille", {d.x + 26 * s, d.y + 138 * s}, pal::dim);
+        st.new_size = a.ui.segmented("nw_size", {d.x + 120 * s, d.y + 130 * s, d.w - 146 * s, 36 * s}, size_names, st.new_size, 14);
+        a.text.draw(Font::Regular, 13 * s, ART_KINDS[st.new_kind].id == std::string("frame") ? "Un cadre : une taille multiple de 3 (24 ou 48) se coupe proprement en 3 \xC3\x97 3."
+                                                                                            : "16 ou 32 pixels : un vrai style pixel art ; 64 : plus de d\xC3\xA9tails.",
+                    {d.x + 26 * s, d.y + 186 * s}, pal::faint);
+        if (a.ui.button("nw_ok", {d.right() - 200 * s, d.bottom() - 70 * s, 174 * s, 48 * s}, "Cr\xC3\xA9" "er", Style::Primary) || a.in.key(SDLK_RETURN)) {
+            st.new_open = false;
+            studio_new(a, ART_KINDS[st.new_kind].id, SIZES[st.new_size]);
+        }
+        if (a.ui.button("nw_cancel", {d.right() - 390 * s, d.bottom() - 70 * s, 174 * s, 48 * s}, "Annuler", Style::Ghost) || a.in.key(SDLK_ESCAPE)) {
+            st.new_open = false;
+            a.in.eat(SDLK_ESCAPE);
+        }
+    }
+}
+
+// ── tab "Plateaux" ──
+void studio_theme_save(App& a) {
+    auto& st = a.studio;
+    if (!st.theme_loaded) return;
+    Theme& t = st.theme;
+    if (t.file.empty()) {
+        std::string base = slug(t.name), id = base;
+        for (int k = 2; fs::exists(g_paths.assets / "themes" / (id + ".json")); k++) id = base + "_" + std::to_string(k);
+        t.id = id;
+        t.file = id + ".json";
+    }
+    if (!write_file(g_paths.assets / "themes" / t.file, theme_to_json(t).dump(2))) { a.notify("Impossible d'enregistrer le th\xC3\xA8me."); return; }
+    a.themes = load_themes(g_paths.assets / "themes");
+    a.board_textures.clear();
+    st.theme_modified = false;
+}
+void studio_theme_open(App& a, const Theme& t) {
+    auto& st = a.studio;
+    if (st.theme_modified) studio_theme_save(a);
+    st.theme = t;
+    st.theme_loaded = true;
+    st.theme_modified = false;
+    st.confirm_theme_delete = false;
+    st.tex_changed = a.time;
+}
+
+void studio_boards(App& a) {
+    const float s = a.s;
+    auto& st = a.studio;
+    if (!st.theme_loaded) studio_theme_open(a, a.theme());
+    Theme& t = st.theme;
+    const float margin = 26 * s, top = 150 * s;
+    Box lib{margin, top, 270 * s, a.h - top - margin};
+    Box right{a.w - margin - 470 * s, top, 470 * s, a.h - top - margin};
+    Box mid{lib.right() + 26 * s, top, right.x - lib.right() - 52 * s, a.h - top - margin};
+
+    // ── the themes ──
+    a.ui.panel(lib);
+    float y = lib.y + 12 * s;
+    const Theme* open = nullptr;
+    for (auto& th : a.themes) {
+        Box r{lib.x + 8 * s, y, lib.w - 16 * s, 44 * s};
+        bool cur = th.file == t.file;
+        bool h = a.ui.hover(r);
+        if (h) a.ui.hovering = true;
+        draw::round_box(r, 8 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.28f : (h ? 0.08f : 0.0f)));
+        Box sw{r.x + 8 * s, r.y + 8 * s, 28 * s, 28 * s};
+        const Theme& shown = cur ? t : th;
+        draw::rect({sw.x, sw.y, sw.w / 2, sw.h / 2}, shown.light);
+        draw::rect({sw.x + sw.w / 2, sw.y, sw.w / 2, sw.h / 2}, shown.dark);
+        draw::rect({sw.x, sw.y + sw.h / 2, sw.w / 2, sw.h / 2}, shown.dark);
+        draw::rect({sw.x + sw.w / 2, sw.y + sw.h / 2, sw.w / 2, sw.h / 2}, shown.light);
+        a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, shown.name, {sw.right() + 10 * s, r.y + 13 * s}, pal::text);
+        if (h && a.in.released && !cur) open = &th;
+        y += 48 * s;
+    }
+    if (a.ui.button("th_new", {lib.x + 10 * s, lib.bottom() - 120 * s, lib.w - 20 * s, 42 * s}, "+ Nouveau th\xC3\xA8me", Style::Primary, true, 15)) {
+        studio_theme_save(a);
+        Theme copy = t;
+        copy.file.clear();
+        copy.name = t.name + " (copie)";
+        st.theme = copy;
+        st.theme_modified = true;
+        studio_theme_save(a);
+        a.notify("Nouveau th\xC3\xA8me : " + st.theme.name);
+    }
+    bool can_delete = a.themes.size() > 1;
+    if (a.ui.button("th_del", {lib.x + 10 * s, lib.bottom() - 70 * s, lib.w - 20 * s, 40 * s}, st.confirm_theme_delete ? "Confirmer la suppression ?" : "Supprimer ce th\xC3\xA8me", Style::Danger, can_delete, 14)) {
+        if (!st.confirm_theme_delete) st.confirm_theme_delete = true;
+        else {
+            std::error_code ec;
+            fs::remove(g_paths.assets / "themes" / t.file, ec);
+            a.themes = load_themes(g_paths.assets / "themes");
+            a.board_textures.clear();
+            st.theme_loaded = false;
+            st.theme_modified = false;
+            a.notify("Th\xC3\xA8me supprim\xC3\xA9 : " + t.name);
+            return;
+        }
+    }
+
+    // ── a live board ──
+    // The board texture is computed pixel by pixel: while a colour changes,
+    // it is rebuilt at most 5 times a second (under a key of its own).
+    Theme shown = t;
+    shown.id = "__studio_" + std::to_string(int(st.tex_built * 1000));
+    if (st.tex_changed > st.tex_built && a.time - st.tex_built > 0.2) {
+        a.board_textures.clear();
+        st.tex_built = a.time;
+        shown.id = "__studio_" + std::to_string(int(st.tex_built * 1000));
+    }
+    const float frame = 26 * s;
+    float B = std::floor(std::min(mid.w, mid.h) - 2 * frame - 30 * s);
+    B = std::floor(B / 8) * 8;
+    st.board.area = {std::floor(mid.x + (mid.w - B) / 2), std::floor(mid.y + frame + 4 * s), B, B};
+    Yolah y0;
+    {   // A position with holes and pieces of both sides, one of them shut in.
+        uint64_t b = 0, w = 0, e = 0;
+        for (int sq : {9, 18, 36, 43}) b |= uint64_t(1) << sq;
+        for (int sq : {14, 29, 52, 63}) w |= uint64_t(1) << sq;
+        for (int sq : {0, 1, 8, 10, 17, 19, 21, 27, 28, 35, 44, 45, 53, 54, 55, 62, 22, 30, 38, 46, 47})
+            if (!((b | w) >> sq & 1)) e |= uint64_t(1) << sq;
+        y0.set_state(b, w, e, 4, 4, 8);
+    }
+    BoardView::Look look;
+    look.sprite[BLACK] = &a.player_sprite("human");
+    look.sprite[WHITE] = &a.player_sprite("dev");
+    look.halo[BLACK] = true;
+    st.board.draw(a.text, a.board_textures, shown, y0, look, a.time, s);
+    if (a.ui.hover(st.board.area) && a.in.released) {   // a click: a hole opens there (to see its animation)
+        int sq = st.board.at(a.in.mouse);
+        if (sq >= 0) st.board.hole_since[sq] = a.time;
+    }
+    a.text.draw(Font::Regular, 13 * s, "Cliquez sur un trou pour revoir son apparition.", {mid.center().x, st.board.area.bottom() + frame + 2 * s}, pal::faint, Align::Center);
+
+    // ── settings ──
+    a.ui.panel(right);
+    float x = right.x + 18 * s, w = right.w - 36 * s;
+    y = right.y + 12 * s;
+    a.text.draw(Font::Bold, 12 * s, st.theme_modified ? "Nom  \xE2\x80\xA2 modifi\xC3\xA9" : "Nom", {x, y}, pal::dim);
+    if (a.ui.text_field("th_name", {x, y + 16 * s, w, 34 * s}, t.name, "Nom du th\xC3\xA8me", 15)) st.theme_modified = true;
+    y += 58 * s;
+    const std::vector<std::pair<std::string, std::string>> PATTERNS = {{"wood", "Bois"}, {"marble", "Marbre"}, {"stone", "Pierre"}, {"neon", "N\xC3\xA9on"}, {"flat", "Uni"}};
+    std::vector<std::string> pl;
+    int pi = 0;
+    for (size_t i = 0; i < PATTERNS.size(); i++) { pl.push_back(PATTERNS[i].second); if (PATTERNS[i].first == t.pattern) pi = int(i); }
+    int np = a.ui.segmented("th_pat", {x, y, w, 30 * s}, pl, pi, 13);
+    if (np != pi) { t.pattern = PATTERNS[np].first; st.theme_modified = true; st.tex_changed = a.time; }
+    y += 36 * s;
+    std::vector<std::string> strengths = {"Motif discret", "Motif l\xC3\xA9ger", "Motif moyen", "Motif marqu\xC3\xA9", "Motif fort"};
+    const float STRENGTH[] = {0.15f, 0.3f, 0.5f, 0.75f, 1.0f};
+    int sti = 0;
+    for (int i = 0; i < 5; i++) if (std::abs(STRENGTH[i] - t.strength) < std::abs(STRENGTH[sti] - t.strength)) sti = i;
+    int nst = a.ui.cycler("th_str", {x, y, w, 30 * s}, "Motif", strengths, sti, 13);
+    if (nst != sti) { t.strength = STRENGTH[nst]; st.theme_modified = true; st.tex_changed = a.time; }
+    y += 38 * s;
+    // The drawings of the workshop.
+    struct Slot { const char* label; const char* kind; std::string* id; };
+    Slot slots[] = {{"Case claire", "tile", &t.tile_light}, {"Case fonc\xC3\xA9" "e", "tile", &t.tile_dark}, {"Trous", "hole", &t.hole_art}, {"Cadre", "frame", &t.frame_art}};
+    for (auto& sl : slots) {
+        std::vector<std::string> names = {"Aucun (couleurs)"}, ids = {""};
+        int idx = 0;
+        for (Art* x2 : arts_of(sl.kind)) { names.push_back(x2->name); ids.push_back(x2->id); if (x2->id == *sl.id) idx = int(ids.size()) - 1; }
+        int ni = a.ui.cycler(std::string("th_art_") + sl.label, {x, y, w - 84 * s, 30 * s}, sl.label, names, idx, 13);
+        if (ni != idx) { *sl.id = ids[ni]; st.theme_modified = true; }
+        if (a.ui.button(std::string("th_edit_") + sl.label, {x + w - 76 * s, y, 76 * s, 30 * s}, sl.id->empty() ? "Dessiner" : "\xC3\x89" "diter", Style::Normal, true, 12)) {
+            studio_theme_save(a);
+            if (sl.id->empty()) {   // a new drawing of this kind, then used by the theme
+                studio_new(a, sl.kind, sl.kind == std::string("frame") ? 24 : 16);
+                *sl.id = st.edit.id;
+                st.theme_modified = true;
+                studio_theme_save(a);
+            } else {
+                studio_open(a, *sl.id);
+            }
+            st.back_to_theme = t.file;
+            st.tab = 0;
+            return;
+        }
+        y += 36 * s;
+    }
+    y += 4 * s;
+    // The colours: a grid of swatches; the selected one is edited below.
+    struct Col { const char* label; Rgba* c; bool texture; };
+    Col cols[] = {{"Case claire", &t.light, true}, {"Case fonc\xC3\xA9" "e", &t.dark, true}, {"Cadre (haut)", &t.frame_top, false},
+                  {"Cadre (bas)", &t.frame_bottom, false}, {"Filet du cadre", &t.frame_line, false}, {"Coordonn\xC3\xA9" "es", &t.coords, false},
+                  {"Trou", &t.hole, false}, {"Bord du trou", &t.hole_rim, false}, {"Dernier coup", &t.last_move, false},
+                  {"S\xC3\xA9lection", &t.select, false}, {"Coups possibles", &t.legal, false}, {"Conseil", &t.hint, false},
+                  {"Accent", &t.accent, false}, {"Fond (haut)", &t.bg_top, false}, {"Fond (bas)", &t.bg_bottom, false}};
+    const int NC = int(std::size(cols));
+    float cw = (w - 8 * s) / 3, ch = 30 * s;
+    for (int i = 0; i < NC; i++) {
+        Box r{x + (i % 3) * (cw + 4 * s), y + (i / 3) * (ch + 4 * s), cw, ch};
+        bool cur = i == st.color_slot, h = a.ui.hover(r);
+        if (h) a.ui.hovering = true;
+        draw::round_box(r, 6 * s, with_alpha(hex(0xffffff), cur ? 0.16f : (h ? 0.08f : 0.03f)));
+        if (cur) draw::round_frame(r, 6 * s, 2 * s, a.theme().accent);
+        Box sw{r.x + 5 * s, r.y + 5 * s, 20 * s, 20 * s};
+        checker(sw, 5 * s);
+        draw::rect(sw, *cols[i].c);
+        a.text.draw(Font::Regular, 11 * s, cols[i].label, {sw.right() + 6 * s, r.y + 8 * s}, pal::text);
+        if (h && a.in.released) { st.color_slot = i; rgb_to_hsv(*cols[i].c, st.hue, st.sat, st.val); }
+    }
+    y += ((NC + 2) / 3) * (ch + 4 * s) + 6 * s;
+    Col& cc = cols[std::clamp(st.color_slot, 0, NC - 1)];
+    Box cp{x, y, w, std::max(80 * s, right.bottom() - y - 66 * s)};
+    if (color_picker(a, cp, *cc.c, st.hue, st.sat, st.val, st.drag, "th")) {
+        st.theme_modified = true;
+        if (cc.texture) st.tex_changed = a.time;
+    }
+    if (a.ui.button("th_save", {x, right.bottom() - 56 * s, w, 44 * s}, "Enregistrer le th\xC3\xA8me", Style::Primary, true, 16)) {
+        studio_theme_save(a);
+        a.notify("Th\xC3\xA8me enregistr\xC3\xA9 : assets/themes/" + t.file);
+    }
+    if (open) studio_theme_open(a, *open);
+}
+
+void scene_studio(App& a) {
+    const float s = a.s;
+    auto& st = a.studio;
+    draw_background(a, false);
+    a.text.draw_shadowed(Font::Title, 34 * s, "Atelier", {40 * s, 24 * s}, pal::text, Align::Left, hex(0x000000, 120), 3 * s);
+    a.text.draw(Font::Regular, 15 * s, st.tab == 0 ? "Dessinez les pions, les d\xC3\xA9" "cors, les cases, les trous et les cadres, image par image ; glissez une image sur la fen\xC3\xAAtre pour l'importer."
+                                                : "Les th\xC3\xA8mes du plateau : couleurs, motif, et les dessins de l'atelier pour les cases, les trous et le cadre.",
+                {42 * s, 74 * s}, pal::dim);
+    if (!st.new_open && a.ui.focus.empty() && back_button(a)) {
+        if (st.modified) studio_save(a);
+        if (st.theme_modified) studio_theme_save(a);
+        a.go(Scene::Menu);
+        return;
+    }
+    int nt = a.ui.tabs("st_tabs", {40 * s, 104 * s, 420 * s, 36 * s}, {"Dessins", "Plateaux"}, st.tab);
+    if (nt != st.tab) {
+        if (st.modified) studio_save(a);
+        if (st.theme_modified) studio_theme_save(a);
+        if (nt == 1 && !st.back_to_theme.empty()) {   // back to the theme that opened the drawing
+            for (auto& th : a.themes)
+                if (th.file == st.back_to_theme) studio_theme_open(a, th);
+            st.back_to_theme.clear();
+        }
+        st.tab = nt;
+        a.ui.focus.clear();
+    }
+    if (st.tab == 0) studio_drawings(a);
+    else studio_boards(a);
+}
+
 }   // namespace yapp
 
 // ─── @@MAIN ─────────────────────────────────────────────────────────────────
@@ -4616,6 +5935,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     }
     a->themes = load_themes(g_paths.assets / "themes");
     a->sprites = load_sprites(g_paths.assets / "sprites" / "sprites.json");
+    load_all_arts();
+    register_art_sprites(a->sprites);
     a->roster = load_roster(g_paths.assets / "ai_roster.json");
     {
         json j = load_json(g_paths.assets / "sprites" / "assignments.json");
@@ -4679,6 +6000,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         }
     }
     else if (scene == "editor") a->go(Scene::Editor);
+    else if (scene == "studio") {
+        a->go(Scene::Studio);
+        a->studio.tab = std::stoi(arg_value(argc, argv, "--tab", "0"));
+        std::string art = arg_value(argc, argv, "--art");   // open this drawing
+        if (find_art(art)) studio_open(*a, art);
+    }
     a->time = now_seconds();
     a->scene_t0 = a->time - 10;
     return SDL_APP_CONTINUE;
@@ -4738,6 +6065,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     case Scene::Tutorial: scene_tutorial(*a); break;
     case Scene::Puzzles: scene_puzzles(*a); break;
     case Scene::Editor: scene_editor(*a); break;
+    case Scene::Studio: scene_studio(*a); break;
     }
     if (a->scene != Scene::Game) {
         a->fx.update(float(a->dt));

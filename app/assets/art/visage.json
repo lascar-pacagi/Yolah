@@ -1,0 +1,32 @@
+{
+  "name": "Visage",
+  "kind": "piece",
+  "size": 16,
+  "on stone": true,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 4,
+      "loop": true,
+      "frames": 8
+    },
+    {
+      "name": "move",
+      "fps": 8,
+      "loop": false,
+      "frames": 2
+    },
+    {
+      "name": "blocked",
+      "fps": 3,
+      "loop": true,
+      "frames": 4
+    },
+    {
+      "name": "win",
+      "fps": 6,
+      "loop": true,
+      "frames": 2
+    }
+  ]
+}

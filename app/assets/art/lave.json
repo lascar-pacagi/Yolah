@@ -1,0 +1,20 @@
+{
+  "name": "Lave",
+  "kind": "hole",
+  "size": 16,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 4,
+      "loop": true,
+      "frames": 6
+    },
+    {
+      "name": "open",
+      "fps": 10,
+      "loop": false,
+      "frames": 6
+    }
+  ]
+}

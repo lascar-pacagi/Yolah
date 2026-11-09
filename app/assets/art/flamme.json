@@ -1,0 +1,14 @@
+{
+  "name": "Flamme",
+  "kind": "decor",
+  "size": 16,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 8,
+      "loop": true,
+      "frames": 6
+    }
+  ]
+}

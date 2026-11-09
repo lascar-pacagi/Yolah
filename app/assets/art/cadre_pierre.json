@@ -1,0 +1,14 @@
+{
+  "name": "Cadre de pierre",
+  "kind": "frame",
+  "size": 24,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 1,
+      "loop": true,
+      "frames": 1
+    }
+  ]
+}

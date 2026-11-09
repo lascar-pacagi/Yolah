@@ -1,0 +1,14 @@
+{
+  "name": "Terre",
+  "kind": "tile",
+  "size": 16,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 1,
+      "loop": true,
+      "frames": 1
+    }
+  ]
+}
