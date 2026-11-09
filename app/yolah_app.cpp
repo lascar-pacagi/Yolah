@@ -1042,11 +1042,12 @@ public:
         return lines;
     }
     // Draws wrapped text; returns the height used.
-    float paragraph(Font f, float size, const std::string& s, Box b, Rgba col, float spacing = 1.25f) {
+    float paragraph(Font f, float size, const std::string& s, Box b, Rgba col, float spacing = 1.25f, Align al = Align::Left) {
         float lh = line_height(f, size) * spacing / 1.2f, y = b.y;
         for (auto& l : wrap(f, size, s, b.w)) {
             if (y + lh > b.bottom() + 1) break;
-            draw(f, size, l, {b.x, y}, col);
+            if (al == Align::Center) draw(f, size, l, {b.center().x, y}, col, Align::Center);
+            else draw(f, size, l, {b.x, y}, col);
             y += lh;
         }
         return y - b.y;
@@ -3113,7 +3114,7 @@ App* g_app = nullptr;
 void start_lesson(App& a, int i);
 int first_lesson_to_do(const App& a);
 void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai = "");
-void draw_image_background(App& a, const std::string& file, uint8_t dim);
+void draw_image_background(App& a, const std::string& file, uint8_t dim = 70, bool vignette = true);
 std::string goal_text(const App& a, const Puzzle& p);
 
 // Drawn behind every scene: the theme's gradient, a vignette, faint shapes.
@@ -3564,12 +3565,12 @@ void scene_game(App& a) {
     const float s = a.s;
     // A puzzle starts with its introduction: its image, its title, its goal.
     if (g.puzzle_mode && g.intro) {
-        draw_image_background(a, g.puzzle.background, 20);
+        draw_image_background(a, g.puzzle.background, 0, false);   // the whole window, as it is
         float k = ease_out_cubic(float((a.time - a.scene_t0) / 0.6));
         Box card{a.w * 0.5f - 420 * s, a.h - 340 * s + (1 - k) * 60 * s, 840 * s, 290 * s};
         a.ui.panel(card, 24, hex(0x10151d, uint8_t(225 * k)));
         a.text.draw_shadowed(Font::Title, 40 * s, g.puzzle.name, {card.center().x, card.y + 26 * s}, with_alpha(pal::text, k), Align::Center, hex(0x000000, 120), 3 * s);
-        a.text.paragraph(Font::Regular, 18 * s, g.puzzle.text, {card.x + 50 * s, card.y + 92 * s, card.w - 100 * s, 60 * s}, with_alpha(pal::dim, k));
+        a.text.paragraph(Font::Regular, 18 * s, g.puzzle.text, {card.x + 50 * s, card.y + 92 * s, card.w - 100 * s, 60 * s}, with_alpha(pal::dim, k), 1.25f, Align::Center);
         a.text.draw(Font::Bold, 18 * s, goal_text(a, g.puzzle), {card.center().x, card.y + 160 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
         if (a.ui.button("pz_start", {card.center().x + 10 * s, card.bottom() - 74 * s, 220 * s, 52 * s}, "Commencer", Style::Primary) || a.in.key(SDLK_RETURN)) {
             g.intro = false;
@@ -4354,7 +4355,8 @@ std::string goal_text(const App& a, const Puzzle& p) {
 
 // The window covered by a background image (cropped to keep its proportions),
 // darkened a little so that the board and the panels stay readable.
-void draw_image_background(App& a, const std::string& file, uint8_t dim = 70) {
+// vignette: darken the edges (behind a board); off for a full-window picture.
+void draw_image_background(App& a, const std::string& file, uint8_t dim, bool vignette) {
     SDL_Texture* tex = file.empty() ? nullptr : a.background(file);
     if (!tex) { draw_background(a, false); return; }
     float tw, th;
@@ -4363,7 +4365,7 @@ void draw_image_background(App& a, const std::string& file, uint8_t dim = 70) {
     SDL_FRect dst{(a.w - tw * k) / 2, (a.h - th * k) / 2, tw * k, th * k};
     SDL_RenderTexture(a.renderer, tex, nullptr, &dst);
     draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, dim));
-    draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 50);
+    if (vignette) draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 50);
 }
 
 // A small picture of a puzzle: its squares, holes and pieces.
