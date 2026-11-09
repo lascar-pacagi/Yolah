@@ -3114,8 +3114,11 @@ void scene_game(App& a) {
         else a.go(Scene::Menu);
         return;
     }
-    if (a.in.key(SDLK_H) && !g.puzzle_mode) a.settings.show_hint = !a.settings.show_hint;
-    if (a.in.key(SDLK_E) && !g.puzzle_mode) a.settings.show_eval = !a.settings.show_eval;
+    // The analysis is a help: none in a puzzle played from a level (it would
+    // give the solution), but there when the editor tests a puzzle.
+    const bool help = !g.puzzle_mode || g.from_editor;
+    if (a.in.key(SDLK_H) && help) a.settings.show_hint = !a.settings.show_hint;
+    if (a.in.key(SDLK_E) && help) a.settings.show_eval = !a.settings.show_eval;
     if (a.in.key(SDLK_F)) g.board.flipped = !g.board.flipped;
     if (a.in.key(SDLK_U) || a.in.key(SDLK_BACKSPACE)) a.undo_move();
     if (a.in.key(SDLK_SPACE) && !g.slot[0].human() && !g.slot[1].human()) g.paused = !g.paused;
@@ -3123,9 +3126,9 @@ void scene_game(App& a) {
     game_logic(a);
 
     // Analysis: restarted whenever the position changes and something shows it.
-    // (Not in a puzzle: no help there.)
-    const bool show_eval = a.settings.show_eval && !g.puzzle_mode;
-    bool need = !g.puzzle_mode && (a.settings.show_eval || a.settings.show_hint || a.settings.show_pv || g.tab == 1);
+    if (!help && g.tab == 1) g.tab = 0;
+    const bool show_eval = a.settings.show_eval && help;
+    bool need = help && (a.settings.show_eval || a.settings.show_hint || a.settings.show_pv || g.tab == 1);
     if (need && g.analysed != g.token && !g.board.animating(a.time) && !g.match.over()) {
         g.analyzer.analyse(g.match.pos, g.token, 20.0);
         g.analysed = g.token;
@@ -3191,7 +3194,8 @@ void scene_game(App& a) {
         tabs_y += 48 * s;
     }
     Box tabs{panel.x + 20 * s, tabs_y, panel.w - 40 * s, 38 * s};
-    g.tab = a.ui.tabs("gtabs", tabs, {"Coups", "Analyse", "IA"}, g.tab);
+    if (help) g.tab = a.ui.tabs("gtabs", tabs, {"Coups", "Analyse", "IA"}, g.tab);
+    else g.tab = a.ui.tabs("gtabs2", tabs, {"Coups", "IA"}, g.tab == 2 ? 1 : 0) == 1 ? 2 : 0;   // no analysis tab
     Box buttons{panel.x + 16 * s, card_bottom.y - 66 * s, panel.w - 32 * s, 50 * s};
     Box content{panel.x + 24 * s, tabs.bottom() + 16 * s, panel.w - 48 * s, buttons.y - tabs.bottom() - 30 * s};
     if (g.tab == 0) tab_moves(a, content);
@@ -3202,7 +3206,7 @@ void scene_game(App& a) {
     auto bbox = [&](int i) { return Box{buttons.x + i * (bw + 8 * s), buttons.y, bw, buttons.h}; };
     if (ai_vs_ai) {
         if (a.ui.button("g_pause", bbox(0), g.paused ? "Reprendre" : "Pause", g.paused ? Style::Primary : Style::Normal, true, 17)) g.paused = !g.paused;
-    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.settings.show_hint && !g.puzzle_mode ? Style::Primary : Style::Normal, !g.puzzle_mode, 17)) {
+    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.settings.show_hint && help ? Style::Primary : Style::Normal, help, 17)) {
         a.settings.show_hint = !a.settings.show_hint;
     }
     if (a.ui.button("g_undo", bbox(1), "Annuler", Style::Normal, !g.match.history.empty(), 17)) a.undo_move();
