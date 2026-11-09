@@ -4471,7 +4471,7 @@ void scene_puzzles(App& a) {
             a.text.draw(Font::Regular, 13 * s, ok ? "r\xC3\xA9ussi" : (p->margin > 1 ? strf("gagner de %d+", p->margin) : std::string("gagner")),
                         {c.x + 44 * s, c.bottom() - 50 * s}, ok ? pal::good : pal::dim);
             if (ok) draw_emblem("check", {c.right() - 30 * s, c.bottom() - 56 * s}, 12 * s, pal::good);
-            if (h && a.in.released) { start_puzzle(a, *p, any_order ? "" : l.id, int(i), false); return; }
+            if (h && a.in.released) { draw::clip(nullptr); start_puzzle(a, *p, any_order ? "" : l.id, int(i), false); return; }
         }
         draw::clip(nullptr);
         if (l.puzzles.empty()) a.text.draw(Font::Regular, 16 * s, "Ce niveau est vide.", {grid.x, grid.y}, pal::faint);
@@ -6166,6 +6166,9 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     g_graveyard.reap();
     a->in.files = a->take_files();
 
+    // A scene that returned between draw::clip(&box) and draw::clip(nullptr)
+    // (a click that changes scene) must not crop the next frame.
+    SDL_SetRenderClipRect(a->renderer, nullptr);
     SDL_SetRenderDrawColor(a->renderer, 0, 0, 0, 255);
     SDL_RenderClear(a->renderer);
     switch (a->scene) {
