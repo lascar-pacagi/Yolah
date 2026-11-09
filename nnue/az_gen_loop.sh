@@ -21,8 +21,11 @@
 #              A task stopped before its share (time limit) fails: run
 #              `bash az_gen_loop.sh G` again, the tasks go on where they were.
 #   train      GPU: az_<G-1> trained EPOCHS epochs on the WINDOW newest rows
-#              (gen_<G>, gen_<G-1>, ..., then OLD_SELFPLAY) → az_<G>
-#              (nnue/az_gen_train.py; resumes from its checkpoint)
+#              (gen_<G>, gen_<G-1>, ..., then positions of OLD_CACHE to fill
+#              the window: 3/4 at generation 1, 2/4, 1/4, none from generation
+#              4 on with GEN_ROWS = WINDOW / 4) → az_<G> (nnue/az_gen_train.py;
+#              resumes from its checkpoint). The policy is learnt on the rows
+#              of the full searches only, the value on every row (z).
 #   eval       GPU array: az_<G> against az_<G-1> (task 0) and az_0 (task 1),
 #              EVAL_GAMES games at EVAL_SECONDS s per move, the balanced book
 #              (alphazero_match.sh) → ROOT/matches.csv
@@ -43,7 +46,8 @@ export WORK_DIR="${ROOT}"                       # alphazero_common.sh: /work in 
 GPU_EXCLUDE="${GPU_EXCLUDE:-crn22}"             # crn22 refuses containers
 START_PT="${START_PT:-${HOME}/DistillLoop/round_001/resnet.pt}"
 START_TS="${START_TS:-${HOME}/DistillLoop/round_001/resnet.ts}"
-OLD_SELFPLAY="${OLD_SELFPLAY:-${HOME}/AlphaZeroLearn/work/selfplay}"   # "none": no old rows
+OLD_CACHE="${OLD_CACHE:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"  # fills the window ("none": no)
+OLD_SELFPLAY="${OLD_SELFPLAY:-none}"            # older self-play rows, before OLD_CACHE ("none": no)
 GEN_ROWS="${GEN_ROWS:-12500000}"                # new rows per generation
 WINDOW="${WINDOW:-50000000}"                    # rows of a training (new + old)
 EPOCHS="${EPOCHS:-10}"
@@ -109,6 +113,10 @@ OLD_BIND=()
 if [[ "${OLD_SELFPLAY}" != "none" && -d "${OLD_SELFPLAY}" ]]; then
     OLD_ARGS=(--old /old)
     OLD_BIND=(--bind "${OLD_SELFPLAY}:/old")
+fi
+if [[ "${OLD_CACHE}" != "none" && -d "${OLD_CACHE}" ]]; then
+    OLD_ARGS+=(--old-cache /oldcache)
+    OLD_BIND+=(--bind "${OLD_CACHE}:/oldcache")
 fi
 
 header() {

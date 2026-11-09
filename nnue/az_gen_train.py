@@ -8,25 +8,32 @@ epochs on a window of the newest WINDOW self-play rows, becomes generation G.
 
 ROOT/models/az_<G-1>.pt   the network trained further (generation 0: the start network)
 ROOT/gen_<g>/selfplay/    the rows of generation g (self-play by az_<g-1>)
+--old-cache DIR           an older training cache (preprocess_nnue.py layout:
+                          inputs.u8, values.i8; cache_az256), which fills the
+                          window while the generations do not
 --old DIR                 older self-play rows (another run's selfplay/), used
-                          after all the generations, newest first, while the
-                          window is not full
+                          after the generations, before the old cache
 
 The window: the rows of gen_G (all of them), then gen_{G-1}, gen_{G-2}, ...,
-then the --old directories, newest file first, until WINDOW rows. So with
-generations of WINDOW / 4 rows, each generation is trained on its own rows and
-the 3 generations before, and a generation's rows leave the window 4
-generations later.
+then the --old directories, newest file first, then positions of the old
+cache, until WINDOW rows. With generations of WINDOW / 4 rows: generation 1 =
+its rows + 3/4 of the window from the old cache, generation 2 = 2/4 + 2/4,
+generation 3 = 3/4 + 1/4, then only generations; a generation's rows leave the
+window 4 generations later. The old cache's positions are drawn by blocks of
+--old-block consecutive positions in one fixed random order (--old-seed): each
+generation takes the beginning of it, so the old positions of a generation are
+among those of the generation before (they leave the window little by little).
 
 Validation: one file in 50 of gen_G (kept out of the training).
 
 Targets
   value   z (the game's result; the exact result where the solver gave it,
           flags SAMPLE_EXACT), blended with the search value root_q if
-          --q-weight > 0 (not where z is exact)
-  policy  cross-entropy with the search's π; the rows of the fast searches
-          (flags SAMPLE_FAST: few visits, no noise) weigh --fast-policy-weight
-          (0: value only, as KataGo)
+          --q-weight > 0 (not where z is exact): for every row
+  policy  cross-entropy with the search's π: the rows of the full searches
+          only by default (the fast searches, flags SAMPLE_FAST, few visits
+          and no noise, weigh --fast-policy-weight = 0; the old cache's
+          positions, flags OLD, have no π)
 One random symmetry of the board per row (alphazero_learn.BatchMaker).
 
 The learning rate: a linear warm-up, then a cosine down to a tenth over the
@@ -52,7 +59,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from alphazero_learn import (SAMPLE_DTYPE, BatchMaker, export_model, load_state_dict,  # noqa: E402
                              make_net, model_paths, publish_latest, read_header, read_samples)
 
-FAST, EXACT = 1, 2
+FAST, EXACT, OLD = 1, 2, 4
+ROW = 193
 STOP = {"flag": False}
 
 
@@ -86,6 +94,32 @@ def window_files(root, gen, old_dirs, window, val_every):
     return parts, val, total
 
 
+def old_cache_rows(path, n, block, seed):
+    """n positions of an old cache as self-play rows (no π, flags OLD), by blocks in a fixed random order."""
+    with open(os.path.join(path, "meta.json")) as f:
+        on = int(json.load(f)["n_positions"])
+    inputs = np.memmap(os.path.join(path, "inputs.u8"), np.uint8, "r", shape=(on, ROW))
+    values = np.memmap(os.path.join(path, "values.i8"), np.int8, "r", shape=(on,))
+    starts = np.random.default_rng(seed).permutation(on // block) * block
+    nb = min(len(starts), -(-n // block))
+    take = np.sort(starts[:nb])
+    out = np.zeros(nb * block, dtype=SAMPLE_DTYPE)
+    for i, st in enumerate(take):
+        r = np.asarray(inputs[st:st + block])
+        o = out[i * block:(i + 1) * block]
+        for k, name in enumerate(("black", "white", "empty")):
+            # bit 63 − j of the bitboard is byte j of the row (loop_prepare.board_rows)
+            o[name] = np.packbits(r[:, 64 * k:64 * (k + 1)], axis=1).view(">u8").ravel().astype("<u8")
+        o["turn"] = r[:, 192]
+        o["z"] = values[st:st + block]
+        if i % 1000 == 0:
+            log(f"  old cache: {i * block:,} / {nb * block:,} positions")
+    out["flags"] = OLD
+    out = out[:n]
+    log(f"  old cache {path}: {len(out):,} of its {on:,} positions")
+    return out
+
+
 def load_rows(parts, total):
     rows = np.empty(total, dtype=SAMPLE_DTYPE)
     pos = 0
@@ -109,6 +143,7 @@ class Losses:
         flags = torch.from_numpy(rows["flags"].astype(np.int64)).to(self.dev)
         exact = (flags & EXACT) != 0
         fast = (flags & FAST) != 0
+        no_pi = (flags & OLD) != 0
         target = z
         if self.q > 0:
             q = torch.from_numpy(rows["root_q"].astype(np.float32)).to(self.dev).clamp(-1.0, 1.0)
@@ -120,6 +155,7 @@ class Losses:
         logp = F.log_softmax(logits.float(), dim=1).gather(1, actions)
         ce = -(probs * logp).sum(1)
         w = torch.where(fast, torch.full_like(ce, self.fw), torch.ones_like(ce))
+        w = torch.where(no_pi, torch.zeros_like(ce), w)
         p_loss = (w * ce).sum() / w.sum().clamp_min(1e-6)
         best = actions.gather(1, probs.argmax(1, keepdim=True)).squeeze(1)
         top1 = (logits.argmax(1) == best).float()
@@ -150,6 +186,9 @@ def main():
     ap.add_argument("--gen", type=int, required=True)
     ap.add_argument("--window", type=int, default=50_000_000)
     ap.add_argument("--old", action="append", default=[], help="older self-play directories (after the generations)")
+    ap.add_argument("--old-cache", default="", help="an older training cache, which fills the window")
+    ap.add_argument("--old-block", type=int, default=4096)
+    ap.add_argument("--old-seed", type=int, default=12345)
     ap.add_argument("--epochs", type=float, default=10.0)
     ap.add_argument("--lr", type=float, default=5e-5)
     ap.add_argument("--weight-decay", type=float, default=1e-4)
@@ -182,13 +221,16 @@ def main():
     log(f"generation {a.gen}: {init_pt} → az_{a.gen:08d}, window {a.window:,} rows, {a.epochs:g} epochs, "
         f"lr {a.lr:g}, q weight {a.q_weight}, fast policy weight {a.fast_policy_weight}, {amp_dtype}, {device}")
     parts, val_files, total = window_files(a.root, a.gen, a.old, a.window, a.val_every)
+    rows = load_rows(parts, total)
+    if a.old_cache and total < a.window:
+        rows = np.concatenate([rows, old_cache_rows(a.old_cache, a.window - total, a.old_block, a.old_seed)])
+        total = len(rows)
     if total == 0:
         sys.exit("no rows")
-    rows = load_rows(parts, total)
     val = np.concatenate([read_samples(f, SAMPLE_DTYPE) for f in val_files])[:a.val_rows] if val_files else rows[:0]
-    fast, exact = (rows["flags"] & FAST) != 0, (rows["flags"] & EXACT) != 0
-    log(f"window: {total:,} rows ({fast.mean():.1%} fast, {exact.mean():.1%} exact), validation {len(val):,} rows")
-    del fast, exact
+    share = lambda bit: ((rows["flags"] & bit) != 0).mean()
+    log(f"window: {total:,} rows ({share(OLD):.1%} old cache, {share(FAST):.1%} fast, {share(EXACT):.1%} exact), "
+        f"validation {len(val):,} rows")
 
     net = make_net(load_state_dict(init_pt)).to(device).to(memory_format=torch.channels_last)
     net.train()
