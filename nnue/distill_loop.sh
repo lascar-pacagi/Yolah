@@ -32,6 +32,14 @@
 #   eval_resnet GPU: the MCTS player with ResNet_{r+1} against ResNet_r and ResNet_0
 #              (alphazero_match.sh)
 #   summary    LOOP_DIR/progress.csv (loop_progress.py)
+#   relabel    (by hand) round r's cache labelled again by ResNet_{r+1} and
+#              blended, without training the ResNet again (after a new prepare)
+#
+# NNUE experiments (by hand): NNUE_TAG=<name> with the stages nnue and
+# eval_nnue writes NNUE_{r+1} to round_<r+1>/exp_<name>/ and its player to
+# players/nnue_r<r+1>_<name>.cfg, and plays it against NNUE_r
+# (eval/nnue_r<r+1>_<name>__vs__nnue_r<r>.csv): the loop's own files are left
+# alone. With NNUE_EPOCHS, NNUE_LR, NNUE_ALPHA.
 #   next       (AUTO=1, after nnue) deletes round r's cache and the games of
 #              the round that leaves the window (r − WINDOW + 1 is the oldest
 #              round r + 1 reads; KEEP_DATA=1 keeps everything) and submits
@@ -88,6 +96,7 @@ SEARCH_WEIGHT="${SEARCH_WEIGHT:-0.5}"             # NNUE teacher: (1 − w)·Res
 NNUE_EPOCHS="${NNUE_EPOCHS:-2}"
 NNUE_LR="${NNUE_LR:-1e-4}"
 NNUE_ALPHA="${NNUE_ALPHA:-0.8}"
+NNUE_TAG="${NNUE_TAG:-}"                          # an NNUE experiment (see the stages nnue and eval_nnue)
 EVAL_NNUE_TIME="${EVAL_NNUE_TIME:-1000000}"       # µs per move
 EVAL_NNUE_ROUNDS="${EVAL_NNUE_ROUNDS:-1000}"      # pairs of games
 EVAL_CPUS="${EVAL_CPUS:-32}"
@@ -117,12 +126,13 @@ run_old() {
         --bind "${OLD_CACHE}:/old" "${SIF}" "$@"
 }
 
-# The dev player's configuration with the network of round $1 (paths inside the container).
+# The dev player's configuration with the network of round $1 (paths inside the
+# container); $2: the network's folder (default round_$1), $3: a name suffix.
 write_player() {
-    local r="$1"
-    sed -e "s|\"weights\": *\"[^\"]*\"|\"weights\": \"/work/round_${r}/nnue.quantized.txt\"|" \
-        -e "s|\"description\": *\"[^\"]*\"|\"description\": \"dev player, network of round ${r} of the distillation loop\"|" \
-        "${YOLAH_DIR}/config/search_study/dev_final.cfg" > "${LOOP_DIR}/players/nnue_r${r}.cfg"
+    local r="$1" dir="${2:-round_$1}" suffix="${3:-}"
+    sed -e "s|\"weights\": *\"[^\"]*\"|\"weights\": \"/work/${dir}/nnue.quantized.txt\"|" \
+        -e "s|\"description\": *\"[^\"]*\"|\"description\": \"dev player, network of round ${r}${suffix} of the distillation loop\"|" \
+        "${YOLAH_DIR}/config/search_study/dev_final.cfg" > "${LOOP_DIR}/players/nnue_r${r}${suffix}.cfg"
 }
 
 physical_cores() {
@@ -255,33 +265,48 @@ resnet)
     echo "[$(date '+%F %T')] done: ${ND}/resnet.pt"
     ;;
 
+# ── by hand: round r's cache labelled by the existing ResNet_{r+1} ──────────
+relabel)
+    header
+    [[ -s "${LOOP_DIR}/resnet/models/az_${STEP_NEXT}.pt" ]] || { echo "missing: resnet/models/az_${STEP_NEXT}.pt" >&2; exit 1; }
+    run bash -c "set -e; cd /Yolah/nnue
+        rm -f /work/${RD}/cache/teacher_values.f16 /work/${RD}/cache/teacher_done.u8 /work/${RD}/cache/teacher_resnet.f16
+        python3 distill_teacher_labels.py /work/${RD}/cache --model /work/resnet/models/az_${STEP_NEXT}.pt
+        python3 loop_blend.py /work/${RD}/cache --search-weight ${SEARCH_WEIGHT}"
+    echo "[$(date '+%F %T')] done: ${RD}/cache labelled by az_${STEP_NEXT}"
+    ;;
+
 # ── NNUE_{r+1} ──────────────────────────────────────────────────────────────
 nnue)
     header
     nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || true
-    mkdir -p "${LOOP_DIR}/${ND}/nnue_train"
-    rm -f "${LOOP_DIR}/${ND}/nnue_train/"*.pt
+    OD="${ND}${NNUE_TAG:+/exp_${NNUE_TAG}}"         # an experiment: its own folder
+    SUFFIX="${NNUE_TAG:+_${NNUE_TAG}}"
+    echo "  NNUE: ${NNUE_EPOCHS} epochs, lr ${NNUE_LR}, alpha ${NNUE_ALPHA} → ${OD}"
+    mkdir -p "${LOOP_DIR}/${OD}/nnue_train"
+    rm -f "${LOOP_DIR}/${OD}/nnue_train/"*.pt
     NAME=nnue_persp_k8_them_g046_qat_distill
-    run env YOLAH_CACHE_DIR=/work/${RD}/cache YOLAH_MODEL_DIR=/work/${ND}/nnue_train/ \
+    run env YOLAH_CACHE_DIR=/work/${RD}/cache YOLAH_MODEL_DIR=/work/${OD}/nnue_train/ \
         YOLAH_INIT_MODEL=/work/${RD}/nnue.pt YOLAH_PERSP_K=8 YOLAH_PERSP_THEM=1 YOLAH_SPACE_GROUPS=0x46 \
         YOLAH_QAT=1 YOLAH_NB_EPOCHS=${NNUE_EPOCHS} YOLAH_LR=${NNUE_LR} YOLAH_DISTILL_ALPHA=${NNUE_ALPHA} \
         YOLAH_SEED=${ROUND} YOLAH_DDP_PORT=$(( 20000 + ${SLURM_JOB_ID:-0} % 20000 )) \
         bash -c "set -e; cd /Yolah/nnue && python3 nnue_persp_distill.py"
-    cp "${LOOP_DIR}/${ND}/nnue_train/${NAME}.$(( NNUE_EPOCHS - 1 )).pt" "${LOOP_DIR}/${ND}/nnue.pt"
-    run bash -c "set -e; cd /Yolah/nnue && python3 export_value_nets.py --persp /work/${ND}/nnue.pt /work/${ND}"
-    [[ -s "${LOOP_DIR}/${ND}/nnue.quantized.txt" ]] || { echo "export failed: no ${ND}/nnue.quantized.txt" >&2; exit 1; }
-    write_player "${N}"
-    echo "[$(date '+%F %T')] done: ${ND}/nnue.pt, players/nnue_r${N}.cfg"
+    cp "${LOOP_DIR}/${OD}/nnue_train/${NAME}.$(( NNUE_EPOCHS - 1 )).pt" "${LOOP_DIR}/${OD}/nnue.pt"
+    run bash -c "set -e; cd /Yolah/nnue && python3 export_value_nets.py --persp /work/${OD}/nnue.pt /work/${OD}"
+    [[ -s "${LOOP_DIR}/${OD}/nnue.quantized.txt" ]] || { echo "export failed: no ${OD}/nnue.quantized.txt" >&2; exit 1; }
+    write_player "${N}" "${OD}" "${SUFFIX}"
+    echo "[$(date '+%F %T')] done: ${OD}/nnue.pt, players/nnue_r${N}${SUFFIX}.cfg"
     ;;
 
 # ── the dev player with NNUE_{r+1} against NNUE_r (task 0) and NNUE_0 (task 1) ──
 eval_nnue)
     header
     REF=$([[ "${SLURM_ARRAY_TASK_ID:-0}" == "0" ]] && echo "${R}" || echo 000)
-    NAME="nnue_r${N}__vs__nnue_r${REF}"
+    SUFFIX="${NNUE_TAG:+_${NNUE_TAG}}"
+    NAME="nnue_r${N}${SUFFIX}__vs__nnue_r${REF}"
     PHYS=$(physical_cores)
     PARALLEL=$(( ${SLURM_CPUS_PER_TASK:-32} < PHYS ? ${SLURM_CPUS_PER_TASK:-32} : PHYS ))
-    printf '/work/players/nnue_r%s.cfg\n/work/players/nnue_r%s.cfg\n' "${N}" "${REF}" > "${LOOP_DIR}/eval/${NAME}.players"
+    printf '/work/players/nnue_r%s.cfg\n/work/players/nnue_r%s.cfg\n' "${N}${SUFFIX}" "${REF}" > "${LOOP_DIR}/eval/${NAME}.players"
     build_alphazero_learn yolah_tournament
     start_in_container bash -c "cd /Yolah/config && exec ${BUILD_DIR}/yolah_tournament \
         --players /work/eval/${NAME}.players --results /work/eval/${NAME}.csv \

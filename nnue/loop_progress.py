@@ -27,10 +27,11 @@ def elo(s):
 def nnue_rows(loop):
     rows = []
     for path in sorted(glob.glob(os.path.join(loop, "eval", "*.csv"))):
-        m = re.match(r"nnue_r(\d+)__vs__nnue_r(\d+)\.csv$", os.path.basename(path))
+        m = re.match(r"nnue_r(\d+)(_[A-Za-z0-9-]+)?__vs__nnue_r(\d+)\.csv$", os.path.basename(path))
         if not m:
             continue
-        cand, ref = f"nnue_r{m.group(1)}", f"nnue_r{m.group(2)}"
+        tag = m.group(2) or ""                     # an NNUE experiment (NNUE_TAG)
+        cand, ref = f"nnue_r{m.group(1)}{tag}", f"nnue_r{m.group(3)}"
         pairs = defaultdict(list)
         for g in csv.DictReader(open(path)):
             r = float(g["result"])
@@ -45,7 +46,7 @@ def nnue_rows(loop):
         s = sum(k * c for k, c in enumerate(counts)) / (4.0 * n)
         var = sum(c * (k / 4.0 - s) ** 2 for k, c in enumerate(counts)) / n
         se = math.sqrt(var / n) if n > 1 else float("inf")
-        rows.append(dict(player="nnue", round=int(m.group(1)), against=int(m.group(2)), games=2 * n,
+        rows.append(dict(player="nnue" + tag, round=int(m.group(1)), against=int(m.group(3)), games=2 * n,
                          score=f"{s:.3f}", elo=f"{elo(s):+.1f}", elo_low=f"{elo(s - 1.96 * se):+.1f}",
                          elo_high=f"{elo(s + 1.96 * se):+.1f}"))
     return rows
@@ -71,9 +72,9 @@ def main():
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         w.writerows(rows)
-    print(f"{'player':7s} {'round':>5} {'vs':>4} {'games':>6} {'score':>6} {'Elo':>7}  95% interval")
+    print(f"{'player':16s} {'round':>5} {'vs':>4} {'games':>6} {'score':>6} {'Elo':>7}  95% interval")
     for r in rows:
-        print(f"{r['player']:7s} {r['round']:5d} {r['against']:4d} {r['games']:6d} {r['score']:>6} {r['elo']:>7}  "
+        print(f"{r['player']:16s} {r['round']:5d} {r['against']:4d} {r['games']:6d} {r['score']:>6} {r['elo']:>7}  "
               f"[{r['elo_low']}, {r['elo_high']}]")
 
 
