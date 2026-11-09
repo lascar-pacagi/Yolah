@@ -2259,7 +2259,7 @@ std::string slug(const std::string& name) {
     while (!out.empty() && out.back() == '_') out.pop_back();
     return out.empty() ? "puzzle" : out;
 }
-std::vector<std::string> json_files(const fs::path& dir) {
+std::vector<std::string> json_files(const fs::path& dir) {   // file names without ".json"
     std::vector<std::string> ids;
     std::error_code ec;
     for (auto& e : fs::directory_iterator(dir, ec))
@@ -2295,6 +2295,7 @@ std::vector<Level> load_levels() {
     std::vector<Level> list;
     fs::path dir = g_paths.assets / "levels";
     for (auto& id : json_files(dir)) {
+        if (id == "order") continue;
         json j = load_json(dir / (id + ".json"));
         if (!j.is_object()) continue;
         Level l;
@@ -2306,7 +2307,23 @@ std::vector<Level> load_levels() {
                 if (x.is_string()) l.puzzles.push_back(x.get<std::string>());
         list.push_back(l);
     }
+    // Their order (assets/levels/order.json, written by the editor); levels
+    // not listed there come after, by file name.
+    json o = load_json(dir / "order.json");
+    std::vector<std::string> order;
+    if (o.is_object() && o.contains("levels") && o["levels"].is_array())
+        for (auto& x : o["levels"]) if (x.is_string()) order.push_back(x.get<std::string>());
+    auto rank = [&](const Level& l) {
+        auto it = std::find(order.begin(), order.end(), l.id);
+        return it == order.end() ? int(order.size()) : int(it - order.begin());
+    };
+    std::stable_sort(list.begin(), list.end(), [&](const Level& a, const Level& b) { return rank(a) < rank(b); });
     return list;
+}
+bool save_level_order(const std::vector<Level>& levels) {
+    json ids = json::array();
+    for (auto& l : levels) ids.push_back(l.id);
+    return write_file(g_paths.assets / "levels" / "order.json", json{{"levels", ids}}.dump(2));
 }
 bool save_level(Level& l) {
     fs::path dir = g_paths.assets / "levels";
@@ -3054,10 +3071,23 @@ void draw_puzzle_over(App& a, Box area, float k) {
     const Level* lvl = nullptr;
     for (auto& l : a.levels) if (l.id == g.level) lvl = &l;
     const Puzzle* next = nullptr;
+    std::string next_level = g.level;
+    int next_pos = g.level_pos + 1;
     if (ok && lvl && g.level_pos + 1 < int(lvl->puzzles.size())) next = a.find_puzzle(lvl->puzzles[g.level_pos + 1]);
+    else if (ok && lvl)   // the last puzzle of the level: the first of the next level
+        for (size_t i = 0; i + 1 < a.levels.size(); i++)
+            if (a.levels[i].id == lvl->id && !a.levels[i + 1].puzzles.empty()) {
+                next = a.find_puzzle(a.levels[i + 1].puzzles.front());
+                next_level = a.levels[i + 1].id;
+                next_pos = 0;
+            }
     float bw = 140 * s, by = card.bottom() - 74 * s;
     if (next) {
-        if (a.ui.button("pz_next", {card.x + 24 * s, by, bw, 50 * s}, "Puzzle suivant", Style::Primary, true, 17)) { Puzzle n = *next; start_puzzle(a, n, g.level, g.level_pos + 1, false); return; }
+        if (a.ui.button("pz_next", {card.x + 24 * s, by, bw, 50 * s}, next_level == g.level ? "Puzzle suivant" : "Niveau suivant", Style::Primary, true, 17)) {
+            Puzzle n = *next;
+            start_puzzle(a, n, next_level, next_pos, false);
+            return;
+        }
     } else if (a.ui.button("pz_retry", {card.x + 24 * s, by, bw, 50 * s}, "R\xC3\xA9" "essayer", ok ? Style::Normal : Style::Primary, true, 17)) {
         Puzzle again = p;
         start_puzzle(a, again, g.level, g.level_pos, g.from_editor, ai_test ? g.slot[p.human].who : "");
@@ -3906,7 +3936,13 @@ void scene_puzzles(App& a) {
         for (size_t i = 0; i < shown.size(); i++) {
             const Level& l = shown[i];
             Box c{area.x + (i % cols) * (cw + gap), area.y + (i / cols) * (ch + gap), cw, ch};
-            bool h = a.ui.hover(c);
+            // A level opens when the one before is finished ("Tous les puzzles": always).
+            bool unlocked = l.id == "*" || i == 0;
+            if (!unlocked) {
+                unlocked = true;
+                for (auto& id : shown[i - 1].puzzles) unlocked &= a.solved(id);
+            }
+            bool h = unlocked && a.ui.hover(c);
             if (h) a.ui.hovering = true;
             float k = a.ui.anim("lv" + l.id, h);
             Box cc{c.x, c.y - 4 * s * k, c.w, c.h};
@@ -3919,10 +3955,14 @@ void scene_puzzles(App& a) {
             Box bar{cc.x + 22 * s, cc.bottom() - 24 * s, cc.w - 44 * s, 8 * s};
             draw::round_box(bar, 4 * s, hex(0xffffff, 25));
             if (!l.puzzles.empty()) draw::round_box({bar.x, bar.y, bar.w * done / l.puzzles.size(), bar.h}, 4 * s, pal::good);
+            if (!unlocked) {
+                draw::round_box(cc, 18 * s, hex(0x000000, 130));
+                a.text.draw(Font::Black, 17 * s, strf("verrouill\xC3\xA9 : terminez \xC2\xAB %s \xC2\xBB", shown[i - 1].name.c_str()), {cc.center().x, cc.center().y - 10 * s}, pal::dim, Align::Center);
+            }
             if (h && a.in.released) { st.open_level = l.id; st.scroll = 0; }
         }
         if (a.levels.empty())
-            a.text.draw(Font::Regular, 16 * s, "Aucun niveau pour l'instant : cr\xC3\xA9" "ez-en un dans l'onglet \xC2\xAB Cr\xC3\xA9" "er des niveaux \xC2\xBB.", {area.x, area.bottom() - 30 * s}, pal::faint);
+            a.text.draw(Font::Regular, 16 * s, "Aucun niveau pour l'instant : cr\xC3\xA9" "ez-en un dans l'\xC3\xA9" "diteur.", {area.x, area.bottom() - 30 * s}, pal::faint);
     } else if (st.tab == 0) {
         // The puzzles of one level.
         Level l;
@@ -4072,7 +4112,15 @@ void scene_editor(App& a) {
             else draw::poly({c + V2{-t * 0.6f, -t}, c + V2{t * 0.8f, 0}, c + V2{-t * 0.6f, t}}, pal::dim);
         }
         a.text.draw(Font::Bold, 15 * s, strf("%s  (%zu)", l.name.c_str(), l.puzzles.size()), {hr.x + 28 * s, hr.y + 8 * s}, pal::text);
-        if (h && a.in.released) {
+        const int li = int(&l - &a.levels[0]);
+        bool on_arrows = false;
+        if (ed.level_selected == l.id) {   // the order of the levels: the order in which they are played
+            Box up{hr.right() - 62 * s, hr.y + 3 * s, 28 * s, hr.h - 6 * s}, down{hr.right() - 32 * s, hr.y + 3 * s, 28 * s, hr.h - 6 * s};
+            on_arrows = up.contains(a.in.mouse) || down.contains(a.in.mouse);
+            if (a.ui.button("lu" + l.id, up, "\xE2\x86\x91", Style::Ghost, li > 0, 14)) { action = "lvmove"; action_level = l.id; move_dir = -1; }
+            if (a.ui.button("ld" + l.id, down, "\xE2\x86\x93", Style::Ghost, li + 1 < int(a.levels.size()), 14)) { action = "lvmove"; action_level = l.id; move_dir = 1; }
+        }
+        if (h && a.in.released && !on_arrows) {
             if (open) ed.open_levels.erase(l.id);
             else ed.open_levels.insert(l.id);
             ed.level_selected = l.id;
@@ -4112,7 +4160,7 @@ void scene_editor(App& a) {
     if (lsel) {
         if (a.ui.text_field("lv_name", {tree.x + 12 * s, by, tree.w - 24 * s, 40 * s}, lsel->name, "Nom du niveau")) save_level(*lsel);
     } else {
-        a.text.paragraph(Font::Regular, 13 * s, "Cliquez sur un niveau pour l'ouvrir et le renommer.", {tree.x + 16 * s, by + 4 * s, tree.w - 32 * s, 40 * s}, pal::faint);
+        a.text.paragraph(Font::Regular, 13 * s, "Cliquez sur un niveau pour l'ouvrir, le renommer et le d\xC3\xA9placer (\xE2\x86\x91 \xE2\x86\x93 : l'ordre de jeu).", {tree.x + 16 * s, by + 4 * s, tree.w - 32 * s, 40 * s}, pal::faint);
     }
     if (a.ui.button("lv_new", {tree.x + 12 * s, tree.bottom() - 60 * s, tree.w - 24 * s, 48 * s}, "+ Nouveau niveau", Style::Normal, true, 16)) action = "newlevel";
 
@@ -4294,9 +4342,18 @@ void scene_editor(App& a) {
                 int i = int(it - l.puzzles.begin()), j = i + move_dir;
                 if (it != l.puzzles.end() && j >= 0 && j < int(l.puzzles.size())) { std::swap(l.puzzles[i], l.puzzles[j]); save_level(l); }
             }
+    } else if (action == "lvmove") {
+        for (size_t i = 0; i < a.levels.size(); i++)
+            if (a.levels[i].id == action_level) {
+                int j = int(i) + move_dir;
+                if (j >= 0 && j < int(a.levels.size())) { std::swap(a.levels[i], a.levels[j]); save_level_order(a.levels); }
+                break;
+            }
     } else if (action == "newlevel") {
         Level l;
         save_level(l);
+        a.levels.push_back(l);
+        save_level_order(a.levels);   // a new level comes last
         a.reload_puzzles();
         ed.open_levels.insert(l.id);
         ed.level_selected = l.id;
