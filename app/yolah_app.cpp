@@ -25,6 +25,8 @@
 //   @@SPRITE        piece sprites (assets/sprites/sprites.json): stones,
 //                   rings, emblems drawn by code, optional PNG replacements,
 //                   PNG export
+//   @@ART           pixel-art drawings of the workshop (assets/art): frames,
+//                   animations, the nearest-pixel texture, 9-grid frames
 //   @@FX            animations and effects (particles, floating text, ripples,
 //                   confetti); the Effect interface is the hook for future
 //                   effects
@@ -45,6 +47,8 @@
 //                   next), the level editor, the introduction card, the goal
 //   @@SCENE_EDITOR  puzzle editor: paint the board, who starts, the player's
 //                   side, the AI, the goal, theme, holes, sprites, background
+//   @@SCENE_STUDIO  the workshop: pixel editor (tools, colours, frames, undo,
+//                   import) and board editor (theme colours and drawings)
 //   @@MAIN          the SDL callbacks: SDL_AppInit, SDL_AppEvent,
 //                   SDL_AppIterate, SDL_AppQuit; screenshot mode
 //
@@ -52,7 +56,7 @@
 //   --size WxH            window size
 //   --screenshot FILE     render, save FILE (.bmp) and quit (tests, docs)
 //   --frames N            frames rendered before the screenshot (default 30)
-//   --scene NAME          menu, setup, game, themes, tutorial, puzzles, editor
+//   --scene NAME          menu, setup, game, themes, tutorial, puzzles, editor, studio
 //   --lesson N            lesson of the tutorial scene (0 = the first)
 //   --pick ID             themes scene: open the sprite picker of player ID
 //   --level ID            puzzles scene: the puzzles of a level
@@ -2828,7 +2832,10 @@ struct App {
         std::string level_selected;       // the level whose name is edited
         std::set<std::string> open_levels;   // levels unfolded in the list
         std::string tester;               // the AI playing the player's side in "AI against AI"
-        int tool = 1;                     // 0 free square, 1 hole, 2 black piece, 3 white piece
+        int tool = 1;                     // 0 free square, 1 hole, 2 black piece, 3 white piece, 4 special square, 5 decoration
+        std::string tile_art, decor_art;  // the drawings of the brushes "Case" and "Décor"
+        int decor_size = 2;               // index in DECOR_SIZES
+        int decor_drag = -1;              // the decoration being moved
         float scroll = 0;
         BoardView board;
         bool painting = false;            // the button went down on the board
@@ -2863,6 +2870,7 @@ struct App {
         bool confirm_delete = false;
         float list_scroll = 0;
         std::string back_to_theme;        // opened from the board editor: return there after
+        Scene return_to = Scene::Menu;    // where "Retour" goes (the puzzle editor when opened from it)
         // Boards.
         Theme theme;                      // the theme being edited (a copy)
         bool theme_loaded = false, theme_modified = false, confirm_theme_delete = false;
@@ -4580,8 +4588,8 @@ void scene_editor(App& a) {
         return;
     }
     if (a.ui.focus.empty() && !modal)
-        for (int k = 0; k < 4; k++)
-            if (a.in.key(SDLK_1 + k)) ed.tool = k;   // keys 1-4: the brushes
+        for (int k = 0; k < 6; k++)
+            if (a.in.key(SDLK_1 + k)) ed.tool = k;   // keys 1-6: the brushes
 
     const float margin = 26 * s, tree_w = 330 * s, panel_w = 440 * s, top = 100 * s;
     Box tree{margin, top, tree_w, a.h - top - margin};
@@ -4689,31 +4697,63 @@ void scene_editor(App& a) {
     if (a.ui.button("lv_new", {tree.x + 12 * s, tree.bottom() - 60 * s, tree.w - 24 * s, 48 * s}, "+ Nouveau niveau", Style::Normal, true, 16)) action = "newlevel";
 
     // ── middle: brushes and board ──
-    const char* names[4] = {"Libre", "Trou", "Noir", "Blanc"};
-    float tbw = std::min(110 * s, (mid.w - 3 * 8 * s) / 7);
-    for (int i = 0; i < 4; i++) {
+    const char* names[6] = {"Libre", "Trou", "Noir", "Blanc", "Case", "D\xC3\xA9" "cor"};
+    float tbw = (mid.w - 5 * 6 * s) / 6;
+    for (int i = 0; i < 6; i++) {
         Box r{mid.x + i * (tbw + 6 * s), mid.y, tbw, 44 * s};
         if (a.ui.button("tool" + std::to_string(i), r, "", ed.tool == i ? Style::Primary : Style::Normal)) ed.tool = i;
         V2 ic{r.x + 20 * s, r.center().y};
         if (i == 0) draw::round_box({ic.x - 10 * s, ic.y - 10 * s, 20 * s, 20 * s}, 4 * s, a.theme_or(p.theme).light);
         else if (i == 1) draw::round_box({ic.x - 10 * s, ic.y - 10 * s, 20 * s, 20 * s}, 4 * s, hex(0x0d0f12));
-        else draw::circle_lit(ic, 10 * s, ic + V2{-3 * s, -3 * s}, i == 2 ? hex(0x5b6170) : hex(0xffffff), i == 2 ? hex(0x0a0c11) : hex(0xb9bec8));
-        a.text.draw(Font::Bold, 15 * s, names[i], {r.x + 36 * s, r.center().y - 9 * s}, ed.tool == i ? hex(0x1a1206) : pal::text);
+        else if (i <= 3) draw::circle_lit(ic, 10 * s, ic + V2{-3 * s, -3 * s}, i == 2 ? hex(0x5b6170) : hex(0xffffff), i == 2 ? hex(0x0a0c11) : hex(0xb9bec8));
+        else {
+            Art* ia = find_art(i == 4 ? ed.tile_art : ed.decor_art);
+            Box ib{ic.x - 11 * s, ic.y - 11 * s, 22 * s, 22 * s};
+            if (ia) draw_art(*ia, "idle", a.time, ib);
+            else draw::round_frame(ib, 4 * s, 1.5f * s, pal::dim);
+        }
+        a.text.draw(Font::Bold, 15 * s, names[i], {r.x + 38 * s, r.center().y - 9 * s}, ed.tool == i ? hex(0x1a1206) : pal::text);
     }
-    float bx2 = mid.x + 4 * (tbw + 6 * s) + 10 * s, bw2 = (mid.right() - bx2 - 12 * s) / 3;
-    if (a.ui.button("ed_fill", {bx2, mid.y, bw2, 44 * s}, "Tout noircir", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '.') c = '#';
-    if (a.ui.button("ed_clear", {bx2 + bw2 + 6 * s, mid.y, bw2, 44 * s}, "Tout vider", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '#') c = '.';
-    if (a.ui.button("ed_start", {bx2 + 2 * (bw2 + 6 * s), mid.y, bw2, 44 * s}, "D\xC3\xA9part", Style::Ghost, true, 14)) p.cells = Puzzle().cells;
+    // The second row: what the brush does.
+    const std::vector<float> DECOR_SIZES = {0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f};
+    Box row2{mid.x, mid.y + 50 * s, mid.w, 38 * s};
+    auto art_choice = [&](const char* id, const char* kind, std::string& cur, Box b, const char* label) {
+        auto list = arts_of(kind);
+        if (list.empty()) {
+            a.text.draw(Font::Regular, 14 * s, strf("Aucun dessin de type \xC2\xAB %s \xC2\xBB : cr\xC3\xA9" "ez-en dans l'atelier.", art_kind(kind).label), {b.x, b.y + 10 * s}, pal::faint);
+            return;
+        }
+        std::vector<std::string> nm;
+        int idx = 0;
+        for (size_t i = 0; i < list.size(); i++) { nm.push_back(list[i]->name); if (list[i]->id == cur) idx = int(i); }
+        cur = list[a.ui.cycler(id, b, label, nm, idx, 14)]->id;
+    };
+    if (ed.tool <= 3) {
+        float bw2 = (row2.w - 12 * s) / 3;
+        if (a.ui.button("ed_fill", {row2.x, row2.y, bw2, row2.h}, "Tout noircir", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '.') c = '#';
+        if (a.ui.button("ed_clear", {row2.x + bw2 + 6 * s, row2.y, bw2, row2.h}, "Tout vider", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '#') c = '.';
+        if (a.ui.button("ed_start", {row2.x + 2 * (bw2 + 6 * s), row2.y, bw2, row2.h}, "D\xC3\xA9part", Style::Ghost, true, 14)) p.cells = Puzzle().cells;
+    } else if (ed.tool == 4) {
+        art_choice("ed_tile", "tile", ed.tile_art, {row2.x, row2.y, row2.w * 0.5f, row2.h}, "Case");
+        a.text.draw(Font::Regular, 13 * s, "clic : peindre \xE2\x80\xA2 clic droit : effacer", {row2.x + row2.w * 0.52f, row2.y + 11 * s}, pal::faint);
+        if (a.ui.button("ed_tiles_clear", {row2.right() - 120 * s, row2.y, 120 * s, row2.h}, "Tout effacer", Style::Ghost, !p.tiles.empty(), 13)) p.tiles.clear();
+    } else {
+        art_choice("ed_decor", "decor", ed.decor_art, {row2.x, row2.y, row2.w * 0.4f, row2.h}, "D\xC3\xA9" "cor");
+        std::vector<std::string> sz;
+        for (float k : DECOR_SIZES) sz.push_back(strf("%g case%s", k, k > 1 ? "s" : ""));
+        ed.decor_size = a.ui.cycler("ed_dsize", {row2.x + row2.w * 0.42f, row2.y, row2.w * 0.3f, row2.h}, "Taille", sz, ed.decor_size, 14);
+        if (a.ui.button("ed_decor_clear", {row2.right() - 120 * s, row2.y, 120 * s, row2.h}, "Tout retirer", Style::Ghost, !p.decor.empty(), 13)) p.decor.clear();
+    }
     const float frame = 26 * s;
-    float bavail_h = mid.h - 60 * s - 40 * s - 2 * frame;
+    float bavail_h = mid.h - 96 * s - 40 * s - 2 * frame;
     float B = std::floor(std::min(bavail_h, mid.w - 2 * frame) / 8) * 8;
-    ed.board.area = {std::floor(mid.x + (mid.w - B) / 2), std::floor(mid.y + 60 * s + frame), B, B};
+    ed.board.area = {std::floor(mid.x + (mid.w - B) / 2), std::floor(mid.y + 96 * s + frame), B, B};
     // Painting: a press on the board starts it; while the button is held, the
     // brush paints every square the mouse passes over (pieces: on the press only).
     int hover_sq = modal ? -1 : ed.board.at(a.in.mouse);
-    if (a.in.pressed) ed.painting = hover_sq >= 0;
-    if (!a.in.down) { ed.painting = false; ed.painted = -1; }
-    if (ed.painting && hover_sq >= 0 && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1)) {
+    if (a.in.pressed || a.in.rpressed) ed.painting = hover_sq >= 0;
+    if (!a.in.down && !a.in.rdown) { ed.painting = false; ed.painted = -1; }
+    if (ed.tool <= 3 && ed.painting && hover_sq >= 0 && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1)) {
         ed.painted = hover_sq;
         const char want = ed.tool == 0 ? '.' : ed.tool == 1 ? '#' : ed.tool == 2 ? 'B' : 'W';
         char& c = p.cells[hover_sq];
@@ -4721,6 +4761,34 @@ void scene_editor(App& a) {
             a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord (pinceau Libre).", want == 'B' ? "noirs" : "blancs"));
         else if (a.in.pressed && (want == 'B' || want == 'W') && c == want) c = '.';   // a click on a piece removes it
         else c = want;
+    }
+    if (ed.tool == 4 && ed.painting && hover_sq >= 0) {   // special squares: painted (left) or erased (right)
+        if (a.in.rdown) p.tiles.erase(hover_sq);
+        else if (!ed.tile_art.empty()) p.tiles[hover_sq] = ed.tile_art;
+    }
+    if (ed.tool == 5 && !modal) {   // decorations: anywhere on the board or around it
+        const float q = ed.board.sq();
+        Box zone = ed.board.area.inset(-frame - 10 * s);
+        V2 m{(a.in.mouse.x - ed.board.area.x) / q, (a.in.mouse.y - ed.board.area.y) / q};
+        int hit = -1;
+        for (int i = int(p.decor.size()) - 1; i >= 0 && hit < 0; i--)
+            if (std::abs(m.x - p.decor[i].x) < p.decor[i].scale * 0.5f && std::abs(m.y - p.decor[i].y) < p.decor[i].scale * 0.5f) hit = i;
+        if (zone.contains(a.in.mouse)) {
+            a.ui.hovering = true;
+            if (a.in.rpressed && hit >= 0) p.decor.erase(p.decor.begin() + hit);
+            else if (a.in.pressed) {
+                if (hit >= 0) ed.decor_drag = hit;
+                else if (!ed.decor_art.empty()) {
+                    p.decor.push_back({ed.decor_art, m.x, m.y, DECOR_SIZES[ed.decor_size]});
+                    ed.decor_drag = int(p.decor.size()) - 1;
+                }
+            }
+        }
+        if (ed.decor_drag >= 0 && ed.decor_drag < int(p.decor.size()) && a.in.down) {
+            p.decor[ed.decor_drag].x = std::clamp(m.x, -1.0f, 9.0f);
+            p.decor[ed.decor_drag].y = std::clamp(m.y, -1.0f, 9.0f);
+        }
+        if (!a.in.down) ed.decor_drag = -1;
     }
     if (hover_sq >= 0) a.ui.hovering = true;
     Yolah shown;
@@ -4746,7 +4814,13 @@ void scene_editor(App& a) {
     look.tiles = &p.tiles;
     look.decor = &p.decor;
     ed.board.draw(a.text, a.board_textures, a.theme_or(p.theme), shown, look, a.time, s);
-    if (hover_sq >= 0) draw::round_frame(ed.board.square(hover_sq).inset(2 * s), 6 * s, 3 * s, hex(0xffd36b, 220));
+    if (hover_sq >= 0 && ed.tool <= 4) draw::round_frame(ed.board.square(hover_sq).inset(2 * s), 6 * s, 3 * s, hex(0xffd36b, 220));
+    if (ed.tool == 5)   // the decorations' boxes
+        for (size_t i = 0; i < p.decor.size(); i++) {
+            const float q = ed.board.sq(), w2 = p.decor[i].scale * q;
+            Box db{ed.board.area.x + p.decor[i].x * q - w2 / 2, ed.board.area.y + p.decor[i].y * q - w2 / 2, w2, w2};
+            draw::round_frame(db, 4 * s, int(i) == ed.decor_drag ? 2.5f * s : 1.2f * s, hex(0x5ee7ff, int(i) == ed.decor_drag ? 230 : 120));
+        }
     std::string problem = puzzle_problem(p);
     std::string status = strf("Noirs %d/4 \xE2\x80\xA2 Blancs %d/4 \xE2\x80\xA2 %d cases libres  \xE2\x80\x94  ", p.count('B'), p.count('W'), p.count('.')) +
                          (problem.empty() ? std::string("pr\xC3\xAAt \xC3\xA0 jouer") : problem);
@@ -4815,6 +4889,13 @@ void scene_editor(App& a) {
         draw_piece(cur, side, {r.x + 24 * s, r.center().y}, 16 * s, 0, a.time, 1, p.human == side);
         a.text.draw(Font::Bold, 13 * s, side == BLACK ? "Pions noirs" : "Pions blancs", {r.x + 46 * s, r.y + 7 * s}, pal::text);
         a.text.draw(Font::Regular, 12 * s, id.empty() ? "par d\xC3\xA9" "faut" : cur.name, {r.x + 46 * s, r.y + 25 * s}, pal::dim);
+    }
+    y += 54 * s;
+    if (a.ui.button("ed_studio", {x, y, w, 36 * s}, "Atelier : dessiner pions, d\xC3\xA9" "cors, cases, plateaux\xE2\x80\xA6", Style::Ghost, true, 14)) {
+        if (editor_dirty(a)) editor_save(a);
+        a.go(Scene::Studio);
+        a.studio.return_to = Scene::Editor;
+        return;
     }
     // Tests.
     Box tb{x, panel.bottom() - 178 * s, w, 104 * s};
@@ -5852,7 +5933,9 @@ void scene_studio(App& a) {
     if (!st.new_open && a.ui.focus.empty() && back_button(a)) {
         if (st.modified) studio_save(a);
         if (st.theme_modified) studio_theme_save(a);
-        a.go(Scene::Menu);
+        Scene back = st.return_to;
+        st.return_to = Scene::Menu;
+        a.go(back);
         return;
     }
     int nt = a.ui.tabs("st_tabs", {40 * s, 104 * s, 420 * s, 36 * s}, {"Dessins", "Plateaux"}, st.tab);
