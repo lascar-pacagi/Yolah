@@ -3,6 +3,7 @@
 //
 //   alphazero_learn selfplay --config ../config/alphazero_mcts_selfplay_player.cfg --work <dir>
 //         [--games 128] [--max-games 0] [--flush-samples 2000] [--flush-seconds 600]
+//         [--max-samples N] [--record-fast] [--exact-free 22] [--exact-ms 300]   (nnue/az_gen_loop.sh)
 //         [--poll 30] [--report 300] [--max-stale-hours 0] [--tag name] [--set 'key=value' ...]
 //     Plays self-play games with the network named in <dir>/latest.json (hot-
 //     swapped when it changes) and writes training samples to <dir>/selfplay/.
@@ -83,6 +84,10 @@ int selfplay_main(Args& a) {
         else if (o == "--report") opt.report_seconds = std::stod(a.next(o));
         else if (o == "--max-stale-hours") opt.max_stale_hours = std::stod(a.next(o));
         else if (o == "--tag") opt.tag = a.next(o);
+        else if (o == "--max-samples") opt.max_samples = std::stoull(a.next(o));
+        else if (o == "--record-fast") opt.record_fast = true;
+        else if (o == "--exact-free") opt.exact_free = std::stoi(a.next(o));
+        else if (o == "--exact-ms") opt.exact_ms = std::stoi(a.next(o));
         else if (o == "--set") sets.push_back(a.next(o));
         else { std::cerr << "unknown option " << o << "\n"; return 2; }
     }

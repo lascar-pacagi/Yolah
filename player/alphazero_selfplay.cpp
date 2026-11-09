@@ -1,6 +1,8 @@
 #include "alphazero_selfplay.h"
 #include "alphazero_mcts_player.h"
 #include "batched_evaluator.h"
+#include "endgame_solver.h"
+#include <condition_variable>
 #include <unistd.h>
 #include <algorithm>
 #include <chrono>
@@ -12,6 +14,7 @@
 #include <iostream>
 #include <memory_resource>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -172,6 +175,25 @@ TrainingSampleAux with_ownership(const TrainingSample& s, const uint8_t leaver[6
     return a;
 }
 
+// The exact result (win / draw / loss) for the side to move, or nothing if
+// the solver needs more than `ms` milliseconds.
+std::optional<int8_t> solve_wld(EndgameSolver& solver, const Yolah& y, int ms) {
+    std::atomic_bool stop{false};
+    std::mutex m;
+    std::condition_variable cv;
+    bool finished = false;
+    std::thread dog([&] {
+        std::unique_lock lk(m);
+        if (!cv.wait_for(lk, std::chrono::milliseconds(ms), [&] { return finished; })) stop = true;
+    });
+    const EndgameSolver::Result r = solver.solve(y, true, &stop);
+    { std::lock_guard lk(m); finished = true; }
+    cv.notify_one();
+    dog.join();
+    if (!r.complete) return std::nullopt;
+    return static_cast<int8_t>((r.value > 0) - (r.value < 0));
+}
+
 } // namespace
 
 void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
@@ -198,7 +220,15 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
     std::atomic<uint32_t> model_step{static_cast<uint32_t>(model.step)};
     std::atomic<uint64_t> games_started{0}, games_done{0}, samples_done{0}, plies_done{0};
     std::atomic<uint64_t> evaluations{0}, black_wins{0}, white_wins{0};
+    std::atomic<uint64_t> fast_done{0}, exact_done{0}, exact_flipped{0}, exact_timeouts{0};
     std::atomic<size_t>   active{nb_games};
+    // Game threads busy with the endgame solver: they ask for no evaluation.
+    std::atomic<size_t>   solving{0};
+    // The clients the batcher waits for (a momentary miscount only costs its max_wait).
+    auto update_clients = [&] {
+        const size_t a = active.load(), b = solving.load();
+        evaluator.set_nb_clients(a > b ? a - b : 0);
+    };
     // The games stop on `halt`: set by the caller's `stop` or by staleness.
     std::atomic<bool>     halt{false};
     // Record the auxiliary targets (latest.json "aux"; re-read at every poll).
@@ -210,9 +240,16 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                              nb_games, merged, params.nb_simulations, params.nb_simulations_fast,
                              params.playout_cap_fast_prob, model.step, evaluator.info(),
                              model.aux ? "on" : "off") << std::flush;
+    if (opt.max_samples || opt.record_fast || opt.exact_free)
+        std::cout << std::format("selfplay: at most {} samples, fast searches {}, exact results at most {} free squares ({} ms)\n",
+                                 opt.max_samples, opt.record_fast ? "recorded" : "not recorded",
+                                 opt.exact_free, opt.exact_ms) << std::flush;
 
     auto game_loop = [&](size_t index) {
         std::pmr::synchronized_pool_resource memory;
+        // The endgame solver of this game thread (32 MB of table), if asked.
+        std::unique_ptr<EndgameSolver> solver;
+        if (opt.exact_free > 0) solver = std::make_unique<EndgameSolver>();
         {
             // A fixed seed (reproducible runs) still differs from game to game.
             SearchParams game_params = params;
@@ -223,6 +260,8 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                 if (opt.max_games && games_started.fetch_add(1) >= opt.max_games) break;
                 Yolah y;
                 std::vector<TrainingSample> samples;
+                // The positions of the samples the solver may label (few free squares).
+                std::vector<std::pair<size_t, Yolah>> endgame;
                 // Who left each square during this game (auxiliary targets).
                 uint8_t leaver[64];
                 std::fill(std::begin(leaver), std::end(leaver), uint8_t(0xFF));
@@ -238,8 +277,12 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                     }
                     const SearchResult r = search.search(y);
                     evaluations.fetch_add(r.nb_evaluations, std::memory_order_relaxed);
-                    if (r.full_search && !r.children.empty())
+                    if ((r.full_search || opt.record_fast) && !r.children.empty()) {
                         samples.push_back(make_sample(y, r, model_step.load()));
+                        if (!r.full_search) samples.back().flags |= SAMPLE_FAST;
+                        if (solver && std::popcount(y.free_squares()) <= opt.exact_free)
+                            endgame.emplace_back(samples.size() - 1, y);
+                    }
                     if (r.best_move != Move::none())   // a pass leaves no hole
                         leaver[static_cast<int>(r.best_move.from_sq())] = y.current_player();
                     y.play(r.best_move);
@@ -252,10 +295,35 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                     const int d = s.turn == Yolah::BLACK ? black_diff : -black_diff;
                     s.z = static_cast<int8_t>((d > 0) - (d < 0));
                 }
+                if (solver && !endgame.empty()) {
+                    // This thread asks for no evaluation while it solves: the
+                    // batcher must not wait for it.
+                    solving.fetch_add(1);
+                    update_clients();
+                    solver->clear();
+                    // From the end backwards (easiest first, and the table
+                    // helps the next ones), until one is not solved in time.
+                    for (auto it = endgame.rbegin(); it != endgame.rend(); ++it) {
+                        const std::optional<int8_t> e = solve_wld(*solver, it->second, opt.exact_ms);
+                        if (!e) { exact_timeouts.fetch_add(1); break; }
+                        TrainingSample& s = samples[it->first];
+                        if (*e != s.z) exact_flipped.fetch_add(1);
+                        s.z = *e;
+                        s.flags |= SAMPLE_EXACT;
+                        exact_done.fetch_add(1);
+                    }
+                    solving.fetch_sub(1);
+                    update_clients();
+                }
+                for (const TrainingSample& s : samples)
+                    if (s.flags & SAMPLE_FAST) fast_done.fetch_add(1, std::memory_order_relaxed);
                 if (black_diff > 0) black_wins.fetch_add(1);
                 if (black_diff < 0) white_wins.fetch_add(1);
                 plies_done.fetch_add(y.nb_plies());
-                samples_done.fetch_add(samples.size());
+                if (opt.max_samples && samples_done.fetch_add(samples.size()) + samples.size() >= opt.max_samples)
+                    halt.store(true);            // this game is still written; the unfinished ones are dropped
+                else if (!opt.max_samples)
+                    samples_done.fetch_add(samples.size());
                 games_done.fetch_add(1);
                 if (record_aux.load()) {
                     std::vector<TrainingSampleAux> rows;
@@ -268,7 +336,8 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
             }
         }
         // Fewer clients: the batcher must stop waiting for this one.
-        evaluator.set_nb_clients(active.fetch_sub(1) - 1);
+        active.fetch_sub(1);
+        update_clients();
     };
 
     std::vector<std::jthread> threads;
@@ -314,10 +383,14 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
             const uint64_t g = games_done.load(), s = samples_done.load(), e = evaluations.load();
             const double dt = t - last_report;
             std::cout << std::format("selfplay: {:.1f}h  games {} (+{:.2f}/s)  samples {} (+{:.1f}/s)  "
-                                     "evals/s {:.0f}  avg plies {:.1f}  black wins {:.1f}%  white wins {:.1f}%\n",
+                                     "evals/s {:.0f}  avg plies {:.1f}  black wins {:.1f}%  white wins {:.1f}%{}\n",
                                      (t - start) / 3600, g, (g - last_games) / dt, s, (s - last_samples) / dt,
                                      (e - last_evals) / dt, g ? double(plies_done.load()) / g : 0.0,
-                                     g ? 100.0 * black_wins.load() / g : 0.0, g ? 100.0 * white_wins.load() / g : 0.0)
+                                     g ? 100.0 * black_wins.load() / g : 0.0, g ? 100.0 * white_wins.load() / g : 0.0,
+                                     (opt.record_fast || opt.exact_free)
+                                         ? std::format("  fast {}  exact {} (z changed {}, timeouts {})", fast_done.load(),
+                                                       exact_done.load(), exact_flipped.load(), exact_timeouts.load())
+                                         : std::string())
                       << std::flush;
             last_report = t;
             last_games = g; last_samples = s; last_evals = e;
@@ -325,7 +398,9 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
     }
     threads.clear();   // join (the game threads watch `halt` / max_games)
     writer.flush();
-    std::cout << std::format("selfplay: done, {} games, {} samples\n", games_done.load(), samples_done.load()) << std::flush;
+    std::cout << std::format("selfplay: done, {} games, {} samples ({} fast, {} exact, z changed by the solver {}, timeouts {})\n",
+                             games_done.load(), samples_done.load(), fast_done.load(), exact_done.load(),
+                             exact_flipped.load(), exact_timeouts.load()) << std::flush;
 }
 
 } // namespace az

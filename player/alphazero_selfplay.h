@@ -44,13 +44,19 @@ struct TrainingSample {
     uint8_t  turn;                       // 0 = black to move, 1 = white
     int8_t   z;                          // outcome for the side to move: -1, 0, +1
     uint8_t  nb_moves;                   // entries used in action[] / prob[]
-    uint8_t  flags;                      // reserved (0)
+    uint8_t  flags;                      // SAMPLE_FAST | SAMPLE_EXACT (0 in the learning loop's rows)
     float    root_q;                     // search value of the root, side to move
     uint32_t model_step;                 // trainer step of the network that searched
     uint16_t action[Yolah::MAX_NB_MOVES];  // policy index from*64+to (nn::action_index)
     uint16_t prob[Yolah::MAX_NB_MOVES];    // π(action) · 65535, rounded
 };
 static_assert(sizeof(TrainingSample) == 336, "keep in sync with alphazero_learn.py");
+
+// TrainingSample::flags (SelfPlayOptions::record_fast / exact_free).
+enum SampleFlags : uint8_t {
+    SAMPLE_FAST  = 1,   // a fast search of playout cap randomization: π is noisy (few visits, no noise)
+    SAMPLE_EXACT = 2,   // z is the exact result of the position (the endgame solver), not the game's
+};
 
 // Future ownership of a square, relative to the side to move at the sample.
 enum OwnershipCode : uint8_t {
@@ -104,6 +110,15 @@ struct SelfPlayOptions {
     // when the trainer's job is over, no new network comes and they stop
     // instead of burning GPU hours on an outdated one.
     double      max_stale_hours = 0;
+    // The generations loop (nnue/az_gen_loop.sh):
+    uint64_t    max_samples    = 0;      // stop after this many recorded samples (0 = no limit)
+    bool        record_fast    = false;  // record the fast searches too (flags SAMPLE_FAST)
+    // z of the positions with at most exact_free free squares = their exact
+    // result by the endgame solver (win / draw / loss, at most exact_ms per
+    // position; from the end of the game backwards, until one is not solved
+    // in time), flags SAMPLE_EXACT. 0 = off: z is the game's result.
+    int         exact_free     = 0;
+    int         exact_ms       = 300;
 };
 
 // Plays until `stop` is set (or max_games). Unfinished games are dropped;
