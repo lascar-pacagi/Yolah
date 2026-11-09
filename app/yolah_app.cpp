@@ -104,6 +104,7 @@
 #include <mutex>
 #include <optional>
 #include <random>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -2455,11 +2456,17 @@ struct App {
     // The puzzle editor (@@SCENE_EDITOR).
     struct EditorState {
         Puzzle p;
+        std::string saved;                // the puzzle as last saved (JSON): "modified" when it differs
+        std::string level;                // the level the puzzle was opened from ("" = none)
+        std::string level_selected;       // the level whose name is edited
+        std::set<std::string> open_levels;   // levels unfolded in the list
+        std::string tester;               // the AI playing the player's side in "AI against AI"
         int tool = 1;                     // 0 free square, 1 hole, 2 black piece, 3 white piece
-        bool browsing = false;            // the list of puzzles to open
         float scroll = 0;
         BoardView board;
+        bool painting = false;            // the button went down on the board
         int painted = -1;                 // the last square painted by a drag
+        bool confirm_delete = false;
     } editor;
 
     // The puzzles and levels (@@SCENE_PUZZLES).
@@ -2649,7 +2656,7 @@ struct App {
 App* g_app = nullptr;
 void start_lesson(App& a, int i);
 int first_lesson_to_do(const App& a);
-void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor);
+void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai = "");
 void draw_image_background(App& a, const std::string& file, uint8_t dim);
 std::string goal_text(const App& a, const Puzzle& p);
 
@@ -3039,9 +3046,10 @@ void draw_puzzle_over(App& a, Box area, float k) {
     bool ok = margin >= p.margin;
     Box card{area.center().x - 250 * s, area.center().y - 160 * s + (1 - k) * 40 * s, 500 * s, 320 * s};
     a.ui.panel(card, 22, with_alpha(pal::panel, k));
-    a.text.draw_shadowed(Font::Title, 34 * s, ok ? "Puzzle r\xC3\xA9ussi !" : "Pas encore\xE2\x80\xA6", {card.center().x, card.y + 28 * s}, with_alpha(ok ? pal::good : pal::text, k), Align::Center, hex(0x000000, 100), 2 * s);
+    const bool ai_test = !g.slot[p.human].human();
+    a.text.draw_shadowed(Font::Title, 34 * s, ai_test ? (ok ? "L'IA r\xC3\xA9ussit le puzzle" : "L'IA \xC3\xA9" "choue") : (ok ? "Puzzle r\xC3\xA9ussi !" : "Pas encore\xE2\x80\xA6"), {card.center().x, card.y + 28 * s}, with_alpha(ok ? pal::good : pal::text, k), Align::Center, hex(0x000000, 100), 2 * s);
     a.text.draw(Font::Black, 50 * s, strf("%d \xE2\x80\x93 %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 84 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
-    a.text.draw(Font::Regular, 16 * s, strf("Votre avance : %+d \xE2\x80\xA2 objectif : %+d", margin, p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    a.text.draw(Font::Regular, 16 * s, strf("Avance du joueur : %+d \xE2\x80\xA2 objectif : %+d", margin, p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
     // The next puzzle of the level.
     const Level* lvl = nullptr;
     for (auto& l : a.levels) if (l.id == g.level) lvl = &l;
@@ -3052,7 +3060,7 @@ void draw_puzzle_over(App& a, Box area, float k) {
         if (a.ui.button("pz_next", {card.x + 24 * s, by, bw, 50 * s}, "Puzzle suivant", Style::Primary, true, 17)) { Puzzle n = *next; start_puzzle(a, n, g.level, g.level_pos + 1, false); return; }
     } else if (a.ui.button("pz_retry", {card.x + 24 * s, by, bw, 50 * s}, "R\xC3\xA9" "essayer", ok ? Style::Normal : Style::Primary, true, 17)) {
         Puzzle again = p;
-        start_puzzle(a, again, g.level, g.level_pos, g.from_editor);
+        start_puzzle(a, again, g.level, g.level_pos, g.from_editor, ai_test ? g.slot[p.human].who : "");
         return;
     }
     if (next && a.ui.button("pz_retry2", {card.center().x - bw / 2, by, bw, 50 * s}, "Rejouer", Style::Normal, true, 17)) { Puzzle again = p; start_puzzle(a, again, g.level, g.level_pos, false); return; }
@@ -3812,9 +3820,10 @@ void scene_tutorial(App& a) {
 // Plays a puzzle: a game from its position, the player against its AI, with
 // its look; the introduction card first (scene_game shows it while
 // game.intro is set), and at the end the goal is checked (draw_game_over).
-void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor) {
+// player_ai: an AI plays the player's side (the editor's "AI against AI" test).
+void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai) {
     std::string who[2];
-    who[p.human] = "human";
+    who[p.human] = player_ai.empty() ? "human" : player_ai;
     who[1 - p.human] = p.opponent;
     a.game.puzzle_mode = true;   // before launch: the look of the first frames
     a.game.puzzle = p;
@@ -3875,9 +3884,8 @@ void scene_puzzles(App& a) {
         if (!st.open_level.empty()) st.open_level.clear();
         else { a.go(Scene::Menu); return; }
     }
-    Box tabs{60 * s, 118 * s, 520 * s, 40 * s};
-    int tab = a.ui.tabs("ptabs", tabs, {"Jouer", "Cr\xC3\xA9" "er des niveaux"}, st.tab);
-    if (tab != st.tab) { st.tab = tab; st.open_level.clear(); st.editing = false; }
+    st.tab = 0;
+    if (a.ui.button("to_editor", {60 * s, 118 * s, 360 * s, 44 * s}, "Cr\xC3\xA9" "er ou modifier des puzzles et des niveaux", Style::Normal, true, 15)) { a.go(Scene::Editor); return; }
     Box area{60 * s, 180 * s, a.w - 120 * s, a.h - 210 * s};
 
     if (st.tab == 0 && st.open_level.empty()) {
@@ -3948,129 +3956,194 @@ void scene_puzzles(App& a) {
         }
         draw::clip(nullptr);
         if (l.puzzles.empty()) a.text.draw(Font::Regular, 16 * s, "Ce niveau est vide.", {grid.x, grid.y}, pal::faint);
-    } else {
-        // The level editor: levels on the left, the edited level in the middle,
-        // every puzzle on the right.
-        Box left{area.x, area.y, 300 * s, area.h}, mid{left.right() + 24 * s, area.y, 520 * s, area.h}, right{mid.right() + 24 * s, area.y, area.right() - mid.right() - 24 * s, area.h};
-        a.ui.panel(left);
-        a.text.draw(Font::Black, 18 * s, "Niveaux", {left.x + 18 * s, left.y + 16 * s}, pal::text);
-        for (size_t i = 0; i < a.levels.size(); i++) {
-            Box r{left.x + 10 * s, left.y + 52 * s + i * 46 * s, left.w - 20 * s, 42 * s};
-            bool cur = st.editing && st.edit.id == a.levels[i].id;
-            if (a.ui.button("lvl" + a.levels[i].id, r, a.levels[i].name, cur ? Style::Primary : Style::Ghost, true, 15)) { st.edit = a.levels[i]; st.editing = true; }
-        }
-        if (a.ui.button("lvl_new", {left.x + 10 * s, left.bottom() - 58 * s, left.w - 20 * s, 46 * s}, "+ Nouveau niveau", Style::Normal, true, 16)) {
-            st.edit = Level{};
-            st.editing = true;
-        }
-        a.ui.panel(mid);
-        if (!st.editing) {
-            a.text.paragraph(Font::Regular, 16 * s, "Choisissez un niveau \xC3\xA0 gauche, ou cr\xC3\xA9" "ez-en un. Un niveau est une suite de puzzles : chacun ouvre le suivant.", mid.inset(24 * s), pal::dim);
-        } else {
-            float y = mid.y + 18 * s;
-            a.text.draw(Font::Bold, 14 * s, "Nom", {mid.x + 22 * s, y}, pal::dim);
-            a.ui.text_field("lv_name", {mid.x + 22 * s, y + 20 * s, mid.w - 44 * s, 40 * s}, st.edit.name, "Nom du niveau");
-            y += 72 * s;
-            a.text.draw(Font::Bold, 14 * s, "Description", {mid.x + 22 * s, y}, pal::dim);
-            a.ui.text_field("lv_text", {mid.x + 22 * s, y + 20 * s, mid.w - 44 * s, 40 * s}, st.edit.text, "Quelques mots sur ce niveau");
-            y += 80 * s;
-            a.text.draw(Font::Bold, 15 * s, "Puzzles, dans l'ordre", {mid.x + 22 * s, y}, pal::text);
-            y += 28 * s;
-            int remove = -1, up = -1;
-            for (size_t i = 0; i < st.edit.puzzles.size(); i++) {
-                Box r{mid.x + 16 * s, y + i * 44 * s, mid.w - 32 * s, 40 * s};
-                if (r.bottom() > mid.bottom() - 70 * s) break;
-                draw::round_box(r, 8 * s, hex(0xffffff, 10));
-                const Puzzle* p = a.find_puzzle(st.edit.puzzles[i]);
-                a.text.draw(Font::Bold, 15 * s, strf("%zu. %s", i + 1, p ? p->name.c_str() : st.edit.puzzles[i].c_str()), {r.x + 12 * s, r.y + 10 * s}, p ? pal::text : pal::bad);
-                if (a.ui.button("up" + std::to_string(i), {r.right() - 96 * s, r.y + 4 * s, 42 * s, 32 * s}, "\xE2\x86\x91", Style::Ghost, i > 0, 16)) up = int(i);
-                if (a.ui.button("rm" + std::to_string(i), {r.right() - 48 * s, r.y + 4 * s, 42 * s, 32 * s}, "\xC3\x97", Style::Ghost, true, 18)) remove = int(i);
-            }
-            if (up > 0) std::swap(st.edit.puzzles[up], st.edit.puzzles[up - 1]);
-            if (remove >= 0) st.edit.puzzles.erase(st.edit.puzzles.begin() + remove);
-            if (a.ui.button("lv_save", {mid.x + 22 * s, mid.bottom() - 62 * s, mid.w - 44 * s, 48 * s}, "Enregistrer le niveau", Style::Primary)) {
-                if (save_level(st.edit)) a.notify("Niveau enregistr\xC3\xA9 : assets/levels/" + st.edit.id + ".json");
-                else a.notify("Impossible d'enregistrer le niveau.");
-                std::string keep = st.edit.id;
-                a.reload_puzzles();
-                for (auto& x : a.levels) if (x.id == keep) st.edit = x;
-            }
-        }
-        a.ui.panel(right);
-        a.text.draw(Font::Black, 18 * s, "Tous les puzzles", {right.x + 18 * s, right.y + 16 * s}, pal::text);
-        Box list{right.x + 10 * s, right.y + 52 * s, right.w - 20 * s, right.h - 62 * s};
-        if (a.ui.hover(list)) st.scroll2 = std::max(0.0f, st.scroll2 - a.in.wheel * 50 * s);
-        draw::clip(&list);
-        for (size_t i = 0; i < a.puzzles.size(); i++) {
-            Box r{list.x, list.y + i * 76 * s - st.scroll2, list.w, 70 * s};
-            draw::round_box(r, 10 * s, hex(0xffffff, 10));
-            draw_mini_board(a, {r.x + 10 * s, r.y + 9 * s, 52 * s, 52 * s}, a.puzzles[i]);
-            a.text.draw(Font::Bold, 15 * s, a.puzzles[i].name, {r.x + 78 * s, r.y + 12 * s}, pal::text);
-            a.text.draw(Font::Regular, 12 * s, a.puzzles[i].id, {r.x + 78 * s, r.y + 36 * s}, pal::faint);
-            if (st.editing &&
-                a.ui.button("add" + a.puzzles[i].id, {r.right() - 110 * s, r.y + 16 * s, 100 * s, 38 * s}, "+ Ajouter", Style::Normal, true, 14))
-                st.edit.puzzles.push_back(a.puzzles[i].id);
-        }
-        draw::clip(nullptr);
     }
 }
 
 // ─── @@SCENE_EDITOR ─────────────────────────────────────────────────────────
-// Paint the board (free squares, holes, the 4 pieces of each side), set who
-// starts, the side of the player, the AI, the goal and the look, test, save.
+// One screen for everything: on the left the levels and their puzzles (open,
+// add, duplicate, delete, reorder, create a level), in the middle the board
+// and its brushes (click or drag), on the right the puzzle's settings and the
+// two tests (me against the AI, AI against AI). Every change is saved when the
+// puzzle is left or tested.
+void editor_save(App& a) {
+    auto& ed = a.editor;
+    if (!save_puzzle(ed.p)) { a.notify("Impossible d'enregistrer le puzzle."); return; }
+    ed.saved = puzzle_to_json(ed.p).dump();
+    // A puzzle created in a level belongs to it.
+    for (auto& l : a.levels)
+        if (l.id == ed.level && std::find(l.puzzles.begin(), l.puzzles.end(), ed.p.id) == l.puzzles.end()) {
+            l.puzzles.push_back(ed.p.id);
+            save_level(l);
+        }
+    std::string keep_level = ed.level;
+    a.reload_puzzles();
+    ed.level = keep_level;
+}
+bool editor_dirty(const App& a) { return puzzle_to_json(a.editor.p).dump() != a.editor.saved; }
+void editor_open(App& a, const Puzzle& p, const std::string& level) {
+    auto& ed = a.editor;
+    if (editor_dirty(a) && !ed.p.id.empty()) editor_save(a);
+    ed.p = p;
+    ed.level = level;
+    ed.saved = puzzle_to_json(p).dump();
+    ed.confirm_delete = false;
+}
+void editor_new(App& a, const std::string& level) {
+    auto& ed = a.editor;
+    if (editor_dirty(a) && !ed.p.id.empty()) editor_save(a);
+    ed.p = Puzzle{};
+    ed.level = level;
+    editor_save(a);   // it appears at once in the list (and in its level)
+    ed.confirm_delete = false;
+}
+
 void scene_editor(App& a) {
     const float s = a.s;
     auto& ed = a.editor;
     Puzzle& p = ed.p;
-    const bool modal = a.picker.open || ed.browsing;
-    draw_image_background(a, p.background, 110);
-    draw_title(a, "\xC3\x89" "diteur de puzzles", "Peignez le plateau, r\xC3\xA9glez la partie, testez, enregistrez. Les puzzles vont dans assets/puzzles.");
-    a.ui.blocked = modal;
-    if (!modal && a.ui.focus.empty() && back_button(a)) { a.go(Scene::Menu); return; }
-
-    const float margin = 34 * s, tool_w = 250 * s, panel_w = 500 * s, frame = 26 * s, top = 130 * s;
-    Box tools{margin, top, tool_w, a.h - top - margin};
-    Box panel{a.w - margin - panel_w, top, panel_w, a.h - top - margin};
-    float avail_w = panel.x - tools.right() - 2 * margin - 2 * frame;
-    float B = std::floor(std::min(a.h - top - margin - 2 * frame - 20 * s, avail_w) / 8) * 8;
-    ed.board.area = {std::floor(tools.right() + margin + frame + (avail_w - B) / 2), std::floor(top + frame + (a.h - top - margin - 2 * frame - B) / 2), B, B};
-
-    // Tools.
-    a.ui.panel(tools);
-    a.text.draw(Font::Black, 18 * s, "Pinceau", {tools.x + 18 * s, tools.y + 16 * s}, pal::text);
-    const char* names[4] = {"Case libre", "Trou", "Pion noir", "Pion blanc"};
-    for (int i = 0; i < 4; i++) {
-        Box r{tools.x + 12 * s, tools.y + 52 * s + i * 62 * s, tools.w - 24 * s, 56 * s};
-        if (a.ui.button("tool" + std::to_string(i), r, "", ed.tool == i ? Style::Primary : Style::Normal)) ed.tool = i;
-        V2 ic{r.x + 30 * s, r.center().y};
-        if (i == 0) draw::round_box({ic.x - 14 * s, ic.y - 14 * s, 28 * s, 28 * s}, 5 * s, a.theme_or(p.theme).light);
-        else if (i == 1) draw::round_box({ic.x - 14 * s, ic.y - 14 * s, 28 * s, 28 * s}, 6 * s, hex(0x0d0f12));
-        else draw_piece(i == 2 ? a.sprite(p.sprite_black.empty() ? "human" : p.sprite_black) : a.sprite(p.sprite_white.empty() ? "dev" : p.sprite_white),
-                        i == 2 ? BLACK : WHITE, ic, 15 * s);
-        a.text.draw(Font::Bold, 16 * s, names[i], {r.x + 56 * s, r.center().y - 10 * s}, ed.tool == i ? hex(0x1a1206) : pal::text);
+    if (p.id.empty() && ed.saved.empty()) {   // first visit: the first puzzle of the first level, unfolded
+        for (auto& l : a.levels)
+            if (!l.puzzles.empty() && a.find_puzzle(l.puzzles.front())) {
+                editor_open(a, *a.find_puzzle(l.puzzles.front()), l.id);
+                ed.open_levels.insert(l.id);
+                ed.level_selected = l.id;
+                break;
+            }
+        if (ed.saved.empty() && !a.puzzles.empty()) editor_open(a, a.puzzles.front(), "");
     }
-    float ty = tools.y + 52 * s + 4 * 62 * s + 10 * s;
-    a.text.draw(Font::Regular, 15 * s, strf("Pions noirs : %d / 4", p.count('B')), {tools.x + 18 * s, ty}, p.count('B') == 4 ? pal::good : pal::bad);
-    a.text.draw(Font::Regular, 15 * s, strf("Pions blancs : %d / 4", p.count('W')), {tools.x + 18 * s, ty + 24 * s}, p.count('W') == 4 ? pal::good : pal::bad);
-    a.text.draw(Font::Regular, 15 * s, strf("Cases libres : %d", p.count('.')), {tools.x + 18 * s, ty + 48 * s}, pal::dim);
-    ty += 86 * s;
-    if (a.ui.button("ed_start", {tools.x + 12 * s, ty, tools.w - 24 * s, 44 * s}, "Position de d\xC3\xA9part", Style::Ghost, true, 15)) p.cells = Puzzle().cells;
-    if (a.ui.button("ed_fill", {tools.x + 12 * s, ty + 50 * s, tools.w - 24 * s, 44 * s}, "Tout en trous", Style::Ghost, true, 15))
-        for (auto& c : p.cells) if (c == '.') c = '#';
-    if (a.ui.button("ed_clear", {tools.x + 12 * s, ty + 100 * s, tools.w - 24 * s, 44 * s}, "Effacer les trous", Style::Ghost, true, 15))
-        for (auto& c : p.cells) if (c == '#') c = '.';
-    std::string problem = puzzle_problem(p);
-    a.text.paragraph(Font::Bold, 14 * s, problem.empty() ? "Pr\xC3\xAAt \xC3\xA0 jouer." : problem, {tools.x + 18 * s, tools.bottom() - 70 * s, tools.w - 36 * s, 60 * s}, problem.empty() ? pal::good : pal::bad);
+    const bool modal = a.picker.open;
+    draw_image_background(a, p.background, 120);
+    a.text.draw_shadowed(Font::Title, 34 * s, "\xC3\x89" "diteur de puzzles", {40 * s, 24 * s}, pal::text, Align::Left, hex(0x000000, 120), 3 * s);
+    a.ui.blocked = modal;
+    if (!modal && a.ui.focus.empty() && back_button(a)) {
+        if (editor_dirty(a)) editor_save(a);
+        a.go(Scene::Menu);
+        return;
+    }
+    if (a.ui.focus.empty() && !modal)
+        for (int k = 0; k < 4; k++)
+            if (a.in.key(SDLK_1 + k)) ed.tool = k;   // keys 1-4: the brushes
 
-    // The board: a click or a drag paints with the tool.
+    const float margin = 26 * s, tree_w = 330 * s, panel_w = 440 * s, top = 100 * s;
+    Box tree{margin, top, tree_w, a.h - top - margin};
+    Box panel{a.w - margin - panel_w, top, panel_w, a.h - top - margin};
+    Box mid{tree.right() + margin, top, panel.x - tree.right() - 2 * margin, a.h - top - margin};
+
+    // ── left: levels and puzzles ──
+    a.ui.panel(tree);
+    a.text.draw(Font::Black, 18 * s, "Niveaux et puzzles", {tree.x + 16 * s, tree.y + 14 * s}, pal::text);
+    Box list{tree.x + 8 * s, tree.y + 48 * s, tree.w - 16 * s, tree.h - 168 * s};
+    if (a.ui.hover(list)) ed.scroll = std::max(0.0f, ed.scroll - a.in.wheel * 40 * s);
+    float y = list.y - ed.scroll;
+    const float rh = 34 * s;
+    std::string action, action_level, action_puzzle;   // done after the loop (the lists may change)
+    int move_dir = 0;
+    draw::clip(&list);
+    auto puzzle_row = [&](const std::string& pid, const std::string& lid, int idx, int count) {
+        Box r{list.x + 18 * s, y, list.w - 18 * s, rh - 3 * s};
+        const Puzzle* pz = a.find_puzzle(pid);
+        bool cur = pid == p.id && lid == ed.level;
+        bool h = a.ui.hover(r) && list.contains(a.in.mouse);
+        if (h) a.ui.hovering = true;
+        draw::round_box(r, 7 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.3f : (h ? 0.08f : 0.0f)));
+        a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, pz ? pz->name : pid + " (introuvable)", {r.x + 10 * s, r.y + 8 * s}, pz ? pal::text : pal::bad);
+        if (cur && !lid.empty()) {
+            if (idx > 0 && a.ui.button("mu" + pid, {r.right() - 62 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xE2\x86\x91", Style::Ghost, true, 14)) { action = "move"; action_level = lid; action_puzzle = pid; move_dir = -1; }
+            if (idx + 1 < count && a.ui.button("md" + pid, {r.right() - 32 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xE2\x86\x93", Style::Ghost, true, 14)) { action = "move"; action_level = lid; action_puzzle = pid; move_dir = 1; }
+        } else if (h && a.in.released && pz) { action = "open"; action_level = lid; action_puzzle = pid; }
+        y += rh;
+    };
+    std::set<std::string> in_level;
+    for (auto& l : a.levels) {
+        Box hr{list.x, y, list.w, rh};
+        bool open = ed.open_levels.count(l.id) > 0;
+        bool sel = ed.level == l.id;
+        bool h = a.ui.hover(hr) && list.contains(a.in.mouse);
+        if (h) a.ui.hovering = true;
+        draw::round_box(hr, 7 * s, with_alpha(hex(0xffffff), sel ? 0.12f : (h ? 0.06f : 0.03f)));
+        {   // a small triangle: pointing down when unfolded
+            V2 c{hr.x + 15 * s, hr.center().y};
+            float t = 5 * s;
+            if (open) draw::poly({c + V2{-t, -t * 0.6f}, c + V2{t, -t * 0.6f}, c + V2{0, t * 0.8f}}, pal::dim);
+            else draw::poly({c + V2{-t * 0.6f, -t}, c + V2{t * 0.8f, 0}, c + V2{-t * 0.6f, t}}, pal::dim);
+        }
+        a.text.draw(Font::Bold, 15 * s, strf("%s  (%zu)", l.name.c_str(), l.puzzles.size()), {hr.x + 28 * s, hr.y + 8 * s}, pal::text);
+        if (h && a.in.released) {
+            if (open) ed.open_levels.erase(l.id);
+            else ed.open_levels.insert(l.id);
+            ed.level_selected = l.id;
+        }
+        y += rh;
+        if (open) {
+            for (size_t i = 0; i < l.puzzles.size(); i++) {
+                in_level.insert(l.puzzles[i]);
+                puzzle_row(l.puzzles[i], l.id, int(i), int(l.puzzles.size()));
+            }
+            Box add{list.x + 18 * s, y, list.w - 18 * s, rh - 4 * s};
+            if (a.ui.button("addp" + l.id, add, "+ nouveau puzzle dans ce niveau", Style::Ghost, true, 13)) { action = "new"; action_level = l.id; }
+            y += rh;
+            if (p.id.size() && std::find(l.puzzles.begin(), l.puzzles.end(), p.id) == l.puzzles.end()) {
+                if (a.ui.button("addc" + l.id, {list.x + 18 * s, y, list.w - 18 * s, rh - 4 * s}, "+ ajouter \xC2\xAB " + p.name + " \xC2\xBB", Style::Ghost, true, 13)) { action = "add"; action_level = l.id; }
+                y += rh;
+            }
+        } else {
+            for (auto& id : l.puzzles) in_level.insert(id);
+        }
+    }
+    // Puzzles in no level.
+    std::vector<std::string> loose;
+    for (auto& pz : a.puzzles) if (!in_level.count(pz.id)) loose.push_back(pz.id);
+    if (!loose.empty()) {
+        a.text.draw(Font::Bold, 13 * s, "Hors niveau", {list.x + 6 * s, y + 10 * s}, pal::faint);
+        y += rh;
+        for (size_t i = 0; i < loose.size(); i++) puzzle_row(loose[i], "", int(i), int(loose.size()));
+    }
+    draw::clip(nullptr);
+    float content = y + ed.scroll - list.y;
+    ed.scroll = std::clamp(ed.scroll, 0.0f, std::max(0.0f, content - list.h));
+    // The selected level: its name, editable.
+    Level* lsel = nullptr;
+    for (auto& l : a.levels) if (l.id == ed.level_selected) lsel = &l;
+    float by = tree.bottom() - 112 * s;
+    if (lsel) {
+        if (a.ui.text_field("lv_name", {tree.x + 12 * s, by, tree.w - 24 * s, 40 * s}, lsel->name, "Nom du niveau")) save_level(*lsel);
+    } else {
+        a.text.paragraph(Font::Regular, 13 * s, "Cliquez sur un niveau pour l'ouvrir et le renommer.", {tree.x + 16 * s, by + 4 * s, tree.w - 32 * s, 40 * s}, pal::faint);
+    }
+    if (a.ui.button("lv_new", {tree.x + 12 * s, tree.bottom() - 60 * s, tree.w - 24 * s, 48 * s}, "+ Nouveau niveau", Style::Normal, true, 16)) action = "newlevel";
+
+    // ── middle: brushes and board ──
+    const char* names[4] = {"Libre", "Trou", "Noir", "Blanc"};
+    float tbw = std::min(110 * s, (mid.w - 3 * 8 * s) / 7);
+    for (int i = 0; i < 4; i++) {
+        Box r{mid.x + i * (tbw + 6 * s), mid.y, tbw, 44 * s};
+        if (a.ui.button("tool" + std::to_string(i), r, "", ed.tool == i ? Style::Primary : Style::Normal)) ed.tool = i;
+        V2 ic{r.x + 20 * s, r.center().y};
+        if (i == 0) draw::round_box({ic.x - 10 * s, ic.y - 10 * s, 20 * s, 20 * s}, 4 * s, a.theme_or(p.theme).light);
+        else if (i == 1) draw::round_box({ic.x - 10 * s, ic.y - 10 * s, 20 * s, 20 * s}, 4 * s, hex(0x0d0f12));
+        else draw::circle_lit(ic, 10 * s, ic + V2{-3 * s, -3 * s}, i == 2 ? hex(0x5b6170) : hex(0xffffff), i == 2 ? hex(0x0a0c11) : hex(0xb9bec8));
+        a.text.draw(Font::Bold, 15 * s, names[i], {r.x + 36 * s, r.center().y - 9 * s}, ed.tool == i ? hex(0x1a1206) : pal::text);
+    }
+    float bx2 = mid.x + 4 * (tbw + 6 * s) + 10 * s, bw2 = (mid.right() - bx2 - 12 * s) / 3;
+    if (a.ui.button("ed_fill", {bx2, mid.y, bw2, 44 * s}, "Tout noircir", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '.') c = '#';
+    if (a.ui.button("ed_clear", {bx2 + bw2 + 6 * s, mid.y, bw2, 44 * s}, "Tout vider", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '#') c = '.';
+    if (a.ui.button("ed_start", {bx2 + 2 * (bw2 + 6 * s), mid.y, bw2, 44 * s}, "D\xC3\xA9part", Style::Ghost, true, 14)) p.cells = Puzzle().cells;
+    const float frame = 26 * s;
+    float bavail_h = mid.h - 60 * s - 40 * s - 2 * frame;
+    float B = std::floor(std::min(bavail_h, mid.w - 2 * frame) / 8) * 8;
+    ed.board.area = {std::floor(mid.x + (mid.w - B) / 2), std::floor(mid.y + 60 * s + frame), B, B};
+    // Painting: a press on the board starts it; while the button is held, the
+    // brush paints every square the mouse passes over (pieces: on the press only).
     int hover_sq = modal ? -1 : ed.board.at(a.in.mouse);
-    if (!a.in.down) ed.painted = -1;
-    if (hover_sq >= 0 && a.in.down && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1)) {
+    if (a.in.pressed) ed.painting = hover_sq >= 0;
+    if (!a.in.down) { ed.painting = false; ed.painted = -1; }
+    if (ed.painting && hover_sq >= 0 && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1)) {
         ed.painted = hover_sq;
-        char want = "._BW"[ed.tool] == '_' ? '#' : "._BW"[ed.tool];
+        const char want = ed.tool == 0 ? '.' : ed.tool == 1 ? '#' : ed.tool == 2 ? 'B' : 'W';
         char& c = p.cells[hover_sq];
-        if ((want == 'B' || want == 'W') && c != want && p.count(want) >= 4) a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord.", want == 'B' ? "noirs" : "blancs"));
-        else if (a.in.pressed && c == want && want != '.') c = '.';   // a click on the same thing clears it
+        if ((want == 'B' || want == 'W') && c != want && p.count(want) >= 4)
+            a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord (pinceau Libre).", want == 'B' ? "noirs" : "blancs"));
+        else if (a.in.pressed && (want == 'B' || want == 'W') && c == want) c = '.';   // a click on a piece removes it
         else c = want;
     }
     if (hover_sq >= 0) a.ui.hovering = true;
@@ -4086,114 +4159,168 @@ void scene_editor(App& a) {
         shown.set_state(b, w, e, 0, 0, p.to_move == BLACK ? 0 : 1);
     }
     ed.board.flipped = false;
+    const AiSpec* opp = a.ai(p.opponent);
+    const SpriteDef& sb = !p.sprite_black.empty() ? a.sprite(p.sprite_black) : a.player_sprite(p.human == BLACK ? "human" : (opp ? opp->id : "dev"));
+    const SpriteDef& sw = !p.sprite_white.empty() ? a.sprite(p.sprite_white) : a.player_sprite(p.human == WHITE ? "human" : (opp ? opp->id : "dev"));
     BoardView::Look look;
-    const SpriteDef& sb = a.sprite(p.sprite_black.empty() ? (p.human == BLACK ? "human" : a.ai(p.opponent) ? a.ai(p.opponent)->sprite : "dev") : p.sprite_black);
-    const SpriteDef& sw = a.sprite(p.sprite_white.empty() ? (p.human == WHITE ? "human" : a.ai(p.opponent) ? a.ai(p.opponent)->sprite : "dev") : p.sprite_white);
     look.sprite[BLACK] = &sb;
     look.sprite[WHITE] = &sw;
     look.halo[p.human] = true;
     look.hole_style = p.hole_style;
     ed.board.draw(a.text, a.board_textures, a.theme_or(p.theme), shown, look, a.time, s);
     if (hover_sq >= 0) draw::round_frame(ed.board.square(hover_sq).inset(2 * s), 6 * s, 3 * s, hex(0xffd36b, 220));
+    std::string problem = puzzle_problem(p);
+    std::string status = strf("Noirs %d/4 \xE2\x80\xA2 Blancs %d/4 \xE2\x80\xA2 %d cases libres  \xE2\x80\x94  ", p.count('B'), p.count('W'), p.count('.')) +
+                         (problem.empty() ? std::string("pr\xC3\xAAt \xC3\xA0 jouer") : problem);
+    a.text.draw(Font::Bold, 15 * s, status, {mid.center().x, ed.board.area.bottom() + frame + 4 * s}, problem.empty() ? pal::good : pal::bad, Align::Center);
 
-    // Properties.
+    // ── right: settings and tests ──
     a.ui.panel(panel);
-    float x = panel.x + 22 * s, w = panel.w - 44 * s, y = panel.y + 16 * s;
-    a.text.draw(Font::Bold, 14 * s, "Titre", {x, y}, pal::dim);
-    a.ui.text_field("ed_name", {x, y + 20 * s, w, 38 * s}, p.name, "Titre du puzzle");
-    y += 66 * s;
-    a.text.draw(Font::Bold, 14 * s, "Introduction (montr\xC3\xA9" "e avant le puzzle)", {x, y}, pal::dim);
-    a.ui.text_field("ed_text", {x, y + 20 * s, w, 38 * s}, p.text, "Une phrase pour pr\xC3\xA9senter le d\xC3\xA9" "fi");
-    y += 70 * s;
-    a.text.draw(Font::Regular, 16 * s, "Vous jouez", {x, y + 8 * s}, pal::dim);
-    p.human = a.ui.segmented("ed_human", {x + w * 0.38f, y, w * 0.62f, 36 * s}, {"Noirs", "Blancs"}, p.human);
-    y += 44 * s;
-    a.text.draw(Font::Regular, 16 * s, "Commence", {x, y + 8 * s}, pal::dim);
-    p.to_move = a.ui.segmented("ed_tomove", {x + w * 0.38f, y, w * 0.62f, 36 * s}, {"Noirs", "Blancs"}, p.to_move);
-    y += 44 * s;
+    float x = panel.x + 20 * s, w = panel.w - 40 * s;
+    y = panel.y + 14 * s;
+    a.text.draw(Font::Bold, 13 * s, editor_dirty(a) ? "Titre  \xE2\x80\xA2 modifi\xC3\xA9 (enregistr\xC3\xA9 en changeant de puzzle ou en testant)" : "Titre", {x, y}, pal::dim);
+    a.ui.text_field("ed_name", {x, y + 18 * s, w, 36 * s}, p.name, "Titre du puzzle", 16);
+    y += 60 * s;
+    a.text.draw(Font::Bold, 13 * s, "Introduction (montr\xC3\xA9" "e avant le puzzle)", {x, y}, pal::dim);
+    a.ui.text_field("ed_text", {x, y + 18 * s, w, 36 * s}, p.text, "Une phrase pour pr\xC3\xA9senter le d\xC3\xA9" "fi", 15);
+    y += 62 * s;
     std::vector<std::string> ai_names, ai_ids;
     int ai_idx = 0;
     for (auto& ai : a.roster)
         if (ai.available) { if (ai.id == p.opponent) ai_idx = int(ai_ids.size()); ai_ids.push_back(ai.id); ai_names.push_back(ai.name); }
-    if (!ai_ids.empty()) p.opponent = ai_ids[a.ui.cycler("ed_ai", {x, y, w, 36 * s}, "Adversaire", ai_names, ai_idx)];
-    y += 44 * s;
+    if (!ai_ids.empty()) p.opponent = ai_ids[a.ui.cycler("ed_ai", {x, y, w, 36 * s}, "IA adverse", ai_names, ai_idx)];
+    y += 42 * s;
+    a.text.draw(Font::Regular, 16 * s, "Le joueur a", {x, y + 8 * s}, pal::dim);
+    p.human = a.ui.segmented("ed_human", {x + w * 0.38f, y, w * 0.62f, 34 * s}, {"les Noirs", "les Blancs"}, p.human, 15);
+    y += 40 * s;
+    a.text.draw(Font::Regular, 16 * s, "Commence", {x, y + 8 * s}, pal::dim);
+    p.to_move = a.ui.segmented("ed_tomove", {x + w * 0.38f, y, w * 0.62f, 34 * s}, {"Noirs", "Blancs"}, p.to_move, 15);
+    y += 40 * s;
     std::vector<std::string> goals;
     for (int m = 1; m <= 12; m++) goals.push_back(m == 1 ? "Gagner" : strf("Gagner de %d+", m));
-    p.margin = 1 + a.ui.cycler("ed_goal", {x, y, w, 36 * s}, "Objectif", goals, p.margin - 1);
-    y += 44 * s;
+    p.margin = 1 + a.ui.cycler("ed_goal", {x, y, w, 34 * s}, "Objectif", goals, p.margin - 1);
+    y += 40 * s;
     a.text.draw(Font::Regular, 16 * s, "Temps de l'IA", {x, y + 8 * s}, pal::dim);
-    p.time_index = a.ui.segmented("ed_time", {x + w * 0.38f, y, w * 0.62f, 36 * s}, TIME_LABELS, p.time_index, 15);
-    y += 52 * s;
-    // Look.
+    p.time_index = a.ui.segmented("ed_time", {x + w * 0.38f, y, w * 0.62f, 34 * s}, TIME_LABELS, p.time_index, 14);
+    y += 46 * s;
     std::vector<std::string> th_names = {"Th\xC3\xA8me du joueur"};
     int th_idx = 0;
     for (size_t i = 0; i < a.themes.size(); i++) { th_names.push_back(a.themes[i].name); if (a.themes[i].id == p.theme) th_idx = int(i) + 1; }
-    int ti = a.ui.cycler("ed_theme", {x, y, w, 36 * s}, "Plateau", th_names, th_idx);
+    int ti = a.ui.cycler("ed_theme", {x, y, w, 34 * s}, "Plateau", th_names, th_idx);
     p.theme = ti == 0 ? "" : a.themes[ti - 1].id;
-    y += 44 * s;
+    y += 40 * s;
     std::vector<std::string> hs_names;
     int hs_idx = 0;
     for (size_t i = 0; i < HOLE_STYLES.size(); i++) { hs_names.push_back(HOLE_STYLES[i].second); if (HOLE_STYLES[i].first == p.hole_style) hs_idx = int(i); }
-    p.hole_style = HOLE_STYLES[a.ui.cycler("ed_holes", {x, y, w, 36 * s}, "Trous", hs_names, hs_idx)].first;
-    y += 44 * s;
-    std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Aucun"};
+    p.hole_style = HOLE_STYLES[a.ui.cycler("ed_holes", {x, y, w, 34 * s}, "Trous", hs_names, hs_idx)].first;
+    y += 40 * s;
+    std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Aucune"};
     int bg_idx = 0;
     for (size_t i = 0; i < bgs.size(); i++) { bg_names.push_back(bgs[i]); if (bgs[i] == p.background) bg_idx = int(i) + 1; }
-    int bi = a.ui.cycler("ed_bg", {x, y, w, 36 * s}, "Image de fond", bg_names, bg_idx);
+    int bi = a.ui.cycler("ed_bg", {x, y, w, 34 * s}, "Image de fond", bg_names, bg_idx);
     p.background = bi == 0 ? "" : bgs[bi - 1];
-    y += 48 * s;
+    y += 42 * s;
     for (int side : {BLACK, WHITE}) {
-        Box r{x + side * (w / 2 + 4 * s), y, w / 2 - 4 * s, 50 * s};
-        std::string& id = side == BLACK ? p.sprite_black : p.sprite_white;
+        Box r{x + side * (w / 2 + 4 * s), y, w / 2 - 4 * s, 46 * s};
+        const std::string& id = side == BLACK ? p.sprite_black : p.sprite_white;
         const SpriteDef& cur = side == BLACK ? sb : sw;
         if (a.ui.button(side == BLACK ? "ed_sb" : "ed_sw", r, "", Style::Normal)) {
             Puzzle* pp = &p;
             bool black = side == BLACK;
-            a.open_picker(strf("Sprite des pions %s du puzzle", black ? "noirs" : "blancs"), cur.id, p.human == side, [pp, black](const std::string& sid) {
-                (black ? pp->sprite_black : pp->sprite_white) = sid;
-            });
+            a.open_picker(strf("Sprite des pions %s du puzzle", black ? "noirs" : "blancs"), cur.id, p.human == side,
+                          [pp, black](const std::string& sid) { (black ? pp->sprite_black : pp->sprite_white) = sid; });
         }
-        draw_piece(cur, side, {r.x + 26 * s, r.center().y}, 17 * s, 0, a.time, 1, p.human == side);
-        a.text.draw(Font::Bold, 14 * s, side == BLACK ? "Pions noirs" : "Pions blancs", {r.x + 50 * s, r.y + 8 * s}, pal::text);
-        a.text.draw(Font::Regular, 12 * s, id.empty() ? "sprite du joueur" : cur.name, {r.x + 50 * s, r.y + 28 * s}, pal::dim);
+        draw_piece(cur, side, {r.x + 24 * s, r.center().y}, 16 * s, 0, a.time, 1, p.human == side);
+        a.text.draw(Font::Bold, 13 * s, side == BLACK ? "Pions noirs" : "Pions blancs", {r.x + 46 * s, r.y + 7 * s}, pal::text);
+        a.text.draw(Font::Regular, 12 * s, id.empty() ? "par d\xC3\xA9" "faut" : cur.name, {r.x + 46 * s, r.y + 25 * s}, pal::dim);
     }
-    // Actions.
-    Box bar{x, panel.bottom() - 70 * s, w, 50 * s};
-    float bw = (w - 3 * 8 * s) / 4;
-    auto bb = [&](int i) { return Box{bar.x + i * (bw + 8 * s), bar.y, bw, bar.h}; };
-    if (a.ui.button("ed_new", bb(0), "Nouveau", Style::Ghost, true, 16)) p = Puzzle{};
-    if (a.ui.button("ed_open", bb(1), "Ouvrir", Style::Normal, true, 16)) { a.reload_puzzles(); ed.browsing = true; ed.scroll = 0; }
-    if (a.ui.button("ed_save", bb(2), "Enregistrer", Style::Normal, true, 16)) {
-        if (save_puzzle(p)) a.notify("Enregistr\xC3\xA9 : assets/puzzles/" + p.id + ".json");
-        else a.notify("Impossible d'enregistrer le puzzle.");
+    // Tests.
+    Box tb{x, panel.bottom() - 178 * s, w, 104 * s};
+    draw::round_box(tb, 12 * s, hex(0x0f141c, 200));
+    a.text.draw(Font::Bold, 14 * s, "Tester ce puzzle", {tb.x + 12 * s, tb.y + 8 * s}, pal::dim);
+    std::vector<std::string> me_names, me_ids;
+    int me_idx = 0;
+    for (auto& ai : a.roster)
+        if (ai.available) { if (ai.id == ed.tester) me_idx = int(me_ids.size()); me_ids.push_back(ai.id); me_names.push_back(ai.name); }
+    if (ed.tester.empty() && !me_ids.empty()) me_idx = int(me_ids.size()) - 1;
+    float half = (tb.w - 30 * s) / 2;
+    if (a.ui.button("ed_play", {tb.x + 10 * s, tb.y + 32 * s, half, 62 * s}, "Moi contre l'IA", Style::Primary, problem.empty(), 16)) {
+        editor_save(a);
+        start_puzzle(a, p, "", -1, true);
+        return;
     }
-    if (a.ui.button("ed_test", bb(3), "Tester", Style::Primary, problem.empty(), 16)) { start_puzzle(a, p, "", -1, true); return; }
-
+    Box ab{tb.x + 20 * s + half, tb.y + 32 * s, half, 62 * s};
+    if (!me_ids.empty()) {
+        if (a.ui.button("ed_ai_vs_ai", {ab.x, ab.y, ab.w, 34 * s}, "IA contre IA", Style::Normal, problem.empty(), 15)) {
+            editor_save(a);
+            start_puzzle(a, p, "", -1, true, me_ids[me_idx]);
+            return;
+        }
+        // The AI playing the player's side.
+        int k = a.ui.cycler("ed_tester", {ab.x, ab.y + 38 * s, ab.w, 24 * s}, "", me_names, me_idx, 12);
+        ed.tester = me_ids[k];
+    }
+    // File actions.
+    Box fb{x, panel.bottom() - 62 * s, w, 46 * s};
+    float fw = (w - 2 * 8 * s) / 3;
+    if (a.ui.button("ed_save", {fb.x, fb.y, fw, fb.h}, "Enregistrer", Style::Normal, true, 15)) { editor_save(a); a.notify("Enregistr\xC3\xA9 : assets/puzzles/" + p.id + ".json"); }
+    if (a.ui.button("ed_dup", {fb.x + fw + 8 * s, fb.y, fw, fb.h}, "Dupliquer", Style::Normal, true, 15)) action = "dup";
+    if (a.ui.button("ed_del", {fb.x + 2 * (fw + 8 * s), fb.y, fw, fb.h}, ed.confirm_delete ? "Confirmer ?" : "Supprimer", Style::Danger, !p.id.empty(), 15)) {
+        if (ed.confirm_delete) action = "delete";
+        else ed.confirm_delete = true;
+    }
     a.ui.blocked = false;
-    // The list of puzzles to open.
-    if (ed.browsing) {
-        draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 160));
-        Box m{a.w * 0.5f - 420 * s, 90 * s, 840 * s, a.h - 180 * s};
-        a.ui.panel(m, 22, hex(0x1a202b));
-        a.text.draw(Font::Black, 24 * s, "Ouvrir un puzzle", {m.x + 26 * s, m.y + 22 * s}, pal::text);
-        if (a.ui.button("br_close", {m.right() - 160 * s, m.y + 18 * s, 136 * s, 44 * s}, "Fermer", Style::Ghost) || a.in.key(SDLK_ESCAPE)) { ed.browsing = false; a.in.eat(SDLK_ESCAPE); return; }
-        Box list{m.x + 16 * s, m.y + 80 * s, m.w - 32 * s, m.h - 96 * s};
-        if (a.ui.hover(list)) ed.scroll = std::max(0.0f, ed.scroll - a.in.wheel * 60 * s);
-        draw::clip(&list);
-        for (size_t i = 0; i < a.puzzles.size(); i++) {
-            Box r{list.x, list.y + i * 84 * s - ed.scroll, list.w, 78 * s};
-            bool h = a.ui.hover(r) && list.contains(a.in.mouse);
-            if (h) a.ui.hovering = true;
-            draw::round_box(r, 10 * s, hex(0xffffff, uint8_t(h ? 26 : 10)));
-            draw_mini_board(a, {r.x + 12 * s, r.y + 11 * s, 56 * s, 56 * s}, a.puzzles[i]);
-            a.text.draw(Font::Bold, 17 * s, a.puzzles[i].name, {r.x + 86 * s, r.y + 14 * s}, pal::text);
-            a.text.draw(Font::Regular, 13 * s, a.puzzles[i].id + " \xE2\x80\xA2 " + goal_text(a, a.puzzles[i]), {r.x + 86 * s, r.y + 42 * s}, pal::dim);
-            if (h && a.in.released) { p = a.puzzles[i]; ed.browsing = false; }
-        }
-        draw::clip(nullptr);
-        if (a.puzzles.empty()) a.text.draw(Font::Regular, 16 * s, "Aucun puzzle enregistr\xC3\xA9.", {list.x, list.y}, pal::faint);
-    }
     if (a.picker.open) sprite_picker(a);
+
+    // ── actions on the lists ──
+    if (action == "open") {
+        if (const Puzzle* pz = a.find_puzzle(action_puzzle)) { Puzzle copy = *pz; editor_open(a, copy, action_level); }
+    } else if (action == "new") {
+        editor_new(a, action_level);
+        ed.open_levels.insert(action_level);
+        a.notify("Nouveau puzzle cr\xC3\xA9\xC3\xA9 : peignez le plateau.");
+    } else if (action == "add") {
+        for (auto& l : a.levels)
+            if (l.id == action_level) { l.puzzles.push_back(p.id); save_level(l); }
+        ed.level = action_level;
+    } else if (action == "move") {
+        for (auto& l : a.levels)
+            if (l.id == action_level) {
+                auto it = std::find(l.puzzles.begin(), l.puzzles.end(), action_puzzle);
+                int i = int(it - l.puzzles.begin()), j = i + move_dir;
+                if (it != l.puzzles.end() && j >= 0 && j < int(l.puzzles.size())) { std::swap(l.puzzles[i], l.puzzles[j]); save_level(l); }
+            }
+    } else if (action == "newlevel") {
+        Level l;
+        save_level(l);
+        a.reload_puzzles();
+        ed.open_levels.insert(l.id);
+        ed.level_selected = l.id;
+        a.ui.focus = "lv_name";
+        a.notify("Niveau cr\xC3\xA9\xC3\xA9 : donnez-lui un nom, puis ajoutez des puzzles.");
+    } else if (action == "dup") {
+        if (editor_dirty(a) && !p.id.empty()) editor_save(a);
+        Puzzle copy = p;
+        copy.id.clear();
+        copy.name += " (copie)";
+        ed.p = copy;
+        editor_save(a);
+        a.notify("Copie cr\xC3\xA9\xC3\xA9" "e : " + ed.p.name);
+    } else if (action == "delete") {
+        std::error_code ec;
+        fs::remove(g_paths.assets / "puzzles" / (p.id + ".json"), ec);
+        for (auto& l : a.levels) {
+            auto it = std::remove(l.puzzles.begin(), l.puzzles.end(), p.id);
+            if (it != l.puzzles.end()) { l.puzzles.erase(it, l.puzzles.end()); save_level(l); }
+        }
+        a.notify("Puzzle supprim\xC3\xA9 : " + p.name);
+        a.reload_puzzles();
+        ed.saved.clear();
+        ed.p = Puzzle{};
+        ed.p.id.clear();
+        if (!a.puzzles.empty()) editor_open(a, a.puzzles.front(), "");
+        ed.confirm_delete = false;
+    }
 }
 
 }   // namespace yapp
