@@ -35,8 +35,11 @@
 //   @@SCENE_MENU    main menu
 //   @@SCENE_SETUP   choice of the players (human or AI) and of the options
 //   @@SCENE_GAME    a game: board, evaluation bar, players, moves, analysis
-//   @@SCENE_THEMES  themes and sprites (preview, selection, PNG export)
-//   @@SCENE_RULES   the rules (placeholder until the interactive tutorial)
+//   @@SCENE_THEMES  themes, the sprite of each player (picker over the sprite
+//                   library), PNG export
+//   @@SCENE_TUTORIAL learn to play: lessons on the board, each with a goal
+//                   checked by code (reach a square, shut a piece in, win an
+//                   endgame...), a small perfect solver for the endgames
 //   @@SCENE_PUZZLES puzzles and quests (placeholder)
 //   @@SCENE_EDITOR  puzzle editor (placeholder)
 //   @@MAIN          the SDL callbacks: SDL_AppInit, SDL_AppEvent,
@@ -46,7 +49,9 @@
 //   --size WxH            window size
 //   --screenshot FILE     render, save FILE (.bmp) and quit (tests, docs)
 //   --frames N            frames rendered before the screenshot (default 30)
-//   --scene NAME          menu, setup, game, themes, rules, puzzles, editor
+//   --scene NAME          menu, setup, game, themes, tutorial, puzzles, editor
+//   --lesson N            lesson of the tutorial scene (0 = the first)
+//   --pick ID             themes scene: open the sprite picker of player ID
 //   --black ID --white ID players of the game scene (human or an AI id)
 //   --plies N             random moves played before the game scene starts
 //   --hint                show the hint (game scene)
@@ -81,6 +86,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -376,6 +382,8 @@ public:
 struct AiSpec {
     std::string id, name, family, sprite, description, config_file;
     int elo = 0;
+    double time_factor = 1;   // × the time per move chosen in the application
+    double random_moves = 0;  // probability of a random legal move instead of a search
     json config;          // the engine configuration, overrides applied, paths absolute
     bool available = false;
     std::string reason;   // why it is not available
@@ -403,6 +411,8 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
         s.sprite = jstr(e, "sprite", "default");
         s.config_file = jstr(e, "config");
         s.elo = int(jnum(e, "elo", 0));
+        s.time_factor = jnum(e, "time factor", 1);
+        s.random_moves = jnum(e, "random moves", 0);
         s.config = load_json(g_paths.root / "config" / s.config_file);
         if (!s.config.is_object()) {
             s.reason = "configuration introuvable : config/" + s.config_file;
@@ -436,7 +446,7 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
 // cores to the interface and to the analysis.
 json game_config(const AiSpec& s, double seconds) {
     json c = s.config;
-    if (c.contains("microseconds")) c["microseconds"] = uint64_t(seconds * 1e6);
+    if (c.contains("microseconds")) c["microseconds"] = std::max<uint64_t>(1000, uint64_t(seconds * s.time_factor * 1e6));
     const int hw = std::max(2u, std::thread::hardware_concurrency());
     if (c.contains("nb threads") && c["nb threads"].is_number())
         c["nb threads"] = std::max(1, std::min(c["nb threads"].get<int>(), hw - 2));
@@ -475,7 +485,10 @@ Graveyard g_graveyard;
 // thread at a time (the mutex of Shared).
 class AiAgent {
 public:
-    explicit AiAgent(json cfg) : sh_(std::make_shared<Shared>()) { sh_->cfg = std::move(cfg); }
+    // random_moves: probability of playing a random legal move (weaker AIs).
+    explicit AiAgent(json cfg, double random_moves = 0) : sh_(std::make_shared<Shared>()), random_moves_(random_moves) {
+        sh_->cfg = std::move(cfg);
+    }
     ~AiAgent() { cancel(); }
 
     void think(const Yolah& pos, uint64_t token) {
@@ -484,8 +497,18 @@ public:
         job->token = token;
         job_ = job;
         auto sh = sh_;
-        thread_ = std::thread([sh, job, pos] {
+        const bool random = random_moves_ > 0 && std::uniform_real_distribution<double>(0, 1)(rng_) < random_moves_;
+        const uint32_t seed = rng_();
+        thread_ = std::thread([sh, job, pos, random, seed] {
             std::lock_guard lock(sh->m);
+            if (random) {   // a random move, after a short pause (as if it thought)
+                auto mv = legal_moves(pos);
+                std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                job->move = mv[seed % mv.size()];
+                job->seconds = 0.3;
+                job->done->store(true);
+                return;
+            }
             try {
                 if (!sh->player) {
                     sh->player = Player::create(sh->cfg);
@@ -540,6 +563,8 @@ private:
     std::shared_ptr<Shared> sh_;
     std::shared_ptr<Job> job_;
     std::thread thread_;
+    double random_moves_ = 0;
+    std::mt19937 rng_{std::random_device{}()};
 };
 
 // The analysis engine: the dev minimax player searches the current position
@@ -841,6 +866,14 @@ void arrow(V2 a, V2 b, float w, Rgba col) {
     V2 base = b - d * head;
     poly({a + n * (w * 0.5f), base + n * (w * 0.5f), base - n * (w * 0.5f), a - n * (w * 0.5f)}, col);
     poly({base + n * (head * 0.75f), b, base - n * (head * 0.75f)}, col);
+}
+// A thick polyline: segments joined by discs.
+void polyline(const std::vector<V2>& pts, float w, Rgba col, bool closed = false) {
+    const size_t n = pts.size();
+    if (n < 2) return;
+    const size_t segs = closed ? n : n - 1;
+    for (size_t i = 0; i < segs; i++) line(pts[i], pts[(i + 1) % n], w, col);
+    for (size_t i = closed ? 0 : 1; i < (closed ? n : n - 1); i++) circle(pts[i], w * 0.5f, col);
 }
 void rect(Box b, Rgba c) {
     SDL_SetRenderDrawColor(R, c.r, c.g, c.b, c.a);
@@ -1203,7 +1236,7 @@ private:
 // describes them; "image": "x.png" replaces the drawing by a picture (with the
 // same size as the stone). The editor will change these files.
 struct SpriteDef {
-    std::string id = "default", name = "Pion", emblem = "none", image;
+    std::string id = "default", name = "Pion", emblem = "none", image, category;
     Rgba ring_top = hex(0xcfd6df), ring_bottom = hex(0x7d8794), emblem_color = hex(0xffffff);
     int tier = 0;            // 0..8: pips under the emblem
     bool halo = false;       // pulsing halo (the human player)
@@ -1221,6 +1254,7 @@ std::vector<SpriteDef> load_sprites(const fs::path& file) {
             s.name = jstr(e, "name", s.id);
             s.emblem = jstr(e, "emblem", s.emblem);
             s.image = jstr(e, "image");
+            s.category = jstr(e, "category");
             s.ring_top = jcolor(e, "ring top", s.ring_top);
             s.ring_bottom = jcolor(e, "ring bottom", s.ring_bottom);
             s.emblem_color = jcolor(e, "emblem color", s.emblem_color);
@@ -1248,8 +1282,15 @@ std::vector<SpriteDef> load_sprites(const fs::path& file) {
 }
 
 // The emblems: each one built from discs, segments and convex polygons, in a
-// box of "radius" s around c.
-void draw_emblem(const std::string& e, V2 c, float s, Rgba col) {
+// box of "radius" s around c. `under`: the colour of the stone below, used to
+// cut holes (moon, gear, eyes); transparent for the emblem's shadow.
+const std::vector<std::string> EMBLEMS = {
+    "none", "star", "dice", "branch", "tree", "hex", "prism", "bolt", "eye", "crown", "heart", "shield", "dot",
+    "moon", "sun", "flame", "drop", "leaf", "snowflake", "clover", "target", "atom", "planet", "gear", "triangle",
+    "square", "plus", "cross", "diamond", "hexagram", "star4", "rook", "pawn", "note", "spade", "mountain", "check",
+    "infinity", "paw", "flower", "ring", "arrow", "ghost", "cat", "anchor", "key"};
+
+void draw_emblem(const std::string& e, V2 c, float s, Rgba col, Rgba under = {0, 0, 0, 0}) {
     using namespace draw;
     auto P = [&](float x, float y) { return V2{c.x + x * s, c.y + y * s}; };
     if (e == "star") {
@@ -1328,19 +1369,210 @@ void draw_emblem(const std::string& e, V2 c, float s, Rgba col) {
         poly({P(0, -0.7f), P(0.7f, -0.7f), P(0.65f, 0.15f), P(0, 0.9f)}, shade(col, -0.2f));
     } else if (e == "dot") {
         circle(c, 0.4f * s, col);
+    } else if (e == "moon") {
+        circle(c, 0.8f * s, col);
+        if (under.a) circle(P(0.36f, -0.26f), 0.66f * s, under);
+    } else if (e == "sun") {
+        circle(c, 0.44f * s, col);
+        for (int i = 0; i < 8; i++) {
+            float a = i * float(M_PI) / 4, d = 0.13f;
+            poly({P(0.58f * std::cos(a - d), 0.58f * std::sin(a - d)), P(0.95f * std::cos(a), 0.95f * std::sin(a)),
+                  P(0.58f * std::cos(a + d), 0.58f * std::sin(a + d))}, col);
+        }
+    } else if (e == "flame" || e == "drop") {
+        // A round bottom and a pointed top (the flame's tip is bent).
+        auto shape = [&](float ox, float oy, float k, Rgba kc) {
+            auto Q = [&](float x, float y) { return P(ox + k * x, oy + k * y); };
+            std::vector<V2> pts;
+            for (int i = 0; i <= 16; i++) {
+                float a = float(M_PI) * i / 16;
+                pts.push_back(Q(0.55f * std::cos(a), 0.3f + 0.55f * std::sin(a)));
+            }
+            V2 L{-0.55f, 0.3f}, T{e == "flame" ? 0.15f : 0.0f, -0.95f}, Rr{0.55f, 0.3f};
+            V2 cl{-0.6f, -0.25f}, cr{e == "flame" ? 0.75f : 0.6f, -0.25f};
+            for (int i = 1; i <= 12; i++) {
+                float t = i / 12.0f;
+                V2 q = L * ((1 - t) * (1 - t)) + cl * (2 * t * (1 - t)) + T * (t * t);
+                pts.push_back(Q(q.x, q.y));
+            }
+            for (int i = 1; i < 12; i++) {
+                float t = i / 12.0f;
+                V2 q = T * ((1 - t) * (1 - t)) + cr * (2 * t * (1 - t)) + Rr * (t * t);
+                pts.push_back(Q(q.x, q.y));
+            }
+            poly_around(Q(0, 0.3f), pts, kc);
+        };
+        shape(0, 0, 1, col);
+        if (e == "flame") shape(0.0f, 0.3f, 0.5f, shade(col, 0.55f));
+        else circle(P(-0.2f, 0.38f), 0.12f * s, shade(col, 0.6f));
+    } else if (e == "leaf") {
+        auto rot = [&](float x, float y) { const float k = 0.7071f; return P((x - y) * k, (x + y) * k); };
+        std::vector<V2> pts;
+        for (int i = 0; i <= 16; i++) { float t = i / 16.0f; pts.push_back(rot(-0.95f + 1.9f * t, -0.42f * std::sin(float(M_PI) * t))); }
+        for (int i = 15; i >= 1; i--) { float t = i / 16.0f; pts.push_back(rot(-0.95f + 1.9f * t, 0.42f * std::sin(float(M_PI) * t))); }
+        poly(pts, col);
+        line(rot(-0.95f, 0), rot(0.75f, 0), std::max(1.0f, 0.07f * s), shade(col, -0.35f));
+    } else if (e == "snowflake") {
+        float w = std::max(1.5f, 0.11f * s);
+        for (int i = 0; i < 3; i++) {
+            float a = float(M_PI) / 2 + i * float(M_PI) / 3;
+            V2 d{std::cos(a), std::sin(a)};
+            line(c - d * (0.9f * s), c + d * (0.9f * s), w, col);
+            for (float sg : {1.0f, -1.0f}) {
+                V2 u = d * sg, b = c + u * (0.55f * s);
+                for (float tw : {0.8f, -0.8f}) {
+                    V2 r{u.x * std::cos(tw) - u.y * std::sin(tw), u.x * std::sin(tw) + u.y * std::cos(tw)};
+                    line(b, b + r * (0.3f * s), w * 0.8f, col);
+                }
+            }
+        }
+    } else if (e == "clover") {
+        for (int i = 0; i < 3; i++) {
+            float a = -float(M_PI) / 2 + i * 2 * float(M_PI) / 3;
+            circle(P(0.38f * std::cos(a), -0.1f + 0.38f * std::sin(a)), 0.34f * s, col);
+        }
+        poly({P(-0.08f, 0.1f), P(0.08f, 0.1f), P(0.18f, 0.9f), P(-0.18f, 0.9f)}, col);
+    } else if (e == "target") {
+        ring(c, 0.88f * s, 0.17f * s, col);
+        ring(c, 0.55f * s, 0.15f * s, col);
+        circle(c, 0.2f * s, col);
+    } else if (e == "atom" || e == "planet") {
+        auto ellipse = [&](float rx, float ry, float rt) {
+            std::vector<V2> pts;
+            for (int i = 0; i < 48; i++) {
+                float a = 2 * float(M_PI) * i / 48, x = rx * std::cos(a), y = ry * std::sin(a);
+                pts.push_back(P(x * std::cos(rt) - y * std::sin(rt), x * std::sin(rt) + y * std::cos(rt)));
+            }
+            return pts;
+        };
+        float w = std::max(1.2f, 0.08f * s);
+        if (e == "atom") {
+            for (int i = 0; i < 3; i++) polyline(ellipse(0.92f, 0.32f, i * float(M_PI) / 3), w, col, true);
+            circle(c, 0.17f * s, col);
+        } else {
+            circle(c, 0.48f * s, col);
+            polyline(ellipse(0.95f, 0.28f, -0.4f), w * 1.3f, shade(col, 0.4f), true);
+        }
+    } else if (e == "gear") {
+        std::vector<V2> pts;
+        for (int i = 0; i < 8; i++) {
+            float a = i * float(M_PI) / 4;
+            for (auto [da, r] : std::vector<std::pair<float, float>>{{-0.3f, 0.66f}, {-0.17f, 0.92f}, {0.17f, 0.92f}, {0.3f, 0.66f}})
+                pts.push_back(P(r * std::cos(a + da), r * std::sin(a + da)));
+        }
+        poly_around(c, pts, col);
+        if (under.a) circle(c, 0.26f * s, under);
+    } else if (e == "triangle") {
+        poly({P(0, -0.85f), P(0.82f, 0.6f), P(-0.82f, 0.6f)}, col);
+    } else if (e == "square") {
+        round_box({c.x - 0.65f * s, c.y - 0.65f * s, 1.3f * s, 1.3f * s}, 0.22f * s, col);
+    } else if (e == "plus" || e == "cross") {
+        float rt = e == "cross" ? float(M_PI) / 4 : 0;
+        for (int k = 0; k < 2; k++) {
+            float a = rt + k * float(M_PI) / 2;
+            V2 d{std::cos(a), std::sin(a)};
+            line(c - d * (0.8f * s), c + d * (0.8f * s), 0.36f * s, col);
+        }
+    } else if (e == "diamond") {
+        poly({P(0, -0.9f), P(0.65f, 0), P(0, 0.9f), P(-0.65f, 0)}, col);
+    } else if (e == "hexagram") {
+        poly({P(0, -0.9f), P(0.78f, 0.45f), P(-0.78f, 0.45f)}, col);
+        poly({P(0, 0.9f), P(0.78f, -0.45f), P(-0.78f, -0.45f)}, col);
+    } else if (e == "star4") {
+        poly_around(c, {P(0, -0.95f), P(0.2f, -0.2f), P(0.95f, 0), P(0.2f, 0.2f), P(0, 0.95f), P(-0.2f, 0.2f), P(-0.95f, 0), P(-0.2f, -0.2f)}, col);
+    } else if (e == "rook") {
+        round_box({c.x - 0.62f * s, c.y + 0.5f * s, 1.24f * s, 0.3f * s}, 0.06f * s, col);
+        poly({P(-0.42f, 0.52f), P(0.42f, 0.52f), P(0.34f, -0.35f), P(-0.34f, -0.35f)}, col);
+        round_box({c.x - 0.55f * s, c.y - 0.55f * s, 1.1f * s, 0.25f * s}, 0.04f * s, col);
+        for (float x : {-0.55f, -0.12f, 0.31f}) round_box({c.x + x * s, c.y - 0.85f * s, 0.24f * s, 0.32f * s}, 0.04f * s, col);
+    } else if (e == "pawn") {
+        circle(P(0, -0.5f), 0.3f * s, col);
+        poly({P(-0.18f, -0.25f), P(0.18f, -0.25f), P(0.42f, 0.55f), P(-0.42f, 0.55f)}, col);
+        round_box({c.x - 0.6f * s, c.y + 0.5f * s, 1.2f * s, 0.3f * s}, 0.08f * s, col);
+    } else if (e == "note") {
+        circle(P(-0.22f, 0.52f), 0.3f * s, col);
+        line(P(0.05f, 0.5f), P(0.05f, -0.8f), std::max(1.5f, 0.12f * s), col);
+        poly({P(0.05f, -0.8f), P(0.55f, -0.45f), P(0.55f, -0.2f), P(0.05f, -0.5f)}, col);
+    } else if (e == "spade") {
+        circle(P(-0.35f, 0.12f), 0.4f * s, col);
+        circle(P(0.35f, 0.12f), 0.4f * s, col);
+        poly({P(-0.73f, 0.0f), P(0.73f, 0.0f), P(0, -0.88f)}, col);
+        poly({P(0, 0.2f), P(0.3f, 0.85f), P(-0.3f, 0.85f)}, col);
+    } else if (e == "mountain") {
+        poly({P(-0.95f, 0.65f), P(-0.25f, -0.6f), P(0.45f, 0.65f)}, shade(col, -0.2f));
+        poly({P(-0.3f, 0.65f), P(0.35f, -0.25f), P(0.95f, 0.65f)}, col);
+        poly({P(-0.25f, -0.6f), P(-0.06f, -0.26f), P(-0.44f, -0.26f)}, shade(col, 0.6f));
+    } else if (e == "check") {
+        polyline({P(-0.7f, 0.05f), P(-0.2f, 0.55f), P(0.75f, -0.55f)}, 0.24f * s, col);
+    } else if (e == "infinity") {
+        std::vector<V2> pts;
+        for (int i = 0; i < 60; i++) {
+            float t = 2 * float(M_PI) * i / 60;
+            pts.push_back(P(0.9f * std::cos(t), 0.8f * std::sin(t) * std::cos(t)));
+        }
+        polyline(pts, std::max(1.5f, 0.15f * s), col, true);
+    } else if (e == "paw") {
+        circle(P(0, 0.3f), 0.38f * s, col);
+        for (V2 t : {V2{-0.58f, -0.12f}, V2{-0.22f, -0.5f}, V2{0.22f, -0.5f}, V2{0.58f, -0.12f}}) circle(P(t.x, t.y), 0.17f * s, col);
+    } else if (e == "flower") {
+        for (int i = 0; i < 6; i++) {
+            float a = i * float(M_PI) / 3;
+            circle(P(0.5f * std::cos(a), 0.5f * std::sin(a)), 0.3f * s, col);
+        }
+        circle(c, 0.3f * s, shade(col, 0.5f));
+    } else if (e == "ring") {
+        ring(c, 0.78f * s, 0.24f * s, col);
+    } else if (e == "arrow") {
+        poly({P(-0.18f, 0.85f), P(0.18f, 0.85f), P(0.18f, -0.1f), P(-0.18f, -0.1f)}, col);
+        poly({P(-0.62f, -0.05f), P(0.62f, -0.05f), P(0, -0.9f)}, col);
+    } else if (e == "ghost") {
+        circle(P(0, -0.2f), 0.6f * s, col);
+        poly({P(-0.6f, -0.2f), P(0.6f, -0.2f), P(0.6f, 0.6f), P(-0.6f, 0.6f)}, col);
+        for (float x : {-0.4f, 0.0f, 0.4f}) circle(P(x, 0.62f), 0.2f * s, col);
+        if (under.a) {
+            circle(P(-0.22f, -0.22f), 0.13f * s, under);
+            circle(P(0.22f, -0.22f), 0.13f * s, under);
+        }
+    } else if (e == "cat") {
+        circle(P(0, 0.12f), 0.62f * s, col);
+        poly({P(-0.6f, -0.05f), P(-0.55f, -0.85f), P(-0.15f, -0.45f)}, col);
+        poly({P(0.6f, -0.05f), P(0.55f, -0.85f), P(0.15f, -0.45f)}, col);
+        if (under.a) {
+            circle(P(-0.24f, 0.05f), 0.11f * s, under);
+            circle(P(0.24f, 0.05f), 0.11f * s, under);
+            poly({P(-0.09f, 0.27f), P(0.09f, 0.27f), P(0, 0.38f)}, under);
+        }
+    } else if (e == "anchor") {
+        float w = std::max(1.5f, 0.12f * s);
+        ring(P(0, -0.68f), 0.2f * s, 0.09f * s, col);
+        line(P(0, -0.48f), P(0, 0.8f), w, col);
+        line(P(-0.4f, -0.25f), P(0.4f, -0.25f), w, col);
+        std::vector<V2> arc;
+        for (int i = 0; i <= 16; i++) {
+            float a = float(M_PI) * (0.1f + 0.8f * i / 16);
+            arc.push_back(P(0.7f * std::cos(a), 0.15f + 0.65f * std::sin(a)));
+        }
+        polyline(arc, w, col);
+    } else if (e == "key") {
+        float w = std::max(1.5f, 0.14f * s);
+        ring(P(-0.45f, -0.45f), 0.38f * s, 0.13f * s, col);
+        line(P(-0.18f, -0.18f), P(0.75f, 0.75f), w, col);
+        line(P(0.45f, 0.45f), P(0.62f, 0.28f), w, col);
+        line(P(0.62f, 0.62f), P(0.8f, 0.44f), w, col);
     }
 }
 
 // Draws a piece of `side` with sprite `sp`, centred at c, radius r.
 // lift: 0 on the board, up to 1 when picked up (bigger, higher shadow).
 // time: seconds, for the halo's pulse.
-void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1) {
+// halo: force the pulsing halo (the human player, whatever the sprite).
+void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1, bool halo = false) {
     using namespace draw;
     r *= 1 + 0.08f * lift;
     // Shadow.
     float soff = r * (0.10f + 0.25f * lift);
     circle(c + V2{soff * 0.4f, soff}, r * (1.0f + 0.05f * lift), hex(0x000000, uint8_t(110 * alpha)), hex(0x000000, 0), r * 0.35f);
-    if (sp.halo) {
+    if (sp.halo || halo) {
         float p = 0.5f + 0.5f * float(std::sin(time * 3.0));
         ring(c, r * (1.18f + 0.05f * p), r * 0.10f, with_alpha(sp.halo_color, (0.35f + 0.35f * p) * alpha));
     }
@@ -1364,7 +1596,8 @@ void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, do
     // The emblem, with a small shadow; darker on the white stone.
     Rgba ec = side == BLACK ? sp.emblem_color : shade(sp.emblem_color, -0.45f);
     draw_emblem(sp.emblem, c + V2{0, r * 0.04f}, r * 0.42f, with_alpha(hex(0x000000, 90), alpha));
-    draw_emblem(sp.emblem, c, r * 0.42f, with_alpha(ec, alpha));
+    Rgba under = side == BLACK ? hex(0x25282f) : hex(0xd0d3d9);   // the stone's colour at its centre
+    draw_emblem(sp.emblem, c, r * 0.42f, with_alpha(ec, alpha), with_alpha(under, alpha));
     // Tier pips along the bottom of the ring.
     for (int i = 0; i < sp.tier; i++) {
         float a = float(M_PI) / 2 + (i - (sp.tier - 1) * 0.5f) * 0.2f;
@@ -1694,6 +1927,7 @@ public:
 
     struct Look {
         const SpriteDef* sprite[2] = {nullptr, nullptr};
+        bool halo[2] = {false, false};   // the human players
         bool coords = true;
         std::optional<Move> hint;
         std::string hint_label;
@@ -1757,7 +1991,7 @@ public:
                 if (!(bb >> s2 & 1)) continue;
                 if (anim.active && now < anim.t0 + anim.dur && s2 == anim.m.to_sq()) continue;
                 if (dragging && s2 == drag_from) continue;
-                draw_piece(*look.sprite[side], side, center(s2), q * 0.4f, 0, now);
+                draw_piece(*look.sprite[side], side, center(s2), q * 0.4f, 0, now, 1, look.halo[side]);
             }
         }
         // Principal variation: numbered faint arrows.
@@ -1789,11 +2023,11 @@ public:
             V2 a = center(anim.m.from_sq()), b = center(anim.m.to_sq());
             V2 p = a + (b - a) * k;
             float lift = std::sin(k * float(M_PI));
-            draw_piece(*look.sprite[anim.side], anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now);
+            draw_piece(*look.sprite[anim.side], anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now, 1, look.halo[anim.side]);
         }
         // The dragged piece follows the mouse.
         if (dragging && drag_from >= 0 && (pos.bitboard(me) >> drag_from & 1))
-            draw_piece(*look.sprite[me], me, drag_pos, q * 0.4f, 1, now);
+            draw_piece(*look.sprite[me], me, drag_pos, q * 0.4f, 1, now, 1, look.halo[me]);
     }
     V2 drag_pos;
 
@@ -1812,7 +2046,7 @@ private:
 };
 
 // ─── @@APP ──────────────────────────────────────────────────────────────────
-enum class Scene { Menu, Setup, Game, Themes, Rules, Puzzles, Editor };
+enum class Scene { Menu, Setup, Game, Themes, Tutorial, Puzzles, Editor };
 
 // Saved in the preferences folder (settings.json).
 struct Settings {
@@ -1820,9 +2054,11 @@ struct Settings {
     bool show_eval = true, show_hint = false, show_coords = true, show_pv = false;
     int time_index = 1;                       // index in TIMES
     std::string black = "human", white = "dev";
+    std::vector<int> tutorial_done;           // lessons completed
     json to_json() const {
         return {{"theme", theme}, {"show eval", show_eval}, {"show hint", show_hint}, {"show coordinates", show_coords},
-                {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white}};
+                {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white},
+                {"tutorial done", tutorial_done}};
     }
     void from_json(const json& j) {
         if (!j.is_object()) return;
@@ -1834,6 +2070,7 @@ struct Settings {
         time_index = j.value("time index", time_index);
         black = j.value("black", black);
         white = j.value("white", white);
+        if (j.contains("tutorial done") && j["tutorial done"].is_array()) tutorial_done = j["tutorial done"].get<std::vector<int>>();
     }
 };
 const std::vector<double> TIMES = {0.5, 1.0, 2.0, 5.0};
@@ -1896,11 +2133,31 @@ struct App {
         double think_t0 = 0;
     } game;
 
-    // The setup scene.
-    struct SetupState {
-        bool ai_vs_ai = false;
-        float scroll[2] = {0, 0};
-    } setup;
+    // The tutorial scene (@@SCENE_TUTORIAL).
+    struct TutorialState {
+        int index = 0;                    // the lesson
+        Match match;
+        BoardView board;
+        std::vector<int> targets;         // squares to reach
+        int victim = -1;                  // the white piece to shut in
+        int moves_done = 0;
+        enum class Phase { Play, Success, Failed } phase = Phase::Play;
+        double phase_t = 0, reply_at = -1, pass_at = -1;
+        std::string feedback;
+        bool hint = false;
+        Move hint_move = Move::none();
+        size_t hint_ply = size_t(-1);     // the position the hint was computed for
+    } tuto;
+
+    // The themes scene: the player whose sprite is being chosen ("" = none).
+    struct ThemesState {
+        std::string picking;
+        float scroll = 0;
+    } themes_ui;
+
+    // Sprite of each player (assets/sprites/assignments.json): player id
+    // ("human" or an AI id) → sprite id; default: the roster's sprite.
+    std::map<std::string, std::string> assigned;
 
     // ── helpers ──
     const Theme& theme() const {
@@ -1918,7 +2175,26 @@ struct App {
             if (a.id == id) return &a;
         return nullptr;
     }
-    const SpriteDef& slot_sprite(const Slot& sl) const { return sl.human() ? sprite("human") : sprite(sl.spec->sprite); }
+    bool has_sprite(const std::string& id) const {
+        for (auto& sp : sprites)
+            if (sp.id == id) return true;
+        return false;
+    }
+    // The sprite of a player: "human" or an AI id.
+    const SpriteDef& player_sprite(const std::string& who) const {
+        auto it = assigned.find(who);
+        if (it != assigned.end() && has_sprite(it->second)) return sprite(it->second);
+        if (who == "human") return sprite("human");
+        const AiSpec* sp = ai(who);
+        return sprite(sp ? sp->sprite : who);
+    }
+    void assign_sprite(const std::string& who, const std::string& sprite_id) {
+        assigned[who] = sprite_id;
+        json j = json::object();
+        for (auto& [k, v] : assigned) j[k] = v;
+        write_file(g_paths.assets / "sprites" / "assignments.json", json{{"players", j}}.dump(2));
+    }
+    const SpriteDef& slot_sprite(const Slot& sl) const { return player_sprite(sl.human() ? "human" : sl.spec->id); }
     std::string slot_name(const Slot& sl) const { return sl.human() ? "Vous" : sl.spec->name; }
     void notify(const std::string& msg) {
         toast = msg;
@@ -1955,7 +2231,7 @@ struct App {
             sl.who = who[side];
             sl.spec = ai(who[side]);
             if (sl.spec && sl.spec->available)
-                sl.agent = std::make_unique<AiAgent>(game_config(*sl.spec, TIMES[settings.time_index]));
+                sl.agent = std::make_unique<AiAgent>(game_config(*sl.spec, TIMES[settings.time_index]), sl.spec->random_moves);
             else
                 sl.spec = nullptr;   // unknown or unavailable AI: a human plays it
         }
@@ -2002,6 +2278,8 @@ struct App {
     }
 };
 App* g_app = nullptr;
+void start_lesson(App& a, int i);
+int first_lesson_to_do(const App& a);
 
 // Drawn behind every scene: the theme's gradient, a vignette, faint shapes.
 void draw_background(App& a, bool decorated = true) {
@@ -2040,8 +2318,8 @@ void scene_menu(App& a) {
         // Faded out when passing behind the title and the buttons.
         float fade = smoothstep(260 * s, 420 * s, std::abs(c.x - a.w * 0.5f));
         if (fade <= 0.01f) continue;
-        const SpriteDef& sp = i == 0 ? a.sprite("human") : a.sprite(a.roster[i - 1].sprite);
-        draw_piece(sp, i % 2 ? WHITE : BLACK, c, (36 + 6 * std::sin(float(a.time) + i)) * s, 0.4f, a.time, 0.9f * fade);
+        const SpriteDef& sp = a.player_sprite(i == 0 ? "human" : a.roster[i - 1].id);
+        draw_piece(sp, i % 2 ? WHITE : BLACK, c, (36 + 6 * std::sin(float(a.time) + i)) * s, 0.4f, a.time, 0.9f * fade, i == 0);
     }
     // Title on a soft light.
     V2 tp{a.w * 0.5f, 75 * s};
@@ -2051,9 +2329,8 @@ void scene_menu(App& a) {
 
     struct Item { const char* label; std::function<void()> act; Style st; };
     std::vector<Item> items = {
-        {"Jouer contre une IA", [&] { a.setup.ai_vs_ai = false; a.go(Scene::Setup); }, Style::Primary},
-        {"Regarder deux IA s'affronter", [&] { a.setup.ai_vs_ai = true; a.go(Scene::Setup); }, Style::Normal},
-        {"R\xC3\xA8gles du jeu", [&] { a.go(Scene::Rules); }, Style::Normal},
+        {"Jouer", [&] { a.go(Scene::Setup); }, Style::Primary},
+        {"Apprendre \xC3\xA0 jouer", [&] { start_lesson(a, first_lesson_to_do(a)); }, Style::Normal},
         {"Puzzles et qu\xC3\xAA" "tes", [&] { a.go(Scene::Puzzles); }, Style::Normal},
         {"\xC3\x89" "diteur de puzzles", [&] { a.go(Scene::Editor); }, Style::Normal},
         {"Th\xC3\xA8mes et sprites", [&] { a.go(Scene::Themes); }, Style::Normal},
@@ -2073,8 +2350,8 @@ void scene_menu(App& a) {
 void scene_setup(App& a) {
     const float s = a.s;
     draw_background(a);
-    draw_title(a, a.setup.ai_vs_ai ? "Deux IA face \xC3\xA0 face" : "Nouvelle partie",
-               "Choisissez qui joue les Noirs (ils commencent) et qui joue les Blancs. Les IA sont class\xC3\xA9" "es de la plus faible \xC3\xA0 la plus forte.");
+    draw_title(a, "Nouvelle partie",
+               "Choisissez qui joue les Noirs (ils commencent) et qui joue les Blancs : un humain ou une IA de chaque c\xC3\xB4t\xC3\xA9. Les IA sont class\xC3\xA9" "es de la plus faible \xC3\xA0 la plus forte.");
     if (back_button(a)) { a.go(Scene::Menu); return; }
 
     struct Entry { std::string id, name, sub, sprite; bool available; std::string reason, description; };
@@ -2083,7 +2360,7 @@ void scene_setup(App& a) {
     for (auto& ai : a.roster)
         entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", ai.elo, ai.family.c_str()), ai.sprite, ai.available, ai.reason, ai.description});
 
-    const float top = 130 * s, bottom_bar = 150 * s, desc_h = 70 * s;
+    const float top = 122 * s, bottom_bar = 150 * s, desc_h = 52 * s;
     const float col_w = std::min(560 * s, (a.w - 180 * s) / 2), gap = 40 * s;
     const float x0 = a.w * 0.5f - col_w - gap / 2;
     const float avail = a.h - top - bottom_bar - desc_h - 60 * s;
@@ -2107,7 +2384,7 @@ void scene_setup(App& a) {
             if (ks > 0.01f) draw::round_frame(r, 12 * s, 2 * s, with_alpha(a.theme().accent, ks));
             float alpha = e.available ? 1.0f : 0.35f;
             float pr = std::min(row_h * 0.36f, 27 * s);
-            draw_piece(a.sprite(e.sprite), side, {r.x + 16 * s + pr, r.center().y}, pr, 0.2f * k, a.time, alpha);
+            draw_piece(a.player_sprite(e.id), side, {r.x + 16 * s + pr, r.center().y}, pr, 0.2f * k, a.time, alpha, e.id == "human");
             float tx = r.x + 30 * s + 2 * pr;
             a.text.draw(Font::Bold, 19 * s, e.name, {tx, r.center().y - 22 * s}, with_alpha(pal::text, alpha));
             a.text.draw(Font::Regular, 14 * s, e.available ? e.sub : "indisponible \xE2\x80\x94 survolez pour savoir pourquoi",
@@ -2234,7 +2511,7 @@ void draw_player_card(App& a, Box b, int side, bool active) {
     draw::round_box(b, 14 * s, with_alpha(mix(hex(0xffffff), a.theme().accent, k), 0.04f + 0.1f * k));
     draw::round_frame(b, 14 * s, 1.5f * s, with_alpha(a.theme().accent, 0.15f + 0.85f * k));
     float pr = b.h * 0.33f;
-    draw_piece(a.slot_sprite(sl), side, {b.x + 18 * s + pr, b.center().y}, pr, 0.3f * k, a.time);
+    draw_piece(a.slot_sprite(sl), side, {b.x + 18 * s + pr, b.center().y}, pr, 0.3f * k, a.time, 1, sl.human());
     float tx = b.x + 34 * s + 2 * pr;
     a.text.draw(Font::Bold, 19 * s, a.slot_name(sl), {tx, b.y + 14 * s}, pal::text);
     std::string sub = sl.human() ? std::string("Humain \xE2\x80\xA2 ") + side_name(side) : strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", sl.spec->elo, side_name(side));
@@ -2433,6 +2710,8 @@ void scene_game(App& a) {
     BoardView::Look look;
     look.sprite[BLACK] = &a.slot_sprite(g.slot[BLACK]);
     look.sprite[WHITE] = &a.slot_sprite(g.slot[WHITE]);
+    look.halo[BLACK] = g.slot[BLACK].human();
+    look.halo[WHITE] = g.slot[WHITE].human();
     look.coords = a.settings.show_coords;
     look.human_turn = human_turn;
     if (fresh && !g.board.animating(a.time) && !g.match.over()) {
@@ -2523,10 +2802,15 @@ std::string export_sprites(App& a) {
     return strf("%d images export\xC3\xA9" "es dans %s", count, dir.string().c_str());
 }
 
+void sprite_picker(App& a);
+
 void scene_themes(App& a) {
     const float s = a.s;
+    const bool picking = !a.themes_ui.picking.empty();
     draw_background(a);
-    draw_title(a, "Th\xC3\xA8mes et sprites", "Choisissez l'apparence du plateau. Les th\xC3\xA8mes sont des fichiers JSON de assets/themes : copiez-en un pour cr\xC3\xA9" "er le v\xC3\xB4tre.");
+    draw_title(a, "Th\xC3\xA8mes et sprites", "Choisissez l'apparence du plateau, et le sprite de chaque joueur. Les th\xC3\xA8mes sont des fichiers JSON de assets/themes.");
+    a.ui.blocked = picking;
+    if (picking && a.in.key(SDLK_ESCAPE)) { a.themes_ui.picking.clear(); a.in.keys.clear(); }
     if (back_button(a)) { a.save_settings(); a.go(Scene::Menu); return; }
     // Themes: cards with a small live board.
     const float card_w = 250 * s, card_h = 300 * s, gap = 24 * s;
@@ -2542,7 +2826,6 @@ void scene_themes(App& a) {
         draw::shadow({cc.x, cc.y + 10 * s, cc.w, cc.h}, 18 * s, 30 * s, hex(0x000000, 110));
         draw::round_box(cc, 18 * s, t.bg_top, t.bg_bottom);
         if (ks > 0.01f) draw::round_frame(cc, 18 * s, 3 * s, with_alpha(t.accent, ks));
-        // Mini board: frame, squares, a hole, two pieces.
         Box b{cc.x + 25 * s, cc.y + 22 * s, 200 * s, 200 * s};
         draw::round_box(b.inset(-10 * s), 10 * s, t.frame_top, t.frame_bottom);
         SDL_FRect dst = b.frect();
@@ -2552,34 +2835,521 @@ void scene_themes(App& a) {
             Box hb{b.x + hsq.x * q + q * 0.08f, b.y + hsq.y * q + q * 0.08f, q * 0.84f, q * 0.84f};
             draw::round_box(hb, q * 0.2f, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
         }
-        draw_piece(a.sprite("human"), BLACK, {b.x + 2.5f * q, b.y + 2.5f * q}, q * 0.4f, 0, a.time);
-        draw_piece(a.sprite("dev"), WHITE, {b.x + 5.5f * q, b.y + 4.5f * q}, q * 0.4f, 0, a.time);
+        draw_piece(a.player_sprite("human"), BLACK, {b.x + 2.5f * q, b.y + 2.5f * q}, q * 0.4f, 0, a.time, 1, true);
+        draw_piece(a.player_sprite("dev"), WHITE, {b.x + 5.5f * q, b.y + 4.5f * q}, q * 0.4f, 0, a.time);
         a.text.draw(Font::Bold, 20 * s, t.name, {cc.center().x, cc.bottom() - 62 * s}, pal::text, Align::Center);
         a.text.draw(Font::Regular, 14 * s, sel ? "th\xC3\xA8me actuel" : "cliquer pour choisir", {cc.center().x, cc.bottom() - 34 * s}, sel ? t.accent : pal::dim, Align::Center);
         if (h && a.in.released) a.settings.theme = t.id;
     }
-    // Sprites: the gallery and the export.
+    // The players and their sprites.
     Box gal{area.right() + 50 * s, 140 * s, a.w - area.right() - 110 * s, a.h - 180 * s};
     a.ui.panel(gal);
     a.text.draw(Font::Black, 22 * s, "Sprites des joueurs", {gal.x + 22 * s, gal.y + 18 * s}, pal::text);
-    a.text.paragraph(Font::Regular, 14 * s, "Chaque IA a son embl\xC3\xA8me ; l'anneau et les points disent sa force. Le halo bleu signale le joueur humain. D\xC3\xA9" "crits dans assets/sprites/sprites.json.",
+    a.text.paragraph(Font::Regular, 14 * s, strf("Cliquez sur un joueur pour lui choisir un sprite parmi les %zu de la biblioth\xC3\xA8que (assets/sprites/sprites.json). Le joueur humain garde toujours son halo bleu.", a.sprites.size()),
                      {gal.x + 22 * s, gal.y + 52 * s, gal.w - 44 * s, 60 * s}, pal::dim);
-    float rh = std::min(64.0f * s, (gal.h - 220 * s) / std::max<size_t>(1, a.sprites.size()));
-    for (size_t i = 0; i < a.sprites.size(); i++) {
-        const SpriteDef& sp = a.sprites[i];
-        float y = gal.y + 120 * s + i * rh;
-        float pr = rh * 0.38f;
-        draw_piece(sp, BLACK, {gal.x + 30 * s + pr, y + rh / 2}, pr, 0, a.time);
-        draw_piece(sp, WHITE, {gal.x + 40 * s + 3 * pr, y + rh / 2}, pr, 0, a.time);
-        a.text.draw(Font::Bold, 17 * s, sp.name, {gal.x + 60 * s + 4 * pr, y + rh / 2 - 20 * s}, pal::text);
-        a.text.draw(Font::Regular, 13 * s, strf("embl\xC3\xA8me \xC2\xAB %s \xC2\xBB \xE2\x80\xA2 niveau %d%s", sp.emblem.c_str(), sp.tier, sp.texture ? " \xE2\x80\xA2 image PNG" : ""),
-                    {gal.x + 60 * s + 4 * pr, y + rh / 2 + 2 * s}, pal::dim);
+    std::vector<std::pair<std::string, std::string>> players = {{"human", "Joueur humain"}};
+    for (auto& ai : a.roster) players.push_back({ai.id, ai.name});
+    float top = gal.y + 118 * s, rh = std::min(64.0f * s, (gal.h - 210 * s) / players.size());
+    for (size_t i = 0; i < players.size(); i++) {
+        const auto& [id, name] = players[i];
+        const SpriteDef& sp = a.player_sprite(id);
+        Box r{gal.x + 12 * s, top + i * rh, gal.w - 24 * s, rh - 4 * s};
+        bool h = a.ui.hover(r);
+        if (h) a.ui.hovering = true;
+        float k = a.ui.anim("pl" + id, h);
+        draw::round_box(r, 10 * s, with_alpha(hex(0xffffff), 0.02f + 0.07f * k));
+        float pr = rh * 0.36f;
+        draw_piece(sp, BLACK, {r.x + 14 * s + pr, r.center().y}, pr, 0.2f * k, a.time, 1, id == "human");
+        draw_piece(sp, WHITE, {r.x + 22 * s + 3 * pr, r.center().y}, pr, 0.2f * k, a.time, 1, id == "human");
+        float tx = r.x + 40 * s + 4 * pr;
+        a.text.draw(Font::Bold, 17 * s, name, {tx, r.center().y - 20 * s}, pal::text);
+        a.text.draw(Font::Regular, 13 * s, "sprite : " + sp.name, {tx, r.center().y + 2 * s}, pal::dim);
+        a.text.draw(Font::Bold, 15 * s, "Changer \xE2\x86\x92", {r.right() - 12 * s, r.center().y - 9 * s}, mix(pal::faint, a.theme().accent, k), Align::Right);
+        if (h && a.in.released) { a.themes_ui.picking = id; a.themes_ui.scroll = 0; }
     }
-    if (a.ui.button("export", {gal.x + 22 * s, gal.bottom() - 74 * s, gal.w - 44 * s, 52 * s}, "Exporter les sprites en PNG", Style::Primary))
+    if (a.ui.button("export", {gal.x + 22 * s, gal.bottom() - 74 * s, gal.w - 44 * s, 52 * s}, "Exporter tous les sprites en PNG", Style::Primary))
         a.notify(export_sprites(a));
+    a.ui.blocked = false;
+    if (picking) sprite_picker(a);
 }
 
-// ─── @@SCENE_RULES ──────────────────────────────────────────────────────────
+// The sprite library as a grid, by category; a click gives the sprite to the
+// player being edited.
+void sprite_picker(App& a) {
+    const float s = a.s;
+    const std::string who = a.themes_ui.picking;
+    std::string who_name = who == "human" ? "Joueur humain" : (a.ai(who) ? a.ai(who)->name : who);
+    draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 160));
+    Box p{a.w * 0.5f - 600 * s, 60 * s, 1200 * s, a.h - 120 * s};
+    a.ui.panel(p, 22, hex(0x1a202b));
+    a.text.draw(Font::Black, 26 * s, "Sprite de " + who_name, {p.x + 30 * s, p.y + 24 * s}, pal::text);
+    if (a.ui.button("pick_close", {p.right() - 170 * s, p.y + 20 * s, 140 * s, 46 * s}, "Fermer", Style::Ghost)) { a.themes_ui.picking.clear(); return; }
+    Box grid{p.x + 24 * s, p.y + 84 * s, p.w - 48 * s, p.h - 190 * s};
+    const float cell = 104 * s;
+    const int cols = std::max(1, int(grid.w / cell));
+    // Categories in the order of the file.
+    std::vector<std::string> cats;
+    for (auto& sp : a.sprites) {
+        std::string c = sp.category.empty() ? "Divers" : sp.category;
+        if (std::find(cats.begin(), cats.end(), c) == cats.end()) cats.push_back(c);
+    }
+    if (a.ui.hover(grid)) a.themes_ui.scroll -= a.in.wheel * cell * 0.8f;
+    float y = grid.y - a.themes_ui.scroll;
+    const SpriteDef* hovered = nullptr;
+    const std::string current = a.player_sprite(who).id;
+    draw::clip(&grid);
+    for (auto& cat : cats) {
+        a.text.draw(Font::Bold, 17 * s, cat, {grid.x + 6 * s, y + 4 * s}, a.theme().accent);
+        y += 34 * s;
+        int col = 0;
+        for (auto& sp : a.sprites) {
+            if ((sp.category.empty() ? "Divers" : sp.category) != cat) continue;
+            Box c{grid.x + col * cell, y, cell - 8 * s, cell - 8 * s};
+            bool vis = c.bottom() > grid.y && c.y < grid.bottom();
+            bool h = vis && a.ui.hover(c) && grid.contains(a.in.mouse);
+            if (h) { a.ui.hovering = true; hovered = &sp; }
+            if (vis) {
+                float k = a.ui.anim("pk" + sp.id, h);
+                bool cur = sp.id == current;
+                draw::round_box(c, 12 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.22f : 0.03f + 0.08f * k));
+                if (cur) draw::round_frame(c, 12 * s, 2 * s, a.theme().accent);
+                draw_piece(sp, (col % 2) ? WHITE : BLACK, c.center(), c.w * 0.34f, 0.3f * k, a.time, 1, who == "human");
+                if (h && a.in.released) {
+                    a.assign_sprite(who, sp.id);
+                    a.notify(who_name + " : " + sp.name);
+                    a.themes_ui.picking.clear();
+                }
+            }
+            if (++col == cols) { col = 0; y += cell; }
+        }
+        if (col) y += cell;
+        y += 8 * s;
+    }
+    draw::clip(nullptr);
+    float content = y + a.themes_ui.scroll - grid.y;
+    a.themes_ui.scroll = std::clamp(a.themes_ui.scroll, 0.0f, std::max(0.0f, content - grid.h));
+    // The hovered sprite on both stones, with its name.
+    Box info{p.x + 24 * s, p.bottom() - 96 * s, p.w - 48 * s, 76 * s};
+    draw::round_box(info, 14 * s, hex(0x0f141c, 200));
+    if (hovered) {
+        draw_piece(*hovered, BLACK, {info.x + 44 * s, info.center().y}, 28 * s, 0, a.time, 1, who == "human");
+        draw_piece(*hovered, WHITE, {info.x + 108 * s, info.center().y}, 28 * s, 0, a.time, 1, who == "human");
+        a.text.draw(Font::Bold, 20 * s, hovered->name, {info.x + 160 * s, info.y + 14 * s}, pal::text);
+        a.text.draw(Font::Regular, 14 * s, strf("embl\xC3\xA8me \xC2\xAB %s \xC2\xBB \xE2\x80\xA2 niveau %d \xE2\x80\xA2 id %s", hovered->emblem.c_str(), hovered->tier, hovered->id.c_str()),
+                    {info.x + 160 * s, info.y + 44 * s}, pal::dim);
+    } else {
+        a.text.draw(Font::Regular, 16 * s, "Survolez un sprite pour le voir sur les deux pierres ; cliquez pour l'attribuer.", {info.x + 24 * s, info.y + 28 * s}, pal::dim);
+    }
+}
+
+// ─── @@SCENE_TUTORIAL ───────────────────────────────────────────────────────
+// Learn to play. Each lesson is a position and a goal that the code checks
+// after the player's move. A board is 8 strings, rank 8 first:
+//   B black (the player)  W white  X the white piece to shut in
+//   # hole  . free square  * target (a free square to reach)
+// The engine needs exactly 4 pieces per side. The positions were checked by a
+// small solver (one solution for "reach", the endgame lesson won by 2 with the
+// big zone and lost by 2 with the small one).
+struct Lesson {
+    enum class Goal { Read, Reach, Moves, Immobilize, Win };
+    std::string title, text, task, success, failure;
+    std::vector<std::string> board;    // empty: the starting position
+    Goal goal = Goal::Read;
+    int moves = 1;                     // Goal::Moves: the player's moves
+    bool replies = false;              // the opponent answers: at random (Moves), perfectly (Win)
+    int score = 0;                     // starting score of both sides
+    std::string button = "Continuer";
+};
+
+const std::vector<Lesson>& lessons() {
+    using G = Lesson::Goal;
+    static const std::vector<Lesson> L = [] {
+        std::vector<Lesson> v;
+        Lesson l;
+        l = {};
+        l.title = "Bienvenue dans Yolah !";
+        l.text = "Yolah se joue \xC3\xA0 deux sur un plateau de 8 \xC3\x97 8 cases. Tu joues les Noirs : tes pions portent une \xC3\xA9toile et un halo bleu. L'adversaire joue les Blancs. Chaque camp a 4 pions, et les Noirs commencent toujours.";
+        l.task = "Rep\xC3\xA8re tes 4 pions, puis clique sur Continuer.";
+        v.push_back(l);
+
+        l = {};
+        l.title = "Comme une dame";
+        l.text = "Un pion se d\xC3\xA9place en ligne droite ou en diagonale, comme la dame aux \xC3\xA9" "checs, d'autant de cases libres qu'il veut. Clique sur un pion : des points montrent o\xC3\xB9 il peut aller.";
+        l.task = "Am\xC3\xA8ne ton pion de d4 sur la case dor\xC3\xA9" "e.";
+        l.success = "Parfait ! Toute une diagonale en un seul coup.";
+        l.board = {"W......W", "......*.", "........", "........", "...B....", "........", "........", "BBB...WW"};
+        l.goal = G::Reach;
+        v.push_back(l);
+
+        l = {};
+        l.title = "Pas de saut !";
+        l.text = "Un pion ne saute jamais : ni par-dessus un autre pion, ni par-dessus un trou (les cases creus\xC3\xA9" "es). Les trous coupent les lignes.";
+        l.task = "Un seul de tes pions peut atteindre la case dor\xC3\xA9" "e. Trouve-le !";
+        l.success = "Bien vu : les trous barraient la route aux trois autres.";
+        l.board = {"W..W...W", "........", "........", "B.#.*...", "....#...", "..#.....", ".......B", "B...B.W."};
+        l.goal = G::Reach;
+        v.push_back(l);
+
+        l = {};
+        l.title = "Chaque pas creuse un trou";
+        l.text = "Quand un pion part, la case qu'il quitte s'effondre : elle devient un trou, et plus personne ne pourra y aller. Le plateau r\xC3\xA9tr\xC3\xA9" "cit \xC3\xA0 chaque coup.";
+        l.task = "Joue le coup de ton choix et regarde ce qui reste derri\xC3\xA8re toi.";
+        l.success = "Tu vois le trou ? Il restera l\xC3\xA0 jusqu'\xC3\xA0 la fin de la partie.";
+        l.goal = G::Moves;
+        l.moves = 1;
+        v.push_back(l);
+
+        l = {};
+        l.title = "Un coup, un point";
+        l.text = "Chaque coup rapporte 1 point, \xC3\xA0 toi comme \xC3\xA0 l'adversaire. Le score, c'est le nombre de coups jou\xC3\xA9s : le gagnant est celui qui peut bouger le plus longtemps.";
+        l.task = "Joue 3 coups. L'adversaire r\xC3\xA9pond \xC3\xA0 chaque fois.";
+        l.success = "3 points ! Le score suit le nombre de coups.";
+        l.goal = G::Moves;
+        l.moves = 3;
+        l.replies = true;
+        v.push_back(l);
+
+        l = {};
+        l.title = "Bloqu\xC3\xA9 ? On passe !";
+        l.text = "Un camp qui ne peut plus bouger passe son tour, et l'autre rejoue. La partie ne s'arr\xC3\xAA" "te que quand plus personne ne peut bouger. Ici, les quatre pions blancs sont enferm\xC3\xA9s.";
+        l.task = "Joue deux coups : les Blancs passeront entre les deux.";
+        l.success = "Les Blancs ont pass\xC3\xA9 : leurs pions ne rapporteront plus rien.";
+        l.board = {"W#....#W", "##....##", "........", "...BB...", "...BB...", "........", "##....##", "W#....#W"};
+        l.goal = G::Moves;
+        l.moves = 2;
+        l.replies = true;
+        v.push_back(l);
+
+        l = {};
+        l.title = "Enfermer un pion";
+        l.text = "Un pion entour\xC3\xA9 de trous et de pions ne peut plus bouger : il ne rapporte plus de points. Enfermer les pions adverses, c'est leur voler des coups.";
+        l.task = "En un seul coup, enferme le pion blanc du coin h8 (entour\xC3\xA9 de rouge).";
+        l.success = "Enferm\xC3\xA9 ! Ce pion ne jouera plus de la partie.";
+        l.board = {"WWW...#X", "......#.", "........", "........", "........", ".......B", "........", "BBB....."};
+        l.goal = G::Immobilize;
+        v.push_back(l);
+
+        l = {};
+        l.title = "Choisir son territoire";
+        l.text = "En fin de partie, le plateau se d\xC3\xA9" "coupe en zones s\xC3\xA9par\xC3\xA9" "es. Chaque case d'une zone, c'est un coup de plus pour celui qui l'occupe. Ton pion en c5 peut entrer dans l'une de deux zones ; le pion blanc a d\xC3\xA9j\xC3\xA0 la sienne, de 4 cases.";
+        l.task = "Gagne cette fin de partie : choisis la bonne zone, puis ne te coupe pas le chemin.";
+        l.success = "Gagn\xC3\xA9 ! Tu as gard\xC3\xA9 plus de cases que l'adversaire.";
+        l.failure = "Perdu : entre dans la plus grande zone, puis parcours-la case par case.";
+        l.board = {"########", "#...####", "#...#W##", "##B##..#", "##.##..#", "##.#####", "B######W", "BB####WW"};
+        l.goal = G::Win;
+        l.replies = true;
+        l.score = 20;
+        v.push_back(l);
+
+        l = {};
+        l.title = "Pr\xC3\xAAt pour une vraie partie !";
+        l.text = "Tu connais toutes les r\xC3\xA8gles. Le secret : garde de la place pour tes pions et prends-en \xC3\xA0 l'adversaire. Commence par l'IA la plus douce, Monte Carlo, puis monte en puissance.";
+        l.task = "Lance ta premi\xC3\xA8re partie !";
+        l.button = "Jouer contre Monte Carlo";
+        v.push_back(l);
+        return v;
+    }();
+    return L;
+}
+
+Yolah lesson_position(const Lesson& l, std::vector<int>& targets, int& victim) {
+    targets.clear();
+    victim = -1;
+    if (l.board.size() != 8) return Yolah();
+    uint64_t b = 0, w = 0, e = 0;
+    for (int r = 0; r < 8; r++)
+        for (int f = 0; f < 8; f++) {
+            char ch = l.board[r][f];
+            int sq = (7 - r) * 8 + f;
+            uint64_t bit = uint64_t(1) << sq;
+            if (ch == 'B') b |= bit;
+            else if (ch == 'W' || ch == 'X') w |= bit;
+            else if (ch == '#') e |= bit;
+            if (ch == '*') targets.push_back(sq);
+            if (ch == 'X') victim = sq;
+        }
+    Yolah y;
+    y.set_state(b, w, e, uint16_t(l.score), uint16_t(l.score), 0);
+    return y;
+}
+
+// Perfect play in the tiny endgames of the lessons: the final score
+// difference for the side to move.
+int solve(Yolah& y, int depth = 0) {
+    if (y.game_over() || depth > 48) return y.score(y.current_player());
+    int best = -10000;
+    for (Move m : legal_moves(y)) {
+        y.play(m);
+        best = std::max(best, -solve(y, depth + 1));
+        y.undo(m);
+    }
+    return best;
+}
+Move best_move(Yolah y) {
+    Move best = Move::none();
+    int bv = -10000;
+    for (Move m : legal_moves(y)) {
+        y.play(m);
+        int v = -solve(y);
+        y.undo(m);
+        if (v > bv) { bv = v; best = m; }
+    }
+    return best;
+}
+
+// Does the move m (already played: `after`) reach the lesson's goal?
+bool goal_reached(const Lesson& l, const Yolah& after, Move m, const std::vector<int>& targets, int victim) {
+    if (l.goal == Lesson::Goal::Reach)
+        return std::find(targets.begin(), targets.end(), int(m.to_sq())) != targets.end();
+    if (l.goal == Lesson::Goal::Immobilize) {
+        if (victim < 0 || !(after.bitboard(WHITE) >> victim & 1)) return false;
+        Yolah::MoveList ml;
+        after.moves(uint8_t(WHITE), ml);
+        for (Move x : ml)
+            if (x != Move::none() && x.from_sq() == victim) return false;
+        return true;
+    }
+    return false;
+}
+
+int first_lesson_to_do(const App& a) {
+    for (int i = 0; i < int(lessons().size()); i++)
+        if (std::find(a.settings.tutorial_done.begin(), a.settings.tutorial_done.end(), i) == a.settings.tutorial_done.end()) return i;
+    return 0;
+}
+
+void start_lesson(App& a, int i) {
+    auto& t = a.tuto;
+    t.index = std::clamp(i, 0, int(lessons().size()) - 1);
+    t.match.reset(lesson_position(lessons()[t.index], t.targets, t.victim));
+    t.board.reset();
+    t.moves_done = 0;
+    t.phase = App::TutorialState::Phase::Play;
+    t.reply_at = t.pass_at = -1;
+    t.feedback.clear();
+    t.hint = false;
+    t.hint_ply = size_t(-1);
+    a.go(Scene::Tutorial);
+}
+
+void tutorial_play(App& a, Move m) {
+    auto& t = a.tuto;
+    const int side = t.match.to_move();
+    t.match.play(m);
+    t.board.on_move(m, side, a.time, a.fx, a.theme(), a.rng);
+    if (m != Move::none()) {
+        float q = t.board.sq();
+        V2 c = t.board.center(m.to_sq());
+        a.fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0x7ff0ff) : hex(0xffffff), q * 0.32f));
+        a.fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, a.theme().accent));
+    } else {
+        a.notify(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.");
+    }
+}
+
+void tutorial_result(App& a, bool ok, const std::string& msg) {
+    auto& t = a.tuto;
+    t.phase = ok ? App::TutorialState::Phase::Success : App::TutorialState::Phase::Failed;
+    t.phase_t = a.time;
+    t.feedback = msg;
+    t.hint = false;
+    if (ok) {
+        auto& done = a.settings.tutorial_done;
+        if (std::find(done.begin(), done.end(), t.index) == done.end()) done.push_back(t.index);
+        a.save_settings();
+        a.fx.add(std::make_unique<Confetti>(Box{0, 0, float(a.w), float(a.h) * 0.6f}, a.rng));
+    }
+}
+
+void tutorial_human_move(App& a, Move m) {
+    auto& t = a.tuto;
+    const Lesson& l = lessons()[t.index];
+    tutorial_play(a, m);
+    switch (l.goal) {
+    case Lesson::Goal::Reach:
+        if (goal_reached(l, t.match.pos, m, t.targets, t.victim)) tutorial_result(a, true, l.success);
+        else tutorial_result(a, false, "Ce coup arrive en " + sq_name(m.to_sq()) + ", pas sur la case dor\xC3\xA9" "e. On recommence !");
+        break;
+    case Lesson::Goal::Immobilize:
+        if (goal_reached(l, t.match.pos, m, t.targets, t.victim)) tutorial_result(a, true, l.success);
+        else tutorial_result(a, false, "Le pion de " + sq_name(t.victim) + " peut encore bouger. On recommence !");
+        break;
+    case Lesson::Goal::Moves:
+        if (++t.moves_done >= l.moves) tutorial_result(a, true, l.success);
+        break;
+    default: break;   // Win: checked at the end of the game
+    }
+}
+
+void scene_tutorial(App& a) {
+    auto& t = a.tuto;
+    using Phase = App::TutorialState::Phase;
+    const float s = a.s;
+    const auto& L = lessons();
+    const Lesson& l = L[t.index];
+    if (a.in.key(SDLK_ESCAPE)) { a.go(Scene::Menu); return; }
+
+    // ── logic ──
+    const bool anim = t.board.animating(a.time);
+    Yolah& pos = t.match.pos;
+    if (t.phase == Phase::Play && !anim && l.goal != Lesson::Goal::Read) {
+        if (t.match.over()) {
+            if (l.goal == Lesson::Goal::Win)
+                tutorial_result(a, t.match.score(BLACK) > t.match.score(WHITE), t.match.score(BLACK) > t.match.score(WHITE) ? l.success : l.failure);
+        } else if (must_pass(pos)) {
+            if (t.pass_at < 0) t.pass_at = a.time + 0.8;
+            if (a.time >= t.pass_at) { t.pass_at = -1; tutorial_play(a, Move::none()); }
+        } else if (pos.current_player() == WHITE && l.replies) {
+            if (t.reply_at < 0) t.reply_at = a.time + 0.55;
+            if (a.time >= t.reply_at) {
+                t.reply_at = -1;
+                Move m;
+                if (l.goal == Lesson::Goal::Win) m = best_move(pos);
+                else {
+                    auto mv = legal_moves(pos);
+                    m = mv[a.rng() % mv.size()];
+                }
+                tutorial_play(a, m);
+            }
+        }
+    }
+    if (t.phase == Phase::Failed && l.goal != Lesson::Goal::Win && a.time > t.phase_t + 1.8) start_lesson(a, t.index);
+
+    // ── layout ──
+    draw_background(a, false);
+    draw_title(a, "Apprendre \xC3\xA0 jouer", "Neuf petites le\xC3\xA7ons, du premier coup \xC3\xA0 la premi\xC3\xA8re victoire.");
+    if (back_button(a)) { a.go(Scene::Menu); return; }
+    const float margin = 34 * s, list_w = 290 * s, panel_w = 470 * s, frame = 26 * s, top = 130 * s;
+    Box list{margin, top, list_w, a.h - top - margin};
+    Box panel{a.w - margin - panel_w, top, panel_w, a.h - top - margin};
+    float avail_w = panel.x - list.right() - 2 * margin - 2 * frame;
+    float B = std::floor(std::min(a.h - top - margin - 2 * frame - 20 * s, avail_w) / 8) * 8;
+    t.board.area = {std::floor(list.right() + margin + frame + (avail_w - B) / 2), std::floor(top + frame + (a.h - top - margin - 2 * frame - B) / 2), B, B};
+
+    // Lesson list.
+    a.ui.panel(list);
+    float rh = std::min(66 * s, (list.h - 20 * s) / L.size());
+    for (size_t i = 0; i < L.size(); i++) {
+        Box r{list.x + 10 * s, list.y + 10 * s + i * rh, list.w - 20 * s, rh - 4 * s};
+        bool cur = int(i) == t.index;
+        bool done = std::find(a.settings.tutorial_done.begin(), a.settings.tutorial_done.end(), int(i)) != a.settings.tutorial_done.end();
+        bool h = a.ui.hover(r);
+        if (h) a.ui.hovering = true;
+        float k = a.ui.anim("ls" + std::to_string(i), h), kc = a.ui.anim("lc" + std::to_string(i), cur);
+        draw::round_box(r, 10 * s, with_alpha(mix(hex(0xffffff), a.theme().accent, kc), 0.03f + 0.06f * k + 0.14f * kc));
+        V2 cc{r.x + 24 * s, r.center().y};
+        draw::circle(cc, 16 * s, done ? pal::good : (cur ? a.theme().accent : hex(0x3a4352)));
+        if (done) draw_emblem("check", cc, 9 * s, hex(0x0b1a10));
+        else a.text.draw(Font::Black, 15 * s, std::to_string(i + 1), {cc.x, cc.y - 9 * s}, cur ? hex(0x1a1206) : pal::text, Align::Center);
+        auto lines = a.text.wrap(Font::Bold, 15 * s, L[i].title, r.w - 60 * s);
+        float ty = r.center().y - lines.size() * 9 * s;
+        for (auto& ln : lines) { a.text.draw(Font::Bold, 15 * s, ln, {r.x + 50 * s, ty}, cur ? pal::text : pal::dim); ty += 18 * s; }
+        if (h && a.in.released && !cur) { start_lesson(a, int(i)); return; }
+    }
+
+    // Board.
+    const bool human_turn = t.phase == Phase::Play && l.goal != Lesson::Goal::Read && !t.match.over() &&
+                            pos.current_player() == BLACK && !must_pass(pos) && !anim;
+    auto mv = t.board.input(a.in, pos, human_turn, false);
+    t.board.drag_pos = a.in.mouse;
+    if (mv) tutorial_human_move(a, *mv);
+    if (t.hint && t.hint_ply != t.match.history.size()) {
+        t.hint_ply = t.match.history.size();
+        t.hint_move = Move::none();
+        if (l.goal == Lesson::Goal::Win) t.hint_move = best_move(pos);
+        else
+            for (Move m : legal_moves(pos)) {
+                if (m == Move::none()) continue;
+                Yolah after = pos;
+                after.play(m);
+                if (l.goal == Lesson::Goal::Moves || goal_reached(l, after, m, t.targets, t.victim)) { t.hint_move = m; break; }
+            }
+    }
+    BoardView::Look look;
+    look.sprite[BLACK] = &a.player_sprite("human");
+    look.sprite[WHITE] = &a.player_sprite("monte_carlo");
+    look.halo[BLACK] = true;
+    look.human_turn = human_turn;
+    look.coords = true;
+    if (t.hint && human_turn && t.hint_move != Move::none()) { look.hint = t.hint_move; look.hint_label = "indice"; }
+    t.board.draw(a.text, a.board_textures, a.theme(), pos, look, a.time, s);
+    // Targets (golden squares) and the piece to shut in (red ring).
+    float pulse = 0.75f + 0.25f * float(std::sin(a.time * 4));
+    for (int sq : t.targets) {
+        if (!pos.free_squares() || !((pos.free_squares() >> sq) & 1)) continue;
+        Box b = t.board.square(sq).inset(t.board.sq() * 0.06f);
+        draw::round_box(b, b.w * 0.18f, hex(0xffd36b, uint8_t(70 * pulse)));
+        draw::round_frame(b, b.w * 0.18f, std::max(2.0f, b.w * 0.06f), hex(0xffd36b, uint8_t(255 * pulse)));
+    }
+    if (t.victim >= 0 && (pos.bitboard(WHITE) >> t.victim & 1))
+        draw::ring(t.board.center(t.victim), t.board.sq() * 0.5f, t.board.sq() * 0.06f, hex(0xff5a5a, uint8_t(255 * pulse)));
+    a.fx.update(float(a.ui.dt));
+    a.fx.draw(a.text);
+
+    // The guide's panel.
+    a.ui.panel(panel);
+    float y = panel.y + 22 * s;
+    draw_piece(a.player_sprite("human"), BLACK, {panel.x + 54 * s, y + 34 * s}, 32 * s, 0.3f, a.time, 1, true);
+    a.text.draw(Font::Bold, 14 * s, strf("Le\xC3\xA7on %d sur %zu", t.index + 1, L.size()), {panel.x + 104 * s, y + 6 * s}, a.theme().accent);
+    a.text.draw(Font::Black, 24 * s, l.title, {panel.x + 104 * s, y + 26 * s}, pal::text);
+    y += 86 * s;
+    // Speech bubble.
+    auto lines = a.text.wrap(Font::Regular, 17 * s, l.text, panel.w - 80 * s);
+    float bh = lines.size() * 25 * s + 30 * s;
+    Box bubble{panel.x + 22 * s, y, panel.w - 44 * s, bh};
+    draw::poly({V2{panel.x + 46 * s, y + 1}, V2{panel.x + 64 * s, y - 14 * s}, V2{panel.x + 76 * s, y + 1}}, hex(0xf4efe6));
+    draw::round_box(bubble, 16 * s, hex(0xf8f4ec), hex(0xebe4d6));
+    float ly = bubble.y + 15 * s;
+    for (auto& ln : lines) { a.text.draw(Font::Regular, 17 * s, ln, {bubble.x + 18 * s, ly}, hex(0x2a2218)); ly += 25 * s; }
+    y = bubble.bottom() + 20 * s;
+    // The task.
+    a.text.draw(Font::Black, 15 * s, "\xC3\x80 TOI !", {panel.x + 24 * s, y}, a.theme().accent);
+    y += 24 * s;
+    y += a.text.paragraph(Font::Bold, 18 * s, l.task, {panel.x + 24 * s, y, panel.w - 48 * s, 90 * s}, pal::text) + 10 * s;
+    if (l.goal == Lesson::Goal::Moves || l.goal == Lesson::Goal::Win) {
+        std::string sc = strf("Score : Noirs %d \xE2\x80\x93 Blancs %d", t.match.score(BLACK), t.match.score(WHITE));
+        if (l.goal == Lesson::Goal::Moves) sc += strf("   \xE2\x80\xA2   coups : %d / %d", t.moves_done, l.moves);
+        a.text.draw(Font::Regular, 16 * s, sc, {panel.x + 24 * s, y}, pal::dim);
+        y += 30 * s;
+    }
+    // Feedback.
+    if (!t.feedback.empty()) {
+        bool ok = t.phase == Phase::Success;
+        float k = ease_out_back(float((a.time - t.phase_t) / 0.4));
+        auto fl = a.text.wrap(Font::Bold, 17 * s, t.feedback, panel.w - 96 * s);
+        Box fb{panel.x + 22 * s, y, panel.w - 44 * s, fl.size() * 24 * s + 26 * s};
+        Box fbk{fb.center().x - fb.w * 0.5f * k, fb.y, fb.w * k, fb.h};
+        draw::round_box(fbk, 14 * s, with_alpha(ok ? pal::good : pal::bad, 0.9f), with_alpha(shade(ok ? pal::good : pal::bad, -0.25f), 0.9f));
+        if (k > 0.9f) {
+            draw_emblem(ok ? "check" : "cross", {fb.x + 26 * s, fb.y + fb.h / 2}, 12 * s, hex(0xffffff));
+            float fy = fb.y + 13 * s;
+            for (auto& ln : fl) { a.text.draw(Font::Bold, 17 * s, ln, {fb.x + 52 * s, fy}, hex(0xffffff)); fy += 24 * s; }
+        }
+    }
+    // Buttons.
+    Box bar{panel.x + 22 * s, panel.bottom() - 74 * s, panel.w - 44 * s, 52 * s};
+    const bool last = t.index + 1 == int(L.size());
+    const bool can_next = l.goal == Lesson::Goal::Read || t.phase == Phase::Success;
+    float bw3 = (bar.w - 16 * s) / 3;
+    if (l.goal != Lesson::Goal::Read) {
+        if (a.ui.button("t_hint", {bar.x, bar.y, bw3, bar.h}, "Indice", t.hint ? Style::Primary : Style::Normal, human_turn, 17)) t.hint = !t.hint;
+        if (a.ui.button("t_retry", {bar.x + bw3 + 8 * s, bar.y, bw3, bar.h}, "Recommencer", Style::Normal, true, 17)) { start_lesson(a, t.index); return; }
+    }
+    Box next = l.goal == Lesson::Goal::Read ? bar : Box{bar.x + 2 * (bw3 + 8 * s), bar.y, bw3, bar.h};
+    std::string label = last ? l.button : (l.goal == Lesson::Goal::Read ? l.button : "Suivant \xE2\x86\x92");
+    if (a.ui.button("t_next", next, label, can_next ? Style::Primary : Style::Normal, can_next, 17) || (can_next && a.in.key(SDLK_RETURN))) {
+        if (last) {
+            a.settings.black = "human";
+            a.settings.white = "monte_carlo";
+            a.start_game();
+        } else {
+            start_lesson(a, t.index + 1);
+        }
+        return;
+    }
+}
+
+// A screen of the steps to come (puzzles, editor).
 void placeholder(App& a, const std::string& title, const std::string& subtitle, const std::string& body, const std::string& next) {
     const float s = a.s;
     draw_background(a);
@@ -2590,17 +3360,6 @@ void placeholder(App& a, const std::string& title, const std::string& subtitle, 
     float y = p.y + 30 * s;
     y += a.text.paragraph(Font::Regular, 19 * s, body, {p.x + 40 * s, y, p.w - 80 * s, p.h - 160 * s}, pal::text, 1.45f);
     a.text.paragraph(Font::Regular, 16 * s, next, {p.x + 40 * s, p.bottom() - 90 * s, p.w - 80 * s, 70 * s}, a.theme().accent);
-}
-
-void scene_rules(App& a) {
-    placeholder(a, "R\xC3\xA8gles du jeu", "Yolah en une minute",
-                "\xE2\x80\xA2 Le plateau a 8 \xC3\x97 8 cases. Chaque camp a 4 pions ; les Noirs commencent.\n"
-                "\xE2\x80\xA2 Un pion se d\xC3\xA9place comme la dame aux \xC3\xA9" "checs : en ligne droite ou en diagonale, d'autant de cases libres qu'il veut, sans sauter par-dessus un pion ni un trou.\n"
-                "\xE2\x80\xA2 La case qu'il quitte devient un trou : plus personne ne pourra y aller.\n"
-                "\xE2\x80\xA2 Chaque coup rapporte 1 point.\n"
-                "\xE2\x80\xA2 Un camp qui ne peut plus bouger passe son tour ; la partie s'arr\xC3\xAA" "te quand plus personne ne peut bouger.\n"
-                "\xE2\x80\xA2 Le camp qui a jou\xC3\xA9 le plus de coups gagne : il faut garder de la place pour soi et en \xC3\xB4ter \xC3\xA0 l'adversaire.",
-                "Bient\xC3\xB4t : un tutoriel interactif, \xC3\xA9tape par \xC3\xA9tape, avec des exemples anim\xC3\xA9s sur le plateau.");
 }
 
 // ─── @@SCENE_PUZZLES ────────────────────────────────────────────────────────
@@ -2684,6 +3443,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     a->themes = load_themes(g_paths.assets / "themes");
     a->sprites = load_sprites(g_paths.assets / "sprites" / "sprites.json");
     a->roster = load_roster(g_paths.assets / "ai_roster.json");
+    {
+        json j = load_json(g_paths.assets / "sprites" / "assignments.json");
+        if (j.is_object() && j.contains("players") && j["players"].is_object())
+            for (auto& [k, v] : j["players"].items())
+                if (v.is_string()) a->assigned[k] = v.get<std::string>();
+    }
     {   // The analysis engine.
         json r = load_json(g_paths.assets / "ai_roster.json");
         json an = r.is_object() && r.contains("analysis") ? r["analysis"] : json::object();
@@ -2721,8 +3486,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         a->game.board.hole_since.fill(-100);
         a->game.tab = std::stoi(arg_value(argc, argv, "--tab", "0"));
     } else if (scene == "setup") a->go(Scene::Setup);
-    else if (scene == "themes") a->go(Scene::Themes);
-    else if (scene == "rules") a->go(Scene::Rules);
+    else if (scene == "themes") {
+        a->go(Scene::Themes);
+        a->themes_ui.picking = arg_value(argc, argv, "--pick");   // open the sprite picker for this player
+    }
+    else if (scene == "tutorial" || scene == "rules") start_lesson(*a, std::stoi(arg_value(argc, argv, "--lesson", "0")));
     else if (scene == "puzzles") a->go(Scene::Puzzles);
     else if (scene == "editor") a->go(Scene::Editor);
     a->time = now_seconds();
@@ -2772,7 +3540,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     case Scene::Setup: scene_setup(*a); break;
     case Scene::Game: scene_game(*a); break;
     case Scene::Themes: scene_themes(*a); break;
-    case Scene::Rules: scene_rules(*a); break;
+    case Scene::Tutorial: scene_tutorial(*a); break;
     case Scene::Puzzles: scene_puzzles(*a); break;
     case Scene::Editor: scene_editor(*a); break;
     }

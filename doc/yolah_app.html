@@ -87,6 +87,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--r
     <li><a href="#ai">10. The AIs and the analysis</a></li>
     <li><a href="#themes">11. Themes and sprites</a></li>
     <li><a href="#fx">12. Animations and effects</a></li>
+    <li><a href="#tutorial">12b. The tutorial</a></li>
     <li><a href="#tests">13. Screenshots and tests</a></li>
     <li><a href="#next">14. What comes next</a></li>
   </ol>
@@ -119,9 +120,10 @@ cmake -S app -B app/build -DYOLAH_APP_TORCH=OFF</code></pre>
 <tr><td><code>app/assets/fonts/</code></td><td>Lato (interface) and Comfortaa (titles), OFL licence</td></tr>
 <tr><td><code>app/assets/ai_roster.json</code></td><td>the AIs offered, weakest first, and the analysis engine</td></tr>
 <tr><td><code>app/assets/themes/*.json</code></td><td>one file per board theme</td></tr>
-<tr><td><code>app/assets/sprites/sprites.json</code></td><td>the piece sprites; PNG files may replace the drawings</td></tr>
+<tr><td><code>app/assets/sprites/sprites.json</code></td><td>the sprite library (61 sprites in categories); PNG files may replace the drawings</td></tr>
+<tr><td><code>app/assets/sprites/assignments.json</code></td><td>the sprite of each player, written by the Themes and sprites screen</td></tr>
 </table>
-<p>Inside the file, every section starts with a tag. Search for it to jump there: <code>@@CONFIG</code>, <code>@@UTIL</code>, <code>@@ENGINE</code>, <code>@@AI</code>, <code>@@DRAW</code>, <code>@@TEXT</code>, <code>@@THEME</code>, <code>@@SPRITE</code>, <code>@@FX</code>, <code>@@UI</code>, <code>@@BOARD</code>, <code>@@APP</code>, <code>@@SCENE_MENU</code>, <code>@@SCENE_SETUP</code>, <code>@@SCENE_GAME</code>, <code>@@SCENE_THEMES</code>, <code>@@SCENE_RULES</code>, <code>@@SCENE_PUZZLES</code>, <code>@@SCENE_EDITOR</code>, <code>@@MAIN</code>. The table of contents at the top of the file lists them with one line each.</p>
+<p>Inside the file, every section starts with a tag. Search for it to jump there: <code>@@CONFIG</code>, <code>@@UTIL</code>, <code>@@ENGINE</code>, <code>@@AI</code>, <code>@@DRAW</code>, <code>@@TEXT</code>, <code>@@THEME</code>, <code>@@SPRITE</code>, <code>@@FX</code>, <code>@@UI</code>, <code>@@BOARD</code>, <code>@@APP</code>, <code>@@SCENE_MENU</code>, <code>@@SCENE_SETUP</code>, <code>@@SCENE_GAME</code>, <code>@@SCENE_THEMES</code>, <code>@@SCENE_TUTORIAL</code>, <code>@@SCENE_PUZZLES</code>, <code>@@SCENE_EDITOR</code>, <code>@@MAIN</code>. The table of contents at the top of the file lists them with one line each.</p>
 <p>Keyboard in a game: <kbd>H</kbd> hint, <kbd>E</kbd> evaluation bar, <kbd>U</kbd> or <kbd>Backspace</kbd> undo, <kbd>F</kbd> flip the board, <kbd>Space</kbd> pause (two AIs), <kbd>Esc</kbd> menu.</p>
 </div>
 </section>
@@ -386,6 +388,8 @@ a.settings.time_index = a.ui.segmented("time", box, TIME_LABELS, a.settings.time
 <tr><td><code>overrides</code></td><td>keys that replace those of the <code>.cfg</code>; <code>torch overrides</code> only when the application is built with libtorch</td></tr>
 <tr><td><code>weights</code> paths</td><td><code>"../x"</code> is relative to <code>config/</code> (the convention of the <code>.cfg</code> files), anything else to the repository; a missing file makes the AI unavailable, and <code>missing hint</code> says what to do</td></tr>
 <tr><td><code>elo</code></td><td>indicative: only the order matters for now (it is the order of the list)</td></tr>
+<tr><td><code>time factor</code></td><td>multiplies the time per move chosen in the application (the "Débutant" thinks 2 % of it)</td></tr>
+<tr><td><code>random moves</code></td><td>probability of playing a random legal move instead of searching: a simple way to make weaker players from any AI</td></tr>
 <tr><td><code>analysis</code></td><td>the engine of the evaluation bar, the hint and the variation (the dev player)</td></tr>
 </table>
 <p>The ResNet players run on the GPU through libtorch (the <code>.ts</code> files, used by default when CMake finds libtorch). Without it they use the CPU backend (<code>nn::ResNetCPU</code>, <code>.bin</code> weights), much slower, so weaker at equal time. Both files come from <code>nnue/resnet_export.py</code>; for AlphaZero they are exported from <code>models/cnn_resnet_256x30_value_policy.pt</code>.</p>
@@ -423,6 +427,7 @@ a.settings.time_index = a.ui.segmented("time", box, TIME_LABELS, a.settings.time
   "ring top": "#fff1a0", "ring bottom": "#d39b12", "emblem color": "#ffe14d", "tier": 6 }</code></pre>
 <div class="col">
 <p>A piece is a stone, black or white depending on the side, lit from the top left; a metal ring whose colour tells the strength (bronze, silver, gold, violet, diamond); <code>tier</code> small pips; an emblem drawn by code (<code>star</code>, <code>dice</code>, <code>branch</code>, <code>tree</code>, <code>hex</code>, <code>prism</code>, <code>bolt</code>, <code>eye</code>, <code>crown</code>, <code>heart</code>, <code>shield</code>, <code>dot</code>), darker on the white stone; and, for the human, a pulsing halo (<code>"halo": true</code>). <code>"image": "file.png"</code> replaces the whole drawing with a picture of this folder.</p>
+<p><b>Library and assignment.</b> <code>sprites.json</code> is a library: every sprite has a <code>category</code> (Joueurs, Héros, Formes, Nature, Cosmos, Animaux et fantaisie, Jeux, Symboles) and any player can use any sprite. On the Themes and sprites screen, clicking a player opens a picker over the whole library; the choice is saved in <code>assignments.json</code> (player id → sprite id). Without an entry there, a player uses the <code>sprite</code> of its roster line. The human player always keeps the pulsing halo, whatever the sprite, so that one's own pieces stay recognisable.</p>
 <p>The button <i>Exporter les sprites en PNG</i> (Themes and sprites screen) renders every sprite on both stones into 256 × 256 images in <code>assets/sprites/export/</code>: a starting point to paint one's own. The editor (next steps) will change these files from the application.</p>
 </div>
 </section>
@@ -443,6 +448,22 @@ a.fx.add(std::make_unique&lt;FloatText&gt;(position, "+1", colour, size));</code
 </div>
 </section>
 
+<section id="tutorial">
+<h2><span class="n">12b</span>The tutorial</h2>
+<div class="col">
+<p><i>Apprendre à jouer</i> is a list of lessons (<code>lessons()</code> in <code>@@SCENE_TUTORIAL</code>). A lesson is a text, a task, a position and a goal that the code checks after the player's move:</p>
+<table>
+<tr><th>Goal</th><th>Checked by</th></tr>
+<tr><td><code>Read</code></td><td>nothing: a Continue button</td></tr>
+<tr><td><code>Reach</code></td><td>the move ends on a golden square (<code>*</code> in the board)</td></tr>
+<tr><td><code>Moves</code></td><td>the player has made N moves (the opponent may answer at random)</td></tr>
+<tr><td><code>Immobilize</code></td><td>after the move, the white piece marked <code>X</code> has no move left</td></tr>
+<tr><td><code>Win</code></td><td>the game ends with the player ahead; the opponent plays perfectly (<code>solve</code>, a full negamax, fine in tiny endgames)</td></tr>
+</table>
+<p>A board is 8 strings, rank 8 first: <code>B</code> the player, <code>W</code> the opponent, <code>X</code> the white piece to shut in, <code>#</code> a hole, <code>.</code> a free square, <code>*</code> a target. The engine needs exactly 4 pieces per side. A wrong move shows why and restarts the lesson; <i>Indice</i> draws a move that reaches the goal; completed lessons are saved in the settings and ticked in the list. The positions were checked with a small solver: in the endgame lesson, entering the big zone wins by 2 and the small one loses by 2.</p>
+</div>
+</section>
+
 <section id="tests">
 <h2><span class="n">13</span>Screenshots and tests</h2>
 <div class="col"><p>The application can render without a window and save a picture, which is how the images of this page were made and how a change can be checked without clicking:</p></div>
@@ -450,7 +471,7 @@ a.fx.add(std::make_unique&lt;FloatText&gt;(position, "+1", colour, size));</code
 ./yolah_app --screenshot game.bmp --scene game --black human --white dev --plies 16 --tab 1 --hint --frames 220
 ./yolah_app --screenshot end.bmp --scene game --black basic_minmax --white dev --time 0 --frames 2500   <span class="c"># a whole AI game</span></code></pre>
 <div class="col">
-<p><code>--screenshot</code> switches to SDL's <code>offscreen</code> video driver and the <code>software</code> renderer, draws <code>--frames</code> frames (enough for the AIs or the analysis to work) and saves the last one. Other options: <code>--size WxH</code>, <code>--theme ID</code>, <code>--scene setup|themes|rules|puzzles|editor</code>, <code>--verbose</code> (the AI players print to the terminal). Test runs do not overwrite the user's settings.</p>
+<p><code>--screenshot</code> switches to SDL's <code>offscreen</code> video driver and the <code>software</code> renderer, draws <code>--frames</code> frames (enough for the AIs or the analysis to work) and saves the last one. Other options: <code>--size WxH</code>, <code>--theme ID</code>, <code>--scene setup|themes|tutorial|puzzles|editor</code>, <code>--lesson N</code>, <code>--pick ID</code> (the sprite picker), <code>--verbose</code> (the AI players print to the terminal). Test runs do not overwrite the user's settings.</p>
 </div>
 </section>
 
@@ -458,7 +479,6 @@ a.fx.add(std::make_unique&lt;FloatText&gt;(position, "+1", colour, size));</code
 <h2><span class="n">14</span>What comes next</h2>
 <div class="col">
 <ul>
-<li><b>Rules as a game.</b> An interactive tutorial: step-by-step lessons on the board (move like a queen, the hole left behind, passing, counting), each with a small exercise.</li>
 <li><b>Puzzle editor.</b> Paint holes, place the 4 pieces of each side, choose the sprites of the players, of the holes and of the empty squares, the side to move, the opposing AI and the background image; puzzles saved as JSON files.</li>
 <li><b>Levels.</b> Sequences of puzzles, created by any user, with progress.</li>
 <li><b>Effects.</b> New <code>Effect</code> classes, attached to puzzles or squares.</li>

@@ -1,0 +1,15 @@
+{
+  "players": {
+    "random": "random",
+    "beginner": "beginner",
+    "human": "human",
+    "monte_carlo": "monte_carlo",
+    "mcts": "mcts",
+    "basic_minmax": "basic_minmax",
+    "nnue193": "nnue193",
+    "features": "features",
+    "resnet": "resnet",
+    "dev": "dev",
+    "alphazero": "alphazero"
+  }
+}

@@ -1,41 +1,54 @@
 {
   // The AIs of the application, from the weakest to the strongest.
-  //   id           used by the settings and the sprites
+  //   id           used by the settings and the sprites (sprites/assignments.json)
   //   name         shown in the application
   //   family       one line: what kind of AI it is
-  //   elo          indicative strength (relative scale, mm_player ≈ 1500),
-  //                from the grading tournament and the later matches; only the
-  //                order matters for now
-  //   sprite       id of a sprite of sprites/sprites.json
-  //   config       engine configuration, relative to config/ (the same .cfg
-  //                files as the tournaments); "microseconds" is set by the
-  //                application (time per move), "nb threads" capped
-  //   overrides    keys replacing those of the .cfg ("weights": "../x" is
-  //                relative to config/, other relative paths to the repository)
-  //   torch overrides   the same, only in a build with -DYOLAH_APP_TORCH=ON
   //   description  shown in the application (default: the .cfg's)
-//   missing hint shown when the weights file does not exist
+  //   elo          indicative strength (relative scale, mm_player ≈ 1500); only the order matters for now
+  //   sprite       default sprite (sprites/sprites.json), when none is assigned
+  //   config       engine configuration, relative to config/ (the same .cfg files as the tournaments);
+  //                "microseconds" is set by the application (time per move), "nb threads" capped
+  //   time factor  the time per move chosen in the application is multiplied by this (default 1)
+  //   random moves probability of playing a random legal move instead of thinking (default 0)
+  //   overrides    keys replacing those of the .cfg ("weights": "../x" is relative to config/,
+  //                other relative paths to the repository)
+  //   torch overrides   the same, only when the application is built with libtorch
+  //   missing hint shown when the weights file does not exist
   "ais": [
-    { "id": "monte_carlo", "description": "Pour chaque coup possible, joue des milliers de parties au hasard jusqu'\u00e0 la fin et choisit le coup qui gagne le plus souvent. Aucune connaissance du jeu.", "name": "Monte Carlo", "family": "parties aléatoires", "elo": 1150,
-      "sprite": "monte_carlo", "config": "mc_player.cfg" },
-    { "id": "mcts", "description": "Construit un arbre de recherche en concentrant les parties al\u00e9atoires sur les coups prometteurs (UCT). Plus fort que Monte Carlo \u00e0 temps \u00e9gal.", "name": "MCTS", "family": "arbre de recherche Monte Carlo", "elo": 1250,
-      "sprite": "mcts", "config": "mcts_player.cfg" },
-    { "id": "basic_minmax", "description": "Examine tous les coups jusqu'\u00e0 4 demi-coups (alpha-b\u00eata) et juge les positions avec une heuristique \u00e9crite \u00e0 la main.", "name": "Minimax basique", "family": "minimax + heuristique", "elo": 1350,
-      "sprite": "basic_minmax", "config": "basic_mm_player.cfg" },
-    { "id": "nnue193", "description": "Minimax avec approfondissement it\u00e9ratif, table de transposition et r\u00e9ductions ; \u00e9value les positions avec un r\u00e9seau NNUE (193 entr\u00e9es) distill\u00e9 d'un r\u00e9seau convolutif et calcul\u00e9 en entiers.", "name": "Minimax NNUE (ancien)", "family": "minimax + réseau NNUE quantifié", "elo": 1770,
-      "sprite": "nnue193", "config": "mm_nnue193_distill_quantized_player.cfg" },
-    { "id": "features", "description": "Le m\u00eame minimax, avec un r\u00e9seau qui lit 119 caract\u00e9ristiques calcul\u00e9es sur la position (territoire, mobilit\u00e9, zones), quantifi\u00e9 en entiers 16 bits.", "name": "Minimax Features", "family": "minimax + réseau de features quantifié", "elo": 1800,
-      "sprite": "features", "config": "mm_features119_distill_quantized_player.cfg" },
-    { "id": "resnet", "description": "Recherche Monte Carlo guid\u00e9e par un r\u00e9seau convolutif r\u00e9siduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Sur GPU avec libtorch ; sur CPU sinon, bien plus lent, donc plus faible \u00e0 temps \u00e9gal.", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif (CPU)", "elo": 2100,
-      "sprite": "resnet", "config": "az_vs_nnue/resnet_supervised.cfg",
+    { "id": "random", "name": "Hasard", "family": "coups au hasard", "elo": 600, "sprite": "random",
+      "config": "random_player.cfg",
+      "description": "Joue un coup au hasard parmi les coups possibles. Idéal pour découvrir le jeu." },
+    { "id": "beginner", "name": "Débutant", "family": "Monte Carlo bridé", "elo": 900, "sprite": "beginner",
+      "config": "mc_player.cfg", "time factor": 0.02, "random moves": 0.3, "overrides": { "nb threads": 1 },
+      "description": "Un Monte Carlo qui réfléchit très peu (2 % du temps, un seul cœur) et joue un coup au hasard trois fois sur dix." },
+    { "id": "monte_carlo", "name": "Monte Carlo", "family": "parties aléatoires", "elo": 1150, "sprite": "monte_carlo",
+      "config": "mc_player.cfg",
+      "description": "Pour chaque coup possible, joue des milliers de parties au hasard jusqu'à la fin et choisit le coup qui gagne le plus souvent. Aucune connaissance du jeu." },
+    { "id": "mcts", "name": "MCTS", "family": "arbre de recherche Monte Carlo", "elo": 1250, "sprite": "mcts",
+      "config": "mcts_player.cfg",
+      "description": "Construit un arbre de recherche en concentrant les parties aléatoires sur les coups prometteurs (UCT). Plus fort que Monte Carlo à temps égal." },
+    { "id": "basic_minmax", "name": "Minimax basique", "family": "minimax + heuristique", "elo": 1350, "sprite": "basic_minmax",
+      "config": "basic_mm_player.cfg",
+      "description": "Examine tous les coups jusqu'à 4 demi-coups (alpha-bêta) et juge les positions avec une heuristique écrite à la main." },
+    { "id": "nnue193", "name": "Minimax NNUE (ancien)", "family": "minimax + réseau NNUE quantifié", "elo": 1770, "sprite": "nnue193",
+      "config": "mm_nnue193_distill_quantized_player.cfg",
+      "description": "Minimax avec approfondissement itératif, table de transposition et réductions ; évalue les positions avec un réseau NNUE (193 entrées) distillé d'un réseau convolutif et calculé en entiers." },
+    { "id": "features", "name": "Minimax Features", "family": "minimax + réseau de features quantifié", "elo": 1800, "sprite": "features",
+      "config": "mm_features119_distill_quantized_player.cfg",
+      "description": "Le même minimax, avec un réseau qui lit 119 caractéristiques calculées sur la position (territoire, mobilité, zones), quantifié en entiers 16 bits." },
+    { "id": "resnet", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif", "elo": 2100, "sprite": "resnet",
+      "config": "az_vs_nnue/resnet_supervised.cfg",
+      "description": "Recherche Monte Carlo guidée par un réseau convolutif résiduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Sur GPU avec libtorch ; sur CPU sinon, bien plus lent, donc plus faible à temps égal.",
       "overrides": { "backend": "cpu", "weights": "../nnue/cnn_resnet_256x30_value_policy.bin", "nb threads": 8, "batch size": 16 },
       "torch overrides": { "backend": "torch", "weights": "../nnue/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } },
-    { "id": "alphazero", "description": "Le m\u00eame MCTS, avec le r\u00e9seau qu'AlphaZero a entra\u00een\u00e9 en jouant contre lui-m\u00eame \u00e0 partir du r\u00e9seau supervis\u00e9.", "name": "AlphaZero", "family": "MCTS + réseau appris par auto-apprentissage", "elo": 2100,
-      "sprite": "alphazero", "config": "az_vs_nnue/az256.cfg",
+    { "id": "dev", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 2150, "sprite": "dev",
+      "config": "search_study/dev_final.cfg", "overrides": { "tt size": 128 },
+      "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, réductions, élagage, solveur de fin de partie, et un réseau NNUE vu du camp au trait, avec 8 têtes de phase et des caractéristiques d'espace." },
+    { "id": "alphazero", "name": "AlphaZero", "family": "MCTS + réseau AlphaZero", "elo": 2250, "sprite": "alphazero",
+      "config": "az_vs_nnue/az256.cfg",
+      "description": "Le même MCTS, avec le réseau qu'AlphaZero a entraîné en jouant contre lui-même à partir du réseau supervisé.",
       "overrides": { "backend": "cpu", "weights": "models/cnn_resnet_256x30_value_policy.bin", "nb threads": 8, "batch size": 16 },
-      "torch overrides": { "backend": "torch", "weights": "models/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } },
-    { "id": "dev", "description": "Le minimax le plus travaill\u00e9 : PVS, fen\u00eatres d'aspiration adaptatives, r\u00e9ductions, \u00e9lagage, solveur de fin de partie, et un r\u00e9seau NNUE vu du camp au trait, avec 8 t\u00eates de phase et des caract\u00e9ristiques d'espace.", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 2200,
-      "sprite": "dev", "config": "search_study/dev_final.cfg", "overrides": { "tt size": 128 } }
+      "torch overrides": { "backend": "torch", "weights": "models/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } }
   ],
   // The engine behind the evaluation bar, the hint and the principal variation.
   "analysis": { "config": "search_study/dev_final.cfg", "overrides": { "tt size": 64 } }
