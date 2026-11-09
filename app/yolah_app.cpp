@@ -3039,9 +3039,9 @@ void draw_puzzle_over(App& a, Box area, float k) {
     bool ok = margin >= p.margin;
     Box card{area.center().x - 250 * s, area.center().y - 160 * s + (1 - k) * 40 * s, 500 * s, 320 * s};
     a.ui.panel(card, 22, with_alpha(pal::panel, k));
-    a.text.draw_shadowed(Font::Title, 34 * s, ok ? "Puzzle rÃ©ussi !" : "Pas encoreâ¦", {card.center().x, card.y + 28 * s}, with_alpha(ok ? pal::good : pal::text, k), Align::Center, hex(0x000000, 100), 2 * s);
-    a.text.draw(Font::Black, 50 * s, strf("%d â %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 84 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
-    a.text.draw(Font::Regular, 16 * s, strf("Votre avance : %+d â¢ objectif : %+d", margin, p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    a.text.draw_shadowed(Font::Title, 34 * s, ok ? "Puzzle r\xC3\xA9ussi !" : "Pas encore\xE2\x80\xA6", {card.center().x, card.y + 28 * s}, with_alpha(ok ? pal::good : pal::text, k), Align::Center, hex(0x000000, 100), 2 * s);
+    a.text.draw(Font::Black, 50 * s, strf("%d \xE2\x80\x93 %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 84 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
+    a.text.draw(Font::Regular, 16 * s, strf("Votre avance : %+d \xE2\x80\xA2 objectif : %+d", margin, p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
     // The next puzzle of the level.
     const Level* lvl = nullptr;
     for (auto& l : a.levels) if (l.id == g.level) lvl = &l;
@@ -3050,13 +3050,13 @@ void draw_puzzle_over(App& a, Box area, float k) {
     float bw = 140 * s, by = card.bottom() - 74 * s;
     if (next) {
         if (a.ui.button("pz_next", {card.x + 24 * s, by, bw, 50 * s}, "Puzzle suivant", Style::Primary, true, 17)) { Puzzle n = *next; start_puzzle(a, n, g.level, g.level_pos + 1, false); return; }
-    } else if (a.ui.button("pz_retry", {card.x + 24 * s, by, bw, 50 * s}, "RÃ©" "essayer", ok ? Style::Normal : Style::Primary, true, 17)) {
+    } else if (a.ui.button("pz_retry", {card.x + 24 * s, by, bw, 50 * s}, "R\xC3\xA9" "essayer", ok ? Style::Normal : Style::Primary, true, 17)) {
         Puzzle again = p;
         start_puzzle(a, again, g.level, g.level_pos, g.from_editor);
         return;
     }
     if (next && a.ui.button("pz_retry2", {card.center().x - bw / 2, by, bw, 50 * s}, "Rejouer", Style::Normal, true, 17)) { Puzzle again = p; start_puzzle(a, again, g.level, g.level_pos, false); return; }
-    if (a.ui.button("pz_leave", {card.right() - 24 * s - bw, by, bw, 50 * s}, g.from_editor ? "Ã" "diteur" : "Puzzles", Style::Ghost, true, 17)) leave_puzzle(a);
+    if (a.ui.button("pz_leave", {card.right() - 24 * s - bw, by, bw, 50 * s}, g.from_editor ? "\xC3\x89" "diteur" : "Puzzles", Style::Ghost, true, 17)) leave_puzzle(a);
 }
 
 void draw_game_over(App& a, Box area) {
