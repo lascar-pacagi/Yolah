@@ -109,6 +109,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -1736,7 +1737,11 @@ struct Input {
     bool down = false;       // left button held
     bool pressed = false;    // went down this frame
     bool released = false;   // went up this frame
+    bool rdown = false, rpressed = false;   // right button: held, went down this frame
     float wheel = 0;
+    // Files given this frame: dropped on the window ("drop") or chosen in a
+    // file dialog (the purpose given to App::choose_file).
+    std::vector<std::pair<std::string, std::string>> files;   // (purpose, path)
     std::vector<SDL_Keycode> keys;   // keys pressed this frame
     std::string text;                // characters typed this frame (UTF-8, SDL_EVENT_TEXT_INPUT)
     int backspaces = 0;              // Backspace presses this frame, key repeats included
@@ -2484,6 +2489,11 @@ struct App {
         bool painting = false;            // the button went down on the board
         int painted = -1;                 // the last square painted by a drag
         bool confirm_delete = false;
+        std::string confirm_level;        // the level whose deletion waits for a second click
+        // The "new puzzle" dialog: start from the starting position or from any puzzle.
+        bool choose_new = false;
+        std::string new_level;            // the level the new puzzle goes into
+        float new_scroll = 0;
     } editor;
 
     // The puzzles and levels (@@SCENE_PUZZLES).
@@ -2524,6 +2534,51 @@ struct App {
             stbi_image_free(px);
         }
         return backgrounds[file] = tex;
+    }
+
+    // Files from the system's file dialog and from drag and drop. The dialog's
+    // callback may run on another thread: the paths wait here, behind a
+    // mutex, until the next frame hands them to the scene (Input::files).
+    std::mutex files_mutex;
+    std::vector<std::pair<std::string, std::string>> pending_files;
+    void push_file(const std::string& purpose, const std::string& path) {
+        std::lock_guard lock(files_mutex);
+        pending_files.push_back({purpose, path});
+    }
+    std::vector<std::pair<std::string, std::string>> take_files() {
+        std::lock_guard lock(files_mutex);
+        return std::exchange(pending_files, {});
+    }
+    // Opens the system's dialog to choose an image; the answer comes back as
+    // a file of Input::files with this purpose (nothing if cancelled).
+    std::string dialog_purpose;
+    void choose_image(const std::string& purpose) {
+        static const SDL_DialogFileFilter filters[] = {{"Images", "png;jpg;jpeg;bmp;gif;tga"}};
+        dialog_purpose = purpose;
+        SDL_ShowOpenFileDialog(
+            [](void* user, const char* const* list, int) {
+                App* a = static_cast<App*>(user);
+                if (!list) { a->push_file("dialog-error", SDL_GetError()); return; }
+                if (list[0]) a->push_file(a->dialog_purpose, list[0]);
+            },
+            this, window, filters, 1, nullptr, false);
+    }
+    // Copies an image into assets/<folder>/ (a free name from its own);
+    // returns the new file name, "" on failure.
+    std::string import_image(const std::string& path, const std::string& folder) {
+        fs::path src(path);
+        std::string ext = src.extension().string();
+        for (auto& c : ext) c = char(std::tolower(uint8_t(c)));
+        int w, h, n;
+        if (!stbi_info(path.c_str(), &w, &h, &n)) { notify("Ce fichier n'est pas une image lisible : " + src.filename().string()); return ""; }
+        fs::path dir = g_paths.assets / folder;
+        std::error_code ec;
+        fs::create_directories(dir, ec);
+        std::string base = slug(src.stem().string()), name = base + ext;
+        for (int k = 2; fs::exists(dir / name); k++) name = base + "_" + std::to_string(k) + ext;
+        fs::copy_file(src, dir / name, ec);
+        if (ec) { notify("Copie impossible : " + ec.message()); return ""; }
+        return name;
     }
 
     // Sprite of each player (assets/sprites/assignments.json): player id
@@ -4032,13 +4087,89 @@ void editor_open(App& a, const Puzzle& p, const std::string& level) {
     ed.saved = puzzle_to_json(p).dump();
     ed.confirm_delete = false;
 }
-void editor_new(App& a, const std::string& level) {
+// A new puzzle in `level`: the starting position, or a copy of `model` (its
+// board, its settings and its look) under a new name.
+void editor_new(App& a, const std::string& level, const Puzzle* model = nullptr) {
     auto& ed = a.editor;
     if (editor_dirty(a) && !ed.p.id.empty()) editor_save(a);
-    ed.p = Puzzle{};
+    ed.p = model ? *model : Puzzle{};
+    if (model) { ed.p.id.clear(); ed.p.name = model->name + " (variante)"; }
     ed.level = level;
     editor_save(a);   // it appears at once in the list (and in its level)
     ed.confirm_delete = false;
+}
+
+// The "new puzzle" dialog: the starting position, or any existing puzzle as a
+// model (by level, then those in no level).
+void editor_new_dialog(App& a) {
+    const float s = a.s;
+    auto& ed = a.editor;
+    draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 160));
+    Box p{a.w * 0.5f - 380 * s, 70 * s, 760 * s, a.h - 140 * s};
+    a.ui.panel(p, 22, hex(0x1a202b));
+    a.text.draw(Font::Black, 24 * s, "Nouveau puzzle", {p.x + 28 * s, p.y + 22 * s}, pal::text);
+    a.text.draw(Font::Regular, 15 * s, "Partir de la position de d\xC3\xA9part, ou d'une copie de n'importe quel puzzle (plateau, r\xC3\xA9glages, apparence).",
+                {p.x + 28 * s, p.y + 60 * s}, pal::dim);
+    if (a.ui.button("nw_close", {p.right() - 150 * s, p.y + 18 * s, 122 * s, 42 * s}, "Annuler", Style::Ghost) || a.in.key(SDLK_ESCAPE)) {
+        ed.choose_new = false;
+        a.in.eat(SDLK_ESCAPE);
+        return;
+    }
+    Box list{p.x + 20 * s, p.y + 96 * s, p.w - 40 * s, p.h - 116 * s};
+    if (a.ui.hover(list)) ed.new_scroll = std::max(0.0f, ed.new_scroll - a.in.wheel * 40 * s);
+    float y = list.y - ed.new_scroll;
+    const float rh = 54 * s;
+    const Puzzle* chosen = nullptr;
+    bool blank = false;
+    draw::clip(&list);
+    auto row = [&](const std::string& id, const std::string& title, const std::string& sub, const Puzzle* pz) {
+        Box r{list.x, y, list.w, rh - 6 * s};
+        bool h = a.ui.hover(r) && list.contains(a.in.mouse);
+        if (h) a.ui.hovering = true;
+        draw::round_box(r, 10 * s, with_alpha(hex(0xffffff), h ? 0.1f : 0.03f));
+        // A small view of the board.
+        Box mb{r.x + 8 * s, r.y + 4 * s, r.h - 8 * s, r.h - 8 * s};
+        Puzzle start;
+        const Puzzle& src = pz ? *pz : start;
+        float q = mb.w / 8;
+        draw::rect(mb, a.theme_or(src.theme).light);
+        for (int sq = 0; sq < 64; sq++) {
+            char c = src.cells[sq];
+            V2 cc{mb.x + (sq % 8 + 0.5f) * q, mb.y + (7 - sq / 8 + 0.5f) * q};
+            if (c == '#') draw::rect({cc.x - q / 2, cc.y - q / 2, q, q}, hex(0x101318));
+            else if (c == 'B') draw::circle(cc, q * 0.4f, hex(0x222630));
+            else if (c == 'W') draw::circle(cc, q * 0.4f, hex(0xf4f6fa));
+        }
+        a.text.draw(Font::Bold, 16 * s, title, {mb.right() + 14 * s, r.y + 7 * s}, pal::text);
+        a.text.draw(Font::Regular, 13 * s, sub, {mb.right() + 14 * s, r.y + 27 * s}, pal::dim);
+        if (h && a.in.released) { if (pz) chosen = pz; else blank = true; }
+        y += rh;
+        (void)id;
+    };
+    row("", "Position de d\xC3\xA9part", "le plateau du d\xC3\xA9" "but de partie", nullptr);
+    std::set<std::string> seen;
+    for (auto& l : a.levels) {
+        a.text.draw(Font::Bold, 14 * s, l.name, {list.x + 4 * s, y + 10 * s}, a.theme().accent);
+        y += 36 * s;
+        for (auto& id : l.puzzles)
+            if (const Puzzle* pz = a.find_puzzle(id)) { seen.insert(id); row(id, pz->name, pz->text.empty() ? id : pz->text, pz); }
+    }
+    bool header = false;
+    for (auto& pz : a.puzzles) {
+        if (seen.count(pz.id)) continue;
+        if (!header) { a.text.draw(Font::Bold, 14 * s, "Hors niveau", {list.x + 4 * s, y + 10 * s}, pal::faint); y += 36 * s; header = true; }
+        row(pz.id, pz.name, pz.text.empty() ? pz.id : pz.text, &pz);
+    }
+    draw::clip(nullptr);
+    float content = y + ed.new_scroll - list.y;
+    ed.new_scroll = std::clamp(ed.new_scroll, 0.0f, std::max(0.0f, content - list.h));
+    if (chosen || blank) {
+        Puzzle model = chosen ? *chosen : Puzzle{};
+        ed.choose_new = false;
+        editor_new(a, ed.new_level, chosen ? &model : nullptr);
+        if (!ed.new_level.empty()) ed.open_levels.insert(ed.new_level);
+        a.notify(chosen ? "Variante cr\xC3\xA9\xC3\xA9" "e : " + ed.p.name : std::string("Nouveau puzzle cr\xC3\xA9\xC3\xA9 : peignez le plateau."));
+    }
 }
 
 void scene_editor(App& a) {
@@ -4055,7 +4186,7 @@ void scene_editor(App& a) {
             }
         if (ed.saved.empty() && !a.puzzles.empty()) editor_open(a, a.puzzles.front(), "");
     }
-    const bool modal = a.picker.open;
+    const bool modal = a.picker.open || ed.choose_new;
     draw_image_background(a, p.background, 120);
     a.text.draw_shadowed(Font::Title, 34 * s, "\xC3\x89" "diteur de puzzles", {40 * s, 24 * s}, pal::text, Align::Left, hex(0x000000, 120), 3 * s);
     a.ui.blocked = modal;
@@ -4092,6 +4223,8 @@ void scene_editor(App& a) {
         draw::round_box(r, 7 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.3f : (h ? 0.08f : 0.0f)));
         a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, pz ? pz->name : pid + " (introuvable)", {r.x + 10 * s, r.y + 8 * s}, pz ? pal::text : pal::bad);
         if (cur && !lid.empty()) {
+            // × : out of this level (the puzzle itself stays, in "Hors niveau" if no level has it).
+            if (a.ui.button("mx" + pid, {r.right() - 92 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xC3\x97", Style::Ghost, true, 15)) { action = "unlink"; action_level = lid; action_puzzle = pid; }
             if (idx > 0 && a.ui.button("mu" + pid, {r.right() - 62 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xE2\x86\x91", Style::Ghost, true, 14)) { action = "move"; action_level = lid; action_puzzle = pid; move_dir = -1; }
             if (idx + 1 < count && a.ui.button("md" + pid, {r.right() - 32 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xE2\x86\x93", Style::Ghost, true, 14)) { action = "move"; action_level = lid; action_puzzle = pid; move_dir = 1; }
         } else if (h && a.in.released && pz) { action = "open"; action_level = lid; action_puzzle = pid; }
@@ -4132,7 +4265,7 @@ void scene_editor(App& a) {
                 puzzle_row(l.puzzles[i], l.id, int(i), int(l.puzzles.size()));
             }
             Box add{list.x + 18 * s, y, list.w - 18 * s, rh - 4 * s};
-            if (a.ui.button("addp" + l.id, add, "+ nouveau puzzle dans ce niveau", Style::Ghost, true, 13)) { action = "new"; action_level = l.id; }
+            if (a.ui.button("addp" + l.id, add, "+ nouveau puzzle dans ce niveau\xE2\x80\xA6", Style::Ghost, true, 13)) { action = "new"; action_level = l.id; }
             y += rh;
             if (p.id.size() && std::find(l.puzzles.begin(), l.puzzles.end(), p.id) == l.puzzles.end()) {
                 if (a.ui.button("addc" + l.id, {list.x + 18 * s, y, list.w - 18 * s, rh - 4 * s}, "+ ajouter \xC2\xAB " + p.name + " \xC2\xBB", Style::Ghost, true, 13)) { action = "add"; action_level = l.id; }
@@ -4158,7 +4291,14 @@ void scene_editor(App& a) {
     for (auto& l : a.levels) if (l.id == ed.level_selected) lsel = &l;
     float by = tree.bottom() - 112 * s;
     if (lsel) {
-        if (a.ui.text_field("lv_name", {tree.x + 12 * s, by, tree.w - 24 * s, 40 * s}, lsel->name, "Nom du niveau")) save_level(*lsel);
+        const float dw = 104 * s;
+        if (a.ui.text_field("lv_name", {tree.x + 12 * s, by, tree.w - 32 * s - dw, 40 * s}, lsel->name, "Nom du niveau")) save_level(*lsel);
+        bool confirm = ed.confirm_level == lsel->id;
+        if (a.ui.button("lv_del", {tree.right() - 12 * s - dw, by, dw, 40 * s}, confirm ? "Confirmer ?" : "Supprimer", Style::Danger, true, 13)) {
+            if (confirm) { action = "dellevel"; action_level = lsel->id; }
+            else ed.confirm_level = lsel->id;
+        }
+        if (confirm) a.text.draw(Font::Regular, 12 * s, "Le niveau dispara\xC3\xAEt, ses puzzles restent.", {tree.x + 14 * s, by - 18 * s}, pal::bad);
     } else {
         a.text.paragraph(Font::Regular, 13 * s, "Cliquez sur un niveau pour l'ouvrir, le renommer et le d\xC3\xA9placer (\xE2\x86\x91 \xE2\x86\x93 : l'ordre de jeu).", {tree.x + 16 * s, by + 4 * s, tree.w - 32 * s, 40 * s}, pal::faint);
     }
@@ -4269,8 +4409,10 @@ void scene_editor(App& a) {
     std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Aucune"};
     int bg_idx = 0;
     for (size_t i = 0; i < bgs.size(); i++) { bg_names.push_back(bgs[i]); if (bgs[i] == p.background) bg_idx = int(i) + 1; }
-    int bi = a.ui.cycler("ed_bg", {x, y, w, 34 * s}, "Image de fond", bg_names, bg_idx);
+    const float lw = 96 * s;
+    int bi = a.ui.cycler("ed_bg", {x, y, w - lw - 8 * s, 34 * s}, "Image de fond", bg_names, bg_idx);
     p.background = bi == 0 ? "" : bgs[bi - 1];
+    if (a.ui.button("ed_bg_load", {x + w - lw, y, lw, 34 * s}, "Charger\xE2\x80\xA6", Style::Normal, true, 13)) a.choose_image("puzzle-background");
     y += 42 * s;
     for (int side : {BLACK, WHITE}) {
         Box r{x + side * (w / 2 + 4 * s), y, w / 2 - 4 * s, 46 * s};
@@ -4317,20 +4459,46 @@ void scene_editor(App& a) {
     float fw = (w - 2 * 8 * s) / 3;
     if (a.ui.button("ed_save", {fb.x, fb.y, fw, fb.h}, "Enregistrer", Style::Normal, true, 15)) { editor_save(a); a.notify("Enregistr\xC3\xA9 : assets/puzzles/" + p.id + ".json"); }
     if (a.ui.button("ed_dup", {fb.x + fw + 8 * s, fb.y, fw, fb.h}, "Dupliquer", Style::Normal, true, 15)) action = "dup";
+    // An image given to the editor (dialog or dropped on the window): the puzzle's background.
+    for (auto& [purpose, path] : a.in.files) {
+        if (purpose == "dialog-error") { a.notify("Pas de s\xC3\xA9lecteur de fichiers ici : glissez l'image sur la fen\xC3\xAAtre."); continue; }
+        if (purpose != "puzzle-background" && purpose != "drop") continue;
+        std::string name = a.import_image(path, "backgrounds");
+        if (!name.empty()) { p.background = name; a.notify("Image de fond : " + name + " (copi\xC3\xA9" "e dans assets/backgrounds)"); }
+    }
     if (a.ui.button("ed_del", {fb.x + 2 * (fw + 8 * s), fb.y, fw, fb.h}, ed.confirm_delete ? "Confirmer ?" : "Supprimer", Style::Danger, !p.id.empty(), 15)) {
         if (ed.confirm_delete) action = "delete";
         else ed.confirm_delete = true;
     }
     a.ui.blocked = false;
     if (a.picker.open) sprite_picker(a);
+    if (ed.choose_new) { editor_new_dialog(a); return; }
 
     // ── actions on the lists ──
     if (action == "open") {
         if (const Puzzle* pz = a.find_puzzle(action_puzzle)) { Puzzle copy = *pz; editor_open(a, copy, action_level); }
     } else if (action == "new") {
-        editor_new(a, action_level);
-        ed.open_levels.insert(action_level);
-        a.notify("Nouveau puzzle cr\xC3\xA9\xC3\xA9 : peignez le plateau.");
+        ed.choose_new = true;
+        ed.new_level = action_level;
+        ed.new_scroll = 0;
+    } else if (action == "unlink") {
+        for (auto& l : a.levels)
+            if (l.id == action_level) {
+                l.puzzles.erase(std::remove(l.puzzles.begin(), l.puzzles.end(), action_puzzle), l.puzzles.end());
+                save_level(l);
+            }
+        if (ed.level == action_level) ed.level.clear();
+        a.notify("Retir\xC3\xA9 du niveau (le puzzle existe toujours).");
+    } else if (action == "dellevel") {
+        std::error_code ec;
+        fs::remove(g_paths.assets / "levels" / (action_level + ".json"), ec);
+        a.levels.erase(std::remove_if(a.levels.begin(), a.levels.end(), [&](const Level& l) { return l.id == action_level; }), a.levels.end());
+        save_level_order(a.levels);
+        if (ed.level == action_level) ed.level.clear();
+        ed.level_selected.clear();
+        ed.confirm_level.clear();
+        a.reload_puzzles();
+        a.notify("Niveau supprim\xC3\xA9 ; ses puzzles sont dans \xC2\xAB Hors niveau \xC2\xBB s'ils n'ont plus de niveau.");
     } else if (action == "add") {
         for (auto& l : a.levels)
             if (l.id == action_level) { l.puzzles.push_back(p.id); save_level(l); }
@@ -4526,9 +4694,15 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {
     case SDL_EVENT_MOUSE_MOTION: a->in.mouse = {e->motion.x, e->motion.y}; break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         if (e->button.button == SDL_BUTTON_LEFT) { a->in.down = true; a->in.pressed = true; a->in.mouse = {e->button.x, e->button.y}; }
+        if (e->button.button == SDL_BUTTON_RIGHT) { a->in.rdown = true; a->in.rpressed = true; a->in.mouse = {e->button.x, e->button.y}; }
         break;
     case SDL_EVENT_MOUSE_BUTTON_UP:
         if (e->button.button == SDL_BUTTON_LEFT) { a->in.down = false; a->in.released = true; a->in.mouse = {e->button.x, e->button.y}; }
+        if (e->button.button == SDL_BUTTON_RIGHT) a->in.rdown = false;
+        break;
+    // A file dropped on the window (SDL sends one event per file).
+    case SDL_EVENT_DROP_FILE:
+        if (e->drop.data) a->push_file("drop", e->drop.data);
         break;
     case SDL_EVENT_MOUSE_WHEEL: a->in.wheel += e->wheel.y; break;
     case SDL_EVENT_KEY_DOWN:
@@ -4552,6 +4726,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     a->ui.dt = float(a->dt);
     a->ui.hovering = false;
     g_graveyard.reap();
+    a->in.files = a->take_files();
 
     SDL_SetRenderDrawColor(a->renderer, 0, 0, 0, 255);
     SDL_RenderClear(a->renderer);
@@ -4600,8 +4775,9 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
         }
     }
     SDL_RenderPresent(a->renderer);
-    a->in.pressed = a->in.released = false;
+    a->in.pressed = a->in.released = a->in.rpressed = false;
     a->in.wheel = 0;
+    a->in.files.clear();
     a->in.keys.clear();
     a->in.text.clear();
     a->in.backspaces = 0;
