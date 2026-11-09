@@ -18,11 +18,11 @@
       "emblem color": "#bcd6ff", "tier": 4 },
     { "id": "features", "name": "Minimax Features", "emblem": "prism", "ring top": "#ffe9a8", "ring bottom": "#b8862c",
       "emblem color": "#ffd76a", "tier": 5 },
-    { "id": "dev", "name": "Minimax NNUE dev", "emblem": "bolt", "ring top": "#fff1a0", "ring bottom": "#d39b12",
-      "emblem color": "#ffe14d", "tier": 6 },
-    { "id": "resnet", "name": "MCTS ResNet", "emblem": "eye", "ring top": "#e5cfff", "ring bottom": "#7a49c9",
-      "emblem color": "#d6b8ff", "tier": 7 },
-    { "id": "alphazero", "name": "AlphaZero", "emblem": "crown", "ring top": "#ffffff", "ring bottom": "#7fd9ff",
-      "emblem color": "#ffe27a", "tier": 8, "halo": false }
+    { "id": "dev", "name": "Minimax NNUE dev", "emblem": "bolt", "ring top": "#ffffff", "ring bottom": "#7fd9ff",
+      "emblem color": "#ffe14d", "tier": 8 },
+    { "id": "resnet", "name": "MCTS ResNet", "emblem": "eye", "ring top": "#fff1a0", "ring bottom": "#d39b12",
+      "emblem color": "#d6b8ff", "tier": 6 },
+    { "id": "alphazero", "name": "AlphaZero", "emblem": "crown", "ring top": "#e5cfff", "ring bottom": "#7a49c9",
+      "emblem color": "#ffe27a", "tier": 7 }
   ]
 }

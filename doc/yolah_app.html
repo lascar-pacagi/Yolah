@@ -107,8 +107,9 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--r
 cmake --build app/build -j
 ./app/build/yolah_app
 
-<span class="c"># optional: the ResNet players (MCTS ResNet, AlphaZero) on the GPU with libtorch</span>
-cmake -S app -B app/build -DYOLAH_APP_TORCH=ON -DCMAKE_PREFIX_PATH=&lt;libtorch&gt;</code></pre>
+<span class="c"># libtorch (ResNet players on the GPU) is used by default: found in CMAKE_PREFIX_PATH or in ~/env's torch package;</span>
+<span class="c"># without it the build goes on and these players run on the CPU. To never use it:</span>
+cmake -S app -B app/build -DYOLAH_APP_TORCH=OFF</code></pre>
 <div class="col">
 <table>
 <tr><th>Path</th><th>Content</th></tr>
@@ -382,12 +383,12 @@ a.settings.time_index = a.ui.segmented("time", box, TIME_LABELS, a.settings.time
 <table>
 <tr><th>Key</th><th>Meaning</th></tr>
 <tr><td><code>config</code></td><td>a file of <code>config/</code>; <code>"microseconds"</code> is replaced by the time per move chosen in the application, <code>"nb threads"</code> is capped to the cores minus two</td></tr>
-<tr><td><code>overrides</code></td><td>keys that replace those of the <code>.cfg</code>; <code>torch overrides</code> only in a <code>-DYOLAH_APP_TORCH=ON</code> build</td></tr>
+<tr><td><code>overrides</code></td><td>keys that replace those of the <code>.cfg</code>; <code>torch overrides</code> only when the application is built with libtorch</td></tr>
 <tr><td><code>weights</code> paths</td><td><code>"../x"</code> is relative to <code>config/</code> (the convention of the <code>.cfg</code> files), anything else to the repository; a missing file makes the AI unavailable, and <code>missing hint</code> says what to do</td></tr>
 <tr><td><code>elo</code></td><td>indicative: only the order matters for now (it is the order of the list)</td></tr>
 <tr><td><code>analysis</code></td><td>the engine of the evaluation bar, the hint and the variation (the dev player)</td></tr>
 </table>
-<p>The ResNet players need libtorch only for the GPU. Without it they use the CPU backend (<code>nn::ResNetCPU</code>, weights exported by <code>nnue/resnet_export.py</code>), much slower, so weaker at equal time. AlphaZero is unavailable until its latest network is copied into <code>models/</code> and exported.</p>
+<p>The ResNet players run on the GPU through libtorch (the <code>.ts</code> files, used by default when CMake finds libtorch). Without it they use the CPU backend (<code>nn::ResNetCPU</code>, <code>.bin</code> weights), much slower, so weaker at equal time. Both files come from <code>nnue/resnet_export.py</code>; for AlphaZero they are exported from <code>models/cnn_resnet_256x30_value_policy.pt</code>.</p>
 </div>
 <h3><span class="n">10.2</span>The analysis engine</h3>
 <div class="col">

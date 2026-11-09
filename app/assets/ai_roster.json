@@ -26,17 +26,16 @@
       "sprite": "nnue193", "config": "mm_nnue193_distill_quantized_player.cfg" },
     { "id": "features", "description": "Le m\u00eame minimax, avec un r\u00e9seau qui lit 119 caract\u00e9ristiques calcul\u00e9es sur la position (territoire, mobilit\u00e9, zones), quantifi\u00e9 en entiers 16 bits.", "name": "Minimax Features", "family": "minimax + réseau de features quantifié", "elo": 1800,
       "sprite": "features", "config": "mm_features119_distill_quantized_player.cfg" },
-    { "id": "dev", "description": "Le minimax le plus travaill\u00e9 : PVS, fen\u00eatres d'aspiration adaptatives, r\u00e9ductions, \u00e9lagage, solveur de fin de partie, et un r\u00e9seau NNUE vu du camp au trait, avec 8 t\u00eates de phase et des caract\u00e9ristiques d'espace.", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 2000,
-      "sprite": "dev", "config": "search_study/dev_final.cfg", "overrides": { "tt size": 128 } },
-    { "id": "resnet", "description": "Recherche Monte Carlo guid\u00e9e par un r\u00e9seau convolutif r\u00e9siduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Ici sur CPU : bien plus lent que sur GPU, donc plus faible \u00e0 temps \u00e9gal.", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif (CPU)", "elo": 2150,
+    { "id": "resnet", "description": "Recherche Monte Carlo guid\u00e9e par un r\u00e9seau convolutif r\u00e9siduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Sur GPU avec libtorch ; sur CPU sinon, bien plus lent, donc plus faible \u00e0 temps \u00e9gal.", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif (CPU)", "elo": 2100,
       "sprite": "resnet", "config": "az_vs_nnue/resnet_supervised.cfg",
       "overrides": { "backend": "cpu", "weights": "../nnue/cnn_resnet_256x30_value_policy.bin", "nb threads": 8, "batch size": 16 },
       "torch overrides": { "backend": "torch", "weights": "../nnue/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } },
-    { "id": "alphazero", "description": "Le m\u00eame MCTS, avec le r\u00e9seau qu'AlphaZero a entra\u00een\u00e9 en jouant contre lui-m\u00eame \u00e0 partir du r\u00e9seau supervis\u00e9.", "name": "AlphaZero", "family": "MCTS + réseau appris par auto-apprentissage", "elo": 2200,
+    { "id": "alphazero", "description": "Le m\u00eame MCTS, avec le r\u00e9seau qu'AlphaZero a entra\u00een\u00e9 en jouant contre lui-m\u00eame \u00e0 partir du r\u00e9seau supervis\u00e9.", "name": "AlphaZero", "family": "MCTS + réseau appris par auto-apprentissage", "elo": 2100,
       "sprite": "alphazero", "config": "az_vs_nnue/az256.cfg",
-      "overrides": { "backend": "cpu", "weights": "models/az256.bin", "nb threads": 8, "batch size": 16 },
-      "torch overrides": { "backend": "torch", "weights": "models/az256.ts", "nb threads": 16, "batch size": 64 },
-      "missing hint": "Copier le dernier réseau AlphaZero du cluster dans models/ (az256.ts pour la version GPU) et l'exporter pour le CPU avec nnue/resnet_export.py (az256.bin)." }
+      "overrides": { "backend": "cpu", "weights": "models/cnn_resnet_256x30_value_policy.bin", "nb threads": 8, "batch size": 16 },
+      "torch overrides": { "backend": "torch", "weights": "models/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } },
+    { "id": "dev", "description": "Le minimax le plus travaill\u00e9 : PVS, fen\u00eatres d'aspiration adaptatives, r\u00e9ductions, \u00e9lagage, solveur de fin de partie, et un r\u00e9seau NNUE vu du camp au trait, avec 8 t\u00eates de phase et des caract\u00e9ristiques d'espace.", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 2200,
+      "sprite": "dev", "config": "search_study/dev_final.cfg", "overrides": { "tt size": 128 } }
   ],
   // The engine behind the evaluation bar, the hint and the principal variation.
   "analysis": { "config": "search_study/dev_final.cfg", "overrides": { "tt size": 64 } }

@@ -15,3 +15,6 @@ nnue/cnn_resnet_256x30_value_policy.bin
 nnue/cnn_resnet_256x30_value_policy.ts
 # Intermediate PDFs of the TikZ figures (doc/figs/build.sh; the PNGs are kept)
 doc/figs/*.pdf
+models/cnn_resnet_256x30_value_policy.bin
+models/cnn_resnet_256x30_value_policy.ts
+models/cnn_resnet_256x30_value_policy.test.bin

@@ -16,10 +16,14 @@
 # single headers, public domain). No other library.
 #
 # Options:
-#   -DYOLAH_APP_TORCH=ON   libtorch backend for the ResNet players (MCTS ResNet,
-#                          AlphaZero) on the GPU; without it they run on the CPU
-#                          (the .bin weights of nnue/resnet_export.py), slower.
-#                          Needs -DCMAKE_PREFIX_PATH=<libtorch>.
+#   -DYOLAH_APP_TORCH=ON   (default) libtorch backend for the ResNet players
+#                          (MCTS ResNet, AlphaZero) on the GPU. libtorch is
+#                          looked for in -DCMAKE_PREFIX_PATH, then in the torch
+#                          package of ~/env (pip install torch); if it is not
+#                          found, the build goes on without it and these players
+#                          use the CPU backend (the .bin weights of
+#                          nnue/resnet_export.py), much slower.
+#   -DYOLAH_APP_TORCH=OFF  never use libtorch.
 # ────────────────────────────────────────────────────────────────────────────
 cmake_minimum_required(VERSION 3.20)
 project(YolahApp CXX C)
@@ -31,7 +35,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-option(YOLAH_APP_TORCH "libtorch (GPU) backend for the ResNet players" OFF)
+option(YOLAH_APP_TORCH "libtorch (GPU) backend for the ResNet players" ON)
 option(YOLAH_FETCH_SDL3 "Download and build SDL3 instead of using an installed one" OFF)
 set(YOLAH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE PATH "The Yolah repository (engine and AI sources)")
 
@@ -56,6 +60,25 @@ find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 find_package(TBB QUIET)
 
+# libtorch: TorchConfig.cmake of a CUDA libtorch probes the GPUs by compiling a
+# CUDA test project unless it is given the architectures (8.6 = RTX 30xx,
+# 8.9 = RTX 40xx, 7.5 = RTX 20xx).
+set(YOLAH_TORCH_FOUND OFF)
+if(YOLAH_APP_TORCH)
+    if(NOT DEFINED ENV{TORCH_CUDA_ARCH_LIST} AND NOT TORCH_CUDA_ARCH_LIST)
+        set(TORCH_CUDA_ARCH_LIST "8.6" CACHE STRING "CUDA architectures for the libtorch probe")
+    endif()
+    file(GLOB _pip_torch "$ENV{HOME}/env/lib/python3*/site-packages/torch")
+    list(APPEND CMAKE_PREFIX_PATH ${_pip_torch})
+    find_package(Torch QUIET)
+    if(Torch_FOUND)
+        set(YOLAH_TORCH_FOUND ON)
+        message(STATUS "libtorch: ${TORCH_INSTALL_PREFIX} (ResNet players on the GPU)")
+    else()
+        message(WARNING "libtorch not found: the ResNet players will run on the CPU (set CMAKE_PREFIX_PATH to a libtorch, or -DYOLAH_APP_TORCH=OFF)")
+    endif()
+endif()
+
 set(R "${YOLAH_ROOT}")
 set(ENGINE_SOURCES
     ${R}/game/game.cpp ${R}/game/magic.cpp ${R}/game/move.cpp ${R}/game/zobrist.cpp
@@ -75,7 +98,7 @@ set(ENGINE_SOURCES
     ${R}/optimization/cem.cpp ${R}/optimization/nelder_mead.cpp
     ${R}/data/generate_games.cpp
 )
-if(YOLAH_APP_TORCH)
+if(YOLAH_TORCH_FOUND)
     list(APPEND ENGINE_SOURCES ${R}/nnue/resnet_torch.cpp)
 endif()
 add_library(yolah_engine STATIC ${ENGINE_SOURCES})
@@ -86,8 +109,7 @@ target_link_libraries(yolah_engine PUBLIC OpenMP::OpenMP_CXX Threads::Threads)
 if(TBB_FOUND)
     target_link_libraries(yolah_engine PUBLIC TBB::tbb)
 endif()
-if(YOLAH_APP_TORCH)
-    find_package(Torch REQUIRED)
+if(YOLAH_TORCH_FOUND)
     target_compile_definitions(yolah_engine PUBLIC ENABLE_TORCH)
     target_include_directories(yolah_engine PUBLIC ${TORCH_INCLUDE_DIRS})
     target_link_libraries(yolah_engine PUBLIC ${TORCH_LIBRARIES})
@@ -100,7 +122,7 @@ target_compile_options(yolah_app PRIVATE -march=native -Wall -Wno-unused-functio
 target_compile_definitions(yolah_app PRIVATE
     YOLAH_APP_ASSETS="${CMAKE_CURRENT_SOURCE_DIR}/assets"
     YOLAH_APP_ROOT="${YOLAH_ROOT}")
-if(YOLAH_APP_TORCH)
+if(YOLAH_TORCH_FOUND)
     target_compile_definitions(yolah_app PRIVATE YOLAH_APP_TORCH)
 endif()
 target_link_libraries(yolah_app PRIVATE yolah_engine SDL3::SDL3)
