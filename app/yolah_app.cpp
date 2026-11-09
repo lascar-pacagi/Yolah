@@ -40,8 +40,11 @@
 //   @@SCENE_TUTORIAL learn to play: lessons on the board, each with a goal
 //                   checked by code (reach a square, shut a piece in, win an
 //                   endgame...), a small perfect solver for the endgames
-//   @@SCENE_PUZZLES puzzles and quests (placeholder)
-//   @@SCENE_EDITOR  puzzle editor (placeholder)
+//   @@PUZZLE        puzzles and levels: data, JSON files, validity, hole styles
+//   @@SCENE_PUZZLES levels and puzzles to play (each solved puzzle unlocks the
+//                   next), the level editor, the introduction card, the goal
+//   @@SCENE_EDITOR  puzzle editor: paint the board, who starts, the player's
+//                   side, the AI, the goal, theme, holes, sprites, background
 //   @@MAIN          the SDL callbacks: SDL_AppInit, SDL_AppEvent,
 //                   SDL_AppIterate, SDL_AppQuit; screenshot mode
 //
@@ -52,6 +55,9 @@
 //   --scene NAME          menu, setup, game, themes, tutorial, puzzles, editor
 //   --lesson N            lesson of the tutorial scene (0 = the first)
 //   --pick ID             themes scene: open the sprite picker of player ID
+//   --level ID            puzzles scene: the puzzles of a level
+//   --ptab N              puzzles scene: 0 play, 1 edit the levels
+//   --puzzle ID           play a puzzle (--no-intro: skip its introduction)
 //   --black ID --white ID players of the game scene (human or an AI id)
 //   --plies N             random moves played before the game scene starts
 //   --hint                show the hint (game scene)
@@ -1731,7 +1737,10 @@ struct Input {
     bool released = false;   // went up this frame
     float wheel = 0;
     std::vector<SDL_Keycode> keys;   // keys pressed this frame
+    std::string text;                // characters typed this frame (UTF-8, SDL_EVENT_TEXT_INPUT)
+    int backspaces = 0;              // Backspace presses this frame, key repeats included
     bool key(SDL_Keycode k) const { return std::find(keys.begin(), keys.end(), k) != keys.end(); }
+    void eat(SDL_Keycode k) { keys.erase(std::remove(keys.begin(), keys.end(), k), keys.end()); }
 };
 
 // The colours of the interface (independent of the board theme).
@@ -1751,6 +1760,7 @@ public:
     float s = 1;              // scale (design → pixels)
     float dt = 0;
     bool hovering = false;    // a clickable widget is under the mouse (hand cursor)
+    std::string focus;        // the text field being typed in ("" = none)
     bool blocked = false;     // a modal box is open: widgets outside it ignore the mouse
 
     float anim(const std::string& id, bool target, float speed = 14) {
@@ -1833,6 +1843,66 @@ public:
         }
         draw::rect({b.x, b.bottom(), b.w, 1}, pal::panel_border);
         return sel;
+    }
+    // A one-line text field: click to type; Enter, Escape or a click elsewhere
+    // to stop. SDL only sends typed text between SDL_StartTextInput and
+    // SDL_StopTextInput (see SDL_AppIterate, which follows `focus`).
+    bool text_field(const std::string& id, Box b, std::string& value, const std::string& placeholder, float font = 17) {
+        bool h = hover(b);
+        if (h) hovering = true;
+        if (in.pressed && !blocked) {
+            if (h) focus = id;
+            else if (focus == id) focus.clear();
+        }
+        const bool f = focus == id;
+        bool changed = false;
+        if (f) {
+            if (!in.text.empty()) { value += in.text; changed = true; }
+            for (int i = 0; i < in.backspaces && !value.empty(); i++) {
+                size_t k = value.size() - 1;
+                while (k > 0 && (uint8_t(value[k]) & 0xC0) == 0x80) k--;   // a whole UTF-8 character
+                value.erase(k);
+                changed = true;
+            }
+            if (in.key(SDLK_RETURN) || in.key(SDLK_ESCAPE)) { focus.clear(); in.eat(SDLK_RETURN); in.eat(SDLK_ESCAPE); }
+        }
+        draw::round_box(b, 8 * s, hex(0x0f141c, 230));
+        draw::round_frame(b, 8 * s, f ? 2 * s : 1, f ? pal::accent : pal::panel_border);
+        const float fs = font * s, ty = b.center().y - text.line_height(Font::Regular, fs) * 0.45f;
+        std::string shown = value;   // the end of the text when it is too long
+        while (!shown.empty() && text.width(Font::Regular, fs, shown) > b.w - 26 * s) {
+            shown.erase(0, 1);
+            while (!shown.empty() && (uint8_t(shown[0]) & 0xC0) == 0x80) shown.erase(0, 1);
+        }
+        if (value.empty() && !f) {
+            text.draw(Font::Regular, fs, placeholder, {b.x + 12 * s, ty}, pal::faint);
+        } else {
+            float w = text.draw(Font::Regular, fs, shown, {b.x + 12 * s, ty}, pal::text);
+            if (f && std::fmod(now_seconds(), 1.0) < 0.55) draw::rect({b.x + 13 * s + w, ty + 2 * s, 2 * s, fs * 1.05f}, pal::accent);
+        }
+        return changed;
+    }
+    // A label and "‹ value ›": returns the new index in names.
+    int cycler(const std::string& id, Box b, const std::string& label, const std::vector<std::string>& names, int idx, float font = 16) {
+        if (names.empty()) return 0;
+        text.draw(Font::Regular, font * s, label, {b.x, b.center().y - text.line_height(Font::Regular, font * s) * 0.45f}, pal::dim);
+        float vw = b.w * 0.62f;
+        Box v{b.right() - vw, b.y, vw, b.h};
+        draw::round_box(v, b.h / 2, hex(0x0f141c, 220));
+        Box l{v.x, v.y, v.h, v.h}, r{v.right() - v.h, v.y, v.h, v.h};
+        for (int k = 0; k < 2; k++) {
+            Box a = k ? r : l;
+            bool h = hover(a);
+            if (h) hovering = true;
+            float an = anim(id + (k ? ">" : "<"), h);
+            draw::circle(a.center(), a.h * 0.4f, with_alpha(pal::accent, 0.15f + 0.5f * an));
+            text.draw(Font::Black, font * 1.2f * s, k ? "\xE2\x80\xBA" : "\xE2\x80\xB9", {a.center().x, a.center().y - text.line_height(Font::Black, font * 1.2f * s) * 0.5f}, pal::text, Align::Center);
+            if (h && in.released) idx = (idx + (k ? 1 : int(names.size()) - 1)) % int(names.size());
+        }
+        std::string shown = names[std::clamp(idx, 0, int(names.size()) - 1)];
+        while (shown.size() > 3 && text.width(Font::Bold, font * s, shown) > vw - 2.4f * v.h) shown = shown.substr(0, shown.size() - 4) + "\xE2\x80\xA6";
+        text.draw(Font::Bold, font * s, shown, {v.center().x, v.center().y - text.line_height(Font::Bold, font * s) * 0.45f}, pal::text, Align::Center);
+        return idx;
     }
     void forget(const std::string& prefix) {
         for (auto it = anims_.begin(); it != anims_.end();)
@@ -1928,6 +1998,7 @@ public:
     struct Look {
         const SpriteDef* sprite[2] = {nullptr, nullptr};
         bool halo[2] = {false, false};   // the human players
+        std::string hole_style = "pit";  // HOLE_STYLES
         bool coords = true;
         std::optional<Move> hint;
         std::string hint_label;
@@ -1968,7 +2039,7 @@ public:
             if (!(holes >> s2 & 1)) continue;
             float k = ease_out_back(float((now - hole_since[s2]) / 0.35));
             if (now < hole_since[s2]) continue;
-            draw_hole(square(s2), t, k, s);
+            draw_hole(square(s2), t, k, s, look.hole_style, now, s2);
         }
         // Selection and legal moves.
         const int me = pos.current_player();
@@ -2032,18 +2103,229 @@ public:
     V2 drag_pos;
 
 private:
-    void draw_hole(Box b, const Theme& t, float k, float s) {
+    // The look of a hole: "pit" (the theme's colours), "lava", "water",
+    // "void", "ice" or "bush" (HOLE_STYLES); k: its size while it opens.
+    void draw_hole(Box b, const Theme& t, float k, float s, const std::string& style, double now, int sq) {
         using namespace draw;
         Box h = b.inset(b.w * 0.07f);
         V2 c = h.center();
         h = {c.x - h.w * 0.5f * k, c.y - h.h * 0.5f * k, h.w * k, h.h * k};
+        c = h.center();
         float r = h.w * 0.22f;
-        round_box(h.inset(-1.5f * s), r + 1.5f * s, with_alpha(t.hole_rim, 0.9f), with_alpha(shade(t.hole_rim, 0.25f), 0.9f));
-        round_box(h, r, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
-        // Inner shadow at the top: the hole is deep.
-        round_box({h.x, h.y, h.w, h.h * 0.45f}, r, hex(0x000000, 110), hex(0x000000, 0));
+        const float seed = hash2(sq, 7, 3);
+        auto deep = [&] { round_box({h.x, h.y, h.w, h.h * 0.45f}, r, hex(0x000000, 110), hex(0x000000, 0)); };
+        if (style == "lava") {
+            float p = 0.7f + 0.3f * float(std::sin(now * 2.5 + seed * 6));
+            round_box(h.inset(-1.5f * s), r + 1.5f * s, hex(0x2a0c05));
+            round_box(h, r, hex(0x5a1205), hex(0x260602));
+            circle(c, h.w * 0.46f, hex(0xff9a2a, uint8_t(230 * p)), hex(0xff3d00, 0), 0);
+            for (int i = 0; i < 3; i++) {
+                float a = seed * 6 + i * 2.1f;
+                line(c, c + V2{std::cos(a), std::sin(a)} * (h.w * 0.38f), std::max(1.0f, h.w * 0.035f), hex(0xffe08a, uint8_t(200 * p)));
+            }
+        } else if (style == "water") {
+            round_box(h.inset(-1.5f * s), r + 1.5f * s, hex(0x0a2a40));
+            round_box(h, r, hex(0x0f4f7a), hex(0x062033));
+            for (int i = 0; i < 2; i++) {
+                float f = float(std::fmod(now * 0.5 + seed + i * 0.5, 1.0));
+                ring(c, h.w * (0.08f + 0.36f * f), std::max(1.0f, h.w * 0.03f), hex(0x9fdcff, uint8_t(170 * (1 - f))));
+            }
+            deep();
+        } else if (style == "void") {
+            round_box(h.inset(-1.5f * s), r + 1.5f * s, hex(0x2b2160));
+            round_box(h, r, hex(0x05030f), hex(0x120a35));
+            for (int i = 0; i < 6; i++) {
+                V2 p{h.x + h.w * (0.15f + 0.7f * hash2(sq, i, 11)), h.y + h.h * (0.15f + 0.7f * hash2(sq, i, 13))};
+                float tw = 0.5f + 0.5f * float(std::sin(now * 3 + i * 1.7 + seed * 9));
+                circle(p, std::max(0.8f, h.w * 0.025f), hex(0xffffff, uint8_t(90 + 160 * tw)));
+            }
+        } else if (style == "ice") {
+            round_box(h.inset(-1.5f * s), r + 1.5f * s, hex(0x6fa9cf));
+            round_box(h, r, hex(0xe6f7ff), hex(0x8cc4e6));
+            V2 a = c + V2{-h.w * 0.3f, -h.h * 0.1f}, m = c + V2{h.w * 0.02f, h.h * 0.05f}, z = c + V2{h.w * 0.32f, -h.h * 0.22f};
+            float w = std::max(1.0f, h.w * 0.025f);
+            line(a, m, w, hex(0x3e7fae));
+            line(m, z, w, hex(0x3e7fae));
+            line(m, c + V2{h.w * 0.1f, h.h * 0.34f}, w, hex(0x3e7fae));
+        } else if (style == "bush") {
+            round_box(h.inset(-1.5f * s), r + 1.5f * s, hex(0x0c2a12));
+            round_box(h, r, hex(0x24642f), hex(0x0f3317));
+            for (int i = 0; i < 7; i++) {
+                V2 p{h.x + h.w * (0.2f + 0.6f * hash2(sq, i, 5)), h.y + h.h * (0.2f + 0.6f * hash2(sq, i, 9))};
+                circle(p, h.w * (0.12f + 0.08f * hash2(sq, i, 17)), shade(hex(0x3f9a4a), (hash2(sq, i, 21) - 0.5f) * 0.6f));
+            }
+        } else {
+            round_box(h.inset(-1.5f * s), r + 1.5f * s, with_alpha(t.hole_rim, 0.9f), with_alpha(shade(t.hole_rim, 0.25f), 0.9f));
+            round_box(h, r, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
+            deep();   // inner shadow at the top: the hole is deep
+        }
     }
 };
+
+// Time per move offered to the AIs.
+const std::vector<double> TIMES = {0.5, 1.0, 2.0, 5.0};
+const std::vector<std::string> TIME_LABELS = {"0,5 s", "1 s", "2 s", "5 s"};
+
+// ─── @@PUZZLE ───────────────────────────────────────────────────────────────
+// A puzzle (assets/puzzles/<id>.json): a position (any placement of the 4
+// pieces of each side and of the holes), who starts, which side the player
+// takes, the opposing AI, the goal (win by at least `margin` points) and its
+// look (board theme, hole style, piece sprites, background image). A level
+// (assets/levels/<id>.json) is a sequence of puzzles: each one unlocks the next.
+const std::vector<std::pair<std::string, std::string>> HOLE_STYLES = {
+    {"pit", "Fosse (th\xC3\xA8me)"}, {"lava", "Lave"}, {"water", "Eau"}, {"void", "Vide \xC3\xA9toil\xC3\xA9"}, {"ice", "Glace"}, {"bush", "Buisson"}};
+
+struct Puzzle {
+    std::string id, name = "Nouveau puzzle", text;
+    std::array<char, 64> cells{};   // by square (a1 = 0): '.' free, '#' hole, 'B' black, 'W' white
+    int to_move = BLACK, human = BLACK;
+    std::string opponent = "dev";
+    int margin = 1;                 // win by at least this many points
+    int time_index = 1;             // index in TIMES
+    std::string theme, hole_style = "pit", sprite_black, sprite_white, background;
+    Puzzle() {
+        // The starting position of the game.
+        Yolah y;
+        for (int sq = 0; sq < 64; sq++)
+            cells[sq] = (y.bitboard(BLACK) >> sq & 1) ? 'B' : (y.bitboard(WHITE) >> sq & 1) ? 'W' : '.';
+    }
+    int count(char c) const { return int(std::count(cells.begin(), cells.end(), c)); }
+};
+
+json puzzle_to_json(const Puzzle& p) {
+    json rows = json::array();
+    for (int r = 7; r >= 0; r--) {
+        std::string row;
+        for (int f = 0; f < 8; f++) row += p.cells[r * 8 + f];
+        rows.push_back(row);
+    }
+    return {{"name", p.name}, {"text", p.text}, {"board", rows}, {"to move", p.to_move == BLACK ? "black" : "white"},
+            {"player", p.human == BLACK ? "black" : "white"}, {"opponent", p.opponent}, {"margin", p.margin},
+            {"time index", p.time_index}, {"theme", p.theme}, {"hole style", p.hole_style},
+            {"sprite black", p.sprite_black}, {"sprite white", p.sprite_white}, {"background", p.background}};
+}
+Puzzle puzzle_from_json(const json& j, const std::string& id) {
+    Puzzle p;
+    p.id = id;
+    p.name = jstr(j, "name", p.name);
+    p.text = jstr(j, "text");
+    if (j.contains("board") && j["board"].is_array() && j["board"].size() == 8)
+        for (int r = 0; r < 8; r++) {
+            std::string row = j["board"][r].is_string() ? j["board"][r].get<std::string>() : "";
+            for (int f = 0; f < 8; f++) {
+                char c = f < int(row.size()) ? row[f] : '.';
+                p.cells[(7 - r) * 8 + f] = (c == '#' || c == 'B' || c == 'W') ? c : '.';
+            }
+        }
+    p.to_move = jstr(j, "to move", "black") == "white" ? WHITE : BLACK;
+    p.human = jstr(j, "player", "black") == "white" ? WHITE : BLACK;
+    p.opponent = jstr(j, "opponent", p.opponent);
+    p.margin = std::max(1, int(jnum(j, "margin", 1)));
+    p.time_index = std::clamp(int(jnum(j, "time index", 1)), 0, int(TIMES.size()) - 1);
+    p.theme = jstr(j, "theme");
+    p.hole_style = jstr(j, "hole style", "pit");
+    p.sprite_black = jstr(j, "sprite black");
+    p.sprite_white = jstr(j, "sprite white");
+    p.background = jstr(j, "background");
+    return p;
+}
+Yolah puzzle_position(const Puzzle& p) {
+    uint64_t b = 0, w = 0, e = 0;
+    for (int sq = 0; sq < 64; sq++) {
+        uint64_t bit = uint64_t(1) << sq;
+        if (p.cells[sq] == 'B') b |= bit;
+        else if (p.cells[sq] == 'W') w |= bit;
+        else if (p.cells[sq] == '#') e |= bit;
+    }
+    Yolah y;
+    y.set_state(b, w, e, 0, 0, p.to_move == BLACK ? 0 : 1);
+    return y;
+}
+// Why the puzzle cannot be played ("" when it can).
+std::string puzzle_problem(const Puzzle& p) {
+    if (p.count('B') != 4) return strf("Il faut exactement 4 pions noirs (il y en a %d).", p.count('B'));
+    if (p.count('W') != 4) return strf("Il faut exactement 4 pions blancs (il y en a %d).", p.count('W'));
+    if (puzzle_position(p).game_over()) return "Personne ne peut bouger : la partie serait d\xC3\xA9j\xC3\xA0 finie.";
+    return "";
+}
+// A file name from a title: lower case letters, digits and '_'.
+std::string slug(const std::string& name) {
+    std::string out;
+    for (unsigned char c : name) {
+        if (std::isalnum(c)) out += char(std::tolower(c));
+        else if ((c == ' ' || c == '-' || c == '_') && !out.empty() && out.back() != '_') out += '_';
+    }
+    while (!out.empty() && out.back() == '_') out.pop_back();
+    return out.empty() ? "puzzle" : out;
+}
+std::vector<std::string> json_files(const fs::path& dir) {
+    std::vector<std::string> ids;
+    std::error_code ec;
+    for (auto& e : fs::directory_iterator(dir, ec))
+        if (e.path().extension() == ".json") ids.push_back(e.path().stem().string());
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+std::vector<Puzzle> load_puzzles() {
+    std::vector<Puzzle> list;
+    fs::path dir = g_paths.assets / "puzzles";
+    for (auto& id : json_files(dir)) {
+        json j = load_json(dir / (id + ".json"));
+        if (j.is_object()) list.push_back(puzzle_from_json(j, id));
+    }
+    return list;
+}
+// Saves the puzzle; a new one gets an id from its name.
+bool save_puzzle(Puzzle& p) {
+    fs::path dir = g_paths.assets / "puzzles";
+    if (p.id.empty()) {
+        std::string base = slug(p.name), id = base;
+        for (int k = 2; fs::exists(dir / (id + ".json")); k++) id = base + "_" + std::to_string(k);
+        p.id = id;
+    }
+    return write_file(dir / (p.id + ".json"), puzzle_to_json(p).dump(2));
+}
+
+struct Level {
+    std::string id, name = "Nouveau niveau", text;
+    std::vector<std::string> puzzles;   // ids, in order
+};
+std::vector<Level> load_levels() {
+    std::vector<Level> list;
+    fs::path dir = g_paths.assets / "levels";
+    for (auto& id : json_files(dir)) {
+        json j = load_json(dir / (id + ".json"));
+        if (!j.is_object()) continue;
+        Level l;
+        l.id = id;
+        l.name = jstr(j, "name", l.name);
+        l.text = jstr(j, "text");
+        if (j.contains("puzzles") && j["puzzles"].is_array())
+            for (auto& x : j["puzzles"])
+                if (x.is_string()) l.puzzles.push_back(x.get<std::string>());
+        list.push_back(l);
+    }
+    return list;
+}
+bool save_level(Level& l) {
+    fs::path dir = g_paths.assets / "levels";
+    if (l.id.empty()) {
+        std::string base = slug(l.name), id = base;
+        for (int k = 2; fs::exists(dir / (id + ".json")); k++) id = base + "_" + std::to_string(k);
+        l.id = id;
+    }
+    return write_file(dir / (l.id + ".json"), json{{"name", l.name}, {"text", l.text}, {"puzzles", l.puzzles}}.dump(2));
+}
+std::vector<std::string> list_backgrounds() {
+    std::vector<std::string> files;
+    std::error_code ec;
+    for (auto& e : fs::directory_iterator(g_paths.assets / "backgrounds", ec)) {
+        auto ext = e.path().extension().string();
+        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") files.push_back(e.path().filename().string());
+    }
+    std::sort(files.begin(), files.end());
+    return files;
+}
 
 // ─── @@APP ──────────────────────────────────────────────────────────────────
 enum class Scene { Menu, Setup, Game, Themes, Tutorial, Puzzles, Editor };
@@ -2055,10 +2337,11 @@ struct Settings {
     int time_index = 1;                       // index in TIMES
     std::string black = "human", white = "dev";
     std::vector<int> tutorial_done;           // lessons completed
+    std::vector<std::string> puzzles_done;    // puzzles solved
     json to_json() const {
         return {{"theme", theme}, {"show eval", show_eval}, {"show hint", show_hint}, {"show coordinates", show_coords},
                 {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white},
-                {"tutorial done", tutorial_done}};
+                {"tutorial done", tutorial_done}, {"puzzles done", puzzles_done}};
     }
     void from_json(const json& j) {
         if (!j.is_object()) return;
@@ -2071,10 +2354,9 @@ struct Settings {
         black = j.value("black", black);
         white = j.value("white", white);
         if (j.contains("tutorial done") && j["tutorial done"].is_array()) tutorial_done = j["tutorial done"].get<std::vector<int>>();
+        if (j.contains("puzzles done") && j["puzzles done"].is_array()) puzzles_done = j["puzzles done"].get<std::vector<std::string>>();
     }
 };
-const std::vector<double> TIMES = {0.5, 1.0, 2.0, 5.0};
-const std::vector<std::string> TIME_LABELS = {"0,5 s", "1 s", "2 s", "5 s"};
 
 // One side of a game: a human or an AI of the roster.
 struct Slot {
@@ -2131,6 +2413,14 @@ struct App {
         float move_scroll = 0;
         float eval_shown = 0.5f;          // the bar's animated share
         double think_t0 = 0;
+        // A puzzle being played (@@SCENE_PUZZLES): no analysis, its own look.
+        bool puzzle_mode = false;
+        Puzzle puzzle;
+        std::string level;                // the level being played ("" = none)
+        int level_pos = -1;               // the puzzle's index in it
+        bool from_editor = false;         // a test from the editor
+        bool intro = false;               // the introduction card is shown
+        bool recorded = false;            // the result was saved
     } game;
 
     // The tutorial scene (@@SCENE_TUTORIAL).
@@ -2149,11 +2439,68 @@ struct App {
         size_t hint_ply = size_t(-1);     // the position the hint was computed for
     } tuto;
 
-    // The themes scene: the player whose sprite is being chosen ("" = none).
-    struct ThemesState {
-        std::string picking;
+    // The sprite picker (a modal grid over the library), used by the themes
+    // scene and the editor: on_pick receives the chosen sprite id.
+    struct Picker {
+        bool open = false;
+        std::string title, current;
+        bool halo = false;
+        std::function<void(const std::string&)> on_pick;
         float scroll = 0;
-    } themes_ui;
+    } picker;
+    void open_picker(std::string title, std::string current, bool halo, std::function<void(const std::string&)> f) {
+        picker = Picker{true, std::move(title), std::move(current), halo, std::move(f), 0};
+    }
+
+    // The puzzle editor (@@SCENE_EDITOR).
+    struct EditorState {
+        Puzzle p;
+        int tool = 1;                     // 0 free square, 1 hole, 2 black piece, 3 white piece
+        bool browsing = false;            // the list of puzzles to open
+        float scroll = 0;
+        BoardView board;
+        int painted = -1;                 // the last square painted by a drag
+    } editor;
+
+    // The puzzles and levels (@@SCENE_PUZZLES).
+    struct PuzzlesState {
+        int tab = 0;                      // 0 play, 1 edit the levels
+        std::string open_level;           // the level whose puzzles are listed ("" = the levels)
+        Level edit;                       // the level being edited
+        bool editing = false;
+        float scroll = 0, scroll2 = 0;
+    } puzzles_ui;
+    std::vector<Puzzle> puzzles;
+    std::vector<Level> levels;
+    void reload_puzzles() {
+        puzzles = load_puzzles();
+        levels = load_levels();
+    }
+    const Puzzle* find_puzzle(const std::string& id) const {
+        for (auto& p : puzzles)
+            if (p.id == id) return &p;
+        return nullptr;
+    }
+    bool solved(const std::string& id) const {
+        return std::find(settings.puzzles_done.begin(), settings.puzzles_done.end(), id) != settings.puzzles_done.end();
+    }
+
+    // Background images (assets/backgrounds), loaded on first use.
+    std::map<std::string, SDL_Texture*> backgrounds;
+    SDL_Texture* background(const std::string& file) {
+        auto it = backgrounds.find(file);
+        if (it != backgrounds.end()) return it->second;
+        SDL_Texture* tex = nullptr;
+        int w, h, n;
+        fs::path p = g_paths.assets / "backgrounds" / file;
+        if (unsigned char* px = stbi_load(p.string().c_str(), &w, &h, &n, 4)) {
+            tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w, h);
+            SDL_UpdateTexture(tex, nullptr, px, w * 4);
+            SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_LINEAR);
+            stbi_image_free(px);
+        }
+        return backgrounds[file] = tex;
+    }
 
     // Sprite of each player (assets/sprites/assignments.json): player id
     // ("human" or an AI id) → sprite id; default: the roster's sprite.
@@ -2195,6 +2542,20 @@ struct App {
         write_file(g_paths.assets / "sprites" / "assignments.json", json{{"players", j}}.dump(2));
     }
     const SpriteDef& slot_sprite(const Slot& sl) const { return player_sprite(sl.human() ? "human" : sl.spec->id); }
+    // In a game: the puzzle's sprites and theme when it has some.
+    const SpriteDef& game_sprite(int side) const {
+        if (game.puzzle_mode) {
+            const std::string& id = side == BLACK ? game.puzzle.sprite_black : game.puzzle.sprite_white;
+            if (!id.empty() && has_sprite(id)) return sprite(id);
+        }
+        return slot_sprite(game.slot[side]);
+    }
+    const Theme& theme_or(const std::string& id) const {
+        for (auto& t : themes)
+            if (!id.empty() && t.id == id) return t;
+        return theme();
+    }
+    const Theme& game_theme() const { return game.puzzle_mode ? theme_or(game.puzzle.theme) : theme(); }
     std::string slot_name(const Slot& sl) const { return sl.human() ? "Vous" : sl.spec->name; }
     void notify(const std::string& msg) {
         toast = msg;
@@ -2202,9 +2563,12 @@ struct App {
     }
     void go(Scene sc) {
         if (scene == Scene::Game && sc != Scene::Game) leave_game();
+        if (sc == Scene::Puzzles || sc == Scene::Editor) reload_puzzles();
         scene = sc;
         scene_t0 = time;
         fx.clear();
+        ui.focus.clear();
+        picker.open = false;
     }
     void save_settings() {
         if (screenshot.empty()) write_file(g_paths.prefs / "settings.json", settings.to_json().dump(2));
@@ -2212,6 +2576,11 @@ struct App {
 
     // ── game management (@@SCENE_GAME uses these) ──
     void start_game(const Yolah& start = Yolah()) {
+        game.puzzle_mode = false;
+        launch(start, settings.black, settings.white, TIMES[settings.time_index]);
+    }
+    // A game from `start` between two players ("human" or AI ids).
+    void launch(const Yolah& start, const std::string& black, const std::string& white, double seconds) {
         leave_game();
         auto& g = game;
         g.match.reset(start);
@@ -2224,14 +2593,14 @@ struct App {
         g.pass_at = -1;
         g.move_scroll = 0;
         g.eval_shown = 0.5f;
-        const std::string who[2] = {settings.black, settings.white};
+        const std::string who[2] = {black, white};
         for (int side : {BLACK, WHITE}) {
             Slot& sl = g.slot[side];
             sl = Slot{};
             sl.who = who[side];
             sl.spec = ai(who[side]);
             if (sl.spec && sl.spec->available)
-                sl.agent = std::make_unique<AiAgent>(game_config(*sl.spec, TIMES[settings.time_index]), sl.spec->random_moves);
+                sl.agent = std::make_unique<AiAgent>(game_config(*sl.spec, seconds), sl.spec->random_moves);
             else
                 sl.spec = nullptr;   // unknown or unavailable AI: a human plays it
         }
@@ -2248,12 +2617,12 @@ struct App {
         auto& g = game;
         const int side = g.match.to_move();
         g.match.play(m);
-        g.board.on_move(m, side, time, fx, theme(), rng);
+        g.board.on_move(m, side, time, fx, game_theme(), rng);
         if (m != Move::none()) {
             float q = g.board.sq();
             V2 c = g.board.center(m.to_sq());
             fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0xb6c2d6) : hex(0xffffff), q * 0.32f));
-            fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, theme().accent));
+            fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, game_theme().accent));
         } else {
             notify(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.");
         }
@@ -2280,6 +2649,9 @@ struct App {
 App* g_app = nullptr;
 void start_lesson(App& a, int i);
 int first_lesson_to_do(const App& a);
+void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor);
+void draw_image_background(App& a, const std::string& file, uint8_t dim);
+std::string goal_text(const App& a, const Puzzle& p);
 
 // Drawn behind every scene: the theme's gradient, a vignette, faint shapes.
 void draw_background(App& a, bool decorated = true) {
@@ -2424,10 +2796,21 @@ void scene_setup(App& a) {
 void game_logic(App& a) {
     auto& g = a.game;
     const bool anim = g.board.animating(a.time);
+    if (g.intro) return;   // a puzzle's introduction card
     if (g.match.over()) {
         if (!g.over && !anim) {
             g.over = true;
             g.over_t = a.time;
+            if (g.puzzle_mode) {   // the goal: win by at least `margin`
+                int margin = g.match.score(g.puzzle.human) - g.match.score(1 - g.puzzle.human);
+                bool ok = margin >= g.puzzle.margin;
+                if (ok && !g.from_editor && !a.solved(g.puzzle.id)) {
+                    a.settings.puzzles_done.push_back(g.puzzle.id);
+                    a.save_settings();
+                }
+                if (ok) a.fx.add(std::make_unique<Confetti>(Box{0, 0, float(a.w), float(a.h)}, a.rng));
+                return;
+            }
             int win = g.match.winner();
             bool human_won = win >= 0 && g.slot[win].human() && !g.slot[1 - win].human();
             if (human_won || (win >= 0 && g.slot[0].human() && g.slot[1].human()))
@@ -2511,7 +2894,7 @@ void draw_player_card(App& a, Box b, int side, bool active) {
     draw::round_box(b, 14 * s, with_alpha(mix(hex(0xffffff), a.theme().accent, k), 0.04f + 0.1f * k));
     draw::round_frame(b, 14 * s, 1.5f * s, with_alpha(a.theme().accent, 0.15f + 0.85f * k));
     float pr = b.h * 0.33f;
-    draw_piece(a.slot_sprite(sl), side, {b.x + 18 * s + pr, b.center().y}, pr, 0.3f * k, a.time, 1, sl.human());
+    draw_piece(a.game_sprite(side), side, {b.x + 18 * s + pr, b.center().y}, pr, 0.3f * k, a.time, 1, sl.human());
     float tx = b.x + 34 * s + 2 * pr;
     a.text.draw(Font::Bold, 19 * s, a.slot_name(sl), {tx, b.y + 14 * s}, pal::text);
     std::string sub = sl.human() ? std::string("Humain \xE2\x80\xA2 ") + side_name(side) : strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", sl.spec->elo, side_name(side));
@@ -2624,7 +3007,7 @@ void tab_ai(App& a, Box b) {
         const Slot& sl = g.slot[side];
         if (sl.human()) continue;
         any = true;
-        draw_piece(a.slot_sprite(sl), side, {b.x + 24 * s, y + 24 * s}, 22 * s, 0, a.time);
+        draw_piece(a.game_sprite(side), side, {b.x + 24 * s, y + 24 * s}, 22 * s, 0, a.time);
         a.text.draw(Font::Bold, 18 * s, sl.spec->name, {b.x + 58 * s, y + 2 * s}, pal::text);
         a.text.draw(Font::Regular, 14 * s, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s \xE2\x80\xA2 joue les %s", sl.spec->elo, sl.spec->family.c_str(), side_name(side)),
                     {b.x + 58 * s, y + 26 * s}, pal::dim);
@@ -2642,12 +3025,47 @@ void tab_ai(App& a, Box b) {
     a.text.paragraph(Font::Regular, 12 * s, "Analyse : Minimax NNUE dev (1 thread), ind\xC3\xA9pendant des joueurs.", {b.x, b.bottom() - 18 * s, b.w, 20 * s}, pal::faint);
 }
 
+// Leaving a puzzle: back to the editor (a test) or to the puzzles.
+void leave_puzzle(App& a) {
+    if (a.game.from_editor) a.go(Scene::Editor);
+    else a.go(Scene::Puzzles);
+}
+
+void draw_puzzle_over(App& a, Box area, float k) {
+    auto& g = a.game;
+    const float s = a.s;
+    const Puzzle& p = g.puzzle;
+    int margin = g.match.score(p.human) - g.match.score(1 - p.human);
+    bool ok = margin >= p.margin;
+    Box card{area.center().x - 250 * s, area.center().y - 160 * s + (1 - k) * 40 * s, 500 * s, 320 * s};
+    a.ui.panel(card, 22, with_alpha(pal::panel, k));
+    a.text.draw_shadowed(Font::Title, 34 * s, ok ? "Puzzle rÃ©ussi !" : "Pas encoreâ¦", {card.center().x, card.y + 28 * s}, with_alpha(ok ? pal::good : pal::text, k), Align::Center, hex(0x000000, 100), 2 * s);
+    a.text.draw(Font::Black, 50 * s, strf("%d â %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 84 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
+    a.text.draw(Font::Regular, 16 * s, strf("Votre avance : %+d â¢ objectif : %+d", margin, p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    // The next puzzle of the level.
+    const Level* lvl = nullptr;
+    for (auto& l : a.levels) if (l.id == g.level) lvl = &l;
+    const Puzzle* next = nullptr;
+    if (ok && lvl && g.level_pos + 1 < int(lvl->puzzles.size())) next = a.find_puzzle(lvl->puzzles[g.level_pos + 1]);
+    float bw = 140 * s, by = card.bottom() - 74 * s;
+    if (next) {
+        if (a.ui.button("pz_next", {card.x + 24 * s, by, bw, 50 * s}, "Puzzle suivant", Style::Primary, true, 17)) { Puzzle n = *next; start_puzzle(a, n, g.level, g.level_pos + 1, false); return; }
+    } else if (a.ui.button("pz_retry", {card.x + 24 * s, by, bw, 50 * s}, "RÃ©" "essayer", ok ? Style::Normal : Style::Primary, true, 17)) {
+        Puzzle again = p;
+        start_puzzle(a, again, g.level, g.level_pos, g.from_editor);
+        return;
+    }
+    if (next && a.ui.button("pz_retry2", {card.center().x - bw / 2, by, bw, 50 * s}, "Rejouer", Style::Normal, true, 17)) { Puzzle again = p; start_puzzle(a, again, g.level, g.level_pos, false); return; }
+    if (a.ui.button("pz_leave", {card.right() - 24 * s - bw, by, bw, 50 * s}, g.from_editor ? "Ã" "diteur" : "Puzzles", Style::Ghost, true, 17)) leave_puzzle(a);
+}
+
 void draw_game_over(App& a, Box area) {
     auto& g = a.game;
     const float s = a.s;
     float k = ease_out_cubic(float((a.time - g.over_t) / 0.5));
     a.ui.blocked = false;
     draw::round_box(area, 6 * s, hex(0x000000, uint8_t(110 * k)));
+    if (g.puzzle_mode) { draw_puzzle_over(a, area, k); return; }
     Box card{area.center().x - 230 * s, area.center().y - 150 * s + (1 - k) * 40 * s, 460 * s, 300 * s};
     a.ui.panel(card, 22, with_alpha(pal::panel, k));
     int win = g.match.winner();
@@ -2666,10 +3084,30 @@ void draw_game_over(App& a, Box area) {
 void scene_game(App& a) {
     auto& g = a.game;
     const float s = a.s;
+    // A puzzle starts with its introduction: its image, its title, its goal.
+    if (g.puzzle_mode && g.intro) {
+        draw_image_background(a, g.puzzle.background, 20);
+        float k = ease_out_cubic(float((a.time - a.scene_t0) / 0.6));
+        Box card{a.w * 0.5f - 420 * s, a.h - 340 * s + (1 - k) * 60 * s, 840 * s, 290 * s};
+        a.ui.panel(card, 24, hex(0x10151d, uint8_t(225 * k)));
+        a.text.draw_shadowed(Font::Title, 40 * s, g.puzzle.name, {card.center().x, card.y + 26 * s}, with_alpha(pal::text, k), Align::Center, hex(0x000000, 120), 3 * s);
+        a.text.paragraph(Font::Regular, 18 * s, g.puzzle.text, {card.x + 50 * s, card.y + 92 * s, card.w - 100 * s, 60 * s}, with_alpha(pal::dim, k));
+        a.text.draw(Font::Bold, 18 * s, goal_text(a, g.puzzle), {card.center().x, card.y + 160 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
+        if (a.ui.button("pz_start", {card.center().x + 10 * s, card.bottom() - 74 * s, 220 * s, 52 * s}, "Commencer", Style::Primary) || a.in.key(SDLK_RETURN)) {
+            g.intro = false;
+            a.scene_t0 = a.time;
+        }
+        if (a.ui.button("pz_back", {card.center().x - 230 * s, card.bottom() - 74 * s, 220 * s, 52 * s}, "Retour", Style::Ghost) || a.in.key(SDLK_ESCAPE)) { leave_puzzle(a); return; }
+        return;
+    }
     // Keyboard shortcuts.
-    if (a.in.key(SDLK_ESCAPE)) { a.go(Scene::Menu); return; }
-    if (a.in.key(SDLK_H)) a.settings.show_hint = !a.settings.show_hint;
-    if (a.in.key(SDLK_E)) a.settings.show_eval = !a.settings.show_eval;
+    if (a.in.key(SDLK_ESCAPE)) {
+        if (g.puzzle_mode) leave_puzzle(a);
+        else a.go(Scene::Menu);
+        return;
+    }
+    if (a.in.key(SDLK_H) && !g.puzzle_mode) a.settings.show_hint = !a.settings.show_hint;
+    if (a.in.key(SDLK_E) && !g.puzzle_mode) a.settings.show_eval = !a.settings.show_eval;
     if (a.in.key(SDLK_F)) g.board.flipped = !g.board.flipped;
     if (a.in.key(SDLK_U) || a.in.key(SDLK_BACKSPACE)) a.undo_move();
     if (a.in.key(SDLK_SPACE) && !g.slot[0].human() && !g.slot[1].human()) g.paused = !g.paused;
@@ -2677,7 +3115,9 @@ void scene_game(App& a) {
     game_logic(a);
 
     // Analysis: restarted whenever the position changes and something shows it.
-    bool need = a.settings.show_eval || a.settings.show_hint || a.settings.show_pv || g.tab == 1;
+    // (Not in a puzzle: no help there.)
+    const bool show_eval = a.settings.show_eval && !g.puzzle_mode;
+    bool need = !g.puzzle_mode && (a.settings.show_eval || a.settings.show_hint || a.settings.show_pv || g.tab == 1);
     if (need && g.analysed != g.token && !g.board.animating(a.time) && !g.match.over()) {
         g.analyzer.analyse(g.match.pos, g.token, 20.0);
         g.analysed = g.token;
@@ -2691,14 +3131,15 @@ void scene_game(App& a) {
     const float left_w = a.w - panel_w - 3 * margin;
     float B = std::min(a.h - 2 * margin - 2 * frame - 10 * s, left_w - bar_w - gap - 2 * frame);
     B = std::floor(B / 8) * 8;
-    float block_w = (a.settings.show_eval ? bar_w + gap : 0) + 2 * frame + B;
-    float bx = margin + (left_w - block_w) / 2 + (a.settings.show_eval ? bar_w + gap : 0) + frame;
+    float block_w = (show_eval ? bar_w + gap : 0) + 2 * frame + B;
+    float bx = margin + (left_w - block_w) / 2 + (show_eval ? bar_w + gap : 0) + frame;
     float by = (a.h - B) / 2;
     g.board.area = {std::floor(bx), std::floor(by), B, B};
     Box panel{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin};
 
-    draw_background(a, false);
-    if (a.settings.show_eval) draw_eval_bar(a, {g.board.area.x - frame - gap - bar_w, g.board.area.y, bar_w, B}, snap);
+    if (g.puzzle_mode) draw_image_background(a, g.puzzle.background, 70);
+    else draw_background(a, false);
+    if (show_eval) draw_eval_bar(a, {g.board.area.x - frame - gap - bar_w, g.board.area.y, bar_w, B}, snap);
 
     // Board.
     const int side = g.match.to_move();
@@ -2708,8 +3149,9 @@ void scene_game(App& a) {
     g.board.drag_pos = a.in.mouse;
     if (mv) a.play_move(*mv);
     BoardView::Look look;
-    look.sprite[BLACK] = &a.slot_sprite(g.slot[BLACK]);
-    look.sprite[WHITE] = &a.slot_sprite(g.slot[WHITE]);
+    look.sprite[BLACK] = &a.game_sprite(BLACK);
+    look.sprite[WHITE] = &a.game_sprite(WHITE);
+    if (g.puzzle_mode) look.hole_style = g.puzzle.hole_style;
     look.halo[BLACK] = g.slot[BLACK].human();
     look.halo[WHITE] = g.slot[WHITE].human();
     look.coords = a.settings.show_coords;
@@ -2723,7 +3165,7 @@ void scene_game(App& a) {
         if (a.settings.show_pv) look.pv = snap.pv;
     }
     if (human_turn && g.board.hover_sq >= 0 && (g.match.pos.bitboard(side) >> g.board.hover_sq & 1)) a.ui.hovering = true;
-    g.board.draw(a.text, a.board_textures, a.theme(), g.match.pos, look, a.time, s);
+    g.board.draw(a.text, a.board_textures, a.game_theme(), g.match.pos, look, a.time, s);
     a.fx.update(float(a.ui.dt));
     a.fx.draw(a.text);
 
@@ -2735,7 +3177,12 @@ void scene_game(App& a) {
     Box card_bottom{panel.x + 16 * s, panel.bottom() - 108 * s, panel.w - 32 * s, 92 * s};
     draw_player_card(a, card_top, top_side, side == top_side && !g.match.over());
     draw_player_card(a, card_bottom, 1 - top_side, side != top_side && !g.match.over());
-    Box tabs{panel.x + 20 * s, card_top.bottom() + 14 * s, panel.w - 40 * s, 38 * s};
+    float tabs_y = card_top.bottom() + 14 * s;
+    if (g.puzzle_mode) {   // the puzzle's goal, always in sight
+        a.text.paragraph(Font::Bold, 15 * s, "Objectif : " + goal_text(a, g.puzzle), {panel.x + 24 * s, tabs_y, panel.w - 48 * s, 44 * s}, a.game_theme().accent);
+        tabs_y += 48 * s;
+    }
+    Box tabs{panel.x + 20 * s, tabs_y, panel.w - 40 * s, 38 * s};
     g.tab = a.ui.tabs("gtabs", tabs, {"Coups", "Analyse", "IA"}, g.tab);
     Box buttons{panel.x + 16 * s, card_bottom.y - 66 * s, panel.w - 32 * s, 50 * s};
     Box content{panel.x + 24 * s, tabs.bottom() + 16 * s, panel.w - 48 * s, buttons.y - tabs.bottom() - 30 * s};
@@ -2747,12 +3194,16 @@ void scene_game(App& a) {
     auto bbox = [&](int i) { return Box{buttons.x + i * (bw + 8 * s), buttons.y, bw, buttons.h}; };
     if (ai_vs_ai) {
         if (a.ui.button("g_pause", bbox(0), g.paused ? "Reprendre" : "Pause", g.paused ? Style::Primary : Style::Normal, true, 17)) g.paused = !g.paused;
-    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.settings.show_hint ? Style::Primary : Style::Normal, true, 17)) {
+    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.settings.show_hint && !g.puzzle_mode ? Style::Primary : Style::Normal, !g.puzzle_mode, 17)) {
         a.settings.show_hint = !a.settings.show_hint;
     }
     if (a.ui.button("g_undo", bbox(1), "Annuler", Style::Normal, !g.match.history.empty(), 17)) a.undo_move();
     if (a.ui.button("g_flip", bbox(2), "Retourner", Style::Normal, true, 17)) g.board.flipped = !g.board.flipped;
-    if (a.ui.button("g_menu", bbox(3), "Menu", Style::Ghost, true, 17)) { a.go(Scene::Menu); return; }
+    if (a.ui.button("g_menu", bbox(3), g.puzzle_mode ? "Quitter" : "Menu", Style::Ghost, true, 17)) {
+        if (g.puzzle_mode) leave_puzzle(a);
+        else a.go(Scene::Menu);
+        return;
+    }
 
     if (g.over && a.time > g.over_t + 0.3) draw_game_over(a, g.board.area.inset(-26 * s));
     a.ui.blocked = false;
@@ -2806,11 +3257,11 @@ void sprite_picker(App& a);
 
 void scene_themes(App& a) {
     const float s = a.s;
-    const bool picking = !a.themes_ui.picking.empty();
+    const bool picking = a.picker.open;
     draw_background(a);
     draw_title(a, "Th\xC3\xA8mes et sprites", "Choisissez l'apparence du plateau, et le sprite de chaque joueur. Les th\xC3\xA8mes sont des fichiers JSON de assets/themes.");
     a.ui.blocked = picking;
-    if (picking && a.in.key(SDLK_ESCAPE)) { a.themes_ui.picking.clear(); a.in.keys.clear(); }
+    if (picking && a.in.key(SDLK_ESCAPE)) { a.picker.open = false; a.in.eat(SDLK_ESCAPE); }
     if (back_button(a)) { a.save_settings(); a.go(Scene::Menu); return; }
     // Themes: cards with a small live board.
     const float card_w = 250 * s, card_h = 300 * s, gap = 24 * s;
@@ -2865,7 +3316,13 @@ void scene_themes(App& a) {
         a.text.draw(Font::Bold, 17 * s, name, {tx, r.center().y - 20 * s}, pal::text);
         a.text.draw(Font::Regular, 13 * s, "sprite : " + sp.name, {tx, r.center().y + 2 * s}, pal::dim);
         a.text.draw(Font::Bold, 15 * s, "Changer \xE2\x86\x92", {r.right() - 12 * s, r.center().y - 9 * s}, mix(pal::faint, a.theme().accent, k), Align::Right);
-        if (h && a.in.released) { a.themes_ui.picking = id; a.themes_ui.scroll = 0; }
+        if (h && a.in.released) {
+            std::string pid = id, pname = name;
+            a.open_picker("Sprite de " + name, sp.id, id == "human", [&a, pid, pname](const std::string& sid) {
+                a.assign_sprite(pid, sid);
+                a.notify(pname + " : " + a.sprite(sid).name);
+            });
+        }
     }
     if (a.ui.button("export", {gal.x + 22 * s, gal.bottom() - 74 * s, gal.w - 44 * s, 52 * s}, "Exporter tous les sprites en PNG", Style::Primary))
         a.notify(export_sprites(a));
@@ -2873,30 +3330,32 @@ void scene_themes(App& a) {
     if (picking) sprite_picker(a);
 }
 
-// The sprite library as a grid, by category; a click gives the sprite to the
-// player being edited.
+// The sprite library as a grid, by category (App::picker): a click calls
+// picker.on_pick with the sprite's id.
 void sprite_picker(App& a) {
     const float s = a.s;
-    const std::string who = a.themes_ui.picking;
-    std::string who_name = who == "human" ? "Joueur humain" : (a.ai(who) ? a.ai(who)->name : who);
+    auto& pk = a.picker;
     draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 160));
     Box p{a.w * 0.5f - 600 * s, 60 * s, 1200 * s, a.h - 120 * s};
     a.ui.panel(p, 22, hex(0x1a202b));
-    a.text.draw(Font::Black, 26 * s, "Sprite de " + who_name, {p.x + 30 * s, p.y + 24 * s}, pal::text);
-    if (a.ui.button("pick_close", {p.right() - 170 * s, p.y + 20 * s, 140 * s, 46 * s}, "Fermer", Style::Ghost)) { a.themes_ui.picking.clear(); return; }
+    a.text.draw(Font::Black, 26 * s, pk.title, {p.x + 30 * s, p.y + 24 * s}, pal::text);
+    if (a.ui.button("pick_close", {p.right() - 170 * s, p.y + 20 * s, 140 * s, 46 * s}, "Fermer", Style::Ghost) || a.in.key(SDLK_ESCAPE)) {
+        pk.open = false;
+        a.in.eat(SDLK_ESCAPE);
+        return;
+    }
     Box grid{p.x + 24 * s, p.y + 84 * s, p.w - 48 * s, p.h - 190 * s};
     const float cell = 104 * s;
     const int cols = std::max(1, int(grid.w / cell));
-    // Categories in the order of the file.
-    std::vector<std::string> cats;
+    std::vector<std::string> cats;   // in the order of the file
     for (auto& sp : a.sprites) {
         std::string c = sp.category.empty() ? "Divers" : sp.category;
         if (std::find(cats.begin(), cats.end(), c) == cats.end()) cats.push_back(c);
     }
-    if (a.ui.hover(grid)) a.themes_ui.scroll -= a.in.wheel * cell * 0.8f;
-    float y = grid.y - a.themes_ui.scroll;
+    if (a.ui.hover(grid)) pk.scroll -= a.in.wheel * cell * 0.8f;
+    float y = grid.y - pk.scroll;
     const SpriteDef* hovered = nullptr;
-    const std::string current = a.player_sprite(who).id;
+    std::string picked;
     draw::clip(&grid);
     for (auto& cat : cats) {
         a.text.draw(Font::Bold, 17 * s, cat, {grid.x + 6 * s, y + 4 * s}, a.theme().accent);
@@ -2910,15 +3369,11 @@ void sprite_picker(App& a) {
             if (h) { a.ui.hovering = true; hovered = &sp; }
             if (vis) {
                 float k = a.ui.anim("pk" + sp.id, h);
-                bool cur = sp.id == current;
+                bool cur = sp.id == pk.current;
                 draw::round_box(c, 12 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.22f : 0.03f + 0.08f * k));
                 if (cur) draw::round_frame(c, 12 * s, 2 * s, a.theme().accent);
-                draw_piece(sp, (col % 2) ? WHITE : BLACK, c.center(), c.w * 0.34f, 0.3f * k, a.time, 1, who == "human");
-                if (h && a.in.released) {
-                    a.assign_sprite(who, sp.id);
-                    a.notify(who_name + " : " + sp.name);
-                    a.themes_ui.picking.clear();
-                }
+                draw_piece(sp, (col % 2) ? WHITE : BLACK, c.center(), c.w * 0.34f, 0.3f * k, a.time, 1, pk.halo);
+                if (h && a.in.released) picked = sp.id;
             }
             if (++col == cols) { col = 0; y += cell; }
         }
@@ -2926,19 +3381,22 @@ void sprite_picker(App& a) {
         y += 8 * s;
     }
     draw::clip(nullptr);
-    float content = y + a.themes_ui.scroll - grid.y;
-    a.themes_ui.scroll = std::clamp(a.themes_ui.scroll, 0.0f, std::max(0.0f, content - grid.h));
-    // The hovered sprite on both stones, with its name.
+    float content = y + pk.scroll - grid.y;
+    pk.scroll = std::clamp(pk.scroll, 0.0f, std::max(0.0f, content - grid.h));
     Box info{p.x + 24 * s, p.bottom() - 96 * s, p.w - 48 * s, 76 * s};
     draw::round_box(info, 14 * s, hex(0x0f141c, 200));
     if (hovered) {
-        draw_piece(*hovered, BLACK, {info.x + 44 * s, info.center().y}, 28 * s, 0, a.time, 1, who == "human");
-        draw_piece(*hovered, WHITE, {info.x + 108 * s, info.center().y}, 28 * s, 0, a.time, 1, who == "human");
+        draw_piece(*hovered, BLACK, {info.x + 44 * s, info.center().y}, 28 * s, 0, a.time, 1, pk.halo);
+        draw_piece(*hovered, WHITE, {info.x + 108 * s, info.center().y}, 28 * s, 0, a.time, 1, pk.halo);
         a.text.draw(Font::Bold, 20 * s, hovered->name, {info.x + 160 * s, info.y + 14 * s}, pal::text);
         a.text.draw(Font::Regular, 14 * s, strf("embl\xC3\xA8me \xC2\xAB %s \xC2\xBB \xE2\x80\xA2 niveau %d \xE2\x80\xA2 id %s", hovered->emblem.c_str(), hovered->tier, hovered->id.c_str()),
                     {info.x + 160 * s, info.y + 44 * s}, pal::dim);
     } else {
-        a.text.draw(Font::Regular, 16 * s, "Survolez un sprite pour le voir sur les deux pierres ; cliquez pour l'attribuer.", {info.x + 24 * s, info.y + 28 * s}, pal::dim);
+        a.text.draw(Font::Regular, 16 * s, "Survolez un sprite pour le voir sur les deux pierres ; cliquez pour le choisir.", {info.x + 24 * s, info.y + 28 * s}, pal::dim);
+    }
+    if (!picked.empty()) {
+        pk.open = false;
+        if (pk.on_pick) pk.on_pick(picked);
     }
 }
 
@@ -3349,33 +3807,393 @@ void scene_tutorial(App& a) {
     }
 }
 
-// A screen of the steps to come (puzzles, editor).
-void placeholder(App& a, const std::string& title, const std::string& subtitle, const std::string& body, const std::string& next) {
-    const float s = a.s;
-    draw_background(a);
-    draw_title(a, title, subtitle);
-    if (back_button(a)) { a.go(Scene::Menu); return; }
-    Box p{a.w * 0.5f - 460 * s, 150 * s, 920 * s, a.h - 220 * s};
-    a.ui.panel(p, 22);
-    float y = p.y + 30 * s;
-    y += a.text.paragraph(Font::Regular, 19 * s, body, {p.x + 40 * s, y, p.w - 80 * s, p.h - 160 * s}, pal::text, 1.45f);
-    a.text.paragraph(Font::Regular, 16 * s, next, {p.x + 40 * s, p.bottom() - 90 * s, p.w - 80 * s, 70 * s}, a.theme().accent);
-}
 
 // ─── @@SCENE_PUZZLES ────────────────────────────────────────────────────────
+// Plays a puzzle: a game from its position, the player against its AI, with
+// its look; the introduction card first (scene_game shows it while
+// game.intro is set), and at the end the goal is checked (draw_game_over).
+void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor) {
+    std::string who[2];
+    who[p.human] = "human";
+    who[1 - p.human] = p.opponent;
+    a.game.puzzle_mode = true;   // before launch: the look of the first frames
+    a.game.puzzle = p;
+    a.launch(puzzle_position(p), who[BLACK], who[WHITE], TIMES[p.time_index]);
+    auto& g = a.game;
+    g.puzzle_mode = true;
+    g.puzzle = p;
+    g.level = level;
+    g.level_pos = pos;
+    g.from_editor = from_editor;
+    g.intro = true;
+    g.recorded = false;
+    g.board.flipped = p.human == WHITE;
+}
+std::string goal_text(const App& a, const Puzzle& p) {
+    const AiSpec* ai = a.ai(p.opponent);
+    std::string vs = ai ? ai->name : p.opponent;
+    if (p.margin <= 1) return strf("Gagne avec les %s contre %s.", side_name(p.human), vs.c_str());
+    return strf("Gagne avec les %s contre %s, avec au moins %d points d'avance.", side_name(p.human), vs.c_str(), p.margin);
+}
+
+// The window covered by a background image (cropped to keep its proportions),
+// darkened a little so that the board and the panels stay readable.
+void draw_image_background(App& a, const std::string& file, uint8_t dim = 70) {
+    SDL_Texture* tex = file.empty() ? nullptr : a.background(file);
+    if (!tex) { draw_background(a, false); return; }
+    float tw, th;
+    SDL_GetTextureSize(tex, &tw, &th);
+    float k = std::max(a.w / tw, a.h / th);
+    SDL_FRect dst{(a.w - tw * k) / 2, (a.h - th * k) / 2, tw * k, th * k};
+    SDL_RenderTexture(a.renderer, tex, nullptr, &dst);
+    draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, dim));
+    draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 50);
+}
+
+// A small picture of a puzzle: its squares, holes and pieces.
+void draw_mini_board(App& a, Box b, const Puzzle& p) {
+    const Theme& t = a.theme_or(p.theme);
+    draw::round_box(b.inset(-6 * a.s), 8 * a.s, t.frame_top, t.frame_bottom);
+    SDL_FRect dst = b.frect();
+    SDL_RenderTexture(a.renderer, a.board_textures.get(t, int(b.w)), nullptr, &dst);
+    float q = b.w / 8;
+    for (int sq = 0; sq < 64; sq++) {
+        Box c{b.x + sq_file(sq) * q, b.y + (7 - sq_rank(sq)) * q, q, q};
+        if (p.cells[sq] == '#') draw::round_box(c.inset(q * 0.08f), q * 0.2f, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
+        else if (p.cells[sq] == 'B') draw::circle_lit(c.center(), q * 0.38f, c.center() + V2{-q * 0.12f, -q * 0.14f}, hex(0x5b6170), hex(0x0a0c11));
+        else if (p.cells[sq] == 'W') draw::circle_lit(c.center(), q * 0.38f, c.center() + V2{-q * 0.12f, -q * 0.14f}, hex(0xffffff), hex(0xb9bec8));
+    }
+}
+
 void scene_puzzles(App& a) {
-    placeholder(a, "Puzzles et qu\xC3\xAA" "tes", "Des positions \xC3\xA0 r\xC3\xA9soudre, regroup\xC3\xA9" "es en niveaux",
-                "Chaque puzzle part d'une position choisie (pions plac\xC3\xA9s librement, trous d\xC3\xA9j\xC3\xA0 creus\xC3\xA9s), avec le camp qui commence et l'IA adverse. "
-                "Une image de fond accompagne chaque puzzle et entoure le plateau. Les puzzles se suivent dans des niveaux que chacun peut composer \xC3\xA0 partir de ses propres cr\xC3\xA9" "ations.",
-                "Cette partie arrive avec l'\xC3\xA9" "diteur, dans une prochaine \xC3\xA9tape.");
+    const float s = a.s;
+    auto& st = a.puzzles_ui;
+    draw_background(a);
+    draw_title(a, "Puzzles et qu\xC3\xAA" "tes", "Des positions \xC3\xA0 r\xC3\xA9soudre, regroup\xC3\xA9" "es en niveaux : chaque puzzle r\xC3\xA9ussi ouvre le suivant.");
+    a.ui.blocked = !a.ui.focus.empty() && false;
+    if (a.ui.focus.empty() && back_button(a)) {
+        if (!st.open_level.empty()) st.open_level.clear();
+        else { a.go(Scene::Menu); return; }
+    }
+    Box tabs{60 * s, 118 * s, 520 * s, 40 * s};
+    int tab = a.ui.tabs("ptabs", tabs, {"Jouer", "Cr\xC3\xA9" "er des niveaux"}, st.tab);
+    if (tab != st.tab) { st.tab = tab; st.open_level.clear(); st.editing = false; }
+    Box area{60 * s, 180 * s, a.w - 120 * s, a.h - 210 * s};
+
+    if (st.tab == 0 && st.open_level.empty()) {
+        // The levels, plus every puzzle in one list.
+        std::vector<Level> shown = a.levels;
+        Level all;
+        all.id = "*";
+        all.name = "Tous les puzzles";
+        all.text = "Chaque puzzle de assets/puzzles, sans ordre impos\xC3\xA9.";
+        for (auto& p : a.puzzles) all.puzzles.push_back(p.id);
+        shown.push_back(all);
+        const float cw = 360 * s, ch = 170 * s, gap = 24 * s;
+        int cols = std::max(1, int((area.w + gap) / (cw + gap)));
+        for (size_t i = 0; i < shown.size(); i++) {
+            const Level& l = shown[i];
+            Box c{area.x + (i % cols) * (cw + gap), area.y + (i / cols) * (ch + gap), cw, ch};
+            bool h = a.ui.hover(c);
+            if (h) a.ui.hovering = true;
+            float k = a.ui.anim("lv" + l.id, h);
+            Box cc{c.x, c.y - 4 * s * k, c.w, c.h};
+            a.ui.panel(cc, 18);
+            int done = 0;
+            for (auto& id : l.puzzles) done += a.solved(id);
+            a.text.draw(Font::Black, 22 * s, l.name, {cc.x + 22 * s, cc.y + 18 * s}, pal::text);
+            a.text.paragraph(Font::Regular, 14 * s, l.text, {cc.x + 22 * s, cc.y + 52 * s, cc.w - 44 * s, 50 * s}, pal::dim);
+            a.text.draw(Font::Bold, 15 * s, strf("%zu puzzles \xE2\x80\xA2 %d r\xC3\xA9ussis", l.puzzles.size(), done), {cc.x + 22 * s, cc.bottom() - 52 * s}, a.theme().accent);
+            Box bar{cc.x + 22 * s, cc.bottom() - 24 * s, cc.w - 44 * s, 8 * s};
+            draw::round_box(bar, 4 * s, hex(0xffffff, 25));
+            if (!l.puzzles.empty()) draw::round_box({bar.x, bar.y, bar.w * done / l.puzzles.size(), bar.h}, 4 * s, pal::good);
+            if (h && a.in.released) { st.open_level = l.id; st.scroll = 0; }
+        }
+        if (a.levels.empty())
+            a.text.draw(Font::Regular, 16 * s, "Aucun niveau pour l'instant : cr\xC3\xA9" "ez-en un dans l'onglet \xC2\xAB Cr\xC3\xA9" "er des niveaux \xC2\xBB.", {area.x, area.bottom() - 30 * s}, pal::faint);
+    } else if (st.tab == 0) {
+        // The puzzles of one level.
+        Level l;
+        bool any_order = st.open_level == "*";
+        if (any_order) { l.name = "Tous les puzzles"; for (auto& p : a.puzzles) l.puzzles.push_back(p.id); }
+        else for (auto& x : a.levels) if (x.id == st.open_level) l = x;
+        a.text.draw(Font::Black, 24 * s, l.name, {area.x, area.y - 6 * s}, pal::text);
+        const float cw = 230 * s, ch = 290 * s, gap = 22 * s;
+        int cols = std::max(1, int((area.w + gap) / (cw + gap)));
+        Box grid{area.x, area.y + 40 * s, area.w, area.h - 40 * s};
+        if (a.ui.hover(grid)) st.scroll = std::max(0.0f, st.scroll - a.in.wheel * 60 * s);
+        draw::clip(&grid);
+        for (size_t i = 0; i < l.puzzles.size(); i++) {
+            const Puzzle* p = a.find_puzzle(l.puzzles[i]);
+            Box c{grid.x + (i % cols) * (cw + gap), grid.y + (i / cols) * (ch + gap) - st.scroll, cw, ch};
+            bool unlocked = any_order || i == 0 || a.solved(l.puzzles[i - 1]);
+            bool ok = p && a.solved(p->id);
+            bool h = p && unlocked && a.ui.hover(c) && grid.contains(a.in.mouse);
+            if (h) a.ui.hovering = true;
+            float k = a.ui.anim("pz" + l.puzzles[i], h);
+            a.ui.panel({c.x, c.y - 4 * s * k, c.w, c.h}, 16);
+            if (!p) { a.text.draw(Font::Regular, 14 * s, "introuvable : " + l.puzzles[i], {c.x + 16 * s, c.y + 20 * s}, pal::bad); continue; }
+            Box mb{c.x + 25 * s, c.y + 22 * s - 4 * s * k, 180 * s, 180 * s};
+            draw_mini_board(a, mb, *p);
+            if (!unlocked) {
+                draw::round_box(mb.inset(-6 * s), 8 * s, hex(0x000000, 150));
+                a.text.draw(Font::Black, 18 * s, "verrouill\xC3\xA9", {mb.center().x, mb.center().y - 12 * s}, pal::dim, Align::Center);
+            }
+            a.text.draw(Font::Black, 15 * s, strf("%zu.", i + 1), {c.x + 16 * s, c.bottom() - 74 * s}, a.theme().accent);
+            a.text.draw(Font::Bold, 17 * s, p->name, {c.x + 44 * s, c.bottom() - 76 * s}, pal::text);
+            a.text.draw(Font::Regular, 13 * s, ok ? "r\xC3\xA9ussi" : (p->margin > 1 ? strf("gagner de %d+", p->margin) : std::string("gagner")),
+                        {c.x + 44 * s, c.bottom() - 50 * s}, ok ? pal::good : pal::dim);
+            if (ok) draw_emblem("check", {c.right() - 30 * s, c.bottom() - 56 * s}, 12 * s, pal::good);
+            if (h && a.in.released) { start_puzzle(a, *p, any_order ? "" : l.id, int(i), false); return; }
+        }
+        draw::clip(nullptr);
+        if (l.puzzles.empty()) a.text.draw(Font::Regular, 16 * s, "Ce niveau est vide.", {grid.x, grid.y}, pal::faint);
+    } else {
+        // The level editor: levels on the left, the edited level in the middle,
+        // every puzzle on the right.
+        Box left{area.x, area.y, 300 * s, area.h}, mid{left.right() + 24 * s, area.y, 520 * s, area.h}, right{mid.right() + 24 * s, area.y, area.right() - mid.right() - 24 * s, area.h};
+        a.ui.panel(left);
+        a.text.draw(Font::Black, 18 * s, "Niveaux", {left.x + 18 * s, left.y + 16 * s}, pal::text);
+        for (size_t i = 0; i < a.levels.size(); i++) {
+            Box r{left.x + 10 * s, left.y + 52 * s + i * 46 * s, left.w - 20 * s, 42 * s};
+            bool cur = st.editing && st.edit.id == a.levels[i].id;
+            if (a.ui.button("lvl" + a.levels[i].id, r, a.levels[i].name, cur ? Style::Primary : Style::Ghost, true, 15)) { st.edit = a.levels[i]; st.editing = true; }
+        }
+        if (a.ui.button("lvl_new", {left.x + 10 * s, left.bottom() - 58 * s, left.w - 20 * s, 46 * s}, "+ Nouveau niveau", Style::Normal, true, 16)) {
+            st.edit = Level{};
+            st.editing = true;
+        }
+        a.ui.panel(mid);
+        if (!st.editing) {
+            a.text.paragraph(Font::Regular, 16 * s, "Choisissez un niveau \xC3\xA0 gauche, ou cr\xC3\xA9" "ez-en un. Un niveau est une suite de puzzles : chacun ouvre le suivant.", mid.inset(24 * s), pal::dim);
+        } else {
+            float y = mid.y + 18 * s;
+            a.text.draw(Font::Bold, 14 * s, "Nom", {mid.x + 22 * s, y}, pal::dim);
+            a.ui.text_field("lv_name", {mid.x + 22 * s, y + 20 * s, mid.w - 44 * s, 40 * s}, st.edit.name, "Nom du niveau");
+            y += 72 * s;
+            a.text.draw(Font::Bold, 14 * s, "Description", {mid.x + 22 * s, y}, pal::dim);
+            a.ui.text_field("lv_text", {mid.x + 22 * s, y + 20 * s, mid.w - 44 * s, 40 * s}, st.edit.text, "Quelques mots sur ce niveau");
+            y += 80 * s;
+            a.text.draw(Font::Bold, 15 * s, "Puzzles, dans l'ordre", {mid.x + 22 * s, y}, pal::text);
+            y += 28 * s;
+            int remove = -1, up = -1;
+            for (size_t i = 0; i < st.edit.puzzles.size(); i++) {
+                Box r{mid.x + 16 * s, y + i * 44 * s, mid.w - 32 * s, 40 * s};
+                if (r.bottom() > mid.bottom() - 70 * s) break;
+                draw::round_box(r, 8 * s, hex(0xffffff, 10));
+                const Puzzle* p = a.find_puzzle(st.edit.puzzles[i]);
+                a.text.draw(Font::Bold, 15 * s, strf("%zu. %s", i + 1, p ? p->name.c_str() : st.edit.puzzles[i].c_str()), {r.x + 12 * s, r.y + 10 * s}, p ? pal::text : pal::bad);
+                if (a.ui.button("up" + std::to_string(i), {r.right() - 96 * s, r.y + 4 * s, 42 * s, 32 * s}, "\xE2\x86\x91", Style::Ghost, i > 0, 16)) up = int(i);
+                if (a.ui.button("rm" + std::to_string(i), {r.right() - 48 * s, r.y + 4 * s, 42 * s, 32 * s}, "\xC3\x97", Style::Ghost, true, 18)) remove = int(i);
+            }
+            if (up > 0) std::swap(st.edit.puzzles[up], st.edit.puzzles[up - 1]);
+            if (remove >= 0) st.edit.puzzles.erase(st.edit.puzzles.begin() + remove);
+            if (a.ui.button("lv_save", {mid.x + 22 * s, mid.bottom() - 62 * s, mid.w - 44 * s, 48 * s}, "Enregistrer le niveau", Style::Primary)) {
+                if (save_level(st.edit)) a.notify("Niveau enregistr\xC3\xA9 : assets/levels/" + st.edit.id + ".json");
+                else a.notify("Impossible d'enregistrer le niveau.");
+                std::string keep = st.edit.id;
+                a.reload_puzzles();
+                for (auto& x : a.levels) if (x.id == keep) st.edit = x;
+            }
+        }
+        a.ui.panel(right);
+        a.text.draw(Font::Black, 18 * s, "Tous les puzzles", {right.x + 18 * s, right.y + 16 * s}, pal::text);
+        Box list{right.x + 10 * s, right.y + 52 * s, right.w - 20 * s, right.h - 62 * s};
+        if (a.ui.hover(list)) st.scroll2 = std::max(0.0f, st.scroll2 - a.in.wheel * 50 * s);
+        draw::clip(&list);
+        for (size_t i = 0; i < a.puzzles.size(); i++) {
+            Box r{list.x, list.y + i * 76 * s - st.scroll2, list.w, 70 * s};
+            draw::round_box(r, 10 * s, hex(0xffffff, 10));
+            draw_mini_board(a, {r.x + 10 * s, r.y + 9 * s, 52 * s, 52 * s}, a.puzzles[i]);
+            a.text.draw(Font::Bold, 15 * s, a.puzzles[i].name, {r.x + 78 * s, r.y + 12 * s}, pal::text);
+            a.text.draw(Font::Regular, 12 * s, a.puzzles[i].id, {r.x + 78 * s, r.y + 36 * s}, pal::faint);
+            if (st.editing &&
+                a.ui.button("add" + a.puzzles[i].id, {r.right() - 110 * s, r.y + 16 * s, 100 * s, 38 * s}, "+ Ajouter", Style::Normal, true, 14))
+                st.edit.puzzles.push_back(a.puzzles[i].id);
+        }
+        draw::clip(nullptr);
+    }
 }
 
 // ─── @@SCENE_EDITOR ─────────────────────────────────────────────────────────
+// Paint the board (free squares, holes, the 4 pieces of each side), set who
+// starts, the side of the player, the AI, the goal and the look, test, save.
 void scene_editor(App& a) {
-    placeholder(a, "\xC3\x89" "diteur de puzzles", "Cr\xC3\xA9" "er positions, sprites et niveaux",
-                "L'\xC3\xA9" "diteur permettra de noircir les cases de son choix, de placer les 4 pions de chaque camp, de choisir les sprites des joueurs, des trous et des cases vides "
-                "(une collection est fournie, modifiable), le camp qui commence et l'IA adverse, l'image de fond, puis d'encha\xC3\xAEner les puzzles en niveaux.",
-                "Prochaine \xC3\xA9tape du d\xC3\xA9veloppement.");
+    const float s = a.s;
+    auto& ed = a.editor;
+    Puzzle& p = ed.p;
+    const bool modal = a.picker.open || ed.browsing;
+    draw_image_background(a, p.background, 110);
+    draw_title(a, "\xC3\x89" "diteur de puzzles", "Peignez le plateau, r\xC3\xA9glez la partie, testez, enregistrez. Les puzzles vont dans assets/puzzles.");
+    a.ui.blocked = modal;
+    if (!modal && a.ui.focus.empty() && back_button(a)) { a.go(Scene::Menu); return; }
+
+    const float margin = 34 * s, tool_w = 250 * s, panel_w = 500 * s, frame = 26 * s, top = 130 * s;
+    Box tools{margin, top, tool_w, a.h - top - margin};
+    Box panel{a.w - margin - panel_w, top, panel_w, a.h - top - margin};
+    float avail_w = panel.x - tools.right() - 2 * margin - 2 * frame;
+    float B = std::floor(std::min(a.h - top - margin - 2 * frame - 20 * s, avail_w) / 8) * 8;
+    ed.board.area = {std::floor(tools.right() + margin + frame + (avail_w - B) / 2), std::floor(top + frame + (a.h - top - margin - 2 * frame - B) / 2), B, B};
+
+    // Tools.
+    a.ui.panel(tools);
+    a.text.draw(Font::Black, 18 * s, "Pinceau", {tools.x + 18 * s, tools.y + 16 * s}, pal::text);
+    const char* names[4] = {"Case libre", "Trou", "Pion noir", "Pion blanc"};
+    for (int i = 0; i < 4; i++) {
+        Box r{tools.x + 12 * s, tools.y + 52 * s + i * 62 * s, tools.w - 24 * s, 56 * s};
+        if (a.ui.button("tool" + std::to_string(i), r, "", ed.tool == i ? Style::Primary : Style::Normal)) ed.tool = i;
+        V2 ic{r.x + 30 * s, r.center().y};
+        if (i == 0) draw::round_box({ic.x - 14 * s, ic.y - 14 * s, 28 * s, 28 * s}, 5 * s, a.theme_or(p.theme).light);
+        else if (i == 1) draw::round_box({ic.x - 14 * s, ic.y - 14 * s, 28 * s, 28 * s}, 6 * s, hex(0x0d0f12));
+        else draw_piece(i == 2 ? a.sprite(p.sprite_black.empty() ? "human" : p.sprite_black) : a.sprite(p.sprite_white.empty() ? "dev" : p.sprite_white),
+                        i == 2 ? BLACK : WHITE, ic, 15 * s);
+        a.text.draw(Font::Bold, 16 * s, names[i], {r.x + 56 * s, r.center().y - 10 * s}, ed.tool == i ? hex(0x1a1206) : pal::text);
+    }
+    float ty = tools.y + 52 * s + 4 * 62 * s + 10 * s;
+    a.text.draw(Font::Regular, 15 * s, strf("Pions noirs : %d / 4", p.count('B')), {tools.x + 18 * s, ty}, p.count('B') == 4 ? pal::good : pal::bad);
+    a.text.draw(Font::Regular, 15 * s, strf("Pions blancs : %d / 4", p.count('W')), {tools.x + 18 * s, ty + 24 * s}, p.count('W') == 4 ? pal::good : pal::bad);
+    a.text.draw(Font::Regular, 15 * s, strf("Cases libres : %d", p.count('.')), {tools.x + 18 * s, ty + 48 * s}, pal::dim);
+    ty += 86 * s;
+    if (a.ui.button("ed_start", {tools.x + 12 * s, ty, tools.w - 24 * s, 44 * s}, "Position de d\xC3\xA9part", Style::Ghost, true, 15)) p.cells = Puzzle().cells;
+    if (a.ui.button("ed_fill", {tools.x + 12 * s, ty + 50 * s, tools.w - 24 * s, 44 * s}, "Tout en trous", Style::Ghost, true, 15))
+        for (auto& c : p.cells) if (c == '.') c = '#';
+    if (a.ui.button("ed_clear", {tools.x + 12 * s, ty + 100 * s, tools.w - 24 * s, 44 * s}, "Effacer les trous", Style::Ghost, true, 15))
+        for (auto& c : p.cells) if (c == '#') c = '.';
+    std::string problem = puzzle_problem(p);
+    a.text.paragraph(Font::Bold, 14 * s, problem.empty() ? "Pr\xC3\xAAt \xC3\xA0 jouer." : problem, {tools.x + 18 * s, tools.bottom() - 70 * s, tools.w - 36 * s, 60 * s}, problem.empty() ? pal::good : pal::bad);
+
+    // The board: a click or a drag paints with the tool.
+    int hover_sq = modal ? -1 : ed.board.at(a.in.mouse);
+    if (!a.in.down) ed.painted = -1;
+    if (hover_sq >= 0 && a.in.down && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1)) {
+        ed.painted = hover_sq;
+        char want = "._BW"[ed.tool] == '_' ? '#' : "._BW"[ed.tool];
+        char& c = p.cells[hover_sq];
+        if ((want == 'B' || want == 'W') && c != want && p.count(want) >= 4) a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord.", want == 'B' ? "noirs" : "blancs"));
+        else if (a.in.pressed && c == want && want != '.') c = '.';   // a click on the same thing clears it
+        else c = want;
+    }
+    if (hover_sq >= 0) a.ui.hovering = true;
+    Yolah shown;
+    {
+        uint64_t b = 0, w = 0, e = 0;
+        for (int sq = 0; sq < 64; sq++) {
+            uint64_t bit = uint64_t(1) << sq;
+            if (p.cells[sq] == 'B') b |= bit;
+            else if (p.cells[sq] == 'W') w |= bit;
+            else if (p.cells[sq] == '#') e |= bit;
+        }
+        shown.set_state(b, w, e, 0, 0, p.to_move == BLACK ? 0 : 1);
+    }
+    ed.board.flipped = false;
+    BoardView::Look look;
+    const SpriteDef& sb = a.sprite(p.sprite_black.empty() ? (p.human == BLACK ? "human" : a.ai(p.opponent) ? a.ai(p.opponent)->sprite : "dev") : p.sprite_black);
+    const SpriteDef& sw = a.sprite(p.sprite_white.empty() ? (p.human == WHITE ? "human" : a.ai(p.opponent) ? a.ai(p.opponent)->sprite : "dev") : p.sprite_white);
+    look.sprite[BLACK] = &sb;
+    look.sprite[WHITE] = &sw;
+    look.halo[p.human] = true;
+    look.hole_style = p.hole_style;
+    ed.board.draw(a.text, a.board_textures, a.theme_or(p.theme), shown, look, a.time, s);
+    if (hover_sq >= 0) draw::round_frame(ed.board.square(hover_sq).inset(2 * s), 6 * s, 3 * s, hex(0xffd36b, 220));
+
+    // Properties.
+    a.ui.panel(panel);
+    float x = panel.x + 22 * s, w = panel.w - 44 * s, y = panel.y + 16 * s;
+    a.text.draw(Font::Bold, 14 * s, "Titre", {x, y}, pal::dim);
+    a.ui.text_field("ed_name", {x, y + 20 * s, w, 38 * s}, p.name, "Titre du puzzle");
+    y += 66 * s;
+    a.text.draw(Font::Bold, 14 * s, "Introduction (montr\xC3\xA9" "e avant le puzzle)", {x, y}, pal::dim);
+    a.ui.text_field("ed_text", {x, y + 20 * s, w, 38 * s}, p.text, "Une phrase pour pr\xC3\xA9senter le d\xC3\xA9" "fi");
+    y += 70 * s;
+    a.text.draw(Font::Regular, 16 * s, "Vous jouez", {x, y + 8 * s}, pal::dim);
+    p.human = a.ui.segmented("ed_human", {x + w * 0.38f, y, w * 0.62f, 36 * s}, {"Noirs", "Blancs"}, p.human);
+    y += 44 * s;
+    a.text.draw(Font::Regular, 16 * s, "Commence", {x, y + 8 * s}, pal::dim);
+    p.to_move = a.ui.segmented("ed_tomove", {x + w * 0.38f, y, w * 0.62f, 36 * s}, {"Noirs", "Blancs"}, p.to_move);
+    y += 44 * s;
+    std::vector<std::string> ai_names, ai_ids;
+    int ai_idx = 0;
+    for (auto& ai : a.roster)
+        if (ai.available) { if (ai.id == p.opponent) ai_idx = int(ai_ids.size()); ai_ids.push_back(ai.id); ai_names.push_back(ai.name); }
+    if (!ai_ids.empty()) p.opponent = ai_ids[a.ui.cycler("ed_ai", {x, y, w, 36 * s}, "Adversaire", ai_names, ai_idx)];
+    y += 44 * s;
+    std::vector<std::string> goals;
+    for (int m = 1; m <= 12; m++) goals.push_back(m == 1 ? "Gagner" : strf("Gagner de %d+", m));
+    p.margin = 1 + a.ui.cycler("ed_goal", {x, y, w, 36 * s}, "Objectif", goals, p.margin - 1);
+    y += 44 * s;
+    a.text.draw(Font::Regular, 16 * s, "Temps de l'IA", {x, y + 8 * s}, pal::dim);
+    p.time_index = a.ui.segmented("ed_time", {x + w * 0.38f, y, w * 0.62f, 36 * s}, TIME_LABELS, p.time_index, 15);
+    y += 52 * s;
+    // Look.
+    std::vector<std::string> th_names = {"Th\xC3\xA8me du joueur"};
+    int th_idx = 0;
+    for (size_t i = 0; i < a.themes.size(); i++) { th_names.push_back(a.themes[i].name); if (a.themes[i].id == p.theme) th_idx = int(i) + 1; }
+    int ti = a.ui.cycler("ed_theme", {x, y, w, 36 * s}, "Plateau", th_names, th_idx);
+    p.theme = ti == 0 ? "" : a.themes[ti - 1].id;
+    y += 44 * s;
+    std::vector<std::string> hs_names;
+    int hs_idx = 0;
+    for (size_t i = 0; i < HOLE_STYLES.size(); i++) { hs_names.push_back(HOLE_STYLES[i].second); if (HOLE_STYLES[i].first == p.hole_style) hs_idx = int(i); }
+    p.hole_style = HOLE_STYLES[a.ui.cycler("ed_holes", {x, y, w, 36 * s}, "Trous", hs_names, hs_idx)].first;
+    y += 44 * s;
+    std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Aucun"};
+    int bg_idx = 0;
+    for (size_t i = 0; i < bgs.size(); i++) { bg_names.push_back(bgs[i]); if (bgs[i] == p.background) bg_idx = int(i) + 1; }
+    int bi = a.ui.cycler("ed_bg", {x, y, w, 36 * s}, "Image de fond", bg_names, bg_idx);
+    p.background = bi == 0 ? "" : bgs[bi - 1];
+    y += 48 * s;
+    for (int side : {BLACK, WHITE}) {
+        Box r{x + side * (w / 2 + 4 * s), y, w / 2 - 4 * s, 50 * s};
+        std::string& id = side == BLACK ? p.sprite_black : p.sprite_white;
+        const SpriteDef& cur = side == BLACK ? sb : sw;
+        if (a.ui.button(side == BLACK ? "ed_sb" : "ed_sw", r, "", Style::Normal)) {
+            Puzzle* pp = &p;
+            bool black = side == BLACK;
+            a.open_picker(strf("Sprite des pions %s du puzzle", black ? "noirs" : "blancs"), cur.id, p.human == side, [pp, black](const std::string& sid) {
+                (black ? pp->sprite_black : pp->sprite_white) = sid;
+            });
+        }
+        draw_piece(cur, side, {r.x + 26 * s, r.center().y}, 17 * s, 0, a.time, 1, p.human == side);
+        a.text.draw(Font::Bold, 14 * s, side == BLACK ? "Pions noirs" : "Pions blancs", {r.x + 50 * s, r.y + 8 * s}, pal::text);
+        a.text.draw(Font::Regular, 12 * s, id.empty() ? "sprite du joueur" : cur.name, {r.x + 50 * s, r.y + 28 * s}, pal::dim);
+    }
+    // Actions.
+    Box bar{x, panel.bottom() - 70 * s, w, 50 * s};
+    float bw = (w - 3 * 8 * s) / 4;
+    auto bb = [&](int i) { return Box{bar.x + i * (bw + 8 * s), bar.y, bw, bar.h}; };
+    if (a.ui.button("ed_new", bb(0), "Nouveau", Style::Ghost, true, 16)) p = Puzzle{};
+    if (a.ui.button("ed_open", bb(1), "Ouvrir", Style::Normal, true, 16)) { a.reload_puzzles(); ed.browsing = true; ed.scroll = 0; }
+    if (a.ui.button("ed_save", bb(2), "Enregistrer", Style::Normal, true, 16)) {
+        if (save_puzzle(p)) a.notify("Enregistr\xC3\xA9 : assets/puzzles/" + p.id + ".json");
+        else a.notify("Impossible d'enregistrer le puzzle.");
+    }
+    if (a.ui.button("ed_test", bb(3), "Tester", Style::Primary, problem.empty(), 16)) { start_puzzle(a, p, "", -1, true); return; }
+
+    a.ui.blocked = false;
+    // The list of puzzles to open.
+    if (ed.browsing) {
+        draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 160));
+        Box m{a.w * 0.5f - 420 * s, 90 * s, 840 * s, a.h - 180 * s};
+        a.ui.panel(m, 22, hex(0x1a202b));
+        a.text.draw(Font::Black, 24 * s, "Ouvrir un puzzle", {m.x + 26 * s, m.y + 22 * s}, pal::text);
+        if (a.ui.button("br_close", {m.right() - 160 * s, m.y + 18 * s, 136 * s, 44 * s}, "Fermer", Style::Ghost) || a.in.key(SDLK_ESCAPE)) { ed.browsing = false; a.in.eat(SDLK_ESCAPE); return; }
+        Box list{m.x + 16 * s, m.y + 80 * s, m.w - 32 * s, m.h - 96 * s};
+        if (a.ui.hover(list)) ed.scroll = std::max(0.0f, ed.scroll - a.in.wheel * 60 * s);
+        draw::clip(&list);
+        for (size_t i = 0; i < a.puzzles.size(); i++) {
+            Box r{list.x, list.y + i * 84 * s - ed.scroll, list.w, 78 * s};
+            bool h = a.ui.hover(r) && list.contains(a.in.mouse);
+            if (h) a.ui.hovering = true;
+            draw::round_box(r, 10 * s, hex(0xffffff, uint8_t(h ? 26 : 10)));
+            draw_mini_board(a, {r.x + 12 * s, r.y + 11 * s, 56 * s, 56 * s}, a.puzzles[i]);
+            a.text.draw(Font::Bold, 17 * s, a.puzzles[i].name, {r.x + 86 * s, r.y + 14 * s}, pal::text);
+            a.text.draw(Font::Regular, 13 * s, a.puzzles[i].id + " \xE2\x80\xA2 " + goal_text(a, a.puzzles[i]), {r.x + 86 * s, r.y + 42 * s}, pal::dim);
+            if (h && a.in.released) { p = a.puzzles[i]; ed.browsing = false; }
+        }
+        draw::clip(nullptr);
+        if (a.puzzles.empty()) a.text.draw(Font::Regular, 16 * s, "Aucun puzzle enregistr\xC3\xA9.", {list.x, list.y}, pal::faint);
+    }
+    if (a.picker.open) sprite_picker(a);
 }
 
 }   // namespace yapp
@@ -3488,10 +4306,22 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     } else if (scene == "setup") a->go(Scene::Setup);
     else if (scene == "themes") {
         a->go(Scene::Themes);
-        a->themes_ui.picking = arg_value(argc, argv, "--pick");   // open the sprite picker for this player
+        std::string who = arg_value(argc, argv, "--pick");   // open the sprite picker for this player
+        if (!who.empty()) a->open_picker("Sprite de " + who, a->player_sprite(who).id, who == "human", nullptr);
     }
     else if (scene == "tutorial" || scene == "rules") start_lesson(*a, std::stoi(arg_value(argc, argv, "--lesson", "0")));
-    else if (scene == "puzzles") a->go(Scene::Puzzles);
+    else if (scene == "puzzles") {
+        a->go(Scene::Puzzles);
+        a->puzzles_ui.open_level = arg_value(argc, argv, "--level");
+        a->puzzles_ui.tab = std::stoi(arg_value(argc, argv, "--ptab", "0"));
+        if (a->puzzles_ui.tab == 1 && !a->levels.empty()) { a->puzzles_ui.edit = a->levels.front(); a->puzzles_ui.editing = true; }
+        std::string pid = arg_value(argc, argv, "--puzzle");
+        if (const Puzzle* pz = a->find_puzzle(pid)) {
+            Puzzle copy = *pz;
+            start_puzzle(*a, copy, "", -1, false);
+            if (arg_flag(argc, argv, "--no-intro")) a->game.intro = false;
+        }
+    }
     else if (scene == "editor") a->go(Scene::Editor);
     a->time = now_seconds();
     a->scene_t0 = a->time - 10;
@@ -3515,7 +4345,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {
     case SDL_EVENT_MOUSE_WHEEL: a->in.wheel += e->wheel.y; break;
     case SDL_EVENT_KEY_DOWN:
         if (!e->key.repeat) a->in.keys.push_back(e->key.key);
+        if (e->key.key == SDLK_BACKSPACE) a->in.backspaces++;
         break;
+    case SDL_EVENT_TEXT_INPUT: a->in.text += e->text.text; break;
     default: break;
     }
     return SDL_APP_CONTINUE;
@@ -3563,6 +4395,11 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     float fade = 1 - clamp01(float(a->time - a->scene_t0) / 0.25f);
     if (fade > 0) draw::rect({0, 0, float(a->w), float(a->h)}, hex(0x000000, uint8_t(255 * fade)));
     SDL_SetCursor(a->ui.hovering ? a->cursor_hand : a->cursor_arrow);
+    // Typed text only arrives while text input is on: on while a field has the focus.
+    if (!a->ui.focus.empty() != SDL_TextInputActive(a->window)) {
+        if (!a->ui.focus.empty()) SDL_StartTextInput(a->window);
+        else SDL_StopTextInput(a->window);
+    }
 
     if (a->frames_left >= 0) {
         if (a->frames_left-- == 0) {
@@ -3578,6 +4415,8 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     a->in.pressed = a->in.released = false;
     a->in.wheel = 0;
     a->in.keys.clear();
+    a->in.text.clear();
+    a->in.backspaces = 0;
     return SDL_APP_CONTINUE;
 }
 

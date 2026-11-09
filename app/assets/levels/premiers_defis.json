@@ -1,0 +1,10 @@
+{
+  "name": "Premiers défis",
+  "text": "Quatre fins de partie vérifiées par un solveur : un seul bon chemin à chaque fois.",
+  "puzzles": [
+    "le_chemin_le_plus_long",
+    "deux_d_avance",
+    "neuf_choix",
+    "le_grand_ecart"
+  ]
+}

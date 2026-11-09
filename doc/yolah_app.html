@@ -88,6 +88,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--r
     <li><a href="#themes">11. Themes and sprites</a></li>
     <li><a href="#fx">12. Animations and effects</a></li>
     <li><a href="#tutorial">12b. The tutorial</a></li>
+    <li><a href="#puzzles">12c. Puzzles and the editor</a></li>
     <li><a href="#tests">13. Screenshots and tests</a></li>
     <li><a href="#next">14. What comes next</a></li>
   </ol>
@@ -464,6 +465,16 @@ a.fx.add(std::make_unique&lt;FloatText&gt;(position, "+1", colour, size));</code
 </div>
 </section>
 
+<section id="puzzles">
+<h2><span class="n">12c</span>Puzzles, levels and the editor</h2>
+<div class="col">
+<p>A puzzle is a JSON file of <code>assets/puzzles/</code>: a board (8 strings, rank 8 first, <code>B</code> <code>W</code> <code>#</code> <code>.</code>), who starts, the side of the player, the opposing AI, the goal (win by at least <code>margin</code> points), the AI's time, and its look: board theme, hole style (<code>pit</code>, <code>lava</code>, <code>water</code>, <code>void</code>, <code>ice</code>, <code>bush</code>, drawn by code in <code>BoardView::draw_hole</code>), piece sprites, background image (<code>assets/backgrounds/</code>). A level (<code>assets/levels/</code>) lists puzzles in order; each solved puzzle unlocks the next, and solved puzzles are kept in the settings.</p>
+<p><b>Playing.</b> <code>start_puzzle</code> launches an ordinary game from the puzzle's position (<code>App::launch</code>), with <code>game.puzzle_mode</code> set: the background image replaces the theme's gradient, the puzzle's theme, holes and sprites replace the player's, the analysis (bar, hint, variation) is off, and the game starts with an introduction card (the image, the title, the goal). At the end, <code>draw_puzzle_over</code> compares the player's lead with the goal and offers the next puzzle of the level.</p>
+<p><b>The editor.</b> A brush (free square, hole, black piece, white piece) paints the board by clicks and drags; the counters show the 4 + 4 pieces the engine needs, and <code>puzzle_problem</code> says what is missing. The right panel sets the title and introduction (text fields: <code>Ui::text_field</code> with <code>SDL_StartTextInput</code> and the <code>SDL_EVENT_TEXT_INPUT</code> events), the sides, the AI, the goal, the time and the look (<code>Ui::cycler</code> for the lists, the sprite picker for the pieces). <i>Tester</i> plays the puzzle and comes back to the editor; <i>Enregistrer</i> writes the file (its name comes from the title). Levels are made in the second tab of the puzzles screen.</p>
+<p>The four sample puzzles were drawn at random and kept only if a perfect solver wins them with the given margin while most first moves lose; their opponent is the dev minimax, whose endgame solver plays them perfectly.</p>
+</div>
+</section>
+
 <section id="tests">
 <h2><span class="n">13</span>Screenshots and tests</h2>
 <div class="col"><p>The application can render without a window and save a picture, which is how the images of this page were made and how a change can be checked without clicking:</p></div>
@@ -471,7 +482,7 @@ a.fx.add(std::make_unique&lt;FloatText&gt;(position, "+1", colour, size));</code
 ./yolah_app --screenshot game.bmp --scene game --black human --white dev --plies 16 --tab 1 --hint --frames 220
 ./yolah_app --screenshot end.bmp --scene game --black basic_minmax --white dev --time 0 --frames 2500   <span class="c"># a whole AI game</span></code></pre>
 <div class="col">
-<p><code>--screenshot</code> switches to SDL's <code>offscreen</code> video driver and the <code>software</code> renderer, draws <code>--frames</code> frames (enough for the AIs or the analysis to work) and saves the last one. Other options: <code>--size WxH</code>, <code>--theme ID</code>, <code>--scene setup|themes|tutorial|puzzles|editor</code>, <code>--lesson N</code>, <code>--pick ID</code> (the sprite picker), <code>--verbose</code> (the AI players print to the terminal). Test runs do not overwrite the user's settings.</p>
+<p><code>--screenshot</code> switches to SDL's <code>offscreen</code> video driver and the <code>software</code> renderer, draws <code>--frames</code> frames (enough for the AIs or the analysis to work) and saves the last one. Other options: <code>--size WxH</code>, <code>--theme ID</code>, <code>--scene setup|themes|tutorial|puzzles|editor</code>, <code>--lesson N</code>, <code>--pick ID</code> (the sprite picker), <code>--level ID</code>, <code>--ptab 1</code>, <code>--puzzle ID [--no-intro]</code>, <code>--verbose</code> (the AI players print to the terminal). Test runs do not overwrite the user's settings.</p>
 </div>
 </section>
 
@@ -479,8 +490,6 @@ a.fx.add(std::make_unique&lt;FloatText&gt;(position, "+1", colour, size));</code
 <h2><span class="n">14</span>What comes next</h2>
 <div class="col">
 <ul>
-<li><b>Puzzle editor.</b> Paint holes, place the 4 pieces of each side, choose the sprites of the players, of the holes and of the empty squares, the side to move, the opposing AI and the background image; puzzles saved as JSON files.</li>
-<li><b>Levels.</b> Sequences of puzzles, created by any user, with progress.</li>
 <li><b>Effects.</b> New <code>Effect</code> classes, attached to puzzles or squares.</li>
 <li><b>Fewer than 4 pieces.</b> The engine assumes exactly 4 pieces per side (<code>Yolah::moves</code> takes four squares from the bitboard). Puzzles with fewer pieces need a generalised move generation, measured for speed and checked with every AI. The networks have only seen 4 against 4 positions from real games: on unusual positions their evaluations are less reliable, the search compensates partly.</li>
 </ul>

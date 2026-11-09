@@ -1,0 +1,24 @@
+{
+  "name": "Deux d'avance",
+  "text": "Gagner ne suffit pas : il faut deux points d'avance.",
+  "board": [
+    "B.#W###.",
+    ".#######",
+    "########",
+    "###.####",
+    ".#..##.#",
+    "#W#.##W#",
+    "##B##.##",
+    "B##.#WB."
+  ],
+  "to move": "black",
+  "player": "black",
+  "opponent": "dev",
+  "margin": 2,
+  "time index": 1,
+  "theme": "jade",
+  "hole style": "bush",
+  "sprite black": "",
+  "sprite white": "",
+  "background": "crepuscule.jpg"
+}

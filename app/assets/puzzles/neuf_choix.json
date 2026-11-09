@@ -1,0 +1,24 @@
+{
+  "name": "Neuf choix, un seul bon",
+  "text": "Le plateau est criblé de trous. Trouve le seul coup gagnant.",
+  "board": [
+    "###.#..#",
+    "#.#W.###",
+    "####B#W#",
+    "#B####B.",
+    "####W#.#",
+    "#####.W.",
+    "####B..#",
+    "#####..#"
+  ],
+  "to move": "black",
+  "player": "black",
+  "opponent": "dev",
+  "margin": 1,
+  "time index": 1,
+  "theme": "marbre",
+  "hole style": "ice",
+  "sprite black": "",
+  "sprite white": "",
+  "background": "ocean.jpg"
+}

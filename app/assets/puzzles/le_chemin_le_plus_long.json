@@ -1,0 +1,24 @@
+{
+  "name": "Le chemin le plus long",
+  "text": "Six coups possibles, un seul mène à la victoire.",
+  "board": [
+    "###.####",
+    "B###W#W#",
+    "###W.###",
+    ".#.#.###",
+    "#.#W###.",
+    ".B##.##B",
+    "B.######",
+    "########"
+  ],
+  "to move": "black",
+  "player": "black",
+  "opponent": "dev",
+  "margin": 1,
+  "time index": 1,
+  "theme": "bois",
+  "hole style": "pit",
+  "sprite black": "",
+  "sprite white": "",
+  "background": "foret.jpg"
+}

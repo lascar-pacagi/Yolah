@@ -1,0 +1,24 @@
+{
+  "name": "Le grand écart",
+  "text": "Un territoire immense t'attend, si tu sais le prendre.",
+  "board": [
+    "...#.##.",
+    ".#######",
+    "WB##.B##",
+    "#W###.##",
+    ".##.####",
+    "W##B####",
+    "W###.#.#",
+    "####B#.."
+  ],
+  "to move": "black",
+  "player": "black",
+  "opponent": "dev",
+  "margin": 7,
+  "time index": 1,
+  "theme": "nuit",
+  "hole style": "void",
+  "sprite black": "",
+  "sprite white": "",
+  "background": "nebuleuse.jpg"
+}
