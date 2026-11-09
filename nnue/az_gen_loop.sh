@@ -20,12 +20,13 @@
 #              solver's exact result (flags EXACT) → gen_<G>/selfplay/*.bin.
 #              A task stopped before its share (time limit) fails: run
 #              `bash az_gen_loop.sh G` again, the tasks go on where they were.
-#   train      GPU: az_<G-1> trained EPOCHS epochs on the WINDOW newest rows
-#              (gen_<G>, gen_<G-1>, ..., then positions of OLD_CACHE to fill
-#              the window: 3/4 at generation 1, 2/4, 1/4, none from generation
-#              4 on with GEN_ROWS = WINDOW / 4) → az_<G> (nnue/az_gen_train.py;
-#              resumes from its checkpoint). The policy is learnt on the rows
-#              of the full searches only, the value on every row (z).
+#   train      GPU: az_<G-1> trained EPOCHS epochs on the rows of gen_<G> and
+#              OTHERS rows drawn at random from the POOL (POOL positions:
+#              at the start all from OLD_CACHE; each generation's rows enter it
+#              and push out as many old positions; then the oldest generations
+#              leave it) → az_<G> (nnue/az_gen_train.py; resumes from its
+#              checkpoint). The policy is learnt on the rows of the full
+#              searches only, the value on every row (z).
 #   eval       GPU array: az_<G> against az_<G-1> (task 0) and az_0 (task 1),
 #              EVAL_GAMES games at EVAL_SECONDS s per move, the balanced book
 #              (alphazero_match.sh) → ROOT/matches.csv
@@ -33,8 +34,9 @@
 #
 # Generation 0 is START_PT / START_TS (ResNet_1 of the distillation loop),
 # copied to ROOT/models/az_00000000.{pt,ts} by the first submission.
-# Sizes: a row is 336 bytes: 12.5 M rows = 4.2 GB per generation; the window
-# of 50 M rows takes ~17 GB of memory in the training job.
+# Sizes: a row is 336 bytes: 12.5 M rows = 4.2 GB per generation (200 M rows
+# of generations: 67 GB on disk); a training of 50 M rows takes ~17 GB of
+# memory.
 # ────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"
@@ -47,9 +49,9 @@ GPU_EXCLUDE="${GPU_EXCLUDE:-crn22}"             # crn22 refuses containers
 START_PT="${START_PT:-${HOME}/DistillLoop/round_001/resnet.pt}"
 START_TS="${START_TS:-${HOME}/DistillLoop/round_001/resnet.ts}"
 OLD_CACHE="${OLD_CACHE:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"  # fills the window ("none": no)
-OLD_SELFPLAY="${OLD_SELFPLAY:-none}"            # older self-play rows, before OLD_CACHE ("none": no)
 GEN_ROWS="${GEN_ROWS:-12500000}"                # new rows per generation
-WINDOW="${WINDOW:-50000000}"                    # rows of a training (new + old)
+POOL="${POOL:-200000000}"                        # positions of the pool (old cache, then generations)
+OTHERS="${OTHERS:-37500000}"                    # rows drawn from the pool for a training, besides the new ones
 EPOCHS="${EPOCHS:-10}"
 LR="${LR:-5e-5}"
 Q_WEIGHT="${Q_WEIGHT:-0}"                       # value target (1 − q)·z + q·root_q (not on exact rows)
@@ -110,10 +112,6 @@ source "${YOLAH_DIR}/nnue/alphazero_common.sh"   # SIF, run(), build_alphazero_l
 # The old rows at /old in the container (if any).
 OLD_ARGS=()
 OLD_BIND=()
-if [[ "${OLD_SELFPLAY}" != "none" && -d "${OLD_SELFPLAY}" ]]; then
-    OLD_ARGS=(--old /old)
-    OLD_BIND=(--bind "${OLD_SELFPLAY}:/old")
-fi
 if [[ "${OLD_CACHE}" != "none" && -d "${OLD_CACHE}" ]]; then
     OLD_ARGS+=(--old-cache /oldcache)
     OLD_BIND+=(--bind "${OLD_CACHE}:/oldcache")
@@ -155,7 +153,7 @@ submit)
             --cpus-per-task=8 --mem=96G --time=4-00:00:00 --signal=B:USR1@900 \
             --job-name="ag${G}_train" --output="${L}/${G}_train_%j.out" "${SCRIPT}")
         dep=(--dependency=afterok:"${j_tr}")
-        echo "train ${j_tr} (${EPOCHS} epochs on ${WINDOW} rows, lr ${LR})"
+        echo "train ${j_tr} (${EPOCHS} epochs on the new rows + ${OTHERS} of the pool of ${POOL}, lr ${LR})"
     fi
     LAST=$(( GEN >= 2 ? 1 : 0 ))
     j_ev=$(sbatch "${common[@]}" ${dep[@]+"${dep[@]}"} --export="${env_base},STAGE=eval" --array=0-${LAST} \
@@ -206,7 +204,7 @@ train)
     trap 'echo "[$(date "+%F %T")] signal received, checkpointing"; kill -TERM ${PID} 2>/dev/null || true' USR1 TERM
     ( exec singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" \
         ${OLD_BIND[@]+"${OLD_BIND[@]}"} "${SIF}" python3 /Yolah/nnue/az_gen_train.py /work --gen "${GEN}" \
-        --window "${WINDOW}" --epochs "${EPOCHS}" --lr "${LR}" --q-weight "${Q_WEIGHT}" \
+        --pool "${POOL}" --others "${OTHERS}" --epochs "${EPOCHS}" --lr "${LR}" --q-weight "${Q_WEIGHT}" \
         --fast-policy-weight "${FAST_POLICY_WEIGHT}" --seed "${GEN}" ${OLD_ARGS[@]+"${OLD_ARGS[@]}"} ) &
     PID=$!
     RC=0; wait ${PID} || RC=$?
