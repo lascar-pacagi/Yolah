@@ -3567,7 +3567,7 @@ void scene_game(App& a) {
     if (g.puzzle_mode && g.intro) {
         draw_image_background(a, g.puzzle.background, 0, false);   // the whole window, as it is
         float k = ease_out_cubic(float((a.time - a.scene_t0) / 0.6));
-        Box card{a.w * 0.5f - 420 * s, a.h - 340 * s + (1 - k) * 60 * s, 840 * s, 290 * s};
+        Box card{a.w * 0.5f - 420 * s, a.h * 0.5f - 145 * s + (1 - k) * 60 * s, 840 * s, 290 * s};   // centred in the window
         a.ui.panel(card, 24, hex(0x10151d, uint8_t(225 * k)));
         a.text.draw_shadowed(Font::Title, 40 * s, g.puzzle.name, {card.center().x, card.y + 26 * s}, with_alpha(pal::text, k), Align::Center, hex(0x000000, 120), 3 * s);
         a.text.paragraph(Font::Regular, 18 * s, g.puzzle.text, {card.x + 50 * s, card.y + 92 * s, card.w - 100 * s, 60 * s}, with_alpha(pal::dim, k), 1.25f, Align::Center);
