@@ -2813,6 +2813,7 @@ struct App {
 
     // The sprite picker (a modal grid over the library), used by the themes
     // scene and the editor: on_pick receives the chosen sprite id.
+    float themes_scroll = 0;              // the theme cards (@@SCENE_THEMES)
     struct Picker {
         bool open = false;
         std::string title, current;
@@ -3167,7 +3168,7 @@ void scene_menu(App& a) {
         {"Apprendre \xC3\xA0 jouer", [&] { start_lesson(a, first_lesson_to_do(a)); }, Style::Normal},
         {"Puzzles et qu\xC3\xAA" "tes", [&] { a.go(Scene::Puzzles); }, Style::Normal},
         {"\xC3\x89" "diteur de puzzles", [&] { a.go(Scene::Editor); }, Style::Normal},
-        {"Th\xC3\xA8mes et sprites", [&] { a.go(Scene::Themes); }, Style::Normal},
+        {"Th\xC3\xA8mes", [&] { a.go(Scene::Themes); }, Style::Normal},
         {"Atelier : dessins et plateaux", [&] { a.go(Scene::Studio); }, Style::Normal},
         {"Quitter", [&] { SDL_Event e{}; e.type = SDL_EVENT_QUIT; SDL_PushEvent(&e); }, Style::Ghost},
     };
@@ -3748,44 +3749,68 @@ void scene_themes(App& a) {
     const float s = a.s;
     const bool picking = a.picker.open;
     draw_background(a);
-    draw_title(a, "Th\xC3\xA8mes et sprites", "Choisissez l'apparence du plateau, et le sprite de chaque joueur. Les th\xC3\xA8mes sont des fichiers JSON de assets/themes.");
+    draw_title(a, "Th\xC3\xA8mes", "Le plateau et le sprite de chaque joueur, parmi ceux de la biblioth\xC3\xA8que et ceux cr\xC3\xA9\xC3\xA9s dans l'atelier.");
     a.ui.blocked = picking;
     if (picking && a.in.key(SDLK_ESCAPE)) { a.picker.open = false; a.in.eat(SDLK_ESCAPE); }
     if (back_button(a)) { a.save_settings(); a.go(Scene::Menu); return; }
-    // Themes: cards with a small live board.
-    const float card_w = 250 * s, card_h = 300 * s, gap = 24 * s;
+    // Themes: cards with a small live board (with the drawings of the
+    // workshop when the theme has some), in a grid that scrolls.
+    const float card_w = 236 * s, card_h = 272 * s, gap = 20 * s;
     const int cols = 3;
-    Box area{60 * s, 140 * s, cols * card_w + (cols - 1) * gap, a.h - 180 * s};
+    Box area{60 * s, 140 * s, cols * card_w + (cols - 1) * gap, a.h - 230 * s};
+    if (a.ui.hover(area)) a.themes_scroll = std::max(0.0f, a.themes_scroll - a.in.wheel * 60 * s);
+    const int rows = (int(a.themes.size()) + cols - 1) / cols;
+    a.themes_scroll = std::clamp(a.themes_scroll, 0.0f, std::max(0.0f, rows * (card_h + gap) - gap - area.h + 12 * s));
+    Box clip_box{area.x - 12 * s, area.y - 10 * s, area.w + 24 * s, area.h + 20 * s};
+    draw::clip(&clip_box);
     for (size_t i = 0; i < a.themes.size(); i++) {
         const Theme& t = a.themes[i];
-        Box c{area.x + (i % cols) * (card_w + gap), area.y + (i / cols) * (card_h + gap), card_w, card_h};
-        bool sel = t.id == a.settings.theme, h = a.ui.hover(c);
+        Box c{area.x + (i % cols) * (card_w + gap), area.y + (i / cols) * (card_h + gap) - a.themes_scroll, card_w, card_h};
+        if (c.bottom() < area.y - 10 * s || c.y > area.bottom()) continue;
+        bool sel = t.id == a.settings.theme, h = a.ui.hover(c) && area.contains(a.in.mouse);
         if (h) a.ui.hovering = true;
         float k = a.ui.anim("th" + t.id, h), ks = a.ui.anim("ths" + t.id, sel);
         Box cc{c.x, c.y - 6 * s * k, c.w, c.h};
         draw::shadow({cc.x, cc.y + 10 * s, cc.w, cc.h}, 18 * s, 30 * s, hex(0x000000, 110));
         draw::round_box(cc, 18 * s, t.bg_top, t.bg_bottom);
         if (ks > 0.01f) draw::round_frame(cc, 18 * s, 3 * s, with_alpha(t.accent, ks));
-        Box b{cc.x + 25 * s, cc.y + 22 * s, 200 * s, 200 * s};
-        draw::round_box(b.inset(-10 * s), 10 * s, t.frame_top, t.frame_bottom);
+        Box b{cc.x + 28 * s, cc.y + 22 * s, 180 * s, 180 * s};
+        if (Art* fa = t.frame_art.empty() ? nullptr : find_art(t.frame_art)) draw_art_frame(*fa, a.time, b.inset(-10 * s), 10 * s);
+        else draw::round_box(b.inset(-10 * s), 10 * s, t.frame_top, t.frame_bottom);
         SDL_FRect dst = b.frect();
         SDL_RenderTexture(a.renderer, a.board_textures.get(t, int(b.w)), nullptr, &dst);
         float q = b.w / 8;
+        Art* tl = t.tile_light.empty() ? nullptr : find_art(t.tile_light);
+        Art* td = t.tile_dark.empty() ? nullptr : find_art(t.tile_dark);
+        if (tl || td)
+            for (int y = 0; y < 8; y++)
+                for (int x = 0; x < 8; x++)
+                    if (Art* ta = (x + y) % 2 == 0 ? tl : td) draw_art(*ta, "idle", a.time, {b.x + x * q, b.y + y * q, q, q});
+        Art* ha = t.hole_art.empty() ? nullptr : find_art(t.hole_art);
         for (V2 hsq : {V2{3, 3}, V2{4, 2}, V2{2, 5}}) {
-            Box hb{b.x + hsq.x * q + q * 0.08f, b.y + hsq.y * q + q * 0.08f, q * 0.84f, q * 0.84f};
-            draw::round_box(hb, q * 0.2f, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
+            Box hb{b.x + hsq.x * q, b.y + hsq.y * q, q, q};
+            if (ha) draw_art(*ha, "idle", a.time + hsq.x, hb);
+            else draw::round_box(hb.inset(q * 0.08f), q * 0.2f, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
         }
         draw_piece(a.player_sprite("human"), BLACK, {b.x + 2.5f * q, b.y + 2.5f * q}, q * 0.4f, 0, a.time, 1, true);
         draw_piece(a.player_sprite("dev"), WHITE, {b.x + 5.5f * q, b.y + 4.5f * q}, q * 0.4f, 0, a.time);
-        a.text.draw(Font::Bold, 20 * s, t.name, {cc.center().x, cc.bottom() - 62 * s}, pal::text, Align::Center);
-        a.text.draw(Font::Regular, 14 * s, sel ? "th\xC3\xA8me actuel" : "cliquer pour choisir", {cc.center().x, cc.bottom() - 34 * s}, sel ? t.accent : pal::dim, Align::Center);
+        a.text.draw(Font::Bold, 18 * s, t.name, {cc.center().x, cc.bottom() - 56 * s}, pal::text, Align::Center);
+        a.text.draw(Font::Regular, 13 * s, sel ? "th\xC3\xA8me actuel" : "cliquer pour choisir", {cc.center().x, cc.bottom() - 30 * s}, sel ? t.accent : pal::dim, Align::Center);
         if (h && a.in.released) a.settings.theme = t.id;
+    }
+    draw::clip(nullptr);
+    if (a.ui.button("th_studio", {area.x, a.h - 80 * s, area.w, 46 * s}, "Cr\xC3\xA9" "er ou modifier des plateaux et des sprites dans l'atelier\xE2\x80\xA6", Style::Ghost, true, 16)) {
+        a.save_settings();
+        a.go(Scene::Studio);
+        a.studio.return_to = Scene::Themes;
+        a.studio.tab = 1;
+        return;
     }
     // The players and their sprites.
     Box gal{area.right() + 50 * s, 140 * s, a.w - area.right() - 110 * s, a.h - 180 * s};
     a.ui.panel(gal);
     a.text.draw(Font::Black, 22 * s, "Sprites des joueurs", {gal.x + 22 * s, gal.y + 18 * s}, pal::text);
-    a.text.paragraph(Font::Regular, 14 * s, strf("Cliquez sur un joueur pour lui choisir un sprite parmi les %zu de la biblioth\xC3\xA8que (assets/sprites/sprites.json). Le joueur humain garde toujours son halo bleu.", a.sprites.size()),
+    a.text.paragraph(Font::Regular, 14 * s, strf("Cliquez sur un joueur pour lui choisir un sprite parmi les %zu de la biblioth\xC3\xA8que, dont vos dessins de l'atelier (\xC2\xAB Mes dessins \xC2\xBB). Le joueur humain garde toujours son halo bleu.", a.sprites.size()),
                      {gal.x + 22 * s, gal.y + 52 * s, gal.w - 44 * s, 60 * s}, pal::dim);
     std::vector<std::pair<std::string, std::string>> players = {{"human", "Joueur humain"}};
     for (auto& ai : a.roster) players.push_back({ai.id, ai.name});
@@ -3836,11 +3861,12 @@ void sprite_picker(App& a) {
     Box grid{p.x + 24 * s, p.y + 84 * s, p.w - 48 * s, p.h - 190 * s};
     const float cell = 104 * s;
     const int cols = std::max(1, int(grid.w / cell));
-    std::vector<std::string> cats;   // in the order of the file
+    std::vector<std::string> cats;   // the drawings of the workshop first, then in the order of the file
     for (auto& sp : a.sprites) {
         std::string c = sp.category.empty() ? "Divers" : sp.category;
         if (std::find(cats.begin(), cats.end(), c) == cats.end()) cats.push_back(c);
     }
+    std::stable_partition(cats.begin(), cats.end(), [](const std::string& c) { return c == "Mes dessins"; });
     if (a.ui.hover(grid)) pk.scroll -= a.in.wheel * cell * 0.8f;
     float y = grid.y - pk.scroll;
     const SpriteDef* hovered = nullptr;
