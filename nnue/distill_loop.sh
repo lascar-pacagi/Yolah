@@ -34,6 +34,9 @@
 #   summary    LOOP_DIR/progress.csv (loop_progress.py)
 #   relabel    (by hand) round r's cache labelled again by ResNet_{r+1} and
 #              blended, without training the ResNet again (after a new prepare)
+#   stats      (by hand, CPU) what the NNUE's targets are made of, per number
+#              of free squares (loop_label_stats.py): exact / not exact, how
+#              well the search value, the ResNet and the blend predict z
 #
 # NNUE experiments (by hand): NNUE_TAG=<name> with the stages nnue and
 # eval_nnue writes NNUE_{r+1} to round_<r+1>/exp_<name>/ and its player to
@@ -274,6 +277,12 @@ relabel)
         python3 distill_teacher_labels.py /work/${RD}/cache --model /work/resnet/models/az_${STEP_NEXT}.pt
         python3 loop_blend.py /work/${RD}/cache --search-weight ${SEARCH_WEIGHT}"
     echo "[$(date '+%F %T')] done: ${RD}/cache labelled by az_${STEP_NEXT}"
+    ;;
+
+# ── by hand: the NNUE's targets of round r, per number of free squares ─────
+stats)
+    header
+    run bash -c "cd /Yolah/nnue && python3 loop_label_stats.py /work/${RD}"
     ;;
 
 # ── NNUE_{r+1} ──────────────────────────────────────────────────────────────
