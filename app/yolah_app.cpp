@@ -6249,6 +6249,11 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
         a->fx.update(float(a->dt));
         a->fx.draw(a->text);
     }
+    // A message on the board (a side that must pass) goes as soon as the game is
+    // over: the scores take its place.
+    if (a->toast_at.x >= 0 && ((a->scene == Scene::Game && a->game.match.over())
+                               || (a->scene == Scene::Tutorial && a->tuto.match.over())))
+        a->toast.clear();
     // Toast message at the bottom.
     float tk = float(a->time - a->toast_t);
     if (tk < 4.0f && !a->toast.empty()) {
