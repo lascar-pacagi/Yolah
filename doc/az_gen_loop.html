@@ -1,0 +1,865 @@
+<title>Yolah Generations Loop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a sticky table of contents on the left (wide screens), one reading column of ~70 characters,
+   code, diagrams and widgets allowed to run wider than the text column. */
+:root {
+  --paper: #f3f5f7;
+  --panel: #ffffff;
+  --ink: #17202b;
+  --ink-2: #4b5667;
+  --ink-3: #7a8494;
+  --rule: #d8dde4;
+  --accent: #2c55c9;
+  --accent-soft: #e3e9fa;
+  --black-pc: #c0701a;
+  --black-soft: #f6e3cc;
+  --white-pc: #117f74;
+  --white-soft: #cfeee9;
+  --hole: #4d5563;
+  --neutral: #b7bec9;
+  --good: #2e8a3e;
+  --bad: #c2412d;
+  --code-bg: #111821;
+  --code-ink: #dbe2ea;
+  --code-dim: #7f8b9b;
+  --code-kw: #ff9e64;
+  --code-ty: #7dcfff;
+  --code-fn: #9ece6a;
+  --code-num: #e0af68;
+  --code-str: #c3e88d;
+  --code-com: #6c7a8c;
+  --code-pre: #bb9af7;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Literata", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --measure: 70ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+    --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+    --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+    --code-bg: #0a0f15; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+  --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+  --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+  --code-bg: #0a0f15; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.62;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.page { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 1050px) { .page { grid-template-columns: minmax(0, 1fr); gap: 0; } nav.toc { display: none; } }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; max-height: 100vh; overflow-y: auto; padding: 28px 0 40px; font-family: var(--font-display); font-size: 13.5px; }
+nav.toc .toc-title { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+nav.toc ol ol { padding-left: 14px; margin: 2px 0 6px; }
+nav.toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 2px 8px; border-left: 2px solid transparent; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-left-color: var(--accent); outline: none; }
+nav.toc ol ol a { font-size: 12.5px; color: var(--ink-3); }
+main { min-width: 0; padding-top: 28px; }
+.col { max-width: var(--measure); }
+.wide { max-width: 980px; }
+header.hero { padding: 24px 0 8px; border-bottom: 1px solid var(--rule); margin-bottom: 32px; }
+.eyebrow { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 5vw, 54px); line-height: 1.04; letter-spacing: -.02em; margin: 10px 0 14px; text-wrap: balance; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; margin: 0 0 20px; }
+h2 { font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -.01em; line-height: 1.15; margin: 64px 0 14px; padding-top: 18px; border-top: 3px solid var(--ink); text-wrap: balance; }
+h2 .num, h3 .num { color: var(--accent); margin-right: .4em; font-variant-numeric: tabular-nums; }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 21px; margin: 40px 0 8px; text-wrap: balance; }
+h4 { font-family: var(--font-display); font-weight: 700; font-size: 16px; margin: 24px 0 4px; color: var(--ink-2); }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+code, kbd { font-family: var(--font-mono); font-size: .84em; background: var(--accent-soft); padding: .08em .32em; border-radius: 4px; }
+ul, ol { padding-left: 1.3em; margin: 0 0 14px; }
+li { margin: 3px 0; }
+.note { border-left: 3px solid var(--accent); padding: 8px 14px; background: var(--panel); margin: 18px 0; font-size: 15.5px; color: var(--ink-2); }
+.note strong { color: var(--ink); }
+table { border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.tbl { overflow-x: auto; margin: 14px 0 20px; }
+th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-display); font-weight: 700; font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); border-bottom: 2px solid var(--ink); }
+td code { white-space: nowrap; }
+.num-r { text-align: right; padding-right: 16px; }
+.formula { font-family: var(--font-mono); font-size: 15px; background: var(--panel); border: 1px solid var(--rule); padding: 10px 14px; margin: 12px 0 18px; overflow-x: auto; white-space: pre; line-height: 1.5; }
+figure { margin: 22px 0 26px; }
+figcaption { font-family: var(--font-display); font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+figure.code { margin: 16px 0 22px; max-width: 980px; }
+figure.code .code-head { font-family: var(--font-mono); font-size: 12px; color: var(--code-dim); background: var(--code-bg); padding: 8px 14px 0; border-radius: 8px 8px 0 0; }
+figure.code pre { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 10px 14px 14px; border-radius: 0 0 8px 8px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.55; tab-size: 4; }
+figure.code pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+.hljs-keyword, .hljs-built_in { color: var(--code-kw); }
+.hljs-type { color: var(--code-ty); }
+.hljs-title, .hljs-title.function_ { color: var(--code-fn); }
+.hljs-number, .hljs-literal { color: var(--code-num); }
+.hljs-string { color: var(--code-str); }
+.hljs-comment { color: var(--code-com); font-style: italic; }
+.hljs-meta, .hljs-meta .hljs-keyword { color: var(--code-pre); }
+.diagram { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 18px 0 8px; }
+.diagram svg { display: block; max-width: none; }
+.diagram svg text { font-family: var(--font-display); fill: var(--ink); }
+.widget { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 20px 0 8px; max-width: 980px; }
+.widget-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.widget-title { font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: .03em; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font-family: var(--font-display); font-weight: 600; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+button.primary:hover { color: var(--panel); filter: brightness(1.08); }
+label { font-family: var(--font-display); font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+input[type=range] { accent-color: var(--accent); width: 150px; }
+.readout { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); background: var(--paper); border-radius: 6px; padding: 8px 12px; margin-top: 10px; white-space: pre-wrap; overflow-x: auto; }
+.log { font-family: var(--font-display); font-size: 14px; color: var(--ink); min-height: 2.8em; margin-top: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: var(--font-display); font-size: 12.5px; color: var(--ink-2); margin-top: 10px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+.twocol { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; align-items: start; }
+.twocol > * { min-width: 0; }
+.board-wrap { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.board-wrap > * { min-width: 0; }
+.tag { display: inline-block; font-family: var(--font-display); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); vertical-align: 2px; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 18px 0 8px; max-width: 980px; }
+.stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.stat b { display: block; font-family: var(--font-display); font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat span { font-family: var(--font-display); font-size: 12.5px; color: var(--ink-3); }
+details.mobile-toc { display: none; margin: 8px 0 20px; font-family: var(--font-display); font-size: 14px; }
+@media (max-width: 1050px) { details.mobile-toc { display: block; } }
+details.mobile-toc summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+details.mobile-toc ol { columns: 1; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="page">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol id="toc-list"></ol>
+</nav>
+<main>
+<header class="hero">
+  <div class="eyebrow">Yolah · generations loop · MCTS self-play → ResNet (nnue/az_gen_loop.sh)</div>
+  <h1>Yolah Generations Loop Internals</h1>
+  <p class="lede">How the value/policy ResNet of the MCTS player improves generation after generation: the current network plays games against itself with its full MCTS search, the endgame solver gives the exact result near the end, and the network learns from the new games mixed with a large pool of older positions that changes slowly. Every stage is shown with its code and its targets.</p>
+  <div class="stat-row">
+    <div class="stat"><b>12.5 M</b><span>new positions per generation</span></div>
+    <div class="stat"><b>+ 37.5 M</b><span>positions drawn from the pool for each training</span></div>
+    <div class="stat"><b>200 M</b><span>positions in the pool</span></div>
+    <div class="stat"><b>1600 / 200</b><span>simulations of a full / fast search</span></div>
+  </div>
+</header>
+<details class="mobile-toc"><summary>Contents</summary><ol id="toc-list-m"></ol></details>
+
+<section id="s1">
+<h2><span class="num">1</span>The loop at a glance</h2>
+<div class="col">
+<p>Each generation G starts from the network az<sub>G−1</sub> and ends with az<sub>G</sub>. In four stages:</p>
+<ol>
+<li><strong>selfplay</strong>: az<sub>G−1</sub> plays games against itself with the MCTS search until 12.5 M positions are recorded. Every move is recorded. Positions with at most 22 free squares get the solver's exact result.</li>
+<li><strong>train</strong>: az<sub>G−1</sub> trains for 10 epochs on these 12.5 M positions plus 37.5 M positions drawn from the pool, then becomes az<sub>G</sub>.</li>
+<li><strong>eval</strong>: az<sub>G</sub> plays against az<sub>G−1</sub> and against az<sub>0</sub>.</li>
+<li><strong>next</strong>: submits generation G + 1 as soon as az<sub>G</sub> exists, while the evaluation is still playing.</li>
+</ol>
+<p>Generation 0 is ResNet<sub>1</sub> of the distillation loop (section 7), which beat its predecessor by +22 Elo.</p>
+</div>
+
+<h3 id="s1-why"><span class="num">1.1</span>Why this loop replaced the distillation loop</h3>
+<div class="col">
+<p>The distillation loop (<code>nnue/distill_loop.sh</code>, <code>doc/distillation_loop.html</code>) generated its games with the minimax dev player and labelled the positions with its search. A search value of the dev player is computed by the NNUE at its leaves. That label carries what the NNUE knows, and the NNUE knows less than the ResNet. The ResNet trained on it gained +22 Elo in one round, but the NNUE distilled from it lost 32.6 Elo (−16.5 with 20 epochs instead of 2). Labels of positions inside a search tree have a second problem: the game's result z is not the result of a position the game never reached.</p>
+<p>The generations loop keeps only what AlphaZero relies on:</p>
+<ul>
+<li>the games are played by the network being trained, with its own search;</li>
+<li>every recorded position is a position of the game, so z is its real result;</li>
+<li>near the end, the exact result replaces z.</li>
+</ul>
+<p>The price is speed: one MCTS move costs a GPU much more than one minimax move costs a CPU core. The pool compensates. Each training sees the new generation as only a quarter of its rows, so the network moves slowly and does not forget what the 200 M older positions taught it.</p>
+</div>
+
+<h3 id="s1-gen"><span class="num">1.2</span>One generation</h3>
+<div class="diagram wide" id="d-gen"></div>
+
+<h3 id="s1-map"><span class="num">1.3</span>The code map</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>File</th><th>Stage</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>nnue/az_gen_loop.sh</code></td><td>all</td><td>submits a generation (one SLURM job per stage, with dependencies), runs each stage in the container, <code>status</code></td></tr>
+<tr><td><code>test/alphazero_learn_main.cpp</code></td><td>selfplay</td><td><code>alphazero_learn selfplay</code>: options <code>--max-samples</code>, <code>--record-fast</code>, <code>--exact-free</code>, <code>--exact-ms</code></td></tr>
+<tr><td><code>player/alphazero_selfplay.{h,cpp}</code></td><td>selfplay</td><td>the game threads, <code>TrainingSample</code>, the flags, the solver at the end of a game, the sample files</td></tr>
+<tr><td><code>config/alphazero_mcts_selfplay_player.cfg</code></td><td>selfplay</td><td>the MCTS settings of self-play</td></tr>
+<tr><td><code>nnue/az_gen_train.py</code></td><td>train</td><td>the pool, the draw, the losses, the training with checkpoints, the export</td></tr>
+<tr><td><code>nnue/alphazero_learn.py</code></td><td>train</td><td><code>BatchMaker</code> (planes, symmetries), <code>make_net</code>, <code>export_model</code>, the sample file reader</td></tr>
+<tr><td><code>nnue/az_gen_data.py</code></td><td>selfplay, analysis</td><td><code>count</code>: rows of a task; <code>stats</code>: fast and exact rows, diversity of the games</td></tr>
+<tr><td><code>nnue/alphazero_match.sh</code></td><td>eval</td><td>the matches of two networks with the MCTS player</td></tr>
+</tbody></table></div>
+
+<h3 id="s1-settings"><span class="num">1.4</span>The settings</h3>
+<div class="col">
+<p>Every setting is an environment variable of <code>az_gen_loop.sh</code>, read at submission and passed on to every job and to the next generations.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Variable</th><th class="num-r">Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>GEN_ROWS</code></td><td class="num-r">12500000</td><td>new rows per generation, shared between the self-play tasks</td></tr>
+<tr><td><code>SELFPLAY_JOBS</code>, <code>SELFPLAY_GAMES</code></td><td class="num-r">4, 256</td><td>GPUs of the self-play (one task each), games played at the same time per GPU</td></tr>
+<tr><td><code>SIMS</code>, <code>SIMS_FAST</code></td><td class="num-r">1600, 200</td><td>simulations of a full search and of a fast search</td></tr>
+<tr><td><code>EXACT_FREE</code>, <code>EXACT_MS</code></td><td class="num-r">22, 300</td><td>solve positions with at most 22 free squares, 300 ms each</td></tr>
+<tr><td><code>POOL</code>, <code>OTHERS</code></td><td class="num-r">200 M, 37.5 M</td><td>positions of the pool; rows drawn from it for a training</td></tr>
+<tr><td><code>OLD_CACHE</code></td><td class="num-r">cache_az256</td><td>the old positions that fill the pool at the start (<code>none</code>: no old positions)</td></tr>
+<tr><td><code>EPOCHS</code>, <code>LR</code></td><td class="num-r">10, 5e-5</td><td>epochs of a training, peak learning rate</td></tr>
+<tr><td><code>Q_WEIGHT</code></td><td class="num-r">0</td><td>value target (1 − q) · z + q · root_q on non-exact rows (0: z alone)</td></tr>
+<tr><td><code>FAST_POLICY_WEIGHT</code></td><td class="num-r">0</td><td>weight of the fast searches' rows in the policy loss</td></tr>
+<tr><td><code>EVAL_GAMES</code>, <code>EVAL_SECONDS</code></td><td class="num-r">400, 1</td><td>games of each match, seconds per move</td></tr>
+<tr><td><code>START_PT</code>, <code>START_TS</code></td><td class="num-r">ResNet<sub>1</sub></td><td>generation 0: <code>~/DistillLoop/round_001/resnet.{pt,ts}</code></td></tr>
+<tr><td><code>AUTO</code>, <code>MAX_GEN</code></td><td class="num-r">1, 20</td><td>submit the next generation automatically, up to generation 20</td></tr>
+<tr><td><code>GPU_EXCLUDE</code></td><td class="num-r">crn22</td><td>GPU nodes to avoid (crn22 refuses containers)</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s2">
+<h2><span class="num">2</span>Self-play</h2>
+<div class="col">
+<p>Each self-play task is one GPU running <code>alphazero_learn selfplay</code>: 256 games at the same time, one thread per game, and the network's evaluations gathered into batches on the GPU. The program is the self-play of the AlphaZero learning loop with four options added for this loop.</p>
+</div>
+<script type="text/x-code" data-lang="bash" data-title="nnue/az_gen_loop.sh · selfplay, the command of a task">
+start_in_container bash -c "cd /Yolah/config && exec ${BUILD_DIR}/alphazero_learn selfplay \
+    --config /Yolah/config/alphazero_mcts_selfplay_player.cfg --work /work/${GD} \
+    --games ${SELFPLAY_GAMES} --set 'nn cache=32' --set 'nb simulations=${SIMS}' --set 'nb simulations fast=${SIMS_FAST}' \
+    --max-samples ${LEFT} --record-fast --exact-free ${EXACT_FREE} --exact-ms ${EXACT_MS} \
+    --report 900 --tag ${TAG}"
+</script>
+
+<h3 id="s2-search"><span class="num">2.1</span>The search of a move</h3>
+<div class="col">
+<p>The MCTS player is the one of <code>doc/alphazero_mcts_player.html</code> (PUCT in KataGo's form, graph search, network cache), with the self-play settings:</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Setting</th><th class="num-r">Value</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>playout cap fast prob</code></td><td class="num-r">0.75</td><td>playout cap randomization: 3 moves in 4 use a fast search of 200 simulations, 1 in 4 a full search of 1600</td></tr>
+<tr><td><code>dirichlet alpha</code>, <code>dirichlet epsilon</code></td><td class="num-r">0.3, 0.25</td><td>noise on the root's priors, full searches only</td></tr>
+<tr><td><code>temperature</code>, <code>temperature cutoff</code></td><td class="num-r">1, 20</td><td>the first 20 plies: the move is drawn in proportion to the visits; then the best move</td></tr>
+<tr><td><code>forced playouts k</code></td><td class="num-r">2</td><td>KataGo's forced playouts: every child with a prior gets a minimum of visits</td></tr>
+<tr><td><code>policy target pruning</code></td><td class="num-r">on</td><td>the forced visits are removed from π before it is recorded</td></tr>
+<tr><td><code>graph search</code>, <code>reuse tree</code></td><td class="num-r">on, on</td><td>transpositions share a node; the subtree of the move played is kept</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The full searches give the policy targets: many visits, with noise for exploration. The fast searches play the game quickly, which yields more games and so more results z for the same GPU time.</p>
+</div>
+
+<h3 id="s2-diversity"><span class="num">2.2</span>Where the diversity comes from</h3>
+<div class="col">
+<p>A self-play game starts from the empty board, without a book or random plies (those are used in the matches only). Two sources of chance make the games differ:</p>
+<ul>
+<li>for the first 20 plies, each move is drawn in proportion to the visits of the root's children;</li>
+<li>the Dirichlet noise changes the priors of every full search, so the visits differ too.</li>
+</ul>
+<p>The distillation loop, by contrast, used the book plus 2 random plies, because the dev player is deterministic. <code>az_gen_data.py stats</code> measures the diversity of a generation: for each number of moves played, the number of distinct positions among the games (100 % means that no two games share the position).</p>
+</div>
+
+<h3 id="s2-record"><span class="num">2.3</span>The record</h3>
+<div class="col">
+<p>Every recorded move is a <code>TrainingSample</code> of 336 bytes: the position, the result z, the flags, the search's value and its policy π over at most 75 moves.</p>
+</div>
+<div class="diagram wide" id="d-record"></div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_selfplay.h · TrainingSample and its flags">
+struct TrainingSample {
+    uint64_t black, white, empty;        // bitboards (the network input, see nn::encode_planes)
+    uint8_t  turn;                       // 0 = black to move, 1 = white
+    int8_t   z;                          // outcome for the side to move: -1, 0, +1
+    uint8_t  nb_moves;                   // entries used in action[] / prob[]
+    uint8_t  flags;                      // SAMPLE_FAST | SAMPLE_EXACT (0 in the learning loop's rows)
+    float    root_q;                     // search value of the root, side to move
+    uint32_t model_step;                 // trainer step of the network that searched
+    uint16_t action[Yolah::MAX_NB_MOVES];  // policy index from*64+to (nn::action_index)
+    uint16_t prob[Yolah::MAX_NB_MOVES];    // π(action) · 65535, rounded
+};
+static_assert(sizeof(TrainingSample) == 336, "keep in sync with alphazero_learn.py");
+
+enum SampleFlags : uint8_t {
+    SAMPLE_FAST  = 1,   // a fast search of playout cap randomization: π is noisy (few visits, no noise)
+    SAMPLE_EXACT = 2,   // z is the exact result of the position (the endgame solver), not the game's
+};
+</script>
+<div class="col">
+<p>In the AlphaZero learning loop only the full searches were recorded. With <code>--record-fast</code>, the fast searches are recorded too, flagged <code>SAMPLE_FAST</code>. Their π is too noisy to be a policy target, but their position has a real result z, so they become value targets. That multiplies the value targets by four.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_selfplay.cpp · one move of a game">
+const SearchResult r = search.search(y);
+evaluations.fetch_add(r.nb_evaluations, std::memory_order_relaxed);
+if ((r.full_search || opt.record_fast) && !r.children.empty()) {
+    samples.push_back(make_sample(y, r, model_step.load()));
+    if (!r.full_search) samples.back().flags |= SAMPLE_FAST;
+    if (solver && std::popcount(y.free_squares()) <= opt.exact_free)
+        endgame.emplace_back(samples.size() - 1, y);
+}
+if (r.best_move != Move::none())   // a pass leaves no hole
+    leaver[static_cast<int>(r.best_move.from_sq())] = y.current_player();
+y.play(r.best_move);
+</script>
+
+<h3 id="s2-exact"><span class="num">2.4</span>The result and the exact result</h3>
+<div class="col">
+<p>When the game is over, every sample gets z, the game's result for its side to move. Then the solver goes through the positions with at most 22 free squares, <strong>from the end of the game backwards</strong>. The last positions are the easiest, and the solver's table, kept between them, helps with the next ones. The first position that is not solved within 300 ms stops the pass: the earlier ones, with more free squares, would be harder still. A solved position gets z = its exact result and the flag <code>SAMPLE_EXACT</code>.</p>
+<p>While a game thread solves, it asks for no network evaluation. It declares this (<code>solving</code>), so that the GPU's batcher does not wait for it.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_selfplay.cpp · the end of a game">
+// Outcome for the side to move at each recorded position.
+const auto [bs, ws] = y.score();
+const int black_diff = int(bs) - int(ws);
+for (TrainingSample& s : samples) {
+    const int d = s.turn == Yolah::BLACK ? black_diff : -black_diff;
+    s.z = static_cast<int8_t>((d > 0) - (d < 0));
+}
+if (solver && !endgame.empty()) {
+    // This thread asks for no evaluation while it solves: the
+    // batcher must not wait for it.
+    solving.fetch_add(1);
+    update_clients();
+    solver->clear();
+    // From the end backwards (easiest first, and the table
+    // helps the next ones), until one is not solved in time.
+    for (auto it = endgame.rbegin(); it != endgame.rend(); ++it) {
+        const std::optional<int8_t> e = solve_wld(*solver, it->second, opt.exact_ms);
+        if (!e) { exact_timeouts.fetch_add(1); break; }
+        TrainingSample& s = samples[it->first];
+        if (*e != s.z) exact_flipped.fetch_add(1);
+        s.z = *e;
+        s.flags |= SAMPLE_EXACT;
+        exact_done.fetch_add(1);
+    }
+    solving.fetch_sub(1);
+    update_clients();
+}
+</script>
+<div class="col">
+<p>Every position recorded here was played in the game, so z is already its true result when both sides play the network's moves. The counter <code>exact_flipped</code> counts the positions where the exact result differs from z: in a local test of 64-simulation games it stayed at 0. The solver is then mostly a check, and a correction for the rare endgame mistakes of the network.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Local test (64 simulations per search)</th><th class="num-r">Value</th></tr></thead>
+<tbody>
+<tr><td>rows per game</td><td class="num-r">55</td></tr>
+<tr><td>fast rows</td><td class="num-r">75 %</td></tr>
+<tr><td>exact rows</td><td class="num-r">38 %</td></tr>
+<tr><td>z changed by the solver</td><td class="num-r">0</td></tr>
+</tbody></table></div>
+
+<h3 id="s2-share"><span class="num">2.5</span>The share of a task and resuming</h3>
+<div class="col">
+<p>The 12.5 M rows are split between the tasks: 3 125 000 each with 4 GPUs. A task first counts the rows its files already hold (their names carry its tag, <code>g001t02</code> for generation 1, task 2), then plays only what is left, with <code>--max-samples</code>. When the count is reached, the game that reached it is still written, and the unfinished games are dropped: every file holds whole games only.</p>
+<p>A task stopped before its share (the 7-day time limit, a node failure) fails. Running <code>bash az_gen_loop.sh G</code> again on the login node submits the generation again, and every task continues from the rows it already has; a task whose share is complete exits at once.</p>
+</div>
+<script type="text/x-code" data-lang="bash" data-title="nnue/az_gen_loop.sh · selfplay, the share of a task">
+TASK="${SLURM_ARRAY_TASK_ID:?array task}"
+NT="${SLURM_ARRAY_TASK_COUNT:-${SELFPLAY_JOBS}}"
+TAG="g${G}t$(printf '%02d' "${TASK}")"
+SHARE=$(( (GEN_ROWS + NT - 1) / NT ))
+rows_done() { run python3 /Yolah/nnue/az_gen_data.py count "/work/${GD}/selfplay" --tag "_${TAG}_" | tail -1; }
+DONE=$(rows_done)
+LEFT=$(( SHARE - DONE ))
+(( LEFT > 0 )) || { echo "[$(date '+%F %T')] done already"; exit 0; }
+</script>
+</section>
+
+<section id="s3">
+<h2><span class="num">3</span>The pool</h2>
+<div class="col">
+<p>Training only on the newest games would make the network chase its own latest games and forget the rest. The pool gives the training inertia. It holds 200 M positions; each training uses all of the new generation and 37.5 M positions drawn from the rest of the pool. The pool is not a file: it is a rule that <code>az_gen_train.py</code> applies to the files on disk.</p>
+</div>
+
+<h3 id="s3-rule"><span class="num">3.1</span>The rule</h3>
+<div class="col">
+<ul>
+<li>At the start, the pool is 200 M positions of the old cache <code>cache_az256</code>.</li>
+<li>Each generation's rows enter the pool and push out as many old positions.</li>
+<li>With 12.5 M rows per generation, the old positions are all gone after 16 generations. After that, the oldest generations leave the pool.</li>
+</ul>
+<p>The old positions leave in a fixed order: the cache is cut into blocks of 4096 consecutive positions, shuffled once with a fixed seed. The pool's old part is always the beginning of that order, so the blocks at its end are the first to leave, and the old positions of generation G are a subset of those of generation G − 1.</p>
+</div>
+<div class="diagram wide" id="d-pool"></div>
+<script type="text/x-code" data-lang="python" data-title="nnue/az_gen_train.py · build_training, the pool">
+own = gen_files(root, gen)
+val = [f for f, _ in own[::val_every]]
+own = [(f, n) for f, n in own if f not in set(val)]
+n_own = sum(n for _, n in own)
+in_pool = n_own + sum(n for f, n in gen_files(root, gen)[::val_every])
+# The rest of the pool: the generations before, newest first, while they fit...
+units = []
+per_gen = {}
+for g in range(gen - 1, 0, -1):
+    for f, n in reversed(gen_files(root, g)):
+        if in_pool + n > pool:
+            break
+        units.append(("gen", f, n))
+        per_gen[g] = per_gen.get(g, 0) + n
+        in_pool += n
+# ...then the old positions still in it.
+n_old_pool = 0
+if old is not None:
+    n_old_pool = max(0, min(pool - in_pool, len(old.order) * old.block))
+    nb = n_old_pool // old.block
+    units += [("old", int(st), old.block) for st in old.order[:nb]]
+    n_old_pool = nb * old.block
+</script>
+
+<h3 id="s3-draw"><span class="num">3.2</span>The draw</h3>
+<div class="col">
+<p>The 37.5 M other rows are drawn from the rest of the pool by whole units: a self-play file (about 2000 rows) or an old block (4096 positions). The units are shuffled with a seed given by the generation, then taken until 37.5 M. Each source therefore contributes in proportion to its size in the pool. Drawing whole units lets the old cache be read sequentially, block after block, rather than one random position at a time.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/az_gen_train.py · build_training, the draw">
+rng = np.random.default_rng(1_000_003 * seed + gen)
+order = rng.permutation(len(units))
+take, n_take = [], 0
+for i in order:
+    if n_take >= others:
+        break
+    kind, src, n = units[i]
+    k = min(n, others - n_take)
+    take.append((kind, src, k))
+    n_take += k
+</script>
+<div class="widget" id="w-pool">
+  <div class="widget-head">
+    <div class="widget-title">The pool and the training of generation G</div>
+    <div class="controls">
+      <label for="pl-g">G <input id="pl-g" type="range" min="1" max="24" step="1" value="1"> <span id="pl-gv"></span></label>
+    </div>
+  </div>
+  <div style="overflow-x:auto"><svg id="pl-svg" width="900" height="150" viewBox="0 0 900 150" role="img" aria-label="composition of the pool and of the training"></svg></div>
+  <div class="readout" id="pl-out"></div>
+</div>
+<div class="col">
+<p>The widget assumes exactly 12.5 M rows per generation and gives the expected composition of the draw. The real draw is random, by units, and a generation holds slightly more than 12.5 M rows, because the last games of a task are finished.</p>
+</div>
+
+<h3 id="s3-old"><span class="num">3.3</span>The old positions</h3>
+<div class="col">
+<p><code>cache_az256</code> is the old distillation cache: positions of the engine games of <code>data/games</code>, in the layout of <code>preprocess_nnue.py</code> (<code>inputs.u8</code>: 193 bytes per position; <code>values.i8</code>: the game's result z). <code>OldCache.rows</code> turns them into rows of the self-play format with no policy (<code>nb_moves</code> = 0) and the flag <code>OLD</code> = 4, which exists only in Python. Their value target is z, the real result of their game.</p>
+</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/az_gen_train.py · OldCache.rows">
+def rows(self, st, n):
+    """n positions from st as self-play rows (no π, flags OLD)."""
+    r = np.asarray(self.inputs[st:st + n])
+    o = np.zeros(n, dtype=SAMPLE_DTYPE)
+    for k, name in enumerate(("black", "white", "empty")):
+        # bit 63 − j of the bitboard is byte j of the row (loop_prepare.board_rows)
+        o[name] = np.packbits(r[:, 64 * k:64 * (k + 1)], axis=1).view(">u8").ravel().astype("<u8")
+    o["turn"] = r[:, 192]
+    o["z"] = self.values[st:st + n]
+    o["flags"] = OLD
+    return o
+</script>
+</section>
+
+<section id="s4">
+<h2><span class="num">4</span>Training</h2>
+<div class="col">
+<p><code>az_gen_train.py</code> loads az<sub>G−1</sub>, reads the training rows into memory (50 M rows of 336 bytes: about 17 GB) and trains for 10 epochs.</p>
+</div>
+
+<h3 id="s4-targets"><span class="num">4.1</span>The targets</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Rows</th><th>Value target (MSE)</th><th>Policy target (cross-entropy)</th></tr></thead>
+<tbody>
+<tr><td>full searches</td><td>z</td><td>π of the search (weight 1)</td></tr>
+<tr><td>fast searches (<code>FAST</code>)</td><td>z</td><td>none (weight <code>FAST_POLICY_WEIGHT</code> = 0)</td></tr>
+<tr><td>solved positions (<code>EXACT</code>)</td><td>the exact result (z holds it)</td><td>as their search: π if full, none if fast</td></tr>
+<tr><td>old positions (<code>OLD</code>)</td><td>z of their game</td><td>none</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>With <code>Q_WEIGHT</code> = q &gt; 0, the value target of the non-exact rows becomes (1 − q) · z + q · root_q, the search's own value. It is 0 by default: the value learns the results only.</p>
+</div>
+<div class="formula">L = (v − target)² + Σ w · CE(π, p) / Σ w        w = 1 full search, 0 fast search or old position</div>
+<script type="text/x-code" data-lang="python" data-title="nnue/az_gen_train.py · Losses.__call__">
+x, z, actions, probs = self.make(rows, augment=augment)
+flags = torch.from_numpy(rows["flags"].astype(np.int64)).to(self.dev)
+exact = (flags & EXACT) != 0
+fast = (flags & FAST) != 0
+no_pi = (flags & OLD) != 0
+target = z
+if self.q > 0:
+    q = torch.from_numpy(rows["root_q"].astype(np.float32)).to(self.dev).clamp(-1.0, 1.0)
+    target = torch.where(exact, z, (1.0 - self.q) * z + self.q * q)
+with torch.autocast(self.dev.type, dtype=self.amp, enabled=self.dev.type == "cuda"):
+    v, logits = net(x)
+v = v.float().view(-1)
+v_loss = F.mse_loss(v, target)
+logp = F.log_softmax(logits.float(), dim=1).gather(1, actions)
+ce = -(probs * logp).sum(1)
+w = torch.where(fast, torch.full_like(ce, self.fw), torch.ones_like(ce))
+w = torch.where(no_pi, torch.zeros_like(ce), w)
+p_loss = (w * ce).sum() / w.sum().clamp_min(1e-6)
+</script>
+
+<h3 id="s4-opt"><span class="num">4.2</span>The optimisation</h3>
+<div class="col">
+<p>Each row of a batch gets one of the 8 symmetries of the board, drawn at random (<code>BatchMaker</code>). The optimiser is AdamW (weight decay 10⁻⁴, batch 1024), with gradients clipped at 5 and bf16 on the GPU. The learning rate warms up linearly over 500 steps, then follows a cosine from 5·10⁻⁵ down to a tenth of it over the whole training. The exported network is the exponential average of the weights (decay 0.999).</p>
+</div>
+<div class="formula">lr(step) = LR · min(1, (step + 1) / 500) · (0.55 + 0.45 · cos(π · step / total))</div>
+
+<h3 id="s4-val"><span class="num">4.3</span>Validation and progress</h3>
+<div class="col">
+<p>One self-play file in 50 of the new generation is kept out of the training (at most 1 M rows). Before the first step and after each epoch, the averaged network is measured on it, and one line goes to <code>ROOT/train_log.jsonl</code>:</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Field</th><th>Measure</th></tr></thead>
+<tbody>
+<tr><td><code>val_mse_z</code></td><td>MSE of the value against z, on every row</td></tr>
+<tr><td><code>val_policy_ce</code></td><td>policy cross-entropy, on the full searches' rows</td></tr>
+<tr><td><code>val_top1</code></td><td>how often the network's first move is the search's most visited move</td></tr>
+<tr><td><code>val_mse_exact</code></td><td>MSE of the value on the solved rows: the error against the truth</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The validation rows are games of az<sub>G−1</sub>, which the network has not seen. The line at epoch 0 is therefore the old network on the new games, a reference for the following lines.</p>
+</div>
+
+<h3 id="s4-ckpt"><span class="num">4.4</span>Checkpoints</h3>
+<div class="col">
+<p>A checkpoint (<code>gen_G/train_ckpt.pt</code>: weights, optimiser, averaged weights, step) is written every 30 minutes and when SLURM sends its warning signal, 15 minutes before the time limit. The script then exits with code 3. Run again (<code>bash az_gen_loop.sh G train</code>), it draws the same rows (same seeds) and resumes at the saved step. At the end it exports <code>models/az_G.pt</code> and its TorchScript <code>az_G.ts</code>, the file the MCTS player loads, and deletes the checkpoint.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="num">5</span>Measuring the progress</h2>
+<div class="col">
+<p>After the training, two matches of the MCTS player with <code>alphazero_match.sh</code>, each on a GPU: az<sub>G</sub> against az<sub>G−1</sub> (task 0) and az<sub>G</sub> against az<sub>0</sub> (task 1, from generation 2 on). Each match is 400 games at 1 s per move, from the balanced openings of <code>config/openings/balanced.txt</code>, each opening played with both colours. The results go to <code>ROOT/matches.csv</code>, one line per match with the score and the Elo, and the games to <code>ROOT/evals/</code>. The match against the previous generation says whether the last generation still helped; the match against generation 0 adds up the generations.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="num">6</span>On the cluster</h2>
+<div class="col">
+<p><code>az_gen_loop.sh G</code>, run on the login node, submits generation G as a chain of SLURM jobs. Each job runs the same script with its stage, inside the AlphaZero container. The C++ is compiled on the node.</p>
+</div>
+<div class="diagram wide" id="d-jobs"></div>
+<div class="tbl wide"><table>
+<thead><tr><th>Stage</th><th>Resources</th><th>Waits for</th><th>Writes</th></tr></thead>
+<tbody>
+<tr><td>selfplay</td><td>GPU array of 4 tasks, 12 CPUs, 64 GB, 7 days</td><td>–</td><td><code>gen_G/selfplay/*.bin</code></td></tr>
+<tr><td>train</td><td>1 GPU, 8 CPUs, 96 GB, 4 days</td><td>every selfplay task (afterok)</td><td><code>models/az_G.{pt,ts}</code>, <code>train_log.jsonl</code></td></tr>
+<tr><td>eval</td><td>GPU array of 2 tasks (1 for G = 1), 8 CPUs, 16 GB, 16 h</td><td>train</td><td><code>matches.csv</code>, <code>evals/</code></td></tr>
+<tr><td>next</td><td>CPU, 1 CPU, 10 min</td><td>train</td><td>submits generation G + 1</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>A selfplay task that fails keeps the training waiting forever: SLURM shows the dependency as never satisfied. The fix is to submit the generation again (2.5). Everything lives in <code>ROOT</code> (<code>~/AzGen</code>), and <code>jobs.txt</code> lists the job numbers of every generation.</p>
+</div>
+
+<h3 id="s6-commands"><span class="num">6.1</span>Commands</h3>
+<script type="text/x-code" data-lang="bash" data-title="on the login node">
+bash ~/Yolah/nnue/az_gen_loop.sh 1              # submit generation 1 (then the next ones, AUTO=1)
+bash ~/Yolah/nnue/az_gen_loop.sh status         # rows per generation, validation per epoch, matches, jobs
+bash ~/Yolah/nnue/az_gen_loop.sh 3              # generation 3 again: the selfplay tasks continue where they were
+bash ~/Yolah/nnue/az_gen_loop.sh 3 train        # generation 3 from its training (resumes its checkpoint)
+bash ~/Yolah/nnue/az_gen_loop.sh 3 eval         # only its matches
+
+tail -n 5 ~/AzGen/logs/001_selfplay_*_0.out     # self-play speed of a task
+tail -n 5 ~/AzGen/logs/001_train_*.out          # training progress
+python3 ~/Yolah/nnue/az_gen_data.py stats ~/AzGen/gen_001/selfplay   # fast / exact rows, diversity
+</script>
+
+<h3 id="s6-files"><span class="num">6.2</span>Files and sizes</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Path under <code>~/AzGen</code></th><th>Content</th></tr></thead>
+<tbody>
+<tr><td><code>models/az_00000000.{pt,ts}</code> …</td><td>the network of every generation</td></tr>
+<tr><td><code>gen_001/selfplay/*.bin</code></td><td>the rows of a generation (header <code>YOLAHSP1</code>, then the samples)</td></tr>
+<tr><td><code>gen_001/latest.json</code></td><td>the network the self-play of the generation loads</td></tr>
+<tr><td><code>gen_001/train_ckpt.pt</code></td><td>the training's checkpoint, while it runs</td></tr>
+<tr><td><code>train_log.jsonl</code>, <code>matches.csv</code>, <code>evals/</code></td><td>validation per epoch, results of the matches, their games</td></tr>
+<tr><td><code>logs/001_selfplay_&lt;job&gt;_&lt;task&gt;.out</code>, <code>001_train_&lt;job&gt;.out</code>, <code>001_eval_…</code>, <code>001_next_…</code></td><td>the SLURM logs, by generation</td></tr>
+</tbody></table></div>
+<div class="tbl wide"><table>
+<thead><tr><th>Item</th><th class="num-r">Size</th></tr></thead>
+<tbody>
+<tr><td>a row</td><td class="num-r">336 bytes</td></tr>
+<tr><td>a generation (12.5 M rows)</td><td class="num-r">4.2 GB</td></tr>
+<tr><td>200 M rows of generations</td><td class="num-r">67 GB on disk</td></tr>
+<tr><td>a training (50 M rows in memory)</td><td class="num-r">≈ 17 GB</td></tr>
+<tr><td>self-play of generation 1, first measure</td><td class="num-r">8.8 M rows in 11.9 h</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s7">
+<h2><span class="num">7</span>The distillation loop and the NNUE</h2>
+<div class="col">
+<p>The previous loop, <code>nnue/distill_loop.sh</code> (<code>doc/distillation_loop.html</code>), improved both players together: the dev player's games trained the ResNet, and the ResNet then became the NNUE's teacher. It was stopped after round 0.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Round 0 → 1</th><th class="num-r">Elo</th><th class="num-r">95 % interval</th></tr></thead>
+<tbody>
+<tr><td>ResNet<sub>1</sub> against ResNet<sub>0</sub> (400 games, 1 s)</td><td class="num-r">+22</td><td class="num-r">[+7, +36]</td></tr>
+<tr><td>NNUE<sub>1</sub> against NNUE<sub>0</sub>, 2 epochs (2000 games)</td><td class="num-r">−32.6</td><td class="num-r">[−42.9, −22.3]</td></tr>
+<tr><td>NNUE<sub>1</sub> against NNUE<sub>0</sub>, 20 epochs (484 games)</td><td class="num-r">−16.5</td><td class="num-r">[−40.3, +7.1]</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>ResNet<sub>1</sub> is the starting point of the generations loop. The NNUE is not part of the generations loop: the dev player keeps its current network (<code>dev_final</code>). The NNUE experiments of the distillation loop (<code>NNUE_TAG</code>, <code>distill_nnue_experiment.sh</code>) and their table (<code>loop_progress.py ~/DistillLoop</code>) stay available.</p>
+</div>
+</section>
+<footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
+Repository state: commit 6e5819e (az_gen_loop.sh, az_gen_train.py). Local test of the self-play on an RTX 3080; first measure of generation 1 on the cluster, 2026-11-10.
+</footer>
+</main>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker>
+    <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+    <marker id="arr-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--good)"/></marker>
+  </defs>
+</svg>
+<style>
+.dg-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+.dg-box.k-acc { fill: var(--accent-soft); stroke: var(--accent); }
+.dg-box.k-b { fill: var(--black-soft); stroke: var(--black-pc); }
+.dg-box.k-w { fill: var(--white-soft); stroke: var(--white-pc); }
+.dg-box.k-good { fill: var(--paper); stroke: var(--good); stroke-width: 1.6; }
+.dg-box.k-dim { fill: var(--panel); stroke: var(--rule); stroke-dasharray: 4 3; }
+.dg-t { font-size: 13px; font-weight: 700; fill: var(--ink); }
+.dg-s { font-size: 11.5px; fill: var(--ink-2); }
+.dg-m { font-family: var(--font-mono) !important; font-size: 11px; fill: var(--ink-2); }
+.dg-a { stroke: var(--ink-3); stroke-width: 1.4; fill: none; marker-end: url(#arr); }
+.dg-a.acc { stroke: var(--accent); marker-end: url(#arr-acc); }
+.dg-a.good { stroke: var(--good); marker-end: url(#arr-good); }
+.dg-a.dash { stroke-dasharray: 5 4; }
+.dg-lbl { font-size: 11px; fill: var(--ink-3); font-weight: 600; }
+.dg-ret { font-size: 11px; fill: var(--good); font-weight: 700; }
+.cells { display: grid; gap: 2px; font-family: var(--font-mono); font-size: 10.5px; margin: 4px 0 10px; }
+.cell { min-width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; color: var(--ink); font-variant-numeric: tabular-nums; padding: 0 2px; }
+.cell.z { color: var(--ink-3); }
+.cell.hl { background: var(--accent-soft); border-color: var(--accent); }
+.cell.ok { background: var(--white-soft); border-color: var(--white-pc); }
+.cell.wt { background: var(--black-soft); border-color: var(--black-pc); }
+.reg-row { display: flex; gap: 8px; align-items: center; }
+.reg-name { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); width: 120px; flex: none; text-align: right; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* ── code blocks ─────────────────────────────────────────────────────────── */
+document.querySelectorAll('script[type="text/x-code"]').forEach(sc => {
+  const fig = document.createElement("figure");
+  fig.className = "code";
+  const head = document.createElement("div");
+  head.className = "code-head";
+  head.textContent = sc.dataset.title || "";
+  const pre = document.createElement("pre");
+  const code = document.createElement("code");
+  code.className = "language-" + (sc.dataset.lang || "cpp");
+  code.textContent = sc.textContent.replace(/^\n/, "").replace(/\s+$/, "");
+  pre.appendChild(code);
+  fig.appendChild(head);
+  fig.appendChild(pre);
+  sc.replaceWith(fig);
+  try { if (window.hljs) window.hljs.highlightElement(code); } catch (e) { /* plain text */ }
+});
+
+/* ── table of contents ───────────────────────────────────────────────────── */
+(function toc() {
+  const lists = [$("toc-list"), $("toc-list-m")];
+  const label = h => { const n = h.querySelector(".num"); return n ? n.textContent + "  " + h.textContent.slice(n.textContent.length) : h.textContent; };
+  document.querySelectorAll("main section").forEach(sec => {
+    const h2 = sec.querySelector("h2");
+    if (!h2) return;
+    lists.forEach(list => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "#" + sec.id;
+      a.textContent = label(h2);
+      li.appendChild(a);
+      const subs = sec.querySelectorAll("h3[id]");
+      if (subs.length) {
+        const ol = document.createElement("ol");
+        subs.forEach(h3 => {
+          const l2 = document.createElement("li");
+          const a2 = document.createElement("a");
+          a2.href = "#" + h3.id;
+          a2.textContent = label(h3);
+          l2.appendChild(a2);
+          ol.appendChild(l2);
+        });
+        li.appendChild(ol);
+      }
+      list.appendChild(li);
+    });
+  });
+})();
+
+/* ── SVG diagram helpers ─────────────────────────────────────────────────── */
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function B(x, y, w, h, title, sub, kind) {
+  let s = `<rect class="dg-box ${kind || ""}" x="${x}" y="${y}" width="${w}" height="${h}" rx="7"/>`;
+  const lines = sub ? (Array.isArray(sub) ? sub : [sub]) : [];
+  const total = 16 + lines.length * 14;
+  let ty = y + h / 2 - total / 2 + 12;
+  s += `<text class="dg-t" x="${x + w / 2}" y="${ty}" text-anchor="middle">${esc(title)}</text>`;
+  lines.forEach((l, i) => { s += `<text class="dg-s" x="${x + w / 2}" y="${ty + 15 + i * 14}" text-anchor="middle">${esc(l)}</text>`; });
+  return s;
+}
+function A(x1, y1, x2, y2, cls, label, lx, ly) {
+  let s = `<path class="dg-a ${cls || ""}" d="M${x1},${y1} L${x2},${y2}"/>`;
+  if (label) s += `<text class="dg-lbl" x="${lx ?? (x1 + x2) / 2 + 4}" y="${ly ?? (y1 + y2) / 2 - 4}">${esc(label)}</text>`;
+  return s;
+}
+function P(d, cls) { return `<path class="dg-a ${cls || ""}" d="${d}"/>`; }
+function T(x, y, text, cls, anchor) { return `<text class="${cls || "dg-s"}" x="${x}" y="${y}" text-anchor="${anchor || "start"}">${esc(text)}</text>`; }
+function svg(id, w, h, body, label) {
+  const el = $(id);
+  if (el) el.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label || id)}">${body}</svg>`;
+}
+
+
+/* 1.2 one generation */
+(function () {
+  let s = "";
+  s += B(10, 20, 260, 70, "1. selfplay (4 GPUs)", ["az_G−1 + MCTS, 1600 / 200 simulations,", "every move, exact z ≤ 22 free"], "k-w");
+  s += A(140, 90, 140, 120);
+  s += B(10, 120, 260, 64, "gen_G: 12.5 M rows", ["position, z, π, flags FAST / EXACT"], "");
+  s += A(270, 152, 310, 152);
+  s += B(310, 120, 250, 64, "pool of 200 M", ["old cache, then generations;", "37.5 M drawn at random"], "k-b");
+  s += A(435, 184, 435, 214);
+  s += A(140, 184, 140, 246);
+  s += P("M140,246 L309,246", "");
+  s += B(310, 214, 250, 64, "2. train (1 GPU)", ["10 epochs on 12.5 M + 37.5 M:", "value z on all, policy on full"], "k-w");
+  s += A(560, 246, 600, 246);
+  s += B(600, 214, 250, 64, "az_G", ["models/az_G.{pt,ts}"], "k-acc");
+  s += A(725, 214, 725, 184, "dash");
+  s += B(600, 120, 250, 64, "3. eval (GPU)", ["az_G vs az_G−1 and vs az_0,", "400 games, 1 s per move"], "k-dim");
+  s += P("M850,246 L870,246 L870,8 L140,8 L140,19", "acc");
+  s += T(420, 4 + 18, "4. next: generation G + 1 plays with az_G", "dg-lbl");
+  svg("d-gen", 890, 290, s, "one generation of the loop");
+})();
+
+/* 2.3 record layout */
+(function () {
+  let s = "";
+  const u1 = 30, u2 = 2.6;
+  const rows = [
+    [u1, 34, [["black", 8, "u64"], ["white", 8, "u64"], ["empty", 8, "u64: holes"]]],
+    [u1, 116, [["turn", 1, ""], ["z", 1, "±1, 0"], ["nb moves", 1, ""], ["flags", 1, "1|2"], ["root_q", 4, "float"], ["model step", 4, "u32"]]],
+    [u2, 198, [["action", 150, "u16 × 75: from · 64 + to"], ["prob", 150, "u16 × 75: π · 65535"]]]];
+  s += T(10, 16, "336 bytes, little-endian; a file = a 24-byte header (YOLAHSP1) then the rows", "dg-lbl");
+  let byte = 0;
+  rows.forEach(([u, y, f]) => {
+    let x = 10;
+    f.forEach(r => {
+      const kind = ["z", "flags"].includes(r[0]) ? "k-w" : ["root_q", "action", "prob"].includes(r[0]) ? "k-acc" : ["turn", "nb moves"].includes(r[0]) ? "k-b" : "";
+      const w = r[1] * u;
+      s += `<rect class="dg-box ${kind}" x="${x}" y="${y}" width="${w}" height="52" rx="4"/>`;
+      const words = r[0].split(" ");
+      if (words.length === 2 && r[1] === 1) {
+        s += `<text class="dg-t" x="${x + w / 2}" y="${y + 22}" text-anchor="middle" style="font-size:11px">${esc(words[0])}</text>`;
+        s += `<text class="dg-t" x="${x + w / 2}" y="${y + 36}" text-anchor="middle" style="font-size:11px">${esc(words[1])}</text>`;
+      } else {
+        s += `<text class="dg-t" x="${x + w / 2}" y="${y + 23}" text-anchor="middle" style="font-size:12px">${esc(r[0])}</text>`;
+        if (r[2]) s += `<text class="dg-s" x="${x + w / 2}" y="${y + 40}" text-anchor="middle" style="font-size:10.5px">${esc(r[2])}</text>`;
+      }
+      s += `<text class="dg-m" x="${x + 2}" y="${y - 3}" style="font-size:9.5px">${byte}</text>`;
+      byte += r[1] * (r[0] === "action" || r[0] === "prob" ? 2 : 1);
+      x += w;
+    });
+  });
+  s += T(10, 272, "green: the result and its flags; blue: the search (value and π); orange: side to move and number of moves.", "dg-s");
+  svg("d-record", 860, 284, s, "TrainingSample layout");
+})();
+
+/* 3.1 the pool over the generations */
+(function () {
+  let s = "";
+  const X0 = 110, k = 3.3;              // millions → px
+  s += T(10, 18, "THE POOL AFTER GENERATION g (millions of positions)", "dg-lbl");
+  [0, 1, 2, 8, 16, 17, 20].forEach((g, i) => {
+    const y = 30 + i * 32;
+    s += T(10, y + 17, `g = ${g}`, "dg-t");
+    const old = Math.max(0, 200 - 12.5 * g);
+    let x = X0;
+    if (old > 0) {
+      s += `<rect x="${x}" y="${y}" width="${old * k}" height="22" rx="3" style="fill:var(--black-soft);stroke:var(--black-pc)"/>`;
+      s += `<text class="dg-s" x="${x + old * k / 2}" y="${y + 15}" text-anchor="middle">old cache ${old} M</text>`;
+      x += old * k;
+    }
+    const first = Math.max(1, g - 15);
+    for (let j = first; j <= g; j++) {
+      const cls = j === g ? "fill:var(--accent-soft);stroke:var(--accent)" : "fill:var(--white-soft);stroke:var(--white-pc)";
+      s += `<rect x="${x}" y="${y}" width="${12.5 * k}" height="22" rx="3" style="${cls}"/>`;
+      if (12.5 * k > 26) s += `<text class="dg-m" x="${x + 12.5 * k / 2}" y="${y + 15}" text-anchor="middle">${j}</text>`;
+      x += 12.5 * k;
+    }
+    if (g > 16) s += T(X0 + 200 * k + 8, y + 15, `gens 1–${g - 16} gone`, "dg-lbl");
+  });
+  s += T(10, 262, "orange: positions of cache_az256; green: older generations; blue: the newest generation.", "dg-s");
+  svg("d-pool", 860, 274, s, "the pool over the generations");
+})();
+
+/* 3.2 pool widget */
+(function () {
+  if (!$("pl-svg")) return;
+  function render() {
+    const G = parseInt($("pl-g").value, 10);
+    $("pl-gv").textContent = G;
+    const own = 12.5;
+    const rest = 200 - own;                                   // the rest of the pool
+    const old = Math.max(0, 200 - 12.5 * G);
+    const gens = rest - old;                                  // older generations in the pool
+    const nGens = Math.round(gens / 12.5);
+    const firstGen = G - nGens;
+    const dOld = 37.5 * old / rest, dGens = 37.5 * gens / rest;
+    const X0 = 140, k = 3.5;
+    let g = "";
+    const bar = (y, parts, label) => {
+      g += `<text x="10" y="${y + 17}" style="font-family:var(--font-display);font-size:13px;font-weight:700;fill:var(--ink)">${label}</text>`;
+      let x = X0;
+      parts.forEach(([v, fill, stroke, txt]) => {
+        if (v <= 0) return;
+        g += `<rect x="${x}" y="${y}" width="${v * k}" height="26" rx="3" style="fill:${fill};stroke:${stroke}"/>`;
+        if (v * k > 70) g += `<text x="${x + v * k / 2}" y="${y + 17}" text-anchor="middle" style="font-family:var(--font-display);font-size:11.5px;fill:var(--ink-2)">${txt}</text>`;
+        x += v * k;
+      });
+    };
+    bar(20, [[old, "var(--black-soft)", "var(--black-pc)", `old ${old.toFixed(1)} M`],
+             [gens, "var(--white-soft)", "var(--white-pc)", `gens ${firstGen}–${G - 1}: ${gens.toFixed(1)} M`],
+             [own, "var(--accent-soft)", "var(--accent)", `gen ${G}`]], "pool (200 M)");
+    bar(80, [[dOld, "var(--black-soft)", "var(--black-pc)", `old ${dOld.toFixed(1)} M`],
+             [dGens, "var(--white-soft)", "var(--white-pc)", `older ${dGens.toFixed(1)} M`],
+             [own, "var(--accent-soft)", "var(--accent)", `gen ${G} 12.5 M`]], "training (50 M)");
+    $("pl-svg").innerHTML = g;
+    const f = v => v.toFixed(1);
+    $("pl-out").textContent =
+      `pool after generation ${G}: old cache ${f(old)} M, generations ${nGens ? firstGen + "–" + (G - 1) : "none"} ${f(gens)} M, generation ${G} 12.5 M\n` +
+      `training of az_${G}: generation ${G} 12.5 M (all) + 37.5 M drawn from the other ${f(rest)} M\n` +
+      `expected draw: old cache ${f(dOld)} M (${(100 * dOld / 50).toFixed(0)} %), older generations ${f(dGens)} M (${(100 * dGens / 50).toFixed(0)} %), new 25 %`;
+  }
+  $("pl-g").addEventListener("input", render);
+  render();
+})();
+
+/* 6 jobs */
+(function () {
+  let s = "";
+  s += B(10, 70, 150, 50, "selfplay", "GPU array 0–3", "k-w");
+  s += A(160, 95, 200, 95);
+  s += B(200, 70, 130, 50, "train", "GPU, 4 days", "k-w");
+  s += A(265, 120, 265, 170);
+  s += B(195, 170, 140, 44, "eval", "GPU array 0–1", "k-dim");
+  s += A(330, 95, 380, 95, "acc");
+  s += B(380, 70, 170, 50, "next", ["submits G + 1"], "k-acc");
+  s += P("M465,70 L465,30 L85,30 L85,69", "acc");
+  s += T(170, 24, "generation G + 1: the same chain", "dg-lbl");
+  s += T(380, 160, "all dependencies: afterok", "dg-lbl");
+  svg("d-jobs", 600, 230, s, "SLURM jobs of a generation");
+})();
+const rerender = () => (window.__rerender || []).forEach(f => { try { f(); } catch (e) { /* ignore */ } });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender); } catch (e) { /* old browsers */ }
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>

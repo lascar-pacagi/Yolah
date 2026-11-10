@@ -35,7 +35,14 @@ the same style: the games of the dev player (node limit, openings, the 40-byte
 records, the tree nodes, the exact results), the training cache (the tree
 nodes on the game's path, `zmask`, the window of rounds), the ResNet's
 targets and training, the NNUE's teacher and distillation, the evaluation
-matches and the SLURM jobs of a round.
+matches and the SLURM jobs of a round. Stopped after round 0.
+
+`az_gen_loop.html` — the generations loop of `nnue/az_gen_loop.sh`, which
+replaced it for the ResNet: MCTS self-play by the current network (every move
+recorded, fast searches flagged, exact results from the solver near the end),
+the pool of 200 M positions (old cache, then generations) and the draw of a
+training, the targets and the optimisation, the matches, the SLURM jobs, the
+commands and files; the results of the distillation loop.
 
 Both reuse the CSS and the script framework of `minmax_nnue_dev_player.html`
 (code blocks, contents, diagram helpers).
