@@ -1285,6 +1285,7 @@ private:
 struct SpriteDef {
     std::string id = "default", name = "Pion", emblem = "none", image, category;
     std::string art;         // a pixel-art sprite of the workshop (@@ART): drawn instead
+    std::string style;       // "" (stone + ring + emblem) or a plain stone: go, flat, checkers, glass, marble
     Rgba ring_top = hex(0xcfd6df), ring_bottom = hex(0x7d8794), emblem_color = hex(0xffffff);
     int tier = 0;            // 0..8: pips under the emblem
     bool halo = false;       // pulsing halo (the human player)
@@ -1309,6 +1310,7 @@ std::vector<SpriteDef> load_sprites(const fs::path& file) {
             s.tier = int(jnum(e, "tier", 0));
             s.halo = e.value("halo", false);
             s.halo_color = jcolor(e, "halo color", s.halo_color);
+            s.style = jstr(e, "style");
             if (!s.image.empty()) {
                 int w, h, n;
                 fs::path p = file.parent_path() / s.image;
@@ -1854,6 +1856,57 @@ void register_art_sprites(std::vector<SpriteDef>& sprites) {
 // state, state_t: a drawing of the workshop plays its animation `state`
 // ("idle", "move", "blocked", "win"), started `state_t` seconds ago (the
 // other sprites ignore them).
+// Classic stones without any sign: black or white by the side.
+//   go       slate and shell: biconvex, a broad soft light, a darker rim
+//   flat     a flat counter with a thin edge
+//   checkers a draughts piece: flat, two grooves
+//   glass    a glass bead: deep colour, a sharp highlight, light through it
+//   marble   polished stone with a few soft veins
+void draw_plain_stone(const std::string& style, int side, V2 c, float r, float alpha) {
+    using namespace draw;
+    const bool B = side == BLACK;
+    auto A = [&](Rgba k) { return with_alpha(k, alpha); };
+    V2 light = c + V2{-r * 0.35f, -r * 0.4f};
+    if (style == "go") {
+        if (B) circle_lit(c, r, light, A(hex(0x4a4e55)), A(hex(0x050608)));
+        else circle_lit(c, r, light, A(hex(0xffffff)), A(hex(0xc9c4b6)));
+        ring(c, r, r * 0.10f, A(hex(0x000000, 0)), A(hex(0x000000, B ? 90 : 45)));     // the rim turns away
+        circle(c + V2{-r * 0.28f, -r * 0.34f}, r * 0.42f, A(hex(0xffffff, B ? 45 : 110)), A(hex(0xffffff, 0)), r * 0.3f);
+    } else if (style == "flat") {
+        circle(c, r, A(B ? hex(0x111318) : hex(0xb8bcc4)));
+        circle(c, r * 0.9f, A(B ? hex(0x262a31) : hex(0xf4f5f7)));
+        circle(c + V2{-r * 0.2f, -r * 0.25f}, r * 0.55f, A(hex(0xffffff, B ? 18 : 40)), A(hex(0xffffff, 0)), r * 0.4f);
+    } else if (style == "checkers") {
+        Rgba face = B ? hex(0x23262c) : hex(0xeeeae0), edge = B ? hex(0x0b0c0f) : hex(0xb3ad9e);
+        circle(c, r, A(edge));
+        circle_lit(c, r * 0.93f, light, A(shade(face, 0.10f)), A(face));
+        for (float k : {0.72f, 0.48f}) {   // grooves: a dark line with a light line under it
+            ring(c, r * k, r * 0.035f, A(with_alpha(edge, 0.9f)));
+            ring(c, r * k - r * 0.035f, r * 0.025f, A(hex(0xffffff, B ? 25 : 120)));
+        }
+    } else if (style == "glass") {
+        if (B) circle_lit(c, r, c + V2{r * 0.3f, r * 0.35f}, A(hex(0x3a4150)), A(hex(0x020306)));   // light comes out at the bottom
+        else circle_lit(c, r, c + V2{r * 0.3f, r * 0.35f}, A(hex(0xffffff)), A(hex(0xd5dbe4)));
+        ring(c, r, r * 0.06f, A(hex(0xffffff, B ? 40 : 70)), A(hex(0x000000, B ? 60 : 30)));
+        circle(c + V2{-r * 0.36f, -r * 0.42f}, r * 0.20f, A(hex(0xffffff, 230)), A(hex(0xffffff, 0)), r * 0.10f);
+        circle(c + V2{r * 0.30f, r * 0.42f}, r * 0.16f, A(hex(0xffffff, B ? 40 : 90)), A(hex(0xffffff, 0)), r * 0.12f);
+    } else {   // marble
+        if (B) circle_lit(c, r, light, A(hex(0x3d3f46)), A(hex(0x0c0d10)));
+        else circle_lit(c, r, light, A(hex(0xfbfaf7)), A(hex(0xcfcac0)));
+        Rgba vein = B ? hex(0x8a8f99, 70) : hex(0x8c8576, 80);
+        for (int i = 0; i < 3; i++) {   // veins: a few gentle curves inside the stone
+            std::vector<V2> pts;
+            float y0 = (-0.45f + 0.45f * i) * r, ph = 1.3f * i;
+            for (int k = 0; k <= 40; k++) {
+                float x = (-0.85f + 1.7f * k / 40) * r, y = y0 + std::sin(x / r * 3.1f + ph) * r * 0.14f + x * 0.25f;
+                if (x * x + y * y < r * r * 0.80f) pts.push_back(c + V2{x, y});
+            }
+            if (pts.size() > 1) polyline(pts, r * 0.035f, A(vein));
+        }
+        circle(c + V2{-r * 0.3f, -r * 0.36f}, r * 0.3f, A(hex(0xffffff, B ? 60 : 130)), A(hex(0xffffff, 0)), r * 0.2f);
+    }
+}
+
 void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1, bool halo = false,
                 const char* state = "idle", double state_t = -1) {
     using namespace draw;
@@ -1884,6 +1937,7 @@ void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, do
         }
         return;
     }
+    if (!sp.style.empty()) { draw_plain_stone(sp.style, side, c, r, alpha); return; }
     // The stone: lit from the top left.
     V2 light = c + V2{-r * 0.35f, -r * 0.4f};
     if (side == BLACK)
