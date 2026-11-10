@@ -279,12 +279,22 @@ class NetPersp(nn.Module):
     def init_from_persp(self, sd):
         """Start from another NetPersp with the same K / them / sizes and FEWER (or
         no) space features: everything is copied, the fc2 columns of the space
-        features it lacks start at 0 — same values as the source network."""
+        features it lacks start at 0 — same values as the source network. A plain
+        source (one fc1 set) into a factorised network: its fc1 is the shared set,
+        the corrections per phase start at 0."""
         sd = {(k[7:] if k.startswith("module.") else k): v.float() for k, v in sd.items()}
         k, them, l1, l2, l3, mask = config_of(sd)
+        # A plain network into a factorised one: its fc1 becomes the shared set, the
+        # corrections stay at 0 — the same values as the source.
+        plain_to_factor = self.fc1_factor and int(sd.get("fc1_buckets_t", 1)) == 1 and not bool(sd.get("fc1_factor_t", 0))
+        if plain_to_factor:
+            sd = dict(sd)
+            sd["fc1_shared.weight"], sd["fc1_shared.bias"] = sd["fc1.weight"], sd["fc1.bias"]
+            sd["fc1.weight"], sd["fc1.bias"] = torch.zeros_like(self.fc1.weight), torch.zeros_like(self.fc1.bias)
         if (k, them, l1, l2, l3) != (self.k, self.them, self.l1_size, self.l2_size, self.l3_size) \
-                or int(sd.get("fc1_buckets_t", 1)) != self.fc1_buckets or bool(sd.get("square_t", 0)) != self.square \
-                or bool(sd.get("fc1_factor_t", 0)) != self.fc1_factor \
+                or (not plain_to_factor and (int(sd.get("fc1_buckets_t", 1)) != self.fc1_buckets
+                                             or bool(sd.get("fc1_factor_t", 0)) != self.fc1_factor)) \
+                or bool(sd.get("square_t", 0)) != self.square \
                 or mask & ~self.space_mask:
             raise ValueError(f"init_from_persp: source K={k} them={them} mask={mask:#x} does not fit "
                              f"K={self.k} them={self.them} mask={self.space_mask:#x}")

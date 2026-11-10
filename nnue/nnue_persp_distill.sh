@@ -69,6 +69,14 @@
 #   YOLAH_L2_SQUARE=1                  w3 reads [h2, h2²]                        → …_sq…
 #   YOLAH_INPUT_BUCKETS=4              4 sets of fc1 weights by phase            → …_ib4…
 #   YOLAH_FC1_FACTOR=1 (with the above) shared set + a correction per phase       → …_ib4f…
+# From the frozen reference (FROM_REF=1: P7, them, groups 0x46, QAT set here; 10 epochs,
+# lr 1e-4): the reference k8_them_g046_qat_scratch_az20 (REF_MODEL, default the repo's
+# models/ copy) with every weight frozen, only fc1 learns (YOLAH_FREEZE=1). Epoch 0 is
+# the reference exactly, so the gain is what the extra weights bring:
+#   FROM_REF=1 YOLAH_INPUT_BUCKETS=4 YOLAH_FC1_FACTOR=1   the shared set = the reference's
+#                                      fc1, frozen; only the 4 corrections learn → k8_them_g046_qat_ib4f_ref_az20
+#   FROM_REF=1                         the control: the reference's own fc1 fine-tuned,
+#                                      the rest frozen                     → k8_them_g046_qat_ref_az20
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
 # space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
@@ -118,6 +126,16 @@ YOLAH_INPUT_BUCKETS="${YOLAH_INPUT_BUCKETS:-1}"
 YOLAH_FC1_FACTOR="${YOLAH_FC1_FACTOR:-0}"
 if [[ "${P7}" == "1" ]]; then CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"; fi
 EVAL_MODEL="${EVAL_MODEL:-}"
+FROM_REF="${FROM_REF:-0}"
+YOLAH_FREEZE=0
+if [[ "${FROM_REF}" == "1" ]]; then
+    [[ "${SCRATCH}" != "1" ]] || { echo "FROM_REF=1 and SCRATCH=1 are exclusive" >&2; exit 1; }
+    P7=1; YOLAH_PERSP_K=8; YOLAH_PERSP_THEM=1; YOLAH_SPACE_GROUPS=0x46; YOLAH_QAT=1; YOLAH_FREEZE=1
+    CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"
+    INIT_MODEL="${REF_MODEL:-${SRC_DIR}/../models/nnue_persp_k8_them_g046_qat_scratch_az20_distill.pt}"
+    YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-10}"
+    YOLAH_LR="${YOLAH_LR:-1e-4}"
+fi
 if [[ "${FROM_SPACELITE}" == "1" ]]; then
     YOLAH_PERSP_K=8; YOLAH_PERSP_THEM=1; YOLAH_SPACE_MASK=65278
     INIT_MODEL_STEP2="${INIT_MODEL_STEP2:-${SRC_DIR}/../models/nnue_persp_k8_them_spacelite_distill.pt}"
@@ -154,8 +172,11 @@ if [[ "${YOLAH_L1_SIZE}" != "1024" ]]; then
     if [[ "${SCRATCH}" != "1" ]]; then echo "YOLAH_L1_SIZE=${YOLAH_L1_SIZE} needs SCRATCH=1 (the starting networks have 1024)" >&2; exit 1; fi
     WIDTH_SUFFIX="_l${YOLAH_L1_SIZE}"
 fi
-if [[ "${YOLAH_L2_SIZE}" != "64" || "${YOLAH_L2_SQUARE}" == "1" || "${YOLAH_INPUT_BUCKETS}" != "1" ]] && [[ "${SCRATCH}" != "1" ]]; then
-    echo "YOLAH_L2_SIZE, YOLAH_L2_SQUARE, YOLAH_INPUT_BUCKETS need SCRATCH=1" >&2; exit 1
+if [[ "${YOLAH_L2_SIZE}" != "64" || "${YOLAH_L2_SQUARE}" == "1" ]] && [[ "${SCRATCH}" != "1" ]]; then
+    echo "YOLAH_L2_SIZE, YOLAH_L2_SQUARE need SCRATCH=1" >&2; exit 1
+fi
+if [[ "${YOLAH_INPUT_BUCKETS}" != "1" && "${SCRATCH}" != "1" ]] && ! [[ "${FROM_REF}" == "1" && "${YOLAH_FC1_FACTOR}" == "1" ]]; then
+    echo "YOLAH_INPUT_BUCKETS needs SCRATCH=1, or FROM_REF=1 with YOLAH_FC1_FACTOR=1" >&2; exit 1
 fi
 if [[ "${YOLAH_L2_SIZE}" != "64" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_l2${YOLAH_L2_SIZE}"; fi
 if [[ "${YOLAH_L2_SQUARE}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_sq"; fi
@@ -165,6 +186,7 @@ if [[ "${YOLAH_FC1_FACTOR}" == "1" ]]; then
     WIDTH_SUFFIX="${WIDTH_SUFFIX}f"
 fi
 if [[ "${SCRATCH}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_scratch"; fi
+if [[ "${FROM_REF}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ref"; fi
 if [[ "${P7}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
     if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
@@ -209,6 +231,7 @@ if [[ -n "${YOLAH_SPACE_GROUPS}" && "$(( YOLAH_SPACE_GROUPS ))" != "0" ]]; then
 fi
 # The starting weights, copied into the variant's directory (/mnt in the container).
 INIT_NAME="$([[ "${STEP2}" == "1" ]] && echo init_persp.pt || echo init_193_distill.pt)"
+if [[ "${FROM_REF}" == "1" ]]; then INIT_NAME="init_ref.pt"; fi
 if [[ -n "${EVAL_MODEL}" ]]; then
     INIT_NAME="$(basename "${EVAL_MODEL}")"; cp "${EVAL_MODEL}" "${MODEL_DIR}/${INIT_NAME}"
 fi
@@ -226,6 +249,7 @@ echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none} 
 echo "  Step 3   : P7=${P7}  from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
 echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}  input buckets=${YOLAH_INPUT_BUCKETS}  factorised=${YOLAH_FC1_FACTOR}"
 echo "  Layer 2  : ${YOLAH_L2_SIZE}  square=${YOLAH_L2_SQUARE}"
+echo "  Frozen   : from the reference=${FROM_REF}  freeze (fc1 only)=${YOLAH_FREEZE}"
 echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
 
@@ -241,6 +265,7 @@ singularity exec --nv \
     --env "YOLAH_L2_SQUARE=${YOLAH_L2_SQUARE}" \
     --env "YOLAH_INPUT_BUCKETS=${YOLAH_INPUT_BUCKETS}" \
     --env "YOLAH_FC1_FACTOR=${YOLAH_FC1_FACTOR}" \
+    --env "YOLAH_FREEZE=${YOLAH_FREEZE}" \
     --env "YOLAH_SPACE_MASK=${YOLAH_SPACE_MASK}" \
     --env "YOLAH_SPACE_GROUPS=${YOLAH_SPACE_GROUPS:-0}" \
     --env "YOLAH_SEED=${YOLAH_SEED}" \

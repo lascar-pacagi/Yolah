@@ -42,6 +42,10 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
                           start, no C++ yet)
     YOLAH_FC1_FACTOR      1 (with YOLAH_INPUT_BUCKETS > 1): the sets are a shared set plus
                           a correction per phase starting at 0 (Stockfish's factoriser)
+    YOLAH_FREEZE          1: only fc1 learns, every other weight stays as YOLAH_INIT_MODEL
+                          gives it; with YOLAH_FC1_FACTOR=1 and a plain starting network,
+                          only the corrections per phase learn (the shared set is the
+                          starting fc1, frozen): epoch 0 is the starting network exactly
     YOLAH_INIT_MODEL=none no starting weights: the network starts from PyTorch's random
                           initialisation (seeded by YOLAH_SEED)
     YOLAH_SEED            another shuffling of the training data (default 0), to
@@ -94,6 +98,7 @@ L2_SIZE    = int(os.environ.get("YOLAH_L2_SIZE", "64"))
 L2_SQUARE  = os.environ.get("YOLAH_L2_SQUARE", "0") == "1"
 INPUT_BUCKETS = int(os.environ.get("YOLAH_INPUT_BUCKETS", "1"))
 FC1_FACTOR = os.environ.get("YOLAH_FC1_FACTOR", "0") == "1"
+FREEZE = os.environ.get("YOLAH_FREEZE", "0") == "1"
 SPACE_MASK = int(os.environ.get("YOLAH_SPACE_MASK", "0"), 0)
 SPACE_GROUPS = int(os.environ.get("YOLAH_SPACE_GROUPS", "0"), 0)
 SEED = int(os.environ.get("YOLAH_SEED", "0"))
@@ -154,7 +159,7 @@ class TrainerDDP:
         self.model = model.to(gpu_id)
         self.train_loader, self.val_loader = train_loader, val_loader
         self.save_every = save_every
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LR, weight_decay=0)
+        self.optimizer = torch.optim.Adam([p for p in self.model.parameters() if p.requires_grad], lr=LR, weight_decay=0)
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=NB_EPOCHS,
                                                                     eta_min=LR / 30)
         major, _ = torch.cuda.get_device_capability(gpu_id)
@@ -328,13 +333,20 @@ def main(rank, world_size, batch_size, cache_dir):
         src = f'random init (seed {SEED})'
     else:
         raise SystemExit(f"{INIT_MODEL}: no such file (YOLAH_INIT_MODEL=none for a random start)")
+    if FREEZE:      # only fc1 learns (factorised: the corrections; fc1_shared is frozen)
+        if INIT_MODEL == "none" or EVAL_ONLY:
+            raise SystemExit("YOLAH_FREEZE needs starting weights (YOLAH_INIT_MODEL)")
+        for name, p in net.named_parameters():
+            p.requires_grad_(name in ("fc1.weight", "fc1.bias"))
     if rank == 0:
         print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, l1={L1_SIZE}, l2={L2_SIZE}, square={L2_SQUARE}, '
               f'input buckets={INPUT_BUCKETS}{" factorised" if FC1_FACTOR else ""}, '
               f'space mask={space_mask:#x}, groups={SPACE_GROUPS:#x}, {net.n_space} space features, '
               f'direct path={DIRECT}, quantization-aware={QAT})', flush=True)
         print(net, flush=True)
-        print(f'Parameters: {sum(p.numel() for p in net.parameters()):,}', flush=True)
+        print(f'Parameters: {sum(p.numel() for p in net.parameters()):,}, trained: '
+              f'{sum(p.numel() for p in net.parameters() if p.requires_grad):,}'
+              + (' (YOLAH_FREEZE: fc1 only)' if FREEZE else ''), flush=True)
 
     gc.disable()
     trainer = TrainerDDP(rank, net, train_loader, val_loader)
