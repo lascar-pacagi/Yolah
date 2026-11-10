@@ -2819,6 +2819,8 @@ struct App {
     SDL_Cursor* cursor_hand = nullptr;
     std::string toast;
     double toast_t = -10;
+    V2 toast_at{-1, -1};                  // its centre (x < 0: at the bottom of the window)
+    float toast_size = 17;                // its font size (design pixels)
 
     // Screenshot mode.
     std::string screenshot;
@@ -3078,6 +3080,14 @@ struct App {
     void notify(const std::string& msg) {
         toast = msg;
         toast_t = time;
+        toast_at = {-1, -1};
+        toast_size = 17;
+    }
+    // A message centred at `at` (pixels), with a bigger font: the board's news.
+    void notify_at(const std::string& msg, V2 at, float size = 24) {
+        notify(msg);
+        toast_at = at;
+        toast_size = size;
     }
     void go(Scene sc) {
         if (scene == Scene::Game && sc != Scene::Game) leave_game();
@@ -3142,7 +3152,7 @@ struct App {
             fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0xb6c2d6) : hex(0xffffff), q * 0.32f));
             fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, game_theme().accent));
         } else {
-            notify(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.");
+            notify_at(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.", g.board.area.center());
         }
         g.token++;
         g.move_scroll = 1e9f;   // scroll the move list to its end
@@ -4171,7 +4181,7 @@ void tutorial_play(App& a, Move m) {
         a.fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0x7ff0ff) : hex(0xffffff), q * 0.32f));
         a.fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, a.theme().accent));
     } else {
-        a.notify(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.");
+        a.notify_at(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.", t.board.area.center());
     }
 }
 
@@ -6243,12 +6253,14 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     float tk = float(a->time - a->toast_t);
     if (tk < 4.0f && !a->toast.empty()) {
         float al = clamp01(std::min(tk * 5, (4.0f - tk) * 2));
-        float s = a->s, w = a->text.width(Font::Bold, 17 * s, a->toast) + 48 * s;
-        Box b{a->w * 0.5f - w / 2, a->h - 90 * s + (1 - al) * 20 * s, w, 46 * s};
-        draw::shadow({b.x, b.y + 6 * s, b.w, b.h}, 23 * s, 20 * s, hex(0x000000, uint8_t(120 * al)));
-        draw::round_box(b, 23 * s, with_alpha(hex(0x10151d), 0.95f * al));
-        draw::round_frame(b, 23 * s, 1, with_alpha(pal::accent, 0.6f * al));
-        a->text.draw(Font::Bold, 17 * s, a->toast, {b.center().x, b.y + 12 * s}, with_alpha(pal::text, al), Align::Center);
+        float s = a->s, fs = a->toast_size * s;
+        float w = a->text.width(Font::Bold, fs, a->toast) + 2.8f * fs, h = 2.7f * fs;
+        V2 c = a->toast_at.x >= 0 ? a->toast_at : V2{a->w * 0.5f, a->h - 67 * s};
+        Box b{c.x - w / 2, c.y - h / 2 + (1 - al) * 20 * s, w, h};
+        draw::shadow({b.x, b.y + 6 * s, b.w, b.h}, h / 2, 20 * s, hex(0x000000, uint8_t(120 * al)));
+        draw::round_box(b, h / 2, with_alpha(hex(0x10151d), 0.95f * al));
+        draw::round_frame(b, h / 2, 1, with_alpha(pal::accent, 0.6f * al));
+        a->text.draw(Font::Bold, fs, a->toast, {b.center().x, b.center().y - a->text.line_height(Font::Bold, fs) * 0.45f}, with_alpha(pal::text, al), Align::Center);
     }
     // Fade-in after a scene change.
     float fade = 1 - clamp01(float(a->time - a->scene_t0) / 0.25f);
