@@ -68,6 +68,7 @@
 #   YOLAH_L2_SIZE=32                   32 outputs of fc2 per head instead of 64  → …_l232…
 #   YOLAH_L2_SQUARE=1                  w3 reads [h2, h2²]                        → …_sq…
 #   YOLAH_INPUT_BUCKETS=4              4 sets of fc1 weights by phase            → …_ib4…
+#   YOLAH_FC1_FACTOR=1 (with the above) shared set + a correction per phase       → …_ib4f…
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
 # space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
@@ -114,6 +115,7 @@ SCRATCH="${SCRATCH:-0}"
 YOLAH_L2_SIZE="${YOLAH_L2_SIZE:-64}"
 YOLAH_L2_SQUARE="${YOLAH_L2_SQUARE:-0}"
 YOLAH_INPUT_BUCKETS="${YOLAH_INPUT_BUCKETS:-1}"
+YOLAH_FC1_FACTOR="${YOLAH_FC1_FACTOR:-0}"
 if [[ "${P7}" == "1" ]]; then CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"; fi
 EVAL_MODEL="${EVAL_MODEL:-}"
 if [[ "${FROM_SPACELITE}" == "1" ]]; then
@@ -158,6 +160,10 @@ fi
 if [[ "${YOLAH_L2_SIZE}" != "64" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_l2${YOLAH_L2_SIZE}"; fi
 if [[ "${YOLAH_L2_SQUARE}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_sq"; fi
 if [[ "${YOLAH_INPUT_BUCKETS}" != "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ib${YOLAH_INPUT_BUCKETS}"; fi
+if [[ "${YOLAH_FC1_FACTOR}" == "1" ]]; then
+    [[ "${YOLAH_INPUT_BUCKETS}" != "1" ]] || { echo "YOLAH_FC1_FACTOR needs YOLAH_INPUT_BUCKETS > 1" >&2; exit 1; }
+    WIDTH_SUFFIX="${WIDTH_SUFFIX}f"
+fi
 if [[ "${SCRATCH}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_scratch"; fi
 if [[ "${P7}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
@@ -218,7 +224,7 @@ echo "  Init     : ${INIT_MODEL}"
 echo "  Epochs   : ${YOLAH_NB_EPOCHS}  alpha=${YOLAH_DISTILL_ALPHA}  lr=${YOLAH_LR}  ddp port=${YOLAH_DDP_PORT}"
 echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none}  seed=${YOLAH_SEED}  continue=${CONTINUE}"
 echo "  Step 3   : P7=${P7}  from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
-echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}  input buckets=${YOLAH_INPUT_BUCKETS}"
+echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}  input buckets=${YOLAH_INPUT_BUCKETS}  factorised=${YOLAH_FC1_FACTOR}"
 echo "  Layer 2  : ${YOLAH_L2_SIZE}  square=${YOLAH_L2_SQUARE}"
 echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
@@ -234,6 +240,7 @@ singularity exec --nv \
     --env "YOLAH_L2_SIZE=${YOLAH_L2_SIZE}" \
     --env "YOLAH_L2_SQUARE=${YOLAH_L2_SQUARE}" \
     --env "YOLAH_INPUT_BUCKETS=${YOLAH_INPUT_BUCKETS}" \
+    --env "YOLAH_FC1_FACTOR=${YOLAH_FC1_FACTOR}" \
     --env "YOLAH_SPACE_MASK=${YOLAH_SPACE_MASK}" \
     --env "YOLAH_SPACE_GROUPS=${YOLAH_SPACE_GROUPS:-0}" \
     --env "YOLAH_SEED=${YOLAH_SEED}" \

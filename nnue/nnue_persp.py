@@ -58,6 +58,14 @@ only the active one would be: updating the accumulator would read as many rows a
 now, with a refresh when the position changes set. fc1 is (N · l1) × 192 in the
 file, the N sets one after the other. Random start only.
 
+Factorised first layer per phase (fc1_factor=True, with fc1_buckets=N > 1), as
+Stockfish's factoriser: a shared set fc1_shared (l1 × 192) plus a correction per
+phase in fc1 (N · l1 × 192), which starts at 0. The set of phase b is
+fc1_shared + fc1[b]: every position trains the shared set, so a phase with few
+positions (the endgame) still learns from all of them, and each phase only
+learns its difference. Merged (merged_fc1), it is the plain network with N sets:
+quantization-aware training rounds the merged weights, as the C++ would.
+
 Squared outputs (square=True): w3 reads [h2, h2²] instead of h2, so 2 · l2 inputs;
 in QAT h2² is floor(h2 · h2 · 64) / 64, the (x · x) >> 6 of h2 as integers 0..64.
 l2 = 32 with square has the w3 of l2 = 64, with half of fc2. Random start only.
@@ -132,7 +140,7 @@ def space_columns(mask):
 
 class NetPersp(nn.Module):
     def __init__(self, k=8, them=False, l1_size=1024, l2_size=64, l3_size=32, space_mask=0,
-                 direct=False, qat=False, fc1_buckets=1, square=False):
+                 direct=False, qat=False, fc1_buckets=1, square=False, fc1_factor=False):
         super().__init__()
         self.k, self.them = k, them
         self.l1_size, self.l2_size, self.l3_size = l1_size, l2_size, l3_size
@@ -140,6 +148,14 @@ class NetPersp(nn.Module):
         self.n_space = len(space_columns(self.space_mask))
         self.fc1_buckets, self.square = int(fc1_buckets), bool(square)
         self.fc1 = nn.Linear(INPUT_SIZE, l1_size * self.fc1_buckets)
+        self.fc1_factor = bool(fc1_factor)
+        if self.fc1_factor:
+            if self.fc1_buckets < 2:
+                raise ValueError("fc1_factor needs fc1_buckets > 1")
+            self.fc1_shared = nn.Linear(INPUT_SIZE, l1_size)
+            with torch.no_grad():                # the corrections start at 0: N copies of one layer
+                self.fc1.weight.zero_()
+                self.fc1.bias.zero_()
         self.fc2 = nn.Linear(l1_size * (2 if them else 1) + self.n_space, l2_size * k)
         # One (l3 × l2) matrix and one (l3) value head per phase, initialised like nn.Linear.
         fc3 = [nn.Linear(l2_size * (2 if self.square else 1), l3_size) for _ in range(k)]
@@ -166,6 +182,14 @@ class NetPersp(nn.Module):
         self.register_buffer("qat_t", torch.tensor(int(self.qat), dtype=torch.long))
         self.register_buffer("fc1_buckets_t", torch.tensor(self.fc1_buckets, dtype=torch.long))
         self.register_buffer("square_t", torch.tensor(int(self.square), dtype=torch.long))
+        self.register_buffer("fc1_factor_t", torch.tensor(int(self.fc1_factor), dtype=torch.long))
+
+    def merged_fc1(self):
+        """(weight, bias) of fc1 with the N sets: the shared set added to each correction."""
+        if not self.fc1_factor:
+            return self.fc1.weight, self.fc1.bias
+        n = self.fc1_buckets
+        return self.fc1.weight + self.fc1_shared.weight.repeat(n, 1), self.fc1.bias + self.fc1_shared.bias.repeat(n)
 
     def perspective(self, x):
         """Cache batch (bs, 193) → (us, them, bucket)."""
@@ -181,12 +205,13 @@ class NetPersp(nn.Module):
     def forward(self, x):
         us, them, bucket = self.perspective(x[:, :CACHE_INPUT_SIZE])
         if self.qat:     # what the C++ computes (see the module docstring)
-            w1, b1 = q_weight(self.fc1.weight), q_bias(self.fc1.bias, Q)
+            w1, b1 = self.merged_fc1()
+            w1, b1 = q_weight(w1), q_bias(b1, Q)
             w2, b2 = q_weight(self.fc2.weight), q_bias(self.fc2.bias, Q * Q)
             w3, b3 = q_weight(self.w3), q_bias(self.b3, Q * Q)
             act = q_floor
         else:
-            w1, b1, w2, b2, w3, b3 = self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias, self.w3, self.b3
+            (w1, b1), w2, b2, w3, b3 = self.merged_fc1(), self.fc2.weight, self.fc2.bias, self.w3, self.b3
             act = lambda t: t      # noqa: E731
         h1 = nn.functional.linear(us, w1, b1)
         h1t = nn.functional.linear(them, w1, b1) if self.them else None
@@ -217,6 +242,12 @@ class NetPersp(nn.Module):
         # The int8 trunk (fc1, fc2, w3) stays quantizable; the value heads are free (float in C++).
         for p in (self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias, self.w3, self.b3):
             p.data.clamp_(-WEIGHT_MAX, WEIGHT_MAX)
+        if self.fc1_factor:     # the merged sets within the range: shared clamped, then each correction
+            n = self.fc1_buckets
+            for c, sh in ((self.fc1.weight, self.fc1_shared.weight), (self.fc1.bias, self.fc1_shared.bias)):
+                sh.data.clamp_(-WEIGHT_MAX, WEIGHT_MAX)
+                rep = sh.data.repeat(n, 1) if sh.dim() == 2 else sh.data.repeat(n)
+                c.data.copy_(torch.maximum(torch.minimum(c.data, WEIGHT_MAX - rep), -WEIGHT_MAX - rep))
 
     @torch.no_grad()
     def init_from_nnue193(self, sd):
@@ -226,7 +257,7 @@ class NetPersp(nn.Module):
         turn row; every head gets a copy of fc2–fc4, and the "them" half of fc2
         starts at 0. The new network then gives exactly the old one's values on
         the positions with black to move."""
-        if self.fc1_buckets > 1 or self.square:
+        if self.fc1_buckets > 1 or self.square or self.fc1_factor:
             raise ValueError("first layer per phase, squared outputs: random start only")
         sd = {(k[7:] if k.startswith("module.") else k): v.float() for k, v in sd.items()}
         if sd["fc1.weight"].shape != (self.l1_size, CACHE_INPUT_SIZE):
@@ -253,10 +284,12 @@ class NetPersp(nn.Module):
         k, them, l1, l2, l3, mask = config_of(sd)
         if (k, them, l1, l2, l3) != (self.k, self.them, self.l1_size, self.l2_size, self.l3_size) \
                 or int(sd.get("fc1_buckets_t", 1)) != self.fc1_buckets or bool(sd.get("square_t", 0)) != self.square \
+                or bool(sd.get("fc1_factor_t", 0)) != self.fc1_factor \
                 or mask & ~self.space_mask:
             raise ValueError(f"init_from_persp: source K={k} them={them} mask={mask:#x} does not fit "
                              f"K={self.k} them={self.them} mask={self.space_mask:#x}")
-        for name in ("fc1.weight", "fc1.bias", "fc2.bias", "w3", "b3", "w4", "b4"):
+        for name in ("fc1.weight", "fc1.bias", "fc2.bias", "w3", "b3", "w4", "b4") \
+                + (("fc1_shared.weight", "fc1_shared.bias") if self.fc1_factor else ()):
             self.get_parameter(name).copy_(sd[name])
         if self.direct is not None:     # the direct weights of the features the source has, else 0
             self.direct.zero_()
@@ -298,12 +331,14 @@ def load_persp(path, map_location="cpu"):
     net = NetPersp(k, them, l1, l2, l3, mask, direct="direct" in sd,
                    qat=bool(sd["qat_t"]) if "qat_t" in sd else False,
                    fc1_buckets=int(sd["fc1_buckets_t"]) if "fc1_buckets_t" in sd else 1,
-                   square=bool(sd["square_t"]) if "square_t" in sd else False)
+                   square=bool(sd["square_t"]) if "square_t" in sd else False,
+                   fc1_factor=bool(sd["fc1_factor_t"]) if "fc1_factor_t" in sd else False)
     # networks saved before step 2 / before the ablation / before step 3 lack these buffers: take the new network's
     sd.setdefault("space_mask_t", net.space_mask_t)
     sd.setdefault("space_cols_t", net.space_cols_t)
     sd.setdefault("qat_t", net.qat_t)
     sd.setdefault("fc1_buckets_t", net.fc1_buckets_t)
     sd.setdefault("square_t", net.square_t)
+    sd.setdefault("fc1_factor_t", net.fc1_factor_t)
     net.load_state_dict(sd)
     return net

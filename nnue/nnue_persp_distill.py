@@ -40,6 +40,8 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
     YOLAH_L2_SQUARE       1: w3 reads [h2, h2²] (nnue_persp.py; random start, no C++ yet)
     YOLAH_INPUT_BUCKETS   N > 1: N sets of fc1 weights by phase (nnue_persp.py; random
                           start, no C++ yet)
+    YOLAH_FC1_FACTOR      1 (with YOLAH_INPUT_BUCKETS > 1): the sets are a shared set plus
+                          a correction per phase starting at 0 (Stockfish's factoriser)
     YOLAH_INIT_MODEL=none no starting weights: the network starts from PyTorch's random
                           initialisation (seeded by YOLAH_SEED)
     YOLAH_SEED            another shuffling of the training data (default 0), to
@@ -91,6 +93,7 @@ L1_SIZE    = int(os.environ.get("YOLAH_L1_SIZE", "1024"))
 L2_SIZE    = int(os.environ.get("YOLAH_L2_SIZE", "64"))
 L2_SQUARE  = os.environ.get("YOLAH_L2_SQUARE", "0") == "1"
 INPUT_BUCKETS = int(os.environ.get("YOLAH_INPUT_BUCKETS", "1"))
+FC1_FACTOR = os.environ.get("YOLAH_FC1_FACTOR", "0") == "1"
 SPACE_MASK = int(os.environ.get("YOLAH_SPACE_MASK", "0"), 0)
 SPACE_GROUPS = int(os.environ.get("YOLAH_SPACE_GROUPS", "0"), 0)
 SEED = int(os.environ.get("YOLAH_SEED", "0"))
@@ -304,7 +307,7 @@ def main(rank, world_size, batch_size, cache_dir):
 
     torch.manual_seed(SEED)         # the random initialisation (YOLAH_INIT_MODEL=none)
     net = NetPersp(PERSP_K, PERSP_THEM, l1_size=L1_SIZE, l2_size=L2_SIZE, space_mask=space_mask, direct=DIRECT, qat=QAT,
-                   fc1_buckets=INPUT_BUCKETS, square=L2_SQUARE)
+                   fc1_buckets=INPUT_BUCKETS, square=L2_SQUARE, fc1_factor=FC1_FACTOR)
     if EVAL_ONLY:
         net = load_persp(INIT_MODEL)
         if net.space_mask != space_mask:
@@ -327,7 +330,7 @@ def main(rank, world_size, batch_size, cache_dir):
         raise SystemExit(f"{INIT_MODEL}: no such file (YOLAH_INIT_MODEL=none for a random start)")
     if rank == 0:
         print(f'Student initialised from: {src} (K={PERSP_K}, them={PERSP_THEM}, l1={L1_SIZE}, l2={L2_SIZE}, square={L2_SQUARE}, '
-              f'input buckets={INPUT_BUCKETS}, '
+              f'input buckets={INPUT_BUCKETS}{" factorised" if FC1_FACTOR else ""}, '
               f'space mask={space_mask:#x}, groups={SPACE_GROUPS:#x}, {net.n_space} space features, '
               f'direct path={DIRECT}, quantization-aware={QAT})', flush=True)
         print(net, flush=True)
