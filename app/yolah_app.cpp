@@ -3596,9 +3596,10 @@ void draw_puzzle_over(App& a, Box area, float k) {
     } else if (a.ui.button("pz_retry", {card.x + 24 * s, by, bw, 50 * s}, "R\xC3\xA9" "essayer", ok ? Style::Normal : Style::Primary, true, 17)) {
         Puzzle again = p;
         start_puzzle(a, again, g.level, g.level_pos, g.from_editor, ai_test ? g.slot[p.human].who : "");
+        a.game.intro = false;   // a retry goes straight to the board
         return;
     }
-    if (next && a.ui.button("pz_retry2", {card.center().x - bw / 2, by, bw, 50 * s}, "Rejouer", Style::Normal, true, 17)) { Puzzle again = p; start_puzzle(a, again, g.level, g.level_pos, false); return; }
+    if (next && a.ui.button("pz_retry2", {card.center().x - bw / 2, by, bw, 50 * s}, "Rejouer", Style::Normal, true, 17)) { Puzzle again = p; start_puzzle(a, again, g.level, g.level_pos, false); a.game.intro = false; return; }
     if (a.ui.button("pz_leave", {card.right() - 24 * s - bw, by, bw, 50 * s}, g.from_editor ? "\xC3\x89" "diteur" : "Puzzles", Style::Ghost, true, 17)) leave_puzzle(a);
 }
 
