@@ -1,0 +1,202 @@
+<section id="scenes">
+<h2><span class="n">24</span>The scenes</h2>
+
+<div class="tablewrap"><table>
+<tr><th>Scene</th><th>Function</th><th>What it does</th></tr>
+<tr><td>Menu</td><td><code>scene_menu</code></td><td>the title, the buttons, the players' sprites drifting on an ellipse</td></tr>
+<tr><td>Setup</td><td><code>scene_setup</code></td><td>who plays Black and White (a human or an AI of the roster), time per move, options</td></tr>
+<tr><td>Game</td><td><code>scene_game</code>, <code>game_logic</code></td><td>the board, the evaluation bar, the side panel (players, moves, analysis, AI), the end of game; a puzzle's introduction card</td></tr>
+<tr><td>Themes</td><td><code>scene_themes</code></td><td>the board themes as cards, the sprite of each player (opens the sprite picker), the PNG export</td></tr>
+<tr><td>Tutorial</td><td><code>scene_tutorial</code></td><td>lessons on the board, each with a goal checked by code</td></tr>
+<tr><td>Puzzles</td><td><code>scene_puzzles</code></td><td>the levels and their puzzles; each solved puzzle unlocks the next</td></tr>
+<tr><td>Editor</td><td><code>scene_editor</code></td><td>create and change puzzles and levels</td></tr>
+<tr><td>Studio</td><td><code>scene_studio</code></td><td>the workshop: pixel drawings and board themes</td></tr>
+</table></div>
+
+<h3><span class="n">24.1</span>The game screen's layout</h3>
+<p>A good example of layout by arithmetic: the panel takes 450 design pixels on the right; the board is the largest multiple of 8 pixels that fits the rest, with its frame and, when shown, the evaluation bar; everything is centred in what remains.</p>
+<pre data-lang="cpp" data-title="scene_game: layout">
+const float margin = 34 * s, panel_w = 450 * s, bar_w = 26 * s, frame = 26 * s, gap = 22 * s;
+const float left_w = a.w - panel_w - 3 * margin;
+float B = std::min(a.h - 2 * margin - 2 * frame - 10 * s, left_w - bar_w - gap - 2 * frame);
+B = std::floor(B / 8) * 8;                         // whole pixels per square: crisp lines
+float block_w = (show_eval ? bar_w + gap : 0) + 2 * frame + B;
+float bx = margin + (left_w - block_w) / 2 + (show_eval ? bar_w + gap : 0) + frame;
+float by = (a.h - B) / 2;
+g.board.area = {std::floor(bx), std::floor(by), B, B};
+Box panel{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin};
+</pre>
+
+<h3><span class="n">24.2</span>The tutorial</h3>
+<p>“Apprendre à jouer” is a list of lessons (<code>lessons()</code>). A lesson is a text, a task, a position and a goal that the code checks after the player's move:</p>
+<div class="tablewrap"><table>
+<tr><th>Goal</th><th>Checked by</th></tr>
+<tr><td>Read</td><td>nothing: a Continue button</td></tr>
+<tr><td>Reach</td><td>the move ends on a golden square (<code>*</code> in the board)</td></tr>
+<tr><td>Moves</td><td>the player has made N moves (the opponent may answer at random)</td></tr>
+<tr><td>Immobilize</td><td>after the move, the white piece marked <code>X</code> has no move left</td></tr>
+<tr><td>Win</td><td>the game ends with the player ahead; the opponent plays perfectly (<code>solve</code>, a full negamax, fine in tiny endgames)</td></tr>
+</table></div>
+<pre data-extract="int solve(Yolah& y, int depth = 0) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">24.3</span>Puzzles and levels</h3>
+<p><code>start_puzzle</code> launches an ordinary game from the puzzle's position (<code>App::launch</code>) with <code>game.puzzle_mode</code> set: the background image replaces the theme's gradient, the puzzle's theme, holes, sprites, tiles and decorations replace the player's, the analysis is off (it would give the solution, except when the editor tests a puzzle), and the game starts with the introduction card. At the end, the player's lead is compared with the goal; a success is saved in the settings and opens the next puzzle of the level.</p>
+<pre data-extract="void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">24.4</span>The editor</h3>
+<p>One screen in three columns. Left: the levels (unfold one to see its puzzles, rename, reorder, delete with a confirmation), each with “+ nouveau puzzle dans ce niveau…” (a dialog: the starting position or a copy of any puzzle). Middle: the brushes (free, hole, black, white, special square, decoration; keys 1–6) and the board, painted by pressing and dragging. Right: the title and introduction (text fields), the opposing AI, sides, goal, time, look (theme, holes, sprites, background with “Charger…” or a dropped image), and the tests (“Moi contre l'IA”, “IA contre IA”). The puzzle is saved when it is tested, when another one is opened, or with “Enregistrer”.</p>
+</section>
+
+<section id="files">
+<h2><span class="n">25</span>Data files</h2>
+<p>All the files are JSON (comments allowed, read by <code>load_json</code>); colours are <code>"#rrggbb"</code> or <code>"#rrggbbaa"</code>. The application writes some of them itself (assignments, puzzles, levels, themes from the workshop, drawings, settings).</p>
+
+<h3><span class="n">25.1</span>AI roster: <code>assets/ai_roster.json</code></h3>
+<pre data-lang="json" data-title="one AI, and the analysis engine">
+{ "ais": [
+  { "id": "dev", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 2150,
+    "sprite": "dev", "config": "search_study/dev_final.cfg",
+    "overrides": { "tt size": 128 },
+    "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, ..." } ],
+  "analysis": { "config": "search_study/dev_final.cfg", "overrides": { "tt size": 64 } } }
+</pre>
+<div class="tablewrap"><table>
+<tr><th>Key</th><th>Meaning</th></tr>
+<tr><td><code>config</code></td><td>a file of <code>config/</code>; its <code>"microseconds"</code> is replaced by the time per move chosen in the application, <code>"nb threads"</code> is capped to the cores minus two</td></tr>
+<tr><td><code>overrides</code>, <code>torch overrides</code></td><td>keys that replace those of the .cfg (the second only when built with libtorch)</td></tr>
+<tr><td>weight paths</td><td><code>"../x"</code> is relative to <code>config/</code>, anything else to the repository; a missing file makes the AI unavailable (<code>missing hint</code> says what to do)</td></tr>
+<tr><td><code>time factor</code>, <code>random moves</code></td><td>multiply the time per move; probability of a random legal move instead of a search (weaker players from any AI)</td></tr>
+</table></div>
+
+<h3><span class="n">25.2</span>Theme: <code>assets/themes/&lt;n&gt;_&lt;id&gt;.json</code></h3>
+<pre data-lang="json">
+{ "id": "bois", "name": "Bois précieux", "pattern": "wood", "pattern strength": 0.75, "seed": 3,
+  "light": "#e8c99b", "dark": "#a8703f",
+  "frame top": "#5b371d", "frame bottom": "#2f1b0d", "frame line": "#e2b77d", "coordinates": "#f1dcb8",
+  "hole": "#1c120b", "hole rim": "#6d4626", "background top": "#2b2621", "background bottom": "#110e0b",
+  "last move": "#ffd76a70", "selection": "#7fd1ff90", "legal move": "#20140c80", "hint": "#5ee08a", "accent": "#f2b45a",
+  "tile light": "herbe", "tile dark": "terre", "hole art": "lave", "frame art": "cadre_pierre" }
+</pre>
+<p>The last four keys are optional drawings of the workshop.</p>
+
+<h3><span class="n">25.3</span>Sprite: <code>assets/sprites/sprites.json</code></h3>
+<pre data-lang="json">
+{ "sprites": [
+  { "id": "dev", "name": "Minimax NNUE dev", "category": "Joueurs", "emblem": "bolt",
+    "ring top": "#fff1a0", "ring bottom": "#d39b12", "emblem color": "#ffe14d", "tier": 6 },
+  { "id": "classic_go", "name": "Go", "category": "Classiques", "style": "go" },
+  { "id": "photo", "name": "Ma photo", "category": "Images", "image": "photo.png" } ] }
+</pre>
+<p><code>assignments.json</code>: <code>{"players": {"human": "classic_go", "dev": "art:visage"}}</code>.</p>
+
+<h3><span class="n">25.4</span>Puzzle and level</h3>
+<pre data-lang="json" data-title="assets/puzzles/deux_d_avance.json (rank 8 first: B black, W white, # hole, . free)">
+{ "name": "Deux d'avance", "text": "Gagner ne suffit pas : il faut deux points d'avance.",
+  "board": ["B.#W###.", ".#######", "########", "###.####", ".#..##.#", "#W#.##W#", "##B##.##", "B##.#WB."],
+  "to move": "black", "player": "black", "opponent": "dev", "margin": 2, "time index": 1,
+  "theme": "jade", "hole style": "bush", "sprite black": "", "sprite white": "", "background": "crepuscule.jpg",
+  "tiles": { "e4": "herbe" }, "decor": [ { "art": "flamme", "x": 8.4, "y": 1.2, "scale": 1 } ] }
+</pre>
+<pre data-lang="json" data-title="assets/levels/premiers_defis.json, assets/levels/order.json">
+{ "name": "Premiers défis", "text": "Quatre fins de partie vérifiées par un solveur...",
+  "puzzles": ["deux_d_avance", "le_chemin_le_plus_long", "neuf_choix", "le_grand_ecart"] }
+{ "levels": ["premiers_defis", "nouveau_niveau"] }
+</pre>
+<p>Hole styles: <code>pit</code> (the theme's), <code>lava</code>, <code>water</code>, <code>void</code>, <code>ice</code>, <code>bush</code>, or a drawing <code>art:&lt;id&gt;</code>. Decorations are placed in squares from the top-left corner of the board, so they may sit on the frame or outside it.</p>
+
+<h3><span class="n">25.5</span>Drawing: <code>assets/art/&lt;id&gt;.json</code> + <code>.png</code></h3>
+<pre data-lang="json">
+{ "name": "Visage", "kind": "piece", "size": 16, "on stone": true,
+  "animations": [ { "name": "idle", "fps": 4, "loop": true, "frames": 8 },
+                  { "name": "move", "fps": 8, "loop": false, "frames": 2 },
+                  { "name": "blocked", "fps": 3, "loop": true, "frames": 4 },
+                  { "name": "win", "fps": 6, "loop": true, "frames": 2 } ] }
+</pre>
+
+<h3><span class="n">25.6</span>Settings: <code>settings.json</code> in the preferences folder</h3>
+<p>Theme, toggles (evaluation bar, hint, coordinates, variation), time per move, the last players, the lessons done and the puzzles solved. Test runs (<code>--screenshot</code>) never write it.</p>
+</section>
+
+<section id="tests">
+<h2><span class="n">26</span>Screenshots and tests</h2>
+<p>The application can render without a window and save a picture: this is how the images of this page were made, and how a change is checked without clicking. <code>--screenshot</code> switches to SDL's <code>offscreen</code> video driver and the software renderer, runs <code>--frames</code> frames (animations included), reads the back buffer and quits.</p>
+<pre data-lang="bash">
+./app/build/yolah_app --screenshot menu.bmp --scene menu
+./app/build/yolah_app --screenshot game.bmp --scene game --black human --white dev --plies 16 --tab 1 --hint --frames 220
+./app/build/yolah_app --screenshot intro.bmp --scene puzzles --puzzle deux_d_avance --frames 60
+./app/build/yolah_app --screenshot picker.bmp --scene themes --pick human
+./app/build/yolah_app --screenshot studio.bmp --scene studio --tab 0 --art visage
+python3 -c "from PIL import Image; Image.open('menu.bmp').save('menu.png')"
+</pre>
+<p>The full list of options is at the top of <code>yolah_app.cpp</code>. To rebuild the images of this page and the page itself:</p>
+<pre data-lang="bash">
+python3 doc/build_app_doc.py        # doc/src/yolah_app/*.html → doc/yolah_app.html
+</pre>
+</section>
+
+<section id="recipes">
+<h2><span class="n">27</span>Recipes</h2>
+
+<h3><span class="n">27.1</span>Add a scene</h3>
+<ol>
+<li>Add a value to <code>enum class Scene</code> (<code>@@APP</code>) and, if it needs memory between frames, a nested state structure in <code>App</code>.</li>
+<li>Write <code>void scene_mine(App&amp; a)</code> in a new <code>@@SCENE_MINE</code> section above <code>@@MAIN</code>: background, title, back button, content.</li>
+<li>Add its <code>case</code> in <code>SDL_AppIterate</code>'s switch, a button that calls <code>a.go(Scene::Mine)</code>, and optionally a <code>--scene mine</code> in <code>SDL_AppInit</code> for screenshots.</li>
+</ol>
+<pre data-lang="cpp" data-title="the skeleton of a scene">
+void scene_mine(App& a) {
+    const float s = a.s;
+    draw_background(a);
+    draw_title(a, "Ma scène", "Une phrase qui dit à quoi elle sert.");
+    if (back_button(a)) { a.go(Scene::Menu); return; }        // also Esc
+    Box card{a.w * 0.5f - 300 * s, 180 * s, 600 * s, 400 * s};
+    a.ui.panel(card);
+    if (a.ui.button("mine_ok", {card.x + 24 * s, card.bottom() - 74 * s, 200 * s, 50 * s}, "OK", Style::Primary))
+        a.notify("Cliqué !");
+}
+</pre>
+
+<h3><span class="n">27.2</span>Add an emblem or a stone style</h3>
+<p>An emblem: a branch in <code>draw_emblem</code> using <code>P(x, y)</code> in [−1, 1]², its name in the list <code>EMBLEMS</code> and in the comment of <code>sprites.json</code>. A stone style: a branch in <code>draw_plain_stone</code> and a line <code>{"id": …, "style": "mine"}</code> in <code>sprites.json</code>.</p>
+
+<h3><span class="n">27.3</span>Add an effect</h3>
+<pre data-lang="cpp">
+struct Flash : Effect {
+    Box b; float t = 0, dur = 0.3f;
+    explicit Flash(Box b) : b(b) {}
+    bool update(float dt) override { t += dt; return t < dur; }
+    void draw(TextEngine&) override { draw::rect(b, hex(0xffffff, uint8_t(160 * (1 - t / dur)))); }
+};
+a.fx.add(std::make_unique<Flash>(a.game.board.square(28)));   // flash e4
+</pre>
+
+<h3><span class="n">27.4</span>Add a widget</h3>
+<p>A method of <code>Ui</code> that takes an id and a box, uses <code>hover(box)</code> (which respects <code>blocked</code>), sets <code>hovering</code> when clickable, animates with <code>anim(id, …)</code>, draws with <code>draw::</code> and <code>text</code>, and returns what changed. Nothing else: no registration, no object.</p>
+
+<h3><span class="n">27.5</span>Add an AI</h3>
+<p>A line in <code>assets/ai_roster.json</code> pointing to a <code>.cfg</code> of <code>config/</code>, and a sprite (a line in <code>sprites.json</code>). The engine side is <code>Player::create</code>: any player the tournaments can build, the application can show.</p>
+</section>
+
+<section id="pitfalls">
+<h2><span class="n">28</span>Pitfalls</h2>
+<div class="tablewrap"><table>
+<tr><th>Symptom</th><th>Cause</th><th>Rule</th></tr>
+<tr><td>part of the screen stays black after a scene change</td><td>a clip rectangle left set by a scene that returned early</td><td>reset renderer state before use; the frame resets the clip first thing</td></tr>
+<tr><td>red and blue swapped in an image</td><td>wrong pixel format (<code>ARGB8888</code> vs <code>ABGR8888</code>)</td><td>stb bytes → <code>ABGR8888</code>; <code>0xAARRGGBB</code> numbers → <code>ARGB8888</code></td></tr>
+<tr><td>dark fringes on exported PNGs</td><td>premultiplied colours read from a render target</td><td>divide by alpha before saving</td></tr>
+<tr><td>blurred pixel art</td><td>linear scaling</td><td><code>SDL_SCALEMODE_NEAREST</code> on drawing textures</td></tr>
+<tr><td>mouse and drawing disagree on a high-density screen</td><td>window units vs pixels</td><td><code>SDL_ConvertEventToRenderCoordinates</code> first in <code>SDL_AppEvent</code></td></tr>
+<tr><td>no typed text in a field</td><td>text input not started</td><td>the frame starts it while <code>ui.focus</code> is set</td></tr>
+<tr><td>the window freezes while an AI thinks</td><td>work on the main thread</td><td>searches in threads, tokens for results</td></tr>
+<tr><td>a late AI move after an undo</td><td>a result for an old position</td><td>accept a result only for the current token</td></tr>
+<tr><td>a change has no effect</td><td>an old binary (Ninja project rebuilt with <code>make</code>)</td><td><code>ninja</code> in <code>app/build</code></td></tr>
+<tr><td>compile error “default argument given twice”</td><td>defaults on both a forward declaration and the definition</td><td>defaults only on the first declaration</td></tr>
+<tr><td>animations faster on a 144 Hz screen</td><td>counting frames</td><td>use <code>a.time</code> and <code>a.dt</code></td></tr>
+</table></div>
+</section>
+
+<footer>Yolah · doc/yolah_app.html is generated by <code>python3 doc/build_app_doc.py</code> from <code>doc/src/yolah_app/</code>; the code excerpts are copied from <code>app/yolah_app.cpp</code> at build time.</footer>
+</main>
+</div>
+</body>
+</html>

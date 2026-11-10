@@ -1,0 +1,51 @@
+<div class="part">Part I · Getting started</div>
+
+<section id="build">
+<h2><span class="n">1</span>Build and run</h2>
+
+<p>The application lives in <code>app/</code>. It needs SDL3 and the engine of the repository, nothing else: images and fonts are read by three single-header libraries kept in <code>app/third_party/</code>. SDL3 is installed in <code>~/opt/SDL3</code>; on a machine without it, CMake downloads and compiles it (a minute or two).</p>
+
+<pre data-lang="bash" data-title="first build (CMake chooses Ninja or make; here Ninja)">
+cmake -S app -B app/build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build app/build -j          # or: cd app/build && ninja
+./app/build/yolah_app
+
+# libtorch (ResNet players on the GPU) is used when CMake finds it (CMAKE_PREFIX_PATH or ~/env's torch);
+# without it the build goes on and these players run on the CPU. To never use it:
+cmake -S app -B app/build -DYOLAH_APP_TORCH=OFF
+</pre>
+
+<div class="note warn"><span class="h">After a change</span>
+<p><code>app/build</code> is a Ninja project: rebuild with <code>ninja</code> in that folder (or <code>cmake --build app/build</code>). <code>make</code> there answers “no makefile found”, and an old binary keeps running.</p></div>
+
+<div class="tablewrap"><table>
+<tr><th>Path</th><th>Content</th></tr>
+<tr><td><code>app/yolah_app.cpp</code></td><td>the whole application, about 6 300 lines in tagged sections</td></tr>
+<tr><td><code>app/CMakeLists.txt</code></td><td>SDL3 (installed or downloaded), the engine and the AI players as a static library, the executable, optional libtorch</td></tr>
+<tr><td><code>app/third_party/</code></td><td><code>stb_image.h</code> (read PNG/JPEG), <code>stb_image_write.h</code> (write PNG), <code>stb_truetype.h</code> (fonts): public domain</td></tr>
+<tr><td><code>app/assets/fonts/</code></td><td>Lato (interface) and Comfortaa (titles), OFL licence</td></tr>
+<tr><td><code>app/assets/ai_roster.json</code></td><td>the AIs offered, weakest first, and the analysis engine</td></tr>
+<tr><td><code>app/assets/themes/*.json</code></td><td>one board theme per file</td></tr>
+<tr><td><code>app/assets/sprites/</code></td><td><code>sprites.json</code> (the library of piece looks), <code>assignments.json</code> (the sprite of each player)</td></tr>
+<tr><td><code>app/assets/art/</code></td><td>pixel-art drawings of the workshop: <code>&lt;id&gt;.json</code> + <code>&lt;id&gt;.png</code></td></tr>
+<tr><td><code>app/assets/puzzles/</code>, <code>levels/</code></td><td>one puzzle per file; a level lists puzzles; <code>levels/order.json</code> orders the levels</td></tr>
+<tr><td><code>app/assets/backgrounds/</code></td><td>images behind the puzzles</td></tr>
+<tr><td><code>~/.local/share/Yolah/YolahApp/settings.json</code></td><td>the user's settings and progress (<code>SDL_GetPrefPath</code>)</td></tr>
+</table></div>
+
+<p>Inside the source, every section starts with a tag: search for <code>@@AI</code>, <code>@@DRAW</code>… to jump there. The table of contents at the top of the file lists them, and section <a href="#arch">14</a> shows how they depend on each other.</p>
+
+<p>Keyboard in a game: <kbd>H</kbd> hint, <kbd>E</kbd> evaluation bar, <kbd>U</kbd> or <kbd>Backspace</kbd> undo, <kbd>F</kbd> flip the board, <kbd>Space</kbd> pause (two AIs), <kbd>Esc</kbd> back. In the editor, <kbd>1</kbd>–<kbd>6</kbd> pick a brush; in the workshop, <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd>/<kbd>S</kbd> undo, redo, save.</p>
+</section>
+
+<section id="tour">
+<h2><span class="n">2</span>A tour of the application</h2>
+<figure class="shot"><img src="figs/app_menu.png" alt="Main menu"><figcaption>The menu. The sprites of the players drift around the title on an ellipse and fade out when they pass behind the buttons.</figcaption></figure>
+<figure class="shot"><img src="figs/app_game.png" alt="A game"><figcaption>A game: the evaluation bar on the left, the hint (green arrow and the chance of winning of the side to move), the analysis tab with depth, nodes and the principal variation. The human's pieces carry a star and a pulsing halo; each AI has its emblem.</figcaption></figure>
+<figure class="shot"><img src="figs/app_puzzle_intro.png" alt="A puzzle's introduction"><figcaption>A puzzle's introduction: its own background image over the whole window, the card centred with the title, the description and the goal.</figcaption></figure>
+<figure class="shot"><img src="figs/app_themes.png" alt="Themes"><figcaption>Themes: the board themes as cards (the workshop's drawings included), the sprite of every player on both stones.</figcaption></figure>
+<figure class="shot"><img src="figs/app_picker.png" alt="The sprite picker"><figcaption>The sprite picker: the workshop's drawings first, then the classic stones without any sign (Go, flat counter, draughts, glass, marble), then the categories of sprites drawn by code.</figcaption></figure>
+<figure class="shot"><img src="figs/app_editor.png" alt="The puzzle editor"><figcaption>The puzzle editor: levels and puzzles on the left, the brushes and the board in the middle, the puzzle's settings and look on the right.</figcaption></figure>
+<figure class="shot"><img src="figs/app_studio.png" alt="The pixel editor"><figcaption>The workshop's pixel editor: the library by kind, the tools, the canvas with its grid, the frames of the animation being edited, the colour picker, the palette and the preview on both stones.</figcaption></figure>
+<figure class="shot"><img src="figs/app_studio_boards.png" alt="The board editor"><figcaption>The workshop's board editor with the theme “Prairie”: drawn grass and earth squares, lava holes, a stone frame cut in nine.</figcaption></figure>
+</section>

@@ -1,0 +1,366 @@
+<section id="sdl-colour">
+<h2><span class="n">8</span>Colours and blending</h2>
+
+<p>A colour has four components: red, green, blue and alpha (opacity), each 0–255 in <code>SDL_Color</code> or 0–1 in <code>SDL_FColor</code>. The application keeps its own small type, <code>Rgba</code>, written in hexadecimal like in CSS, and converts at the last moment:</p>
+
+<pre data-extract="struct Rgba {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="constexpr Rgba hex(" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="inline SDL_FColor fcolor(" data-file="app/yolah_app.cpp"></pre>
+
+<p>With <code>SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND)</code>, a colour with alpha <em>a</em> drawn over a pixel mixes with it:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 170" role="img" aria-label="Alpha blending">
+  <rect x="40" y="36" width="110" height="90" rx="8" fill="#2f6fcf"/>
+  <text class="s c" x="95" y="148">pixel on screen</text>
+  <text class="t c" x="185" y="88">+</text>
+  <rect x="220" y="36" width="110" height="90" rx="8" fill="#f2b45a" opacity="0.4"/>
+  <rect x="220" y="36" width="110" height="90" rx="8" fill="none" stroke="var(--rule)"/>
+  <text class="s c" x="275" y="148">new colour, alpha 0.4</text>
+  <text class="t c" x="365" y="88">=</text>
+  <rect x="400" y="36" width="110" height="90" rx="8" fill="#2f6fcf"/>
+  <rect x="400" y="36" width="110" height="90" rx="8" fill="#f2b45a" opacity="0.4"/>
+  <text class="s c" x="455" y="148">result</text>
+  <text class="m" x="560" y="74">result = new × a</text>
+  <text class="m" x="560" y="96">       + old × (1 − a)</text>
+  <text class="xs" x="560" y="124">per component; a = alpha / 255</text>
+</svg>
+<figcaption>The “over” operation. Every soft edge, shadow, glow and fade of the application is this formula applied by the GPU.</figcaption>
+</figure>
+
+<p>Three helpers do all the colour arithmetic of the interface: <code>mix(a, b, t)</code> interpolates two colours, <code>shade(c, k)</code> moves a colour towards white (<em>k</em> &gt; 0) or black (<em>k</em> &lt; 0), and <code>with_alpha(c, k)</code> multiplies the opacity, which is how a whole widget fades in: every colour it uses goes through <code>with_alpha(…, k)</code> with <em>k</em> growing from 0 to 1.</p>
+
+<pre data-extract="inline Rgba mix(" data-file="app/yolah_app.cpp"></pre>
+</section>
+
+<section id="sdl-geometry">
+<h2><span class="n">9</span>Triangles: <code>SDL_RenderGeometry</code></h2>
+
+<p>The SDL renderer has few drawing calls: <code>SDL_RenderFillRect</code> (a rectangle), <code>SDL_RenderLine</code> (one-pixel lines), <code>SDL_RenderTexture</code> (an image) and <strong><code>SDL_RenderGeometry</code></strong>. The last one is the most powerful: it draws a list of triangles whose corners (vertices) each carry a position and a colour. The GPU fills each triangle and <strong>interpolates the colours</strong> between its corners.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 250" role="img" aria-label="A triangle with three colours, and a quad made of two triangles">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b6b"/><stop offset="0.5" stop-color="#f2b45a"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e5484d"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="1"/></linearGradient>
+  </defs>
+  <polygon points="70,200 230,200 150,50" fill="url(#g1)"/>
+  <circle cx="150" cy="50" r="6" class="fk"/><text class="ms" x="162" y="46">v0 red</text>
+  <circle cx="70" cy="200" r="6" class="fk"/><text class="ms" x="30" y="226">v1 orange</text>
+  <circle cx="230" cy="200" r="6" class="fk"/><text class="ms" x="196" y="226">v2 green</text>
+  <text class="s c" x="150" y="244">one triangle: colours blend inside</text>
+  <rect x="330" y="50" width="200" height="150" fill="url(#g2)"/>
+  <rect x="330" y="50" width="200" height="150" fill="url(#g3)"/>
+  <line x1="330" y1="50" x2="530" y2="200" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text class="ms" x="318" y="42">0</text><text class="ms" x="536" y="42">1</text><text class="ms" x="536" y="216">2</text><text class="ms" x="318" y="216">3</text>
+  <text class="s c" x="430" y="244">a quad: indices {0,1,2, 0,2,3}</text>
+  <text class="m" x="590" y="70">SDL_Vertex v[4] = {</text>
+  <text class="ms" x="604" y="92">{{x0, y0}, colour0, {0, 0}},</text>
+  <text class="ms" x="604" y="110">{{x1, y1}, colour1, {0, 0}}, …</text>
+  <text class="m" x="590" y="132">};</text>
+  <text class="m" x="590" y="160">int idx[6] = {0,1,2, 0,2,3};</text>
+  <text class="ms" x="590" y="188">SDL_RenderGeometry(R, nullptr,</text>
+  <text class="ms" x="604" y="206">v, 4, idx, 6);</text>
+</svg>
+<figcaption>Left: colours are interpolated across a triangle. Right: the colour picker's square is exactly this, white → pure hue horizontally, then a second quad from transparent to black vertically.</figcaption>
+</figure>
+
+<p>An <code>SDL_Vertex</code> has a position (<code>SDL_FPoint</code>), a colour (<code>SDL_FColor</code>) and texture coordinates (unused here: the texture argument is <code>nullptr</code>). The index list says which vertices form each triangle, so a vertex shared by several triangles is stored once. The colour picker's square is the shortest real example:</p>
+
+<pre data-extract="void quad(Box b, Rgba tl, Rgba tr, Rgba br, Rgba bl) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">9.1</span>Round shapes and soft edges</h3>
+<p>A rounded box, a circle or a star is a <strong>fan</strong>: a centre vertex and a closed outline, one triangle per outline segment. The edge of such a shape is a staircase of pixels. The trick that makes it smooth (anti-aliasing) is a <strong>fringe</strong>: every outline vertex is copied one pixel further out with alpha 0, and a ring of thin triangles joins the two outlines. The GPU interpolates the alpha across one pixel, and the edge fades instead of stepping. With a fringe of 30 pixels instead of 1, the same function draws a soft shadow.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 280" role="img" aria-label="A fan with its fringe">
+  <g transform="translate(40,20)">
+    <polygon points="140,20 240,60 260,150 190,220 90,220 20,150 40,60" fill="var(--accent-soft)" stroke="var(--accent-line)" stroke-width="1.5"/>
+    <g class="ln" stroke-width="1">
+      <line x1="140" y1="120" x2="140" y2="20"/><line x1="140" y1="120" x2="240" y2="60"/><line x1="140" y1="120" x2="260" y2="150"/>
+      <line x1="140" y1="120" x2="190" y2="220"/><line x1="140" y1="120" x2="90" y2="220"/><line x1="140" y1="120" x2="20" y2="150"/><line x1="140" y1="120" x2="40" y2="60"/>
+    </g>
+    <circle cx="140" cy="120" r="5" class="fa"/>
+    <text class="s c" x="140" y="252">the fan: centre + outline</text>
+  </g>
+  <g transform="translate(330,20)">
+    <polygon points="140,0 262,48 284,158 200,242 80,242 -4,158 18,48" fill="none" stroke="var(--blue-line)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <polygon points="140,20 240,60 260,150 190,220 90,220 20,150 40,60" fill="var(--accent-soft)" stroke="var(--accent-line)" stroke-width="1.5"/>
+    <g stroke="var(--blue-line)" stroke-width="1">
+      <line x1="140" y1="20" x2="140" y2="0"/><line x1="240" y1="60" x2="262" y2="48"/><line x1="260" y1="150" x2="284" y2="158"/>
+      <line x1="190" y1="220" x2="200" y2="242"/><line x1="90" y1="220" x2="80" y2="242"/><line x1="20" y1="150" x2="-4" y2="158"/><line x1="40" y1="60" x2="18" y2="48"/>
+      <line x1="140" y1="20" x2="262" y2="48"/><line x1="240" y1="60" x2="284" y2="158"/>
+    </g>
+    <text class="s c" x="140" y="262">fringe: outer copy, alpha 0</text>
+  </g>
+  <g transform="translate(660,60)">
+    <rect x="0" y="0" width="160" height="40" class="b0"/>
+    <text class="xs" x="8" y="-8">zoom on the edge</text>
+    <rect x="0" y="0" width="80" height="40" fill="var(--accent)"/>
+    <rect x="80" y="0" width="80" height="40" fill="url(#fringe)"/>
+    <defs><linearGradient id="fringe"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    <text class="xs c" x="40" y="58">inside: opaque</text>
+    <text class="xs c" x="120" y="58">1 px: alpha → 0</text>
+    <rect x="0" y="100" width="160" height="40" fill="url(#shadowg)"/>
+    <defs><linearGradient id="shadowg"><stop offset="0" stop-color="#000" stop-opacity="0.5"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient></defs>
+    <text class="xs c" x="80" y="158">30 px: a soft shadow</text>
+  </g>
+</svg>
+<figcaption>The outward direction at each outline vertex is the mean of the normals of its two edges. Every filled shape of the interface (buttons, stones, rings, arrows, emblems) goes through this one function.</figcaption>
+</figure>
+
+<pre data-extract="void fan(V2 c, Rgba cc," data-file="app/yolah_app.cpp"></pre>
+
+<p>Read it as three steps: the vertices (centre, then outline), the triangles of the fan (<code>0, 1+i, 1+(i+1)</code>), then, if <code>feather</code> &gt; 0, the outer copies and two triangles per segment between the outline and its copy. Section <a href="#draw">16</a> lists the shapes built on it.</p>
+</section>
+
+<section id="sdl-textures">
+<h2><span class="n">10</span>Textures</h2>
+
+<p>A texture is an image that the renderer can draw quickly, usually stored in GPU memory. The application creates textures for the glyphs of each font size, the board's squares, the PNG sprites, the background images and the pixel-art drawings. The life of a texture:</p>
+
+<pre data-lang="cpp" data-title="create, fill, configure, draw, destroy">
+SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888,   // byte order of the pixels
+                                     SDL_TEXTUREACCESS_STATIC, w, h);        // filled once
+SDL_UpdateTexture(tex, nullptr, pixels, w * 4);          // copy w × h pixels; the last argument: bytes per row
+SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);       // its alpha makes it transparent
+SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_LINEAR);      // smooth when scaled (NEAREST: pixel art)
+
+SDL_FRect src{0, 0, 32, 32};                             // a part of the texture (nullptr: all of it)
+SDL_FRect dst{x, y, 128, 128};                           // where on screen, at which size
+SDL_RenderTexture(renderer, tex, &src, &dst);
+
+SDL_DestroyTexture(tex);                                 // when no longer needed
+</pre>
+
+<h3><span class="n">10.1</span>Pixel formats: the byte order trap</h3>
+<p>A pixel is 4 bytes, but which byte is red? SDL names formats by the order of the components <em>in a 32-bit number</em>, and on a little-endian PC the bytes in memory come in the reverse order. stb_image returns bytes R, G, B, A in memory, which is <code>SDL_PIXELFORMAT_ABGR8888</code>; the code that builds pixels as numbers (<code>0xAARRGGBB</code>) uses <code>SDL_PIXELFORMAT_ARGB8888</code>.</p>
+
+<div class="tablewrap"><table>
+<tr><th>Where</th><th>Pixels built as</th><th>Format</th></tr>
+<tr><td>images read by stb_image, pixel art (<code>Pixel = 0xAABBGGRR</code>)</td><td>bytes R, G, B, A</td><td><code>SDL_PIXELFORMAT_ABGR8888</code></td></tr>
+<tr><td>board squares, glyph atlases</td><td><code>uint32_t</code> = <code>0xAARRGGBB</code></td><td><code>SDL_PIXELFORMAT_ARGB8888</code></td></tr>
+</table></div>
+<p>Pick the wrong one and red and blue swap: a blue sky turns orange. The pixel-art code packs its own pixels in stb's order so that loading, editing and saving never convert:</p>
+<pre data-extract="inline Pixel pack(Rgba c)" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">10.2</span>Access modes</h3>
+<div class="tablewrap"><table>
+<tr><th>Access</th><th>Use</th><th>In the application</th></tr>
+<tr><td><code>SDL_TEXTUREACCESS_STATIC</code></td><td>filled with <code>SDL_UpdateTexture</code>, rarely changed</td><td>glyphs, board squares, images, drawings (rebuilt when a drawing changes)</td></tr>
+<tr><td><code>SDL_TEXTUREACCESS_STREAMING</code></td><td>changed every frame (<code>SDL_LockTexture</code>)</td><td>not used</td></tr>
+<tr><td><code>SDL_TEXTUREACCESS_TARGET</code></td><td>the renderer can draw <em>into</em> it</td><td>the PNG export of the sprites (section <a href="#sdl-targets">11</a>)</td></tr>
+</table></div>
+
+<h3><span class="n">10.3</span>Scaling: linear or nearest</h3>
+<p>When a texture is drawn bigger or smaller than its size, each screen pixel must take a colour from the texture. <code>SDL_SCALEMODE_LINEAR</code> blends the four nearest texels: right for photos, fonts and the procedural board. <code>SDL_SCALEMODE_NEAREST</code> takes the single nearest one: each texel becomes a crisp square, which is what pixel art needs.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 210" role="img" aria-label="Linear and nearest scaling">
+  <defs>
+    <filter id="blur3" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="9"/></filter>
+    <clipPath id="clipL"><rect x="330" y="30" width="160" height="160" rx="4"/></clipPath>
+  </defs>
+  <g transform="translate(40,70)">
+    <rect x="0" y="0" width="20" height="20" fill="#2f6fcf"/><rect x="20" y="0" width="20" height="20" fill="#f2b45a"/>
+    <rect x="0" y="20" width="20" height="20" fill="#f2b45a"/><rect x="20" y="20" width="20" height="20" fill="#e5484d"/>
+    <text class="xs" x="-4" y="62">a 2 × 2 texture</text>
+  </g>
+  <g transform="translate(150,30)">
+    <rect x="0" y="0" width="80" height="80" fill="#2f6fcf"/><rect x="80" y="0" width="80" height="80" fill="#f2b45a"/>
+    <rect x="0" y="80" width="80" height="80" fill="#f2b45a"/><rect x="80" y="80" width="80" height="80" fill="#e5484d"/>
+  </g>
+  <text class="m c" x="230" y="206">NEAREST</text>
+  <g clip-path="url(#clipL)">
+    <g filter="url(#blur3)">
+      <rect x="310" y="10" width="100" height="100" fill="#2f6fcf"/><rect x="410" y="10" width="100" height="100" fill="#f2b45a"/>
+      <rect x="310" y="110" width="100" height="100" fill="#f2b45a"/><rect x="410" y="110" width="100" height="100" fill="#e5484d"/>
+    </g>
+  </g>
+  <text class="m c" x="410" y="206">LINEAR</text>
+  <text class="s" x="540" y="80">NEAREST: pixel-art drawings,</text>
+  <text class="s" x="540" y="98">the workshop's canvas</text>
+  <text class="s" x="540" y="132">LINEAR: text, board squares,</text>
+  <text class="s" x="540" y="150">photos, PNG sprites</text>
+</svg>
+<figcaption><code>SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST)</code> is one line, and it is the whole difference between a sharp and a blurred pixel-art piece.</figcaption>
+</figure>
+
+<h3><span class="n">10.4</span>Tinting, fading, rotating</h3>
+<ul>
+<li><code>SDL_SetTextureColorMod(tex, r, g, b)</code> multiplies every texel by a colour: the glyph atlas is white, and each string is drawn in its colour this way.</li>
+<li><code>SDL_SetTextureAlphaModFloat(tex, k)</code> multiplies the opacity: the onion skin of the workshop (the previous frame at 30 %), fading pieces.</li>
+<li><code>SDL_RenderTextureRotated(renderer, tex, src, dst, angle, centre, flip)</code>: the flipped board (180°), drawings mirrored horizontally (<code>SDL_FLIP_HORIZONTAL</code>).</li>
+</ul>
+
+<h3><span class="n">10.5</span>Nine pieces: <code>SDL_RenderTexture9Grid</code></h3>
+<p>A frame around the board must stretch to any size without distorting its corners. <code>SDL_RenderTexture9Grid</code> cuts the source in 3 × 3: the four corners are drawn at a fixed scale, the four edges stretch along one direction, the centre stretches in both.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 230" role="img" aria-label="Nine-grid scaling">
+  <g transform="translate(40,40)">
+    <rect x="0" y="0" width="120" height="120" class="bv"/>
+    <line class="grid" x1="40" y1="0" x2="40" y2="120" stroke="var(--violet)"/><line class="grid" x1="80" y1="0" x2="80" y2="120" stroke="var(--violet)"/>
+    <line class="grid" x1="0" y1="40" x2="120" y2="40" stroke="var(--violet)"/><line class="grid" x1="0" y1="80" x2="120" y2="80" stroke="var(--violet)"/>
+    <text class="xs c" x="20" y="24">1</text><text class="xs c" x="60" y="24">2</text><text class="xs c" x="100" y="24">3</text>
+    <text class="xs c" x="20" y="64">4</text><text class="xs c" x="60" y="64">5</text><text class="xs c" x="100" y="64">6</text>
+    <text class="xs c" x="20" y="104">7</text><text class="xs c" x="60" y="104">8</text><text class="xs c" x="100" y="104">9</text>
+    <text class="xs c" x="60" y="146">the drawing (24 × 24)</text>
+  </g>
+  <path class="ln" d="M190 100 L250 100"/><polygon class="fi" points="250,100 240,95 240,105"/>
+  <g transform="translate(270,20)">
+    <rect x="0" y="0" width="420" height="170" class="bv"/>
+    <line x1="40" y1="0" x2="40" y2="170" stroke="var(--violet)"/><line x1="380" y1="0" x2="380" y2="170" stroke="var(--violet)"/>
+    <line x1="0" y1="40" x2="420" y2="40" stroke="var(--violet)"/><line x1="0" y1="130" x2="420" y2="130" stroke="var(--violet)"/>
+    <text class="xs c" x="20" y="24">1</text><text class="xs c" x="210" y="24">2 stretched →</text><text class="xs c" x="400" y="24">3</text>
+    <text class="xs c" x="20" y="90">4</text><text class="xs c" x="210" y="90">5 (hidden by the board)</text><text class="xs c" x="400" y="90">6</text>
+    <text class="xs c" x="20" y="154">7</text><text class="xs c" x="210" y="154">8</text><text class="xs c" x="400" y="154">9</text>
+  </g>
+  <text class="s" x="710" y="70">corners: unchanged</text>
+  <text class="s" x="710" y="92">edges: one direction</text>
+  <text class="s" x="710" y="114">centre: both</text>
+</svg>
+<figcaption>The frame drawing is cut in thirds; the last argument of the call scales the corners so that the frame is <code>border</code> pixels thick on screen.</figcaption>
+</figure>
+
+<pre data-extract="void draw_art_frame(Art& art, double t, Box b, float border) {" data-file="app/yolah_app.cpp"></pre>
+</section>
+
+<section id="sdl-targets">
+<h2><span class="n">11</span>Clipping and render targets</h2>
+
+<h3><span class="n">11.1</span>The clip rectangle</h3>
+<p><code>SDL_SetRenderClipRect(renderer, &amp;rect)</code> restricts all drawing to a rectangle until it is reset with <code>nullptr</code>. Scrolling lists use it: the content is drawn at its scrolled position and whatever falls outside the list's box is simply not drawn.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 200" role="img" aria-label="A clipped scrolling list">
+  <rect x="60" y="16" width="220" height="40" rx="6" class="b0" stroke-dasharray="4 3" opacity="0.6"/><text class="xs c" x="170" y="40">item 1 (scrolled out: not drawn)</text>
+  <rect x="40" y="64" width="260" height="110" rx="8" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+  <text class="xs" x="306" y="80">clip rect</text>
+  <rect x="60" y="74" width="220" height="40" rx="6" class="ba"/><text class="xs c" x="170" y="98">item 2</text>
+  <rect x="60" y="122" width="220" height="40" rx="6" class="ba"/><text class="xs c" x="170" y="146">item 3</text>
+  <rect x="60" y="170" width="220" height="24" rx="6" class="b0" stroke-dasharray="4 3" opacity="0.6"/><text class="xs c" x="170" y="187">item 4: cut</text>
+  <text class="m" x="420" y="56">draw::clip(&amp;list);</text>
+  <text class="ms" x="420" y="78">for (item…) draw at y − scroll;</text>
+  <text class="m" x="420" y="100">draw::clip(nullptr);</text>
+  <text class="s" x="420" y="140">The clip is part of the renderer's state:</text>
+  <text class="s" x="420" y="158">it stays until someone resets it.</text>
+</svg>
+<figcaption>The application wraps the call in <code>draw::clip(const Box*)</code>.</figcaption>
+</figure>
+
+<div class="note warn"><span class="h">A real bug, and its fix</span>
+<p>The clip is <em>state</em>, not a scope. The puzzles grid set it, and a click on a puzzle returned from the scene function before <code>draw::clip(nullptr)</code>. The clip stayed set: the next scene (a puzzle's introduction) was cut to the grid's rectangle, and black bands surrounded its picture. <code>SDL_RenderClear</code> ignores the clip, so the bands were the cleared black. Two fixes: reset before returning, and reset at the start of every frame, so that no scene can leak it into another:</p></div>
+
+<pre data-lang="cpp" data-title="SDL_AppIterate, before clearing">
+// A scene that returned between draw::clip(&box) and draw::clip(nullptr)
+// (a click that changes scene) must not crop the next frame.
+SDL_SetRenderClipRect(a->renderer, nullptr);
+SDL_SetRenderDrawColor(a->renderer, 0, 0, 0, 255);
+SDL_RenderClear(a->renderer);
+</pre>
+
+<p>The same reasoning applies to every piece of renderer state: draw colour, render target, a texture's colour and alpha modulation. The code sets what it needs right before drawing instead of assuming what was left.</p>
+
+<h3><span class="n">11.2</span>Drawing into a texture</h3>
+<p>A texture created with <code>SDL_TEXTUREACCESS_TARGET</code> can receive drawing: <code>SDL_SetRenderTarget(renderer, tex)</code> redirects every call to it, and <code>SDL_SetRenderTarget(renderer, nullptr)</code> goes back to the window. <code>SDL_RenderReadPixels</code> then copies the result to memory as an <code>SDL_Surface</code> (an image in RAM). The button “Exporter les sprites en PNG” uses this to save every sprite on both stones:</p>
+
+<pre data-extract="std::string export_sprites(App& a) {" data-file="app/yolah_app.cpp"></pre>
+
+<div class="note"><span class="h">Premultiplied alpha</span>
+<p>Blending into a transparent target stores colours already multiplied by their alpha (a half-transparent white is stored as grey with alpha 128). A PNG expects straight colours, so the loop divides by alpha before saving; without it, every soft edge of the exported images would look dark.</p></div>
+
+<p>The screenshot mode reads the window's own back buffer the same way (<code>SDL_RenderReadPixels(renderer, nullptr)</code>, then <code>SDL_SaveBMP</code>).</p>
+</section>
+
+<section id="sdl-text">
+<h2><span class="n">12</span>Text</h2>
+
+<p>SDL3 cannot draw text (a companion library, SDL_ttf, exists but is not used). The application reads the <code>.ttf</code> fonts with <code>stb_truetype.h</code>. For each font and each pixel size it meets, it draws every character it may need, once, into one texture called an <strong>atlas</strong>, and remembers where each character is. Drawing a string is then one <code>SDL_RenderTexture</code> per character, from its rectangle in the atlas to its place on screen.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 240" role="img" aria-label="A glyph atlas">
+  <rect x="30" y="20" width="250" height="190" rx="6" class="b0"/>
+  <text class="xs" x="38" y="16">atlas: Lato Bold, 20 px (512 × 512, white glyphs, alpha = coverage)</text>
+  <g font-family="Georgia, serif" font-size="22" fill="var(--ink)">
+    <text x="44" y="54">A</text><text x="72" y="54">B</text><text x="100" y="54">C</text><text x="128" y="54">D</text><text x="156" y="54">E</text><text x="184" y="54">F</text><text x="212" y="54">G</text><text x="240" y="54">H</text>
+    <text x="44" y="90">a</text><text x="72" y="90">b</text><text x="100" y="90">c</text><text x="128" y="90">d</text><text x="156" y="90">e</text><text x="184" y="90">é</text><text x="212" y="90">è</text><text x="240" y="90">ç</text>
+    <text x="44" y="126">0</text><text x="72" y="126">1</text><text x="100" y="126">2</text><text x="128" y="126">→</text><text x="156" y="126">…</text><text x="184" y="126">•</text><text x="212" y="126">€</text><text x="240" y="126">«</text>
+  </g>
+  <rect x="152" y="70" width="24" height="28" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <rect x="180" y="70" width="24" height="28" fill="none" stroke="var(--blue)" stroke-width="2"/>
+  <text class="xs" x="40" y="160">ASCII + Latin-1 (French accents)</text>
+  <text class="xs" x="40" y="176">+ a few symbols (→ • … ≈ ★ ✓)</text>
+  <path class="lna" d="M176 84 C 300 60, 420 60, 520 100"/><polygon class="fa" points="520,100 508,98 514,90"/>
+  <path class="lnb" d="M204 84 C 320 120, 440 130, 548 104"/><polygon class="fb" points="548,104 538,112 536,102"/>
+  <text x="500" y="128" font-family="Georgia, serif" font-size="40" fill="var(--ink)">Thème</text>
+  <text class="s" x="500" y="168">one SDL_RenderTexture per glyph,</text>
+  <text class="s" x="500" y="186">tinted with SDL_SetTextureColorMod</text>
+</svg>
+<figcaption>An atlas is built on first use of a (font, size) pair and kept. Text at 18 px and at 40 px are two atlases: glyphs are never scaled, so they are always sharp.</figcaption>
+</figure>
+
+<pre data-extract="float draw(Font f, float size, const std::string& s, V2 p, Rgba col, Align al = Align::Left) {" data-file="app/yolah_app.cpp"></pre>
+
+<p>Details worth knowing:</p>
+<ul>
+<li><strong>UTF-8.</strong> Strings are UTF-8; <code>next_codepoint</code> decodes one character (1 to 4 bytes) at a time. In the source, accented letters are written as bytes so that the file stays ASCII: <code>"\xC3\xA9"</code> is é, <code>"\xE2\x86\x92"</code> is →.</li>
+<li><strong>Missing characters</strong> show as “?”. To add one, append its code point to the list in <code>TextEngine::load</code>, if the font has it (Lato has no ⇄ or ▶).</li>
+<li><strong>Sharp small text.</strong> Sizes up to 36 px are packed with 2× horizontal oversampling (<code>stbtt_PackSetOversampling</code>): glyphs are positioned to half a pixel.</li>
+<li><strong>White glyphs.</strong> The atlas stores white pixels whose alpha is the coverage of the glyph; colour modulation turns them into any colour without a new atlas.</li>
+<li><strong>Layout helpers.</strong> <code>width</code> measures, <code>wrap</code> breaks a paragraph into lines that fit a width (on spaces, and on <code>\n</code>), <code>paragraph</code> draws the lines left-aligned or centred.</li>
+</ul>
+
+<pre data-extract="Atlas& atlas(Font f, float size) {" data-file="app/yolah_app.cpp"></pre>
+</section>
+
+<section id="sdl-services">
+<h2><span class="n">13</span>Files, dialogs, threads and small services</h2>
+
+<div class="tablewrap"><table>
+<tr><th>Call</th><th>Use in the application</th></tr>
+<tr><td><code>SDL_GetBasePath()</code></td><td>the executable's folder: <code>assets/</code> is looked for there first, so a copied application finds its files</td></tr>
+<tr><td><code>SDL_GetPrefPath("Yolah", "YolahApp")</code></td><td>a per-user folder for <code>settings.json</code> (<code>~/.local/share/Yolah/YolahApp/</code> on Linux); free the string with <code>SDL_free</code></td></tr>
+<tr><td><code>SDL_GetTicksNS()</code></td><td>nanoseconds since <code>SDL_Init</code>: the clock of every animation (<code>now_seconds()</code>)</td></tr>
+<tr><td><code>SDL_CreateSystemCursor</code>, <code>SDL_SetCursor</code></td><td>the hand over anything clickable (<code>ui.hovering</code>), the arrow elsewhere</td></tr>
+<tr><td><code>SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen")</code></td><td>no window at all, plus <code>SDL_HINT_RENDER_DRIVER</code> = <code>"software"</code>: the screenshot mode</td></tr>
+<tr><td><code>SDL_ShowSimpleMessageBox</code></td><td>the fonts are missing: an error box before quitting</td></tr>
+<tr><td><code>SDL_Log</code></td><td>messages on the terminal (JSON errors, missing files)</td></tr>
+<tr><td><code>SDL_EVENT_DROP_FILE</code></td><td>a file dropped on the window: <code>e->drop.data</code> is its path</td></tr>
+<tr><td><code>SDL_ShowOpenFileDialog</code></td><td>the system's “open” dialog, for images</td></tr>
+</table></div>
+
+<h3><span class="n">13.1</span>The file dialog: an answer from another thread</h3>
+<p><code>SDL_ShowOpenFileDialog</code> returns at once; the user's choice arrives later through a <strong>callback</strong>, and SDL may call it from another thread. The frame must not be touched from there. The callback only pushes the path into a list protected by a mutex; the next frame takes the list and hands it to the scene as <code>in.files</code>, exactly like a dropped file.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 250" role="img" aria-label="The dialog's callback and the frame">
+  <text class="s" x="20" y="48">main thread</text>
+  <line class="ln" x1="130" y1="44" x2="840" y2="44"/>
+  <rect class="ba" x="150" y="28" width="140" height="32" rx="6"/><text class="ms c" x="220" y="48">choose_image("bg")</text>
+  <rect class="b0" x="330" y="28" width="70" height="32" rx="6"/><text class="xs c" x="365" y="48">frame</text>
+  <rect class="b0" x="420" y="28" width="70" height="32" rx="6"/><text class="xs c" x="455" y="48">frame</text>
+  <rect class="bg" x="620" y="28" width="200" height="32" rx="6"/><text class="ms c" x="720" y="48">in.files = take_files()</text>
+  <text class="s" x="20" y="188">dialog thread</text>
+  <line class="ln dash" x1="130" y1="184" x2="840" y2="184"/>
+  <rect class="b0" x="290" y="168" width="220" height="32" rx="6"/><text class="xs c" x="400" y="188">the user browses, picks a file</text>
+  <rect class="bb" x="530" y="168" width="150" height="32" rx="6"/><text class="ms c" x="605" y="188">callback(list)</text>
+  <rect class="bv" x="560" y="98" width="190" height="40" rx="6"/><text class="ms c" x="655" y="116">pending_files</text><text class="xs c" x="655" y="131">behind files_mutex</text>
+  <path class="ln" d="M220 60 L300 168"/><polygon class="fi" points="300,168 290,160 299,157"/>
+  <path class="lnb" d="M605 168 L620 138"/><polygon class="fb" points="620,138 612,145 622,148"/>
+  <path class="lng" d="M690 98 L705 60"/><polygon class="fg" points="705,60 697,67 707,70"/>
+  <text class="xs" x="600" y="230">push_file (any thread) → take_files (next frame)</text>
+</svg>
+<figcaption>A purpose string travels with the path (“bg”, “studio-import”…), so the scene that asked knows the answer is for it.</figcaption>
+</figure>
+
+<pre data-extract="void choose_image(const std::string& purpose) {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="void push_file(const std::string& purpose, const std::string& path) {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="std::vector&lt;std::pair&lt;std::string, std::string&gt;&gt; take_files() {" data-file="app/yolah_app.cpp"></pre>
+
+<p>On Linux the dialog needs a desktop portal or <code>zenity</code>; when none is there, the callback receives <code>nullptr</code> and the application reports the error and suggests dropping the file on the window instead.</p>
+
+<h3><span class="n">13.2</span>Threads in general</h3>
+<p>Only the main thread calls the renderer. Anything slow (an AI's search, the analysis) runs in a <code>std::thread</code> and communicates through atomics and mutex-protected snapshots that the frame reads (section <a href="#ai">19</a>). This keeps the window at 60 frames per second while an AI thinks for seconds.</p>
+</section>

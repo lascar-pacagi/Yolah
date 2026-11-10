@@ -1,0 +1,331 @@
+<div class="part">Part III · The application's code</div>
+
+<section id="arch">
+<h2><span class="n">14</span>Architecture</h2>
+
+<p>One source file, on purpose: everything the application does can be found with a search, and there is no build system to learn beyond one CMake file. The file reads <strong>from the bottom up</strong>: small tools first, then the engine wrapper and the AIs, then the drawing layers, the widgets and the board, the application state, the scenes that use all of it, and at the very end the four functions SDL calls. A section only uses the sections above it (a few forward declarations aside).</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 520" role="img" aria-label="The sections of yolah_app.cpp">
+  <rect class="ba" x="20" y="14" width="560" height="44" rx="8"/>
+  <text class="m" x="36" y="41">@@MAIN</text><text class="s" x="140" y="41">SDL_AppInit · SDL_AppEvent · SDL_AppIterate · SDL_AppQuit</text>
+  <rect class="ba" x="20" y="72" width="560" height="98" rx="8"/>
+  <text class="t" x="36" y="96">scenes: one function per screen</text>
+  <text class="ms" x="36" y="120">@@SCENE_MENU  @@SCENE_SETUP  @@SCENE_GAME  @@SCENE_THEMES</text>
+  <text class="ms" x="36" y="140">@@SCENE_TUTORIAL  @@SCENE_PUZZLES  @@SCENE_EDITOR</text>
+  <text class="ms" x="36" y="160">@@SCENE_STUDIO (pixel editor, board editor)</text>
+  <rect class="bv" x="20" y="184" width="560" height="44" rx="8"/>
+  <text class="m" x="36" y="211">@@APP</text><text class="s" x="140" y="211">App: all the state, settings, scene switching, game control</text>
+  <rect class="b0" x="20" y="242" width="180" height="58" rx="8"/><text class="m" x="34" y="266">@@UI</text><text class="xs" x="34" y="286">widgets, Input</text>
+  <rect class="b0" x="210" y="242" width="180" height="58" rx="8"/><text class="m" x="224" y="266">@@BOARD</text><text class="xs" x="224" y="286">BoardView</text>
+  <rect class="b0" x="400" y="242" width="180" height="58" rx="8"/><text class="m" x="414" y="266">@@PUZZLE</text><text class="xs" x="414" y="286">puzzles, levels</text>
+  <rect class="b0" x="20" y="312" width="135" height="58" rx="8"/><text class="m" x="34" y="336">@@THEME</text><text class="xs" x="34" y="356">board textures</text>
+  <rect class="b0" x="162" y="312" width="135" height="58" rx="8"/><text class="m" x="176" y="336">@@SPRITE</text><text class="xs" x="176" y="356">pieces, emblems</text>
+  <rect class="b0" x="304" y="312" width="135" height="58" rx="8"/><text class="m" x="318" y="336">@@ART</text><text class="xs" x="318" y="356">pixel art</text>
+  <rect class="b0" x="446" y="312" width="134" height="58" rx="8"/><text class="m" x="460" y="336">@@FX</text><text class="xs" x="460" y="356">effects</text>
+  <rect class="bg" x="20" y="382" width="275" height="58" rx="8"/><text class="m" x="34" y="406">@@DRAW</text><text class="xs" x="34" y="426">shapes with SDL_RenderGeometry</text>
+  <rect class="bg" x="305" y="382" width="275" height="58" rx="8"/><text class="m" x="319" y="406">@@TEXT</text><text class="xs" x="319" y="426">stb_truetype atlases</text>
+  <rect class="bb" x="20" y="452" width="180" height="58" rx="8"/><text class="m" x="34" y="476">@@AI</text><text class="xs" x="34" y="496">roster, threads</text>
+  <rect class="bb" x="210" y="452" width="180" height="58" rx="8"/><text class="m" x="224" y="476">@@ENGINE</text><text class="xs" x="224" y="496">Match</text>
+  <rect class="b0" x="400" y="452" width="180" height="58" rx="8"/><text class="m" x="414" y="476">@@UTIL @@CONFIG</text><text class="xs" x="414" y="496">V2, Box, Rgba, files</text>
+  <rect class="bg" x="620" y="72" width="220" height="120" rx="10"/>
+  <text class="t" x="636" y="98">assets/</text>
+  <text class="ms" x="636" y="120">ai_roster.json  themes/</text>
+  <text class="ms" x="636" y="138">sprites/  art/  fonts/</text>
+  <text class="ms" x="636" y="156">puzzles/  levels/</text>
+  <text class="ms" x="636" y="174">backgrounds/</text>
+  <rect class="bb" x="620" y="380" width="220" height="130" rx="10"/>
+  <text class="t" x="636" y="406">the repository</text>
+  <text class="ms" x="636" y="428">game/  Yolah, moves</text>
+  <text class="ms" x="636" y="446">player/  Player::create</text>
+  <text class="ms" x="636" y="464">nnue/  networks</text>
+  <text class="ms" x="636" y="482">config/  .cfg, models/</text>
+  <path class="ln dash" d="M580 120 L620 130"/>
+  <path class="ln dash" d="M580 480 L620 460"/>
+  <text class="xs" x="20" y="516"></text>
+</svg>
+<figcaption>Higher boxes use lower ones. Green: the two layers that talk to SDL's renderer. Blue: the game engine and the AI players, compiled from the repository into a static library.</figcaption>
+</figure>
+
+<h3><span class="n">14.1</span>The App structure</h3>
+<p><code>App</code> holds everything: the SDL objects, the size and scale of the window, the clock, the fonts, the input, the widgets' memory, the loaded themes, sprites and AIs, the user's settings, the current scene, and one nested structure per scene for the state that must survive from frame to frame (the game in progress, the tutorial's lesson, the editor's puzzle, the workshop's drawing).</p>
+
+<pre data-extract="struct App {" data-file="app/yolah_app.cpp" data-max="40"></pre>
+
+<h3><span class="n">14.2</span>Scenes</h3>
+<p>A scene is one screen and one function, <code>void scene_xxx(App&amp; a)</code>, called once per frame. It does three things in order: read the input, compute where things go from the window size, draw. Changing screen is <code>a.go(Scene::Setup)</code>, which remembers the time (for the fade), stops the AIs when leaving a game, reloads the puzzles when entering the puzzle screens, and closes popups.</p>
+
+<pre data-extract="void go(Scene sc) {" data-file="app/yolah_app.cpp"></pre>
+
+<div class="note"><span class="h">Why no classes for scenes</span>
+<p>A scene has no constructor, no virtual functions, no lifecycle to manage: the frame calls it, it draws what the state says. The state lives in <code>App</code> (for example <code>App::game</code>), so a scene can be left and re-entered freely, and the command line can start any scene directly (section <a href="#tests">26</a>).</p></div>
+</section>
+
+<section id="util">
+<h2><span class="n">15</span>Small tools</h2>
+
+<p><code>V2</code> is a 2D point or vector with the usual operators; <code>Box</code> is an axis-aligned rectangle (top-left corner, width, height) with the questions the layout asks all the time:</p>
+
+<pre data-extract="struct Box {" data-file="app/yolah_app.cpp"></pre>
+
+<p>Layout code is arithmetic on boxes: a panel is <code>{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin}</code>, a button inside it is <code>panel.inset(16 * s)</code> moved down. Easing curves turn a linear time fraction into a pleasant motion:</p>
+
+<pre data-extract="inline float ease_out_cubic(float t)" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="inline float ease_out_back(float t) {" data-file="app/yolah_app.cpp"></pre>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 200" role="img" aria-label="Easing curves">
+  <g transform="translate(40,20)">
+    <rect x="0" y="0" width="200" height="140" class="b0"/>
+    <path class="lna" d="M0 140 C 60 30, 120 0, 200 0"/>
+    <text class="ms c" x="100" y="166">ease_out_cubic</text><text class="xs c" x="100" y="182">fast start, soft stop (fades, cards)</text>
+  </g>
+  <g transform="translate(330,20)">
+    <rect x="0" y="0" width="200" height="140" class="b0"/>
+    <path class="lnb" d="M0 140 C 80 140, 120 0, 200 0"/>
+    <text class="ms c" x="100" y="166">ease_in_out_cubic</text><text class="xs c" x="100" y="182">a sliding piece</text>
+  </g>
+  <g transform="translate(620,20)">
+    <rect x="0" y="0" width="200" height="140" class="b0"/>
+    <path class="lng" d="M0 140 C 50 -30, 110 -30, 200 0"/>
+    <line class="grid" x1="0" y1="0" x2="200" y2="0" stroke-dasharray="3 3"/>
+    <text class="ms c" x="100" y="166">ease_out_back</text><text class="xs c" x="100" y="182">overshoots: a hole opening</text>
+  </g>
+</svg>
+<figcaption>Input: time fraction from 0 to 1 (horizontal); output: progress (vertical).</figcaption>
+</figure>
+
+<p>The other tools: <code>strf</code> (printf into a <code>std::string</code>), <code>slug</code> (a file name from a title: “Deux d'avance” → <code>deux_d_avance</code>), <code>read_file</code>/<code>write_file</code>, <code>load_json</code> (comments allowed, errors logged, never throws), <code>jstr</code>/<code>jnum</code>/<code>jcolor</code> (read a key with a default), and <code>value_noise</code>/<code>fbm</code> for the procedural board textures (section <a href="#themes">20</a>).</p>
+</section>
+
+<section id="draw">
+<h2><span class="n">16</span>The drawing library (<code>@@DRAW</code>)</h2>
+
+<p>The namespace <code>draw</code> keeps the renderer in <code>draw::R</code> and offers shapes, all built on <code>fan</code> (section <a href="#sdl-geometry">9</a>) or on a strip of quads:</p>
+
+<div class="tablewrap"><table>
+<tr><th>Function</th><th>Draws</th><th>Built with</th></tr>
+<tr><td><code>round_box(b, r, top, bottom)</code></td><td>rounded rectangle, vertical gradient: buttons, panels, cards</td><td>fan over <code>round_box_outline</code></td></tr>
+<tr><td><code>shadow(b, r, blur, c)</code></td><td>soft shadow under a box</td><td>fan with a fringe of <code>blur</code> pixels</td></tr>
+<tr><td><code>round_frame(b, r, t, c)</code></td><td>outline of a rounded box</td><td>quads between two outlines</td></tr>
+<tr><td><code>circle(c, r, inner, outer)</code></td><td>disc, radial gradient</td><td>fan</td></tr>
+<tr><td><code>circle_lit(c, r, light, …)</code></td><td>a sphere lit from a point (the stones)</td><td>fan centred on the light</td></tr>
+<tr><td><code>ring(c, r, t, top, bottom)</code></td><td>annulus with soft edges: the metal rings, the halo</td><td>4 circles of vertices, 3 bands of quads</td></tr>
+<tr><td><code>poly</code>, <code>poly_around</code></td><td>any convex or star-shaped polygon: emblems</td><td>fan</td></tr>
+<tr><td><code>line</code>, <code>arrow</code>, <code>polyline</code></td><td>thick segments, the hint arrow, curves</td><td>quads + discs at the joints</td></tr>
+<tr><td><code>gradient_rect</code>, <code>vignette</code>, <code>rect</code></td><td>window background, darkened borders, plain rectangles</td><td>quads; <code>SDL_RenderFillRect</code></td></tr>
+<tr><td><code>clip(const Box*)</code></td><td>sets or resets the clip rectangle</td><td><code>SDL_SetRenderClipRect</code></td></tr>
+</table></div>
+
+<p>The lit circle shows how far one idea goes: the gradient is centred on a light point up-left of the centre, so the stone looks round:</p>
+<pre data-extract="void circle_lit(V2 c, float r, V2 light, Rgba inner, Rgba outer) {" data-file="app/yolah_app.cpp"></pre>
+
+<p>And a ring: four circles of vertices (outside fringe, outer edge, inner edge, inside fringe) with alpha 0, 1, 1, 0, joined by three bands of quads:</p>
+<pre data-extract="void ring(V2 c, float r, float t, Rgba top, Rgba bottom) {" data-file="app/yolah_app.cpp"></pre>
+
+<p>Number of segments: circles use <code>clamp(r × 0.9, 12, 96)</code> points, rounded corners <code>clamp(r × 0.6, 2, 18)</code> per corner; enough for a smooth outline at any size, few enough to draw thousands of shapes per frame.</p>
+</section>
+
+<section id="ui">
+<h2><span class="n">17</span>Immediate-mode widgets (<code>@@UI</code>)</h2>
+
+<p>There are no button objects. Every frame, the scene says “a button here, with this label”; the same call draws the button and returns <code>true</code> on the frame it is clicked:</p>
+
+<pre data-lang="cpp" data-title="three widgets in a scene">
+if (a.ui.button("start", {x, y, 200 * s, 50 * s}, "Commencer", Style::Primary)) a.start_game();
+a.ui.toggle("t_eval", box, "Barre d'évaluation", a.settings.show_eval);   // flips the bool when clicked
+a.settings.time_index = a.ui.segmented("time", box, TIME_LABELS, a.settings.time_index);
+</pre>
+
+<p>This style is called <strong>immediate mode</strong> (as opposed to “retained mode”, where widgets are objects that live between frames, like in Qt or the web's DOM). Its strength for a game: the interface is always exactly the current state, nothing has to be kept in sync, a widget appears or disappears with an <code>if</code>. Its cost: the layout is recomputed every frame, which is nothing next to drawing.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 230" role="img" aria-label="What ui.button does in one call">
+  <rect class="ba" x="20" y="20" width="230" height="190" rx="10"/>
+  <text class="t" x="36" y="46">ui.button("start", box, …)</text>
+  <text class="s" x="36" y="74">1. hover = box contains mouse</text>
+  <text class="s" x="36" y="96">   (and no modal is open)</text>
+  <text class="s" x="36" y="122">2. k = anim("start", hover)</text>
+  <text class="s" x="36" y="148">3. draw shadow, box, label</text>
+  <text class="s" x="36" y="170">   with colours mixed by k</text>
+  <text class="s" x="36" y="196">4. return hover &amp;&amp; released</text>
+  <rect class="bv" x="300" y="56" width="230" height="120" rx="10"/>
+  <text class="t" x="316" y="82">the only memory</text>
+  <text class="ms" x="316" y="106">anims_["start"]   = 0.83</text>
+  <text class="ms" x="316" y="126">anims_["start#p"] = 0.00</text>
+  <text class="ms" x="316" y="146">anims_["back"]    = 0.10</text>
+  <text class="xs" x="316" y="166">a float per id, eased each frame</text>
+  <path class="ln" d="M250 122 L300 116"/><polygon class="fi" points="300,116 290,112 291,122"/>
+  <g transform="translate(580,40)">
+    <rect x="0" y="0" width="240" height="44" rx="10" fill="#2a3342"/><text class="c" x="120" y="28" style="font-size:14px;fill:#eef2f7;font-weight:700">k = 0 (rest)</text>
+    <rect x="0" y="64" width="240" height="44" rx="10" fill="#334050"/><text class="c" x="120" y="92" style="font-size:14px;fill:#eef2f7;font-weight:700">k = 0.5</text>
+    <rect x="0" y="126" width="240" height="44" rx="10" fill="#3a4659"/><text class="c" x="120" y="154" style="font-size:14px;fill:#eef2f7;font-weight:700">k = 1 (hovered, lifted)</text>
+  </g>
+</svg>
+<figcaption>The id (“start”) names the widget's memory. Two widgets with the same id would share their animation, so ids are unique per screen (often built from an index: <code>"pz" + id</code>).</figcaption>
+</figure>
+
+<pre data-extract="float anim(const std::string& id, bool target, float speed = 14) {" data-file="app/yolah_app.cpp"></pre>
+<p><code>v += (target − v) × min(1, speed × dt)</code> moves the value a fraction of the way to its target each frame: an exponential approach, smooth and independent of the frame rate. With speed 14 the glow reaches 90 % in about 0.16 s.</p>
+
+<pre data-extract="bool button(const std::string& id, Box b, const std::string& label, Style st = Style::Normal, bool enabled = true, float font = 20) {" data-file="app/yolah_app.cpp"></pre>
+
+<div class="tablewrap"><table>
+<tr><th>Widget</th><th>Returns</th></tr>
+<tr><td><code>button(id, box, label, style, enabled, font)</code></td><td><code>true</code> the frame it is clicked; styles Normal, Primary (gold), Ghost (transparent), Danger (red)</td></tr>
+<tr><td><code>toggle(id, box, label, bool&amp;)</code></td><td>flips the bool, <code>true</code> when it changed</td></tr>
+<tr><td><code>segmented(id, box, options, sel)</code></td><td>the selected index (a sliding highlight)</td></tr>
+<tr><td><code>tabs(id, box, names, sel)</code></td><td>the selected tab</td></tr>
+<tr><td><code>cycler(id, box, label, names, idx)</code></td><td>“label ‹ value ›”: the new index</td></tr>
+<tr><td><code>text_field(id, box, string&amp;, placeholder)</code></td><td>edits the string; <code>true</code> when it changed</td></tr>
+<tr><td><code>panel(box, radius, colour)</code></td><td>draws a card with its shadow</td></tr>
+</table></div>
+
+<p>Three flags complete the system. <code>ui.blocked</code>: a modal box is open (end of a game, a dialog), widgets outside it ignore the mouse. <code>ui.hovering</code>: a clickable thing is under the mouse, the frame shows the hand cursor. <code>ui.focus</code>: the id of the text field being typed in (keyboard text is turned on for it, section <a href="#sdl-events">7.2</a>).</p>
+</section>
+
+<section id="board">
+<h2><span class="n">18</span>The board (<code>@@BOARD</code>)</h2>
+
+<h3><span class="n">18.1</span>Squares and screen</h3>
+<p>The engine numbers the squares 0 (a1) to 63 (h8): <code>file = s % 8</code>, <code>rank = s / 8</code>. On screen, rank 8 is at the top; flipped, everything turns by 180°. Two functions convert, and everything else uses them:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 280" role="img" aria-label="Board coordinates">
+  <g transform="translate(40,20)">
+    <g>
+      <rect x="0" y="0" width="240" height="240" class="b0"/>
+      <g fill="var(--accent-soft)">
+        <rect x="30" y="0" width="30" height="30"/><rect x="90" y="0" width="30" height="30"/><rect x="150" y="0" width="30" height="30"/><rect x="210" y="0" width="30" height="30"/>
+        <rect x="0" y="30" width="30" height="30"/><rect x="60" y="30" width="30" height="30"/><rect x="120" y="30" width="30" height="30"/><rect x="180" y="30" width="30" height="30"/>
+        <rect x="30" y="60" width="30" height="30"/><rect x="90" y="60" width="30" height="30"/><rect x="150" y="60" width="30" height="30"/><rect x="210" y="60" width="30" height="30"/>
+        <rect x="0" y="90" width="30" height="30"/><rect x="60" y="90" width="30" height="30"/><rect x="120" y="90" width="30" height="30"/><rect x="180" y="90" width="30" height="30"/>
+        <rect x="30" y="120" width="30" height="30"/><rect x="90" y="120" width="30" height="30"/><rect x="150" y="120" width="30" height="30"/><rect x="210" y="120" width="30" height="30"/>
+        <rect x="0" y="150" width="30" height="30"/><rect x="60" y="150" width="30" height="30"/><rect x="120" y="150" width="30" height="30"/><rect x="180" y="150" width="30" height="30"/>
+        <rect x="30" y="180" width="30" height="30"/><rect x="90" y="180" width="30" height="30"/><rect x="150" y="180" width="30" height="30"/><rect x="210" y="180" width="30" height="30"/>
+        <rect x="0" y="210" width="30" height="30"/><rect x="60" y="210" width="30" height="30"/><rect x="120" y="210" width="30" height="30"/><rect x="180" y="210" width="30" height="30"/>
+      </g>
+      <rect x="0" y="210" width="30" height="30" fill="none" stroke="var(--blue)" stroke-width="2.5"/>
+      <rect x="210" y="0" width="30" height="30" fill="none" stroke="var(--blue)" stroke-width="2.5"/>
+      <rect x="120" y="120" width="30" height="30" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+      <text class="xs c" x="15" y="229">0</text><text class="xs c" x="225" y="19">63</text><text class="xs c" x="135" y="139">28</text>
+    </g>
+    <text class="xs c" x="15" y="256">a</text><text class="xs c" x="225" y="256">h</text>
+    <text class="xs" x="-14" y="229">1</text><text class="xs" x="-14" y="19">8</text>
+  </g>
+  <text class="m" x="330" y="60">square(s) → screen box</text>
+  <text class="ms" x="346" y="82">col = flipped ? 7 − file : file</text>
+  <text class="ms" x="346" y="100">row = flipped ? rank : 7 − rank</text>
+  <text class="ms" x="346" y="118">box = {x + col·q, y + row·q, q, q}</text>
+  <text class="m" x="330" y="160">at(point) → square under the mouse</text>
+  <text class="ms" x="346" y="182">the inverse: col, row from the point,</text>
+  <text class="ms" x="346" y="200">then file, rank, s = rank·8 + file</text>
+  <text class="s" x="330" y="240">e4 = 4 + 3 × 8 = 28 (orange); q = area.w / 8</text>
+</svg>
+<figcaption>a1 = 0 at the bottom left, h8 = 63 at the top right. A human playing White only gets the board flipped automatically.</figcaption>
+</figure>
+
+<pre data-extract="Box square(int s) const {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="int at(V2 p) const {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">18.2</span>Drawing order</h3>
+<ol>
+<li>shadow and frame (a drawn 9-grid frame if the theme has one, else rounded boxes);</li>
+<li>the squares: one texture, rotated by 180° when flipped; then the drawn squares of the theme and of the puzzle;</li>
+<li>the coordinates, the last move (both squares tinted);</li>
+<li>the holes, each growing in with <code>ease_out_back</code> when it opens (or its drawing's “open” animation);</li>
+<li>the puzzle's decorations;</li>
+<li>the selection and the legal destinations (dots; a ring under the mouse);</li>
+<li>the pieces, each with its state: <em>idle</em>, <em>blocked</em> (no free square around), <em>win</em> (the winner, game over), except the one moving or dragged;</li>
+<li>the principal variation (numbered arrows), the hint (pulsing arrow and its label);</li>
+<li>the moving piece, then the dragged piece, above everything.</li>
+</ol>
+<p>What the board shows comes in a <code>Look</code> structure filled by the scene (sprites, halos, hole style, hint, variation, the puzzle's tiles and decorations), so the same <code>BoardView</code> draws the game, the tutorial, the editor and the workshop's preview.</p>
+
+<h3><span class="n">18.3</span>Input: click or drag</h3>
+<p>A human plays by clicking a piece then a destination, or by dragging the piece. <code>BoardView::input</code> handles both with three variables (<code>selected</code>, <code>drag_from</code>, <code>dragging</code>):</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 220" role="img" aria-label="Board input state">
+  <rect class="b0" x="20" y="80" width="140" height="56" rx="10"/><text class="t c" x="90" y="104">nothing</text><text class="xs c" x="90" y="122">selected = −1</text>
+  <rect class="ba" x="300" y="80" width="180" height="56" rx="10"/><text class="t c" x="390" y="104">piece selected</text><text class="xs c" x="390" y="122">selected = drag_from = s</text>
+  <rect class="bb" x="640" y="20" width="200" height="56" rx="10"/><text class="t c" x="740" y="44">dragging</text><text class="xs c" x="740" y="62">moved &gt; 15 % of a square</text>
+  <rect class="bg" x="640" y="140" width="200" height="56" rx="10"/><text class="t c" x="740" y="164">move returned</text><text class="xs c" x="740" y="182">if legal</text>
+  <path class="ln" d="M160 100 L300 100"/><polygon class="fi" points="300,100 290,95 290,105"/><text class="xs c" x="230" y="92">press on own piece</text>
+  <path class="ln" d="M480 92 L640 50"/><polygon class="fi" points="640,50 629,49 632,58"/><text class="xs" x="520" y="58">button held, mouse moves</text>
+  <path class="ln" d="M480 124 L640 166"/><polygon class="fi" points="640,166 632,158 629,167"/><text class="xs" x="500" y="168">press on a destination</text>
+  <path class="ln" d="M740 76 L740 140"/><polygon class="fi" points="740,140 735,130 745,130"/><text class="xs" x="748" y="112">release on a square</text>
+  <path class="ln dash" d="M300 128 C 230 170, 160 170, 110 136"/><polygon class="fi" points="110,136 114,146 120,138"/><text class="xs c" x="205" y="182">press elsewhere</text>
+</svg>
+<figcaption>The move goes to the <code>Match</code> at once; the board only <em>shows</em> it moving for 0.34 s. The next AI search waits for the animation to end.</figcaption>
+</figure>
+
+<pre data-extract="std::optional&lt;Move&gt; input(const Input& in, const Yolah& pos, bool human_turn, bool blocked) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">18.4</span>A move on screen</h3>
+<p><code>on_move</code> remembers the move and its start time, sets when the hole must appear (0.08 s later), and throws debris. While <code>now &lt; t0 + 0.34</code>, the piece is drawn between the two squares with <code>ease_in_out_cubic</code>, lifted along a sine arc (<code>lift = sin(k·π)</code>), bigger and with a longer shadow, and playing its drawing's “move” animation if it has one.</p>
+<pre data-extract="void on_move(Move m, int side, double now, FxLayer& fx, const Theme& theme, std::mt19937& rng) {" data-file="app/yolah_app.cpp"></pre>
+</section>
+
+<section id="ai">
+<h2><span class="n">19</span>AIs in threads (<code>@@AI</code>)</h2>
+
+<p>An AI may think for seconds. If it ran in the frame, the window would freeze for that long. So each search runs in its own <code>std::thread</code>, and the frame only asks, 60 times per second, “is it finished?”.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 280" role="img" aria-label="The threads of a game">
+  <text class="t" x="20" y="44">main thread</text>
+  <g>
+    <rect class="b0" x="160" y="28" width="38" height="26" rx="4"/><rect class="b0" x="204" y="28" width="38" height="26" rx="4"/>
+    <rect class="b0" x="248" y="28" width="38" height="26" rx="4"/><rect class="b0" x="292" y="28" width="38" height="26" rx="4"/>
+    <rect class="b0" x="336" y="28" width="38" height="26" rx="4"/><rect class="b0" x="380" y="28" width="38" height="26" rx="4"/>
+    <rect class="b0" x="424" y="28" width="38" height="26" rx="4"/><rect class="b0" x="468" y="28" width="38" height="26" rx="4"/>
+    <rect class="b0" x="512" y="28" width="38" height="26" rx="4"/><rect class="bg" x="556" y="28" width="38" height="26" rx="4"/>
+    <rect class="b0" x="600" y="28" width="38" height="26" rx="4"/><rect class="b0" x="644" y="28" width="38" height="26" rx="4"/>
+  </g>
+  <text class="xs" x="700" y="46">frames: poll, draw</text>
+  <text class="t" x="20" y="124">AiAgent</text>
+  <rect class="bb" x="200" y="104" width="360" height="32" rx="6"/><text class="ms c" x="380" y="125">Player::play(position) for token 7</text>
+  <path class="ln" d="M180 54 L200 104"/><polygon class="fi" points="200,104 192,96 201,94"/><text class="xs" x="96" y="88">think(pos, 7)</text>
+  <path class="ln" d="M560 120 L575 54"/><polygon class="fi" points="575,54 568,62 578,64"/><text class="xs" x="580" y="96">poll(7) → move</text>
+  <text class="t" x="20" y="204">Analyzer</text>
+  <rect class="bv" x="200" y="186" width="100" height="30" rx="6"/><text class="xs c" x="250" y="206">search 120 ms</text>
+  <rect class="bv" x="306" y="186" width="100" height="30" rx="6"/><text class="xs c" x="356" y="206">search 120 ms</text>
+  <rect class="bv" x="412" y="186" width="100" height="30" rx="6"/><text class="xs c" x="462" y="206">search 120 ms</text>
+  <rect class="bv" x="518" y="186" width="100" height="30" rx="6"/><text class="xs c" x="568" y="206">…</text>
+  <text class="s" x="200" y="248">after each slice: value, depth, best move, variation → snapshot (mutex)</text>
+  <text class="s" x="200" y="266">the bar, the hint and the analysis tab read the latest snapshot</text>
+</svg>
+<figcaption>Three threads in a game against an AI: the frames, the AI's search, the analysis. Only the main thread draws.</figcaption>
+</figure>
+
+<h3><span class="n">19.1</span>Tokens</h3>
+<p>Every position gets a number, <code>game.token</code>, incremented by each move and each undo. A search is started <em>for a token</em>, and its result is accepted only for that token. If the human undoes a move while the AI thinks, the token changes and the late answer is ignored. The same rule applies to the analysis snapshot: the bar only shows a snapshot whose token is the current one.</p>
+
+<pre data-extract="void think(const Yolah& pos, uint64_t token) {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="bool poll(uint64_t token, Move& move, double& seconds, std::string& error) {" data-file="app/yolah_app.cpp"></pre>
+
+<p>Things to notice in <code>think</code>:</p>
+<ul>
+<li>The lambda captures <code>sh</code> and <code>job</code> as <strong><code>shared_ptr</code></strong>: if the game is abandoned and the <code>AiAgent</code> destroyed, the thread still owns what it writes to.</li>
+<li>The engine player is created by the first search (<code>Player::create(cfg)</code>, from the same <code>.cfg</code> files as the tournaments): loading a network takes time, and it happens in the thread too.</li>
+<li>A mutex in <code>Shared</code> makes a new search wait until an abandoned one has finished: an engine player is not made for two searches at once.</li>
+<li><code>done</code> is an <code>atomic&lt;bool&gt;</code>: the frame reads it without a lock; the result fields are written before it is set and read after.</li>
+</ul>
+
+<h3><span class="n">19.2</span>The graveyard</h3>
+<p>A search cannot be killed safely in C++. When it is no longer wanted, its <code>std::thread</code> is moved to <code>g_graveyard</code>; it finishes on its own and is joined later (every frame for the finished ones, all of them when the application quits). The dev player can also be told to stop at once through its <code>stop_flag()</code>.</p>
+<pre data-extract="struct Graveyard {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">19.3</span>The game logic</h3>
+<p><code>game_logic</code> runs every frame of a game: end of game (confetti, a puzzle's goal), automatic passes after 0.8 s, and the AI's turn (start a search for the current token if none runs, collect the move when it is ready, check that it is legal).</p>
+<pre data-extract="void game_logic(App& a) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">19.4</span>The analysis engine</h3>
+<p>Whatever the players are, the <code>Analyzer</code> searches the current position with the dev minimax player, in slices of 120 ms (each slice restarts the iterative deepening; the transposition table makes the restart cheap), for up to 20 seconds, and publishes after each slice the value, the depth, the best move and the principal variation. It feeds the evaluation bar, the hint and the analysis tab.</p>
+<p><strong>Values.</strong> The engine's value is for the side to move; the analyser turns it to Black's point of view. Below 30 000 in absolute value it is the network's tanh × 30 000, an expected result between −1 and 1: the bar gives Black the share (1 + v / 30 000) / 2, and the label shows that chance in percent for the side ahead. Above 30 000 the result is proven: 30 000 + the final score difference, shown as “Gain +3”.</p>
+<pre data-extract="float eval_share(int value) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">19.5</span>The roster</h3>
+<p><code>assets/ai_roster.json</code> lists the AIs from the weakest to the strongest. The application never builds a player itself: it reads the same <code>.cfg</code> files as the tournaments, applies the roster's overrides, makes the weight paths absolute, and marks an AI unavailable (with the reason, shown on hover) when its network file is missing. Section <a href="#files">25</a> gives the keys.</p>
+</section>

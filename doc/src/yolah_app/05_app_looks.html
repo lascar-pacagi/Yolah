@@ -1,0 +1,176 @@
+<section id="themes">
+<h2><span class="n">20</span>Themes (<code>@@THEME</code>)</h2>
+
+<p>A theme (<code>assets/themes/&lt;n&gt;_&lt;id&gt;.json</code>) gives the colours of the board, the holes, the highlights and the window background, the pattern of the squares, and optionally drawings of the workshop for the squares, the holes and the frame. The file names start with a number to set their order in the list.</p>
+
+<h3><span class="n">20.1</span>Squares computed pixel by pixel</h3>
+<p>The 64 squares are one texture of the board's size in pixels, computed once per theme and size by <code>make_board_texture</code> and cached (<code>BoardTextures</code>, at most 24 entries). Every pixel gets the base colour of its square (light or dark), brightened or darkened by a pattern built from noise:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 190" role="img" aria-label="Noise and fractal noise">
+  <defs>
+    <filter id="n1" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="1" seed="3"/><feColorMatrix type="saturate" values="0"/></filter>
+    <filter id="n4" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="4" seed="3"/><feColorMatrix type="saturate" values="0"/></filter>
+    <filter id="wood" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.004 0.09" numOctaves="3" seed="5"/><feColorMatrix type="matrix" values="0 0 0 0 0.66  0 0 0 0 0.44  0 0 0 0 0.25  0 0 0 -2.2 1.6"/></filter>
+  </defs>
+  <rect x="30" y="20" width="200" height="130" filter="url(#n1)"/>
+  <text class="ms c" x="130" y="172">value_noise: smooth random</text>
+  <rect x="320" y="20" width="200" height="130" filter="url(#n4)"/>
+  <text class="ms c" x="420" y="172">fbm: 4 octaves added</text>
+  <rect x="610" y="20" width="200" height="130" fill="#e8c99b"/>
+  <rect x="610" y="20" width="200" height="130" filter="url(#wood)"/>
+  <text class="ms c" x="710" y="172">wood: rings bent by fbm</text>
+</svg>
+<figcaption>Illustration with SVG noise. <code>value_noise</code> interpolates random values on a grid; <code>fbm</code> (“fractal Brownian motion”) adds copies at double frequency and half amplitude, giving natural-looking detail.</figcaption>
+</figure>
+
+<pre data-extract="inline float fbm(float x, float y, uint32_t seed, int octaves = 4) {" data-file="app/yolah_app.cpp"></pre>
+
+<div class="tablewrap"><table>
+<tr><th>Pattern</th><th>How it is made</th></tr>
+<tr><td><code>wood</code></td><td>growth rings: a sine across the grain, bent by low-frequency noise, plus fine fibres; horizontal and vertical grain alternate</td></tr>
+<tr><td><code>marble</code></td><td>soft veins: a sine bent by strong turbulence, sharpened, over cloudy noise</td></tr>
+<tr><td><code>stone</code></td><td>fractal noise and a few bright specks</td></tr>
+<tr><td><code>neon</code></td><td>glowing edges around each square</td></tr>
+<tr><td><code>flat</code></td><td>almost plain</td></tr>
+</table></div>
+<p>Each square also gets a small bevel (lighter top-left edges, darker bottom-right) that makes the board look carved; <code>seed</code> changes the random pattern, <code>pattern strength</code> its contrast. In the workshop, while a square colour is being changed, the texture is rebuilt at most five times a second.</p>
+<pre data-extract="SDL_Texture* make_board_texture(const Theme& t, int px) {" data-file="app/yolah_app.cpp" data-max="22"></pre>
+</section>
+
+<section id="sprites">
+<h2><span class="n">21</span>Sprites (<code>@@SPRITE</code>)</h2>
+
+<p>A sprite is the look of a player's pieces. <code>assets/sprites/sprites.json</code> is a library; <code>assignments.json</code> says which sprite each player uses (a player without an entry uses the sprite of its roster line). Four kinds of sprites exist, chosen in this order by <code>draw_piece</code>:</p>
+
+<div class="tablewrap"><table>
+<tr><th>Kind</th><th>In the JSON</th><th>Drawing</th></tr>
+<tr><td>picture</td><td><code>"image": "file.png"</code></td><td>the PNG, scaled to the stone</td></tr>
+<tr><td>workshop drawing</td><td>(automatic) id <code>art:&lt;id&gt;</code>, category “Mes dessins”</td><td>its pixel-art animation (idle, move, blocked, win), on the stone of its side or alone</td></tr>
+<tr><td>classic stone</td><td><code>"style": "go" | "flat" | "checkers" | "glass" | "marble"</code></td><td>a black or white stone without any sign</td></tr>
+<tr><td>emblem stone</td><td><code>"emblem"</code>, <code>"ring top"</code>, <code>"ring bottom"</code>, <code>"emblem color"</code>, <code>"tier"</code></td><td>stone + metal ring + emblem + pips</td></tr>
+</table></div>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 230" role="img" aria-label="The layers of an emblem stone">
+  <defs>
+    <radialGradient id="stoneg" cx="0.32" cy="0.3" r="0.8"><stop offset="0" stop-color="#5b6170"/><stop offset="1" stop-color="#0a0c11"/></radialGradient>
+    <linearGradient id="ringg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1a0"/><stop offset="1" stop-color="#d39b12"/></linearGradient>
+    <radialGradient id="shadg"><stop offset="0.6" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g transform="translate(70,100)">
+    <circle cx="6" cy="12" r="56" fill="url(#shadg)"/><text class="xs c" x="0" y="96">1 shadow</text>
+  </g>
+  <g transform="translate(210,100)">
+    <circle r="48" fill="url(#stoneg)"/><text class="xs c" x="0" y="96">2 lit stone</text>
+  </g>
+  <g transform="translate(350,100)">
+    <circle r="48" fill="url(#stoneg)"/><circle r="44" fill="none" stroke="url(#ringg)" stroke-width="8"/><text class="xs c" x="0" y="96">3 ring (metal)</text>
+  </g>
+  <g transform="translate(490,100)">
+    <circle r="48" fill="url(#stoneg)"/><circle r="44" fill="none" stroke="url(#ringg)" stroke-width="8"/>
+    <circle cx="-15" cy="-18" r="12" fill="#fff" opacity="0.25"/><text class="xs c" x="0" y="96">4 highlight</text>
+  </g>
+  <g transform="translate(630,100)">
+    <circle r="48" fill="url(#stoneg)"/><circle r="44" fill="none" stroke="url(#ringg)" stroke-width="8"/>
+    <polygon points="5,-30 -16,4 -1,4 -5,28 16,-6 1,-6" fill="#ffe14d"/>
+    <text class="xs c" x="0" y="96">5 emblem</text>
+  </g>
+  <g transform="translate(770,100)">
+    <circle r="48" fill="url(#stoneg)"/><circle r="44" fill="none" stroke="url(#ringg)" stroke-width="8"/>
+    <polygon points="5,-30 -16,4 -1,4 -5,28 16,-6 1,-6" fill="#ffe14d"/>
+    <circle cx="-12" cy="40" r="2.4" fill="#fff"/><circle cx="-4" cy="41.5" r="2.4" fill="#fff"/><circle cx="4" cy="41.5" r="2.4" fill="#fff"/><circle cx="12" cy="40" r="2.4" fill="#fff"/>
+    <text class="xs c" x="0" y="96">6 tier pips</text>
+  </g>
+</svg>
+<figcaption>Drawn back to front by <code>draw_piece</code>. The human player also gets a pulsing halo, whatever the sprite, so that one's own pieces stay recognisable.</figcaption>
+</figure>
+
+<pre data-extract="void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0," data-file="app/yolah_app.cpp"></pre>
+
+<p>The emblems are drawn by code in <code>draw_emblem</code>, in a unit square scaled by <code>s</code>: <code>P(x, y)</code> maps a point of [−1, 1]² to the screen, and each emblem is a few polygons, circles and lines. A crown, for instance:</p>
+<pre data-extract="} else if (e == &quot;crown&quot;) {" data-file="app/yolah_app.cpp" data-max="7"></pre>
+
+<p>The classic stones are a separate function, chosen by <code>"style"</code>: a Go stone is a lit disc, a soft darker rim (a ring whose alpha grows outwards) and a broad highlight; a draughts piece is a flat face with two grooves (a dark ring and a light ring just inside it).</p>
+<pre data-extract="void draw_plain_stone(const std::string& style, int side, V2 c, float r, float alpha) {" data-file="app/yolah_app.cpp" data-max="24"></pre>
+</section>
+
+<section id="art">
+<h2><span class="n">22</span>Pixel art and the workshop (<code>@@ART</code>, <code>@@SCENE_STUDIO</code>)</h2>
+
+<h3><span class="n">22.1</span>A drawing</h3>
+<p>A drawing is a square of <em>size</em> × <em>size</em> pixels (16 to 64) with named animations; its <strong>kind</strong> decides which animations exist and where it can be used:</p>
+<div class="tablewrap"><table>
+<tr><th>Kind</th><th>Animations</th><th>Used as</th></tr>
+<tr><td><code>piece</code></td><td>idle, move (while sliding), blocked (no free square around), win (the winner's pieces)</td><td>a sprite, on its side's stone (“on stone”) or alone</td></tr>
+<tr><td><code>hole</code></td><td>idle, open (played once when the hole appears)</td><td>a theme's holes, a puzzle's hole style <code>art:&lt;id&gt;</code></td></tr>
+<tr><td><code>tile</code></td><td>idle</td><td>a theme's light/dark squares, a puzzle's special squares</td></tr>
+<tr><td><code>decor</code></td><td>idle</td><td>decorations placed on a puzzle's board</td></tr>
+<tr><td><code>frame</code></td><td>idle</td><td>the board's frame, drawn in nine pieces</td></tr>
+</table></div>
+
+<p>On disk, <code>assets/art/&lt;id&gt;.json</code> gives the name, kind, size and each animation's speed, loop and number of frames; <code>&lt;id&gt;.png</code> holds the frames, <strong>one row per animation, one column per frame</strong>. In memory, the same layout becomes one texture, drawn with nearest scaling:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 240" role="img" aria-label="The sprite sheet of a drawing">
+  <g transform="translate(40,30)">
+    <text class="xs" x="0" y="-10">visage.png (16 px frames)</text>
+    <g>
+      <rect x="0" y="0" width="40" height="40" class="ba"/><rect x="44" y="0" width="40" height="40" class="ba"/><rect x="88" y="0" width="40" height="40" class="ba"/><rect x="132" y="0" width="40" height="40" class="ba"/>
+      <rect x="176" y="0" width="40" height="40" class="ba"/><rect x="220" y="0" width="40" height="40" class="ba"/><rect x="264" y="0" width="40" height="40" class="ba"/><rect x="308" y="0" width="40" height="40" class="ba"/>
+      <rect x="0" y="44" width="40" height="40" class="bb"/><rect x="44" y="44" width="40" height="40" class="bb"/>
+      <rect x="0" y="88" width="40" height="40" class="bv"/><rect x="44" y="88" width="40" height="40" class="bv"/><rect x="88" y="88" width="40" height="40" class="bv"/><rect x="132" y="88" width="40" height="40" class="bv"/>
+      <rect x="0" y="132" width="40" height="40" class="bg"/><rect x="44" y="132" width="40" height="40" class="bg"/>
+      <rect x="88" y="0" width="40" height="40" fill="none" stroke="var(--red)" stroke-width="3"/>
+    </g>
+    <text class="ms" x="360" y="25">row 0: idle    8 frames, 4 fps, loop</text>
+    <text class="ms" x="360" y="69">row 1: move    2 frames, 8 fps, once</text>
+    <text class="ms" x="360" y="113">row 2: blocked 4 frames, 3 fps, loop</text>
+    <text class="ms" x="360" y="157">row 3: win     2 frames, 6 fps, loop</text>
+    <text class="s" x="0" y="200">frame shown t seconds after the start:  k = floor(t · fps);  loop ? k mod n : min(k, n − 1)</text>
+  </g>
+</svg>
+<figcaption>Red: frame 2 of “idle”, shown between 0.5 s and 0.75 s (4 fps). Its source rectangle is <code>{2·16, 0·16, 16, 16}</code>.</figcaption>
+</figure>
+
+<pre data-extract="std::optional&lt;SDL_FRect&gt; frame_rect(const std::string& n, double t) {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="void update_texture() {" data-file="app/yolah_app.cpp"></pre>
+
+<p>Drawings are kept in <code>g_arts</code> (id → <code>Art</code>), loaded at start; the pieces among them are registered as sprites <code>art:&lt;id&gt;</code> so that the picker, the players and the puzzles use them like any other sprite.</p>
+
+<h3><span class="n">22.2</span>The pixel editor</h3>
+<p>The canvas is the drawing's texture drawn large over a checkerboard (what transparency looks like in image editors), with a grid. The mouse position becomes a pixel by dividing by the cell size:</p>
+<pre data-lang="cpp" data-title="studio_drawings: the pixel under the mouse">
+int px = int(std::floor((a.in.mouse.x - canvas.x) / cell)), py = int(std::floor((a.in.mouse.y - canvas.y) / cell));
+</pre>
+<div class="tablewrap"><table>
+<tr><th>Tool</th><th>Algorithm</th></tr>
+<tr><td>pencil, eraser (also the right button)</td><td>a pixel at the press, then a Bresenham line from the previous mouse pixel to the current one, so a fast stroke has no gaps</td></tr>
+<tr><td>fill</td><td>4-connected flood fill with an explicit stack (no recursion, no stack overflow)</td></tr>
+<tr><td>line, rectangle</td><td>the frame is restored from a copy taken at the press, then the shape is drawn to the current pixel: a live preview while dragging</td></tr>
+<tr><td>colour picker</td><td>reads the pixel's colour</td></tr>
+<tr><td>mirror</td><td>every plot also sets the pixel at <code>n − 1 − x</code></td></tr>
+<tr><td>undo / redo</td><td>a copy of all the frames before each change (60 levels): simple, and a 64 × 64 drawing is small</td></tr>
+</table></div>
+<pre data-extract="void plot_line(std::vector&lt;Pixel&gt;& f, int n, int x0, int y0, int x1, int y1, Pixel c, bool mirror) {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="void flood_fill(std::vector&lt;Pixel&gt;& f, int n, int x, int y, Pixel c) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">22.3</span>The colour picker</h3>
+<p>Colours are edited in HSV (hue, saturation, value), the natural space for choosing: the square is saturation (horizontal) × value (vertical) for the current hue, the bar below is the hue, the last bar the opacity. The square is two quads of <code>SDL_RenderGeometry</code>: white → pure hue from left to right, then transparent → black from top to bottom over it. While the button is held, the picker remembers which part is being dragged (<code>drag</code>), so the drag goes on when the mouse leaves it.</p>
+<pre data-extract="bool color_picker(App& a, Box b, Rgba& col, float& hue, float& sat, float& val, std::string& drag, const std::string& id) {" data-file="app/yolah_app.cpp"></pre>
+
+<h3><span class="n">22.4</span>Importing an image</h3>
+<p>An image chosen in the dialog or dropped on the window is fitted into the frame: each new pixel averages the pixels it covers, weighted by their opacity (a plain average would darken the edges with transparent black). A strip of square frames (width = k × height) becomes k frames of the current animation.</p>
+
+<h3><span class="n">22.5</span>The board editor</h3>
+<p>The second tab edits a theme: name, pattern and strength, the fifteen colours (each with the same picker), the drawings for the squares, the holes and the frame (“Dessiner” creates a drawing of the right kind and opens it; the workshop then comes back to the theme). The board on the right is a real <code>BoardView</code>, so what is seen is exactly what a game will show.</p>
+</section>
+
+<section id="fx">
+<h2><span class="n">23</span>Animations and effects (<code>@@FX</code>)</h2>
+<p>Two kinds of motion. <strong>Tweens</strong> compute a value from the time elapsed since a start, through an easing curve: the sliding piece, a hole growing in, the cards fading in, the evaluation bar eased towards its target. <strong>Effects</strong> are small objects with a life of their own, kept in an <code>FxLayer</code>:</p>
+<pre data-extract="struct Effect {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="class FxLayer {" data-file="app/yolah_app.cpp"></pre>
+<p>The application has <code>Debris</code> (a hole opens: particles thrown up, falling, fading), <code>FloatText</code> (the “+1” of a move), <code>Ripple</code> (a ring where a piece lands) and <code>Confetti</code> (a won game). A new effect is a class with these two functions, added with <code>a.fx.add(std::make_unique&lt;MyEffect&gt;(…))</code>.</p>
+<pre data-extract="struct Ripple : Effect {" data-file="app/yolah_app.cpp"></pre>
+</section>

@@ -1849,13 +1849,6 @@ void register_art_sprites(std::vector<SpriteDef>& sprites) {
     }
 }
 
-// Draws a piece of `side` with sprite `sp`, centred at c, radius r.
-// lift: 0 on the board, up to 1 when picked up (bigger, higher shadow).
-// time: seconds, for the halo's pulse.
-// halo: force the pulsing halo (the human player, whatever the sprite).
-// state, state_t: a drawing of the workshop plays its animation `state`
-// ("idle", "move", "blocked", "win"), started `state_t` seconds ago (the
-// other sprites ignore them).
 // Classic stones without any sign: black or white by the side.
 //   go       slate and shell: biconvex, a broad soft light, a darker rim
 //   flat     a flat counter with a thin edge
@@ -1907,6 +1900,13 @@ void draw_plain_stone(const std::string& style, int side, V2 c, float r, float a
     }
 }
 
+// Draws a piece of `side` with sprite `sp`, centred at c, radius r.
+// lift: 0 on the board, up to 1 when picked up (bigger, higher shadow).
+// time: seconds, for the halo's pulse.
+// halo: force the pulsing halo (the human player, whatever the sprite).
+// state, state_t: a drawing of the workshop plays its animation `state`
+// ("idle", "move", "blocked", "win"), started `state_t` seconds ago (the
+// other sprites ignore them).
 void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1, bool halo = false,
                 const char* state = "idle", double state_t = -1) {
     using namespace draw;

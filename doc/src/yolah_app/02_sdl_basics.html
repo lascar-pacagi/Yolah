@@ -1,0 +1,239 @@
+<div class="part">Part II · SDL3 from scratch</div>
+
+<section id="sdl-what">
+<h2><span class="n">3</span>What SDL is</h2>
+
+<p>SDL (Simple DirectMedia Layer) is a C library that gives a program the few things every game needs from the operating system: a <strong>window</strong>, a way to <strong>draw</strong> into it, the <strong>events</strong> of the mouse and the keyboard, a <strong>clock</strong>, and small services (files, dialogs, cursors). It hides the differences between Linux (X11, Wayland), Windows and macOS, and between the graphics APIs (OpenGL, Vulkan, Direct3D, Metal): the same calls work everywhere.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 300" role="img" aria-label="The layers below the application">
+  <rect class="ba" x="20" y="16" width="820" height="52" rx="10"/>
+  <text class="t c" x="430" y="40">yolah_app.cpp</text>
+  <text class="s c" x="430" y="58">scenes, widgets, board, AIs: calls only SDL functions (and the engine)</text>
+  <rect class="bb" x="20" y="92" width="820" height="96" rx="10"/>
+  <text class="t" x="36" y="116">SDL3</text>
+  <rect class="b0" x="36"  y="128" width="146" height="46" rx="7"/><text class="m c" x="109" y="148">SDL_Window</text><text class="xs c" x="109" y="164">video</text>
+  <rect class="b0" x="194" y="128" width="146" height="46" rx="7"/><text class="m c" x="267" y="148">SDL_Renderer</text><text class="xs c" x="267" y="164">2D drawing</text>
+  <rect class="b0" x="352" y="128" width="146" height="46" rx="7"/><text class="m c" x="425" y="148">SDL_Event</text><text class="xs c" x="425" y="164">mouse, keys, window</text>
+  <rect class="b0" x="510" y="128" width="146" height="46" rx="7"/><text class="m c" x="583" y="148">SDL_GetTicksNS</text><text class="xs c" x="583" y="164">time</text>
+  <rect class="b0" x="668" y="128" width="156" height="46" rx="7"/><text class="m c" x="746" y="148">SDL_Dialog…</text><text class="xs c" x="746" y="164">files, paths, cursors</text>
+  <rect class="b0" x="20" y="212" width="400" height="70" rx="10"/>
+  <text class="t c" x="220" y="238">the system</text>
+  <text class="s c" x="220" y="258">X11 or Wayland (here WSLg), Windows, macOS</text>
+  <rect class="b0" x="440" y="212" width="400" height="70" rx="10"/>
+  <text class="t c" x="640" y="238">the graphics API</text>
+  <text class="s c" x="640" y="258">OpenGL, Vulkan, Direct3D, Metal, or software</text>
+  <line class="ln" x1="430" y1="68" x2="430" y2="92"/>
+  <line class="ln" x1="220" y1="188" x2="220" y2="212"/>
+  <line class="ln" x1="640" y1="188" x2="640" y2="212"/>
+</svg>
+<figcaption>The application never talks to the system directly: everything goes through SDL, which picks a back end at run time.</figcaption>
+</figure>
+
+<p>SDL does <em>not</em> draw text, read PNG files, lay out buttons or play animations: it is deliberately small. Everything above the boxes of this figure is in <code>yolah_app.cpp</code>, with three helper headers (stb) for fonts and images. That is why the file is long, and also why every pixel on screen can be explained by code you can read.</p>
+
+<div class="note sdl"><span class="h">Vocabulary</span>
+<p>An SDL function returns <code>true</code> on success in SDL3 (SDL2 returned 0), and <code>SDL_GetError()</code> gives the reason of the last failure. Objects are opaque pointers (<code>SDL_Window*</code>, <code>SDL_Texture*</code>) created by <code>SDL_Create…</code> and freed by <code>SDL_Destroy…</code>. Geometry uses floats: <code>SDL_FRect{x, y, w, h}</code>, <code>SDL_FPoint</code>, <code>SDL_FColor</code> (components in 0–1).</p></div>
+</section>
+
+<section id="sdl-callbacks">
+<h2><span class="n">4</span>SDL owns the loop</h2>
+
+<p>A classic program writes <code>main()</code> with a loop: read the events, update, draw, repeat. SDL3 offers a better structure, used here: the program defines <strong>four functions</strong> and SDL calls them. It is enabled by one macro, defined before the SDL headers:</p>
+
+<pre data-extract="#define SDL_MAIN_USE_CALLBACKS 1" data-file="app/yolah_app.cpp"></pre>
+
+<p><code>SDL_main.h</code> then provides the real <code>main()</code>; it runs the loop and calls:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 250" role="img" aria-label="The four callbacks">
+  <rect class="ba" x="20" y="98" width="150" height="54" rx="10"/>
+  <text class="m c" x="95" y="122">SDL_AppInit</text><text class="xs c" x="95" y="140">once</text>
+  <rect class="bb" x="290" y="30" width="230" height="54" rx="10"/>
+  <text class="m c" x="405" y="54">SDL_AppEvent</text><text class="xs c" x="405" y="72">once per event waiting</text>
+  <rect class="bb" x="290" y="166" width="230" height="54" rx="10"/>
+  <text class="m c" x="405" y="190">SDL_AppIterate</text><text class="xs c" x="405" y="208">once per frame (60 per second)</text>
+  <rect class="ba" x="690" y="98" width="150" height="54" rx="10"/>
+  <text class="m c" x="765" y="122">SDL_AppQuit</text><text class="xs c" x="765" y="140">once</text>
+  <path class="ln" d="M170 125 C 220 125, 240 57, 290 57"/>
+  <path class="ln" d="M405 84 L405 166"/>
+  <path class="ln" d="M520 193 C 600 193, 600 57, 520 57"/>
+  <text class="xs" x="574" y="128">next frame</text>
+  <path class="ln dash" d="M520 193 C 610 193, 640 125, 690 125"/>
+  <text class="xs" x="600" y="236">a callback returns SDL_APP_SUCCESS or SDL_APP_FAILURE</text>
+  <polygon class="fi" points="290,57 280,52 280,62"/>
+  <polygon class="fi" points="405,166 400,156 410,156"/>
+  <polygon class="fi" points="520,57 530,52 530,62"/>
+  <polygon class="fi" points="690,125 680,120 680,130"/>
+</svg>
+<figcaption>Before each frame SDL delivers the waiting events one by one to <code>SDL_AppEvent</code>, then calls <code>SDL_AppIterate</code>. As long as every call returns <code>SDL_APP_CONTINUE</code> it goes on.</figcaption>
+</figure>
+
+<p>Each function receives <code>appstate</code>, a pointer that belongs to the program: <code>SDL_AppInit</code> creates the <code>App</code> object (all the state of the application, section <a href="#arch">14</a>) and stores it there; the others cast it back. Nothing is global except a few caches.</p>
+
+<pre data-lang="cpp" data-title="the shape of the four functions (the real ones are in @@MAIN)">
+SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
+    App* a = new App();
+    *appstate = a;                       // SDL gives it back to the three others
+    ...                                  // window, renderer, fonts, files
+    return SDL_APP_CONTINUE;             // SDL_APP_FAILURE: quit with an error
+}
+SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {
+    App* a = static_cast<App*>(appstate);
+    if (e->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;   // the window's close button
+    ...                                  // remember the mouse and the keys (section 7)
+    return SDL_APP_CONTINUE;
+}
+SDL_AppResult SDL_AppIterate(void* appstate) { ... }        // one frame (section 6)
+void SDL_AppQuit(void* appstate, SDL_AppResult result) { delete static_cast<App*>(appstate); }
+</pre>
+
+<p>Why this is better than a hand-written loop: on some platforms (the web, phones) the program may not block in a loop of its own; with callbacks the same code runs everywhere. It also makes the structure obvious: events only <em>record</em> what happened, the frame decides what to do with it.</p>
+</section>
+
+<section id="sdl-window">
+<h2><span class="n">5</span>Window, renderer, pixels</h2>
+
+<p><code>SDL_AppInit</code> starts SDL's video part, then creates the window and its renderer in one call:</p>
+
+<pre data-lang="cpp" data-title="app/yolah_app.cpp · SDL_AppInit (excerpt)">
+if (!SDL_Init(SDL_INIT_VIDEO)) {                    // video + events; audio is not used
+    SDL_Log("SDL_Init: %s", SDL_GetError());
+    return SDL_APP_FAILURE;
+}
+if (!SDL_CreateWindowAndRenderer("Yolah", a->w, a->h,
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY, &a->window, &a->renderer)) {
+    SDL_Log("SDL_CreateWindowAndRenderer: %s", SDL_GetError());
+    return SDL_APP_FAILURE;
+}
+SDL_SetWindowMinimumSize(a->window, 1024, 600);
+SDL_SetRenderVSync(a->renderer, 1);                          // wait for the screen: no tearing, no wasted CPU
+SDL_SetRenderDrawBlendMode(a->renderer, SDL_BLENDMODE_BLEND); // colours with alpha are transparent
+draw::R = a->renderer;                                       // the drawing functions use it (section 16)
+</pre>
+
+<div class="tablewrap"><table>
+<tr><th>Object</th><th>What it is</th></tr>
+<tr><td><code>SDL_Window</code></td><td>the rectangle on the desktop: title, size, resizing, fullscreen, the mouse cursor over it</td></tr>
+<tr><td><code>SDL_Renderer</code></td><td>SDL's 2D drawing engine for that window: fills rectangles, draws triangles and images (textures) into a hidden image, then shows it. It runs on the GPU (OpenGL, Vulkan…) or in software</td></tr>
+<tr><td><code>SDL_Texture</code></td><td>an image owned by the renderer, usually in GPU memory (section <a href="#sdl-textures">10</a>)</td></tr>
+</table></div>
+
+<h3><span class="n">5.1</span>Window units and pixels</h3>
+<p>With <code>SDL_WINDOW_HIGH_PIXEL_DENSITY</code>, a window on a high-density screen gets more pixels than its size in “window units”: a window of 1600 × 900 units on a 200 % screen has 3200 × 1800 pixels. The application draws in <strong>pixels</strong> (sharp everywhere) and asks every frame how many it has:</p>
+
+<pre data-lang="cpp" data-title="SDL_AppIterate: the size and the scale, every frame">
+SDL_GetRenderOutputSize(a->renderer, &a->w, &a->h);    // pixels of the drawing surface (follows resizes)
+a->s = std::min(a->w / DESIGN_W, a->h / DESIGN_H);      // DESIGN_W × DESIGN_H = 1600 × 900
+</pre>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 250" role="img" aria-label="Design pixels, window units and pixels">
+  <rect class="ba" x="24" y="30" width="240" height="135" rx="6"/>
+  <text class="t c" x="144" y="92">1600 × 900</text><text class="s c" x="144" y="112">design pixels</text>
+  <text class="xs c" x="144" y="190">every length of the code:</text>
+  <text class="ms c" x="144" y="206">200 * s</text>
+  <rect class="bb" x="320" y="40" width="200" height="112" rx="6"/>
+  <text class="t c" x="420" y="92">1280 × 720</text><text class="s c" x="420" y="112">a small window: s = 0.8</text>
+  <rect class="bg" x="576" y="14" width="260" height="164" rx="6"/>
+  <text class="t c" x="706" y="92">3200 × 1800</text><text class="s c" x="706" y="112">pixels at 200 %: s = 2</text>
+  <path class="ln" d="M264 97 L320 97"/><polygon class="fi" points="320,97 310,92 310,102"/>
+  <path class="ln" d="M520 97 L576 97"/><polygon class="fi" points="576,97 566,92 566,102"/>
+  <text class="s c" x="430" y="232">s = min(width / 1600, height / 900): the layout keeps its proportions and stays sharp</text>
+</svg>
+<figcaption>The whole interface is written for an imaginary 1600 × 900 screen and multiplied by <code>a.s</code>. A button written <code>{x, y, 200 * s, 50 * s}</code> is 200 × 50 at 1600 × 900, 400 × 100 on a 4K screen.</figcaption>
+</figure>
+
+<p>Mouse events arrive in window units; one call converts them to pixels so that the mouse and the drawing use the same unit (section <a href="#sdl-events">7</a>). Textures whose content depends on their size (the board's squares, the glyphs) are generated for the real pixel size and cached per size, so they stay sharp after a resize.</p>
+</section>
+
+<section id="sdl-frame">
+<h2><span class="n">6</span>One frame</h2>
+
+<p>The renderer draws into a hidden image, the <strong>back buffer</strong>. Nothing appears until <code>SDL_RenderPresent</code>, which shows that image and gives a fresh one for the next frame. With vertical synchronisation on, <code>SDL_RenderPresent</code> waits for the screen's refresh: the loop runs at the screen's rate (60 Hz, 144 Hz…) without burning the CPU.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 210" role="img" aria-label="Clear, draw, present">
+  <rect class="b0" x="20" y="40" width="170" height="110" rx="8"/>
+  <text class="m c" x="105" y="76">SDL_RenderClear</text><text class="s c" x="105" y="98">fill with black</text><text class="xs c" x="105" y="118">(the clip rect is reset first)</text>
+  <rect class="ba" x="230" y="40" width="380" height="110" rx="8"/>
+  <text class="t c" x="420" y="66">draw, back to front</text>
+  <rect class="b0" x="246" y="80" width="80" height="54" rx="5"/><text class="xs c" x="286" y="104">background</text><text class="xs c" x="286" y="120">1</text>
+  <rect class="b0" x="336" y="80" width="80" height="54" rx="5"/><text class="xs c" x="376" y="104">board</text><text class="xs c" x="376" y="120">2</text>
+  <rect class="b0" x="426" y="80" width="80" height="54" rx="5"/><text class="xs c" x="466" y="104">panels, text</text><text class="xs c" x="466" y="120">3</text>
+  <rect class="b0" x="516" y="80" width="80" height="54" rx="5"/><text class="xs c" x="556" y="104">toast, fade</text><text class="xs c" x="556" y="120">4</text>
+  <rect class="bg" x="650" y="40" width="190" height="110" rx="8"/>
+  <text class="m c" x="745" y="76">SDL_RenderPresent</text><text class="s c" x="745" y="98">show the image</text><text class="xs c" x="745" y="118">waits for the screen (vsync)</text>
+  <path class="ln" d="M190 95 L230 95"/><polygon class="fi" points="230,95 220,90 220,100"/>
+  <path class="ln" d="M610 95 L650 95"/><polygon class="fi" points="650,95 640,90 640,100"/>
+  <path class="ln dash" d="M745 150 C 745 196, 105 196, 105 150"/><polygon class="fi" points="105,150 100,160 110,160"/>
+  <text class="xs c" x="430" y="190">the next frame starts from scratch: nothing drawn is kept</text>
+</svg>
+<figcaption>The painter's method: what is drawn later covers what was drawn before. The whole screen is redrawn every frame.</figcaption>
+</figure>
+
+<p>Here is the real frame function. Read it once from top to bottom: the rest of this document explains each line.</p>
+
+<pre data-extract="SDL_AppResult SDL_AppIterate(void* appstate) {" data-file="app/yolah_app.cpp"></pre>
+
+<ul>
+<li><strong>Time, not frames.</strong> <code>a->time</code> (seconds since start, from <code>SDL_GetTicksNS</code>) and <code>a->dt</code> (seconds since the previous frame, capped at 0.1) drive every animation, so an animation lasts the same time on a 60 Hz and a 144 Hz screen.</li>
+<li><strong>The scene</strong> is a plain function chosen by a <code>switch</code>: one per screen (section <a href="#scenes">24</a>).</li>
+<li><strong>Overlays</strong> come last: effects, the toast message, the fade after a scene change (a black rectangle whose opacity goes from 1 to 0 in 0.25 s).</li>
+<li><strong>Screenshot mode</strong>: with <code>--screenshot</code>, the frame is read back with <code>SDL_RenderReadPixels</code> and saved as BMP instead of shown (section <a href="#tests">26</a>).</li>
+<li><strong>“This frame” input is cleared</strong> after the frame: a click is seen by exactly one frame.</li>
+</ul>
+</section>
+
+<section id="sdl-events">
+<h2><span class="n">7</span>Events and input</h2>
+
+<p>The system queues what the user does; SDL turns each item into an <code>SDL_Event</code>, a C union whose <code>type</code> says which member is valid (<code>e->motion</code>, <code>e->button</code>, <code>e->key</code>, <code>e->wheel</code>, <code>e->drop</code>, <code>e->text</code>). The application does not act in the event function: it only <strong>records</strong> what happened in an <code>Input</code> structure, which the frame reads.</p>
+
+<pre data-extract="SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {" data-file="app/yolah_app.cpp"></pre>
+
+<pre data-extract="struct Input {" data-file="app/yolah_app.cpp"></pre>
+
+<p>The difference between <code>down</code> and <code>pressed</code> matters. <code>down</code> is a state: the button is held now. <code>pressed</code> and <code>released</code> are <em>edges</em>: they are true during one frame only, the frame after the event, and the frame function resets them at its end.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 220" role="img" aria-label="Input state over frames">
+  <text class="s" x="20" y="42">frames</text>
+  <g>
+    <rect class="b0" x="120" y="26" width="76" height="26" rx="4"/><text class="xs c" x="158" y="44">1</text>
+    <rect class="b0" x="206" y="26" width="76" height="26" rx="4"/><text class="xs c" x="244" y="44">2</text>
+    <rect class="b0" x="292" y="26" width="76" height="26" rx="4"/><text class="xs c" x="330" y="44">3</text>
+    <rect class="b0" x="378" y="26" width="76" height="26" rx="4"/><text class="xs c" x="416" y="44">4</text>
+    <rect class="b0" x="464" y="26" width="76" height="26" rx="4"/><text class="xs c" x="502" y="44">5</text>
+    <rect class="b0" x="550" y="26" width="76" height="26" rx="4"/><text class="xs c" x="588" y="44">6</text>
+    <rect class="b0" x="636" y="26" width="76" height="26" rx="4"/><text class="xs c" x="674" y="44">7</text>
+  </g>
+  <text class="s" x="20" y="88">events</text>
+  <polygon class="fa" points="201,72 195,82 207,82"/><text class="ms c" x="201" y="100">BUTTON_DOWN</text>
+  <polygon class="fb" points="459,72 453,82 465,82"/><text class="ms c" x="459" y="100">BUTTON_UP</text>
+  <text class="s" x="20" y="138">down</text>
+  <path class="lna" d="M120 142 L206 142 L206 126 L464 126 L464 142 L712 142"/>
+  <text class="s" x="20" y="172">pressed</text>
+  <rect class="ba" x="206" y="160" width="76" height="16" rx="3"/>
+  <text class="s" x="20" y="204">released</text>
+  <rect class="bb" x="464" y="192" width="76" height="16" rx="3"/>
+</svg>
+<figcaption>A click held during frames 2–4. A widget is clicked when <code>released</code> is true while the mouse is over it, which is how desktop buttons behave: pressing, moving away and releasing elsewhere cancels.</figcaption>
+</figure>
+
+<h3><span class="n">7.1</span>Coordinates</h3>
+<p><code>SDL_ConvertEventToRenderCoordinates(renderer, e)</code> rewrites the coordinates inside the event, from window units to the renderer's pixels. It is the first line of <code>SDL_AppEvent</code>: after it, <code>in.mouse</code> and every <code>Box</code> of the drawing code are in the same unit, and <code>box.contains(in.mouse)</code> is the whole hit test.</p>
+
+<h3><span class="n">7.2</span>Keys and typed text</h3>
+<p>Two different events exist for the keyboard. <code>SDL_EVENT_KEY_DOWN</code> gives a key code (<code>SDLK_ESCAPE</code>, <code>SDLK_H</code>…), for shortcuts; <code>e->key.repeat</code> is true for the automatic repeats of a held key, ignored except for Backspace. <code>SDL_EVENT_TEXT_INPUT</code> gives the <em>characters</em> typed, in UTF-8, after the keyboard layout and the dead keys (é, ç, ê): this is what a text field needs. SDL only sends text events between <code>SDL_StartTextInput</code> and <code>SDL_StopTextInput</code> (on some systems this opens the on-screen keyboard), so the frame turns text input on exactly while a text field has the focus:</p>
+
+<pre data-lang="cpp" data-title="end of SDL_AppIterate">
+// Typed text only arrives while text input is on: on while a field has the focus.
+if (!a->ui.focus.empty() != SDL_TextInputActive(a->window)) {
+    if (!a->ui.focus.empty()) SDL_StartTextInput(a->window);
+    else SDL_StopTextInput(a->window);
+}
+</pre>
+
+<p>Modifier keys are read when needed with <code>SDL_GetModState()</code> (the workshop's <kbd>Ctrl</kbd>+<kbd>Z</kbd>): <code>mods &amp; SDL_KMOD_CTRL</code>.</p>
+</section>
