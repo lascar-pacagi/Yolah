@@ -14,6 +14,11 @@
   //                other relative paths to the repository)
   //   torch overrides   the same, only when the application is built with libtorch
   //   missing hint shown when the weights file does not exist
+//   params       what the player may change before a game (button "Régler"): a key of the
+//                configuration, a label, an optional help line and unit, the values offered
+//                ("threads": 1 to the cores of the computer; booleans: no / yes); the default is
+//                the configuration's. Every AI but "random" also gets "time factor" and
+//                "random moves". Saved in the settings, used in games, not in puzzles.
   "ais": [
     { "id": "random", "name": "Hasard", "family": "coups au hasard", "elo": 600, "sprite": "random",
       "config": "random_player.cfg",
@@ -22,30 +27,33 @@
       "config": "mc_player.cfg", "time factor": 0.02, "random moves": 0.3, "overrides": { "nb threads": 1 },
       "description": "Un Monte Carlo qui réfléchit très peu (2 % du temps, un seul cœur) et joue un coup au hasard trois fois sur dix." },
     { "id": "monte_carlo", "name": "Monte Carlo", "family": "parties aléatoires", "elo": 1150, "sprite": "monte_carlo",
-      "config": "mc_player.cfg",
+      "config": "mc_player.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" } ],
       "description": "Pour chaque coup possible, joue des milliers de parties au hasard jusqu'à la fin et choisit le coup qui gagne le plus souvent. Aucune connaissance du jeu." },
     { "id": "mcts", "name": "MCTS", "family": "arbre de recherche Monte Carlo", "elo": 1250, "sprite": "mcts",
-      "config": "mcts_player.cfg",
+      "config": "mcts_player.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" } ],
       "description": "Construit un arbre de recherche en concentrant les parties aléatoires sur les coups prometteurs (UCT). Plus fort que Monte Carlo à temps égal." },
     { "id": "basic_minmax", "name": "Minimax basique", "family": "minimax + heuristique", "elo": 1350, "sprite": "basic_minmax",
-      "config": "basic_mm_player.cfg",
+      "config": "basic_mm_player.cfg", "params": [ { "key": "depth", "label": "Profondeur", "unit": "demi-coups", "values": [2, 3, 4, 5, 6], "help": "jusqu'où il regarde" } ],
       "description": "Examine tous les coups jusqu'à 4 demi-coups (alpha-bêta) et juge les positions avec une heuristique écrite à la main." },
     { "id": "nnue193", "name": "Minimax NNUE (ancien)", "family": "minimax + réseau NNUE quantifié", "elo": 1770, "sprite": "nnue193",
       "config": "mm_nnue193_distill_quantized_player.cfg",
+      "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
       "description": "Minimax avec approfondissement itératif, table de transposition et réductions ; évalue les positions avec un réseau NNUE (193 entrées) distillé d'un réseau convolutif et calculé en entiers." },
     { "id": "features", "name": "Minimax Features", "family": "minimax + réseau de features quantifié", "elo": 1800, "sprite": "features",
       "config": "mm_features119_distill_quantized_player.cfg",
+      "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
       "description": "Le même minimax, avec un réseau qui lit 119 caractéristiques calculées sur la position (territoire, mobilité, zones), quantifié en entiers 16 bits." },
     { "id": "resnet", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif", "elo": 2100, "sprite": "resnet",
-      "config": "az_vs_nnue/resnet_supervised.cfg",
+      "config": "az_vs_nnue/resnet_supervised.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "batch size", "label": "Positions par lot", "values": [8, 16, 32, 64, 128], "help": "évaluées ensemble par le réseau" } ],
       "description": "Recherche Monte Carlo guidée par un réseau convolutif résiduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Sur GPU avec libtorch ; sur CPU sinon, bien plus lent, donc plus faible à temps égal.",
       "overrides": { "backend": "cpu", "weights": "../nnue/cnn_resnet_256x30_value_policy.bin", "nb threads": 8, "batch size": 16 },
       "torch overrides": { "backend": "torch", "weights": "../nnue/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } },
     { "id": "dev", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 2150, "sprite": "dev",
-      "config": "search_study/dev_final.cfg", "overrides": { "tt size": 128 },
+      "config": "search_study/dev_final.cfg", "overrides": { "tt size": 128, "nb threads": 1 },
+      "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
       "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, réductions, élagage, solveur de fin de partie, et un réseau NNUE vu du camp au trait, avec 8 têtes de phase et des caractéristiques d'espace." },
     { "id": "alphazero", "name": "AlphaZero", "family": "MCTS + réseau AlphaZero", "elo": 2250, "sprite": "alphazero",
-      "config": "az_vs_nnue/az256.cfg",
+      "config": "az_vs_nnue/az256.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "batch size", "label": "Positions par lot", "values": [8, 16, 32, 64, 128], "help": "évaluées ensemble par le réseau" } ],
       "description": "Le même MCTS, avec le réseau qu'AlphaZero a entraîné en jouant contre lui-même à partir du réseau supervisé.",
       "overrides": { "backend": "cpu", "weights": "models/cnn_resnet_256x30_value_policy.bin", "nb threads": 8, "batch size": 16 },
       "torch overrides": { "backend": "torch", "weights": "models/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } }

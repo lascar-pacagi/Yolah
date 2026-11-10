@@ -57,6 +57,7 @@
 //   --screenshot FILE     render, save FILE (.bmp) and quit (tests, docs)
 //   --frames N            frames rendered before the screenshot (default 30)
 //   --scene NAME          menu, setup, game, themes, tutorial, puzzles, editor, studio
+//   --scene setup         (--params ID: the settings box of that AI open)
 //   --lesson N            lesson of the tutorial scene (0 = the first)
 //   --pick ID             themes scene: open the sprite picker of player ID
 //   --level ID            puzzles scene: the puzzles of a level
@@ -403,6 +404,24 @@ public:
 // configuration ("overrides"; "torch overrides" with YOLAH_APP_TORCH).
 // Relative weight paths: "../x" is relative to config/ (the convention of the
 // .cfg files), anything else to the repository.
+// An AI setting the player can change before a game (the "Régler" box of the
+// new-game screen): a key of the engine configuration ("nb threads", "tt
+// size", ...) or of the application ("time factor", "random moves"), and the
+// values offered. def: the value without a setting (the roster's).
+struct AiParam {
+    std::string key, label, help, unit;
+    bool app = false;                 // "time factor" / "random moves": not an engine key
+    std::vector<json> values;
+    json def;
+    std::string value_text(const json& v) const {
+        if (key == "time factor") return strf("\xC3\x97 %g", v.get<double>());
+        if (key == "random moves") return strf("%d %%", int(std::lround(v.get<double>() * 100)));
+        if (v.is_boolean()) return v.get<bool>() ? "oui" : "non";
+        if (v.is_number()) return strf("%g", v.get<double>()) + (unit.empty() ? "" : " " + unit);
+        return v.is_string() ? v.get<std::string>() : v.dump();
+    }
+};
+
 struct AiSpec {
     std::string id, name, family, sprite, description, config_file;
     int elo = 0;
@@ -411,7 +430,88 @@ struct AiSpec {
     json config;          // the engine configuration, overrides applied, paths absolute
     bool available = false;
     std::string reason;   // why it is not available
+    std::vector<AiParam> params;   // what the player may set (AiParam)
+    bool threads_set = false;      // "nb threads" chosen by the player: not capped
 };
+
+int hardware_threads() { return std::max(2u, std::thread::hardware_concurrency()); }
+
+// The roster's "params" of an AI, then the two settings every AI but the random
+// one has (time factor, random moves). A default missing from the values is
+// added to them, in order.
+void load_params(AiSpec& s, const json& e) {
+    const int hw = hardware_threads();
+    auto add = [&](AiParam p) {
+        if (p.def.is_null()) return;
+        bool found = false;
+        for (auto& v : p.values)   // numbers read as float (jnum): the nearest value
+            if (v == p.def || (v.is_number() && p.def.is_number() && std::abs(v.get<double>() - p.def.get<double>()) < 1e-6 * std::max(1.0, std::abs(v.get<double>())))) {
+                p.def = v;
+                found = true;
+            }
+        if (!found) {
+            p.values.push_back(p.def);
+            if (p.def.is_number())
+                std::sort(p.values.begin(), p.values.end(), [](const json& x, const json& y) { return x.get<double>() < y.get<double>(); });
+        }
+        s.params.push_back(p);
+    };
+    if (e.contains("params") && e["params"].is_array())
+        for (const json& q : e["params"]) {
+            AiParam p;
+            p.key = jstr(q, "key");
+            p.label = jstr(q, "label", p.key);
+            p.help = jstr(q, "help");
+            p.unit = jstr(q, "unit");
+            if (p.key.empty() || !s.config.contains(p.key)) continue;   // not a key of this engine
+            p.def = s.config[p.key];
+            if (q.contains("values") && q["values"].is_array()) p.values = q["values"].get<std::vector<json>>();
+            else if (jstr(q, "values") == "threads") {   // 1 .. the cores of this computer
+                for (int n : {1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128})
+                    if (n <= hw) p.values.push_back(n);
+                if (p.values.back() != hw) p.values.push_back(hw);
+                if (p.def.is_number()) p.def = std::max(1, std::min(p.def.get<int>(), hw - 2));   // what game_config gives
+            } else if (p.def.is_boolean()) p.values = {false, true};
+            if (p.def.is_number() && p.key == "nb threads" && p.def.get<int>() > hw) p.def = hw;
+            add(p);
+        }
+    if (s.id == "random") return;
+    AiParam t;
+    t.key = "time factor";
+    t.label = "Temps de r\xC3\xA9" "flexion";
+    t.help = "multiplie le temps par coup choisi pour la partie";
+    t.app = true;
+    t.values = {0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0};
+    t.def = s.time_factor;
+    add(t);
+    AiParam r;
+    r.key = "random moves";
+    r.label = "Coups au hasard";
+    r.help = "part des coups jou\xC3\xA9s au hasard au lieu de r\xC3\xA9" "fl\xC3\xA9" "chir";
+    r.app = true;
+    r.values = {0.0, 0.05, 0.1, 0.2, 0.3, 0.5};
+    r.def = s.random_moves;
+    add(r);
+}
+
+// An AI with the player's settings (Settings::ai_options[id]): values that are
+// not among those offered are ignored.
+AiSpec with_options(const AiSpec& base, const json& opts) {
+    AiSpec s = base;
+    if (!opts.is_object()) return s;
+    for (const AiParam& p : base.params) {
+        if (!opts.contains(p.key)) continue;
+        const json& v = opts[p.key];
+        if (std::find(p.values.begin(), p.values.end(), v) == p.values.end()) continue;
+        if (p.key == "time factor") s.time_factor = v.get<double>();
+        else if (p.key == "random moves") s.random_moves = v.get<double>();
+        else {
+            s.config[p.key] = v;
+            if (p.key == "nb threads") s.threads_set = true;
+        }
+    }
+    return s;
+}
 
 fs::path resolve_engine_path(const std::string& p) {
     fs::path path(p);
@@ -453,6 +553,7 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
 #endif
         s.description = jstr(e, "description", jstr(s.config, "description"));
         s.available = true;
+        load_params(s, e);
         if (s.config.contains("weights") && s.config["weights"].is_string()) {
             fs::path w = resolve_engine_path(s.config["weights"].get<std::string>());
             s.config["weights"] = w.string();
@@ -471,8 +572,8 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
 json game_config(const AiSpec& s, double seconds) {
     json c = s.config;
     if (c.contains("microseconds")) c["microseconds"] = std::max<uint64_t>(1000, uint64_t(seconds * s.time_factor * 1e6));
-    const int hw = std::max(2u, std::thread::hardware_concurrency());
-    if (c.contains("nb threads") && c["nb threads"].is_number())
+    const int hw = hardware_threads();
+    if (c.contains("nb threads") && c["nb threads"].is_number() && !s.threads_set)
         c["nb threads"] = std::max(1, std::min(c["nb threads"].get<int>(), hw - 2));
     c["verbose"] = false;
     return c;
@@ -2765,10 +2866,11 @@ struct Settings {
     std::string black = "human", white = "dev";
     std::vector<int> tutorial_done;           // lessons completed
     std::vector<std::string> puzzles_done;    // puzzles solved
+    json ai_options = json::object();         // AI id → {setting: value} (AiParam), games only
     json to_json() const {
         return {{"theme", theme}, {"show eval", show_eval}, {"show hint", show_hint}, {"show coordinates", show_coords},
                 {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white},
-                {"tutorial done", tutorial_done}, {"puzzles done", puzzles_done}};
+                {"tutorial done", tutorial_done}, {"puzzles done", puzzles_done}, {"ai options", ai_options}};
     }
     void from_json(const json& j) {
         if (!j.is_object()) return;
@@ -2782,6 +2884,7 @@ struct Settings {
         white = j.value("white", white);
         if (j.contains("tutorial done") && j["tutorial done"].is_array()) tutorial_done = j["tutorial done"].get<std::vector<int>>();
         if (j.contains("puzzles done") && j["puzzles done"].is_array()) puzzles_done = j["puzzles done"].get<std::vector<std::string>>();
+        if (j.contains("ai options") && j["ai options"].is_object()) ai_options = j["ai options"];
     }
 };
 
@@ -2812,6 +2915,7 @@ struct App {
     std::vector<SpriteDef> sprites;
     std::vector<AiSpec> roster;
     Settings settings;
+    std::string setup_params;             // the AI whose settings box is open (new-game screen)
 
     Scene scene = Scene::Menu;
     double scene_t0 = 0;                  // for the fade-in
@@ -3127,8 +3231,13 @@ struct App {
             sl = Slot{};
             sl.who = who[side];
             sl.spec = ai(who[side]);
-            if (sl.spec && sl.spec->available)
-                sl.agent = std::make_unique<AiAgent>(game_config(*sl.spec, seconds), sl.spec->random_moves);
+            if (sl.spec && sl.spec->available) {
+                // The player's settings in a game; a puzzle keeps the roster's AI.
+                const json none = json::object();
+                const json& opts = !g.puzzle_mode && settings.ai_options.contains(sl.who) ? settings.ai_options[sl.who] : none;
+                AiSpec eff = with_options(*sl.spec, opts);
+                sl.agent = std::make_unique<AiAgent>(game_config(eff, seconds), eff.random_moves);
+            }
             else
                 sl.spec = nullptr;   // unknown or unavailable AI: a human plays it
         }
@@ -3248,18 +3357,25 @@ void scene_menu(App& a) {
 }
 
 // ─── @@SCENE_SETUP ──────────────────────────────────────────────────────────
+void draw_ai_params(App& a);
 void scene_setup(App& a) {
     const float s = a.s;
     draw_background(a);
     draw_title(a, "Nouvelle partie",
                "Choisissez qui joue les Noirs (ils commencent) et qui joue les Blancs : un humain ou une IA de chaque c\xC3\xB4t\xC3\xA9. Les IA sont class\xC3\xA9" "es de la plus faible \xC3\xA0 la plus forte.");
-    if (back_button(a)) { a.go(Scene::Menu); return; }
+    const bool params_open = !a.setup_params.empty();
+    if (params_open && a.in.key(SDLK_ESCAPE)) { a.in.eat(SDLK_ESCAPE); a.setup_params.clear(); }
+    a.ui.blocked = params_open;
+    if (back_button(a)) { a.ui.blocked = false; a.go(Scene::Menu); return; }
 
     struct Entry { std::string id, name, sub, sprite; bool available; std::string reason, description; };
     std::vector<Entry> entries;
     entries.push_back({"human", "Humain", "Vous jouez \xC3\xA0 la souris", "human", true, "", "Cliquez sur un de vos pions puis sur la case d'arriv\xC3\xA9" "e, ou faites-le glisser."});
-    for (auto& ai : a.roster)
-        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", ai.elo, ai.family.c_str()), ai.sprite, ai.available, ai.reason, ai.description});
+    for (auto& ai : a.roster) {
+        const bool set = a.settings.ai_options.contains(ai.id);
+        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", ai.elo, ai.family.c_str()) + (set ? " \xE2\x80\xA2 r\xC3\xA9gl\xC3\xA9" : ""),
+                           ai.sprite, ai.available, ai.reason, ai.description});
+    }
 
     const float top = 122 * s, bottom_bar = 150 * s, desc_h = 52 * s;
     const float col_w = std::min(560 * s, (a.w - 180 * s) / 2), gap = 40 * s;
@@ -3290,13 +3406,20 @@ void scene_setup(App& a) {
             a.text.draw(Font::Bold, 19 * s, e.name, {tx, r.center().y - 22 * s}, with_alpha(pal::text, alpha));
             a.text.draw(Font::Regular, 14 * s, e.available ? e.sub : "indisponible \xE2\x80\x94 survolez pour savoir pourquoi",
                         {tx, r.center().y + 2 * s}, with_alpha(e.available ? pal::dim : pal::bad, std::max(alpha, 0.7f)));
-            if (e.id != "human" && e.available) {   // strength gauge
+            bool on_gear = false;
+            if (e.id != "human" && e.available) {   // strength gauge, settings button
                 float frac = float(i) / (entries.size() - 1);
-                Box gb{r.right() - 96 * s, r.center().y - 4 * s, 80 * s, 8 * s};
+                Box gb{r.right() - 150 * s, r.center().y - 4 * s, 60 * s, 8 * s};
                 draw::round_box(gb, 4 * s, hex(0xffffff, 25));
                 draw::round_box({gb.x, gb.y, gb.w * frac, gb.h}, 4 * s, shade(a.theme().accent, -0.2f), a.theme().accent);
+                const AiSpec* spec = a.ai(e.id);
+                if (spec && !spec->params.empty()) {
+                    Box bb{r.right() - 78 * s, r.center().y - 16 * s, 68 * s, 32 * s};
+                    on_gear = a.ui.hover(bb);
+                    if (a.ui.button("setp" + std::to_string(side) + e.id, bb, "R\xC3\xA9gler", Style::Ghost, true, 13)) a.setup_params = e.id;
+                }
             }
-            if (h && a.in.released) *choice[side] = e.id;
+            if (h && !on_gear && a.in.released) *choice[side] = e.id;
         }
     }
     // Description of the hovered player.
@@ -3312,9 +3435,71 @@ void scene_setup(App& a) {
     a.ui.toggle("t_hint", {bar.x + 380 * s, bar.y + 56 * s, 270 * s, 30 * s}, "Indices (meilleur coup)", a.settings.show_hint);
     if (a.ui.button("swap", {bar.right() - 400 * s, bar.y + 26 * s, 160 * s, 50 * s}, "\xC3\x89" "changer"))
         std::swap(a.settings.black, a.settings.white);
-    if (a.ui.button("start", {bar.right() - 224 * s, bar.y + 26 * s, 200 * s, 50 * s}, "Commencer", Style::Primary) || a.in.key(SDLK_RETURN)) {
+    if (a.ui.button("start", {bar.right() - 224 * s, bar.y + 26 * s, 200 * s, 50 * s}, "Commencer", Style::Primary) || (!params_open && a.in.key(SDLK_RETURN))) {
+        a.ui.blocked = false;
+        a.setup_params.clear();
         a.save_settings();
         a.start_game();
+        return;
+    }
+    a.ui.blocked = false;
+    if (params_open) draw_ai_params(a);
+}
+
+// The settings box of an AI (App::setup_params): one row per AiParam, a row of
+// choices for a few values, − / + around the value for more. A value equal to
+// the default is not stored, so a later change of the roster still applies.
+void draw_ai_params(App& a) {
+    const float s = a.s;
+    const AiSpec* spec = a.ai(a.setup_params);
+    if (!spec) { a.setup_params.clear(); return; }
+    json& all = a.settings.ai_options;
+    json opts = all.contains(spec->id) ? all[spec->id] : json::object();
+    draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 160));
+    const float row = 70 * s;
+    Box m{a.w * 0.5f - 340 * s, 0, 680 * s, 104 * s + row * spec->params.size() + 96 * s};
+    m.y = a.h * 0.5f - m.h / 2;
+    a.ui.panel(m, 20, hex(0x1a202b));
+    a.text.draw(Font::Black, 24 * s, "R\xC3\xA9glages : " + spec->name, {m.x + 30 * s, m.y + 24 * s}, pal::text);
+    a.text.draw(Font::Regular, 14 * s, "Pour les parties ; les puzzles gardent les IA telles qu'elles sont pr\xC3\xA9vues.", {m.x + 30 * s, m.y + 62 * s}, pal::dim);
+    float y = m.y + 104 * s;
+    for (const AiParam& p : spec->params) {
+        int cur = 0;
+        const json v = opts.contains(p.key) ? opts[p.key] : p.def;
+        for (size_t i = 0; i < p.values.size(); i++)
+            if (p.values[i] == v) cur = int(i);
+        int sel = cur;
+        a.text.draw(Font::Bold, 17 * s, p.label, {m.x + 30 * s, y + 6 * s}, pal::text);
+        std::string sub = p.help;
+        if (!sub.empty()) sub += " \xE2\x80\xA2 ";
+        sub += "d\xC3\xA9" "faut : " + p.value_text(p.def);
+        a.text.draw(Font::Regular, 13 * s, sub, {m.x + 30 * s, y + 32 * s}, pal::dim);
+        Box c{m.right() - 30 * s - 300 * s, y + 6 * s, 300 * s, 40 * s};
+        if (p.values.size() <= 5) {
+            std::vector<std::string> labels;
+            for (auto& x : p.values) labels.push_back(p.value_text(x));
+            sel = a.ui.segmented("prm" + p.key, c, labels, cur, 15);
+        } else {
+            if (a.ui.button("prm-" + p.key, {c.x, c.y, 50 * s, c.h}, "\xE2\x80\x93", Style::Normal, cur > 0, 20)) sel = cur - 1;
+            if (a.ui.button("prm+" + p.key, {c.right() - 50 * s, c.y, 50 * s, c.h}, "+", Style::Normal, cur + 1 < int(p.values.size()), 20)) sel = cur + 1;
+            draw::round_box({c.x + 58 * s, c.y, c.w - 116 * s, c.h}, c.h / 2, hex(0x0f141c, 200));
+            a.text.draw(Font::Bold, 17 * s, p.value_text(p.values[cur]), {c.center().x, c.center().y - a.text.line_height(Font::Bold, 17 * s) * 0.42f},
+                        p.values[cur] == p.def ? pal::text : pal::accent, Align::Center);
+        }
+        if (sel != cur) {
+            if (p.values[sel] == p.def) opts.erase(p.key);
+            else opts[p.key] = p.values[sel];
+            if (opts.empty()) all.erase(spec->id);
+            else all[spec->id] = opts;
+        }
+        y += row;
+    }
+    float by = m.bottom() - 74 * s;
+    if (a.ui.button("prm_reset", {m.x + 30 * s, by, 220 * s, 50 * s}, "Valeurs par d\xC3\xA9" "faut", Style::Ghost, all.contains(spec->id), 17)) all.erase(spec->id);
+    if (a.ui.button("prm_close", {m.right() - 30 * s - 180 * s, by, 180 * s, 50 * s}, "Fermer", Style::Primary, true, 17) || a.in.key(SDLK_RETURN)) {
+        a.in.eat(SDLK_RETURN);
+        a.setup_params.clear();
+        a.save_settings();
     }
 }
 
@@ -6156,7 +6341,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         // The holes of the random moves are not animated.
         a->game.board.hole_since.fill(-100);
         a->game.tab = std::stoi(arg_value(argc, argv, "--tab", "0"));
-    } else if (scene == "setup") a->go(Scene::Setup);
+    } else if (scene == "setup") {
+        a->go(Scene::Setup);
+        a->setup_params = arg_value(argc, argv, "--params");   // its settings box open
+    }
     else if (scene == "themes") {
         a->go(Scene::Themes);
         std::string who = arg_value(argc, argv, "--pick");   // open the sprite picker for this player
