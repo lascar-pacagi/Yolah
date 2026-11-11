@@ -1249,6 +1249,8 @@ struct Theme {
     float planet_size = 2.4f, planet_top = 0.6f;
     bool stars = false;
     bool embers = false;     // embers rising over the picture
+    bool petals = false;     // cherry petals falling over the picture
+    bool smoke = false;      // smoke drifting along the bottom of the picture
     // How a square breaks when a piece leaves it (Shatter): "debris" (the
     // default), "stone", "space", "ink", "cannon"; stronger players break harder.
     std::string break_fx = "debris";
@@ -1290,6 +1292,8 @@ Theme parse_theme(const json& j) {
     t.planet_top = jnum(j, "planet top", t.planet_top);
     t.stars = j.value("stars", false);
     t.embers = j.value("embers", false);
+    t.petals = j.value("petals", false);
+    t.smoke = j.value("smoke", false);
     t.break_fx = jstr(j, "break fx", t.break_fx);
     t.piece_set = jstr(j, "piece set");
     return t;
@@ -1314,6 +1318,8 @@ json theme_to_json(const Theme& t) {
     }
     if (t.stars) j["stars"] = true;
     if (t.embers) j["embers"] = true;
+    if (t.petals) j["petals"] = true;
+    if (t.smoke) j["smoke"] = true;
     if (t.break_fx != "debris") j["break fx"] = t.break_fx;
     if (!t.piece_set.empty()) j["piece set"] = t.piece_set;
     return j;
@@ -1402,6 +1408,45 @@ void draw_embers(Box b, double time, float s) {
         Rgba c = hash2(i, 6, 33) < 0.5f ? hex(0xffb040) : hex(0xff6a20);
         circle({x, y}, size * 4, with_alpha(c, 0.25f * fade), with_alpha(c, 0), 0);
         circle({x, y}, size, with_alpha(hex(0xffe0a0), 0.9f * fade));
+    }
+}
+
+// Cherry petals falling: each one drifts down at its own speed, sways and
+// turns (an ellipse that narrows as it turns edge-on).
+void draw_petals(Box b, double time, float s) {
+    using namespace draw;
+    for (int i = 0; i < 46; i++) {
+        float speed = 0.05f + 0.06f * hash2(i, 1, 57);
+        double life = 1.0 / speed;
+        double u = std::fmod(time + life * hash2(i, 2, 57), life) / life;
+        float x = b.x + b.w * hash2(i, 3, 57) + std::sin(float(time) * (0.8f + hash2(i, 4, 57)) + i) * 60 * s - float(u) * 120 * s;
+        float y = b.y - 20 * s + float(u) * (b.h + 40 * s);
+        float turn = float(std::sin(time * (1.5 + 2 * hash2(i, 5, 57)) + i * 1.3));
+        float w = (5 + 4 * hash2(i, 6, 57)) * s, h = w * 0.55f * std::abs(turn) + 0.6f * s;
+        float ang = float(time) * (0.5f + hash2(i, 7, 57)) + i;
+        std::vector<V2> pts;
+        for (int k = 0; k < 10; k++) {
+            float a = k * 0.6283f;
+            V2 q{std::cos(a) * w, std::sin(a) * h};
+            pts.push_back(V2{x, y} + V2{q.x * std::cos(ang) - q.y * std::sin(ang), q.x * std::sin(ang) + q.y * std::cos(ang)});
+        }
+        poly_around({x, y}, pts, with_alpha(hex(0xffc2d4), 0.85f));
+    }
+}
+
+// Smoke drifting along the bottom of a scenery: soft puffs moving to the
+// right at their own speed, swelling and fading as they go.
+void draw_smoke(Box b, double time, float s) {
+    using namespace draw;
+    for (int i = 0; i < 18; i++) {
+        float speed = 0.012f + 0.02f * hash2(i, 1, 71);
+        double life = 1.0 / speed;
+        double u = std::fmod(time + life * hash2(i, 2, 71), life) / life;
+        float x = b.x - 200 * s + float(u) * (b.w + 400 * s);
+        float y = b.y + b.h * (0.62f + 0.3f * hash2(i, 3, 71)) + std::sin(float(time) * 0.3f + i) * 10 * s;
+        float r = (90 + 120 * hash2(i, 4, 71)) * s * (0.7f + 0.6f * float(u));
+        float a = 0.18f * float(std::sin(u * M_PI));
+        circle({x, y}, r, with_alpha(hex(0xd8d0c4), a), with_alpha(hex(0xd8d0c4), 0), r * 0.9f);
     }
 }
 
@@ -3838,6 +3883,8 @@ void draw_background(App& a, bool decorated = true) {
         SDL_RenderTexture(a.renderer, tex, nullptr, &dst);
         if (t.stars) draw_star_field({0, 0, float(a.w), float(a.h)}, a.time, a.s);
         if (t.embers) draw_embers({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        if (t.petals) draw_petals({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        if (t.smoke) draw_smoke({0, 0, float(a.w), float(a.h)}, a.time, a.s);
         draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 60);
         return;
     }
@@ -6900,6 +6947,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     // Start scene (command line).
     std::string scene = arg_value(argc, argv, "--scene", "menu");
     a->debug_fx = arg_value(argc, argv, "--fx");
+    if (!arg_value(argc, argv, "--pieces").empty()) a->settings.piece_set = arg_value(argc, argv, "--pieces");   // a set for this run
     std::string black = arg_value(argc, argv, "--black"), white = arg_value(argc, argv, "--white");
     if (!black.empty()) a->settings.black = black;
     if (!white.empty()) a->settings.white = white;

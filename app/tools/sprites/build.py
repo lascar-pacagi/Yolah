@@ -19,7 +19,15 @@ import render
 from render import render as draw
 from models import MODELS, BASE_TOP, _add_legends
 import legends
+import manga
+import generals
+from models import scaled, SCALE
 _add_legends()
+MODELS.update(manga.MANGA)
+for _k, _f in generals.GENERALS.items():
+    SCALE[_k] = 1.3
+    MODELS[_k] = scaled(_k, _f)
+TOON = set(manga.MANGA)        # rendered in the manga style
 
 ART = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "art")
 SIZE = 192
@@ -34,6 +42,8 @@ NAMES = {"sentinel": "Sentinelle", "human": "Humain", "tin_toy": "Jouet m\u00e9c
 
 
 NAMES.update(legends.NAMES)
+NAMES.update(manga.NAMES)
+NAMES.update(generals.NAMES)
 NAMES["human_legendes"] = "Humain (L\u00e9gendes)"
 
 
@@ -55,7 +65,7 @@ def build(model):
             for k in range(n):
                 t = k / n if loop else k / (n - 1)
                 sheet[r * SIZE:(r + 1) * SIZE, k * SIZE:(k + 1) * SIZE] = draw(MODELS[model](anim, t, side), size=SIZE,
-                                                                                 view=VIEW, center=CENTER)
+                                                                                 view=VIEW, center=CENTER, toon=model in TOON)
         aid = f"fig_{model}{suffix}"
         Image.fromarray(sheet).save(os.path.join(ART, aid + ".png"), optimize=True)
         j = {"name": NAMES.get(model, model) + (" (blanc)" if side else ""), "kind": "piece", "size": SIZE,
