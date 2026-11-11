@@ -64,7 +64,8 @@
 #                                                      → k8_them_g046_qat_l512_scratch_az20
 #   (the same without YOLAH_L1_SIZE: k8_them_g046_qat_scratch_az20, the 1024 network
 #   under the same conditions; a 512 network cannot start from the 193 network)
-# Architecture (SCRATCH=1 needed; validation only, no C++ for the last two yet):
+# Architecture (SCRATCH=1 needed; no C++ for YOLAH_L2_SQUARE yet; the sets by phase, merged, are
+# read by nnue_persp.cpp):
 #   YOLAH_L2_SIZE=32                   32 outputs of fc2 per head instead of 64  → …_l232…
 #   YOLAH_L2_SQUARE=1                  w3 reads [h2, h2²]                        → …_sq…
 #   YOLAH_INPUT_BUCKETS=4              4 sets of fc1 weights by phase            → …_ib4…

@@ -316,7 +316,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
     if (options.lazy_accumulator) {
         s.acc_ok[yolah.nb_plies() + 1] = false;   // the child's accumulator: computed if needed
     } else {
-        net_play(player, m, s.acc);
+        net_play(player, m, s.acc, &s.refresh);
     }
     yolah.play(m);
     int v = alpha + 1;                    // "might beat alpha" until a search says otherwise
@@ -350,7 +350,7 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
         }
     }
     yolah.undo(m);
-    if (!options.lazy_accumulator) net_undo(player, m, s.acc);
+    if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
     return v;
 }
 
@@ -493,13 +493,13 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             const uint64_t child = zobrist::update(hash, player, k);
             s.played[yolah.nb_plies()] = k;
             if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-            else net_play(player, k, s.acc);
+            else net_play(player, k, s.acc, &s.refresh);
             yolah.play(k);
             TR(PROXY, k.raw(), bound, d);
             const int v = -negamax(yolah, s, child, -bound, -bound + 1, d);
             TR(PROXY_RESULT, k.raw(), v, v >= bound);
             yolah.undo(k);
-            if (!options.lazy_accumulator) net_undo(player, k, s.acc);
+            if (!options.lazy_accumulator) net_undo(player, k, s.acc, &s.refresh);
             if (stopped()) return TRET(0);
             if (v >= bound) return TRET(v >= WIN ? beta : v);
             proxy_done = true;               // one witness per node, as usual
@@ -557,13 +557,13 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         const uint8_t player = yolah.current_player();
         s.played[yolah.nb_plies()] = Move::none();
         if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-        else net_play(player, Move::none(), s.acc);
+        else net_play(player, Move::none(), s.acc, &s.refresh);
         yolah.play(Move::none());
         TR(CALL, 5, beta - 1, beta, depth - 1 - R);
         const int v = -negamax(yolah, s, zobrist::update(hash, player, Move::none()), -beta, -beta + 1, depth - 1 - R);
         TR(CALL_RESULT, 5, v);
         yolah.undo(Move::none());
-        if (!options.lazy_accumulator) net_undo(player, Move::none(), s.acc);
+        if (!options.lazy_accumulator) net_undo(player, Move::none(), s.acc, &s.refresh);
         if (stopped()) return TRET(0);
         if (v >= beta) return TRET(v >= WIN ? beta : v);   // no unproven "win" from a null move
     }
@@ -624,13 +624,13 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 const uint64_t child = zobrist::update(hash, player, m);
                 s.played[yolah.nb_plies()] = m;
                 if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-                else net_play(player, m, s.acc);
+                else net_play(player, m, s.acc, &s.refresh);
                 yolah.play(m);
                 TR(PROXY, m.raw(), bound, d);
                 const int v = -negamax(yolah, s, child, -bound, -bound + 1, d);
                 TR(PROXY_RESULT, m.raw(), v, v >= bound);
                 yolah.undo(m);
-                if (!options.lazy_accumulator) net_undo(player, m, s.acc);
+                if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
                 return v;
             };
             const int R = options.proxy_reduction + depth / 4 - 1;
@@ -698,11 +698,11 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                         const uint64_t child = zobrist::update(hash, player, m);
                         s.played[yolah.nb_plies()] = m;
                         if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-                        else net_play(player, m, s.acc);
+                        else net_play(player, m, s.acc, &s.refresh);
                         yolah.play(m);
                         val[cand[k]] = -evaluate(yolah, s, child);
                         yolah.undo(m);
-                        if (!options.lazy_accumulator) net_undo(player, m, s.acc);
+                        if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
                     }
                     std::stable_sort(cand, cand + K, [&](int a, int b) { return val[a] > val[b]; });
                 }
@@ -823,7 +823,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             const uint64_t child = zobrist::update(hash, player, m);
             s.played[yolah.nb_plies()] = m;
             if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
-            else net_play(player, m, s.acc);
+            else net_play(player, m, s.acc, &s.refresh);
             yolah.play(m);
             int v = -INFINITE;
             if (!options.probcut_filter || -evaluate(yolah, s, child) >= bound) {
@@ -832,7 +832,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 TR(CALL_RESULT, 6, v);
             }
             yolah.undo(m);
-            if (!options.lazy_accumulator) net_undo(player, m, s.acc);
+            if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
             if (stopped()) return TRET(0);
             if (v >= bound) return TRET(v >= WIN ? beta : v);
         }
@@ -1250,7 +1250,7 @@ int MinMaxNNUE_DevPlayer::raw_network_value(const Yolah& yolah, Search& s) {
     while (!s.acc_ok[k]) k--;                 // the root's is always valid
     for (; k < ply; k++) {
         // Player at ply k: ply parity (a pass also counts as a ply).
-        update_accumulator(s.accs[k].acc, s.accs[k + 1].acc, uint8_t(k & 1), s.played[k]);
+        update_accumulator(s.accs[k].acc, s.accs[k + 1].acc, uint8_t(k & 1), s.played[k], &s.refresh);
         s.acc_ok[k + 1] = true;
     }
     return int(net_value(s.accs[ply], yolah) * WIN);
@@ -1262,13 +1262,13 @@ void MinMaxNNUE_DevPlayer::net_init(const Yolah& yolah, Accumulator& a) {
     else nnue.init(yolah, a.acc);
 }
 
-void MinMaxNNUE_DevPlayer::net_play(uint8_t player, Move m, Accumulator& a) {
-    if (persp) persp->play(player, m, a.acc);
+void MinMaxNNUE_DevPlayer::net_play(uint8_t player, Move m, Accumulator& a, NNUE_Persp::RefreshCache* cache) {
+    if (persp) persp->play(player, m, a.acc, cache);
     else nnue.play(player, m, a.acc);
 }
 
-void MinMaxNNUE_DevPlayer::net_undo(uint8_t player, Move m, Accumulator& a) {
-    if (persp) persp->undo(player, m, a.acc);
+void MinMaxNNUE_DevPlayer::net_undo(uint8_t player, Move m, Accumulator& a, NNUE_Persp::RefreshCache* cache) {
+    if (persp) persp->undo(player, m, a.acc, cache);
     else nnue.undo(player, m, a.acc);
 }
 
@@ -1280,9 +1280,9 @@ float MinMaxNNUE_DevPlayer::net_value(const Accumulator& a, const Yolah& yolah) 
 // out = in + the change of features of move m by `player` (see NNUE_Quantized::play,
 // whose arithmetic it reproduces, in one pass and without modifying `in`).
 void MinMaxNNUE_DevPlayer::update_accumulator(const int16_t* __restrict in, int16_t* __restrict out,
-                                              uint8_t player, Move m) const {
+                                              uint8_t player, Move m, NNUE_Persp::RefreshCache* cache) const {
     if (persp) {                              // two views, three rows each (see NNUE_Persp::update)
-        persp->update(in, out, player, m);
+        persp->update(in, out, player, m, cache);
         return;
     }
     constexpr int H = NNUE_Quantized::H1_SIZE;

@@ -53,9 +53,9 @@ multiply-add per feature, in float ("DIRECT" section of the weights file).
 
 First layer per phase (fc1_buckets=N > 1): N sets of fc1 weights and biases, the
 set chosen by the holes as for the heads (bucket = holes · N // 57), for both
-views. All the sets are computed here and the right one is kept; in a C++ player
-only the active one would be: updating the accumulator would read as many rows as
-now, with a refresh when the position changes set. fc1 is (N · l1) × 192 in the
+views. All the sets are computed here and the right one is kept; the C++ player
+(nnue_persp.cpp) computes only the active one: updating the accumulator reads as
+many rows as with one set, with a refresh when the position changes set. fc1 is (N · l1) × 192 in the
 file, the N sets one after the other. Random start only.
 
 Factorised first layer per phase (fc1_factor=True, with fc1_buckets=N > 1), as
@@ -69,7 +69,8 @@ quantization-aware training rounds the merged weights, as the C++ would.
 Squared outputs (square=True): w3 reads [h2, h2²] instead of h2, so 2 · l2 inputs;
 in QAT h2² is floor(h2 · h2 · 64) / 64, the (x · x) >> 6 of h2 as integers 0..64.
 l2 = 32 with square has the w3 of l2 = 64, with half of fc2. Random start only.
-No C++ for these two yet (export_value_nets.py refuses them).
+The sets by phase: C++ in nnue_persp.cpp (export_value_nets.py merges the factorised
+sets); the squared outputs: no C++ yet (export_value_nets.py refuses them).
 
 Quantization-aware training (qat=True): the forward pass computes what the
 C++ computes (nnue_persp.cpp), not the float network:

@@ -81,6 +81,7 @@ static T* aligned_array(size_t n) {
 }
 
 NNUE_Persp::~NNUE_Persp() {
+    free(input_to_h1); free(h1_bias);
     free(h1_to_h2); free(h1_to_h2_sparse); free(h2_bias); free(h2_to_h3); free(h3_bias); free(value_weight); free(value_bias);
     free(direct);
 }
@@ -145,9 +146,28 @@ void NNUE_Persp::load(const std::string& filename) {
     h1_size = l1;
     h2_inputs = them ? 2 * h1_size : h1_size;
     h2_stride = h2_inputs + (n_space + 31) / 32 * 32;
-    // fc1 is stored (out, in) by PyTorch: transposed into one row per input.
-    read_matrix(ifs, h1_size, INPUT_SIZE, input_to_h1, true, "fc1");
-    read_bias(ifs, h1_size, h1_bias, "fc1");
+    // fc1 is stored (out, in) by PyTorch: transposed into one row per input. Its
+    // rows / l1 = the number of sets by phase, set b = rows b · l1 … (b · l1 + l1 − 1).
+    {
+        std::string type;
+        int m, n;
+        if (!(ifs >> type >> m >> n) || type != "W" || n != INPUT_SIZE || m % h1_size != 0
+                || m / h1_size < 1 || m / h1_size > MAX_FC1_BUCKETS)
+            throw std::runtime_error("NNUE_Persp: bad matrix fc1 in " + filename);
+        fc1_buckets = m / h1_size;
+        free(input_to_h1); free(h1_bias);
+        input_to_h1 = aligned_array<int8_t>(size_t(fc1_buckets) * INPUT_SIZE * h1_size);
+        h1_bias = aligned_array<int16_t>(size_t(fc1_buckets) * h1_size);
+        for (int i = 0; i < m; i++) {
+            int8_t* set = input_to_h1 + size_t(i / h1_size) * INPUT_SIZE * h1_size;
+            for (int j = 0; j < INPUT_SIZE; j++) {
+                double v;
+                ifs >> v;
+                set[j * h1_size + i % h1_size] = int8_t(v);
+            }
+        }
+        read_bias(ifs, m, h1_bias, "fc1");
+    }
     h1_to_h2 = aligned_array<int8_t>(size_t(k) * H2_SIZE * h2_stride);
     h2_bias = aligned_array<int16_t>(size_t(k) * H2_SIZE);
     h2_to_h3 = aligned_array<int8_t>(size_t(k) * H3_SIZE * H2_SIZE);
@@ -184,16 +204,20 @@ void NNUE_Persp::load(const std::string& filename) {
     }
 }
 
+// pos = black, white, holes. Also writes the position after the values.
 template<int H>
-void NNUE_Persp::init_n(const Yolah& yolah, int16_t* acc) const {
-    const uint64_t pieces[2] = { yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE) };
-    const uint64_t holes = yolah.empty_bitboard();
+void NNUE_Persp::init_n(const uint64_t* pos, int16_t* acc) const {
+    const uint64_t pieces[2] = { pos[0], pos[1] };
+    const uint64_t holes = pos[2];
+    const int set = fc1_bucket(holes);
+    const int8_t* w1 = input_to_h1 + size_t(set) * INPUT_SIZE * H;
+    const int16_t* b1 = h1_bias + set * H;
     for (int v : { Yolah::BLACK, Yolah::WHITE }) {
         int16_t* a = acc + v * H;
-        for (int j = 0; j < H; j++) a[j] = h1_bias[j];
+        for (int j = 0; j < H; j++) a[j] = b1[j];
         auto add = [&](uint64_t bb, int plane) {
             for (; bb; bb &= bb - 1) {
-                const int8_t* w = input_to_h1 + (plane + row(v, std::countr_zero(bb))) * H;
+                const int8_t* w = w1 + (plane + row(v, std::countr_zero(bb))) * H;
                 for (int j = 0; j < H; j++) a[j] += w[j];
             }
         };
@@ -201,59 +225,126 @@ void NNUE_Persp::init_n(const Yolah& yolah, int16_t* acc) const {
         add(pieces[1 - v], 64);     // his
         add(holes, 128);
     }
+    uint64_t* p = position_of(acc);
+    p[0] = pos[0]; p[1] = pos[1]; p[2] = pos[2];
 }
 
 void NNUE_Persp::init(const Yolah& yolah, int16_t* acc) const {
-    if (h1_size == H1_SMALL) init_n<H1_SMALL>(yolah, acc);
-    else init_n<H1_SIZE>(yolah, acc);
+    const uint64_t pos[3] = { yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE), yolah.empty_bitboard() };
+    if (h1_size == H1_SMALL) init_n<H1_SMALL>(pos, acc);
+    else init_n<H1_SIZE>(pos, acc);
+}
+
+// The position after the move m by `player` (SIGN = 1) or before it (SIGN = −1:
+// undo; `pos` is then the position after m): the piece goes from → to, from
+// becomes a hole.
+template<int SIGN>
+static inline void move_position(const uint64_t* in, uint64_t* out, uint8_t player, Move m) {
+    const uint64_t from = uint64_t(1) << m.from_sq(), to = uint64_t(1) << m.to_sq();
+    out[0] = in[0]; out[1] = in[1];
+    out[player == Yolah::BLACK ? 0 : 1] ^= from | to;
+    out[2] = SIGN > 0 ? in[2] | from : in[2] & ~from;
 }
 
 template<int H>
-void NNUE_Persp::update_n(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m) const {
+void NNUE_Persp::refresh_n(const uint64_t* pos, int16_t* out, RefreshCache* cache) const {
+    if (!cache) { init_n<H>(pos, out); return; }
+    const int set = fc1_bucket(pos[2]);
+    int16_t* e = cache->entries[set].acc;
+    if (!cache->valid[set]) {
+        init_n<H>(pos, e);
+        cache->valid[set] = true;
+    } else {
+        const uint64_t* old = position_of(e);
+        const int8_t* w1 = input_to_h1 + size_t(set) * INPUT_SIZE * H;
+        for (int v : { Yolah::BLACK, Yolah::WHITE }) {
+            int16_t* a = e + v * H;
+            // rows of view v: mine (colour v) 0, his 64, holes 128
+            const int planes[3] = { v == Yolah::BLACK ? 0 : 64, v == Yolah::BLACK ? 64 : 0, 128 };
+            for (int c = 0; c < 3; c++) {
+                for (uint64_t bb = old[c] & ~pos[c]; bb; bb &= bb - 1) {
+                    const int8_t* w = w1 + (planes[c] + row(v, std::countr_zero(bb))) * H;
+                    for (int j = 0; j < H; j++) a[j] -= w[j];
+                }
+                for (uint64_t bb = pos[c] & ~old[c]; bb; bb &= bb - 1) {
+                    const int8_t* w = w1 + (planes[c] + row(v, std::countr_zero(bb))) * H;
+                    for (int j = 0; j < H; j++) a[j] += w[j];
+                }
+            }
+        }
+        uint64_t* p = position_of(e);
+        p[0] = pos[0]; p[1] = pos[1]; p[2] = pos[2];
+    }
+    if (out != e) memcpy(out, e, ACC_SIZE * sizeof(int16_t) + 3 * sizeof(uint64_t));
+}
+
+template<int H>
+void NNUE_Persp::update_n(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m,
+                          RefreshCache* cache) const {
     if (m == Move::none()) {        // a pass: no feature changes, only the view that value() reads
         memcpy(out, in, 2 * H * sizeof(int16_t));
+        if (fc1_buckets > 1) memcpy(position_of(out), position_of(in), 3 * sizeof(uint64_t));
         return;
+    }
+    const int8_t* w1 = input_to_h1;
+    if (fc1_buckets > 1) {          // the position follows; another set: from the position
+        uint64_t pos[3];
+        move_position<1>(position_of(in), pos, player, m);
+        const int set = fc1_bucket(pos[2]);
+        if (set != fc1_bucket(position_of(in)[2])) { refresh_n<H>(pos, out, cache); return; }
+        memcpy(position_of(out), pos, sizeof pos);
+        w1 += size_t(set) * INPUT_SIZE * H;
     }
     for (int v : { Yolah::BLACK, Yolah::WHITE }) {
         const int plane = v == player ? 0 : 64;
         const int from = row(v, m.from_sq()), to = row(v, m.to_sq());
-        const int8_t* __restrict w_from = input_to_h1 + (plane + from) * H;
-        const int8_t* __restrict w_to   = input_to_h1 + (plane + to) * H;
-        const int8_t* __restrict w_hole = input_to_h1 + (128 + from) * H;
+        const int8_t* __restrict w_from = w1 + (plane + from) * H;
+        const int8_t* __restrict w_to   = w1 + (plane + to) * H;
+        const int8_t* __restrict w_hole = w1 + (128 + from) * H;
         const int16_t* __restrict a = in + v * H;
         int16_t* __restrict b = out + v * H;
         for (int j = 0; j < H; j++) b[j] = int16_t(a[j] - w_from[j] + w_to[j] + w_hole[j]);
     }
 }
 
-void NNUE_Persp::update(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m) const {
-    if (h1_size == H1_SMALL) update_n<H1_SMALL>(in, out, player, m);
-    else update_n<H1_SIZE>(in, out, player, m);
+void NNUE_Persp::update(const int16_t* __restrict in, int16_t* __restrict out, uint8_t player, Move m,
+                        RefreshCache* cache) const {
+    if (h1_size == H1_SMALL) update_n<H1_SMALL>(in, out, player, m, cache);
+    else update_n<H1_SIZE>(in, out, player, m, cache);
 }
 
 // play (SIGN = 1) or undo (SIGN = −1) the move m by `player`, in place.
 template<int H, int SIGN>
-void NNUE_Persp::play_n(uint8_t player, Move m, int16_t* acc) const {
+void NNUE_Persp::play_n(uint8_t player, Move m, int16_t* acc, RefreshCache* cache) const {
     if (m == Move::none()) return;
+    const int8_t* w1 = input_to_h1;
+    if (fc1_buckets > 1) {          // the position follows; another set: from the position
+        uint64_t pos[3];
+        move_position<SIGN>(position_of(acc), pos, player, m);
+        const int set = fc1_bucket(pos[2]);
+        if (set != fc1_bucket(position_of(acc)[2])) { refresh_n<H>(pos, acc, cache); return; }
+        memcpy(position_of(acc), pos, sizeof pos);
+        w1 += size_t(set) * INPUT_SIZE * H;
+    }
     for (int v : { Yolah::BLACK, Yolah::WHITE }) {
         const int plane = v == player ? 0 : 64;
         const int from = row(v, m.from_sq()), to = row(v, m.to_sq());
-        const int8_t* w_from = input_to_h1 + (plane + from) * H;
-        const int8_t* w_to   = input_to_h1 + (plane + to) * H;
-        const int8_t* w_hole = input_to_h1 + (128 + from) * H;
+        const int8_t* w_from = w1 + (plane + from) * H;
+        const int8_t* w_to   = w1 + (plane + to) * H;
+        const int8_t* w_hole = w1 + (128 + from) * H;
         int16_t* a = acc + v * H;
         for (int j = 0; j < H; j++) a[j] += SIGN * (-w_from[j] + w_to[j] + w_hole[j]);
     }
 }
 
-void NNUE_Persp::play(uint8_t player, Move m, int16_t* acc) const {
-    if (h1_size == H1_SMALL) play_n<H1_SMALL, 1>(player, m, acc);
-    else play_n<H1_SIZE, 1>(player, m, acc);
+void NNUE_Persp::play(uint8_t player, Move m, int16_t* acc, RefreshCache* cache) const {
+    if (h1_size == H1_SMALL) play_n<H1_SMALL, 1>(player, m, acc, cache);
+    else play_n<H1_SIZE, 1>(player, m, acc, cache);
 }
 
-void NNUE_Persp::undo(uint8_t player, Move m, int16_t* acc) const {
-    if (h1_size == H1_SMALL) play_n<H1_SMALL, -1>(player, m, acc);
-    else play_n<H1_SIZE, -1>(player, m, acc);
+void NNUE_Persp::undo(uint8_t player, Move m, int16_t* acc, RefreshCache* cache) const {
+    if (h1_size == H1_SMALL) play_n<H1_SMALL, -1>(player, m, acc, cache);
+    else play_n<H1_SIZE, -1>(player, m, acc, cache);
 }
 
 template<int H>

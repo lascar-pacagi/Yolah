@@ -232,7 +232,10 @@ int check(const string& positions, const string& refs_path, const string& models
 
 // NNUE_Persp (nnue_persp.h) against PyTorch. The accumulators are built three
 // ways — play() move by move, update() move by move (the lazy search's way)
-// and init() on the final position — and must be identical. Then the cost of
+// and init() on the final position — and must be identical; undo() of every
+// move must give the start position's back (with fc1 sets by phase, these
+// cross the sets). play() and undo() go through a refresh cache (kept from one
+// game to the next, as in a search), update() without: both are checked. Then the cost of
 // value() and of one update, compared with NNUE_Quantized if a 193 network is given.
 int check_persp(const string& positions, const string& refs_path, const string& weights, const string& old_weights) {
     const vector<Record> rs = read_records(positions);
@@ -240,10 +243,12 @@ int check_persp(const string& positions, const string& refs_path, const string& 
     vector<float> ref(n);
     std::ifstream(refs_path, std::ios::binary).read((char*)ref.data(), n * sizeof(float));
     auto net = std::make_unique<NNUE_Persp>(weights);
-    std::printf("%zu positions, %s: K = %d, them = %d\n", n, weights.c_str(), net->k, int(net->them));
+    std::printf("%zu positions, %s: K = %d, them = %d, fc1 sets by phase = %d\n", n, weights.c_str(), net->k, int(net->them),
+                net->fc1_buckets);
     double max_err = 0, sum_err = 0, acc_drift = 0;
     size_t sign_flips = 0;
     vector<Yolah> finals;
+    auto cache = std::make_unique<NNUE_Persp::RefreshCache>();
     for (const Record& r : rs) {
         Yolah y;
         NNUE_Persp::Accumulator played, fresh;
@@ -252,7 +257,7 @@ int check_persp(const string& positions, const string& refs_path, const string& 
         net->init(y, played);
         net->init(y, *lazy.back());
         for (Move m : r.moves) {
-            net->play(y.current_player(), m, played);
+            net->play(y.current_player(), m, played, cache.get());
             lazy.push_back(std::make_unique<NNUE_Persp::Accumulator>());
             net->update(lazy[lazy.size() - 2]->acc, lazy.back()->acc, y.current_player(), m);
             y.play(m);
@@ -263,6 +268,17 @@ int check_persp(const string& positions, const string& refs_path, const string& 
             acc_drift = std::max(acc_drift, (double)std::abs(lazy.back()->acc[i] - fresh.acc[i]));
         }
         const float v = net->value(played, y);
+        {   // undo every move: the start position's accumulator again
+            Yolah back = y;
+            NNUE_Persp::Accumulator start;
+            for (size_t j = r.moves.size(); j-- > 0;) {
+                back.undo(r.moves[j]);
+                net->undo(back.current_player(), r.moves[j], played, cache.get());
+            }
+            net->init(back, start);
+            for (int i = 0; i < NNUE_Persp::ACC_SIZE; i++)
+                acc_drift = std::max(acc_drift, (double)std::abs(played.acc[i] - start.acc[i]));
+        }
         const size_t i = finals.size();
         const double e = std::abs(v - ref[i]);
         max_err = std::max(max_err, e); sum_err += e;

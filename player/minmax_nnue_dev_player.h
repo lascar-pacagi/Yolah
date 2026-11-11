@@ -315,8 +315,8 @@ private:
     std::unique_ptr<NNUE_Persp> persp;
     using Accumulator = NNUE_Persp::Accumulator;
     void net_init(const Yolah& yolah, Accumulator& a);
-    void net_play(uint8_t player, Move m, Accumulator& a);
-    void net_undo(uint8_t player, Move m, Accumulator& a);
+    void net_play(uint8_t player, Move m, Accumulator& a, NNUE_Persp::RefreshCache* cache);
+    void net_undo(uint8_t player, Move m, Accumulator& a, NNUE_Persp::RefreshCache* cache);
     float net_value(const Accumulator& a, const Yolah& yolah);
     Options options;
     bool verbose;
@@ -393,6 +393,9 @@ private:
         // tells how to get accs[p + 1] from accs[p].
         Accumulator accs[Yolah::MAX_NB_PLIES + 1];
         bool acc_ok[Yolah::MAX_NB_PLIES + 1]{};
+        // A network with fc1 sets by phase: the refreshes of this thread start
+        // from it (NNUE_Persp::RefreshCache), whichever of acc / accs is used.
+        NNUE_Persp::RefreshCache refresh;
         bool proxy_off = false;                    // during a proxy cut verification: no proxy cut inside
         uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
     };
@@ -417,7 +420,7 @@ private:
     int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
     int  network_value(const Yolah& yolah, Search& s);
     int  raw_network_value(const Yolah& yolah, Search& s);
-    void update_accumulator(const int16_t* in, int16_t* out, uint8_t player, Move m) const;
+    void update_accumulator(const int16_t* in, int16_t* out, uint8_t player, Move m, NNUE_Persp::RefreshCache* cache) const;
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const;
