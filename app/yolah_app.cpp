@@ -3733,6 +3733,9 @@ struct App {
         if (ps.players) return expand(player_sprite(who), side, who);
         return set_units(ps, side, who);
     }
+    // The figurine of a player in the current theme's set (menus, the choice
+    // of the players, the tutorial): the pieces follow the board everywhere.
+    const SpriteDef& themed_sprite(const std::string& who, int side = BLACK) const { return *board_units(theme(), side, who).front(); }
     // Fills look.sprite and look.units for two players on theme t; a puzzle's
     // sprite (or set) for a side wins when given.
     void set_look(BoardView::Look& look, const Theme& t, const std::string& who_black, const std::string& who_white,
@@ -3922,7 +3925,7 @@ void scene_menu(App& a) {
         // Faded out when passing behind the title and the buttons.
         float fade = smoothstep(260 * s, 420 * s, std::abs(c.x - a.w * 0.5f));
         if (fade <= 0.01f) continue;
-        const SpriteDef& sp = a.player_sprite(i == 0 ? "human" : a.roster[i - 1].id);
+        const SpriteDef& sp = a.themed_sprite(i == 0 ? "human" : a.roster[i - 1].id, i % 2 ? WHITE : BLACK);
         draw_piece(sp, i % 2 ? WHITE : BLACK, c, (36 + 6 * std::sin(float(a.time) + i)) * s, 0.4f, a.time, 0.9f * fade, i == 0);
     }
     // Title on a soft light.
@@ -3996,7 +3999,7 @@ void scene_setup(App& a) {
             if (ks > 0.01f) draw::round_frame(r, 12 * s, 2 * s, with_alpha(a.theme().accent, ks));
             float alpha = e.available ? 1.0f : 0.35f;
             float pr = std::min(row_h * 0.36f, 27 * s);
-            draw_piece(a.player_sprite(e.id), side, {r.x + 16 * s + pr, r.center().y}, pr, 0.2f * k, a.time, alpha, e.id == "human");
+            draw_piece(a.themed_sprite(e.id, side), side, {r.x + 16 * s + pr, r.center().y}, pr, 0.2f * k, a.time, alpha, e.id == "human");
             float tx = r.x + 30 * s + 2 * pr;
             a.text.draw(Font::Bold, 19 * s, e.name, {tx, r.center().y - 22 * s}, with_alpha(pal::text, alpha));
             a.text.draw(Font::Regular, 14 * s, e.available ? e.sub : "indisponible \xE2\x80\x94 survolez pour savoir pourquoi",
@@ -5134,7 +5137,7 @@ void scene_tutorial(App& a) {
     // The guide's panel.
     a.ui.panel(panel);
     float y = panel.y + 22 * s;
-    draw_piece(a.player_sprite("human"), BLACK, {panel.x + 54 * s, y + 34 * s}, 32 * s, 0.3f, a.time, 1, true);
+    draw_piece(a.themed_sprite("human"), BLACK, {panel.x + 54 * s, y + 34 * s}, 32 * s, 0.3f, a.time, 1, true);
     a.text.draw(Font::Bold, 14 * s, strf("Le\xC3\xA7on %d sur %zu", t.index + 1, L.size()), {panel.x + 104 * s, y + 6 * s}, a.theme().accent);
     a.text.draw(Font::Black, 24 * s, l.title, {panel.x + 104 * s, y + 26 * s}, pal::text);
     y += 86 * s;
