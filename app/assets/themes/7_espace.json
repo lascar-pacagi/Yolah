@@ -28,5 +28,6 @@
   "planet size": 3.6,
   "planet top": 0.38,
   "stars": true,
-  "piece set": "robots"
+  "piece set": "robots",
+  "break fx": "space"
 }

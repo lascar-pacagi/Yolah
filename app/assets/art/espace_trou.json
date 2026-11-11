@@ -1,21 +1,21 @@
 {
-  "name": "Espace : vortex",
+  "name": "Espace : trou noir",
   "kind": "hole",
-  "size": 128,
+  "size": 160,
   "smooth": true,
   "on stone": false,
   "animations": [
     {
       "name": "idle",
-      "fps": 10,
+      "fps": 12,
       "loop": true,
-      "frames": 16
+      "frames": 24
     },
     {
       "name": "open",
       "fps": 24,
       "loop": false,
-      "frames": 10
+      "frames": 12
     }
   ]
 }

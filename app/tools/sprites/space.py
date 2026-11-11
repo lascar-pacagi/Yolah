@@ -291,6 +291,61 @@ def vortex(S=128, frames=16, opening=False):
     return out
 
 
+def blackhole(S=160, frames=24, opening=False):
+    """A black hole seen almost edge-on, after the classic ray-traced pictures:
+    the shadow, a thin photon ring, the accretion disk crossing in front of
+    the shadow, the far side of the disk bent by the lensing into a halo over
+    the top and the bottom, the approaching side brighter (Doppler), the gas
+    turning; behind it, the dark space of the hole with stars."""
+    out = []
+    x, y = grid(S, S)
+    u, v = (x - 0.5) * 2, (y - 0.5) * 2
+    r = torch.sqrt(u * u + v * v) + 1e-5
+    n_frames = 12 if opening else frames
+    starsmap = stars(x, y, 90, 31, 0.32, S, 0.55).sum(0).clamp(0, 1)
+    for f in range(n_frames):
+        ph = f / frames
+        k = 1.0
+        if opening:
+            k = 1 - (1 - min(1.0, (f + 1) / n_frames)) ** 3
+        Rs = 0.27 * k                                  # the shadow's radius
+        # the hole: deep space, stars, a soft dark lip at the square's edge
+        space_c = srgb("#04050c")[:, None, None] * torch.ones_like(x)[None] + srgb("#cfd8ff")[:, None, None] * (starsmap * 0.6)[None]
+        hole = (r < 0.93).float()
+        # the disk: a thin ellipse (inclination), radii 1.25 .. 3.4 shadow radii
+        flat_ = 0.1
+        rd = torch.sqrt(u * u + (v / flat_) ** 2) + 1e-5
+        phi = torch.atan2(v / flat_, u)
+        turn = phi / TAU * 10.0 - ph * 10.0 / (0.25 + rd)            # inner gas turns faster
+        swirl = 0.6 * noise2(rd * 14.0, turn, 21.0, 3) + 0.4 * (0.5 + 0.5 * torch.sin(rd * 60 + 3 * noise2(rd * 4, turn * 0.5, 2.0, 2)))
+        ring = ((rd > Rs * 1.25) & (rd < Rs * 3.4)).float()
+        heat = (1 - ((rd - Rs * 1.25) / (Rs * 2.15)).clamp(0, 1)) ** 1.5
+        doppler = (1.0 + 0.95 * (-u / rd)).clamp_min(0.1)
+        disk = ring * heat * (0.55 + 0.75 * swirl) * doppler
+        front = (v > -0.002).float() + (r > Rs).float() * (v <= 0).float()      # the back half hides behind the shadow
+        disk = disk * front.clamp(0, 1)
+        # the lensed far side: arcs over and under the shadow
+        halo = torch.exp(-((r - Rs * 1.3) / (Rs * 0.15)) ** 2) * (0.25 + 0.75 * (v.abs() / r) ** 1.5)
+        halo = halo * (0.55 + 0.6 * noise2(r * 20, torch.atan2(v, u) * 3 - ph * 6, 5.0, 2)) * (1.0 + 0.6 * (-u / r)).clamp_min(0.2)
+        photon = torch.exp(-((r - Rs * 1.06) / (Rs * 0.035)) ** 2)
+        light = disk * 2.2 + halo * 1.8 + photon * 2.5
+        hot = srgb("#fff4dc")[:, None, None] * ((light - 0.8).clamp(0, 2) ** 1.3)[None] * 1.2
+        warm = srgb("#ff8a2a")[:, None, None] * (light.clamp(0, 1.2))[None] * 0.8 + srgb("#c8301a")[:, None, None] * (light.clamp(0, 0.5))[None] * 0.5
+        c = space_c * hole[None] + hot + warm
+        c = c * (r > Rs).float()[None] + (srgb("#000000")[:, None, None] * (r <= Rs).float()[None])
+        # the disk passes in front of the shadow
+        c = c + (srgb("#ffd8a0")[:, None, None] * (disk * (r <= Rs).float() * 2.0)[None])
+        lip = torch.exp(-((r - 0.93) / 0.035) ** 2)
+        alpha = (hole + lip * 0.8 + light.clamp(0, 1) * (r >= 0.93).float()).clamp(0, 1)
+        c = c * (1 - 0.6 * lip)[None]
+        if opening:   # it is born from a flash
+            fl = math.exp(-f * 0.5)
+            c = c + srgb("#e8f0ff")[:, None, None] * (fl * torch.exp(-r * 2.5) * 4)[None]
+            alpha = (alpha * k + fl * torch.exp(-r * 2)).clamp(0, 1)
+        out.append(to_rgba(c, alpha))
+    return out
+
+
 def frame_art(S=96, frames=8):
     """A 9-grid frame: corners keep their shape, the edges stretch."""
     out = []
@@ -347,8 +402,8 @@ if __name__ == "__main__":
         write_art("espace_clair", "Espace : dalle claire", "tile", [("idle", [plate_light()])], 128)
         write_art("espace_sombre", "Espace : dalle sombre", "tile", [("idle", plate_dark())], 128, fps={"idle": 6})
     if "hole" in what:
-        write_art("espace_trou", "Espace : vortex", "hole", [("idle", vortex()), ("open", vortex(opening=True))], 128,
-                  fps={"idle": 10, "open": 24}, loops={"idle": True, "open": False})
+        write_art("espace_trou", "Espace : trou noir", "hole", [("idle", blackhole()), ("open", blackhole(opening=True))], 160,
+                  fps={"idle": 12, "open": 24}, loops={"idle": True, "open": False})
     if "frame" in what:
         write_art("espace_cadre", "Espace : cadre", "frame", [("idle", frame_art())], 96, fps={"idle": 4})
     if "theme" in what:

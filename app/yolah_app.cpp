@@ -1249,6 +1249,9 @@ struct Theme {
     float planet_size = 2.4f, planet_top = 0.6f;
     bool stars = false;
     bool embers = false;     // embers rising over the picture
+    // How a square breaks when a piece leaves it (Shatter): "debris" (the
+    // default), "stone", "space", "ink", "cannon"; stronger players break harder.
+    std::string break_fx = "debris";
     // The set of pieces that goes with the board (assets/sprites/sets.json):
     // used when the settings say "Selon le plateau"; "" = the classic stones.
     std::string piece_set;
@@ -1287,6 +1290,7 @@ Theme parse_theme(const json& j) {
     t.planet_top = jnum(j, "planet top", t.planet_top);
     t.stars = j.value("stars", false);
     t.embers = j.value("embers", false);
+    t.break_fx = jstr(j, "break fx", t.break_fx);
     t.piece_set = jstr(j, "piece set");
     return t;
 }
@@ -1310,6 +1314,7 @@ json theme_to_json(const Theme& t) {
     }
     if (t.stars) j["stars"] = true;
     if (t.embers) j["embers"] = true;
+    if (t.break_fx != "debris") j["break fx"] = t.break_fx;
     if (!t.piece_set.empty()) j["piece set"] = t.piece_set;
     return j;
 }
@@ -2356,6 +2361,166 @@ struct Debris : Effect {
     }
 };
 
+// A square breaking when a piece leaves it, in the style of the theme, as
+// strong as the player who moved (power 0..1: its Elo on the roster's scale).
+//   debris  chips thrown up (the classic boards)
+//   stone   rock chunks under gravity, a dust cloud, sparks for the strong
+//   space   matter sucked in a spiral to the centre, a flash, a blue shock
+//           ring; star rays for the strongest
+//   ink     manga impact: ink speed lines, a white starburst, ink drops, a ring
+//   cannon  a muzzle flash, smoke puffs, grapeshot, earth thrown up
+struct Shatter : Effect {
+    struct P { V2 p, v; float life, max, size, spin, ang; Rgba c; int kind; };   // kind: 0 dot, 1 chunk, 2 puff, 3 spark
+    std::vector<P> ps;
+    std::string style;
+    V2 c;
+    float sq, power, t = 0, dur;
+    std::vector<float> rays;      // angles of the speed lines / star rays
+    Shatter(V2 c, float sq, const Theme& th, float power, std::mt19937& rng)
+        : style(th.break_fx), c(c), sq(sq), power(std::clamp(power, 0.0f, 1.0f)) {
+        std::uniform_real_distribution<float> U(0, 1);
+        const float P = this->power;
+        dur = 0.7f + 0.5f * P;
+        auto add = [&](V2 p, V2 v, float max, float size, Rgba col, int kind) {
+            ps.push_back({p, v, 0, max, size, (U(rng) - 0.5f) * 12, U(rng) * 6.3f, col, kind});
+        };
+        if (style == "stone") {
+            int n = 10 + int(22 * P);
+            for (int i = 0; i < n; i++) {
+                float a = -float(M_PI) * (0.1f + 0.8f * U(rng)), sp = sq * (0.8f + 2.2f * U(rng)) * (0.7f + 0.6f * P);
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.6f, (U(rng) - 0.5f) * sq * 0.6f}, V2{std::cos(a) * sp, std::sin(a) * sp},
+                    0.7f + 0.5f * U(rng), sq * (0.07f + 0.11f * U(rng)) * (0.8f + 0.5f * P), shade(th.light, (U(rng) - 0.6f) * 0.6f), 1);
+            }
+            for (int i = 0; i < 6 + int(6 * P); i++)
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, (U(rng) - 0.5f) * sq * 0.3f}, V2{(U(rng) - 0.5f) * sq * 0.8f, -sq * (0.2f + 0.4f * U(rng))},
+                    0.9f + 0.6f * U(rng), sq * (0.22f + 0.18f * U(rng)) * (0.8f + 0.5f * P), hex(0xc8b8a0, 210), 2);
+            if (P > 0.5f)
+                for (int i = 0; i < int(30 * P); i++) {
+                    float a = U(rng) * 6.283f, sp = sq * (1.5f + 3.0f * U(rng));
+                    add(c, V2{std::cos(a) * sp, std::sin(a) * sp - sq}, 0.4f + 0.4f * U(rng), sq * 0.02f, hex(0xffb040), 3);
+                }
+        } else if (style == "space") {
+            int n = 24 + int(40 * P);
+            for (int i = 0; i < n; i++) {     // they start around and spiral in
+                float a = U(rng) * 6.283f, rr = sq * (0.5f + 0.9f * U(rng));
+                add(c + V2{std::cos(a), std::sin(a)} * rr, V2{a, rr}, 0.5f + 0.4f * U(rng), sq * (0.015f + 0.03f * U(rng)),
+                    U(rng) < 0.5f ? hex(0x9fdcff) : hex(0xffd2a0), 0);
+            }
+            for (int i = 0; i < (P > 0.7f ? 6 : 0); i++) rays.push_back(i * 3.14159f / 3 + U(rng) * 0.2f);
+        } else if (style == "ink") {
+            int nl = 10 + int(18 * P);
+            for (int i = 0; i < nl; i++) rays.push_back(U(rng) * 6.283f);
+            for (int i = 0; i < 8 + int(16 * P); i++) {
+                float a = U(rng) * 6.283f, sp = sq * (1.0f + 2.5f * U(rng)) * (0.6f + 0.7f * P);
+                add(c, V2{std::cos(a) * sp, std::sin(a) * sp - sq * 0.5f}, 0.45f + 0.35f * U(rng), sq * (0.025f + 0.05f * U(rng)), hex(0x1b1420), 0);
+            }
+        } else if (style == "cannon") {
+            for (int i = 0; i < 6 + int(8 * P); i++)
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.4f, 0}, V2{(U(rng) - 0.5f) * sq * 0.9f, -sq * (0.4f + 0.8f * U(rng))},
+                    1.0f + 0.8f * U(rng), sq * (0.22f + 0.2f * U(rng)), hex(0xe0dad0, 220), 2);
+            for (int i = 0; i < 10 + int(20 * P); i++) {
+                float a = -float(M_PI) * (0.05f + 0.9f * U(rng)), sp = sq * (1.0f + 2.5f * U(rng)) * (0.7f + 0.6f * P);
+                add(c, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.5f + 0.4f * U(rng), sq * (0.03f + 0.05f * U(rng)), shade(th.dark, -0.2f), 1);
+            }
+            for (int i = 0; i < int(20 * P) + 6; i++) {
+                float a = U(rng) * 6.283f, sp = sq * (2.0f + 3.0f * U(rng));
+                add(c, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.25f + 0.25f * U(rng), sq * 0.018f, hex(0xffd070), 3);
+            }
+        } else {   // debris
+            int n = 12 + int(18 * P);
+            for (int i = 0; i < n; i++) {
+                float a = U(rng) * 2 * float(M_PI), sp = sq * (0.6f + 1.6f * U(rng)) * (0.8f + 0.5f * P);
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, (U(rng) - 0.5f) * sq * 0.5f}, V2{std::cos(a) * sp, std::sin(a) * sp - sq * 1.2f},
+                    0.45f + 0.4f * U(rng), sq * (0.03f + 0.05f * U(rng)), shade(th.dark, (U(rng) - 0.5f) * 0.5f), 0);
+            }
+        }
+    }
+    bool update(float dt) override {
+        t += dt;
+        for (auto& p : ps) {
+            p.life += dt;
+            if (style == "space") continue;              // computed from the time in draw
+            float g = p.kind == 2 ? -sq * 0.3f : p.kind == 3 ? sq * 1.5f : sq * 5.0f;   // puffs rise slowly
+            p.v.y += g * dt;
+            if (p.kind == 2) p.v = p.v * (1 - 1.5f * dt);
+            p.p = p.p + p.v * dt;
+            p.ang += p.spin * dt;
+        }
+        return t < dur + 0.6f;
+    }
+    void draw(TextEngine&) override {
+        using namespace draw;
+        const float P = power;
+        const float k = std::clamp(t / dur, 0.0f, 1.0f);
+        if (style == "space") {
+            // flash and shock ring
+            float fl = std::exp(-t * 5);
+            circle(c, sq * (0.5f + 0.6f * P), hex(0xe8f4ff, uint8_t(240 * fl)), hex(0x9fdcff, 0), 0);
+            ring(c, sq * (0.3f + (1.2f + 1.3f * P) * ease_out_cubic(k)), sq * (0.05f + 0.04f * P) * (1 - k), hex(0x7fd0ff, uint8_t(240 * (1 - k))));
+            for (float a : rays) {
+                float l = sq * (0.8f + 1.4f * P) * (1 - k);
+                V2 d{std::cos(a), std::sin(a)};
+                line(c - d * l, c + d * l, sq * 0.03f * (1 - k), hex(0xffffff, uint8_t(200 * (1 - k))));
+            }
+            for (auto& p : ps) {
+                float u = std::clamp(p.life / p.max, 0.0f, 1.0f);
+                float a = p.v.x + u * (4 + 6 * P), rr = p.v.y * (1 - u) * (1 - u);     // spiral in
+                V2 q = c + V2{std::cos(a), std::sin(a) * 0.6f} * rr;
+                if (u < 1) {
+                    circle(q, p.size * 3 * (1 - u * 0.5f), with_alpha(p.c, 0.3f * (1 - u)), with_alpha(p.c, 0), 0);
+                    circle(q, p.size * 1.4f * (1 - u * 0.5f), with_alpha(p.c, 1 - u));
+                }
+            }
+            return;
+        }
+        if (style == "ink") {
+            float fl = std::exp(-t * 4);
+            if (fl > 0.02f) {   // a white starburst with an ink edge
+                std::vector<V2> star;
+                int n = 14;
+                float R = sq * (0.55f + 0.5f * P) * (0.8f + 0.4f * ease_out_cubic(std::min(1.0f, t * 6)));
+                for (int i = 0; i < 2 * n; i++) {
+                    float a = i * 3.14159f / n, rr = (i % 2 ? 0.45f : 1.0f) * R;
+                    star.push_back(c + V2{std::cos(a), std::sin(a)} * rr);
+                }
+                for (size_t i = 0; i < star.size(); i++) line(star[i], star[(i + 1) % star.size()], sq * 0.035f, hex(0x1b1420, uint8_t(255 * fl)));
+                poly_around(c, star, hex(0xffffff, uint8_t(255 * fl)));
+            }
+            for (float a : rays) {   // speed lines rushing out
+                V2 d{std::cos(a), std::sin(a)};
+                float r0 = sq * (0.5f + 1.6f * ease_out_cubic(k)), r1 = r0 + sq * (0.4f + 0.6f * P) * (1 - k);
+                line(c + d * r0, c + d * r1, sq * 0.03f * (1 - k) + 1, hex(0x1b1420, uint8_t(230 * (1 - k))));
+            }
+            ring(c, sq * (0.4f + (1.0f + P) * ease_out_cubic(k)), sq * 0.03f * (1 - k), hex(0x1b1420, uint8_t(200 * (1 - k))));
+        }
+        if (style == "cannon") {
+            float fl = std::exp(-t * 6);
+            circle(c, sq * (0.55f + 0.45f * P), hex(0xfff0b0, uint8_t(250 * fl)), hex(0xff7a20, 0), 0);
+        }
+        if (style == "stone" && P > 0.6f) {   // a shock ring of dust for the strong
+            ring(c, sq * (0.3f + 1.4f * ease_out_cubic(k)), sq * 0.05f * (1 - k), hex(0xd8c8a8, uint8_t(150 * (1 - k))));
+        }
+        for (auto& p : ps) {
+            if (p.life >= p.max) continue;
+            float u = p.life / p.max, a = 1 - u;
+            if (p.kind == 1) {   // a chunk: a small turning quad
+                std::vector<V2> q;
+                for (int i = 0; i < 4; i++) {
+                    float an = p.ang + i * 1.5708f + (i % 2) * 0.3f;
+                    q.push_back(p.p + V2{std::cos(an), std::sin(an)} * p.size * (i % 2 ? 0.8f : 1.1f));
+                }
+                poly_around(p.p, q, with_alpha(p.c, a));
+            } else if (p.kind == 2) {   // a puff: grows and fades
+                circle(p.p, p.size * (0.6f + 1.2f * u), with_alpha(p.c, 0.8f * a), with_alpha(p.c, 0), p.size);
+            } else if (p.kind == 3) {   // a spark: a short streak along its speed
+                line(p.p, p.p - p.v * 0.03f, std::max(1.0f, p.size), with_alpha(p.c, a));
+            } else {
+                circle(p.p, p.size, with_alpha(p.c, a));
+            }
+        }
+    }
+};
+
 // "+1" that floats up and fades.
 struct FloatText : Effect {
     V2 p; std::string s; Rgba c; float size, t = 0, dur = 1.0f;
@@ -2690,7 +2855,7 @@ public:
         dragging = false;
     }
     // A move was played (match already updated): animate it.
-    void on_move(Move m, int side, double now, FxLayer& fx, const Theme& theme, std::mt19937& rng) {
+    void on_move(Move m, int side, double now, FxLayer& fx, const Theme& theme, std::mt19937& rng, float power = 0.4f) {
         last = m;
         selected = -1;
         if (m == Move::none()) return;
@@ -2700,7 +2865,7 @@ public:
         face_left[m.to_sq()] = dx < -1 ? true : dx > 1 ? false : face_left[m.from_sq()];
         unit[m.to_sq()] = unit[m.from_sq()];          // (kept on from: an undo finds it there)
         unit_side[m.to_sq()] = unit_side[m.from_sq()];
-        fx.add(std::make_unique<Debris>(center(m.from_sq()), sq(), theme.dark, 18, rng));
+        fx.add(std::make_unique<Shatter>(center(m.from_sq()), sq(), theme, power, rng));
     }
 
     // The human's input; returns a move when one is made.
@@ -3223,6 +3388,7 @@ struct App {
     std::vector<Theme> themes;
     std::vector<SpriteDef> sprites;
     std::vector<PieceSet> piece_sets;     // assets/sprites/sets.json
+    std::string debug_fx;                 // --fx style,power (screenshots): a square breaks at the board's centre
     std::vector<AiSpec> roster;
     Settings settings;
     std::string setup_params;             // the AI whose settings box is open (new-game screen)
@@ -3622,7 +3788,10 @@ struct App {
         auto& g = game;
         const int side = g.match.to_move();
         g.match.play(m);
-        g.board.on_move(m, side, time, fx, game_theme(), rng);
+        // How hard the square breaks: the player's strength (Elo 600 → 0, 2250 → 1; the human: 0.6).
+        const Slot& sl = g.slot[side];
+        float power = sl.human() ? 0.6f : std::clamp((sl.spec->elo - 600) / 1650.0f, 0.0f, 1.0f);
+        g.board.on_move(m, side, time, fx, game_theme(), rng, power);
         if (m != Move::none()) {
             float q = g.board.sq();
             V2 c = g.board.center(m.to_sq());
@@ -4250,6 +4419,14 @@ void scene_game(App& a) {
 
     if (g.puzzle_mode) draw_image_background(a, g.puzzle.background, 70);
     else draw_background(a, false);
+    if (!a.debug_fx.empty()) {   // --fx: one square breaking, for screenshots of the effects
+        Theme th = a.game_theme();
+        size_t comma = a.debug_fx.find(',');
+        th.break_fx = a.debug_fx.substr(0, comma);
+        float pw = comma == std::string::npos ? 0.5f : std::stof(a.debug_fx.substr(comma + 1));
+        a.fx.add(std::make_unique<Shatter>(g.board.center(27), g.board.sq(), th, pw, a.rng));
+        a.debug_fx.clear();
+    }
     if (show_eval) draw_eval_bar(a, {g.board.area.x - frame - gap - bar_w, g.board.area.y, bar_w, B}, snap);
 
     // Board.
@@ -6722,6 +6899,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
     // Start scene (command line).
     std::string scene = arg_value(argc, argv, "--scene", "menu");
+    a->debug_fx = arg_value(argc, argv, "--fx");
     std::string black = arg_value(argc, argv, "--black"), white = arg_value(argc, argv, "--white");
     if (!black.empty()) a->settings.black = black;
     if (!white.empty()) a->settings.white = white;

@@ -28,5 +28,6 @@
   "planet size": 1.9,
   "planet top": 0.62,
   "embers": true,
-  "piece set": "legendes"
+  "piece set": "legendes",
+  "break fx": "stone"
 }
