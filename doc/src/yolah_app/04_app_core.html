@@ -264,7 +264,7 @@ a.settings.time_index = a.ui.segmented("time", box, TIME_LABELS, a.settings.time
 
 <h3><span class="n">18.4</span>A move on screen</h3>
 <p><code>on_move</code> remembers the move and its start time, sets when the hole must appear (0.08 s later), and throws debris. While <code>now &lt; t0 + 0.34</code>, the piece is drawn between the two squares with <code>ease_in_out_cubic</code>, lifted along a sine arc (<code>lift = sin(k·π)</code>), bigger and with a longer shadow, and playing its drawing's “move” animation if it has one.</p>
-<pre data-extract="void on_move(Move m, int side, double now, FxLayer& fx, const Theme& theme, std::mt19937& rng) {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="void on_move(Move m, int side, double now, FxLayer& fx, const Theme& theme, std::mt19937& rng, float power = 0.4f) {" data-file="app/yolah_app.cpp"></pre>
 </section>
 
 <section id="ai">
