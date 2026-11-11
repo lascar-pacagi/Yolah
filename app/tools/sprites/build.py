@@ -23,14 +23,18 @@ import manga
 import generals
 from models import scaled, SCALE
 _add_legends()
-import kaiju
-for _k, _f in kaiju.MANGA.items():           # the manga set: creatures and fighters (kaiju.py)
-    SCALE[_k] = kaiju.SCALE[_k[6:]]
+import shonen
+import epic
+for _k, _f in shonen.SHONEN.items():         # the manga set: one character per AI (shonen.py)
+    SCALE[_k] = shonen.SCALE[_k[6:]]
+    MODELS[_k] = scaled(_k, _f)
+for _k, _f in epic.EPIC.items():             # the Légendes set: one character per AI (epic.py)
+    SCALE[_k] = epic.SCALE[_k[4:]]
     MODELS[_k] = scaled(_k, _f)
 for _k, _f in generals.GENERALS.items():
     SCALE[_k] = 1.3
     MODELS[_k] = scaled(_k, _f)
-TOON = set(kaiju.MANGA)        # rendered in the manga style
+TOON = set(shonen.SHONEN)        # rendered in the manga style
 
 ART = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "art")
 SIZE = 192
@@ -45,7 +49,8 @@ NAMES = {"sentinel": "Sentinelle", "human": "Humain", "tin_toy": "Jouet m\u00e9c
 
 
 NAMES.update(legends.NAMES)
-NAMES.update(kaiju.NAMES)
+NAMES.update(shonen.NAMES)
+NAMES.update(epic.NAMES)
 NAMES.update(generals.NAMES)
 NAMES["human_legendes"] = "Humain (L\u00e9gendes)"
 
