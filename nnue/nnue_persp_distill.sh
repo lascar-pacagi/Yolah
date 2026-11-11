@@ -85,6 +85,8 @@
 #     REF_MODEL=$MODEL_ROOT/k8_them_g046_qat_ib4f_ref_az20/nnue_persp_k8_them_g046_qat_ib4f_ref_az20_distill.9.pt
 #                                                      → k8_them_g046_qat_ib4f_ref2_az20
 #   (the same for the control, from k8_them_g046_qat_ref_az20 → k8_them_g046_qat_ref2_az20)
+#   UNFREEZE=1 (with FROM_REF=1)     nothing frozen: every weight learns (factorised: the
+#                                      shared set too), suffix u → …_ref<tag>u_az20
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
 # space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
@@ -135,10 +137,12 @@ YOLAH_FC1_FACTOR="${YOLAH_FC1_FACTOR:-0}"
 if [[ "${P7}" == "1" ]]; then CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"; fi
 EVAL_MODEL="${EVAL_MODEL:-}"
 FROM_REF="${FROM_REF:-0}"
+UNFREEZE="${UNFREEZE:-0}"
 YOLAH_FREEZE=0
 if [[ "${FROM_REF}" == "1" ]]; then
     [[ "${SCRATCH}" != "1" ]] || { echo "FROM_REF=1 and SCRATCH=1 are exclusive" >&2; exit 1; }
-    P7=1; YOLAH_PERSP_K=8; YOLAH_PERSP_THEM=1; YOLAH_SPACE_GROUPS=0x46; YOLAH_QAT=1; YOLAH_FREEZE=1
+    P7=1; YOLAH_PERSP_K=8; YOLAH_PERSP_THEM=1; YOLAH_SPACE_GROUPS=0x46; YOLAH_QAT=1
+    if [[ "${UNFREEZE}" != "1" ]]; then YOLAH_FREEZE=1; fi
     CACHE_DIR="${P7_CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"
     INIT_MODEL="${REF_MODEL:-${SRC_DIR}/../models/nnue_persp_k8_them_g046_qat_scratch_az20_distill.pt}"
     YOLAH_NB_EPOCHS="${YOLAH_NB_EPOCHS:-10}"
@@ -194,7 +198,8 @@ if [[ "${YOLAH_FC1_FACTOR}" == "1" ]]; then
     WIDTH_SUFFIX="${WIDTH_SUFFIX}f"
 fi
 if [[ "${SCRATCH}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_scratch"; fi
-if [[ "${FROM_REF}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ref${REF_TAG:-}"; fi
+if [[ "${UNFREEZE}" == "1" && "${FROM_REF}" != "1" ]]; then echo "UNFREEZE=1 needs FROM_REF=1" >&2; exit 1; fi
+if [[ "${FROM_REF}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ref${REF_TAG:-}$([[ "${UNFREEZE}" == "1" ]] && echo u || true)"; fi
 if [[ "${P7}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
     if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
@@ -257,7 +262,7 @@ echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none} 
 echo "  Step 3   : P7=${P7}  from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
 echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}  input buckets=${YOLAH_INPUT_BUCKETS}  factorised=${YOLAH_FC1_FACTOR}"
 echo "  Layer 2  : ${YOLAH_L2_SIZE}  square=${YOLAH_L2_SQUARE}"
-echo "  Frozen   : from the reference=${FROM_REF}${REF_TAG:+ (tag ${REF_TAG})}  freeze (fc1 only)=${YOLAH_FREEZE}"
+echo "  Frozen   : from the reference=${FROM_REF}${REF_TAG:+ (tag ${REF_TAG})}  freeze (fc1 only)=${YOLAH_FREEZE}  unfreeze=${UNFREEZE}"
 echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
 
