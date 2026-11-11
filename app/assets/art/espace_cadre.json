@@ -1,0 +1,15 @@
+{
+  "name": "Espace : cadre",
+  "kind": "frame",
+  "size": 96,
+  "smooth": true,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 4,
+      "loop": true,
+      "frames": 8
+    }
+  ]
+}

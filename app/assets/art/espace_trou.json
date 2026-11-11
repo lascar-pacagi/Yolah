@@ -1,0 +1,21 @@
+{
+  "name": "Espace : vortex",
+  "kind": "hole",
+  "size": 128,
+  "smooth": true,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 10,
+      "loop": true,
+      "frames": 16
+    },
+    {
+      "name": "open",
+      "fps": 24,
+      "loop": false,
+      "frames": 10
+    }
+  ]
+}

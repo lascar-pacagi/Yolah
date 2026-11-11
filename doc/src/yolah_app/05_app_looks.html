@@ -36,6 +36,12 @@
 </table></div>
 <p>Each square also gets a small bevel (lighter top-left edges, darker bottom-right) that makes the board look carved; <code>seed</code> changes the random pattern, <code>pattern strength</code> its contrast. In the workshop, while a square colour is being changed, the texture is rebuilt at most five times a second.</p>
 <pre data-extract="SDL_Texture* make_board_texture(const Theme& t, int px) {" data-file="app/yolah_app.cpp" data-max="22"></pre>
+
+<h3><span class="n">20.2</span>Sceneries: a picture, a planet, stars</h3>
+<p>A theme can replace the window's gradient by a <strong>scenery</strong>: <code>"background image"</code> (a picture of <code>assets/backgrounds</code>, covering every scene), <code>"planet image"</code> drawn under the board so that the board stands on its top (<code>"planet size"</code>: its diameter in board widths, <code>"planet top"</code>: its top in board heights from the board's top edge), and <code>"stars": true</code>, stars drawn by code over the picture. The space theme (<code>7_espace.json</code>) uses all three. The pictures are loaded once by <code>scenery_texture</code>.</p>
+<p>The stars are not stored: star <em>i</em> takes its place, size, colour and twinkling pace from <code>hash2(i, …)</code>, so they are the same at every frame with no array to keep. A shooting star follows the same idea: the time is cut in periods of 9 seconds; period <em>k</em> hashes <em>k</em> to choose its line, and only its first 0.9 seconds show a streak.</p>
+<pre data-extract="void draw_star_field(Box b, double time, float s) {" data-file="app/yolah_app.cpp" data-max="30"></pre>
+<p>Over a bright planet, the board's soft shadow showed a pale band under the frame (the shadow is drawn as a blurred ring around a box, the box itself left to the board above it, and the shadow is shifted down): with a planet, the board has no shadow.</p>
 </section>
 
 <section id="sprites">
@@ -45,6 +51,7 @@
 
 <div class="tablewrap"><table>
 <tr><th>Kind</th><th>In the JSON</th><th>Drawing</th></tr>
+<tr><td>figurine</td><td><code>"art": "fig_&lt;name&gt;"</code> (a rendered drawing, section 22.6)</td><td>the figure on its base, standing above its square, its own shadow; the white side's drawing for White; mirrored after a move to the left</td></tr>
 <tr><td>picture</td><td><code>"image": "file.png"</code></td><td>the PNG, scaled to the stone</td></tr>
 <tr><td>workshop drawing</td><td>(automatic) id <code>art:&lt;id&gt;</code>, category “Mes dessins”</td><td>its pixel-art animation (idle, move, blocked, win), on the stone of its side or alone</td></tr>
 <tr><td>classic stone</td><td><code>"style": "go" | "flat" | "checkers" | "glass" | "marble"</code></td><td>a black or white stone without any sign</td></tr>
@@ -83,7 +90,7 @@
     <text class="xs c" x="0" y="96">6 tier pips</text>
   </g>
 </svg>
-<figcaption>Drawn back to front by <code>draw_piece</code>. The human player also gets a pulsing halo, whatever the sprite, so that one's own pieces stay recognisable.</figcaption>
+<figcaption>Drawn back to front by <code>draw_piece</code>. A sprite can ask for a pulsing halo (<code>"halo": true</code>); the human player no longer gets one by force: the figurines tell who is who.</figcaption>
 </figure>
 
 <pre data-extract="void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0," data-file="app/yolah_app.cpp"></pre>
@@ -167,6 +174,20 @@ int px = int(std::floor((a.in.mouse.x - canvas.x) / cell)), py = int(std::floor(
 </section>
 
 <section id="fx">
+<h3><span class="n">22.6</span>Rendered drawings and figurines</h3>
+<p>The figurines of the players and the space theme's squares, holes and frame are drawings too, but <strong>rendered</strong> rather than drawn: <code>"smooth": true</code> in their JSON. They are made by the scripts of <code>app/tools/sprites</code> (Python and PyTorch, on the GPU):</p>
+<div class="tablewrap"><table>
+<tr><th>File</th><th>Role</th></tr>
+<tr><td><code>render.py</code></td><td>a small renderer: shapes as signed distance functions (spheres, rounded boxes, capsules, tori...), each with a transform and a material; sphere tracing from an orthographic camera looking down at 32°; a warm key light with soft shadows, a cool fill, a rim light, ambient occlusion, GGX highlights, a studio environment for the metals, glass, emissive parts with bloom, a ground plane that keeps only the contact shadow; rendered twice larger and averaged down</td></tr>
+<tr><td><code>models.py</code></td><td>the characters: <code>model(anim, t, side)</code> builds the scene of one frame (the human's face with its eyes, lids, brows and mouth; one robot per AI, from a wind-up tin toy to an energy core)</td></tr>
+<tr><td><code>build.py</code></td><td>renders idle (16 frames), move (8), blocked (12) and win (16) for both sides into <code>assets/art/fig_&lt;name&gt;[_blanc]</code></td></tr>
+<tr><td><code>space.py</code></td><td>the space theme: background, planet, squares, vortex hole, frame</td></tr>
+<tr><td><code>preview.py</code>, <code>closeup.py</code>, <code>gallery.py</code></td><td>contact sheets for checking a model</td></tr>
+</table></div>
+<p>On screen, a smooth drawing uses a <strong>linear</strong> filter, and a chain of textures each half the size of the previous one: a 192-pixel frame drawn on 70 pixels with a linear filter would read only 4 of the source pixels around each screen pixel and skip the others, so details would flicker as the figure moves (aliasing). <code>draw_art</code> takes the smallest level still at least as large as the box, the classic <em>mipmap</em> (SDL's renderer does not make them). The halving averages with premultiplied alpha, otherwise the transparent pixels' colour would leak in as a dark fringe.</p>
+<pre data-extract="void draw_art(Art& art, const std::string& n, double t, Box b, float alpha = 1, bool flip_h = false) {" data-file="app/yolah_app.cpp"></pre>
+<p>A figurine stands above its square: its JSON gives <code>"box"</code> (its size in squares) and <code>"anchor"</code> (the point of the frame placed at the square's centre: the middle of the base's top). The board draws the pieces from the top of the screen to the bottom, so a figure overlaps the one behind it, and each piece remembers whether its last move went left (<code>face_left</code>): the drawing is then mirrored. White uses the drawing named by <code>"white"</code>; that one carries <code>"variant of"</code> so that the lists do not offer it alone. Outside a board (panels, lists, the picker), the whole figurine is shrunk around the given centre. The workshop does not list smooth drawings: they are not pixel art.</p>
+
 <h2><span class="n">23</span>Animations and effects (<code>@@FX</code>)</h2>
 <p>Two kinds of motion. <strong>Tweens</strong> compute a value from the time elapsed since a start, through an easing curve: the sliding piece, a hole growing in, the cards fading in, the evaluation bar eased towards its target. <strong>Effects</strong> are small objects with a life of their own, kept in an <code>FxLayer</code>:</p>
 <pre data-extract="struct Effect {" data-file="app/yolah_app.cpp"></pre>

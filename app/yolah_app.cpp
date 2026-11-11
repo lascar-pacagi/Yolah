@@ -1241,6 +1241,13 @@ struct Theme {
     // Drawings of the workshop (@@ART ids, "" = none): the light and dark
     // squares, the holes and the frame, instead of the procedural ones.
     std::string tile_light, tile_dark, hole_art, frame_art;
+    // A scenery (assets/backgrounds): a picture behind every scene instead of
+    // the gradient, a planet under the board (its diameter in board widths,
+    // its top in board heights from the board's top), twinkling stars and
+    // shooting stars drawn over the picture.
+    std::string bg_image, planet_image;
+    float planet_size = 2.4f, planet_top = 0.6f;
+    bool stars = false;
     std::string file;        // its file in assets/themes (the board editor rewrites it)
 };
 
@@ -1270,6 +1277,11 @@ Theme parse_theme(const json& j) {
     t.tile_dark = jstr(j, "tile dark");
     t.hole_art = jstr(j, "hole art");
     t.frame_art = jstr(j, "frame art");
+    t.bg_image = jstr(j, "background image");
+    t.planet_image = jstr(j, "planet image");
+    t.planet_size = jnum(j, "planet size", t.planet_size);
+    t.planet_top = jnum(j, "planet top", t.planet_top);
+    t.stars = j.value("stars", false);
     return t;
 }
 json theme_to_json(const Theme& t) {
@@ -1284,6 +1296,13 @@ json theme_to_json(const Theme& t) {
     if (!t.tile_dark.empty()) j["tile dark"] = t.tile_dark;
     if (!t.hole_art.empty()) j["hole art"] = t.hole_art;
     if (!t.frame_art.empty()) j["frame art"] = t.frame_art;
+    if (!t.bg_image.empty()) j["background image"] = t.bg_image;
+    if (!t.planet_image.empty()) {
+        j["planet image"] = t.planet_image;
+        j["planet size"] = t.planet_size;
+        j["planet top"] = t.planet_top;
+    }
+    if (t.stars) j["stars"] = true;
     return j;
 }
 
@@ -1301,6 +1320,58 @@ std::vector<Theme> load_themes(const fs::path& dir) {
     // "order" in the files would be nicer; the file names start with a number.
     if (themes.empty()) themes.push_back(Theme{});
     return themes;
+}
+
+// The pictures of the themes' sceneries (assets/backgrounds), loaded once.
+SDL_Texture* scenery_texture(const std::string& file) {
+    static std::map<std::string, SDL_Texture*> cache;
+    if (file.empty()) return nullptr;
+    auto it = cache.find(file);
+    if (it != cache.end()) return it->second;
+    SDL_Texture* tex = nullptr;
+    int w, h, n;
+    fs::path p = g_paths.assets / "backgrounds" / file;
+    if (unsigned char* px = stbi_load(p.string().c_str(), &w, &h, &n, 4)) {
+        tex = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w, h);
+        SDL_UpdateTexture(tex, nullptr, px, w * 4);
+        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_LINEAR);
+        stbi_image_free(px);
+    } else {
+        SDL_Log("scenery picture not loaded: %s", p.string().c_str());
+    }
+    return cache[file] = tex;
+}
+
+// Stars over a scenery: fixed places, each twinkling at its own pace, a few
+// coloured; now and then a shooting star crosses the top of the window.
+void draw_star_field(Box b, double time, float s) {
+    using namespace draw;
+    for (int i = 0; i < 160; i++) {
+        float x = b.x + b.w * hash2(i, 1, 91), y = b.y + b.h * hash2(i, 2, 91);
+        float size = (0.6f + 1.6f * std::pow(hash2(i, 3, 91), 4.0f)) * s;
+        float tw = 0.55f + 0.45f * float(std::sin(time * (0.7 + 2.3 * hash2(i, 4, 91)) + 6.28 * hash2(i, 5, 91)));
+        float hue = hash2(i, 6, 91);
+        Rgba c = hue < 0.15f ? hex(0xffd9a8) : hue < 0.3f ? hex(0xa8c8ff) : hex(0xffffff);
+        circle({x, y}, size * 2.5f, with_alpha(c, 0.25f * tw), with_alpha(c, 0), 0);
+        circle({x, y}, size, with_alpha(c, 0.9f * tw));
+    }
+    // A shooting star every 9 s, for 0.9 s, along a line that changes each time.
+    const double period = 9.0, life = 0.9;
+    int k = int(time / period);
+    double u = (time - k * period) / life;
+    if (u < 1) {
+        float x0 = b.x + b.w * (0.15f + 0.6f * hash2(k, 7, 17)), y0 = b.y + b.h * (0.05f + 0.25f * hash2(k, 8, 17));
+        V2 dir = normalized(V2{0.8f + 0.4f * hash2(k, 9, 17), 0.35f + 0.3f * hash2(k, 10, 17)});
+        float len = 260 * s, e = float(ease_out_cubic(float(u)));
+        V2 head = V2{x0, y0} + dir * (e * 520 * s);
+        float fade = float(std::sin(u * M_PI));
+        for (int j = 0; j < 12; j++) {
+            float a0 = j / 12.0f, a1 = (j + 1) / 12.0f;
+            line(head - dir * (len * a0), head - dir * (len * a1), (2.2f - 1.8f * a0) * s, hex(0xffffff, uint8_t(220 * fade * (1 - a0))));
+        }
+        circle(head, 3.5f * s, hex(0xdff0ff, uint8_t(230 * fade)), hex(0x9fd0ff, 0), 0);
+    }
 }
 
 // The 8 × 8 squares of a theme as one texture of px × px pixels, computed
@@ -1412,6 +1483,7 @@ std::vector<SpriteDef> load_sprites(const fs::path& file) {
             s.halo = e.value("halo", false);
             s.halo_color = jcolor(e, "halo color", s.halo_color);
             s.style = jstr(e, "style");
+            s.art = jstr(e, "art");      // a drawing of assets/art (a rendered figurine)
             if (!s.image.empty()) {
                 int w, h, n;
                 fs::path p = file.parent_path() / s.image;
@@ -1728,6 +1800,16 @@ void draw_emblem(const std::string& e, V2 c, float s, Rgba col, Rgba under = {0,
 // On screen the frames are drawn from one texture with SDL_SCALEMODE_NEAREST:
 // each pixel becomes a crisp square, whatever the zoom (pixel art blurred by
 // a linear filter looks wrong).
+//
+// Rendered drawings ("smooth": true, made by app/tools/sprites, up to 512
+// pixels): drawn with a linear filter from a chain of halved textures (the
+// level closest to the size on screen, so no shimmering when they are much
+// smaller than their pixels). They are not edited in the workshop. A piece
+// of this kind is a figurine: "box" = its size in squares, "anchor" = the
+// point of the frame placed at the centre of its square (the figure stands
+// above it), it carries its own shadow; "white" = the drawing used for the
+// white side (the black one is this one), "variant of" marks such a drawing
+// (not offered on its own).
 struct ArtKind {
     const char* id;
     const char* label;
@@ -1764,8 +1846,12 @@ struct Art {
     std::string id, name = "Nouveau dessin", kind = "piece";
     int size = 32;
     bool on_stone = true;          // a piece: drawn on the stone of its side (black or white)
+    bool smooth = false;           // rendered: linear filter, halved levels (see above)
+    float box = 1.0f, ax = 0.5f, ay = 0.5f;   // a figurine: size in squares, anchor in the frame
+    std::string white, variant_of; // the white side's drawing; the drawing this one is a variant of
     std::vector<ArtAnim> anims;
     SDL_Texture* tex = nullptr;    // the frames, rebuilt when `dirty`
+    std::vector<SDL_Texture*> levels;   // smooth: the sheet halved 1, 2, ... times
     bool dirty = true;
     int cols = 1;                  // frames per row in the texture
 
@@ -1797,7 +1883,37 @@ struct Art {
         tex = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, cols * size, rows * size);
         SDL_UpdateTexture(tex, nullptr, sheet.data(), cols * size * int(sizeof(Pixel)));
         SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-        SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureScaleMode(tex, smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+        for (SDL_Texture* l : levels) SDL_DestroyTexture(l);
+        levels.clear();
+        if (smooth) {   // halve while the frames stay even and larger than 16 pixels
+            int w = cols * size, h = rows * size, fs = size;
+            std::vector<Pixel> cur = std::move(sheet);
+            while (fs % 2 == 0 && fs / 2 >= 16) {
+                int w2 = w / 2, h2 = h / 2;
+                std::vector<Pixel> nx(size_t(w2) * h2);
+                for (int y = 0; y < h2; y++)
+                    for (int x = 0; x < w2; x++) {
+                        // average of 4 pixels with premultiplied alpha (no dark fringes)
+                        float r = 0, g = 0, b = 0, al = 0;
+                        for (int k = 0; k < 4; k++) {
+                            Rgba c = unpack(cur[size_t(2 * y + k / 2) * w + 2 * x + k % 2]);
+                            float aa = c.a / 255.0f;
+                            r += c.r * aa; g += c.g * aa; b += c.b * aa; al += aa;
+                        }
+                        Rgba o{0, 0, 0, 0};
+                        if (al > 0) o = {uint8_t(r / al + 0.5f), uint8_t(g / al + 0.5f), uint8_t(b / al + 0.5f), uint8_t(al / 4 * 255 + 0.5f)};
+                        nx[size_t(y) * w2 + x] = pack(o);
+                    }
+                SDL_Texture* lt = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w2, h2);
+                SDL_UpdateTexture(lt, nullptr, nx.data(), w2 * int(sizeof(Pixel)));
+                SDL_SetTextureBlendMode(lt, SDL_BLENDMODE_BLEND);
+                SDL_SetTextureScaleMode(lt, SDL_SCALEMODE_LINEAR);
+                levels.push_back(lt);
+                cur = std::move(nx);
+                w = w2; h = h2; fs /= 2;
+            }
+        }
         dirty = false;
     }
     // The frame of animation `n` shown `t` seconds after it started (its row
@@ -1834,8 +1950,18 @@ void draw_art(Art& art, const std::string& n, double t, Box b, float alpha = 1, 
     auto src = art.frame_rect(n, t);
     if (!src) return;
     SDL_FRect dst = b.frect();
-    SDL_SetTextureAlphaModFloat(art.tex, alpha);
-    SDL_RenderTextureRotated(draw::R, art.tex, &*src, &dst, 0, nullptr, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+    SDL_Texture* tex = art.tex;
+    if (art.smooth) {   // the smallest level still at least as large as the box
+        float k = 1;
+        for (SDL_Texture* l : art.levels) {
+            if (art.size * k * 0.5f < b.w * 0.95f) break;
+            tex = l;
+            k *= 0.5f;
+        }
+        src = SDL_FRect{src->x * k, src->y * k, src->w * k, src->h * k};
+    }
+    SDL_SetTextureAlphaModFloat(tex, alpha);
+    SDL_RenderTextureRotated(draw::R, tex, &*src, &dst, 0, nullptr, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
 // A board frame: the drawing cut in 3 × 3 (SDL_RenderTexture9Grid): the
 // corners keep their shape, the edges stretch along the frame, the centre
@@ -1861,8 +1987,16 @@ bool load_art(const std::string& id, Art& out) {
     out.id = id;
     out.name = jstr(j, "name", id);
     out.kind = jstr(j, "kind", "piece");
-    out.size = std::clamp(int(jnum(j, "size", 32)), 4, 128);
+    out.smooth = j.value("smooth", false);
+    out.size = std::clamp(int(jnum(j, "size", 32)), 4, out.smooth ? 512 : 128);
     out.on_stone = j.value("on stone", true);
+    out.box = jnum(j, "box", 1.0f);
+    if (j.contains("anchor") && j["anchor"].is_array() && j["anchor"].size() == 2) {
+        out.ax = j["anchor"][0].get<float>();
+        out.ay = j["anchor"][1].get<float>();
+    }
+    out.white = jstr(j, "white");
+    out.variant_of = jstr(j, "variant of");
     int w = 0, h = 0, n = 0;
     unsigned char* px = stbi_load((art_dir() / (id + ".png")).string().c_str(), &w, &h, &n, 4);
     if (j.contains("animations") && j["animations"].is_array()) {
@@ -1926,11 +2060,12 @@ void load_all_arts() {
         if (load_art(id, *art)) g_arts[id] = std::move(art);
     }
 }
-// The drawings of a kind, by name.
-std::vector<Art*> arts_of(const std::string& kind) {
+// The drawings of a kind, by name (smooth_too: also the rendered ones, which
+// the workshop does not edit; never the white variants).
+std::vector<Art*> arts_of(const std::string& kind, bool smooth_too = true) {
     std::vector<Art*> v;
     for (auto& [id, a] : g_arts)
-        if (a->kind == kind) v.push_back(a.get());
+        if (a->kind == kind && (smooth_too || !a->smooth) && a->variant_of.empty()) v.push_back(a.get());
     std::sort(v.begin(), v.end(), [](Art* x, Art* y) { return x->name < y->name; });
     return v;
 }
@@ -1938,8 +2073,8 @@ std::vector<Art*> arts_of(const std::string& kind) {
 // "Mes dessins"): the sprite picker, the themes scene and the puzzles use
 // them like the others.
 void register_art_sprites(std::vector<SpriteDef>& sprites) {
-    sprites.erase(std::remove_if(sprites.begin(), sprites.end(), [](const SpriteDef& sp) { return !sp.art.empty(); }), sprites.end());
-    for (Art* a : arts_of("piece")) {
+    sprites.erase(std::remove_if(sprites.begin(), sprites.end(), [](const SpriteDef& sp) { return sp.id.rfind("art:", 0) == 0; }), sprites.end());
+    for (Art* a : arts_of("piece", false)) {
         SpriteDef sp;
         sp.id = "art:" + a->id;
         sp.name = a->name;
@@ -2004,19 +2139,35 @@ void draw_plain_stone(const std::string& style, int side, V2 c, float r, float a
 // Draws a piece of `side` with sprite `sp`, centred at c, radius r.
 // lift: 0 on the board, up to 1 when picked up (bigger, higher shadow).
 // time: seconds, for the halo's pulse.
-// halo: force the pulsing halo (the human player, whatever the sprite).
+// halo: no longer used (the sprites tell who is who; a sprite can still ask
+// for a halo in sprites.json).
 // state, state_t: a drawing of the workshop plays its animation `state`
 // ("idle", "move", "blocked", "win"), started `state_t` seconds ago (the
 // other sprites ignore them).
 void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1, bool halo = false,
-                const char* state = "idle", double state_t = -1) {
+                const char* state = "idle", double state_t = -1, bool flip = false) {
     using namespace draw;
     r *= 1 + 0.08f * lift;
     Art* art = sp.art.empty() ? nullptr : find_art(sp.art);
+    if (art && art->smooth) {   // a rendered figurine: its own base and shadow, the white side's drawing
+        Art* drawn = art;
+        if (side == WHITE && !art->white.empty())
+            if (Art* w = find_art(art->white)) drawn = w;
+        float size = 2.5f * r * art->box;      // r = 0.4 square
+        float ay = art->ay;
+        if (state_t < 0) {   // not on a board (panels, lists, the picker): the whole figurine around c
+            size *= 0.72f;
+            ay = 0.6f;
+        }
+        Box b{c.x - size * (flip ? 1 - art->ax : art->ax), c.y - size * ay, size, size};
+        draw_art(*drawn, state, state_t >= 0 ? state_t : time, b, alpha, flip);
+        return;
+    }
     // Shadow.
     float soff = r * (0.10f + 0.25f * lift);
     circle(c + V2{soff * 0.4f, soff}, r * (1.0f + 0.05f * lift), hex(0x000000, uint8_t(110 * alpha)), hex(0x000000, 0), r * 0.35f);
-    if (sp.halo || halo) {
+    (void)halo;
+    if (sp.halo) {
         float p = 0.5f + 0.5f * float(std::sin(time * 3.0));
         ring(c, r * (1.18f + 0.05f * p), r * 0.10f, with_alpha(sp.halo_color, (0.35f + 0.35f * p) * alpha));
     }
@@ -2384,6 +2535,7 @@ public:
     V2 press_pos;
     struct MoveAnim { bool active = false; Move m = Move::none(); int side = BLACK; double t0 = 0, dur = 0.34; } anim;
     std::array<double, 64> hole_since{};   // time each hole appeared (for its animation)
+    std::array<bool, 64> face_left{};      // the piece on this square looks left (its last move went left)
     Move last = Move::none();
     int hover_sq = -1;
 
@@ -2404,6 +2556,7 @@ public:
     void reset() {
         anim = {};
         hole_since.fill(-100);
+        face_left.fill(false);
         last = Move::none();
         selected = drag_from = -1;
         dragging = false;
@@ -2415,6 +2568,8 @@ public:
         if (m == Move::none()) return;
         anim = {true, m, side, now, 0.34};
         hole_since[m.from_sq()] = now + 0.08;
+        float dx = center(m.to_sq()).x - center(m.from_sq()).x;     // on screen (the board may be flipped)
+        face_left[m.to_sq()] = dx < -1 ? true : dx > 1 ? false : face_left[m.from_sq()];
         fx.add(std::make_unique<Debris>(center(m.from_sq()), sq(), theme.dark, 18, rng));
     }
 
@@ -2467,9 +2622,15 @@ public:
     void draw(TextEngine& text, BoardTextures& textures, const Theme& t, const Yolah& pos, const Look& look, double now, float s) {
         using namespace draw;
         const float q = sq();
+        // The theme's planet, under the board (the board stands on its top).
+        if (SDL_Texture* pl = scenery_texture(t.planet_image)) {
+            float size = area.w * t.planet_size;
+            SDL_FRect dst{area.center().x - size / 2, area.y + area.h * t.planet_top, size, size};
+            SDL_RenderTexture(R, pl, nullptr, &dst);
+        }
         // Frame and shadow.
         Box frame = area.inset(-26 * s);
-        shadow({frame.x, frame.y + 14 * s, frame.w, frame.h}, 22 * s, 46 * s, hex(0x000000, 150));
+        if (t.planet_image.empty()) shadow({frame.x, frame.y + 14 * s, frame.w, frame.h}, 22 * s, 46 * s, hex(0x000000, 150));
         if (Art* fa = t.frame_art.empty() ? nullptr : find_art(t.frame_art)) {
             draw_art_frame(*fa, now, frame, 26 * s);
         } else {
@@ -2546,15 +2707,20 @@ public:
                 }
             return true;
         };
+        // From the top of the screen to the bottom: figurines standing above
+        // their square overlap the ones behind them.
+        std::vector<std::pair<int, int>> pieces;      // (square, side)
         for (int side : {BLACK, WHITE}) {
             uint64_t bb = pos.bitboard(side);
-            for (int s2 = 0; s2 < 64; s2++) {
-                if (!(bb >> s2 & 1)) continue;
-                if (anim.active && now < anim.t0 + anim.dur && s2 == anim.m.to_sq()) continue;
-                if (dragging && s2 == drag_from) continue;
-                const char* st = look.winner == side ? "win" : blocked(s2) ? "blocked" : "idle";
-                draw_piece(*look.sprite[side], side, center(s2), q * 0.4f, 0, now, 1, look.halo[side], st, now + s2 * 0.29);
-            }
+            for (int s2 = 0; s2 < 64; s2++)
+                if (bb >> s2 & 1) pieces.push_back({s2, side});
+        }
+        std::sort(pieces.begin(), pieces.end(), [&](auto& x, auto& y) { return center(x.first).y < center(y.first).y; });
+        for (auto [s2, side] : pieces) {
+            if (anim.active && now < anim.t0 + anim.dur && s2 == anim.m.to_sq()) continue;
+            if (dragging && s2 == drag_from) continue;
+            const char* st = look.winner == side ? "win" : blocked(s2) ? "blocked" : "idle";
+            draw_piece(*look.sprite[side], side, center(s2), q * 0.4f, 0, now, 1, look.halo[side], st, now + s2 * 0.29, face_left[s2]);
         }
         // Principal variation: numbered faint arrows.
         for (size_t i = 0; i < look.pv.size() && i < 6; i++) {
@@ -2585,11 +2751,12 @@ public:
             V2 a = center(anim.m.from_sq()), b = center(anim.m.to_sq());
             V2 p = a + (b - a) * k;
             float lift = std::sin(k * float(M_PI));
-            draw_piece(*look.sprite[anim.side], anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now, 1, look.halo[anim.side], "move", now - anim.t0);
+            draw_piece(*look.sprite[anim.side], anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now, 1, look.halo[anim.side], "move", now - anim.t0,
+                       face_left[anim.m.to_sq()]);
         }
         // The dragged piece follows the mouse.
         if (dragging && drag_from >= 0 && (pos.bitboard(me) >> drag_from & 1))
-            draw_piece(*look.sprite[me], me, drag_pos, q * 0.4f, 1, now, 1, look.halo[me]);
+            draw_piece(*look.sprite[me], me, drag_pos, q * 0.4f, 1, now, 1, look.halo[me], "move", now, drag_pos.x < center(drag_from).x - 2);
     }
     V2 drag_pos;
 
@@ -3155,7 +3322,7 @@ struct App {
     const SpriteDef& player_sprite(const std::string& who) const {
         auto it = assigned.find(who);
         if (it != assigned.end() && has_sprite(it->second)) return sprite(it->second);
-        if (who == "human") return sprite("human");
+        if (who == "human") return sprite(has_sprite("fig_human") ? "fig_human" : "human");
         const AiSpec* sp = ai(who);
         return sprite(sp ? sp->sprite : who);
     }
@@ -3293,6 +3460,16 @@ std::string goal_text(const App& a, const Puzzle& p);
 // Drawn behind every scene: the theme's gradient, a vignette, faint shapes.
 void draw_background(App& a, bool decorated = true) {
     const Theme& t = a.theme();
+    if (SDL_Texture* tex = scenery_texture(t.bg_image)) {   // a scenery: its picture, its stars
+        float tw, th;
+        SDL_GetTextureSize(tex, &tw, &th);
+        float k = std::max(a.w / tw, a.h / th);
+        SDL_FRect dst{(a.w - tw * k) / 2, (a.h - th * k) / 2, tw * k, th * k};
+        SDL_RenderTexture(a.renderer, tex, nullptr, &dst);
+        if (t.stars) draw_star_field({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 60);
+        return;
+    }
     draw::gradient_rect({0, 0, float(a.w), float(a.h)}, t.bg_top, t.bg_bottom);
     if (decorated) {
         for (int i = 0; i < 5; i++) {
@@ -3892,8 +4069,7 @@ void scene_game(App& a) {
         int sb = g.match.score(BLACK), sw = g.match.score(WHITE);
         look.winner = sb > sw ? BLACK : sw > sb ? WHITE : -1;
     }
-    look.halo[BLACK] = g.slot[BLACK].human();
-    look.halo[WHITE] = g.slot[WHITE].human();
+    // (No forced halo for the human any more: the sprites tell who is who.)
     look.coords = a.settings.show_coords;
     look.human_turn = human_turn;
     if (fresh && !g.board.animating(a.time) && !g.match.over()) {
@@ -4061,7 +4237,7 @@ void scene_themes(App& a) {
     Box gal{area.right() + 50 * s, 140 * s, a.w - area.right() - 110 * s, a.h - 180 * s};
     a.ui.panel(gal);
     a.text.draw(Font::Black, 22 * s, "Sprites des joueurs", {gal.x + 22 * s, gal.y + 18 * s}, pal::text);
-    a.text.paragraph(Font::Regular, 14 * s, strf("Cliquez sur un joueur pour lui choisir un sprite parmi les %zu de la biblioth\xC3\xA8que, dont vos dessins de l'atelier (\xC2\xAB Mes dessins \xC2\xBB). Le joueur humain garde toujours son halo bleu.", a.sprites.size()),
+    a.text.paragraph(Font::Regular, 14 * s, strf("Cliquez sur un joueur pour lui choisir un sprite parmi les %zu de la biblioth\xC3\xA8que, dont vos dessins de l'atelier (\xC2\xAB Mes dessins \xC2\xBB).", a.sprites.size()),
                      {gal.x + 22 * s, gal.y + 52 * s, gal.w - 44 * s, 60 * s}, pal::dim);
     std::vector<std::pair<std::string, std::string>> players = {{"human", "Joueur humain"}};
     for (auto& ai : a.roster) players.push_back({ai.id, ai.name});
@@ -4192,7 +4368,7 @@ const std::vector<Lesson>& lessons() {
         Lesson l;
         l = {};
         l.title = "Bienvenue dans Yolah !";
-        l.text = "Yolah se joue \xC3\xA0 deux sur un plateau de 8 \xC3\x97 8 cases. Tu joues les Noirs : tes pions portent une \xC3\xA9toile et un halo bleu. L'adversaire joue les Blancs. Chaque camp a 4 pions, et les Noirs commencent toujours.";
+        l.text = "Yolah se joue \xC3\xA0 deux sur un plateau de 8 \xC3\x97 8 cases. Tu joues les Noirs : tes pions sont noirs, ou pos\xC3\xA9s sur un socle noir. L'adversaire joue les Blancs. Chaque camp a 4 pions, et les Noirs commencent toujours.";
         l.task = "Rep\xC3\xA8re tes 4 pions, puis clique sur Continuer.";
         v.push_back(l);
 
@@ -4492,7 +4668,6 @@ void scene_tutorial(App& a) {
     BoardView::Look look;
     look.sprite[BLACK] = &a.player_sprite("human");
     look.sprite[WHITE] = &a.player_sprite("monte_carlo");
-    look.halo[BLACK] = true;
     look.human_turn = human_turn;
     look.coords = true;
     if (t.hint && human_turn && t.hint_move != Move::none()) { look.hint = t.hint_move; look.hint_label = "indice"; }
@@ -5087,7 +5262,6 @@ void scene_editor(App& a) {
     BoardView::Look look;
     look.sprite[BLACK] = &sb;
     look.sprite[WHITE] = &sw;
-    look.halo[p.human] = true;
     look.hole_style = p.hole_style;
     look.tiles = &p.tiles;
     look.decor = &p.decor;
@@ -5615,9 +5789,9 @@ void studio_drawings(App& a) {
     const float s = a.s;
     auto& st = a.studio;
     if (!st.loaded) {
-        auto all = arts_of("piece");
+        auto all = arts_of("piece", false);
         if (all.empty())
-            for (auto& k : ART_KINDS) { auto v = arts_of(k.id); if (!v.empty()) { all = v; break; } }
+            for (auto& k : ART_KINDS) { auto v = arts_of(k.id, false); if (!v.empty()) { all = v; break; } }
         if (!all.empty()) studio_open(a, all.front()->id);
         else studio_new(a, "piece", 32);
     }
@@ -5643,7 +5817,7 @@ void studio_drawings(App& a) {
     std::string open_id;
     draw::clip(&list);
     for (auto& k : ART_KINDS) {
-        auto v = arts_of(k.id);
+        auto v = arts_of(k.id, false);
         a.text.draw(Font::Bold, 13 * s, strf("%s (%zu)", k.label, v.size()), {list.x + 6 * s, y + 6 * s}, a.theme().accent);
         y += 28 * s;
         for (Art* x : v) {
@@ -6110,7 +6284,6 @@ void studio_boards(App& a) {
     BoardView::Look look;
     look.sprite[BLACK] = &a.player_sprite("human");
     look.sprite[WHITE] = &a.player_sprite("dev");
-    look.halo[BLACK] = true;
     st.board.draw(a.text, a.board_textures, shown, y0, look, a.time, s);
     if (a.ui.hover(st.board.area) && a.in.released) {   // a click: a hole opens there (to see its animation)
         int sq = st.board.at(a.in.mouse);

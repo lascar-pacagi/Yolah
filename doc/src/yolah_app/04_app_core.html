@@ -240,7 +240,7 @@ a.settings.time_index = a.ui.segmented("time", box, TIME_LABELS, a.settings.time
 <li>the principal variation (numbered arrows), the hint (pulsing arrow and its label);</li>
 <li>the moving piece, then the dragged piece, above everything.</li>
 </ol>
-<p>What the board shows comes in a <code>Look</code> structure filled by the scene (sprites, halos, hole style, hint, variation, the puzzle's tiles and decorations), so the same <code>BoardView</code> draws the game, the tutorial, the editor and the workshop's preview.</p>
+<p>What the board shows comes in a <code>Look</code> structure filled by the scene (sprites, hole style, hint, variation, the puzzle's tiles and decorations), so the same <code>BoardView</code> draws the game, the tutorial, the editor and the workshop's preview.</p>
 
 <h3><span class="n">18.3</span>Input: click or drag</h3>
 <p>A human plays by clicking a piece then a destination, or by dragging the piece. <code>BoardView::input</code> handles both with three variables (<code>selected</code>, <code>drag_from</code>, <code>dragging</code>):</p>
