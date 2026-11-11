@@ -3730,7 +3730,9 @@ struct App {
     }
     std::vector<const SpriteDef*> set_units(const PieceSet& ps, int side, const std::string& who) const {
         if (ps.players) return {&own_sprite(who)};
-        if (who == "human") return {&sprite(has_sprite("fig_human") ? "fig_human" : "human")};   // the human is always the user, never dressed up
+        // In a set of figurines (a cast), the human is the user's own figurine, never dressed up;
+        // in a set of plain pieces (Classique: go stones), the human plays them like everyone.
+        if (who == "human" && !ps.cast.empty()) return {&sprite(has_sprite("fig_human") ? "fig_human" : "human")};
         if (!ps.cast.empty()) {   // one character per player, never a mix: an AI outside the cast takes one of it
             auto it = ps.cast.find(who);
             if (it == ps.cast.end()) it = std::next(ps.cast.begin(), long(std::hash<std::string>{}(who) % ps.cast.size()));
