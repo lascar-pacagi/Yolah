@@ -2498,6 +2498,18 @@ struct Shatter : Effect {
         const float P = power;
         const float k = std::clamp(t / dur, 0.0f, 1.0f);
         if (style == "space") {
+            // The black hole swallows the light: the whole window goes dark at
+            // once and comes back slowly, the hole lit by its photon ring on top.
+            float dark = std::min(1.0f, t / 0.06f) * std::exp(-std::max(0.0f, t - 0.25f) * (2.2f - 0.8f * P));
+            if (dark > 0.01f) {
+                int ww = 0, wh = 0;
+                SDL_GetCurrentRenderOutputSize(R, &ww, &wh);
+                rect({0, 0, float(ww), float(wh)}, hex(0x000000, uint8_t(255 * (0.62f + 0.25f * P) * dark)));
+                circle(c, sq * (1.6f + 1.2f * P), hex(0x000000, 0), hex(0x000000, uint8_t(120 * dark)), 0);
+                circle(c, sq * 0.42f, hex(0x000000, uint8_t(255 * dark)));
+                ring(c, sq * 0.46f, sq * 0.05f, hex(0xffd8a0, uint8_t(255 * dark)));
+                ring(c, sq * 0.52f, sq * 0.08f, hex(0xff9a40, uint8_t(120 * dark)));
+            }
             // flash and shock ring
             float fl = std::exp(-t * 5);
             circle(c, sq * (0.5f + 0.6f * P), hex(0xe8f4ff, uint8_t(240 * fl)), hex(0x9fdcff, 0), 0);
@@ -3189,7 +3201,7 @@ const std::vector<std::string> TIME_LABELS = {"0,5 s", "1 s", "2 s", "5 s"};
 // look (board theme, hole style, piece sprites, background image). A level
 // (assets/levels/<id>.json) is a sequence of puzzles: each one unlocks the next.
 const std::vector<std::pair<std::string, std::string>> HOLE_STYLES = {
-    {"pit", "Fosse (th\xC3\xA8me)"}, {"lava", "Lave"}, {"water", "Eau"}, {"void", "Vide \xC3\xA9toil\xC3\xA9"}, {"ice", "Glace"}, {"bush", "Buisson"}};
+    {"pit", "Selon le th\xC3\xA8me"}, {"lava", "Lave"}, {"water", "Eau"}, {"void", "Vide \xC3\xA9toil\xC3\xA9"}, {"ice", "Glace"}, {"bush", "Buisson"}};
 
 struct Puzzle {
     std::string id, name = "Nouveau puzzle", text;
@@ -3718,8 +3730,12 @@ struct App {
     }
     std::vector<const SpriteDef*> set_units(const PieceSet& ps, int side, const std::string& who) const {
         if (ps.players) return {&own_sprite(who)};
-        if (who == "human" && !ps.human.empty() && has_sprite(ps.human)) return {&sprite(ps.human)};   // the human is always the user
-        if (auto it = ps.cast.find(who); it != ps.cast.end() && has_sprite(it->second)) return {&sprite(it->second)};
+        if (who == "human") return {&sprite(has_sprite("fig_human") ? "fig_human" : "human")};   // the human is always the user, never dressed up
+        if (!ps.cast.empty()) {   // one character per player, never a mix: an AI outside the cast takes one of it
+            auto it = ps.cast.find(who);
+            if (it == ps.cast.end()) it = std::next(ps.cast.begin(), long(std::hash<std::string>{}(who) % ps.cast.size()));
+            if (has_sprite(it->second)) return {&sprite(it->second)};
+        }
         std::vector<const SpriteDef*> v;
         for (auto& id : side == BLACK ? ps.black : ps.white)
             if (has_sprite(id)) v.push_back(&sprite(id));
@@ -3872,12 +3888,13 @@ App* g_app = nullptr;
 void start_lesson(App& a, int i);
 int first_lesson_to_do(const App& a);
 void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai = "");
-void draw_image_background(App& a, const std::string& file, uint8_t dim = 70, bool vignette = true);
+void draw_image_background(App& a, const std::string& file, uint8_t dim = 70, bool vignette = true, const Theme* th = nullptr);
 std::string goal_text(const App& a, const Puzzle& p);
 
 // Drawn behind every scene: the theme's gradient, a vignette, faint shapes.
-void draw_background(App& a, bool decorated = true) {
-    const Theme& t = a.theme();
+// th: the board theme whose scenery is drawn (default: the player's).
+void draw_background(App& a, bool decorated = true, const Theme* th = nullptr) {
+    const Theme& t = th ? *th : a.theme();
     if (SDL_Texture* tex = scenery_texture(t.bg_image)) {   // a scenery: its picture, its stars
         float tw, th;
         SDL_GetTextureSize(tex, &tw, &th);
@@ -3941,7 +3958,7 @@ void scene_menu(App& a) {
         {"Puzzles et qu\xC3\xAA" "tes", [&] { a.go(Scene::Puzzles); }, Style::Normal},
         {"\xC3\x89" "diteur de puzzles", [&] { a.go(Scene::Editor); }, Style::Normal},
         {"Th\xC3\xA8mes", [&] { a.go(Scene::Themes); }, Style::Normal},
-        {"Atelier : dessins et plateaux", [&] { a.go(Scene::Studio); }, Style::Normal},
+        // {"Atelier : dessins et plateaux", [&] { a.go(Scene::Studio); }, Style::Normal},   // the workshop, put aside for now
         {"Quitter", [&] { SDL_Event e{}; e.type = SDL_EVENT_QUIT; SDL_PushEvent(&e); }, Style::Ghost},
     };
     float bw = 440 * s, bh = 54 * s, gap = 12 * s, y = 296 * s;
@@ -4075,7 +4092,16 @@ void draw_ai_params(App& a) {
         Box c{m.right() - 30 * s - 300 * s, y + 6 * s, 300 * s, 40 * s};
         if (p.values.size() <= 5) {
             std::vector<std::string> labels;
-            for (auto& x : p.values) labels.push_back(p.value_text(x));
+            float widest = 0;
+            for (auto& x : p.values) {
+                labels.push_back(p.value_text(x));
+                widest = std::max(widest, a.text.width(Font::Bold, 15 * s, labels.back()));
+            }
+            if (widest > c.w / p.values.size() - 12 * s && !p.unit.empty()) {   // too wide: the numbers alone, the unit above
+                for (size_t i = 0; i < labels.size(); i++)
+                    if (p.values[i].is_number()) labels[i] = strf("%g", p.values[i].get<double>());
+                a.text.draw(Font::Regular, 12 * s, "en " + p.unit, {c.right(), c.y - 16 * s}, pal::dim, Align::Right);
+            }
             sel = a.ui.segmented("prm" + p.key, c, labels, cur, 15);
         } else {
             if (a.ui.button("prm-" + p.key, {c.x, c.y, 50 * s, c.h}, "\xE2\x80\x93", Style::Normal, cur > 0, 20)) sel = cur - 1;
@@ -4413,7 +4439,7 @@ void scene_game(App& a) {
     const float s = a.s;
     // A puzzle starts with its introduction: its image, its title, its goal.
     if (g.puzzle_mode && g.intro) {
-        draw_image_background(a, g.puzzle.background, 0, false);   // the whole window, as it is
+        draw_image_background(a, g.puzzle.background, 0, false, &a.game_theme());   // the whole window, as it is
         float k = ease_out_cubic(float((a.time - a.scene_t0) / 0.6));
         Box card{a.w * 0.5f - 420 * s, a.h * 0.5f - 145 * s + (1 - k) * 60 * s, 840 * s, 290 * s};   // centred in the window
         a.ui.panel(card, 24, hex(0x10151d, uint8_t(225 * k)));
@@ -4467,7 +4493,7 @@ void scene_game(App& a) {
     g.board.area = {std::floor(bx), std::floor(by), B, B};
     Box panel{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin};
 
-    if (g.puzzle_mode) draw_image_background(a, g.puzzle.background, 70);
+    if (g.puzzle_mode) draw_image_background(a, g.puzzle.background, 70, true, &a.game_theme());
     else draw_background(a, false);
     if (!a.debug_fx.empty()) {   // --fx: one square breaking, for screenshots of the effects
         Theme th = a.game_theme();
@@ -4606,7 +4632,7 @@ void scene_themes(App& a) {
     const float s = a.s;
     const bool picking = a.picker.open;
     draw_background(a);
-    draw_title(a, "Th\xC3\xA8mes", "Le plateau et le sprite de chaque joueur, parmi ceux de la biblioth\xC3\xA8que et ceux cr\xC3\xA9\xC3\xA9s dans l'atelier.");
+    draw_title(a, "Th\xC3\xA8mes", "Le plateau et les pi\xC3\xA8ces de chaque joueur.");
     a.ui.blocked = picking;
     if (picking && a.in.key(SDLK_ESCAPE)) { a.picker.open = false; a.in.eat(SDLK_ESCAPE); }
     if (back_button(a)) { a.save_settings(); a.go(Scene::Menu); return; }
@@ -4659,13 +4685,14 @@ void scene_themes(App& a) {
         if (h && a.in.released) a.settings.theme = t.id;
     }
     draw::clip(nullptr);
-    if (a.ui.button("th_studio", {area.x, a.h - 80 * s, area.w, 46 * s}, "Cr\xC3\xA9" "er ou modifier des plateaux et des sprites dans l'atelier\xE2\x80\xA6", Style::Ghost, true, 16)) {
-        a.save_settings();
-        a.go(Scene::Studio);
-        a.studio.return_to = Scene::Themes;
-        a.studio.tab = 1;
-        return;
-    }
+    // The workshop (Atelier) is put aside for now.
+    // if (a.ui.button("th_studio", {area.x, a.h - 80 * s, area.w, 46 * s}, "Cr\xC3\xA9" "er ou modifier des plateaux et des sprites dans l'atelier\xE2\x80\xA6", Style::Ghost, true, 16)) {
+    //     a.save_settings();
+    //     a.go(Scene::Studio);
+    //     a.studio.return_to = Scene::Themes;
+    //     a.studio.tab = 1;
+    //     return;
+    // }
     // The players and their sprites.
     Box gal{area.right() + 50 * s, 140 * s, a.w - area.right() - 110 * s, a.h - 180 * s};
     a.ui.panel(gal);
@@ -5230,9 +5257,9 @@ std::string goal_text(const App& a, const Puzzle& p) {
 // The window covered by a background image (cropped to keep its proportions),
 // darkened a little so that the board and the panels stay readable.
 // vignette: darken the edges (behind a board); off for a full-window picture.
-void draw_image_background(App& a, const std::string& file, uint8_t dim, bool vignette) {
+void draw_image_background(App& a, const std::string& file, uint8_t dim, bool vignette, const Theme* theme) {
     SDL_Texture* tex = file.empty() ? nullptr : a.background(file);
-    if (!tex) { draw_background(a, false); return; }
+    if (!tex) { draw_background(a, false, theme); return; }   // no picture: the scenery of the board's theme
     float tw, th;
     SDL_GetTextureSize(tex, &tw, &th);
     float k = std::max(a.w / tw, a.h / th);
@@ -5481,7 +5508,7 @@ void scene_editor(App& a) {
         if (ed.saved.empty() && !a.puzzles.empty()) editor_open(a, a.puzzles.front(), "");
     }
     const bool modal = a.picker.open || ed.choose_new;
-    draw_image_background(a, p.background, 120);
+    draw_image_background(a, p.background, 120, true, &a.theme_or(p.theme));
     a.text.draw_shadowed(Font::Title, 34 * s, "\xC3\x89" "diteur de puzzles", {40 * s, 24 * s}, pal::text, Align::Left, hex(0x000000, 120), 3 * s);
     a.ui.blocked = modal;
     if (!modal && a.ui.focus.empty() && back_button(a)) {
@@ -5762,8 +5789,14 @@ void scene_editor(App& a) {
     std::vector<std::string> th_names = {"Th\xC3\xA8me du joueur"};
     int th_idx = 0;
     for (size_t i = 0; i < a.themes.size(); i++) { th_names.push_back(a.themes[i].name); if (a.themes[i].id == p.theme) th_idx = int(i) + 1; }
-    int ti = a.ui.cycler("ed_theme", {x, y, w, 34 * s}, "Plateau", th_names, th_idx);
-    p.theme = ti == 0 ? "" : a.themes[ti - 1].id;
+    int ti = a.ui.cycler("ed_theme", {x, y, w, 34 * s}, "Th\xC3\xA8me", th_names, th_idx);
+    if (ti != th_idx) {   // a new theme: its board, holes, scenery and pieces (the puzzle's own choices are reset)
+        p.theme = ti == 0 ? "" : a.themes[ti - 1].id;
+        p.hole_style = "pit";
+        p.background.clear();
+        p.sprite_black.clear();
+        p.sprite_white.clear();
+    }
     y += 40 * s;
     std::vector<std::string> hs_names, hs_ids;
     int hs_idx = 0;
@@ -5772,7 +5805,7 @@ void scene_editor(App& a) {
     for (size_t i = 0; i < hs_ids.size(); i++) if (hs_ids[i] == p.hole_style) hs_idx = int(i);
     p.hole_style = hs_ids[a.ui.cycler("ed_holes", {x, y, w, 34 * s}, "Trous", hs_names, hs_idx)];
     y += 40 * s;
-    std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Aucune"};
+    std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Selon le th\xC3\xA8me"};
     int bg_idx = 0;
     for (size_t i = 0; i < bgs.size(); i++) { bg_names.push_back(bgs[i]); if (bgs[i] == p.background) bg_idx = int(i) + 1; }
     const float lw = 96 * s;
@@ -5795,12 +5828,13 @@ void scene_editor(App& a) {
         a.text.draw(Font::Regular, 12 * s, id.empty() ? "par d\xC3\xA9" "faut" : cur.name, {r.x + 46 * s, r.y + 25 * s}, pal::dim);
     }
     y += 54 * s;
-    if (a.ui.button("ed_studio", {x, y, w, 36 * s}, "Atelier : dessiner pions, d\xC3\xA9" "cors, cases, plateaux\xE2\x80\xA6", Style::Ghost, true, 14)) {
-        if (editor_dirty(a)) editor_save(a);
-        a.go(Scene::Studio);
-        a.studio.return_to = Scene::Editor;
-        return;
-    }
+    // The workshop (Atelier) is put aside for now.
+    // if (a.ui.button("ed_studio", {x, y, w, 36 * s}, "Atelier : dessiner pions, d\xC3\xA9" "cors, cases, plateaux\xE2\x80\xA6", Style::Ghost, true, 14)) {
+    //     if (editor_dirty(a)) editor_save(a);
+    //     a.go(Scene::Studio);
+    //     a.studio.return_to = Scene::Editor;
+    //     return;
+    // }
     // Tests.
     Box tb{x, panel.bottom() - 178 * s, w, 104 * s};
     draw::round_box(tb, 12 * s, hex(0x0f141c, 200));
