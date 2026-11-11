@@ -1248,6 +1248,10 @@ struct Theme {
     std::string bg_image, planet_image;
     float planet_size = 2.4f, planet_top = 0.6f;
     bool stars = false;
+    bool embers = false;     // embers rising over the picture
+    // The set of pieces that goes with the board (assets/sprites/sets.json):
+    // used when the settings say "Selon le plateau"; "" = the classic stones.
+    std::string piece_set;
     std::string file;        // its file in assets/themes (the board editor rewrites it)
 };
 
@@ -1282,6 +1286,8 @@ Theme parse_theme(const json& j) {
     t.planet_size = jnum(j, "planet size", t.planet_size);
     t.planet_top = jnum(j, "planet top", t.planet_top);
     t.stars = j.value("stars", false);
+    t.embers = j.value("embers", false);
+    t.piece_set = jstr(j, "piece set");
     return t;
 }
 json theme_to_json(const Theme& t) {
@@ -1303,6 +1309,8 @@ json theme_to_json(const Theme& t) {
         j["planet top"] = t.planet_top;
     }
     if (t.stars) j["stars"] = true;
+    if (t.embers) j["embers"] = true;
+    if (!t.piece_set.empty()) j["piece set"] = t.piece_set;
     return j;
 }
 
@@ -1371,6 +1379,24 @@ void draw_star_field(Box b, double time, float s) {
             line(head - dir * (len * a0), head - dir * (len * a1), (2.2f - 1.8f * a0) * s, hex(0xffffff, uint8_t(220 * fade * (1 - a0))));
         }
         circle(head, 3.5f * s, hex(0xdff0ff, uint8_t(230 * fade)), hex(0x9fd0ff, 0), 0);
+    }
+}
+
+// Embers rising over a scenery: each one starts at a hashed place along the
+// bottom, rises at its own speed while swaying, glows and fades out.
+void draw_embers(Box b, double time, float s) {
+    using namespace draw;
+    for (int i = 0; i < 70; i++) {
+        float speed = 0.04f + 0.08f * hash2(i, 1, 33);           // window heights per second
+        double life = 1.0 / speed;
+        double u = std::fmod(time + life * hash2(i, 2, 33), life) / life;   // 0 → 1 along its rise
+        float x = b.x + b.w * hash2(i, 3, 33) + std::sin(float(time) * (0.6f + hash2(i, 4, 33)) + i) * 30 * s;
+        float y = b.bottom() - float(u) * b.h * 1.1f;
+        float fade = float(std::sin(u * M_PI));
+        float size = (1.0f + 2.0f * hash2(i, 5, 33)) * s;
+        Rgba c = hash2(i, 6, 33) < 0.5f ? hex(0xffb040) : hex(0xff6a20);
+        circle({x, y}, size * 4, with_alpha(c, 0.25f * fade), with_alpha(c, 0), 0);
+        circle({x, y}, size, with_alpha(hex(0xffe0a0), 0.9f * fade));
     }
 }
 
@@ -1463,7 +1489,77 @@ struct SpriteDef {
     bool halo = false;       // pulsing halo (the human player)
     Rgba halo_color = hex(0x5ee7ff);
     SDL_Texture* texture = nullptr;   // the picture, if any
+    // A sprite drawn as another one for White (a set of pieces: its black
+    // and its white unit): the id, and the sprite once linked (link_sprites).
+    std::string white_id;
+    const SpriteDef* white_alt = nullptr;
 };
+
+// A set of pieces (assets/sprites/sets.json): what the pieces look like when
+// the set is chosen. "players": each player keeps its own sprite (the robots
+// and the human); otherwise "black" and "white" list the sprites of the four
+// pieces of each side (the units of a faction; one sprite = all alike).
+struct PieceSet {
+    std::string id, name, description;
+    bool players = false;
+    std::vector<std::string> black, white;
+    std::string human;       // the human player's pieces in this set (the user's figurine, dressed for it)
+    std::map<std::string, std::string> cast;   // "cast": a figurine per player (AI id or "human"), whatever the side
+};
+
+std::vector<PieceSet> load_piece_sets(const fs::path& file) {
+    std::vector<PieceSet> v;
+    json j = load_json(file);
+    if (j.is_object() && j.contains("sets") && j["sets"].is_array())
+        for (auto& e : j["sets"]) {
+            PieceSet ps;
+            ps.id = jstr(e, "id");
+            ps.name = jstr(e, "name", ps.id);
+            ps.description = jstr(e, "description");
+            ps.players = e.value("players", false);
+            ps.human = jstr(e, "human");
+            if (e.contains("cast") && e["cast"].is_object())
+                for (auto& [k, v] : e["cast"].items())
+                    if (v.is_string()) ps.cast[k] = v.get<std::string>();
+            for (const char* k : {"black", "white"})
+                if (e.contains(k) && e[k].is_array())
+                    for (auto& x : e[k])
+                        if (x.is_string()) (k[0] == 'b' ? ps.black : ps.white).push_back(x.get<std::string>());
+            if (!ps.id.empty()) v.push_back(ps);
+        }
+    if (v.empty()) v.push_back({"classique", "Pions classiques", "", false, {"classic_go"}, {"classic_go"}, "", {}});
+    return v;
+}
+
+// Each set is also a sprite of the library ("set:<id>", category "Jeux de
+// pièces"), so that a player or a side of a puzzle can take a whole set: it
+// is drawn as its first black unit, or its first white unit for White.
+void add_set_sprites(std::vector<SpriteDef>& sprites, const std::vector<PieceSet>& sets) {
+    sprites.erase(std::remove_if(sprites.begin(), sprites.end(), [](const SpriteDef& sp) { return sp.id.rfind("set:", 0) == 0; }), sprites.end());
+    for (const PieceSet& ps : sets) {
+        SpriteDef sp;
+        sp.id = "set:" + ps.id;
+        sp.name = ps.name;
+        sp.category = "Jeux de pi\xC3\xA8" "ces";
+        std::string b = ps.players ? "fig_human" : ps.black.empty() ? "classic_go" : ps.black[0];
+        std::string w = ps.players ? "fig_sentinel" : ps.white.empty() ? b : ps.white[0];
+        sp.emblem = "none";
+        sp.style = "go";
+        for (const SpriteDef& o : sprites)
+            if (o.id == b) { sp.art = o.art; sp.style = o.style; sp.emblem = o.emblem; }
+        sp.white_id = w;
+        sprites.push_back(sp);
+    }
+}
+// Resolves the white alternatives (after any change to the list).
+void link_sprites(std::vector<SpriteDef>& sprites) {
+    for (SpriteDef& sp : sprites) {
+        sp.white_alt = nullptr;
+        if (!sp.white_id.empty())
+            for (const SpriteDef& o : sprites)
+                if (o.id == sp.white_id && &o != &sp) sp.white_alt = &o;
+    }
+}
 
 std::vector<SpriteDef> load_sprites(const fs::path& file) {
     std::vector<SpriteDef> list;
@@ -2083,6 +2179,7 @@ void register_art_sprites(std::vector<SpriteDef>& sprites) {
         sp.emblem = "none";
         sprites.push_back(sp);
     }
+    link_sprites(sprites);
 }
 
 // Classic stones without any sign: black or white by the side.
@@ -2147,6 +2244,10 @@ void draw_plain_stone(const std::string& style, int side, V2 c, float r, float a
 void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, double time = 0, float alpha = 1, bool halo = false,
                 const char* state = "idle", double state_t = -1, bool flip = false) {
     using namespace draw;
+    if (side == WHITE && sp.white_alt) {   // a set of pieces: its white unit
+        draw_piece(*sp.white_alt, side, c, r, lift, time, alpha, halo, state, state_t, flip);
+        return;
+    }
     r *= 1 + 0.08f * lift;
     Art* art = sp.art.empty() ? nullptr : find_art(sp.art);
     if (art && art->smooth) {   // a rendered figurine: its own base and shadow, the white side's drawing
@@ -2536,6 +2637,31 @@ public:
     struct MoveAnim { bool active = false; Move m = Move::none(); int side = BLACK; double t0 = 0, dur = 0.34; } anim;
     std::array<double, 64> hole_since{};   // time each hole appeared (for its animation)
     std::array<bool, 64> face_left{};      // the piece on this square looks left (its last move went left)
+    // Which piece of its side stands on each square (0..3), so that the units
+    // of a set keep their identity as they move: unit_side[sq] = its side.
+    std::array<int8_t, 64> unit{}, unit_side{};
+    // Numbers the pieces again (in square order) when the position does not
+    // match what we know (a new game, a jump in the history).
+    void sync_units(const Yolah& pos) {
+        for (int side : {BLACK, WHITE}) {
+            uint64_t bb = pos.bitboard(side);
+            bool ok = true;
+            std::array<bool, 8> seen{};
+            for (uint64_t b = bb; b; b &= b - 1) {
+                int sq = std::countr_zero(b);
+                int u = unit[sq];
+                if (unit_side[sq] != side || u < 0 || u > 7 || seen[u]) { ok = false; break; }
+                seen[u] = true;
+            }
+            if (ok) continue;
+            int k = 0;
+            for (uint64_t b = bb; b; b &= b - 1) {
+                int sq = std::countr_zero(b);
+                unit[sq] = int8_t(k++);
+                unit_side[sq] = int8_t(side);
+            }
+        }
+    }
     Move last = Move::none();
     int hover_sq = -1;
 
@@ -2557,6 +2683,8 @@ public:
         anim = {};
         hole_since.fill(-100);
         face_left.fill(false);
+        unit.fill(-1);
+        unit_side.fill(-1);
         last = Move::none();
         selected = drag_from = -1;
         dragging = false;
@@ -2570,6 +2698,8 @@ public:
         hole_since[m.from_sq()] = now + 0.08;
         float dx = center(m.to_sq()).x - center(m.from_sq()).x;     // on screen (the board may be flipped)
         face_left[m.to_sq()] = dx < -1 ? true : dx > 1 ? false : face_left[m.from_sq()];
+        unit[m.to_sq()] = unit[m.from_sq()];          // (kept on from: an undo finds it there)
+        unit_side[m.to_sq()] = unit_side[m.from_sq()];
         fx.add(std::make_unique<Debris>(center(m.from_sq()), sq(), theme.dark, 18, rng));
     }
 
@@ -2607,6 +2737,7 @@ public:
 
     struct Look {
         const SpriteDef* sprite[2] = {nullptr, nullptr};
+        std::vector<const SpriteDef*> units[2];   // the sprites of the 4 pieces of a side (a set's units); empty: sprite[side]
         bool halo[2] = {false, false};   // the human players
         std::string hole_style = "pit";  // HOLE_STYLES
         bool coords = true;
@@ -2622,6 +2753,14 @@ public:
     void draw(TextEngine& text, BoardTextures& textures, const Theme& t, const Yolah& pos, const Look& look, double now, float s) {
         using namespace draw;
         const float q = sq();
+        sync_units(pos);
+        // The sprite of the piece on square sq of `side` (its unit in a set).
+        auto piece_sprite = [&](int side, int sq) -> const SpriteDef& {
+            const auto& u = look.units[side];
+            if (u.empty()) return *look.sprite[side];
+            int k = sq >= 0 && unit[sq] >= 0 ? unit[sq] : 0;
+            return *u[size_t(k) % u.size()];
+        };
         // The theme's planet, under the board (the board stands on its top).
         if (SDL_Texture* pl = scenery_texture(t.planet_image)) {
             float size = area.w * t.planet_size;
@@ -2720,7 +2859,7 @@ public:
             if (anim.active && now < anim.t0 + anim.dur && s2 == anim.m.to_sq()) continue;
             if (dragging && s2 == drag_from) continue;
             const char* st = look.winner == side ? "win" : blocked(s2) ? "blocked" : "idle";
-            draw_piece(*look.sprite[side], side, center(s2), q * 0.4f, 0, now, 1, look.halo[side], st, now + s2 * 0.29, face_left[s2]);
+            draw_piece(piece_sprite(side, s2), side, center(s2), q * 0.4f, 0, now, 1, look.halo[side], st, now + s2 * 0.29, face_left[s2]);
         }
         // Principal variation: numbered faint arrows.
         for (size_t i = 0; i < look.pv.size() && i < 6; i++) {
@@ -2751,12 +2890,12 @@ public:
             V2 a = center(anim.m.from_sq()), b = center(anim.m.to_sq());
             V2 p = a + (b - a) * k;
             float lift = std::sin(k * float(M_PI));
-            draw_piece(*look.sprite[anim.side], anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now, 1, look.halo[anim.side], "move", now - anim.t0,
+            draw_piece(piece_sprite(anim.side, anim.m.to_sq()), anim.side, p + V2{0, -lift * q * 0.12f}, q * 0.4f, lift, now, 1, look.halo[anim.side], "move", now - anim.t0,
                        face_left[anim.m.to_sq()]);
         }
         // The dragged piece follows the mouse.
         if (dragging && drag_from >= 0 && (pos.bitboard(me) >> drag_from & 1))
-            draw_piece(*look.sprite[me], me, drag_pos, q * 0.4f, 1, now, 1, look.halo[me], "move", now, drag_pos.x < center(drag_from).x - 2);
+            draw_piece(piece_sprite(me, drag_from), me, drag_pos, q * 0.4f, 1, now, 1, look.halo[me], "move", now, drag_pos.x < center(drag_from).x - 2);
     }
     V2 drag_pos;
 
@@ -3034,10 +3173,12 @@ struct Settings {
     std::vector<int> tutorial_done;           // lessons completed
     std::vector<std::string> puzzles_done;    // puzzles solved
     json ai_options = json::object();         // AI id → {setting: value} (AiParam), games only
+    std::string piece_set = "auto";           // "auto": the board's set (Theme::piece_set), else a set's id
     json to_json() const {
         return {{"theme", theme}, {"show eval", show_eval}, {"show hint", show_hint}, {"show coordinates", show_coords},
                 {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white},
-                {"tutorial done", tutorial_done}, {"puzzles done", puzzles_done}, {"ai options", ai_options}};
+                {"tutorial done", tutorial_done}, {"puzzles done", puzzles_done}, {"ai options", ai_options},
+                {"piece set", piece_set}};
     }
     void from_json(const json& j) {
         if (!j.is_object()) return;
@@ -3052,6 +3193,7 @@ struct Settings {
         if (j.contains("tutorial done") && j["tutorial done"].is_array()) tutorial_done = j["tutorial done"].get<std::vector<int>>();
         if (j.contains("puzzles done") && j["puzzles done"].is_array()) puzzles_done = j["puzzles done"].get<std::vector<std::string>>();
         if (j.contains("ai options") && j["ai options"].is_object()) ai_options = j["ai options"];
+        piece_set = j.value("piece set", piece_set);
     }
 };
 
@@ -3080,6 +3222,7 @@ struct App {
     FxLayer fx;
     std::vector<Theme> themes;
     std::vector<SpriteDef> sprites;
+    std::vector<PieceSet> piece_sets;     // assets/sprites/sets.json
     std::vector<AiSpec> roster;
     Settings settings;
     std::string setup_params;             // the AI whose settings box is open (new-game screen)
@@ -3333,13 +3476,71 @@ struct App {
         write_file(g_paths.assets / "sprites" / "assignments.json", json{{"players", j}}.dump(2));
     }
     const SpriteDef& slot_sprite(const Slot& sl) const { return player_sprite(sl.human() ? "human" : sl.spec->id); }
+
+    // ── sets of pieces ──
+    const PieceSet* piece_set(const std::string& id) const {
+        for (auto& ps : piece_sets)
+            if (ps.id == id) return &ps;
+        return nullptr;
+    }
+    // The set in use on a board: the one of the settings, or the board's own
+    // ("Selon le plateau"), the classic stones when the board has none.
+    const PieceSet& active_set(const Theme& t) const {
+        std::string id = settings.piece_set == "auto" ? (t.piece_set.empty() ? "classique" : t.piece_set) : settings.piece_set;
+        if (const PieceSet* ps = piece_set(id)) return *ps;
+        return piece_sets.front();
+    }
+    // A player's own sprite, never a set (for the set "players").
+    const SpriteDef& own_sprite(const std::string& who) const {
+        const SpriteDef& sp = player_sprite(who);
+        if (sp.id.rfind("set:", 0) != 0) return sp;
+        if (who == "human") return sprite(has_sprite("fig_human") ? "fig_human" : "human");
+        const AiSpec* ai_ = ai(who);
+        return sprite(ai_ ? ai_->sprite : who);
+    }
+    // The sprites of the four pieces of `side` for sprite sp (a set sprite
+    // gives its units), played by `who`.
+    std::vector<const SpriteDef*> expand(const SpriteDef& sp, int side, const std::string& who) const {
+        if (sp.id.rfind("set:", 0) == 0)
+            if (const PieceSet* ps = piece_set(sp.id.substr(4))) return set_units(*ps, side, who);
+        return {&sp};
+    }
+    std::vector<const SpriteDef*> set_units(const PieceSet& ps, int side, const std::string& who) const {
+        if (ps.players) return {&own_sprite(who)};
+        if (who == "human" && !ps.human.empty() && has_sprite(ps.human)) return {&sprite(ps.human)};   // the human is always the user
+        if (auto it = ps.cast.find(who); it != ps.cast.end() && has_sprite(it->second)) return {&sprite(it->second)};
+        std::vector<const SpriteDef*> v;
+        for (auto& id : side == BLACK ? ps.black : ps.white)
+            if (has_sprite(id)) v.push_back(&sprite(id));
+        if (v.empty()) v.push_back(&sprite("classic_go"));
+        return v;
+    }
+    // The pieces of `who` playing `side` on board theme t: a set of the
+    // player's own (its sprite is a set), else the active set.
+    std::vector<const SpriteDef*> board_units(const Theme& t, int side, const std::string& who) const {
+        const PieceSet& ps = active_set(t);
+        if (ps.players) return expand(player_sprite(who), side, who);
+        return set_units(ps, side, who);
+    }
+    // Fills look.sprite and look.units for two players on theme t; a puzzle's
+    // sprite (or set) for a side wins when given.
+    void set_look(BoardView::Look& look, const Theme& t, const std::string& who_black, const std::string& who_white,
+                  const std::string& force_black = "", const std::string& force_white = "") const {
+        for (int side : {BLACK, WHITE}) {
+            const std::string& who = side == BLACK ? who_black : who_white;
+            const std::string& force = side == BLACK ? force_black : force_white;
+            look.units[side] = !force.empty() && has_sprite(force) ? expand(sprite(force), side, who) : board_units(t, side, who);
+            look.sprite[side] = look.units[side].front();
+        }
+    }
     // In a game: the puzzle's sprites and theme when it has some.
     const SpriteDef& game_sprite(int side) const {
+        const std::string who = game.slot[side].human() ? "human" : game.slot[side].spec->id;
         if (game.puzzle_mode) {
             const std::string& id = side == BLACK ? game.puzzle.sprite_black : game.puzzle.sprite_white;
-            if (!id.empty() && has_sprite(id)) return sprite(id);
+            if (!id.empty() && has_sprite(id)) return *expand(sprite(id), side, who).front();
         }
-        return slot_sprite(game.slot[side]);
+        return *board_units(game_theme(), side, who).front();
     }
     const Theme& theme_or(const std::string& id) const {
         for (auto& t : themes)
@@ -3467,6 +3668,7 @@ void draw_background(App& a, bool decorated = true) {
         SDL_FRect dst{(a.w - tw * k) / 2, (a.h - th * k) / 2, tw * k, th * k};
         SDL_RenderTexture(a.renderer, tex, nullptr, &dst);
         if (t.stars) draw_star_field({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        if (t.embers) draw_embers({0, 0, float(a.w), float(a.h)}, a.time, a.s);
         draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 60);
         return;
     }
@@ -4058,8 +4260,9 @@ void scene_game(App& a) {
     g.board.drag_pos = a.in.mouse;
     if (mv) a.play_move(*mv);
     BoardView::Look look;
-    look.sprite[BLACK] = &a.game_sprite(BLACK);
-    look.sprite[WHITE] = &a.game_sprite(WHITE);
+    a.set_look(look, a.game_theme(), g.slot[BLACK].human() ? "human" : g.slot[BLACK].spec->id,
+               g.slot[WHITE].human() ? "human" : g.slot[WHITE].spec->id,
+               g.puzzle_mode ? g.puzzle.sprite_black : "", g.puzzle_mode ? g.puzzle.sprite_white : "");
     if (g.puzzle_mode) {
         look.hole_style = g.puzzle.hole_style;
         look.tiles = &g.puzzle.tiles;
@@ -4219,8 +4422,11 @@ void scene_themes(App& a) {
             if (ha) draw_art(*ha, "idle", a.time + hsq.x, hb);
             else draw::round_box(hb.inset(q * 0.08f), q * 0.2f, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
         }
-        draw_piece(a.player_sprite("human"), BLACK, {b.x + 2.5f * q, b.y + 2.5f * q}, q * 0.4f, 0, a.time, 1, true);
-        draw_piece(a.player_sprite("dev"), WHITE, {b.x + 5.5f * q, b.y + 4.5f * q}, q * 0.4f, 0, a.time);
+        {   // two pieces of the set this board would use
+            auto ub = a.board_units(t, BLACK, "human"), uw = a.board_units(t, WHITE, "dev");
+            draw_piece(*ub.front(), BLACK, {b.x + 2.5f * q, b.y + 2.5f * q}, q * 0.4f, 0, a.time, 1, false, "idle", a.time);
+            draw_piece(*uw.front(), WHITE, {b.x + 5.5f * q, b.y + 4.5f * q}, q * 0.4f, 0, a.time, 1, false, "idle", a.time + 0.5);
+        }
         a.text.draw(Font::Bold, 18 * s, t.name, {cc.center().x, cc.bottom() - 56 * s}, pal::text, Align::Center);
         a.text.draw(Font::Regular, 13 * s, sel ? "th\xC3\xA8me actuel" : "cliquer pour choisir", {cc.center().x, cc.bottom() - 30 * s}, sel ? t.accent : pal::dim, Align::Center);
         if (h && a.in.released) a.settings.theme = t.id;
@@ -4236,12 +4442,29 @@ void scene_themes(App& a) {
     // The players and their sprites.
     Box gal{area.right() + 50 * s, 140 * s, a.w - area.right() - 110 * s, a.h - 180 * s};
     a.ui.panel(gal);
-    a.text.draw(Font::Black, 22 * s, "Sprites des joueurs", {gal.x + 22 * s, gal.y + 18 * s}, pal::text);
-    a.text.paragraph(Font::Regular, 14 * s, strf("Cliquez sur un joueur pour lui choisir un sprite parmi les %zu de la biblioth\xC3\xA8que, dont vos dessins de l'atelier (\xC2\xAB Mes dessins \xC2\xBB).", a.sprites.size()),
-                     {gal.x + 22 * s, gal.y + 52 * s, gal.w - 44 * s, 60 * s}, pal::dim);
+    // The set of pieces: the board's own, or one for every board.
+    a.text.draw(Font::Black, 22 * s, "Jeu de pi\xC3\xA8" "ces", {gal.x + 22 * s, gal.y + 18 * s}, pal::text);
+    {
+        std::vector<std::string> opts = {"Selon le plateau"}, ids = {"auto"};
+        for (auto& ps : a.piece_sets) { opts.push_back(ps.name); ids.push_back(ps.id); }
+        int cur = 0;
+        for (size_t i = 0; i < ids.size(); i++)
+            if (ids[i] == a.settings.piece_set) cur = int(i);
+        int sel = a.ui.segmented("pset", {gal.x + 22 * s, gal.y + 54 * s, gal.w - 44 * s, 40 * s}, opts, cur, 14);
+        if (sel != cur) a.settings.piece_set = ids[size_t(sel)];
+        const PieceSet& act = a.active_set(a.theme());
+        std::string why = a.settings.piece_set == "auto"
+            ? "Chaque plateau prend son jeu : ici \xC2\xAB " + act.name + " \xC2\xBB (pions classiques pour les plateaux sans jeu propre)."
+            : "Ce jeu sert sur tous les plateaux.";
+        if (!act.description.empty()) why += " " + act.description;
+        a.text.paragraph(Font::Regular, 13 * s, why, {gal.x + 22 * s, gal.y + 102 * s, gal.w - 44 * s, 40 * s}, pal::dim);
+    }
+    a.text.draw(Font::Black, 20 * s, "Sprites des joueurs", {gal.x + 22 * s, gal.y + 150 * s}, pal::text);
+    a.text.paragraph(Font::Regular, 13 * s, strf("Avec le jeu \xC2\xAB Robots \xC2\xBB, chaque joueur garde son sprite. Cliquez sur un joueur pour en choisir un parmi les %zu de la biblioth\xC3\xA8que (un jeu entier aussi, dans \xC2\xAB Jeux de pi\xC3\xA8" "ces \xC2\xBB).", a.sprites.size()),
+                     {gal.x + 22 * s, gal.y + 180 * s, gal.w - 44 * s, 40 * s}, pal::dim);
     std::vector<std::pair<std::string, std::string>> players = {{"human", "Joueur humain"}};
     for (auto& ai : a.roster) players.push_back({ai.id, ai.name});
-    float top = gal.y + 118 * s, rh = std::min(64.0f * s, (gal.h - 210 * s) / players.size());
+    float top = gal.y + 232 * s, rh = std::min(60.0f * s, (gal.h - 320 * s) / players.size());
     for (size_t i = 0; i < players.size(); i++) {
         const auto& [id, name] = players[i];
         const SpriteDef& sp = a.player_sprite(id);
@@ -4666,8 +4889,7 @@ void scene_tutorial(App& a) {
             }
     }
     BoardView::Look look;
-    look.sprite[BLACK] = &a.player_sprite("human");
-    look.sprite[WHITE] = &a.player_sprite("monte_carlo");
+    a.set_look(look, a.theme(), "human", "monte_carlo");
     look.human_turn = human_turn;
     look.coords = true;
     if (t.hint && human_turn && t.hint_move != Move::none()) { look.hint = t.hint_move; look.hint_label = "indice"; }
@@ -5257,11 +5479,14 @@ void scene_editor(App& a) {
     }
     ed.board.flipped = false;
     const AiSpec* opp = a.ai(p.opponent);
-    const SpriteDef& sb = !p.sprite_black.empty() ? a.sprite(p.sprite_black) : a.player_sprite(p.human == BLACK ? "human" : (opp ? opp->id : "dev"));
-    const SpriteDef& sw = !p.sprite_white.empty() ? a.sprite(p.sprite_white) : a.player_sprite(p.human == WHITE ? "human" : (opp ? opp->id : "dev"));
+    // The sprite of each side: the puzzle's, or the first unit of the set of its board.
+    const SpriteDef& sb = !p.sprite_black.empty() ? a.sprite(p.sprite_black)
+                                                  : *a.board_units(a.theme_or(p.theme), BLACK, p.human == BLACK ? "human" : (opp ? opp->id : "dev")).front();
+    const SpriteDef& sw = !p.sprite_white.empty() ? a.sprite(p.sprite_white)
+                                                  : *a.board_units(a.theme_or(p.theme), WHITE, p.human == WHITE ? "human" : (opp ? opp->id : "dev")).front();
     BoardView::Look look;
-    look.sprite[BLACK] = &sb;
-    look.sprite[WHITE] = &sw;
+    a.set_look(look, a.theme_or(p.theme), p.human == BLACK ? "human" : (opp ? opp->id : "dev"),
+               p.human == WHITE ? "human" : (opp ? opp->id : "dev"), p.sprite_black, p.sprite_white);
     look.hole_style = p.hole_style;
     look.tiles = &p.tiles;
     look.decor = &p.decor;
@@ -6282,8 +6507,7 @@ void studio_boards(App& a) {
         y0.set_state(b, w, e, 4, 4, 8);
     }
     BoardView::Look look;
-    look.sprite[BLACK] = &a.player_sprite("human");
-    look.sprite[WHITE] = &a.player_sprite("dev");
+    a.set_look(look, shown, "human", "dev");
     st.board.draw(a.text, a.board_textures, shown, y0, look, a.time, s);
     if (a.ui.hover(st.board.area) && a.in.released) {   // a click: a hole opens there (to see its animation)
         int sq = st.board.at(a.in.mouse);
@@ -6469,6 +6693,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     }
     a->themes = load_themes(g_paths.assets / "themes");
     a->sprites = load_sprites(g_paths.assets / "sprites" / "sprites.json");
+    a->piece_sets = load_piece_sets(g_paths.assets / "sprites" / "sets.json");
+    add_set_sprites(a->sprites, a->piece_sets);
     load_all_arts();
     register_art_sprites(a->sprites);
     a->roster = load_roster(g_paths.assets / "ai_roster.json");

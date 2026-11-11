@@ -1,0 +1,17 @@
+{
+  // The sets of pieces. "players": each player keeps the sprite chosen for it
+  // (assignments.json: the robots of the AIs and the human). Otherwise
+  // "black" and "white" list the sprites of the four pieces of each side,
+  // in order (a set's units; fewer than four: they repeat); "human": the
+  // human player's pieces in that set (the user's figurine, dressed for it),
+  // whatever the side. A board theme
+  // names its set with "piece set"; the settings can force one for all boards.
+  "sets": [
+    {"id": "classique", "name": "Classique", "description": "Pions noirs et blancs.", "black": ["classic_go"], "white": ["classic_go"]},
+    {"id": "robots", "name": "Robots", "description": "Une figurine par joueur : les robots des IA et vous.", "players": true},
+    {"id": "legendes", "name": "Légendes", "description": "Les hordes orques contre l'alliance des elfes et des nains.",
+     "black": ["fig_orc_grunt", "fig_orc_shaman", "fig_orc_brute", "fig_orc_archer"],
+     "white": ["fig_elf_knight", "fig_elf_archer", "fig_elf_mage", "fig_dwarf"],
+     "human": "fig_human_legendes"}
+  ]
+}

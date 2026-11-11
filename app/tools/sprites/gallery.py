@@ -2,12 +2,13 @@
 import sys
 from PIL import Image, ImageDraw
 from render import render
-from models import MODELS
+from models import MODELS, _add_legends
+_add_legends()
 out = sys.argv[1]
 anim = sys.argv[2] if len(sys.argv) > 2 else "idle"
 t = float(sys.argv[3]) if len(sys.argv) > 3 else 0.1
 side = int(sys.argv[4]) if len(sys.argv) > 4 else 0
-names = list(MODELS)
+names = [n for n in MODELS if len(sys.argv) < 6 or n.startswith(tuple(sys.argv[5].split(',')))]
 S = 224
 cols = 6
 rows = (len(names) + cols - 1) // cols

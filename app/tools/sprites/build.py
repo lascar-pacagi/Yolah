@@ -17,7 +17,9 @@ import numpy as np
 from PIL import Image
 import render
 from render import render as draw
-from models import MODELS, BASE_TOP
+from models import MODELS, BASE_TOP, _add_legends
+import legends
+_add_legends()
 
 ART = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "art")
 SIZE = 192
@@ -29,6 +31,10 @@ ANIMS = [("idle", 16, 10, True), ("move", 8, 24, False), ("blocked", 12, 12, Tru
 NAMES = {"sentinel": "Sentinelle", "human": "Humain", "tin_toy": "Jouet m\u00e9canique", "roller": "Roulix",
          "dicer": "T\u00eate de d\u00e9", "tree_bot": "Arborescent", "retro": "R\u00e9tro 1955", "crt": "Cathodique",
          "geometer": "G\u00e9om\u00e8tre", "android": "Androïde", "core": "Noyau"}
+
+
+NAMES.update(legends.NAMES)
+NAMES["human_legendes"] = "Humain (L\u00e9gendes)"
 
 
 def anchor():

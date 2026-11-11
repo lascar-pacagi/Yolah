@@ -27,5 +27,6 @@
   "planet image": "planete.png",
   "planet size": 3.6,
   "planet top": 0.38,
-  "stars": true
+  "stars": true,
+  "piece set": "robots"
 }

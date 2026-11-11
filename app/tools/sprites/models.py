@@ -190,19 +190,57 @@ def sentinel(anim, t, side):
 
 
 # ─── the human: an expressive face (a bust) ─────────────────────────────────
-SKIN = "#e0a283"
+# A portrait of the user, stylised (photo, 2026-11-11): very short buzzed hair
+# with a high, receding hairline, a high forehead with faint lines, a marked
+# brow, light grey-blue eyes, a longer face with a clear jaw, a salt-and-pepper
+# stubble beard and moustache, ears that show; a crew-neck T-shirt, black for
+# Black and white for White.
+SKIN = "#e4b296"
 
 
-def skin_mat():
+def smoothstep(a, b, x):
+    k = ((x - a) / (b - a)).clamp(0, 1)
+    return k * k * (3 - 2 * k)
+
+
+def hairline(q):
+    """Height of the hairline over the head-local point q (high at the front,
+    higher at the temples, low at the back)."""
+    front = smoothstep(-0.05, 0.22, q[:, 2])
+    return 0.15 * front + 0.07 * (q[:, 0] / 0.2) ** 2 * front - 0.13 * (1 - front)
+
+
+def skin_mat(head=None):
+    """Skin; with `head` (the head's transform): the stubble beard and moustache,
+    and faint lines on the forehead, placed in the head's coordinates."""
     base_c = srgb(SKIN)
 
     def pat(pl, pw, n):
-        # blush on the cheeks, a little noise (pores at this size: a soft mottle)
-        cheek = torch.exp(-(((pl[:, 0].abs() - 0.15) / 0.07) ** 2 + ((pl[:, 1] + 0.04) / 0.06) ** 2)) * (pl[:, 2] > 0).float()
+        q = head.to_local(pw) if head is not None else pl
+        cheek = torch.exp(-(((q[:, 0].abs() - 0.14) / 0.06) ** 2 + ((q[:, 1] + 0.03) / 0.05) ** 2)) * (q[:, 2] > 0).float()
         mott = fbm(pl * 30.0, 3)
         a = base_c * (0.94 + 0.12 * mott)[:, None]
-        a = a * (1 - 0.35 * cheek[:, None]) + srgb("#e0786a") * 0.35 * cheek[:, None]
-        return {"albedo": a, "rough": 0.42 + 0.1 * mott}
+        a = a * (1 - 0.22 * cheek[:, None]) + srgb("#d9786a") * 0.22 * cheek[:, None]
+        rough = 0.42 + 0.1 * mott
+        if head is not None:
+            ax = q[:, 0].abs()
+            bline = -0.06 - 0.3 * (0.17 - ax).clamp_min(0)            # the beard's upper edge on the cheeks
+            beard = smoothstep(0.012, -0.012, q[:, 1] - bline) * (q[:, 2] > -0.06).float()
+            stache = smoothstep(-0.095, -0.108, q[:, 1]) * smoothstep(0.08, 0.06, ax) * (q[:, 2] > 0.2).float()
+            beard = torch.maximum(beard, stache)
+            side = smoothstep(0.16, 0.2, ax) * (q[:, 1] < 0.06).float() * (q[:, 2] > -0.07).float() * (q[:, 2] < 0.12).float()
+            beard = torch.maximum(beard, side * smoothstep(0.06, 0.02, q[:, 1]))
+            beard = beard * smoothstep(-0.31, -0.26, q[:, 1])             # fades under the jaw
+            speck = fbm(q * 180.0, 2)
+            grey = (fbm(q * 220.0 + 7.0, 2) > 0.68).float()
+            stubble = srgb("#3a302a") * (1 - 0.6 * grey[:, None]) + srgb("#8f8780") * 0.6 * grey[:, None]
+            w = (beard * (0.68 + 0.25 * speck))[:, None]
+            a = a * (1 - w) + stubble * w
+            rough = rough + 0.3 * beard
+            fore = smoothstep(0.1, 0.13, q[:, 1]) * smoothstep(0.24, 0.2, q[:, 1]) * (q[:, 2] > 0.12).float()
+            lines = (torch.sin(q[:, 1] * 190 + 1.3 + 3 * q[:, 0] ** 2 * 40) > 0.93).float() * fore
+            a = a * (1 - 0.12 * lines[:, None])
+        return {"albedo": a, "rough": rough}
     return Mat(SKIN, rough=0.45, sss=0.55, pattern=pat)
 
 
@@ -269,43 +307,42 @@ def lid_mat(edge, upper=True):
     return Mat(SKIN, rough=0.45, sss=0.4, pattern=pat)
 
 
-def human(anim, t, side):
+def human(anim, t, side, outfit="tee"):
+    """outfit: "tee" (a crew-neck T-shirt) or "legendes" (a tunic, a cloak
+    held by a brooch, a leather strap: the human in the Légendes set)."""
     sc = Scene()
     base(sc, side)
-    skin = skin_mat()
-    hair = Mat("#4a2c1a", rough=0.36, clearcoat=0.5,
-               pattern=lambda pl, pw, n: {"albedo": srgb("#4a2c1a") * (0.6 + 0.7 * fbm(pl * vec(70, 18, 30), 3) ** 1.4)[:, None]})
-    jacket = Mat("#1f6f8b", rough=0.6, pattern=lambda pl, pw, n: {"albedo": srgb("#1f6f8b") * (0.85 + 0.25 * fbm(pl * 40, 2))[:, None]})
-    collar = Mat("#e9e3d6", rough=0.7)
-    lip = Mat("#c47b70", rough=0.32, sss=0.5, clearcoat=0.6)
+    tee_c = "#1b1c20" if side == 0 else "#ebe9e4"
+    tee = Mat(tee_c, rough=0.75, pattern=lambda pl, pw, n: {"albedo": srgb(tee_c) * (0.88 + 0.2 * fbm(pl * 60, 2))[:, None]})
+    rib = Mat(tee_c, rough=0.8, pattern=lambda pl, pw, n: {"albedo": srgb(tee_c) * (0.8 + 0.25 * (torch.sin(torch.atan2(pl[:, 2], pl[:, 0]) * 70) > 0).float())[:, None]})
+    lip = Mat("#b07f73", rough=0.4, sss=0.5, clearcoat=0.3)
     mouth_in = Mat("#4a1418", rough=0.6)
-    teeth = Mat("#f6f2ea", rough=0.25, clearcoat=0.6)
-    brow = Mat("#2c1a12", rough=0.7)
+    teeth = Mat("#f3efe6", rough=0.25, clearcoat=0.6)
+    brow = Mat("#2e2622", rough=0.75)
     # expression parameters
     yaw, pitch, roll, bob = 0.0, 0.0, 0.0, 0.0
-    gaze = (0.15, 0.0, 1.0)
-    lid_up, lid_low = 0.55, -0.75       # opening angles
+    gaze = (0.1, 0.0, 1.0)
+    lid_up, lid_low = 0.45, -0.75       # opening angles
     brow_in, brow_out = 0.0, 0.0        # heights of the inner / outer ends of the brows
-    smile, open_m = 0.35, 0.0
+    smile, open_m = 0.1, 0.0
     sweat = None
     happy_eyes = False
     if anim == "idle":
         bob = 0.008 * wave(t)
         yaw = 0.07 * wave(t, 1, 0.3)
-        roll = 0.03 * wave(t, 1)
+        roll = 0.025 * wave(t, 1)
         gx = 0.35 * math.sin(TAU * t)
-        gaze = (0.15 + gx, 0.05, 1.0)
+        gaze = (0.1 + gx, 0.05, 1.0)
         b = max(0.0, 1 - abs(t - 0.5) / 0.04)        # one blink
-        lid_up = 0.55 - 1.0 * b
+        lid_up = 0.45 - 0.95 * b
         lid_low = -0.75 + 0.3 * b
-        smile = 0.35
     elif anim == "move":
         pitch = 0.12 * math.sin(math.pi * t)
         yaw = 0.25
         gaze = (0.6, -0.05, 1.0)
         brow_in, brow_out = -0.02, 0.0
-        lid_up = 0.35
-        smile, open_m = 0.1, 0.0
+        lid_up = 0.3
+        smile = 0.05
         bob = 0.03 * math.sin(math.pi * t)
     elif anim == "blocked":
         yaw = 0.18 * math.sin(TAU * 2 * t)
@@ -313,7 +350,7 @@ def human(anim, t, side):
         gaze = (0.0, -0.35, 1.0)
         brow_in, brow_out = 0.035, -0.015
         lid_up = 0.4
-        smile, open_m = -0.55, 0.0
+        smile = -0.55
         sweat = (t % 1.0)
     elif anim == "win":
         bob = 0.04 * abs(math.sin(TAU * t))
@@ -324,91 +361,101 @@ def human(anim, t, side):
         smile, open_m = 0.8, 0.85
     y0 = BASE_TOP
     root = RY(HEADING * 0.3) * T(0, bob, 0)
-    # bust: shoulders and chest in a jacket, a white collar, the neck
-    sc.add(sd_ellipsoid(0.36, 0.2, 0.22), jacket, root * T(0, y0 + 0.16, 0))
-    sc.add(sd_ellipsoid(0.27, 0.17, 0.18), jacket, root * T(0, y0 + 0.28, 0), blend=0.06)
-    sc.add(sd_torus(0.105, 0.035), collar, root * T(0, y0 + 0.4, 0.0) * RX(0.15))
-    # a hood gathered behind the neck, a zip, two drawstrings
-    sc.add(sd_ellipsoid(0.2, 0.09, 0.1), jacket, root * T(0, y0 + 0.38, -0.12) * RX(-0.3), blend=0.04)
-    sc.add(sd_box(0.008, 0.12, 0.01, 0.004), chrome(0.2), root * T(0, y0 + 0.26, 0.205) * RX(-0.35))
+    # bust: shoulders and chest in a T-shirt, a ribbed crew neck, the neck
+    if outfit == "legendes":
+        tunic_c, cloak_c = ("#4a1c1e", "#18161a") if side == 0 else ("#3a5a34", "#e4dccb")
+        tunic = Mat(tunic_c, rough=0.85, pattern=lambda pl, pw, n: {"albedo": srgb(tunic_c) * (0.8 + 0.3 * fbm(pl * 70, 2))[:, None]})
+        cloak = Mat(cloak_c, rough=0.9, pattern=lambda pl, pw, n: {"albedo": srgb(cloak_c) * (0.82 + 0.25 * fbm(pl * 40, 3))[:, None]})
+        sc.add(sd_ellipsoid(0.35, 0.2, 0.21), tunic, root * T(0, y0 + 0.16, 0))
+        sc.add(sd_ellipsoid(0.27, 0.17, 0.17), tunic, root * T(0, y0 + 0.28, 0), blend=0.06)
+        # the cloak draped on the shoulders and down the back, its collar, a brooch, a strap
+        for sgn in (-1, 1):
+            sc.add(sd_ellipsoid(0.15, 0.085, 0.17), cloak, root * T(0.2 * sgn, y0 + 0.3, -0.03) * RZ(-0.35 * sgn), blend=0.02)
+        sc.add(sd_ellipsoid(0.33, 0.22, 0.09), cloak, root * T(0, y0 + 0.2, -0.16), blend=0.03)
+        sc.add(sd_torus(0.11, 0.032), cloak, root * T(0, y0 + 0.41, -0.015) * RX(0.25))
+        sc.add(sd_cylinder(0.008, 0.032, 0.004), gold(), root * T(0.12, y0 + 0.37, 0.12) * RX(1.1))
+        sc.add(sd_sphere(0.013), glow("#ff4a3a" if side == 0 else "#4ad0ff", 3.0), root * T(0.12, y0 + 0.375, 0.128))
+        sc.add(sd_box(0.022, 0.19, 0.012, 0.008), Mat("#4a301e", rough=0.6), root * T(-0.03, y0 + 0.24, 0.18) * RX(-0.35) * RZ(0.55))
+    else:
+        sc.add(sd_ellipsoid(0.37, 0.2, 0.22), tee, root * T(0, y0 + 0.16, 0))
+        sc.add(sd_ellipsoid(0.28, 0.17, 0.18), tee, root * T(0, y0 + 0.28, 0), blend=0.06)
+        sc.add(sd_torus(0.098, 0.022), rib, root * T(0, y0 + 0.415, 0.0) * RX(0.18))
+    sc.add(sd_capsule((0, 0, 0), (0, 0.15, 0.01), 0.083), skin_mat(), root * T(0, y0 + 0.38, 0))
+    head = root * T(0, y0 + 0.75, 0.02) * RY(yaw) * RX(pitch - 0.42) * RZ(roll)   # faces the camera
+    skin = skin_mat(head)
+    # head: cranium, jaw, chin, brow ridge, cheekbones, nose, ears
+    sc.add(sd_ellipsoid(0.25, 0.295, 0.265), skin, head)
+    sc.add(sd_ellipsoid(0.175, 0.17, 0.185), skin, head * T(0, -0.13, 0.07), blend=0.08)
+    sc.add(sd_ellipsoid(0.07, 0.05, 0.06), skin, head * T(0, -0.255, 0.16), blend=0.05)
+    sc.add(sd_ellipsoid(0.17, 0.03, 0.05), skin, head * T(0, 0.095, 0.21), blend=0.045)
     for sgn in (-1, 1):
-        sc.add(sd_capsule((0, 0, 0), (0.01 * sgn, -0.12, 0.03), 0.008), Mat("#f1ece2", rough=0.6),
-               root * T(0.05 * sgn, y0 + 0.36, 0.17))
-        sc.add(sd_sphere(0.013), chrome(0.25), root * T(0.05 * sgn + 0.01 * sgn, y0 + 0.235, 0.2))
-    sc.add(sd_capsule((0, 0, 0), (0, 0.14, 0.01), 0.085), skin, root * T(0, y0 + 0.38, 0))
-    head = root * T(0, y0 + 0.74, 0.02) * RY(yaw) * RX(pitch - 0.42) * RZ(roll)   # faces the camera
-    # head: cranium, cheeks and jaw, chin, nose, ears
-    sc.add(sd_ellipsoid(0.27, 0.29, 0.27), skin, head)
-    sc.add(sd_ellipsoid(0.18, 0.17, 0.19), skin, head * T(0, -0.12, 0.07), blend=0.08)
-    sc.add(sd_ellipsoid(0.08, 0.06, 0.07), skin, head * T(0, -0.235, 0.16), blend=0.06)
+        sc.add(sd_ellipsoid(0.05, 0.035, 0.04), skin, head * T(0.125 * sgn, -0.04, 0.2), blend=0.05)   # cheekbones
+        ear = head * T(0.255 * sgn, -0.01, -0.01) * RY(0.5 * sgn)
+        sc.add(sd_ellipsoid(0.05, 0.085, 0.028), skin, ear, blend=0.015)
+        sc.add(sd_ellipsoid(0.028, 0.055, 0.02), skin, ear * T(0, 0, 0.022), op="sub", blend=0.01)
+    sc.add(sd_capsule((0, 0.07, 0.0), (0, -0.04, 0.035), 0.021, 0.031), skin, head * T(0, -0.02, 0.258), blend=0.025)
     for sgn in (-1, 1):
-        sc.add(sd_ellipsoid(0.055, 0.04, 0.04), skin, head * T(0.12 * sgn, -0.055, 0.2), blend=0.05)   # cheeks
-        sc.add(sd_ellipsoid(0.04, 0.07, 0.03), skin, head * T(0.27 * sgn, -0.01, -0.01) * RY(0.3 * sgn), blend=0.02)
-    sc.add(sd_capsule((0, 0.05, 0.0), (0, -0.03, 0.03), 0.022, 0.03), skin, head * T(0, -0.02, 0.262), blend=0.025)
-    for sgn in (-1, 1):
-        sc.add(sd_sphere(0.017), skin, head * T(0.025 * sgn, -0.058, 0.278), blend=0.015)
+        sc.add(sd_sphere(0.017), skin, head * T(0.026 * sgn, -0.062, 0.275), blend=0.015)
     # eye sockets and eyes
-    er = 0.07
+    er = 0.064
     for sgn in (-1, 1):
-        ec = head * T(0.105 * sgn, 0.035, 0.2)
+        ec = head * T(0.1 * sgn, 0.03, 0.195)
         sc.add(sd_sphere(er + 0.012), skin, ec, op="sub", blend=0.02)
         if happy_eyes:   # closed, curved happily
             sc.add(sd_lid(er, 0.006, -0.1), skin, ec, blend=0.01)
             sc.add(sd_lower_lid(er, 0.006, 0.1), skin, ec, blend=0.01)
-            sc.add(sd_capsule((-0.045, -0.005, 0), (0, 0.012, 0), 0.008), Mat("#2c1a12", rough=0.6), ec * T(0, 0, er + 0.01))
-            sc.add(sd_capsule((0, 0.012, 0), (0.045, -0.005, 0), 0.008), Mat("#2c1a12", rough=0.6), ec * T(0, 0, er + 0.01))
+            sc.add(sd_capsule((-0.042, -0.005, 0), (0, 0.011, 0), 0.007), Mat("#2c1a12", rough=0.6), ec * T(0, 0, er + 0.01))
+            sc.add(sd_capsule((0, 0.011, 0), (0.042, -0.005, 0), 0.007), Mat("#2c1a12", rough=0.6), ec * T(0, 0, er + 0.01))
         else:
-            sc.add(sd_sphere(er), eye_mat(gaze), ec)
+            sc.add(sd_sphere(er), eye_mat(gaze, iris="#7f97a6"), ec)
             sc.add(sd_lid(er, 0.008, lid_up), lid_mat(lid_up), ec, blend=0.006)
             sc.add(sd_lower_lid(er, 0.006, lid_low), lid_mat(lid_low, False), ec, blend=0.006)
-        # brows
+        # brows: straight, under the brow ridge
         bi, bo = brow_in, brow_out
-        sc.add(sd_capsule((0.0, 0.0 + bi, 0.0), (0.085 * sgn, -0.01 + bo, -0.03), 0.017, 0.011), brow,
-               head * T(0.06 * sgn, 0.12, 0.245))
+        sc.add(sd_capsule((0.0, 0.0 + bi, 0.0), (0.095 * sgn, -0.002 + bo, -0.035), 0.012, 0.009), brow,
+               head * T(0.035 * sgn, 0.095, 0.262))
     # mouth: lips along a curve (smile > 0: corners up), the mouth open by open_m
-    mw = 0.072
+    mw = 0.07
     pts = []
     for k in range(7):
         x = -mw + 2 * mw * k / 6
         y = smile * 0.06 * (x / mw) ** 2 - smile * 0.015
         pts.append((x, y))
-    mouth = head * T(0, -0.135, 0.266)
+    mouth = head * T(0, -0.145, 0.262)
     if open_m > 0.05:
         sc.add(sd_ellipsoid(mw * 0.95, 0.025 + 0.05 * open_m, 0.06), mouth_in, mouth * T(0, -0.015 * open_m + smile * 0.01, -0.01))
         sc.add(sd_ellipsoid(mw * 1.05, 0.028 + 0.05 * open_m, 0.07), skin, mouth * T(0, -0.015 * open_m + smile * 0.01, 0.0), op="sub", blend=0.012)
         if smile > 0.3:
             sc.add(sd_box(mw * 0.72, 0.014, 0.02, 0.008), teeth, mouth * T(0, 0.016 + smile * 0.008, 0.012))
             sc.add(sd_ellipsoid(mw * 0.6, 0.02, 0.04), Mat("#c8565a", rough=0.4, sss=0.4), mouth * T(0, -0.03 * open_m, -0.005))
-    gap = 0.004 + 0.045 * open_m
+    gap = 0.003 + 0.045 * open_m
     for (x0, y0_), (x1, y1) in zip(pts[:-1], pts[1:]):
         z0, z1 = -0.022 * (x0 / mw) ** 2, -0.022 * (x1 / mw) ** 2
         w0, w1 = 1 - 0.55 * (x0 / mw) ** 2, 1 - 0.55 * (x1 / mw) ** 2       # thinner at the corners
-        sc.add(sd_capsule((x0, y0_ + gap, z0), (x1, y1 + gap, z1), 0.0075 * w0, 0.0075 * w1), lip, mouth, blend=0.006)
-        sc.add(sd_capsule((x0, y0_ - gap - 0.004, z0), (x1, y1 - gap - 0.004, z1), 0.011 * w0, 0.011 * w1), lip, mouth, blend=0.006)
+        sc.add(sd_capsule((x0, y0_ + gap, z0), (x1, y1 + gap, z1), 0.0065 * w0, 0.0065 * w1), lip, mouth, blend=0.006)
+        sc.add(sd_capsule((x0, y0_ - gap - 0.004, z0), (x1, y1 - gap - 0.004, z1), 0.0095 * w0, 0.0095 * w1), lip, mouth, blend=0.006)
     if open_m <= 0.05:
         for (x0, y0_), (x1, y1) in zip(pts[:-1], pts[1:]):
-            sc.add(sd_capsule((x0, y0_, 0.0), (x1, y1, 0.0), 0.0035), mouth_in, mouth * T(0, 0, 0.004))
-    # hair: a cap with volume and a swept fringe
-    hn = torch.nn.functional.normalize(vec(0, 1, -0.7), dim=0)
+            sc.add(sd_capsule((x0, y0_, 0.0), (x1, y1, 0.0), 0.003), mouth_in, mouth * T(0, 0, 0.004))
+    # buzzed hair: a thin shell over the skull, above the hairline, a stubble texture
+    def buzz_pat(pl, pw, n):
+        q = head.to_local(pw)
+        edge = smoothstep(0.0, 0.035, q[:, 1] - hairline(q))          # thinner near the hairline
+        speck = fbm(q * 200.0, 2)
+        grey = (fbm(q * 240.0 + 3.0, 2) > 0.72).float()
+        hc = srgb("#241d19") * (1 - 0.45 * grey[:, None]) + srgb("#6f6862") * 0.45 * grey[:, None]
+        k = (edge * (0.85 + 0.12 * speck))[:, None]
+        a = srgb(SKIN) * 0.9 * (1 - k) + hc * k
+        return {"albedo": a, "rough": 0.55 + 0.3 * edge}
 
-    def hair_cap(p):          # the main volume, above the hairline (lower at the back)
-        ell = sd_ellipsoid(0.295, 0.315, 0.3)(p) - 0.012 * fbm(p * 7.0, 2)
-        return torch.maximum(ell, 0.005 - p @ hn)
-    sc.add(hair_cap, hair, head * T(0, 0.025, -0.015))
-    # a big lock sweeping from the parting over the forehead, to the right
-    sc.add(sd_ellipsoid(0.2, 0.075, 0.12), hair, head * T(0.03, 0.2, 0.15) * RZ(-0.32) * RX(0.45) * RY(-0.25), blend=0.035)
-    sc.add(sd_ellipsoid(0.1, 0.045, 0.075), hair, head * T(0.19, 0.165, 0.17) * RZ(-0.9) * RX(0.4), blend=0.03)
-    # volume on the top, locks combed back
-    for (lx, ly, lz, ax, az) in ((-0.1, 0.29, 0.06, -0.3, 0.25), (0.06, 0.31, 0.02, -0.35, -0.2),
-                                 (-0.02, 0.29, -0.1, -0.6, 0.05), (0.16, 0.26, -0.04, -0.4, -0.5)):
-        sc.add(sd_ellipsoid(0.1, 0.06, 0.16), hair, head * T(lx, ly, lz) * RX(ax) * RZ(az), blend=0.04)
-    # sides, over the top of the ears
-    for sgn in (-1, 1):
-        sc.add(sd_ellipsoid(0.055, 0.1, 0.11), hair, head * T(0.255 * sgn, 0.07, -0.03) * RZ(0.15 * sgn), blend=0.035)
+    def buzz(p):
+        shell = sd_ellipsoid(0.257, 0.302, 0.272)(p)
+        return torch.maximum(shell, -(p[:, 1] - hairline(p)) * 0.5)
+    sc.add(buzz, Mat("#3d342e", rough=0.8, pattern=buzz_pat), head)
     if sweat is not None:
         ph = sweat
         sc.add(sd_ellipsoid(0.018, 0.028, 0.018), Mat("#9ad8ff", rough=0.05, clearcoat=2.0, metal=0.0),
-               head * T(0.24, 0.12 - 0.16 * ph, 0.12))
+               head * T(0.23, 0.12 - 0.16 * ph, 0.12))
     return sc
 
 
@@ -1006,3 +1053,13 @@ def scaled(name, f):
 _MODELS = {"sentinel": sentinel, "human": human, "tin_toy": tin_toy, "roller": roller, "dicer": dicer, "tree_bot": tree_bot,
           "retro": retro, "crt": crt, "geometer": geometer, "android": android, "core": core}
 MODELS = {k: scaled(k, f) for k, f in _MODELS.items()}
+
+
+# the "Légendes" set (legends.py)
+def _add_legends():
+    import legends
+    MODELS["human_legendes"] = lambda anim, t, side: human(anim, t, side, "legendes")
+    for k, f in legends.LEGENDS.items():
+        SCALE.setdefault(k, legends.SCALE.get(k, 1.3))
+        MODELS[k] = scaled(k, f)
+

@@ -349,9 +349,14 @@ def gauss_blur(img, sigma):
 
 
 def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True, bloom=1.0, shadow_strength=0.55,
-           exposure=1.25, steps=160):
+           exposure=1.25, steps=160, toon=False, ink="#1b1420", line=1.0):
     """RGBA uint8 (size, size, 4) numpy array. view: world units across the frame;
-    center: the world point at the frame's centre."""
+    center: the world point at the frame's centre.
+
+    toon: the manga look: flat shading in bands (light, half tone, shadow), a
+    hard highlight, a rim band, and ink lines (colour `ink`, about `line`
+    final pixels wide) on the silhouette, on jumps in depth, on sharp creases
+    and where the flat colour changes (use flat materials)."""
     n = size * ss
     el = math.radians(ELEVATION)
     fwd = vec(0, -math.sin(el), -math.cos(el))      # looking down, towards −z
@@ -383,6 +388,9 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
         alive[idx[h | out]] = False
     color = torch.zeros(N, 3, device=DEV)
     emis = torch.zeros(N, 3, device=DEV)
+    albbuf = torch.zeros(N, 3, device=DEV)
+    gbuf = torch.full((N,), -1, dtype=torch.long, device=DEV)     # toon: ink group (the material) of each pixel
+    nbuf = torch.zeros(N, 3, device=DEV)
     alpha = hit.float()
     hi = hit.nonzero().squeeze(1)
     if hi.numel():
@@ -438,36 +446,59 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
         F0 = 0.04 * (1 - met[:, None]) + alb * met[:, None]
         diff_col = alb * (1 - met[:, None])
         col = torch.zeros_like(p)
-        for L, LC, s_ in ((KEY, KEY_COL, sh), (FILL, FILL_COL, None), (RIM, RIM_COL, None)):
-            ndl = (nrm @ L)
-            wrap = (ndl + sss) / (1 + sss)
-            dif = wrap.clamp_min(0)
-            if s_ is not None:
-                dif = dif * s_
-            Hh = norm(L + V)
-            ndh = (nrm * Hh).sum(-1).clamp_min(0)
-            a2 = (rou ** 2).clamp_min(0.002) ** 2
-            D = a2 / (math.pi * (ndh * ndh * (a2 - 1) + 1) ** 2)
-            ndv = (nrm * V).sum(-1).clamp_min(1e-3)
-            fres = F0 + (1 - F0) * ((1 - (Hh * V).sum(-1).clamp(0, 1)) ** 5)[:, None]
-            spec = (D * ndl.clamp_min(0) / (4 * ndv.clamp_min(0.2)))[:, None] * fres
-            if s_ is not None:
-                spec = spec * s_[:, None]
-            sss_tint = 1 + sss[:, None] * (srgb("#ff6a4a") - 1) * (1 - ndl.clamp(0, 1))[:, None] * 0.6
-            col = col + LC * (diff_col * dif[:, None] * sss_tint / math.pi * 3.2 + spec)
-            if s_ is not None:   # clear coat: a tight extra highlight
-                ccD = (ndh ** 900) * 18
-                col = col + LC * (cc * ccD * s_)[:, None] * 0.25
-        ndv = (nrm * V).sum(-1).clamp(0, 1)
-        R = norm(-V - 2 * (( -V * nrm).sum(-1, keepdim=True)) * nrm)
-        fr = F0 + (1 - F0) * ((1 - ndv) ** 5)[:, None]
-        envc = env(R)
-        rough_k = (1 - rou)[:, None] ** 2
-        col = col + envc * fr * (0.25 + 0.75 * rough_k) * ao[:, None] * (0.6 + 0.4 * sh[:, None])
-        col = col + diff_col * ambient(nrm) * ao[:, None] * 0.9
-        col = col + emi
-        color[hi] = torch.nan_to_num(col, nan=0.0)
-        emis[hi] = emi
+        if toon:
+            albbuf[hi] = alb
+            nbuf[hi] = nrm
+            keys, gid = {}, torch.zeros(len(scene.parts), dtype=torch.long, device=DEV)
+            for i, part in enumerate(scene.parts):      # same look = same group: no ink line between them
+                mt = part.mat
+                k = (tuple(round(float(v), 3) for v in mt.albedo), round(mt.rough, 2), round(mt.metal, 2), mt.pattern is not None and id(mt))
+                gid[i] = keys.setdefault(k, len(keys))
+            gbuf[hi] = gid[ids]
+        if toon:
+            ndv_ = (nrm * V).sum(-1).clamp(0, 1)
+            lit = (nrm @ KEY).clamp_min(0) * sh
+            band = torch.where(lit > 0.45, torch.full_like(lit, 1.0), torch.where(lit > 0.1, torch.full_like(lit, 0.66), torch.full_like(lit, 0.42)))
+            rimb = ((1 - ndv_) > 0.7).float() * ((nrm @ RIM) > -0.3).float() * 0.3
+            Hk = norm(KEY + V)
+            hl = (((nrm * Hk).sum(-1).clamp_min(0)) > (0.9 + 0.09 * (1 - rou))).float() * (1 - rou) * 1.2
+            Rt = norm(-V - 2 * ((-V * nrm).sum(-1, keepdim=True)) * nrm)
+            metal_band = torch.where(Rt[:, 1] > 0.25, torch.full_like(lit, 1.25), torch.full_like(lit, 0.45))
+            base_c = alb * (1 - met[:, None]) * (band + rimb)[:, None] * 1.9 + alb * met[:, None] * metal_band[:, None] * 1.5
+            col = base_c + hl[:, None] + emi
+            color[hi] = torch.nan_to_num(col, nan=0.0)
+            emis[hi] = emi
+        else:
+            for L, LC, s_ in ((KEY, KEY_COL, sh), (FILL, FILL_COL, None), (RIM, RIM_COL, None)):
+                ndl = (nrm @ L)
+                wrap = (ndl + sss) / (1 + sss)
+                dif = wrap.clamp_min(0)
+                if s_ is not None:
+                    dif = dif * s_
+                Hh = norm(L + V)
+                ndh = (nrm * Hh).sum(-1).clamp_min(0)
+                a2 = (rou ** 2).clamp_min(0.002) ** 2
+                D = a2 / (math.pi * (ndh * ndh * (a2 - 1) + 1) ** 2)
+                ndv = (nrm * V).sum(-1).clamp_min(1e-3)
+                fres = F0 + (1 - F0) * ((1 - (Hh * V).sum(-1).clamp(0, 1)) ** 5)[:, None]
+                spec = (D * ndl.clamp_min(0) / (4 * ndv.clamp_min(0.2)))[:, None] * fres
+                if s_ is not None:
+                    spec = spec * s_[:, None]
+                sss_tint = 1 + sss[:, None] * (srgb("#ff6a4a") - 1) * (1 - ndl.clamp(0, 1))[:, None] * 0.6
+                col = col + LC * (diff_col * dif[:, None] * sss_tint / math.pi * 3.2 + spec)
+                if s_ is not None:   # clear coat: a tight extra highlight
+                    ccD = (ndh ** 900) * 18
+                    col = col + LC * (cc * ccD * s_)[:, None] * 0.25
+            ndv = (nrm * V).sum(-1).clamp(0, 1)
+            R = norm(-V - 2 * (( -V * nrm).sum(-1, keepdim=True)) * nrm)
+            fr = F0 + (1 - F0) * ((1 - ndv) ** 5)[:, None]
+            envc = env(R)
+            rough_k = (1 - rou)[:, None] ** 2
+            col = col + envc * fr * (0.25 + 0.75 * rough_k) * ao[:, None] * (0.6 + 0.4 * sh[:, None])
+            col = col + diff_col * ambient(nrm) * ao[:, None] * 0.9
+            col = col + emi
+            color[hi] = torch.nan_to_num(col, nan=0.0)
+            emis[hi] = emi
     # glass: reflections and a tint over the opaque result (or over nothing)
     if scene.has_glass():
         tg = torch.zeros(N, device=DEV, dtype=F)
@@ -513,6 +544,34 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
             a_old = alpha[gi]
             alpha[gi] = torch.maximum(a_old, (0.18 + 0.8 * fr).clamp(0, 1))
             hit = hit | front
+    # ink lines (toon): compare each pixel with its right and lower neighbours
+    if toon:
+        Hm = hit.reshape(n, n)
+        Dm = torch.where(Hm, t.reshape(n, n), torch.full((n, n), 99.0, device=DEV))
+        Gm = gbuf.reshape(n, n)
+        Nm = nbuf.reshape(n, n, 3)
+        edge = torch.zeros(n, n, dtype=torch.bool, device=DEV)
+        for dy, dx in ((0, 1), (1, 0)):
+            a_h, b_h = Hm[:n - dy, :n - dx], Hm[dy:, dx:]
+            sil = a_h != b_h
+            both = a_h & b_h
+            dz = (Dm[:n - dy, :n - dx] - Dm[dy:, dx:]).abs() > 0.035
+            crease = (Nm[:n - dy, :n - dx] * Nm[dy:, dx:]).sum(-1) < 0.55
+            dcol = Gm[:n - dy, :n - dx] != Gm[dy:, dx:]
+            e = sil | (both & (dz | crease | dcol))
+            edge[:n - dy, :n - dx] |= e
+            edge[dy:, dx:] |= e
+        k = max(1, int(round(line * ss)))
+        if k > 1:
+            edge = torch.nn.functional.max_pool2d(edge[None, None].float(), k * 2 - 1, 1, k - 1)[0, 0] > 0
+        glowing = (emis.reshape(n, n, 3).sum(-1) > 0.05)
+        glowing = torch.nn.functional.max_pool2d(glowing[None, None].float(), 3, 1, 1)[0, 0] > 0
+        edge = edge & ~glowing                 # no ink around what glows (auras, flames, lights)
+        ef = edge.reshape(-1)
+        color[ef] = srgb(ink)
+        emis[ef] = 0
+        alpha[ef] = 1.0
+        hit = hit | ef
     # ground: the contact shadow (black with alpha)
     if ground:
         mi = (~hit).nonzero().squeeze(1)
