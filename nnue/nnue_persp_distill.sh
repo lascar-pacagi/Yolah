@@ -77,6 +77,14 @@
 #                                      fc1, frozen; only the 4 corrections learn → k8_them_g046_qat_ib4f_ref_az20
 #   FROM_REF=1                         the control: the reference's own fc1 fine-tuned,
 #                                      the rest frozen                     → k8_them_g046_qat_ref_az20
+# A second fine-tuning from a network of the above (REF_MODEL: its last epoch, <name>.9.pt
+# after 10 epochs; same FROM_REF / buckets settings), REF_TAG=<tag> names it → …_ref<tag>_az20,
+# its own directory (without a tag it would reuse the first run's directory: start again
+# from its init_ref.pt, the reference, overwrite its .<epoch>.pt, append to its .val.jsonl). Lower lr:
+#   FROM_REF=1 YOLAH_INPUT_BUCKETS=4 YOLAH_FC1_FACTOR=1 REF_TAG=2 YOLAH_NB_EPOCHS=20 YOLAH_LR=3e-5
+#     REF_MODEL=$MODEL_ROOT/k8_them_g046_qat_ib4f_ref_az20/nnue_persp_k8_them_g046_qat_ib4f_ref_az20_distill.9.pt
+#                                                      → k8_them_g046_qat_ib4f_ref2_az20
+#   (the same for the control, from k8_them_g046_qat_ref_az20 → k8_them_g046_qat_ref2_az20)
 # Evaluation only (no training): the float AND quantized validation mse of an
 # already trained network, on the validation positions of every run, with the
 # space columns of its training (YOLAH_SPACE_MASK / YOLAH_SPACE_GROUPS):
@@ -186,7 +194,7 @@ if [[ "${YOLAH_FC1_FACTOR}" == "1" ]]; then
     WIDTH_SUFFIX="${WIDTH_SUFFIX}f"
 fi
 if [[ "${SCRATCH}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_scratch"; fi
-if [[ "${FROM_REF}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ref"; fi
+if [[ "${FROM_REF}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ref${REF_TAG:-}"; fi
 if [[ "${P7}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
     if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
@@ -249,7 +257,7 @@ echo "  Space    : mask ${YOLAH_SPACE_MASK}  groups=${YOLAH_SPACE_GROUPS:-none} 
 echo "  Step 3   : P7=${P7}  from spacelite=${FROM_SPACELITE}  direct=${YOLAH_DIRECT}  qat=${YOLAH_QAT}"
 echo "  Layer 1  : ${YOLAH_L1_SIZE}  scratch=${SCRATCH}  input buckets=${YOLAH_INPUT_BUCKETS}  factorised=${YOLAH_FC1_FACTOR}"
 echo "  Layer 2  : ${YOLAH_L2_SIZE}  square=${YOLAH_L2_SQUARE}"
-echo "  Frozen   : from the reference=${FROM_REF}  freeze (fc1 only)=${YOLAH_FREEZE}"
+echo "  Frozen   : from the reference=${FROM_REF}${REF_TAG:+ (tag ${REF_TAG})}  freeze (fc1 only)=${YOLAH_FREEZE}"
 echo "  Eval only: ${EVAL_MODEL:-no}"
 echo "════════════════════════════════════════════════════════════════"
 
