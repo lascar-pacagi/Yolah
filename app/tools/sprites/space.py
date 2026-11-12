@@ -224,7 +224,10 @@ def plate_light(S=128):
 
 def plate_dark(S=128, frames=12):
     """A navy plate with a fine circuit texture (many thin traces, like a
-    printed board seen from afar) whose light runs slowly along them."""
+    printed board seen from afar) that glows softly, all at once. (A light
+    running along a diagonal, as before, made moving diagonals across the
+    whole board, every dark square being in step: the user found it
+    disturbing.)"""
     out = []
     x, y = grid(S, S)
     n = noise2(x * 8, y * 8, 5.0, 4)
@@ -243,7 +246,7 @@ def plate_dark(S=128, frames=12):
     for f in range(frames):
         ph = f / frames
         c = base[:, None, None] * (0.85 + 0.3 * n)
-        pulse = 0.25 + 0.75 * (0.5 + 0.5 * torch.sin(TAU * ((x + y) * 1.0 - ph)))
+        pulse = 0.6 + 0.12 * math.sin(TAU * ph)   # uniform and faint: no wave travels across the board
         glowmap = traces * pulse
         halo = gauss_blur(glowmap[None], 1.5)[0]
         c = c + srgb("#2cb8e6")[:, None, None] * (glowmap * 0.55 + halo * 0.35)
