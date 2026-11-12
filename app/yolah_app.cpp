@@ -3388,7 +3388,7 @@ enum class Scene { Menu, Setup, Game, Themes, Tutorial, Puzzles, Editor, Studio 
 
 // Saved in the preferences folder (settings.json).
 struct Settings {
-    std::string theme = "bois";
+    std::string theme = "espace";
     bool show_eval = true, show_hint = false, show_coords = true, show_pv = false;
     int time_index = 1;                       // index in TIMES
     std::string black = "human", white = "dev";
@@ -3825,6 +3825,7 @@ struct App {
         g.pass_at = -1;
         g.move_scroll = 0;
         g.eval_shown = 0.5f;
+        settings.show_hint = false;     // a new game starts without the hint (it is a help asked for, not a mode)
         const std::string who[2] = {black, white};
         for (int side : {BLACK, WHITE}) {
             Slot& sl = g.slot[side];
@@ -4565,16 +4566,20 @@ void scene_game(App& a) {
     else if (g.tab == 1) tab_analysis(a, content, snap);
     else tab_ai(a, content);
     bool ai_vs_ai = !g.slot[0].human() && !g.slot[1].human();
-    float bw = (buttons.w - 3 * 8 * s) / 4;
-    auto bbox = [&](int i) { return Box{buttons.x + i * (bw + 8 * s), buttons.y, bw, buttons.h}; };
+    float bw = (buttons.w - 4 * 6 * s) / 5;
+    auto bbox = [&](int i) { return Box{buttons.x + i * (bw + 6 * s), buttons.y, bw, buttons.h}; };
     if (ai_vs_ai) {
-        if (a.ui.button("g_pause", bbox(0), g.paused ? "Reprendre" : "Pause", g.paused ? Style::Primary : Style::Normal, true, 17)) g.paused = !g.paused;
-    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.settings.show_hint && help ? Style::Primary : Style::Normal, help, 17)) {
+        if (a.ui.button("g_pause", bbox(0), g.paused ? "Reprendre" : "Pause", g.paused ? Style::Primary : Style::Normal, true, 16)) g.paused = !g.paused;
+    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.settings.show_hint && help ? Style::Primary : Style::Normal, help, 16)) {
         a.settings.show_hint = !a.settings.show_hint;
     }
-    if (a.ui.button("g_undo", bbox(1), "Annuler", Style::Normal, !g.match.history.empty(), 17)) a.undo_move();
-    if (a.ui.button("g_flip", bbox(2), "Retourner", Style::Normal, true, 17)) g.board.flipped = !g.board.flipped;
-    if (a.ui.button("g_menu", bbox(3), g.puzzle_mode ? "Quitter" : "Menu", Style::Ghost, true, 17)) {
+    if (a.ui.button("g_undo", bbox(1), "Annuler", Style::Normal, !g.match.history.empty(), 16)) a.undo_move();
+    if (a.ui.button("g_flip", bbox(2), "Retourner", Style::Normal, true, 16)) g.board.flipped = !g.board.flipped;
+    if (!g.puzzle_mode && a.ui.button("g_players", bbox(3), "Joueurs", Style::Normal, true, 16)) {   // back to the choice of the players
+        a.go(Scene::Setup);
+        return;
+    }
+    if (a.ui.button("g_menu", bbox(g.puzzle_mode ? 3 : 4), g.puzzle_mode ? "Quitter" : "Menu", Style::Ghost, true, 16)) {
         if (g.puzzle_mode) leave_puzzle(a);
         else a.go(Scene::Menu);
         return;
@@ -7002,6 +7007,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
             y.play(mv[rng() % mv.size()]);
         }
         a->start_game(y);
+        if (arg_flag(argc, argv, "--hint")) a->settings.show_hint = true;   // a new game clears it
         // The holes of the random moves are not animated.
         a->game.board.hole_since.fill(-100);
         a->game.tab = std::stoi(arg_value(argc, argv, "--tab", "0"));
