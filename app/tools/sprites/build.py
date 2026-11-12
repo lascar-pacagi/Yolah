@@ -35,6 +35,10 @@ import arctic
 import origami
 import dinos
 import anatomy
+import bombs
+for _k, _f in bombs.BOMBS.items():           # the Bombes set (bombs.py)
+    SCALE[_k] = bombs.SCALE[_k[5:]]
+    MODELS[_k] = scaled(_k, _f)
 for _k, _f in anatomy.ANATOMY.items():       # the Laboratoire set (anatomy.py)
     SCALE[_k] = anatomy.SCALE[_k[4:]]
     MODELS[_k] = scaled(_k, _f)
@@ -72,6 +76,7 @@ NAMES.update(arctic.NAMES)
 NAMES.update(origami.NAMES)
 NAMES.update(dinos.NAMES)
 NAMES.update(anatomy.NAMES)
+NAMES.update(bombs.NAMES)
 NAMES["human_legendes"] = "Humain (L\u00e9gendes)"
 
 

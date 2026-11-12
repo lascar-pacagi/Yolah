@@ -55,6 +55,7 @@
 //  Command line (all optional):
 //   --size WxH            window size
 //   --screenshot FILE     render, save FILE (.bmp) and quit (tests, docs)
+//   --fixed-dt            every frame advances the clock by 1/60 s (with --frames N: the picture at N/60 s)
 //   --frames N            frames rendered before the screenshot (default 30)
 //   --scene NAME          menu, setup, game, themes, tutorial, puzzles, editor, studio
 //   --scene setup         (--params ID: the settings box of that AI open)
@@ -2520,6 +2521,7 @@ struct Shatter : Effect {
     float sq, power, t = 0, dur;
     std::vector<float> rays;      // angles of the speed lines / star rays
     std::vector<std::vector<V2>> cracks;   // ice: jagged cracks from the centre (offsets in squares)
+    int tier = 0;                 // blast: 0 firecracker ... 9 nuclear bomb
     Shatter(V2 c, float sq, const Theme& th, float power, std::mt19937& rng)
         : style(th.break_fx), c(c), sq(sq), power(std::clamp(power, 0.0f, 1.0f)) {
         std::uniform_real_distribution<float> U(0, 1);
@@ -2637,6 +2639,82 @@ struct Shatter : Effect {
                 add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, (U(rng) - 0.5f) * sq * 0.5f}, V2{std::cos(a) * sp, std::sin(a) * sp},
                     1.2f + 0.8f * U(rng), sq * (0.06f + 0.08f * U(rng)) * (0.8f + 0.4f * P), col, 4);
             }
+        } else if (style == "blast") {
+            // The square left is blown up; the stronger the piece, the bigger the blast, and each
+            // strength its own shape (the Bombes set, from the firecracker to the nuclear bomb).
+            tier = P < 0.1f ? 0 : P < 0.25f ? 1 : P < 0.36f ? 2 : P < 0.42f ? 3 : P < 0.5f ? 4 : P < 0.715f ? 5 : P < 0.8f ? 6 : P < 0.92f ? 7 : P < 0.97f ? 8 : 9;
+            dur = std::array<float, 10>{0.45f, 0.9f, 0.8f, 0.9f, 0.8f, 1.0f, 1.2f, 1.3f, 1.4f, 3.2f}[size_t(tier)];
+            auto sparks = [&](int n, float sp0, float sp1, Rgba col, V2 from, float up) {
+                for (int i = 0; i < n; i++) {
+                    float a = U(rng) * 6.283f, sp = sq * (sp0 + (sp1 - sp0) * U(rng));
+                    add(from, V2{std::cos(a) * sp, std::sin(a) * sp - up * sq}, 0.25f + 0.4f * U(rng), sq * 0.02f, col, 3);
+                }
+            };
+            auto smoke = [&](int n, float r0, float rise, Rgba col, float life) {
+                for (int i = 0; i < n; i++) {
+                    float a = U(rng) * 6.283f;
+                    add(c + V2{std::cos(a), std::sin(a)} * sq * r0 * U(rng), V2{std::cos(a) * sq * 0.6f, -sq * rise * (0.5f + U(rng))},
+                        life * (0.7f + 0.6f * U(rng)), sq * (0.18f + 0.2f * U(rng)) * (1 + 0.15f * tier), col, 2);
+                }
+            };
+            auto debris = [&](int n, float sp0, float sp1) {
+                for (int i = 0; i < n; i++) {
+                    float a = -float(M_PI) * (0.05f + 0.9f * U(rng)), sp = sq * (sp0 + (sp1 - sp0) * U(rng));
+                    add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, 0}, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.6f + 0.5f * U(rng),
+                        sq * (0.05f + 0.07f * U(rng)), U(rng) < 0.5f ? th.light : shade(th.dark, 0.1f), 1);
+                }
+            };
+            switch (tier) {
+            case 0:   // firecracker: a few pops, sparks
+                sparks(14, 1.0f, 2.2f, hex(0xffe08a), c, 0.4f);
+                smoke(3, 0.2f, 0.6f, hex(0xc8c0b0, 150), 0.6f);
+                break;
+            case 1:   // firework rocket: a trail up, a burst of coloured stars above the square
+                for (int i = 0; i < 40; i++) {
+                    float a = U(rng) * 6.283f, sp = sq * (1.2f + 0.8f * U(rng));
+                    const Rgba cols[] = {hex(0xff5a7a), hex(0x7ad8ff), hex(0xffe060), hex(0x9aff7a)};
+                    add(c + V2{0, -sq * 1.3f}, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.5f + 0.4f * U(rng), sq * 0.025f, cols[i % 4], 3);
+                }
+                smoke(3, 0.2f, 0.5f, hex(0xc8c0b0, 120), 0.7f);
+                break;
+            case 2: case 3:   // dynamite: a fireball, smoke, earth thrown up
+                sparks(20 + 10 * (tier - 2), 1.2f, 2.8f, hex(0xffc060), c, 0.6f);
+                smoke(5 + 3 * (tier - 2), 0.3f, 0.7f, hex(0x5a4a40, 200), 1.0f);
+                debris(10 + 8 * (tier - 2), 1.2f, 3.0f);
+                break;
+            case 4:   // grenade: shrapnel lines all around, a small fireball
+                for (int i = 0; i < 16; i++) rays.push_back(i * 6.283f / 16 + U(rng) * 0.2f);
+                sparks(24, 2.0f, 3.5f, hex(0xffd080), c, 0.2f);
+                smoke(5, 0.3f, 0.6f, hex(0x4a4440, 200), 1.0f);
+                break;
+            case 5:   // the round bomb: a cartoon BOOM, a cloud of smoke
+                for (int i = 0; i < 12; i++) rays.push_back(i * 6.283f / 12 + (U(rng) - 0.5f) * 0.25f);
+                smoke(9, 0.5f, 0.6f, hex(0x3a3436, 210), 1.1f);
+                sparks(20, 1.5f, 3.0f, hex(0xffe08a), c, 0.4f);
+                break;
+            case 6:   // sea mine: a flash and a tall column of spray
+                for (int i = 0; i < 70; i++) {
+                    float sp = sq * (2.5f + 3.5f * U(rng)), a = -float(M_PI) / 2 + (U(rng) - 0.5f) * 0.7f;
+                    add(c + V2{(U(rng) - 0.5f) * sq * 0.4f, 0}, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.8f + 0.4f * U(rng),
+                        sq * (0.03f + 0.04f * U(rng)), U(rng) < 0.6f ? hex(0xe8f6ff) : hex(0x9fd0f0), 0);
+                }
+                smoke(6, 0.4f, 0.8f, hex(0xdde8f0, 160), 1.0f);
+                break;
+            case 7:   // aerial bomb: a big fireball, a shock ring, earth and stones flying
+                debris(26, 1.5f, 4.0f);
+                smoke(10, 0.6f, 0.8f, hex(0x3a3032, 220), 1.4f);
+                sparks(30, 2.0f, 4.0f, hex(0xffc060), c, 0.5f);
+                break;
+            case 8:   // missile: a white flash, two shock rings, fire
+                debris(20, 2.0f, 4.5f);
+                smoke(12, 0.7f, 0.9f, hex(0x2e2a2c, 220), 1.5f);
+                sparks(44, 2.5f, 5.0f, hex(0xfff0c0), c, 0.4f);
+                break;
+            default:   // the nuclear bomb: the mushroom cloud does the rest (draw)
+                sparks(40, 3.0f, 6.0f, hex(0xfff0c0), c, 0.3f);
+                smoke(16, 1.2f, 0.4f, hex(0x7a6458, 200), 2.6f);
+                break;
+            }
         } else {   // debris
             int n = 12 + int(18 * P);
             for (int i = 0; i < n; i++) {
@@ -2662,6 +2740,116 @@ struct Shatter : Effect {
             p.ang += p.spin * dt;
         }
         return t < dur + 0.6f;
+    }
+    // The blast of the Bombes set, by tier (see the constructor).
+    void draw_blast() {
+        using namespace draw;
+        const float k = std::clamp(t / dur, 0.0f, 1.0f);
+        auto fireball = [&](float R, float speed, float fade) {
+            float g = ease_out_cubic(std::min(1.0f, t * speed)), f = std::exp(-t * fade);
+            if (f < 0.02f) return;
+            float cool = std::clamp(t * fade * 0.5f, 0.0f, 1.0f);           // the fire turns to smoke
+            circle(c, R * g * 1.3f, mix(hex(0xff4a10, uint8_t(200 * f)), hex(0x3a3032, uint8_t(200 * f)), cool), hex(0x2a2020, 0), R * 0.45f);
+            circle(c, R * g, mix(hex(0xff8a20, uint8_t(255 * f)), hex(0x5a4a44, uint8_t(220 * f)), cool), mix(hex(0xff5a10, uint8_t(220 * f)), hex(0x3a3032, uint8_t(160 * f)), cool), R * 0.25f);
+            circle(c, R * g * 0.62f, hex(0xfff4c0, uint8_t(255 * f * (1 - cool))), hex(0xffb030, uint8_t(230 * f * (1 - cool))), R * 0.2f);
+        };
+        auto shock = [&](float R, float delay, float a0) {
+            float u = std::clamp((t - delay) / (dur * 0.6f), 0.0f, 1.0f);
+            if (u <= 0 || u >= 1) return;
+            ring(c, R * ease_out_cubic(u), sq * 0.06f * (1 - u) + 1, hex(0xfff2e0, uint8_t(a0 * (1 - u))));
+        };
+        switch (tier) {
+        case 0: {
+            float f = std::exp(-t * 10);
+            circle(c, sq * 0.45f, hex(0xfff6d0, uint8_t(255 * f)), hex(0xffb040, 0), 0);
+            for (int i = 0; i < 4; i++) {   // pops one after the other, each with its little ring
+                float tt = t - i * 0.07f;
+                if (tt <= 0 || tt >= 0.2f) continue;
+                V2 p = c + V2{std::cos(i * 2.2f), std::sin(i * 2.2f)} * sq * 0.22f;
+                float u = tt / 0.2f;
+                circle(p, sq * 0.16f * (1 - u), hex(0xffffff, 255), hex(0xffd070, 180), sq * 0.05f);
+                ring(p, sq * (0.1f + 0.3f * u), sq * 0.03f * (1 - u) + 1, hex(0xfff0c0, uint8_t(230 * (1 - u))));
+            }
+            break;
+        }
+        case 1: {
+            if (t < 0.18f) line(c, c + V2{0, -sq * 1.3f * t / 0.18f}, sq * 0.04f, hex(0xffe0a0, 230));   // the trail
+            float f = std::exp(-std::max(0.0f, t - 0.15f) * 8);
+            if (t > 0.15f) circle(c + V2{0, -sq * 1.3f}, sq * 0.5f, hex(0xffffff, uint8_t(200 * f)), hex(0xffe0a0, 0), 0);
+            break;
+        }
+        case 2: case 3: fireball(sq * (0.6f + 0.25f * (tier - 2)), 9, 4.5f); break;
+        case 4: {
+            fireball(sq * 0.5f, 10, 6);
+            for (float a : rays) {
+                V2 d{std::cos(a), std::sin(a)};
+                float r0 = sq * (0.3f + 2.2f * ease_out_cubic(k)), r1 = r0 + sq * 0.35f;
+                line(c + d * r0, c + d * r1, sq * 0.025f + 1, hex(0x2a2420, uint8_t(230 * (1 - k))));
+            }
+            break;
+        }
+        case 5: {
+            float fl = std::exp(-t * 3.5f);
+            if (fl > 0.02f) {   // the BOOM: a spiky yellow star with an orange edge
+                std::vector<V2> star;
+                float R = sq * 1.0f * (0.7f + 0.3f * ease_out_cubic(std::min(1.0f, t * 8)));
+                for (size_t i = 0; i < rays.size() * 2; i++) {
+                    float a = rays[i / 2] + (i % 2) * 0.26f, rr = (i % 2 ? 0.5f : 1.0f) * R;
+                    star.push_back(c + V2{std::cos(a), std::sin(a)} * rr);
+                }
+                for (size_t i = 0; i < star.size(); i++) line(star[i], star[(i + 1) % star.size()], sq * 0.05f, hex(0xff5a1a, uint8_t(255 * fl)));
+                poly_around(c, star, hex(0xffd040, uint8_t(255 * fl)));
+                circle(c, R * 0.35f, hex(0xffffff, uint8_t(255 * fl)), hex(0xfff0a0, uint8_t(200 * fl)), R * 0.1f);
+            }
+            break;
+        }
+        case 6: {
+            float f = std::exp(-t * 8);
+            circle(c, sq * 0.9f, hex(0xf0fbff, uint8_t(240 * f)), hex(0x9fd0f0, 0), 0);
+            shock(sq * 2.0f, 0.0f, 200);
+            break;
+        }
+        case 7:
+            fireball(sq * 1.2f, 7, 2.6f);
+            shock(sq * 3.0f, 0.02f, 230);
+            break;
+        case 8: {
+            float f = std::exp(-t * 12);
+            circle(c, sq * 2.2f, hex(0xffffff, uint8_t(230 * f)), hex(0xfff0d0, 0), 0);
+            fireball(sq * 1.4f, 8, 2.2f);
+            shock(sq * 3.6f, 0.0f, 240);
+            shock(sq * 2.6f, 0.15f, 180);
+            break;
+        }
+        default: {   // the nuclear bomb: the window flashes white, a shock ring runs over the board, a mushroom cloud rises
+            int ww = 0, wh = 0;
+            SDL_GetCurrentRenderOutputSize(R, &ww, &wh);
+            float fl = std::exp(-t * 3.0f);
+            if (fl > 0.01f) rect({0, 0, float(ww), float(wh)}, hex(0xfff8e8, uint8_t(235 * fl)));
+            shock(sq * 9.0f, 0.05f, 220);
+            float up = ease_out_cubic(std::min(1.0f, t / 1.6f));
+            float fade = std::clamp(1 - (t - 2.2f) / 1.0f, 0.0f, 1.0f);
+            if (fade <= 0) break;
+            float H = sq * 3.8f * up, cool = std::clamp((t - 0.4f) / 2.0f, 0.0f, 1.0f);
+            Rgba hot = mix(hex(0xfff0b0), hex(0xb08a70), cool), dark = mix(hex(0xff6a1a), hex(0x6a5a56), cool);
+            circle(c + V2{0, -sq * 0.1f}, sq * (0.9f + 1.4f * up), with_alpha(dark, 0.5f * fade), with_alpha(dark, 0), sq * 0.6f);   // the dust at the foot
+            for (int i = 0; i < 10; i++) {   // the stem: a column of puffs
+                float u = i / 9.0f;
+                V2 p = c + V2{std::sin(i * 1.7f + t * 2) * sq * 0.05f, -H * u};
+                circle(p, sq * (0.32f - 0.08f * u) * (0.6f + 0.4f * up), with_alpha(mix(hot, dark, 0.4f), 0.9f * fade), with_alpha(dark, 0), sq * 0.12f);
+            }
+            V2 top = c + V2{0, -H};
+            for (int i = 0; i < 12; i++) {   // the cap: a ring of billows rolling over
+                float a = i * 6.283f / 12 + t * 0.8f;
+                V2 p = top + V2{std::cos(a) * sq * 0.85f * (0.4f + 0.6f * up), std::sin(a) * sq * 0.28f * (0.4f + 0.6f * up) - sq * 0.1f};
+                circle(p, sq * 0.42f * (0.4f + 0.6f * up), with_alpha(dark, 0.9f * fade), with_alpha(dark, 0), sq * 0.2f);
+            }
+            circle(top + V2{0, -sq * 0.15f}, sq * 0.95f * (0.4f + 0.6f * up), with_alpha(dark, 0.95f * fade), with_alpha(dark, 0.4f * fade), sq * 0.3f);
+            circle(top + V2{0, -sq * 0.1f}, sq * 0.6f * (0.4f + 0.6f * up), with_alpha(hot, 0.95f * fade), with_alpha(hot, 0), sq * 0.35f);
+            circle(c, sq * 0.7f, with_alpha(hot, 0.8f * fade * (1 - cool)), with_alpha(hot, 0), sq * 0.4f);   // the fire at its foot
+            break;
+        }
+        }
     }
     void draw(TextEngine&) override {
         using namespace draw;
@@ -2769,6 +2957,7 @@ struct Shatter : Effect {
                     polyline(pts, sq * 0.012f, hex(0xffffff, uint8_t(255 * (1 - t / 0.35f))));
                 }
         }
+        if (style == "blast") draw_blast();
         if (style == "paper") {   // a white tear flash
             float fl = std::exp(-t * 8);
             circle(c, sq * (0.45f + 0.3f * P), hex(0xfffaf0, uint8_t(200 * fl)), hex(0xfffaf0, 0), 0);
@@ -3737,6 +3926,7 @@ struct App {
     std::vector<Theme> themes;
     std::vector<SpriteDef> sprites;
     std::vector<PieceSet> piece_sets;     // assets/sprites/sets.json
+    bool fixed_dt = false;                // --fixed-dt: frames of 1/60 s (screenshots of animations at a given time)
     std::string debug_fx;                 // --fx style,power (screenshots): a square breaks at the board's centre
     std::vector<AiSpec> roster;
     Settings settings;
@@ -8831,6 +9021,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     // Start scene (command line).
     std::string scene = arg_value(argc, argv, "--scene", "menu");
     a->debug_fx = arg_value(argc, argv, "--fx");
+    a->fixed_dt = arg_flag(argc, argv, "--fixed-dt");
     if (!arg_value(argc, argv, "--pieces").empty()) a->settings.piece_set = arg_value(argc, argv, "--pieces");   // a set for this run
     std::string black = arg_value(argc, argv, "--black"), white = arg_value(argc, argv, "--white");
     if (!black.empty()) a->settings.black = black;
@@ -8925,6 +9116,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {
 SDL_AppResult SDL_AppIterate(void* appstate) {
     App* a = static_cast<App*>(appstate);
     double t = now_seconds();
+    if (a->fixed_dt && a->time > 0) t = a->time + 1.0 / 60;   // --fixed-dt (screenshots): every frame 1/60 s, whatever it takes to draw
     a->dt = std::min(0.1, t - a->time);
     a->time = t;
     SDL_GetRenderOutputSize(a->renderer, &a->w, &a->h);
