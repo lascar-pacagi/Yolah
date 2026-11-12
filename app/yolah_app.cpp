@@ -1257,8 +1257,12 @@ struct Theme {
     bool embers = false;     // embers rising over the picture
     bool petals = false;     // cherry petals falling over the picture
     bool smoke = false;      // smoke drifting along the bottom of the picture
+    bool snow = false;       // snow falling over the picture
+    bool aurora = false;     // an aurora shimmering in the sky of the picture
+    bool cranes = false;     // paper cranes flying across the picture
+    bool motes = false;      // glowing motes drifting up through the picture
     // How a square breaks when a piece leaves it (Shatter): "debris" (the
-    // default), "stone", "space", "ink", "cannon"; stronger players break harder.
+    // default), "stone", "space", "ink", "cannon", "ice", "paper", "lava", "atoms"; stronger players break harder.
     std::string break_fx = "debris";
     // The set of pieces that goes with the board (assets/sprites/sets.json):
     // used when the settings say "Selon le plateau"; "" = the classic stones.
@@ -1300,6 +1304,10 @@ Theme parse_theme(const json& j) {
     t.embers = j.value("embers", false);
     t.petals = j.value("petals", false);
     t.smoke = j.value("smoke", false);
+    t.snow = j.value("snow", false);
+    t.aurora = j.value("aurora", false);
+    t.cranes = j.value("cranes", false);
+    t.motes = j.value("motes", false);
     t.break_fx = jstr(j, "break fx", t.break_fx);
     t.piece_set = jstr(j, "piece set");
     return t;
@@ -1326,6 +1334,10 @@ json theme_to_json(const Theme& t) {
     if (t.embers) j["embers"] = true;
     if (t.petals) j["petals"] = true;
     if (t.smoke) j["smoke"] = true;
+    if (t.snow) j["snow"] = true;
+    if (t.aurora) j["aurora"] = true;
+    if (t.cranes) j["cranes"] = true;
+    if (t.motes) j["motes"] = true;
     if (t.break_fx != "debris") j["break fx"] = t.break_fx;
     if (!t.piece_set.empty()) j["piece set"] = t.piece_set;
     return j;
@@ -1437,6 +1449,84 @@ void draw_petals(Box b, double time, float s) {
             pts.push_back(V2{x, y} + V2{q.x * std::cos(ang) - q.y * std::sin(ang), q.x * std::sin(ang) + q.y * std::cos(ang)});
         }
         poly_around({x, y}, pts, with_alpha(hex(0xffc2d4), 0.85f));
+    }
+}
+
+// Snow falling over a scenery: flakes of three sizes (the nearer, the bigger,
+// the faster), swaying as they fall.
+void draw_snow(Box b, double time, float s) {
+    using namespace draw;
+    for (int i = 0; i < 140; i++) {
+        float depth = hash2(i, 8, 61);                  // 0 far … 1 near
+        float speed = 0.025f + 0.07f * depth;
+        double life = 1.0 / speed;
+        double u = std::fmod(time + life * hash2(i, 2, 61), life) / life;
+        float x = b.x + b.w * hash2(i, 3, 61) + std::sin(float(time) * (0.4f + 0.6f * hash2(i, 4, 61)) + i) * (20 + 30 * depth) * s;
+        float y = b.y - 10 * s + float(u) * (b.h + 20 * s);
+        float r = (1.0f + 2.6f * depth * depth) * s;
+        circle({x, y}, r * 2.2f, with_alpha(hex(0xffffff), 0.12f * depth), with_alpha(hex(0xffffff), 0), 0);
+        circle({x, y}, r, with_alpha(hex(0xf2f8ff), 0.45f + 0.45f * depth));
+    }
+}
+
+// An aurora shimmering over a scenery whose picture already has one: faint
+// curtains of light, slowly waving, in the upper part of the sky.
+void draw_aurora(Box b, double time, float s) {
+    using namespace draw;
+    const int N = 90;
+    for (int band = 0; band < 2; band++) {
+        float y0 = b.y + b.h * (band ? 0.2f : 0.3f);
+        for (int i = 0; i < N; i++) {
+            float u = (i + 0.5f) / N;
+            float x = b.x + b.w * u;
+            float yy = y0 + std::sin(u * 7 + float(time) * 0.17f + band * 2) * b.h * 0.035f + std::sin(u * 17 - float(time) * 0.31f) * b.h * 0.01f;
+            float k = 0.5f + 0.5f * std::sin(u * 23 + float(time) * (0.6f + 0.2f * band) + band);
+            k *= 0.5f + 0.5f * std::sin(u * 3.1f - float(time) * 0.12f + band * 4);
+            float h = b.h * (0.1f + 0.06f * k);
+            Box r{x - b.w / N * 0.6f, yy - h, b.w / N * 1.2f, h};
+            gradient_rect(r, with_alpha(band ? hex(0xb06aff) : hex(0x7a8aff), 0.0f), with_alpha(band ? hex(0x5cffc8) : hex(0x3dffa0), 0.10f * k));
+        }
+    }
+    (void)s;
+}
+
+// Paper cranes flying across a scenery, slowly, wings beating: each a few
+// folded triangles, lit on one side.
+void draw_cranes(Box b, double time, float s) {
+    using namespace draw;
+    for (int i = 0; i < 6; i++) {
+        float speed = 0.012f + 0.01f * hash2(i, 1, 83);
+        double life = 1.0 / speed;
+        double u = std::fmod(time + life * hash2(i, 2, 83), life) / life;
+        bool right = hash2(i, 5, 83) < 0.5f;
+        float x = right ? b.x - 80 * s + float(u) * (b.w + 160 * s) : b.right() + 80 * s - float(u) * (b.w + 160 * s);
+        float y = b.y + b.h * (0.08f + 0.35f * hash2(i, 3, 83)) + std::sin(float(time) * 0.7f + i) * 14 * s;
+        float sz = (14 + 14 * hash2(i, 4, 83)) * s, dir = right ? 1.0f : -1.0f;
+        float flap = std::sin(float(time) * (3.0f + hash2(i, 6, 83)) + i * 1.7f);
+        V2 c{x, y};
+        auto P = [&](float px, float py) { return c + V2{px * sz * dir, py * sz}; };
+        const Rgba lit = hex(0xfbf3e6), shade_ = hex(0xd8c8b0), col = i % 3 == 0 ? hex(0xe0503a) : i % 3 == 1 ? hex(0xf1e6d2) : hex(0x5a7ab8);
+        poly({P(-0.9f, 0.05f), P(0.0f, -0.12f), P(0.0f, 0.18f)}, mix(col, shade_, 0.3f));          // body and tail
+        poly({P(0.0f, -0.12f), P(0.85f, -0.45f), P(0.75f, -0.38f), P(0.0f, 0.1f)}, mix(col, lit, 0.2f));   // neck and head
+        poly({P(0.75f, -0.38f), P(0.95f, -0.3f), P(0.85f, -0.45f)}, col);
+        poly({P(-0.25f, -0.02f), P(0.25f, -0.02f), P(-0.05f, -0.1f - 0.9f * flap)}, mix(col, lit, 0.45f));   // the near wing
+        poly({P(-0.2f, 0.0f), P(0.2f, 0.0f), P(0.05f, -0.05f - 0.6f * flap)}, mix(col, shade_, 0.5f));      // the far wing
+    }
+}
+
+// Glowing motes drifting slowly up through a scenery (the reactor's light).
+void draw_motes(Box b, double time, float s) {
+    using namespace draw;
+    for (int i = 0; i < 60; i++) {
+        float speed = 0.015f + 0.025f * hash2(i, 1, 97);
+        double life = 1.0 / speed;
+        double u = std::fmod(time + life * hash2(i, 2, 97), life) / life;
+        float x = b.x + b.w * hash2(i, 3, 97) + std::sin(float(time) * 0.5f + i) * 25 * s;
+        float y = b.bottom() + 10 * s - float(u) * (b.h + 20 * s);
+        float k = std::sin(float(u) * 3.14159f) * (0.5f + 0.5f * std::sin(float(time) * 3 + i));
+        float r = (1.5f + 2.0f * hash2(i, 4, 97)) * s;
+        circle({x, y}, r * 4, with_alpha(hex(0x5ad8ff), 0.15f * k), with_alpha(hex(0x5ad8ff), 0), 0);
+        circle({x, y}, r, with_alpha(hex(0xd8f6ff), 0.8f * k));
     }
 }
 
@@ -2421,12 +2511,13 @@ struct Debris : Effect {
 //   ink     manga impact: ink speed lines, a white starburst, ink drops, a ring
 //   cannon  a muzzle flash, smoke puffs, grapeshot, earth thrown up
 struct Shatter : Effect {
-    struct P { V2 p, v; float life, max, size, spin, ang; Rgba c; int kind; };   // kind: 0 dot, 1 chunk, 2 puff, 3 spark
+    struct P { V2 p, v; float life, max, size, spin, ang; Rgba c; int kind; };   // kind: 0 dot, 1 chunk, 2 puff, 3 spark, 4 scrap of paper
     std::vector<P> ps;
     std::string style;
     V2 c;
     float sq, power, t = 0, dur;
     std::vector<float> rays;      // angles of the speed lines / star rays
+    std::vector<std::vector<V2>> cracks;   // ice: jagged cracks from the centre (offsets in squares)
     Shatter(V2 c, float sq, const Theme& th, float power, std::mt19937& rng)
         : style(th.break_fx), c(c), sq(sq), power(std::clamp(power, 0.0f, 1.0f)) {
         std::uniform_real_distribution<float> U(0, 1);
@@ -2477,6 +2568,73 @@ struct Shatter : Effect {
                 float a = U(rng) * 6.283f, sp = sq * (2.0f + 3.0f * U(rng));
                 add(c, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.25f + 0.25f * U(rng), sq * 0.018f, hex(0xffd070), 3);
             }
+        } else if (style == "ice") {
+            // the plate cracks in a star, then breaks: shards thrown up, spray, a cold mist
+            int nc = 5 + int(5 * P);
+            for (int i = 0; i < nc; i++) {
+                float a = i * 6.283f / nc + (U(rng) - 0.5f) * 0.5f, len = 0.45f + 0.5f * P + 0.2f * U(rng);
+                std::vector<V2> pts{{0, 0}};
+                for (int k = 1; k <= 5; k++) {
+                    a += (U(rng) - 0.5f) * 0.7f;
+                    float r = len * k / 5;
+                    pts.push_back({std::cos(a) * r, std::sin(a) * r});
+                }
+                cracks.push_back(pts);
+            }
+            for (int i = 0; i < 10 + int(22 * P); i++) {
+                float a = -float(M_PI) * (0.1f + 0.8f * U(rng)), sp = sq * (0.8f + 2.0f * U(rng)) * (0.7f + 0.6f * P);
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.6f, (U(rng) - 0.5f) * sq * 0.6f}, V2{std::cos(a) * sp, std::sin(a) * sp},
+                    0.6f + 0.5f * U(rng), sq * (0.05f + 0.09f * U(rng)) * (0.8f + 0.5f * P), U(rng) < 0.5f ? hex(0xe8f6ff, 230) : hex(0x8ad0f0, 210), 1);
+            }
+            for (int i = 0; i < 12 + int(20 * P); i++) {
+                float a = -float(M_PI) * (0.2f + 0.6f * U(rng)), sp = sq * (1.5f + 2.5f * U(rng));
+                add(c, V2{std::cos(a) * sp * 0.6f, std::sin(a) * sp}, 0.4f + 0.3f * U(rng), sq * (0.015f + 0.025f * U(rng)), hex(0xcfeeff), 0);
+            }
+            for (int i = 0; i < 5 + int(5 * P); i++)
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.6f, (U(rng) - 0.5f) * sq * 0.4f}, V2{(U(rng) - 0.5f) * sq * 0.6f, -sq * (0.1f + 0.3f * U(rng))},
+                    1.0f + 0.6f * U(rng), sq * (0.25f + 0.2f * U(rng)), hex(0xe0f2ff, 150), 2);
+        } else if (style == "lava") {
+            // the ground splits, the lava spurts: glowing drops in an arc, black rock chunks, smoke
+            int nc = 4 + int(4 * P);
+            for (int i = 0; i < nc; i++) {
+                float a = i * 6.283f / nc + (U(rng) - 0.5f) * 0.6f, len = 0.4f + 0.4f * P;
+                std::vector<V2> pts{{0, 0}};
+                for (int k = 1; k <= 4; k++) {
+                    a += (U(rng) - 0.5f) * 0.8f;
+                    pts.push_back({std::cos(a) * len * k / 4, std::sin(a) * len * k / 4});
+                }
+                cracks.push_back(pts);
+            }
+            for (int i = 0; i < 12 + int(28 * P); i++) {
+                float a = -float(M_PI) * (0.15f + 0.7f * U(rng)), sp = sq * (1.2f + 2.6f * U(rng)) * (0.7f + 0.6f * P);
+                add(c, V2{std::cos(a) * sp * 0.7f, std::sin(a) * sp}, 0.6f + 0.5f * U(rng), sq * (0.025f + 0.04f * U(rng)),
+                    U(rng) < 0.5f ? hex(0xffb040) : hex(0xff5a1a), 3);
+            }
+            for (int i = 0; i < 6 + int(10 * P); i++) {
+                float a = -float(M_PI) * (0.1f + 0.8f * U(rng)), sp = sq * (0.8f + 1.6f * U(rng));
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, 0}, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.6f + 0.4f * U(rng),
+                    sq * (0.05f + 0.06f * U(rng)), hex(0x2a2220), 1);
+            }
+            for (int i = 0; i < 5 + int(6 * P); i++)
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, 0}, V2{(U(rng) - 0.5f) * sq * 0.5f, -sq * (0.3f + 0.4f * U(rng))},
+                    1.2f + 0.6f * U(rng), sq * (0.25f + 0.2f * U(rng)), hex(0x3a3030, 190), 2);
+        } else if (style == "atoms") {
+            // the square disintegrates: glowing cubes drift up and fade; the strong add electric arcs
+            for (int i = 0; i < 16 + int(30 * P); i++) {
+                V2 p0 = c + V2{(U(rng) - 0.5f) * sq * 0.9f, (U(rng) - 0.5f) * sq * 0.9f};
+                add(p0, V2{(U(rng) - 0.5f) * sq * 0.6f, -sq * (0.3f + 0.9f * U(rng)) * (0.7f + 0.6f * P)}, 0.7f + 0.7f * U(rng),
+                    sq * (0.03f + 0.05f * U(rng)), U(rng) < 0.6f ? hex(0x9ae8ff) : hex(0xffffff), 5);
+            }
+            for (int i = 0; i < (P > 0.5f ? 3 + int(4 * P) : 0); i++) rays.push_back(U(rng) * 6.283f);
+        } else if (style == "paper") {
+            // the square tears: scraps of paper flutter down, turning; the strong blow a gust of them
+            for (int i = 0; i < 10 + int(26 * P); i++) {
+                float a = -float(M_PI) * (0.05f + 0.9f * U(rng)), sp = sq * (0.6f + 1.8f * U(rng)) * (0.7f + 0.7f * P);
+                Rgba col = U(rng) < 0.5f ? th.light : th.dark;
+                if (U(rng) < 0.15f) col = th.accent;
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, (U(rng) - 0.5f) * sq * 0.5f}, V2{std::cos(a) * sp, std::sin(a) * sp},
+                    1.2f + 0.8f * U(rng), sq * (0.06f + 0.08f * U(rng)) * (0.8f + 0.4f * P), col, 4);
+            }
         } else {   // debris
             int n = 12 + int(18 * P);
             for (int i = 0; i < n; i++) {
@@ -2491,9 +2649,13 @@ struct Shatter : Effect {
         for (auto& p : ps) {
             p.life += dt;
             if (style == "space") continue;              // computed from the time in draw
-            float g = p.kind == 2 ? -sq * 0.3f : p.kind == 3 ? sq * 1.5f : sq * 5.0f;   // puffs rise slowly
+            float g = p.kind == 2 ? -sq * 0.3f : p.kind == 3 ? sq * 1.5f : p.kind == 4 ? sq * 1.2f : p.kind == 5 ? -sq * 0.4f : sq * 5.0f;   // puffs rise slowly, paper floats, cubes drift up
             p.v.y += g * dt;
             if (p.kind == 2) p.v = p.v * (1 - 1.5f * dt);
+            if (p.kind == 4) {   // air drag and a sway: a scrap of paper does not fall straight
+                p.v = p.v * (1 - 2.2f * dt);
+                p.p.x += std::sin(p.life * 5 + p.ang) * sq * 0.5f * dt;
+            }
             p.p = p.p + p.v * dt;
             p.ang += p.spin * dt;
         }
@@ -2560,6 +2722,55 @@ struct Shatter : Effect {
             float fl = std::exp(-t * 6);
             circle(c, sq * (0.55f + 0.45f * P), hex(0xfff0b0, uint8_t(250 * fl)), hex(0xff7a20, 0), 0);
         }
+        if (style == "ice") {   // a cold flash, the cracks running out then fading, a frost ring for the strong
+            float fl = std::exp(-t * 7);
+            circle(c, sq * (0.5f + 0.4f * P), hex(0xf0fbff, uint8_t(220 * fl)), hex(0x9fdcff, 0), 0);
+            float grow = std::min(1.0f, t / 0.12f), fade = std::clamp(1 - (t - 0.25f) / 0.35f, 0.0f, 1.0f);
+            for (auto& cr : cracks) {
+                std::vector<V2> pts;
+                int m = 1 + int(grow * (cr.size() - 1));
+                for (int i = 0; i <= m && i < int(cr.size()); i++) pts.push_back(c + cr[i] * sq);
+                if (pts.size() > 1) {
+                    polyline(pts, sq * 0.05f, hex(0x0a3a5a, uint8_t(160 * fade)));
+                    polyline(pts, sq * 0.022f, hex(0xffffff, uint8_t(250 * fade)));
+                }
+            }
+            if (P > 0.5f) ring(c, sq * (0.4f + 1.5f * ease_out_cubic(k)), sq * 0.04f * (1 - k), hex(0xdff4ff, uint8_t(200 * (1 - k))));
+        }
+        if (style == "lava") {   // a hot flash, glowing cracks running out then cooling
+            float fl = std::exp(-t * 5);
+            circle(c, sq * (0.55f + 0.5f * P), hex(0xffd080, uint8_t(240 * fl)), hex(0xff6a1a, 0), 0);
+            float grow = std::min(1.0f, t / 0.15f), cool = std::clamp(1 - (t - 0.3f) / 0.5f, 0.0f, 1.0f);
+            for (auto& cr : cracks) {
+                std::vector<V2> pts;
+                int m = 1 + int(grow * (cr.size() - 1));
+                for (int i = 0; i <= m && i < int(cr.size()); i++) pts.push_back(c + cr[i] * sq);
+                if (pts.size() > 1) {
+                    polyline(pts, sq * 0.06f, hex(0x1a1010, uint8_t(200 * cool)));
+                    polyline(pts, sq * 0.028f, mix(hex(0xff4a1a), hex(0xffd080), cool));
+                }
+            }
+        }
+        if (style == "atoms") {   // a blue flash, a ring, electric arcs for the strong
+            float fl = std::exp(-t * 6);
+            circle(c, sq * (0.6f + 0.5f * P), hex(0xe8f8ff, uint8_t(240 * fl)), hex(0x5ad8ff, 0), 0);
+            ring(c, sq * (0.3f + (1.0f + 1.2f * P) * ease_out_cubic(k)), sq * 0.04f * (1 - k), hex(0x5ad8ff, uint8_t(230 * (1 - k))));
+            if (t < 0.35f)
+                for (size_t r = 0; r < rays.size(); r++) {   // jagged arcs, redrawn each frame
+                    std::vector<V2> pts{c};
+                    float a = rays[r], len = sq * (0.6f + 0.8f * P);
+                    for (int kk = 1; kk <= 6; kk++) {
+                        float j = std::sin(t * 90 + kk * 7 + r * 3) * 0.5f;
+                        pts.push_back(c + V2{std::cos(a + j * 0.4f), std::sin(a + j * 0.4f)} * (len * kk / 6));
+                    }
+                    polyline(pts, sq * 0.035f, hex(0x9ae8ff, uint8_t(200 * (1 - t / 0.35f))));
+                    polyline(pts, sq * 0.012f, hex(0xffffff, uint8_t(255 * (1 - t / 0.35f))));
+                }
+        }
+        if (style == "paper") {   // a white tear flash
+            float fl = std::exp(-t * 8);
+            circle(c, sq * (0.45f + 0.3f * P), hex(0xfffaf0, uint8_t(200 * fl)), hex(0xfffaf0, 0), 0);
+        }
         if (style == "stone" && P > 0.6f) {   // a shock ring of dust for the strong
             ring(c, sq * (0.3f + 1.4f * ease_out_cubic(k)), sq * 0.05f * (1 - k), hex(0xd8c8a8, uint8_t(150 * (1 - k))));
         }
@@ -2575,6 +2786,16 @@ struct Shatter : Effect {
                 poly_around(p.p, q, with_alpha(p.c, a));
             } else if (p.kind == 2) {   // a puff: grows and fades
                 circle(p.p, p.size * (0.6f + 1.2f * u), with_alpha(p.c, 0.8f * a), with_alpha(p.c, 0), p.size);
+            } else if (p.kind == 5) {   // a glowing cube: a small square with a halo, shrinking as it fades
+                float sz = p.size * (1 - 0.5f * u);
+                circle(p.p, sz * 2.5f, with_alpha(p.c, 0.25f * a), with_alpha(p.c, 0), 0);
+                rect({p.p.x - sz, p.p.y - sz, 2 * sz, 2 * sz}, with_alpha(p.c, a));
+            } else if (p.kind == 4) {   // a scrap of paper: a quad that turns over (its width flips with the turn)
+                float flipk = std::cos(p.life * 6 + p.ang);
+                V2 ax{std::cos(p.ang + p.life * 2) * p.size * flipk, std::sin(p.ang + p.life * 2) * p.size * flipk};
+                V2 ay{-std::sin(p.ang + p.life * 2) * p.size * 0.7f, std::cos(p.ang + p.life * 2) * p.size * 0.7f};
+                Rgba col = flipk > 0 ? p.c : shade(p.c, -0.2f);
+                poly_around(p.p, {p.p - ax - ay, p.p + ax - ay, p.p + ax + ay, p.p - ax + ay}, with_alpha(col, std::min(1.0f, a * 2)));
             } else if (p.kind == 3) {   // a spark: a short streak along its speed
                 line(p.p, p.p - p.v * 0.03f, std::max(1.0f, p.size), with_alpha(p.c, a));
             } else {
@@ -3992,6 +4213,10 @@ void draw_background(App& a, bool decorated = true, const Theme* th = nullptr) {
         if (t.embers) draw_embers({0, 0, float(a.w), float(a.h)}, a.time, a.s);
         if (t.petals) draw_petals({0, 0, float(a.w), float(a.h)}, a.time, a.s);
         if (t.smoke) draw_smoke({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        if (t.aurora) draw_aurora({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        if (t.cranes) draw_cranes({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        if (t.snow) draw_snow({0, 0, float(a.w), float(a.h)}, a.time, a.s);
+        if (t.motes) draw_motes({0, 0, float(a.w), float(a.h)}, a.time, a.s);
         draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 60);
         return;
     }

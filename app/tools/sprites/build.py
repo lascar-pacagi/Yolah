@@ -31,6 +31,22 @@ for _k, _f in shonen.SHONEN.items():         # the manga set: one character per 
 for _k, _f in epic.EPIC.items():             # the Légendes set: one character per AI (epic.py)
     SCALE[_k] = epic.SCALE[_k[4:]]
     MODELS[_k] = scaled(_k, _f)
+import arctic
+import origami
+import dinos
+import anatomy
+for _k, _f in anatomy.ANATOMY.items():       # the Laboratoire set (anatomy.py)
+    SCALE[_k] = anatomy.SCALE[_k[4:]]
+    MODELS[_k] = scaled(_k, _f)
+for _k, _f in dinos.DINOS.items():           # the Dinosaures set (dinos.py)
+    SCALE[_k] = dinos.SCALE[_k[5:]]
+    MODELS[_k] = scaled(_k, _f)
+for _k, _f in arctic.ARCTIC.items():         # the Banquise set (arctic.py)
+    SCALE[_k] = arctic.SCALE[_k[4:]]
+    MODELS[_k] = scaled(_k, _f)
+for _k, _f in origami.ORIGAMI.items():       # the Origami set (origami.py)
+    SCALE[_k] = origami.SCALE[_k[4:]]
+    MODELS[_k] = scaled(_k, _f)
 for _k, _f in generals.GENERALS.items():
     SCALE[_k] = 1.3
     MODELS[_k] = scaled(_k, _f)
@@ -52,6 +68,10 @@ NAMES.update(legends.NAMES)
 NAMES.update(shonen.NAMES)
 NAMES.update(epic.NAMES)
 NAMES.update(generals.NAMES)
+NAMES.update(arctic.NAMES)
+NAMES.update(origami.NAMES)
+NAMES.update(dinos.NAMES)
+NAMES.update(anatomy.NAMES)
 NAMES["human_legendes"] = "Humain (L\u00e9gendes)"
 
 

@@ -1,0 +1,21 @@
+{
+  "name": "Origami : papier déchiré",
+  "kind": "hole",
+  "size": 128,
+  "smooth": true,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 1,
+      "loop": true,
+      "frames": 1
+    },
+    {
+      "name": "open",
+      "fps": 20,
+      "loop": false,
+      "frames": 9
+    }
+  ]
+}

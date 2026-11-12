@@ -1,0 +1,15 @@
+{
+  "name": "Banquise : cadre de glace",
+  "kind": "frame",
+  "size": 96,
+  "smooth": true,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 8,
+      "loop": true,
+      "frames": 1
+    }
+  ]
+}

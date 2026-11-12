@@ -1,0 +1,21 @@
+{
+  "name": "Banquise : eau noire",
+  "kind": "hole",
+  "size": 128,
+  "smooth": true,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 6,
+      "loop": true,
+      "frames": 12
+    },
+    {
+      "name": "open",
+      "fps": 20,
+      "loop": false,
+      "frames": 10
+    }
+  ]
+}

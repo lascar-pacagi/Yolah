@@ -1,0 +1,21 @@
+{
+  "name": "Dinosaures : lave",
+  "kind": "hole",
+  "size": 128,
+  "smooth": true,
+  "on stone": false,
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 5,
+      "loop": true,
+      "frames": 10
+    },
+    {
+      "name": "open",
+      "fps": 20,
+      "loop": false,
+      "frames": 9
+    }
+  ]
+}
