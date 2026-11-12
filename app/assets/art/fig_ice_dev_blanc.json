@@ -1,5 +1,5 @@
 {
-  "name": "Ours blanc (blanc)",
+  "name": "Orque (blanc)",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,5 +35,5 @@
       "frames": 16
     }
   ],
-  "variant of": "fig_ice_dev"
+  "variant of": "fig_ice_resnet"
 }

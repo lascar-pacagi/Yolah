@@ -354,7 +354,7 @@ SCALE = {"random": 1.3, "beginner": 1.2, "monte_carlo": 1.3, "mcts": 1.2, "basic
          "features": 1.25, "resnet": 1.15, "dev": 1.05, "alphazero": 1.05}
 CAST = {"random": ("Phoque", seal), "beginner": ("Manchot empereur", penguin), "monte_carlo": ("Renard polaire", arctic_fox),
         "mcts": ("Harfang des neiges", snowy_owl), "basic_minmax": ("Morse", walrus), "nnue193": ("Loup arctique", arctic_wolf),
-        "features": ("Exploratrice polaire", explorer), "resnet": ("Orque", orca), "dev": ("Ours blanc", polar_bear),
+        "features": ("Exploratrice polaire", explorer), "resnet": ("Ours blanc", polar_bear), "dev": ("Orque", orca),
         "alphazero": ("Mammouth laineux", mammoth)}
 ARCTIC = {"ice_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"ice_" + k: n for k, (n, _) in CAST.items()}

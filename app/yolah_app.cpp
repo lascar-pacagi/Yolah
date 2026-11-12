@@ -1639,6 +1639,7 @@ struct SpriteDef {
     // and its white unit): the id, and the sprite once linked (link_sprites).
     std::string white_id;
     const SpriteDef* white_alt = nullptr;
+    float grow = 1;          // a figurine's size on the board: the stronger its AI, the more imposing (set_growth)
 };
 
 // A set of pieces (assets/sprites/sets.json): what the pieces look like when
@@ -2402,6 +2403,7 @@ void draw_piece(const SpriteDef& sp, int side, V2 c, float r, float lift = 0, do
             if (Art* w = find_art(art->white)) drawn = w;
         float size = 2.5f * r * art->box;      // r = 0.4 square
         float ay = art->ay;
+        if (state_t >= 0) size *= sp.grow;     // on the board, the weak small, the strong imposing
         if (state_t < 0) {   // not on a board (panels, lists, the picker): the whole figurine around c
             size *= 0.72f;
             ay = 0.6f;
@@ -4010,6 +4012,21 @@ struct App {
         for (auto& ps : piece_sets)
             if (ps.id == id) return &ps;
         return nullptr;
+    }
+    // The figurines grow with the strength of their AI (Elo 600 -> 0.85, 2250 -> 1.22):
+    // every cast's figurine and each AI's own sprite. The human keeps 1.
+    void set_growth() {
+        auto g = [](int elo) { return 0.85f + 0.37f * std::clamp((elo - 600) / 1650.0f, 0.0f, 1.0f); };
+        for (auto& ai : roster) {
+            for (auto& ps : piece_sets) {
+                auto it = ps.cast.find(ai.id);
+                if (it != ps.cast.end())
+                    for (auto& sp : sprites)
+                        if (sp.id == it->second) sp.grow = g(ai.elo);
+            }
+            for (auto& sp : sprites)
+                if (sp.id == ai.sprite) sp.grow = g(ai.elo);
+        }
     }
     // The set in use on a board: the one of the settings, or the board's own
     // ("Selon le plateau"), the classic stones when the board has none.
@@ -6385,43 +6402,56 @@ void scene_themes(App& a) {
     // The players and their sprites.
     Box gal{area.right() + 50 * s, 140 * s, a.w - area.right() - 110 * s, a.h - 180 * s};
     a.ui.panel(gal);
-    // The set of pieces: the board's own, or one for every board.
+    // The set of pieces: the board's own, or one for every board (a grid of
+    // chips: a segmented bar is too narrow for all of them).
     a.text.draw(Font::Black, 22 * s, "Jeu de pi\xC3\xA8" "ces", {gal.x + 22 * s, gal.y + 18 * s}, pal::text);
+    float y = gal.y + 56 * s;
     {
         std::vector<std::string> opts = {"Selon le plateau"}, ids = {"auto"};
         for (auto& ps : a.piece_sets) { opts.push_back(ps.name); ids.push_back(ps.id); }
-        int cur = 0;
-        for (size_t i = 0; i < ids.size(); i++)
-            if (ids[i] == a.settings.piece_set) cur = int(i);
-        int sel = a.ui.segmented("pset", {gal.x + 22 * s, gal.y + 54 * s, gal.w - 44 * s, 40 * s}, opts, cur, 14);
-        if (sel != cur) a.settings.piece_set = ids[size_t(sel)];
+        const int pc = 4;
+        const float cw = (gal.w - 44 * s - (pc - 1) * 8 * s) / pc, ch = 34 * s;
+        for (size_t i = 0; i < ids.size(); i++) {
+            Box cb{gal.x + 22 * s + (i % pc) * (cw + 8 * s), y + (i / pc) * (ch + 8 * s), cw, ch};
+            bool on = ids[i] == a.settings.piece_set;
+            if (a.ui.button("pset" + ids[i], cb, opts[i], on ? Style::Primary : Style::Ghost, true, 14)) a.settings.piece_set = ids[i];
+        }
+        y += ((ids.size() + pc - 1) / pc) * (ch + 8 * s) + 6 * s;
         const PieceSet& act = a.active_set(a.theme());
         std::string why = a.settings.piece_set == "auto"
-            ? "Chaque plateau prend son jeu : ici \xC2\xAB " + act.name + " \xC2\xBB (pions classiques pour les plateaux sans jeu propre)."
+            ? "Chaque plateau prend son jeu : ici \xC2\xAB " + act.name + " \xC2\xBB."
             : "Ce jeu sert sur tous les plateaux.";
         if (!act.description.empty()) why += " " + act.description;
-        a.text.paragraph(Font::Regular, 13 * s, why, {gal.x + 22 * s, gal.y + 102 * s, gal.w - 44 * s, 40 * s}, pal::dim);
+        y += a.text.paragraph(Font::Regular, 14 * s, why, {gal.x + 22 * s, y, gal.w - 44 * s, 90 * s}, pal::dim) + 14 * s;
     }
-    a.text.draw(Font::Black, 20 * s, "Sprites des joueurs", {gal.x + 22 * s, gal.y + 150 * s}, pal::text);
-    a.text.paragraph(Font::Regular, 13 * s, strf("Avec le jeu \xC2\xAB Robots \xC2\xBB, chaque joueur garde son sprite. Cliquez sur un joueur pour en choisir un parmi les %zu de la biblioth\xC3\xA8que (un jeu entier aussi, dans \xC2\xAB Jeux de pi\xC3\xA8" "ces \xC2\xBB).", a.sprites.size()),
-                     {gal.x + 22 * s, gal.y + 180 * s, gal.w - 44 * s, 40 * s}, pal::dim);
+    // The pieces of each player on the chosen board, as they will be played.
+    const PieceSet& act = a.active_set(a.theme());
+    a.text.draw(Font::Black, 20 * s, "Les pi\xC3\xA8" "ces sur ce plateau", {gal.x + 22 * s, y}, pal::text);
+    y += 34 * s;
+    if (act.players) {
+        a.text.paragraph(Font::Regular, 13 * s, "Avec ce jeu, chaque joueur garde son sprite : cliquez sur un joueur pour en choisir un autre.",
+                         {gal.x + 22 * s, y, gal.w - 44 * s, 40 * s}, pal::dim);
+        y += 26 * s;
+    }
     std::vector<std::pair<std::string, std::string>> players = {{"human", "Joueur humain"}};
     for (auto& ai : a.roster) players.push_back({ai.id, ai.name});
-    float top = gal.y + 232 * s, rh = std::min(60.0f * s, (gal.h - 320 * s) / players.size());
+    float rh = std::min(64.0f * s, (gal.bottom() - 14 * s - y) / players.size());
     for (size_t i = 0; i < players.size(); i++) {
         const auto& [id, name] = players[i];
-        const SpriteDef& sp = a.player_sprite(id);
-        Box r{gal.x + 12 * s, top + i * rh, gal.w - 24 * s, rh - 4 * s};
-        bool h = a.ui.hover(r);
+        auto ub = a.board_units(a.theme(), BLACK, id), uw = a.board_units(a.theme(), WHITE, id);
+        Box r{gal.x + 12 * s, y + i * rh, gal.w - 24 * s, rh - 4 * s};
+        bool h = act.players && a.ui.hover(r);
         if (h) a.ui.hovering = true;
         float k = a.ui.anim("pl" + id, h);
         draw::round_box(r, 10 * s, with_alpha(hex(0xffffff), 0.02f + 0.07f * k));
-        float pr = rh * 0.36f;
-        draw_piece(sp, BLACK, {r.x + 14 * s + pr, r.center().y}, pr, 0.2f * k, a.time, 1, id == "human");
-        draw_piece(sp, WHITE, {r.x + 22 * s + 3 * pr, r.center().y}, pr, 0.2f * k, a.time, 1, id == "human");
+        float pr = rh * 0.40f;
+        draw_piece(*ub.front(), BLACK, {r.x + 14 * s + pr, r.center().y}, pr, 0.2f * k, a.time, 1, id == "human");
+        draw_piece(*uw.front(), WHITE, {r.x + 22 * s + 3 * pr, r.center().y}, pr, 0.2f * k, a.time, 1, id == "human");
         float tx = r.x + 40 * s + 4 * pr;
         a.text.draw(Font::Bold, 17 * s, name, {tx, r.center().y - 20 * s}, pal::text);
-        a.text.draw(Font::Regular, 13 * s, "sprite : " + sp.name, {tx, r.center().y + 2 * s}, pal::dim);
+        a.text.draw(Font::Regular, 13 * s, ub.front()->name, {tx, r.center().y + 2 * s}, pal::dim);
+        if (!act.players) continue;
+        const SpriteDef& sp = a.player_sprite(id);
         a.text.draw(Font::Bold, 15 * s, "Changer \xE2\x86\x92", {r.right() - 12 * s, r.center().y - 9 * s}, mix(pal::faint, a.theme().accent, k), Align::Right);
         if (h && a.in.released) {
             std::string pid = id, pname = name;
@@ -6431,8 +6461,6 @@ void scene_themes(App& a) {
             });
         }
     }
-    if (a.ui.button("export", {gal.x + 22 * s, gal.bottom() - 74 * s, gal.w - 44 * s, 52 * s}, "Exporter tous les sprites en PNG", Style::Primary))
-        a.notify(export_sprites(a));
     a.ui.blocked = false;
     if (picking) sprite_picker(a);
 }
@@ -8648,6 +8676,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     load_all_arts();
     register_art_sprites(a->sprites);
     a->roster = load_roster(g_paths.assets / "ai_roster.json");
+    a->set_growth();
     a->courses.load(g_paths.assets / "courses" / "ai_courses.json");
     {
         json j = load_json(g_paths.assets / "sprites" / "assignments.json");
