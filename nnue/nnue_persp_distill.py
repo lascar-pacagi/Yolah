@@ -9,6 +9,12 @@ they are, NetPersp converts each batch to its 192 inputs on the GPU.
 
     L = α · MSE(v_s, v_t) + (1 - α) · MSE(v_s, z)        α = YOLAH_DISTILL_ALPHA
 
+except at YOLAH_Z_FREE free squares or fewer (the job script sets 22), where
+α = 0: the outcome alone. The games of the cache are played perfectly in the
+endgame (the outcome is exact in 99.9 % of positions at 22 free squares or
+fewer), where the teacher errs in 5 to 14 % of positions between 18 and 22
+free squares. 0 (the default here): α everywhere, as before.
+
 The student starts from the distilled 193 network (YOLAH_INIT_MODEL): fc1
 without its turn row, each head a copy of fc2–fc4 (see
 NetPersp.init_from_nnue193). It then gives the old values on every position
@@ -87,6 +93,8 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 # ── configuration ──────────────────────────────────────────────────────────
 NB_EPOCHS  = int(os.environ.get("YOLAH_NB_EPOCHS", "20"))
 ALPHA      = float(os.environ.get("YOLAH_DISTILL_ALPHA", "0.8"))
+Z_FREE     = int(os.environ.get("YOLAH_Z_FREE", "0"))      # outcome alone at this many free squares or fewer
+TRUTH_FREE = 22         # validation: the "truth" is the outcome at 22 free squares or fewer, the teacher above
 LR         = float(os.environ.get("YOLAH_LR", "3e-4"))
 BATCH_SIZE = int(os.environ.get("YOLAH_BATCH_SIZE", "1024"))
 CHUNK_SIZE = int(os.environ.get("YOLAH_CHUNK_SIZE", str(2048 * 2048)))
@@ -179,6 +187,7 @@ class TrainerDDP:
         """Validation numbers of the epoch → /mnt/<model>.val.jsonl (and the per-phase mse on stdout)."""
         sse, cnt = (t.cpu().tolist() for t in m.phases)
         phases = {name: (a / b if b else None) for name, a, b in zip(PHASES, sse, cnt)}
+        phases_truth = {name: (a / b if b else None) for name, a, b in zip(PHASES, m.phases_truth.cpu().tolist(), cnt)}
         print(f'epoch {epoch + 1} val   [vs teacher] mse per phase: '
               + '  '.join(f'{k} {v:.4f}' for k, v in phases.items() if v is not None), flush=True)
         n = max(m.n, 1)
@@ -187,7 +196,8 @@ class TrainerDDP:
         rec = dict(epoch=epoch + 1, model=os.path.basename(INIT_MODEL)[:-3] if EVAL_ONLY else MODEL_NAME, groups=SPACE_GROUPS, seed=SEED, mask=hex(self.model.module.space_mask),
                    direct=self.model.module.direct is not None, qat=bool(self.model.module.qat),
                    n=m.n, loss=m.loss / n, mse_teacher=m.mse_t / n, mse_outcome=m.mse_z / n,
-                   mse_teacher_quantized=mse_q,
+                   mse_teacher_quantized=mse_q, mse_truth_quantized=m.sse_q_truth.item() / n,
+                   phases_truth=phases_truth, z_free=Z_FREE,
                    sign_teacher=m.sign_t / n, phases=phases, phase_n=dict(zip(PHASES, cnt)))
         out = (f"{MODEL_PATH}{os.path.basename(INIT_MODEL)[:-3]}.eval.jsonl" if EVAL_ONLY
                else f"{MODEL_PATH}{MODEL_NAME}.val.jsonl")
@@ -199,11 +209,16 @@ class TrainerDDP:
             return tuple(t.to(self.gpu_id, non_blocking=True) for t in batch_cpu)
 
     @staticmethod
-    def _loss(v_s, z, v_t):
+    def _loss(v_s, z, v_t, free):
         # Distillation: pull towards the teacher value, keep the outcome as a
         # (down-weighted) anchor so the student cannot drift with the teacher's
-        # systematic errors.
-        return ALPHA * nn.functional.mse_loss(v_s, v_t) + (1.0 - ALPHA) * nn.functional.mse_loss(v_s, z)
+        # systematic errors. At Z_FREE free squares or fewer, the outcome alone
+        # (exact there, the teacher is not).
+        if Z_FREE <= 0:
+            return ALPHA * nn.functional.mse_loss(v_s, v_t) + (1.0 - ALPHA) * nn.functional.mse_loss(v_s, z)
+        a = torch.where(free <= Z_FREE, 0.0, ALPHA)
+        v_s = v_s.float()
+        return (a * (v_s - v_t) ** 2 + (1.0 - a) * (v_s - z) ** 2).mean()
 
     def _epoch(self, loader, train, epoch):
         """One pass over `loader`; returns the accumulated Metrics."""
@@ -211,8 +226,11 @@ class TrainerDDP:
         metrics = Metrics()
         phase_sse = torch.zeros(len(PHASES), device=self.gpu_id)
         phase_n = torch.zeros(len(PHASES), device=self.gpu_id)
+        phase_truth = torch.zeros(len(PHASES), device=self.gpu_id)
         metrics.phases = (phase_sse, phase_n)
+        metrics.phases_truth = phase_truth
         metrics.sse_q = torch.zeros((), device=self.gpu_id)   # validation: the quantized network vs the teacher
+        metrics.sse_q_truth = torch.zeros((), device=self.gpu_id)   # … vs the outcome at ≤ 22 free squares, the teacher above
         it = 0
         loader_iter = iter(loader)
         cpu_cur = next(loader_iter, None)
@@ -230,9 +248,10 @@ class TrainerDDP:
 
                 if train:
                     self.optimizer.zero_grad()
+                free = 56 - X[:, 128:192].sum(dim=1)    # free squares (the holes are inputs 128-191)
                 with torch.autocast('cuda', dtype=self.amp_dtype, enabled=self.amp):
                     v_s = self.model(X)
-                    loss = self._loss(v_s, z, v_t)
+                    loss = self._loss(v_s, z, v_t, free)
                 if train:
                     self.scaler.scale(loss).backward()
                     self.scaler.step(self.optimizer)
@@ -249,10 +268,12 @@ class TrainerDDP:
                             v_q = net(X).float()
                         net.qat = False
                     metrics.sse_q += ((v_q - v_t) ** 2).sum()
-                if not train:                           # mse vs the teacher per phase (free squares)
-                    free = 56 - X[:, 128:192].sum(dim=1)
+                    truth = torch.where(free <= TRUTH_FREE, z, v_t)
+                    metrics.sse_q_truth += ((v_q - truth) ** 2).sum()
+                if not train:                           # mse vs the teacher (and vs the truth) per phase (free squares)
                     ph = (free < 40).long() + (free < 20).long() + (free < 10).long()
                     phase_sse.index_add_(0, ph, (v_s.float() - v_t) ** 2)
+                    phase_truth.index_add_(0, ph, (v_s.float() - truth) ** 2)
                     phase_n.index_add_(0, ph, torch.ones_like(v_t))
 
                 it += 1

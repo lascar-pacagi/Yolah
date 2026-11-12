@@ -86,6 +86,11 @@
 #     REF_MODEL=$MODEL_ROOT/k8_them_g046_qat_ib4f_ref_az20/nnue_persp_k8_them_g046_qat_ib4f_ref_az20_distill.9.pt
 #                                                      → k8_them_g046_qat_ib4f_ref2_az20
 #   (the same for the control, from k8_them_g046_qat_ref_az20 → k8_them_g046_qat_ref2_az20)
+# Endgame target (every run, default): Z_FREE=22 → the outcome alone at 22 free squares or
+#   fewer, suffix …_z22… ; Z_FREE=0 for the old blend everywhere (to resume a run started
+#   before 2026-11-12, e.g. the ref2 runs). The .val.jsonl also gets mse_truth_quantized:
+#   the mse against the outcome at ≤ 22 free squares and the teacher above
+#   (val_compare.py --truth); EVAL_MODEL gives it for an older network.
 #   UNFREEZE=1 (with FROM_REF=1)     nothing frozen: every weight learns (factorised: the
 #                                      shared set too), suffix u → …_ref<tag>u_az20
 # Evaluation only (no training): the float AND quantized validation mse of an
@@ -201,6 +206,13 @@ fi
 if [[ "${SCRATCH}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_scratch"; fi
 if [[ "${UNFREEZE}" == "1" && "${FROM_REF}" != "1" ]]; then echo "UNFREEZE=1 needs FROM_REF=1" >&2; exit 1; fi
 if [[ "${FROM_REF}" == "1" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_ref${REF_TAG:-}$([[ "${UNFREEZE}" == "1" ]] && echo u || true)"; fi
+# The outcome alone as the target at Z_FREE free squares or fewer (exact there: the games
+# of the cache are played perfectly in the endgame; the teacher errs in 5-14 % of the
+# positions at 18-22 free squares). Default 22 since 2026-11-12, suffix _z<N>;
+# Z_FREE=0: the 0.8 teacher / 0.2 outcome blend everywhere, as the runs before (no suffix).
+Z_FREE="${Z_FREE:-22}"
+if [[ -n "${EVAL_MODEL:-}" ]]; then Z_FREE=0; fi
+if [[ "${Z_FREE}" != "0" ]]; then WIDTH_SUFFIX="${WIDTH_SUFFIX}_z${Z_FREE}"; fi
 if [[ "${P7}" == "1" ]]; then
     if [[ "${YOLAH_DIRECT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_d"; fi
     if [[ "${YOLAH_QAT}" == "1" ]]; then YOLAH_NAME_SUFFIX="${YOLAH_NAME_SUFFIX}_qat"; fi
@@ -291,6 +303,7 @@ singularity exec --nv \
     --env "YOLAH_PERSP_THEM=${YOLAH_PERSP_THEM}" \
     --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS}" \
     --env "YOLAH_DISTILL_ALPHA=${YOLAH_DISTILL_ALPHA}" \
+    --env "YOLAH_Z_FREE=${Z_FREE}" \
     --env "YOLAH_LR=${YOLAH_LR}" \
     --env "YOLAH_DDP_PORT=${YOLAH_DDP_PORT}" \
     --env "TORCH_NCCL_BLOCKING_WAIT=1" \

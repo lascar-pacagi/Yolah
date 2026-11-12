@@ -486,6 +486,12 @@ phase par phase pourrait étendre cette zone exacte : étiqueter les positions �
 recherche courte dont les feuilles tombent dans la zone déjà fiable, réentraîner, puis passer à 28 cases
 libres, et ainsi de suite.
 
+Mis en place le 12 novembre 2026 : `nnue_persp_distill.sh` donne désormais `Z_FREE=22` par défaut (l'issue
+seule à 22 cases libres ou moins, suffixe `_z22` dans le nom du run ; `Z_FREE=0` pour l'ancien mélange). La
+validation enregistre aussi l'erreur contre la « vérité » (l'issue à 22 cases libres ou moins, le maître
+au-dessus), comparée par `val_compare.py --truth` : l'erreur contre le maître ne convient plus pour ces runs,
+qui s'en écartent volontairement en finale.
+
 Le maître actuel ne prédit qu'une valeur dans $(-1, 1)$. Un script d'entraînement de ResNet avec l'écart de
 score existe déjà (`nnue/cnn_resnet_with_diff_score.py`) : c'est le point de départ naturel pour un maître qui
 prédit l'écart.
