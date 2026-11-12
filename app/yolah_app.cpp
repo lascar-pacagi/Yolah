@@ -1068,7 +1068,7 @@ public:
         for (int c : {0x152, 0x153, 0x2013, 0x2014, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2026, 0x2039, 0x203A, 0x20AC,
                       0x2190, 0x2191, 0x2192, 0x2193, 0x21C4, 0x2248, 0x2212, 0x2605, 0x2606, 0x2713, 0x2715, 0x25B6, 0x25C0,
                       // the pseudo-code and formulas of the AI courses (only the fonts that have them: the others draw '?')
-                      0x3B1, 0x3B2, 0x3B5, 0x3BB, 0x3C0, 0x3C3, 0x394, 0x3A3, 0x2200, 0x2208, 0x2211, 0x221A, 0x221E,
+                      0x3B1, 0x3B2, 0x3B5, 0x3BC, 0x3B7, 0x3C0, 0x3C4, 0x3BB, 0x3C0, 0x3C3, 0x394, 0x3A3, 0x2200, 0x2208, 0x2211, 0x221A, 0x221E,
                       0x2260, 0x2264, 0x2265, 0x2227, 0x2228, 0x22C5, 0x2016, 0x2500, 0x2502, 0x251C, 0x2514, 0x25CF, 0x25CB,
                       0x2080, 0x2081, 0x2082, 0x2083, 0x1D62, 0x2C7C, 0x23F8, 0x27F2, 0x2193, 0x21BB})
             if (std::find(codepoints_.begin(), codepoints_.end(), c) == codepoints_.end()) codepoints_.push_back(c);
@@ -5366,6 +5366,133 @@ void anim_aspiration(App& a, Box b, float t) {
     }
 }
 
+// ── the cross-entropy method (the weights of the heuristic) ──
+// Two of the weights as a plane; the fitness is highest at the star. Each
+// iteration draws 30 sets of weights around the mean, keeps the best 15 % and
+// moves the mean and the spread onto them (plus a little extra noise).
+void anim_cem(App& a, Box b, float t) {
+    const int iters = 5, n = 30, ne = 5;
+    const float per = 2.6f, P = iters * per + 1.5f;
+    t = std::fmod(t, P);
+    Box pl{b.x + 40 * a.s, b.y + 50 * a.s, b.h - 90 * a.s, b.h - 90 * a.s};
+    draw::round_box(pl.inset(-6 * a.s), 8 * a.s, hex(0x0b0f16, 170));
+    V2 opt{0.72f, 0.3f};
+    SDL_Rect prev_clip{};   // within the clip of the course window (it scrolls)
+    bool had_clip = SDL_RenderClipEnabled(a.renderer) && SDL_GetRenderClipRect(a.renderer, &prev_clip);
+    {
+        SDL_Rect r{int(pl.x), int(pl.y), int(pl.w), int(pl.h)}, both = r;
+        if (had_clip) SDL_GetRectIntersection(&r, &prev_clip, &both);
+        SDL_SetRenderClipRect(a.renderer, &both);
+    }
+    for (int k = 6; k >= 1; k--)   // the fitness: rings around the best weights
+        draw::circle({pl.x + pl.w * opt.x, pl.y + pl.h * opt.y}, pl.w * 0.11f * k, with_alpha(pal::accent2, 0.05f + 0.03f * (6 - k)));
+    SDL_SetRenderClipRect(a.renderer, had_clip ? &prev_clip : nullptr);
+    auto P2 = [&](V2 u) { return V2{pl.x + pl.w * u.x, pl.y + pl.h * u.y}; };
+    label(a, "poids 1", {pl.center().x, pl.bottom() + 8 * a.s}, pal::faint, 12, Font::Regular, Align::Center);
+    label(a, "poids 2", {pl.x - 30 * a.s, pl.center().y}, pal::faint, 12, Font::Regular, Align::Center);
+    V2 mu{0.22f, 0.75f};
+    float sd = 0.17f;
+    int cur = std::min(iters - 1, int(t / per));
+    float ft = t - cur * per;
+    std::vector<V2> pts;
+    std::vector<int> elite;
+    for (int it = 0; it <= cur; it++) {
+        std::mt19937 rng(77 + it);
+        std::normal_distribution<float> g(0, 1);
+        pts.clear();
+        std::vector<std::pair<float, int>> fit;
+        for (int i = 0; i < n; i++) {
+            V2 p{std::clamp(mu.x + sd * g(rng), 0.02f, 0.98f), std::clamp(mu.y + sd * g(rng), 0.02f, 0.98f)};
+            pts.push_back(p);
+            V2 d = p - opt;
+            fit.push_back({-(d.x * d.x + d.y * d.y) + 0.004f * g(rng), i});   // noisy: matches against MCTS
+        }
+        std::sort(fit.rbegin(), fit.rend());
+        elite.clear();
+        for (int i = 0; i < ne; i++) elite.push_back(fit[size_t(i)].second);
+        if (it < cur) {
+            V2 m{0, 0};
+            for (int i : elite) m = m + pts[size_t(i)];
+            m = m * (1.0f / ne);
+            float v = 0;
+            for (int i : elite) { V2 d = pts[size_t(i)] - m; v += d.x * d.x + d.y * d.y; }
+            mu = m;
+            sd = std::sqrt(v / (2 * ne)) + 0.02f;
+        }
+    }
+    // the distribution of this iteration, then the samples, then the elite, then the move
+    draw::ring(P2(mu), pl.w * sd * 2, 1.5f * a.s, with_alpha(pal::accent, 0.6f));
+    draw::circle(P2(mu), 5 * a.s, pal::accent);
+    float k1 = phase(ft, 0.1f, 0.9f), k2 = phase(ft, 1.0f, 1.4f);
+    for (int i = 0; i < n; i++) {
+        if (i > k1 * n) break;
+        bool e = std::find(elite.begin(), elite.end(), i) != elite.end();
+        Rgba c = e && k2 > 0 ? mix(hex(0xaab3c3), pal::good, k2) : with_alpha(hex(0xaab3c3), 1 - 0.6f * k2);
+        draw::circle(P2(pts[size_t(i)]), (e && k2 > 0 ? 5.5f : 4.0f) * a.s, c);
+    }
+    if (ft > 1.6f) {   // the new mean, at the centre of the elite
+        V2 m{0, 0};
+        for (int i : elite) m = m + pts[size_t(i)];
+        m = m * (1.0f / ne);
+        float k3 = smooth(phase(ft, 1.6f, 2.3f));
+        draw::arrow(P2(mu), P2(mu + (m - mu) * k3), 2.5f * a.s, pal::good);
+    }
+    draw::circle(P2(opt), 7 * a.s, hex(0xffd166));
+    draw::ring(P2(opt), 11 * a.s, 1.5f * a.s, hex(0xffd166));
+    step_title(a, b, ft < 1.0f ? strf("It\xC3\xA9ration %d : 30 jeux de poids tir\xC3\xA9s autour de la moyenne", cur + 1)
+                 : ft < 1.6f ? "Chacun joue contre MCTS : on garde les 15 % qui gagnent le plus (l'\xC3\xA9lite)"
+                             : "Nouvelle moyenne et nouvel \xC3\xA9" "cart sur l'\xC3\xA9lite : la distribution se resserre");
+    float tx = pl.right() + 40 * a.s, ty = pl.y + 10 * a.s, tw = b.right() - tx - 20 * a.s;
+    a.text.paragraph(Font::Regular, 14 * a.s, "Chaque point est un jeu complet de 46 poids (ici, deux seulement sont dessin\xC3\xA9s). "
+                     "Sa note : environ 580 parties d'un minimax qui utilise ces poids contre MCTS, avec les deux couleurs, "
+                     "100 000 points par victoire, moins par d\xC3\xA9" "faite, plus l'\xC3\xA9" "cart de score.", {tx, ty, tw, 200 * a.s}, pal::dim);
+    label(a, strf("\xC3\xA9" "cart-type : %.2f", sd), {tx, pl.bottom() - 24 * a.s}, pal::text, 14, Font::Mono);
+}
+
+// ── the genealogy of the AIs: who learnt from whom ──
+void anim_lineage(App& a, Box b, float t) {
+    struct N { const char* title; const char* sub; float x, y; Rgba c; };
+    const N nodes[] = {
+        {"Heuristique + CEM", "mai-sept. 2024 : 46 poids appris contre MCTS", 0.13f, 0.14f, pal::accent2},
+        {"Bon minimax", "juillet 2024 : profondeur it\xC3\xA9rative, table, r\xC3\xA9" "ductions, 9 c\xC5\x93urs", 0.13f, 0.47f, pal::accent2},
+        {"Parties du minimax", "oct. 2024 : contre lui-m\xC3\xAAme, 1 s par coup, 2 \xC3\xA0 9 premiers coups au hasard", 0.13f, 0.80f, hex(0xaab3c3)},
+        {"Premier NNUE", "oct. 2024 \xE2\x86\x92 mai 2025 : 193 entr\xC3\xA9" "es, gagne / nul / perd, puis en entiers", 0.38f, 0.80f, pal::accent},
+        {"Parties du minimax NNUE", "ao\xC3\xBBt-d\xC3\xA9" "c. 2025 : 2 s par coup, 8 c\xC5\x93urs", 0.38f, 0.47f, hex(0xaab3c3)},
+        {"R\xC3\xA9seau de features", "mars-avril 2026 : caract\xC3\xA9ristiques calcul\xC3\xA9" "es, cherch\xC3\xA9" "es aussi avec un LLM", 0.38f, 0.14f, pal::accent},
+        {"ResNet supervis\xC3\xA9", "mai 2026 : 30 blocs \xC3\x97 256, valeur et coups, appris sur ces parties", 0.63f, 0.47f, pal::accent},
+        {"Distillation", "juillet 2026 : le ResNet ma\xC3\xAEtre ; \xC3\xA9l\xC3\xA8ves : le NNUE 193 et le r\xC3\xA9seau de features", 0.63f, 0.80f, pal::good},
+        {"AlphaZero", "sept. 2026 : joue contre lui-m\xC3\xAAme, part du ResNet", 0.87f, 0.47f, pal::good},
+        {"NNUE perspective (dev)", "oct. 2026 : distill\xC3\xA9 d'AlphaZero, recherche retravaill\xC3\xA9" "e", 0.87f, 0.80f, pal::good},
+        {"Boucle de distillation", "nov. 2026 : les parties du dev \xC3\xA9tiquet\xC3\xA9" "es, le ResNet, puis le NNUE", 0.87f, 0.14f, pal::good},
+    };
+    const int E[][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {4, 6}, {6, 7}, {6, 8}, {8, 9}, {9, 10}};
+    const int nn = int(sizeof(nodes) / sizeof(nodes[0])), ne = int(sizeof(E) / sizeof(E[0]));
+    const float P = 16;
+    float tt = std::fmod(t, P);
+    float bw = std::min(200 * a.s, b.w * 0.22f), bh = 84 * a.s;
+    auto box = [&](int i) { return Box{b.x + b.w * nodes[i].x - bw / 2, b.y + 30 * a.s + (b.h - 60 * a.s) * nodes[i].y - bh / 2, bw, bh}; };
+    auto edge_pt = [&](Box r, V2 to) {   // where the segment from the centre to `to` leaves the box
+        V2 c = r.center(), d = to - c;
+        float kx = std::abs(d.x) > 1e-3f ? (r.w / 2) / std::abs(d.x) : 1e9f, ky = std::abs(d.y) > 1e-3f ? (r.h / 2) / std::abs(d.y) : 1e9f;
+        return c + d * std::min(kx, ky);
+    };
+    for (int e = 0; e < ne; e++) {
+        float k = smooth(phase(tt, 0.5f + e * 0.9f, 1.1f + e * 0.9f));
+        if (k <= 0) continue;
+        Box ra = box(E[e][0]), rb = box(E[e][1]);
+        V2 p = edge_pt(ra, rb.center()), q = edge_pt(rb, ra.center());
+        draw::arrow(p, p + (q - p) * k, 2 * a.s, with_alpha(hex(0x5c6878), 0.9f));
+        if (k >= 1) flow(p, q, tt * 0.5f + e * 0.13f, pal::accent, 3 * a.s, 2);
+    }
+    for (int i = 0; i < nn; i++) {
+        float k = smooth(phase(tt, i * 0.9f, i * 0.9f + 0.6f));
+        if (k <= 0) continue;
+        Box r = box(i);
+        r.y += (1 - k) * 10 * a.s;
+        card(a, r, nodes[i].title, nodes[i].sub, nodes[i].c, 0.3f * k);
+    }
+}
+
 // The registry: anim name → drawing function.
 using AnimFn = void (*)(App&, Box, float);
 const std::map<std::string, AnimFn>& anims() {
@@ -5373,7 +5500,8 @@ const std::map<std::string, AnimFn>& anims() {
         {"random", anim_random}, {"monte_carlo", anim_monte_carlo}, {"minimax", anim_minimax}, {"alphabeta", anim_alphabeta},
         {"mcts", anim_mcts}, {"heuristic", anim_heuristic}, {"iterdeep", anim_iterdeep}, {"nnue193", anim_nnue193},
         {"nnue_persp", anim_nnue_persp}, {"features", anim_features}, {"resnet", anim_resnet}, {"batch", anim_batch},
-        {"selfplay", anim_selfplay}, {"distill", anim_distill}, {"lmr", anim_lmr}, {"aspiration", anim_aspiration}};
+        {"selfplay", anim_selfplay}, {"distill", anim_distill}, {"lmr", anim_lmr}, {"aspiration", anim_aspiration},
+        {"cem", anim_cem}, {"lineage", anim_lineage}};
     return m;
 }
 

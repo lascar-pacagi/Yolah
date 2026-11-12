@@ -201,7 +201,7 @@
           "    retourner h"
         ] },
         { "h": "D'où viennent les poids ?" },
-        { "p": "Ils ne sont pas choisis à la main : ils ont été appris par la méthode d'entropie croisée (CEM). On tire au hasard des jeux de poids autour d'une moyenne, on les fait jouer les uns contre les autres, on garde les meilleurs, et on recentre la distribution sur eux. On recommence jusqu'à ce que la distribution se stabilise." },
+        { "p": "Ils ne sont pas choisis à la main : ils ont été appris par la méthode d'entropie croisée (CEM). On tire au hasard des jeux de poids autour d'une moyenne, chacun joue des centaines de parties contre MCTS, on garde les meilleurs, et on recentre la distribution sur eux. On recommence jusqu'à ce que la distribution se stabilise. Le chapitre suivant raconte comment." },
         { "tip": "L'heuristique est le cœur du problème : une recherche parfaite avec une mauvaise évaluation joue mal. Les IA suivantes remplacent cette formule écrite à la main par des réseaux de neurones appris." }
       ]
     },
@@ -271,6 +271,8 @@
           "h₃ ← clamp(W₃ · h₂ + b₃, 0, 1)",
           "v  ← W₄ · h₃ + b₄"
         ] },
+        { "h": "Son histoire" },
+        { "p": "Le premier NNUE du projet (octobre 2024) apprenait le résultat des parties du bon minimax et prédisait victoire, nul ou défaite. Celui de l'application garde ses 193 entrées, mais il a été réappris en juillet 2026 par distillation du ResNet : « ancien » désigne le format du réseau, remplacé depuis par le NNUE du dev, pas l'âge de ses poids." },
         { "tip": "Dans la recherche, chaque nœud fait une mise à jour en descendant et l'annule en remontant : l'accumulateur suit la position comme une pile, en quelques dizaines de nanosecondes par coup avec les instructions vectorielles (AVX2)." }
       ]
     },
@@ -324,7 +326,9 @@
           "Avantage : chaque nombre résume une idée stratégique ; un petit réseau suffit.",
           "Inconvénient : les caractéristiques se recalculent entièrement à chaque position (pas de mise à jour incrémentale comme le NNUE) : l'évaluation est plus lente, la recherche voit moins loin.",
           "Résultat : à peu près la même force que le NNUE ancien. Le minimax NNUE dev combine les deux idées : les cases brutes, plus quelques caractéristiques d'espace."
-        ] }
+        ] },
+        { "h": "Son histoire" },
+        { "p": "Le réseau de features est né en mars 2026 : les caractéristiques de toutes les positions des parties du minimax NNUE ont été calculées sur le cluster (jusqu'à 500 millions d'exemples). D'avril à mai 2026, de nouvelles caractéristiques ont été cherchées, certaines proposées par un modèle de langage (Qwen) dans une boucle qui gardait celles qui aidaient le réseau. Le réseau de l'application a ensuite été distillé du ResNet, comme le NNUE ancien, en juillet 2026." }
       ]
     },
     {
@@ -473,18 +477,122 @@
         ] },
         { "tip": "Pour réfléchir : pourquoi entraîner la politique sur les visites du MCTS plutôt que sur le coup joué ? (Les visites contiennent plus d'information : elles disent aussi quels coups étaient presque aussi bons.)" }
       ]
+    },
+    {
+      "id": "cem",
+      "title": "Apprendre les poids : la méthode de l'entropie croisée",
+      "blocks": [
+        {
+          "p": "L'heuristique additionne 46 termes, chacun avec son poids. Les régler à la main est sans espoir : changer un poids change l'effet de tous les autres. Les poids ont donc été appris, de mai à septembre 2024, par une version bruitée de la méthode d'entropie croisée (Noisy Cross-Entropy Method), sur le cluster de calcul."
+        },
+        {
+          "anim": "cem",
+          "height": 380,
+          "caption": "Deux des 46 poids, dessinés comme un plan ; la note est meilleure près de l'étoile. À chaque itération : tirer des jeux de poids autour de la moyenne, les noter, garder l'élite, déplacer la moyenne et resserrer l'écart."
+        },
+        {
+          "h": "Noter un jeu de poids : des parties contre MCTS"
+        },
+        {
+          "p": "Impossible de savoir si des poids sont bons sans jouer. Chaque candidat est mis dans un minimax (la version 2 du minimax du projet à partir de juillet 2024), qui affronte le joueur MCTS sur un seul cœur : 40 parties depuis la position de départ, 50 après 2 coups tirés au hasard et 200 après 4 coups au hasard, chaque fois avec les deux couleurs, soit 580 parties par candidat. La note ajoute 100 000 par victoire, retire 100 000 par défaite, et ajoute l'écart de points : gagner compte d'abord, gagner largement départage."
+        },
+        {
+          "code": [
+            "fonction CEM()",
+            "    μ ← poids de départ,  σ ← 5          // une moyenne et un écart par poids",
+            "    répéter 500 fois",
+            "        pour i de 1 à 120 faire          // la population",
+            "            w[i] ← μ + σ · bruit_gaussien()",
+            "            note[i] ← parties(minimax(w[i]), MCTS)   // 580 parties",
+            "        élite ← les 18 meilleurs w[i]    // 15 %",
+            "        μ ← moyenne(élite)",
+            "        σ ← écart_type(élite) + 1        // le bruit ajouté : ne pas se figer trop tôt",
+            "    retourner le meilleur w jamais vu"
+          ]
+        },
+        {
+          "list": [
+            "Pourquoi « bruitée » ? Sans le + 1, l'écart-type fond en quelques itérations et la recherche s'arrête sur le premier jeu correct trouvé. Le bruit ajouté garde de l'exploration.",
+            "Les notes elles-mêmes sont bruitées (coups au hasard au départ, parties serrées) : c'est pour cela qu'il faut des centaines de parties par candidat.",
+            "Le calcul est énorme : 120 candidats × 580 parties à chaque itération. Les rondes ont tourné des jours sur le cluster (vingt jours pour l'une d'elles, en août 2024). Chaque ronde repartait des meilleurs poids de la précédente, souvent après l'ajout de nouveaux termes à l'heuristique (influence, pions bloqués, connexité).",
+            "L'adversaire a été réglé au fil des rondes : MCTS à 1 s par coup, puis 2 s en juillet 2024, puis entre 0,1 et 0,3 s à partir d'août.",
+            "La méthode de Nelder-Mead (un simplexe qui se déforme dans l'espace des poids) a aussi été essayée en juin 2024. La CEM a été gardée : elle supporte mieux des notes bruitées."
+          ]
+        },
+        {
+          "tip": "Un bon adversaire d'entraînement n'est ni trop fort ni trop faible : il faut que certaines parties se gagnent et d'autres se perdent, sinon toutes les notes se ressemblent et la méthode ne peut plus classer les candidats."
+        }
+      ]
+    },
+    {
+      "id": "lineage",
+      "title": "D'où vient chaque IA : la généalogie du projet",
+      "blocks": [
+        {
+          "p": "Les IA de Yolah n'ont pas été écrites d'un coup : chacune a servi à fabriquer la suivante. Les parties d'une IA deviennent les données d'apprentissage d'un réseau ; ce réseau rend une autre IA plus forte, dont les parties servent à leur tour. Voici cette histoire, reconstituée d'après le journal du projet (git), de mars 2024 à novembre 2026."
+        },
+        {
+          "anim": "lineage",
+          "height": 470,
+          "caption": "Chaque flèche se lit « a servi à fabriquer ». En vert, les IA les plus fortes aujourd'hui."
+        },
+        {
+          "h": "2024 : les règles, puis une heuristique"
+        },
+        {
+          "list": [
+            "Mars 2024 : Hasard, Monte Carlo et MCTS, qui ne demandent que les règles.",
+            "Mai à septembre 2024 : l'heuristique et ses 46 poids, appris par la méthode d'entropie croisée contre MCTS (chapitre du minimax basique).",
+            "Juillet 2024 : le « bon » minimax, en quatre versions : approfondissement itératif, table de transposition, réductions des coups tardifs, puis Lazy SMP pour jouer sur plusieurs cœurs. Il n'est pas dans la liste des joueurs de l'application, mais toutes les IA suivantes en descendent."
+          ]
+        },
+        {
+          "h": "Octobre 2024 : les premières données"
+        },
+        {
+          "p": "Le bon minimax joue contre lui-même sur le cluster, 1 s par coup sur 9 cœurs. Pour que les parties ne se ressemblent pas, les 2 à 9 premiers coups sont tirés au hasard (le fichier games_5r_1s contient les parties à 5 coups au hasard et 1 seconde par coup). Chaque lot compte environ 75 000 parties, et les symétries du plateau multiplient encore les positions."
+        },
+        {
+          "h": "Octobre 2024 à mai 2025 : le premier NNUE"
+        },
+        {
+          "p": "Un premier réseau est appris en PyTorch sur ces parties : à partir de la position (193 entrées), il prédit si la partie finit par une victoire, un nul ou une défaite. Il est réécrit en C++ en février 2025, accéléré (produits matrice-vecteur vectorisés), puis quantifié en entiers 8 bits entre mars et mai 2025. En mai 2025, un tournoi sur le cluster, 1000 matchs aller-retour par paire, classe toutes les IA."
+        },
+        {
+          "h": "2025 : de meilleures parties, un nouvel entraînement"
+        },
+        {
+          "p": "D'août à décembre 2025, c'est le minimax NNUE quantifié, devenu la meilleure IA, qui joue contre lui-même : 2 s par coup sur 8 cœurs, dans un nouveau format de fichier. Un NNUE est réappris sur ces parties. Le premier essai est mauvais (« the new neural network is bad », novembre 2025 : les poids n'étaient plus bornés pendant l'apprentissage) ; il est corrigé en décembre. Son gain en force n'a pas été clairement établi, mais ses parties, elles, servent à toute la suite."
+        },
+        {
+          "h": "2026 : les gros réseaux, puis la distillation"
+        },
+        {
+          "list": [
+            "Mars-avril 2026 : le réseau de features, qui lit des caractéristiques calculées au lieu des cases. Certaines caractéristiques ont été proposées par un modèle de langage (Qwen) dans une boucle automatique ; une entrée « victoire sûre » a été ajoutée.",
+            "Mai 2026 : le ResNet, un réseau convolutif résiduel à la AlphaZero (30 blocs de 256 filtres, une tête valeur et une tête coups), appris de façon supervisée sur les parties du minimax NNUE, sur plusieurs GPU.",
+            "Juillet 2026 : la distillation. Le ResNet, trop lent pour un minimax, devient le maître : il étiquette des centaines de millions de positions, et deux petits réseaux rapides apprennent à l'imiter. Ce sont eux qui jouent dans l'application : Minimax NNUE (ancien), avec 193 entrées, et Minimax Features, avec 119 caractéristiques.",
+            "Septembre 2026 : AlphaZero part du ResNet et s'améliore en jouant contre lui-même, avec une recherche à la manière de KataGo, sur les GPU du cluster.",
+            "Octobre 2026 : le réseau d'AlphaZero devient le maître à son tour. Il étiquette environ un milliard de positions, et le NNUE vu du camp au trait du Minimax NNUE dev en est distillé. La recherche du dev est retravaillée étape par étape, chaque idée mesurée sur des milliers de parties.",
+            "Novembre 2026 : la boucle de distillation. Les parties du dev sont étiquetées, elles améliorent le ResNet, qui enseigne le NNUE suivant. En fin de partie (22 cases libres ou moins), la cible devient le résultat exact, plus fiable que le maître."
+          ]
+        },
+        {
+          "tip": "La leçon : en IA des jeux, les données comptent autant que l'algorithme. Une IA un peu meilleure produit de meilleures parties, qui entraînent un meilleur réseau, qui donne une IA meilleure encore."
+        }
+      ]
     }
   ],
   "ais": {
     "random": ["random"],
     "beginner": ["beginner", "monte_carlo", "mc_limits"],
-    "monte_carlo": ["monte_carlo", "mc_limits"],
-    "mcts": ["mcts", "uct"],
-    "basic_minmax": ["minimax", "alphabeta", "heuristic", "depth"],
-    "nnue193": ["minimax", "alphabeta", "modern_search", "nnue193", "quantization", "distill"],
-    "features": ["minimax", "alphabeta", "modern_search", "features", "distill"],
-    "dev": ["minimax", "alphabeta", "modern_search", "dev_search", "dev_endgame", "nnue_persp", "quantization", "distill"],
-    "resnet": ["mcts", "uct", "resnet", "puct", "supervised"],
-    "alphazero": ["mcts", "uct", "resnet", "puct", "selfplay"]
+    "monte_carlo": ["monte_carlo", "mc_limits", "lineage"],
+    "mcts": ["mcts", "uct", "lineage"],
+    "basic_minmax": ["minimax", "alphabeta", "heuristic", "cem", "depth", "lineage"],
+    "nnue193": ["minimax", "alphabeta", "modern_search", "nnue193", "quantization", "distill", "lineage"],
+    "features": ["minimax", "alphabeta", "modern_search", "features", "distill", "lineage"],
+    "dev": ["minimax", "alphabeta", "modern_search", "dev_search", "dev_endgame", "nnue_persp", "quantization", "distill", "lineage"],
+    "resnet": ["mcts", "uct", "resnet", "puct", "supervised", "lineage"],
+    "alphazero": ["mcts", "uct", "resnet", "puct", "selfplay", "lineage"]
   }
 }
