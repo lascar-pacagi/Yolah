@@ -1045,14 +1045,14 @@ void clip(const Box* b) {
 // texture (an "atlas"); a string is then drawn glyph by glyph, each glyph a
 // rectangle of the atlas (SDL_RenderTexture), tinted by the texture's colour
 // modulation. One atlas per (font, size), created on first use.
-enum class Font { Regular, Bold, Black, Title };
+enum class Font { Regular, Bold, Black, Title, Mono };   // Mono: the pseudo-code of the AI courses (@@COURSE)
 enum class Align { Left, Center, Right };
 
 class TextEngine {
 public:
     bool load(const fs::path& dir) {
-        const char* files[4] = {"Lato-Regular.ttf", "Lato-Bold.ttf", "Lato-Black.ttf", "Comfortaa-Bold.ttf"};
-        for (int i = 0; i < 4; i++) {
+        const char* files[NF] = {"Lato-Regular.ttf", "Lato-Bold.ttf", "Lato-Black.ttf", "Comfortaa-Bold.ttf", "DejaVuSansMono.ttf"};
+        for (int i = 0; i < NF; i++) {
             auto data = read_file(dir / files[i]);
             if (!data) {
                 SDL_Log("font missing: %s", (dir / files[i]).string().c_str());
@@ -1066,8 +1066,12 @@ public:
         for (int c = 32; c < 127; c++) codepoints_.push_back(c);
         for (int c = 160; c < 256; c++) codepoints_.push_back(c);
         for (int c : {0x152, 0x153, 0x2013, 0x2014, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2026, 0x2039, 0x203A, 0x20AC,
-                      0x2190, 0x2191, 0x2192, 0x2193, 0x21C4, 0x2248, 0x2212, 0x2605, 0x2606, 0x2713, 0x2715, 0x25B6, 0x25C0})
-            codepoints_.push_back(c);
+                      0x2190, 0x2191, 0x2192, 0x2193, 0x21C4, 0x2248, 0x2212, 0x2605, 0x2606, 0x2713, 0x2715, 0x25B6, 0x25C0,
+                      // the pseudo-code and formulas of the AI courses (only the fonts that have them: the others draw '?')
+                      0x3B1, 0x3B2, 0x3B5, 0x3BB, 0x3C0, 0x3C3, 0x394, 0x3A3, 0x2200, 0x2208, 0x2211, 0x221A, 0x221E,
+                      0x2260, 0x2264, 0x2265, 0x2227, 0x2228, 0x22C5, 0x2016, 0x2500, 0x2502, 0x251C, 0x2514, 0x25CF, 0x25CB,
+                      0x2080, 0x2081, 0x2082, 0x2083, 0x1D62, 0x2C7C, 0x23F8, 0x27F2, 0x2193, 0x21BB})
+            if (std::find(codepoints_.begin(), codepoints_.end(), c) == codepoints_.end()) codepoints_.push_back(c);
         return true;
     }
     void clear() {
@@ -1167,7 +1171,8 @@ private:
         stbtt_fontinfo info{};
         std::map<int, Atlas> atlases;
     };
-    Face faces_[4];
+    static constexpr int NF = 5;
+    Face faces_[NF];
     std::vector<int> codepoints_;
 
     static uint32_t next_codepoint(const std::string& s, size_t& i) {
@@ -1204,7 +1209,8 @@ private:
         range.chardata_for_range = a.chars.data();
         stbtt_PackFontRanges(&pc, face.data.data(), 0, &range, 1);
         stbtt_PackEnd(&pc);
-        for (size_t i = 0; i < codepoints_.size(); i++) a.index[uint32_t(codepoints_[i])] = int(i);
+        for (size_t i = 0; i < codepoints_.size(); i++)   // a character the font lacks is drawn as '?'
+            if (codepoints_[i] < 128 || stbtt_FindGlyphIndex(&face.info, codepoints_[i])) a.index[uint32_t(codepoints_[i])] = int(i);
         int asc, desc, gap;
         stbtt_GetFontVMetrics(&face.info, &asc, &desc, &gap);
         float scale = stbtt_ScaleForPixelHeight(&face.info, float(px));
@@ -3383,6 +3389,69 @@ std::vector<std::string> list_backgrounds() {
     return files;
 }
 
+// ─── @@COURSE ───────────────────────────────────────────────────────────────
+// "Comprendre cette IA": a course on each AI, for students. The window shows
+// the AI's summary first (name, family, strength, description), then the
+// chapters of its course: text, pseudo-code, notes and animations, in one
+// column that scrolls (wheel, scroll bar, keys, the table of contents).
+//
+// The texts are data: assets/courses/ai_courses.json, a list of chapters
+// (blocks "h" heading, "p" paragraph, "list" bullets, "tip" note, "code"
+// pseudo-code lines, "anim" an animation of this section with its height and
+// caption) and, for each AI id, the chapters of its course in order. The
+// animations are code (course_anims below): each one draws itself in a box
+// from its own clock, which runs while it is on screen and not paused (a
+// click on it pauses it; the round arrow starts it again). Several use real
+// positions and the real rules (legal moves, random playouts) of the engine.
+
+struct CourseBlock {
+    std::string kind, text, anim;       // kind: h, p, list, tip, code, anim
+    std::vector<std::string> lines;     // list items, code lines
+    float height = 260;                 // anim: its height (design pixels)
+};
+struct CourseChapter {
+    std::string id, title;
+    std::vector<CourseBlock> blocks;
+};
+struct CourseLibrary {
+    std::map<std::string, CourseChapter> chapters;
+    std::map<std::string, std::vector<std::string>> plans;   // AI id → chapter ids
+    void load(const fs::path& file) {
+        json j = load_json(file);
+        chapters.clear();
+        plans.clear();
+        if (!j.is_object()) return;
+        if (j.contains("chapters") && j["chapters"].is_array())
+            for (auto& c : j["chapters"]) {
+                CourseChapter ch;
+                ch.id = jstr(c, "id");
+                ch.title = jstr(c, "title");
+                if (c.contains("blocks") && c["blocks"].is_array())
+                    for (auto& b : c["blocks"]) {
+                        CourseBlock k;
+                        for (const char* kind : {"h", "p", "tip", "list", "code", "anim"})
+                            if (b.contains(kind)) k.kind = kind;
+                        if (k.kind.empty()) continue;
+                        const json& v = b[k.kind];
+                        if (v.is_string()) (k.kind == "anim" ? k.anim : k.text) = v.get<std::string>();
+                        else if (v.is_array())
+                            for (auto& l : v) k.lines.push_back(l.is_string() ? l.get<std::string>() : l.dump());
+                        if (k.kind == "anim") {
+                            k.height = b.value("height", 260.0f);
+                            k.text = jstr(b, "caption");
+                        }
+                        ch.blocks.push_back(std::move(k));
+                    }
+                chapters[ch.id] = std::move(ch);
+            }
+        if (j.contains("ais") && j["ais"].is_object())
+            for (auto& [id, list] : j["ais"].items())
+                if (list.is_array())
+                    for (auto& c : list)
+                        if (c.is_string()) plans[id].push_back(c.get<std::string>());
+    }
+};
+
 // ─── @@APP ──────────────────────────────────────────────────────────────────
 enum class Scene { Menu, Setup, Game, Themes, Tutorial, Puzzles, Editor, Studio };
 
@@ -3508,6 +3577,21 @@ struct App {
     // The sprite picker (a modal grid over the library), used by the themes
     // scene and the editor: on_pick receives the chosen sprite id.
     float themes_scroll = 0;              // the theme cards (@@SCENE_THEMES)
+    // "Comprendre cette IA" (@@COURSE): the AI whose course is open ("" = closed)
+    CourseLibrary courses;
+    std::string course;
+    float course_scroll = 0, course_target = 0, course_drag_dy = 0;
+    bool course_drag = false;
+    std::set<std::string> course_paused;       // the animations paused
+    std::map<std::string, float> course_clock; // the clock of each animation
+    float course_t_offset = 0;                 // tests: the animations start this many seconds in
+    std::string course_seek;                   // tests: scroll to this animation
+    void open_course(const std::string& id) {
+        course = id;
+        course_scroll = course_target = 0;
+        course_clock.clear();
+        course_paused.clear();
+    }
     struct Picker {
         bool open = false;
         std::string title, current;
@@ -3932,6 +4016,1359 @@ bool back_button(App& a) {
     return a.ui.button("back", {a.w - 200 * s, 40 * s, 150 * s, 50 * s}, "\xE2\x86\x90  Retour", Style::Ghost) || a.in.key(SDLK_ESCAPE);
 }
 
+// ─── @@COURSE (continued): the animations and the window ──────────────────
+namespace course {
+
+// ── shared drawing helpers ──
+const Rgba C_BLACK = hex(0x7aa2ff), C_WHITE = hex(0xffb35c), C_GOOD = pal::good, C_BAD = pal::bad;
+
+Box mini_sq(Box b, int s) {
+    float q = b.w / 8;
+    return {b.x + sq_file(s) * q, b.y + (7 - sq_rank(s)) * q, q, q};
+}
+V2 mini_c(Box b, int s) { return mini_sq(b, s).center(); }
+
+// A small board: squares, holes, the pieces (black and white stones).
+void mini_board(Box b, uint64_t black, uint64_t white, uint64_t holes, float alpha = 1) {
+    float q = b.w / 8;
+    draw::round_box(b.inset(-4), 6, with_alpha(hex(0x0b0f16), alpha));
+    for (int s = 0; s < 64; s++) {
+        Box r = mini_sq(b, s);
+        bool dark = (sq_file(s) + sq_rank(s)) % 2 == 0;
+        draw::rect(r, with_alpha(dark ? hex(0x2a3445) : hex(0x364257), alpha));
+        if (holes >> s & 1) {   // a hole: a dark square pit (the pieces are discs)
+            draw::round_box(r.inset(q * 0.06f), q * 0.12f, with_alpha(hex(0x020305), alpha), with_alpha(hex(0x10141c), alpha));
+            draw::round_frame(r.inset(q * 0.06f), q * 0.12f, 1, with_alpha(hex(0x000000), alpha));
+        }
+    }
+    for (int s = 0; s < 64; s++) {
+        V2 c = mini_c(b, s);
+        if (black >> s & 1) {
+            draw::circle(c, q * 0.36f, with_alpha(hex(0x5a6272), alpha), with_alpha(hex(0x16191f), alpha));
+            draw::ring(c, q * 0.36f, 1.5f, with_alpha(hex(0xaab3c3), alpha * 0.7f));
+        } else if (white >> s & 1) {
+            draw::circle(c, q * 0.36f, with_alpha(hex(0xffffff), alpha), with_alpha(hex(0xc9c2b4), alpha));
+            draw::ring(c, q * 0.36f, 1.2f, with_alpha(hex(0x6b6455), alpha * 0.6f));
+        }
+    }
+}
+void mini_board(Box b, const Yolah& y, float alpha = 1) { mini_board(b, y.bitboard(BLACK), y.bitboard(WHITE), y.empty_bitboard(), alpha); }
+
+std::vector<Move> legal(const Yolah& y) {
+    Yolah::MoveList ml;
+    y.moves(ml);
+    std::vector<Move> v;
+    for (size_t i = 0; i < ml.size(); i++)
+        if (ml[i] != Move::none()) v.push_back(ml[i]);
+    return v;
+}
+
+// A position from a game of random moves (deterministic): the first one, at
+// `plies` plies or later, whose side to move has between lo and hi moves.
+Yolah sample_position(uint32_t seed, int plies, int lo, int hi) {
+    for (uint32_t k = 0; k < 2000; k++) {
+        std::mt19937 rng(seed + k * 7919);
+        Yolah y;
+        for (int i = 0; !y.game_over(); i++) {
+            auto mv = legal(y);
+            int n = int(mv.size());
+            if (i >= plies && n >= lo && n <= hi) return y;
+            if (mv.empty()) { y.play(Move::none()); continue; }
+            y.play(mv[rng() % mv.size()]);
+        }
+    }
+    return Yolah();
+}
+
+// Plays random moves to the end; the result for `player`: its points minus the other's.
+float playout(Yolah y, uint8_t player, std::mt19937& rng, std::vector<Move>* trace = nullptr) {
+    while (!y.game_over()) {
+        auto mv = legal(y);
+        Move m = mv.empty() ? Move::none() : mv[rng() % mv.size()];
+        if (trace) trace->push_back(m);
+        y.play(m);
+    }
+    return float(y.score(player));
+}
+
+float phase(float t, float a, float b) { return clamp01((t - a) / (b - a)); }
+float smooth(float x) { x = clamp01(x); return x * x * (3 - 2 * x); }
+
+void label(App& a, const std::string& s, V2 p, Rgba c, float size = 14, Font f = Font::Regular, Align al = Align::Left) {
+    a.text.draw(f, size * a.s, s, p, c, al);
+}
+// A caption box in the corner of an animation (the step being shown).
+void step_title(App& a, Box b, const std::string& s, float alpha = 1) {
+    float fs = 15 * a.s, w = a.text.width(Font::Bold, fs, s) + 24 * a.s;
+    Box r{b.x + 12 * a.s, b.y + 10 * a.s, w, 28 * a.s};
+    draw::round_box(r, 14 * a.s, with_alpha(hex(0x0b0f16), 0.85f * alpha));
+    draw::round_frame(r, 14 * a.s, 1, with_alpha(pal::accent, 0.6f * alpha));
+    a.text.draw(Font::Bold, fs, s, {r.x + 12 * a.s, r.y + 5 * a.s}, with_alpha(pal::text, alpha));
+}
+void node_disc(App& a, V2 c, float r, Rgba fill, Rgba rim, const std::string& txt, float fs = 14) {
+    draw::circle(c, r, shade(fill, 0.15f), shade(fill, -0.15f));
+    draw::ring(c, r, 2 * a.s, rim);
+    if (!txt.empty()) a.text.draw(Font::Bold, fs * a.s, txt, {c.x, c.y - a.text.line_height(Font::Bold, fs * a.s) * 0.45f}, hex(0x0b0f16), Align::Center);
+}
+void move_arrow(Box bd, Move m, Rgba c, float w = 0.11f) {
+    V2 p = mini_c(bd, m.from_sq()), q = mini_c(bd, m.to_sq());
+    draw::arrow(p, q - normalized(q - p) * (bd.w / 8 * 0.25f), bd.w / 8 * w, c);
+}
+// A labelled box (diagrams).
+void card(App& a, Box r, const std::string& title, const std::string& sub, Rgba col, float glow = 0) {
+    if (glow > 0) draw::shadow(r, 10 * a.s, 18 * a.s, with_alpha(col, 0.5f * glow));
+    draw::round_box(r, 10 * a.s, hex(0x1d2532), hex(0x141a24));
+    draw::round_frame(r, 10 * a.s, 1.5f * a.s, with_alpha(col, 0.5f + 0.5f * glow));
+    a.text.draw(Font::Bold, 15 * a.s, title, {r.center().x, r.y + 8 * a.s}, pal::text, Align::Center);
+    if (!sub.empty()) a.text.paragraph(Font::Regular, 12 * a.s, sub, {r.x + 8 * a.s, r.y + 30 * a.s, r.w - 16 * a.s, r.h - 32 * a.s}, pal::dim, 1.2f, Align::Center);
+}
+// A dot travelling along a segment (data flowing in a diagram).
+void flow(V2 p, V2 q, float t, Rgba c, float r, int n = 3) {
+    for (int i = 0; i < n; i++) {
+        float u = std::fmod(t + i / float(n), 1.0f);
+        draw::circle(p + (q - p) * u, r, with_alpha(c, std::sin(u * 3.14159f)));
+    }
+}
+
+// ── 1. random: the moves, a draw, the move ──
+void anim_random(App& a, Box b, float t) {
+    static Yolah y0 = sample_position(11, 12, 8, 16);
+    const float P = 7;
+    int loop = int(t / P);
+    t = std::fmod(t, P);
+    auto mv = legal(y0);
+    float side = std::min(b.h - 30 * a.s, b.w * 0.5f);
+    Box bd{b.x + 30 * a.s, b.y + (b.h - side) / 2 + 10 * a.s, side - 20 * a.s, side - 20 * a.s};
+    int pick = int((loop * 7919u + 3) % mv.size());
+    Yolah y = y0;
+    if (t > 5.0f) y.play(mv[pick]);
+    mini_board(bd, y);
+    float q = bd.w / 8;
+    const bool black = y0.current_player() == BLACK;
+    if (t < 1.5f) {
+        step_title(a, b, "1. Mes pions");
+        uint64_t mine = y0.bitboard(y0.current_player());
+        for (int s = 0; s < 64; s++)
+            if (mine >> s & 1) draw::ring(mini_c(bd, s), q * 0.45f, 3 * a.s, with_alpha(pal::accent, 0.5f + 0.5f * std::sin(t * 6)));
+    } else if (t < 3.0f) {
+        step_title(a, b, strf("2. Les coups possibles : %zu", mv.size()));
+        float k = phase(t, 1.5f, 2.2f);
+        for (size_t i = 0; i < mv.size(); i++) move_arrow(bd, mv[i], with_alpha(pal::accent2, 0.55f * k), 0.06f);
+    } else if (t < 5.0f) {
+        step_title(a, b, "3. Tirage au sort");
+        float u = phase(t, 3.0f, 4.6f);
+        int shown = u >= 1 ? pick : int((loop * 7919u + 3 + int(40 * (1 - (1 - u) * (1 - u)))) % mv.size());
+        for (size_t i = 0; i < mv.size(); i++) move_arrow(bd, mv[i], with_alpha(pal::accent2, 0.18f), 0.05f);
+        move_arrow(bd, mv[shown], u >= 1 ? pal::accent : with_alpha(pal::accent2, 0.9f), 0.13f);
+    } else {
+        step_title(a, b, "4. Je le joue : +1 point");
+        draw::ring(mini_c(bd, mv[pick].to_sq()), q * 0.45f, 3 * a.s, pal::accent);
+    }
+    // Right: the pseudo-random choice, as numbers.
+    float x = bd.right() + 40 * a.s, yy = bd.y + 10 * a.s;
+    label(a, black ? "Aux Noirs de jouer" : "Aux Blancs de jouer", {x, yy}, pal::dim, 15);
+    yy += 30 * a.s;
+    label(a, strf("coups = %zu coups l\xC3\xA9gaux", mv.size()), {x, yy}, pal::text, 15, Font::Mono);
+    yy += 26 * a.s;
+    if (t >= 3.0f) {
+        label(a, strf("i = hasard() mod %zu = %d", mv.size(), pick), {x, yy}, pal::text, 15, Font::Mono);
+        yy += 26 * a.s;
+        label(a, "jouer coups[i] = " + sq_name(mv[pick].from_sq()) + "\xE2\x86\x92" + sq_name(mv[pick].to_sq()), {x, yy}, pal::accent, 15, Font::Mono);
+    }
+}
+
+// ── 2. Monte Carlo: random playouts after each move, the averages ──
+struct McData {
+    Yolah pos;
+    std::vector<Move> moves;
+    std::vector<std::vector<float>> results;   // [move][playout]
+    std::vector<std::vector<Move>> shown;      // the first playout of the first moves, move by move
+};
+const McData& mc_data() {
+    static McData d = [] {
+        McData d;
+        // A position whose moves differ: the best average ahead, the worst behind.
+        for (uint32_t seed = 5; seed < 200; seed++) {
+            d = McData{};
+            d.pos = sample_position(seed, 14, 4, 6);
+            d.moves = legal(d.pos);
+            if (d.moves.size() > 6) d.moves.resize(6);
+            std::mt19937 rng(42);
+            uint8_t me = d.pos.current_player();
+            d.results.assign(d.moves.size(), {});
+            for (int r = 0; r < 120; r++)
+                for (size_t i = 0; i < d.moves.size(); i++) {
+                    Yolah y = d.pos;
+                    y.play(d.moves[i]);
+                    std::vector<Move> tr;
+                    d.results[i].push_back(playout(y, me, rng, r == 0 && i < 3 ? &tr : nullptr));
+                    if (r == 0 && i < 3) d.shown.push_back(tr);
+                }
+            float lo = 1e9f, hi = -1e9f;
+            for (auto& v : d.results) {
+                float m = 0;
+                for (float x : v) m += x;
+                m /= v.size();
+                lo = std::min(lo, m), hi = std::max(hi, m);
+            }
+            if (d.moves.size() >= 4 && hi > 1.5f && lo < -1.5f) break;
+        }
+        return d;
+    }();
+    return d;
+}
+void anim_monte_carlo(App& a, Box b, float t) {
+    const McData& d = mc_data();
+    const float SLOW = 3.2f, T0 = 1.2f, T1 = T0 + 3 * SLOW, T2 = T1 + 5.0f, P = T2 + 3.0f;
+    t = std::fmod(t, P);
+    float side = std::min(b.h - 40 * a.s, b.w * 0.42f);
+    Box bd{b.x + 24 * a.s, b.y + 46 * a.s, side - 20 * a.s, side - 20 * a.s};
+    const size_t n = d.moves.size();
+    // how many playouts of each move are counted at time t
+    std::vector<int> counted(n, 0);
+    Yolah shown = d.pos;
+    std::string title;
+    if (t < T0) {
+        title = strf("Position : %zu coups possibles", n);
+    } else if (t < T1) {
+        int k = int((t - T0) / SLOW);
+        float u = std::fmod(t - T0, SLOW) / SLOW;
+        title = strf("Partie au hasard n\xC2\xB0%d apr\xC3\xA8s le coup %d", k + 1, k + 1);
+        for (int i = 0; i < k; i++) counted[i] = 1;
+        shown.play(d.moves[k]);
+        const auto& tr = d.shown[k];
+        int m = int(std::min(1.0f, u / 0.75f) * tr.size());
+        for (int i = 0; i < m; i++) shown.play(tr[i]);
+        if (u > 0.78f) counted[k] = 1;
+        if (u > 0.78f) {
+            float r = d.results[k][0];
+            label(a, r > 0 ? strf("gagn\xC3\xA9" "e de %d points", int(r)) : r < 0 ? strf("perdue de %d points", int(-r)) : std::string("nulle"),
+                  {bd.center().x, bd.bottom() + 8 * a.s}, r > 0 ? pal::good : r < 0 ? pal::bad : pal::dim, 15, Font::Bold, Align::Center);
+        }
+    } else if (t < T2) {
+        float u = smooth(phase(t, T1, T2));
+        title = "Et ainsi de suite, des milliers de fois...";
+        for (size_t i = 0; i < n; i++) counted[i] = std::max(i < 3 ? 1 : 0, int(u * d.results[i].size()));
+    } else {
+        title = "On joue le coup au meilleur \xC3\xA9" "cart de points moyen";
+        for (size_t i = 0; i < n; i++) counted[i] = int(d.results[i].size());
+    }
+    step_title(a, b, title);
+    mini_board(bd, shown);
+    // bars
+    float x = bd.right() + 36 * a.s, w = b.right() - x - 30 * a.s, rh = std::min(44 * a.s, (b.h - 70 * a.s) / n);
+    int best = 0;
+    std::vector<float> avg(n, 0);
+    float M = 1;   // the scale of the bars: the largest |average| at the end
+    for (size_t i = 0; i < n; i++) {
+        float s = 0;
+        for (float r : d.results[i]) s += r;
+        M = std::max(M, std::abs(s / d.results[i].size()) * 1.3f);
+    }
+    for (size_t i = 0; i < n; i++) {
+        float s = 0;
+        for (int k = 0; k < counted[i]; k++) s += d.results[i][k];
+        avg[i] = counted[i] ? s / counted[i] : 0;
+        if (avg[i] > avg[best]) best = int(i);
+    }
+    bool final_ = t >= T2;
+    for (size_t i = 0; i < n; i++) {
+        float y = b.y + 56 * a.s + i * rh;
+        Rgba col = final_ && int(i) == best ? pal::accent : pal::accent2;
+        label(a, strf("coup %zu  ", i + 1) + sq_name(d.moves[i].from_sq()) + "\xE2\x86\x92" + sq_name(d.moves[i].to_sq()), {x, y}, pal::text, 14, Font::Mono);
+        Box bar{x + 150 * a.s, y + 2 * a.s, w - 300 * a.s, 16 * a.s};
+        draw::round_box(bar, 8 * a.s, hex(0xffffff, 20));
+        float mid = bar.x + bar.w / 2, len = bar.w / 2 * std::clamp(avg[i] / M, -1.0f, 1.0f);
+        draw::rect({mid - 1, bar.y - 3 * a.s, 2, bar.h + 6 * a.s}, hex(0xffffff, 90));
+        if (counted[i]) draw::round_box({std::min(mid, mid + len), bar.y, std::abs(len), bar.h}, 6 * a.s, shade(avg[i] >= 0 ? col : pal::bad, -0.2f), avg[i] >= 0 ? col : pal::bad);
+        label(a, counted[i] ? strf("%+5.1f pts (%d)", avg[i], counted[i]) : "  \xE2\x80\x94", {bar.right() + 10 * a.s, y}, pal::dim, 14, Font::Mono);
+        if (t < T0 + 3 * SLOW || final_) {
+            if (final_ && int(i) == best) move_arrow(bd, d.moves[i], pal::accent, 0.13f);
+            else if (t < T0) move_arrow(bd, d.moves[i], with_alpha(pal::accent2, 0.6f), 0.07f);
+        }
+    }
+}
+
+// ── trees (minimax, alpha-beta, MCTS) ──
+struct TNode {
+    int parent = -1, depth = 0, leaf = 0;   // leaf: its value (minimax trees)
+    std::vector<int> kids;
+    V2 p;
+};
+// The minimax tree of the course: MAX root, 3 MIN nodes, 2 MAX nodes each, 2 leaves each.
+std::vector<TNode> mm_tree() {
+    static const int L[12] = {3, 5, 6, 9, 1, 2, 4, 8, 7, 4, 8, 6};
+    std::vector<TNode> t(1);
+    int li = 0;
+    for (int i = 0; i < 3; i++) {
+        int c = int(t.size()); t.push_back({0, 1}); t[0].kids.push_back(c);
+        for (int j = 0; j < 2; j++) {
+            int g = int(t.size()); t.push_back({c, 2}); t[c].kids.push_back(g);
+            for (int k = 0; k < 2; k++) {
+                int l = int(t.size()); t.push_back({g, 3, L[li++]}); t[g].kids.push_back(l);
+            }
+        }
+    }
+    return t;
+}
+void layout_tree(std::vector<TNode>& t, Box b, int depth_max) {
+    // leaves evenly spaced, parents above the middle of their children
+    std::function<float(int, float&)> place = [&](int n, float& x) -> float {
+        float y = b.y + b.h * (t[n].depth + 0.5f) / (depth_max + 1);
+        if (t[n].kids.empty()) { t[n].p = {x, y}; x += 1; return t[n].p.x; }
+        float lo = 1e9f, hi = -1e9f;
+        for (int k : t[n].kids) { float c = place(k, x); lo = std::min(lo, c); hi = std::max(hi, c); }
+        t[n].p = {(lo + hi) / 2, y};
+        return t[n].p.x;
+    };
+    float x = 0;
+    place(0, x);
+    float n = x;
+    for (auto& nd : t) nd.p.x = b.x + b.w * (nd.p.x + 0.5f) / n;
+}
+int mm_value(const std::vector<TNode>& t, int n) {
+    if (t[n].kids.empty()) return t[n].leaf;
+    int v = t[n].depth % 2 == 0 ? -99 : 99;
+    for (int k : t[n].kids) v = t[n].depth % 2 == 0 ? std::max(v, mm_value(t, k)) : std::min(v, mm_value(t, k));
+    return v;
+}
+void level_labels(App& a, Box b, const std::vector<TNode>& t, int depth_max) {
+    const char* names[4] = {"MAX (moi)", "MIN (lui)", "MAX (moi)", "feuilles : h(position)"};
+    for (int d = 0; d <= depth_max; d++) {
+        float y = b.y + b.h * (d + 0.5f) / (depth_max + 1);
+        label(a, names[std::min(d, 3)], {b.x + 8 * a.s, y - 8 * a.s}, d % 2 == 0 ? C_BLACK : C_WHITE, 13, Font::Bold);
+    }
+}
+
+void anim_minimax(App& a, Box b, float t) {
+    auto tr = mm_tree();
+    Box area{b.x + 150 * a.s, b.y + 40 * a.s, b.w - 170 * a.s, b.h - 50 * a.s};
+    layout_tree(tr, area, 3);
+    level_labels(a, {b.x, area.y, area.w, area.h}, tr, 3);
+    // the order in which the values appear: level 2, then 1, then the root
+    std::vector<int> order;
+    for (int d = 2; d >= 0; d--)
+        for (size_t i = 0; i < tr.size(); i++) if (tr[i].depth == d) order.push_back(int(i));
+    const float T0 = 1.5f, STEP = 0.7f, P = T0 + order.size() * STEP + 4.0f;
+    t = std::fmod(t, P);
+    std::vector<float> shown(tr.size(), 0);
+    for (size_t i = 0; i < tr.size(); i++) if (tr[i].kids.empty()) shown[i] = phase(t, 0, T0);
+    for (size_t k = 0; k < order.size(); k++) shown[order[k]] = phase(t, T0 + k * STEP, T0 + k * STEP + 0.3f);
+    bool done = t > T0 + order.size() * STEP;
+    step_title(a, b, t < T0 ? "Les feuilles sont \xC3\xA9valu\xC3\xA9" "es par l'heuristique" : !done ? "On remonte : MAX prend le plus grand, MIN le plus petit" : "Valeur de la racine : 7, on joue le troisi\xC3\xA8me coup");
+    // the best path once done
+    std::vector<bool> best(tr.size(), false);
+    if (done) {
+        int n = 0;
+        best[0] = true;
+        while (!tr[n].kids.empty()) {
+            int v = mm_value(tr, n), nxt = tr[n].kids[0];
+            for (int k : tr[n].kids) if (mm_value(tr, k) == v) { nxt = k; break; }
+            n = nxt;
+            best[n] = true;
+        }
+    }
+    for (size_t i = 1; i < tr.size(); i++) {
+        bool on = best[i] && best[tr[i].parent];
+        draw::line(tr[tr[i].parent].p, tr[i].p, (on ? 4 : 2) * a.s, on ? pal::accent : hex(0x5c6878));
+    }
+    for (size_t i = 0; i < tr.size(); i++) {
+        bool leaf = tr[i].kids.empty();
+        Rgba fill = leaf ? hex(0x9aa6b6) : tr[i].depth % 2 == 0 ? C_BLACK : C_WHITE;
+        float r = (leaf ? 15 : 19) * a.s;
+        std::string txt = shown[i] > 0.5f ? std::to_string(leaf ? tr[i].leaf : mm_value(tr, int(i))) : "?";
+        if (shown[i] > 0 && shown[i] < 1) draw::circle(tr[i].p, r * (1 + 0.6f * (1 - shown[i])), with_alpha(pal::accent, 0.4f * (1 - shown[i])));
+        node_disc(a, tr[i].p, r, best[i] ? pal::accent : fill, hex(0x0b0f16), txt, leaf ? 13 : 15);
+    }
+}
+
+// Alpha-beta on the same tree: the trace of the search, played back.
+struct AbEvent { int node; int alpha, beta; int value; bool cut; };
+void ab_trace(const std::vector<TNode>& t, int n, int alpha, int beta, std::vector<AbEvent>& ev, std::vector<int>& val, std::vector<int>& pruned_by) {
+    ev.push_back({n, alpha, beta, 0, false});
+    if (t[n].kids.empty()) { val[n] = t[n].leaf; ev.push_back({n, alpha, beta, val[n], false}); return; }
+    bool mx = t[n].depth % 2 == 0;
+    int v = mx ? -99 : 99;
+    for (size_t i = 0; i < t[n].kids.size(); i++) {
+        int k = t[n].kids[i];
+        ab_trace(t, k, alpha, beta, ev, val, pruned_by);
+        v = mx ? std::max(v, val[k]) : std::min(v, val[k]);
+        if (mx) alpha = std::max(alpha, v); else beta = std::min(beta, v);
+        if (alpha >= beta) {
+            for (size_t j = i + 1; j < t[n].kids.size(); j++) pruned_by[t[n].kids[j]] = int(ev.size());
+            val[n] = v;
+            ev.push_back({n, alpha, beta, v, true});
+            return;
+        }
+    }
+    val[n] = v;
+    ev.push_back({n, alpha, beta, v, false});
+}
+void anim_alphabeta(App& a, Box b, float t) {
+    auto tr = mm_tree();
+    Box area{b.x + 150 * a.s, b.y + 44 * a.s, b.w - 170 * a.s, b.h - 54 * a.s};
+    layout_tree(tr, area, 3);
+    level_labels(a, {b.x, area.y, area.w, area.h}, tr, 3);
+    std::vector<AbEvent> ev;
+    std::vector<int> val(tr.size(), 0), pruned_by(tr.size(), -1);
+    ab_trace(tr, 0, -99, 99, ev, val, pruned_by);
+    const float STEP = 0.55f, P = ev.size() * STEP + 4.5f;
+    t = std::fmod(t, P);
+    int cur = std::min(int(t / STEP), int(ev.size()) - 1);
+    bool done = t > ev.size() * STEP;
+    // 0 unseen, 1 entered, 2 valued (its last event, the value, is reached)
+    std::vector<int> state(tr.size(), 0), first(tr.size(), -1), last(tr.size(), -1);
+    std::vector<bool> cut_node(tr.size(), false);
+    for (size_t i = 0; i < ev.size(); i++) {
+        if (first[ev[i].node] < 0) first[ev[i].node] = int(i);
+        last[ev[i].node] = int(i);
+        if (ev[i].cut && int(i) <= cur) cut_node[ev[i].node] = true;
+    }
+    for (size_t n = 0; n < tr.size(); n++) state[n] = last[n] >= 0 && cur >= last[n] ? 2 : first[n] >= 0 && cur >= first[n] ? 1 : 0;
+    auto pruned = [&](int n) {   // n or an ancestor is cut off at this time
+        for (int m = n; m >= 0; m = tr[m].parent) if (pruned_by[m] >= 0 && cur >= pruned_by[m]) return true;
+        return false;
+    };
+    int leaves = 0;
+    for (size_t n = 0; n < tr.size(); n++) if (tr[n].kids.empty() && state[n] == 2) leaves++;
+    const AbEvent& e = ev[cur];
+    step_title(a, b, done ? strf("Valeur 7 comme minimax, avec %d feuilles sur 12", leaves)
+                          : e.cut ? "Coupure : la suite ne peut plus changer le choix"
+                                  : strf("Fen\xC3\xAAtre [\xCE\xB1, \xCE\xB2] = [%s, %s]", e.alpha <= -99 ? "\xE2\x88\x92\xE2\x88\x9E" : std::to_string(e.alpha).c_str(),
+                                         e.beta >= 99 ? "+\xE2\x88\x9E" : std::to_string(e.beta).c_str()));
+    for (size_t i = 1; i < tr.size(); i++) {
+        bool pr = pruned(int(i));
+        draw::line(tr[tr[i].parent].p, tr[i].p, 2 * a.s, pr ? hex(0x5c6878, 70) : state[i] ? hex(0xb8c2d0) : hex(0x5c6878));
+        if (pr && pruned_by[i] >= 0) {   // scissors mark on the cut edge
+            V2 m = (tr[tr[i].parent].p + tr[i].p) * 0.5f;
+            draw::line(m + V2{-8 * a.s, -8 * a.s}, m + V2{8 * a.s, 8 * a.s}, 3 * a.s, C_BAD);
+            draw::line(m + V2{-8 * a.s, 8 * a.s}, m + V2{8 * a.s, -8 * a.s}, 3 * a.s, C_BAD);
+        }
+    }
+    for (size_t i = 0; i < tr.size(); i++) {
+        bool leaf = tr[i].kids.empty(), pr = pruned(int(i));
+        Rgba fill = leaf ? hex(0x9aa6b6) : tr[i].depth % 2 == 0 ? C_BLACK : C_WHITE;
+        if (pr || state[i] == 0) fill = mix(hex(0x121822), fill, pr ? 0.25f : 0.45f);   // opaque: the edges stay behind
+        float r = (leaf ? 15 : 19) * a.s;
+        std::string txt = pr ? "" : state[i] == 2 ? (cut_node[i] ? (tr[i].depth % 2 == 0 ? "\xE2\x89\xA5" : "\xE2\x89\xA4") : "") + std::to_string(val[i]) : "";
+        if (int(i) == e.node && !done) draw::circle(tr[i].p, r * 1.5f, with_alpha(pal::accent, 0.35f));
+        node_disc(a, tr[i].p, r, fill, int(i) == e.node && !done ? pal::accent : hex(0x0b0f16), txt, 13);
+        if (int(i) == e.node && !done && !leaf) {
+            std::string w = strf("[%s, %s]", e.alpha <= -99 ? "-\xE2\x88\x9E" : std::to_string(e.alpha).c_str(), e.beta >= 99 ? "+\xE2\x88\x9E" : std::to_string(e.beta).c_str());
+            label(a, w, tr[i].p + V2{r + 6 * a.s, -r - 6 * a.s}, pal::accent, 13, Font::Mono);
+        }
+    }
+    label(a, strf("feuilles \xC3\xA9valu\xC3\xA9" "es : %d / 12", leaves), {b.right() - 220 * a.s, b.y + 14 * a.s}, pal::dim, 14, Font::Mono);
+}
+
+// ── MCTS: the four phases, iteration by iteration, with UCT at the root ──
+struct MctsIter {
+    std::vector<int> path;              // node ids from the root
+    int added = -1;                     // node created by the expansion
+    float result = 0;                   // the random playout, for the root player
+    std::vector<float> W, N;            // after the iteration
+    std::vector<float> uct;             // UCT score of the root's children at the selection
+    int created = 0;                    // number of nodes after the iteration
+};
+struct MctsData {
+    std::vector<TNode> tree;            // 1 + 3 + 9 nodes, in creation order
+    std::vector<int> slot;              // the fixed place of each node (0..12) in the full tree
+    std::vector<MctsIter> it;
+};
+const MctsData& mcts_data() {
+    static MctsData d = [] {
+        MctsData d;
+        const float P[3][3] = {{0.6f, 0.3f, 0.5f}, {0.8f, 0.7f, 0.75f}, {0.2f, 0.5f, 0.4f}};   // hidden win chances (root player)
+        std::mt19937 rng(3);
+        std::uniform_real_distribution<float> U(0, 1);
+        struct N_ { int parent, slot, depth; std::vector<int> kids; float W = 0, N = 0; };
+        std::vector<N_> n = {{-1, 0, 0, {}}};
+        const float C = 1.2f;
+        for (int iter = 0; iter < 22; iter++) {
+            MctsIter I;
+            int cur = 0;
+            I.path.push_back(0);
+            // UCT of the root's children (when all exist)
+            while (true) {
+                N_& nd = n[cur];
+                int maxk = 3;
+                if (nd.depth < 2 && int(nd.kids.size()) < maxk) {   // expansion
+                    int k = int(nd.kids.size());
+                    int id = int(n.size());
+                    n.push_back({cur, nd.depth == 0 ? 1 + k : 4 + 3 * (n[cur].slot - 1) + k, nd.depth + 1, {}});
+                    n[cur].kids.push_back(id);
+                    I.added = id;
+                    I.path.push_back(id);
+                    cur = id;
+                    break;
+                }
+                if (nd.kids.empty()) break;   // a leaf of the tree (depth 2)
+                int best = nd.kids[0];
+                float bv = -1e9f;
+                std::vector<float> scores;
+                for (int k : nd.kids) {
+                    float q = n[k].W / n[k].N;
+                    if (nd.depth == 1) q = 1 - q;   // the opponent maximises his own chances
+                    float v = q + C * std::sqrt(std::log(nd.N) / n[k].N);
+                    scores.push_back(v);
+                    if (v > bv) { bv = v; best = k; }
+                }
+                if (cur == 0) I.uct = scores;
+                cur = best;
+                I.path.push_back(cur);
+            }
+            // simulation from cur
+            float p;
+            if (n[cur].depth == 2) { int s = n[cur].slot - 4; p = P[s / 3][s % 3]; }
+            else if (n[cur].depth == 1) { int s = n[cur].slot - 1; p = (P[s][0] + P[s][1] + P[s][2]) / 3; }
+            else p = 0.5f;
+            I.result = U(rng) < p ? 1.0f : 0.0f;
+            for (int k : I.path) { n[k].W += I.result; n[k].N += 1; }
+            for (auto& x : n) { I.W.push_back(x.W); I.N.push_back(x.N); }
+            I.created = int(n.size());
+            d.it.push_back(I);
+        }
+        for (auto& x : n) {
+            TNode t;
+            t.parent = x.parent;
+            t.depth = x.depth;
+            t.kids = x.kids;
+            d.tree.push_back(t);
+            d.slot.push_back(x.slot);
+        }
+        return d;
+    }();
+    return d;
+}
+void anim_mcts(App& a, Box b, float t) {
+    const MctsData& d = mcts_data();
+    auto dur = [](size_t i) { return i < 4 ? 4.0f : i < 8 ? 2.0f : 0.9f; };
+    float total = 0;
+    for (size_t i = 0; i < d.it.size(); i++) total += dur(i);
+    const float P = total + 4.0f;
+    t = std::fmod(t, P);
+    size_t k = 0;
+    float t0 = 0;
+    while (k < d.it.size() && t >= t0 + dur(k)) { t0 += dur(k); k++; }
+    bool done = k >= d.it.size();
+    float u = done ? 1 : (t - t0) / dur(k);
+    const MctsIter* I = done ? &d.it.back() : &d.it[k];
+    const MctsIter* before = k > 0 ? &d.it[k - 1] : nullptr;
+    int ph = done ? 4 : u < 0.3f ? 0 : u < 0.45f ? 1 : u < 0.7f ? 2 : 3;
+    // Fixed layout of the 13 places.
+    Box area{b.x + 30 * a.s, b.y + 70 * a.s, b.w * 0.62f, b.h - 120 * a.s};
+    V2 pos[13];
+    pos[0] = {area.center().x, area.y + 20 * a.s};
+    for (int i = 0; i < 3; i++) pos[1 + i] = {area.x + area.w * (i + 0.5f) / 3, area.y + area.h * 0.45f};
+    for (int i = 0; i < 9; i++) pos[4 + i] = {area.x + area.w * (i + 0.5f) / 9, area.y + area.h * 0.85f};
+    // phases legend
+    const char* names[4] = {"1. S\xC3\xA9lection", "2. Expansion", "3. Simulation", "4. R\xC3\xA9tropropagation"};
+    float lx = b.x + 16 * a.s;
+    for (int i = 0; i < 4; i++) {
+        float w = a.text.width(Font::Bold, 14 * a.s, names[i]) + 22 * a.s;
+        Box r{lx, b.y + 12 * a.s, w, 28 * a.s};
+        bool on = i == ph;
+        draw::round_box(r, 14 * a.s, on ? pal::accent : hex(0xffffff, 18));
+        a.text.draw(Font::Bold, 14 * a.s, names[i], {r.x + 11 * a.s, r.y + 6 * a.s}, on ? hex(0x1a1206) : pal::dim);
+        lx += w + 8 * a.s;
+    }
+    label(a, done ? strf("%zu it\xC3\xA9rations : on joue le coup le plus visit\xC3\xA9", d.it.size()) : strf("it\xC3\xA9ration %zu", k + 1),
+          {lx + 10 * a.s, b.y + 17 * a.s}, pal::dim, 14);
+    // which nodes exist, which labels
+    int exist = before ? before->created : 1;
+    if (!done && I->added >= 0 && ph >= 1) exist = I->added + 1;
+    if (done) exist = I->created;
+    const std::vector<float>& W = (ph >= 3 && u > 0.85f) || done ? I->W : (before ? before->W : std::vector<float>(1, 0));
+    const std::vector<float>& Nn = (ph >= 3 && u > 0.85f) || done ? I->N : (before ? before->N : std::vector<float>(1, 0));
+    auto on_path = [&](int n) { return !done && std::find(I->path.begin(), I->path.end(), n) != I->path.end(); };
+    int best_child = -1;
+    if (done) {
+        float bn = -1;
+        for (int c : d.tree[0].kids) if (I->N[c] > bn) { bn = I->N[c]; best_child = c; }
+    }
+    for (int n = 1; n < exist; n++) {
+        int p = d.tree[n].parent;
+        bool lit = (on_path(n) && ph <= 3) || n == best_child;
+        draw::line(pos[d.slot[p]], pos[d.slot[n]], (lit ? 4 : 2) * a.s, lit ? (ph == 3 ? pal::good : pal::accent) : hex(0x5c6878));
+    }
+    // simulation squiggle below the last node of the path
+    if (!done && ph >= 2) {
+        V2 s0 = pos[d.slot[I->path.back()]];
+        float len = 70 * a.s * (ph == 2 ? smooth((u - 0.45f) / 0.25f) : 1);
+        std::vector<V2> pts;
+        for (int i = 0; i <= 20; i++) {
+            float v = i / 20.0f * len;
+            pts.push_back(s0 + V2{std::sin(v * 0.25f / a.s) * 7 * a.s, 22 * a.s + v});
+        }
+        draw::polyline(pts, 2 * a.s, with_alpha(pal::accent2, 0.9f));
+        if (ph >= 2 && u > 0.62f) {
+            V2 e = pts.back() + V2{0, 14 * a.s};
+            draw::round_box({e.x - 34 * a.s, e.y - 2 * a.s, 68 * a.s, 22 * a.s}, 11 * a.s, I->result > 0.5f ? pal::good : pal::bad);
+            a.text.draw(Font::Bold, 13 * a.s, I->result > 0.5f ? "gagn\xC3\xA9" : "perdu", {e.x, e.y + 1 * a.s}, hex(0x0b0f16), Align::Center);
+        }
+    }
+    for (int n = 0; n < exist; n++) {
+        V2 c = pos[d.slot[n]];
+        bool lit = on_path(n);
+        float pop = (!done && n == I->added) ? smooth((u - 0.3f) / 0.15f) : 1;
+        Rgba fill = d.tree[n].depth % 2 == 0 ? C_BLACK : C_WHITE;
+        if (n == best_child) fill = pal::accent;
+        float r = 24 * a.s * pop;
+        if (lit && ph <= 3) draw::circle(c, r * 1.4f, with_alpha(ph == 3 ? pal::good : pal::accent, 0.3f));
+        std::string txt = n < int(Nn.size()) && Nn[n] > 0 ? strf("%d/%d", int(W[n]), int(Nn[n])) : "0/0";
+        node_disc(a, c, r, fill, hex(0x0b0f16), pop > 0.6f ? txt : "", 12);
+    }
+    // UCT panel: the root's children
+    Box pnl{area.right() + 30 * a.s, b.y + 60 * a.s, b.right() - area.right() - 50 * a.s, b.h - 80 * a.s};
+    draw::round_box(pnl, 10 * a.s, hex(0x0b0f16, 160));
+    label(a, "UCT \xC3\xA0 la racine", {pnl.x + 14 * a.s, pnl.y + 10 * a.s}, pal::text, 15, Font::Bold);
+    label(a, "gain moyen + C\xC2\xB7\xE2\x88\x9A(ln N / n)", {pnl.x + 14 * a.s, pnl.y + 34 * a.s}, pal::dim, 13, Font::Mono);
+    const MctsIter& src = done ? *I : (before ? *before : *I);
+    for (int i = 0; i < 3; i++) {
+        float y = pnl.y + 70 * a.s + i * 56 * a.s;
+        int c = i + 1;
+        bool exists = c < (before ? before->created : 1) || done;
+        label(a, strf("coup %d", i + 1), {pnl.x + 14 * a.s, y}, pal::text, 14, Font::Bold);
+        if (!exists || src.N[0] == 0 || c >= int(src.N.size()) || src.N[c] == 0) { label(a, "pas encore essay\xC3\xA9", {pnl.x + 80 * a.s, y}, pal::faint, 13); continue; }
+        float q = src.W[c] / src.N[c], e = 1.2f * std::sqrt(std::log(src.N[0]) / src.N[c]);
+        float sc = 70 * a.s;
+        Box bq{pnl.x + 80 * a.s, y + 2 * a.s, q * sc, 14 * a.s}, be{bq.right(), bq.y, std::min(e, 2.0f) * sc, 14 * a.s};
+        draw::rect(bq, pal::accent2);
+        draw::rect(be, with_alpha(pal::accent, 0.7f));
+        label(a, strf("%.2f + %.2f   n=%d", q, e, int(src.N[c])), {pnl.x + 80 * a.s, y + 20 * a.s}, pal::dim, 12, Font::Mono);
+    }
+    label(a, "bleu : exploitation    orange : exploration", {pnl.x + 14 * a.s, pnl.bottom() - 26 * a.s}, pal::faint, 12);
+}
+
+// ── basic minimax heuristic: what it measures on a position ──
+int king_dist_fill(uint64_t from, uint64_t free, int out[64]) {   // BFS by king steps through free squares
+    for (int i = 0; i < 64; i++) out[i] = 99;
+    std::vector<int> q;
+    for (int s = 0; s < 64; s++) if (from >> s & 1) { out[s] = 0; q.push_back(s); }
+    for (size_t h = 0; h < q.size(); h++) {
+        int s = q[h];
+        for (int df = -1; df <= 1; df++) for (int dr = -1; dr <= 1; dr++) {
+            int f = sq_file(s) + df, r = sq_rank(s) + dr;
+            if ((!df && !dr) || f < 0 || f > 7 || r < 0 || r > 7) continue;
+            int n = r * 8 + f;
+            if (!(free >> n & 1) || out[n] <= out[s] + 1) continue;
+            out[n] = out[s] + 1;
+            q.push_back(n);
+        }
+    }
+    return 0;
+}
+void anim_heuristic(App& a, Box b, float t) {
+    static Yolah y = sample_position(23, 18, 8, 14);
+    const float P = 16;
+    t = std::fmod(t, P);
+    int f = int(t / 4);
+    float side = std::min(b.h - 60 * a.s, b.w * 0.45f);
+    Box bd{b.x + 24 * a.s, b.y + 50 * a.s, side - 10 * a.s, side - 10 * a.s};
+    mini_board(bd, y);
+    float q = bd.w / 8;
+    uint64_t bl = y.bitboard(BLACK), wh = y.bitboard(WHITE), free = y.free_squares();
+    int vb = 0, vw = 0;
+    const char* titles[4] = {"Mobilit\xC3\xA9 : le nombre de coups", "Premier arriv\xC3\xA9 : les cases o\xC3\xB9 j'arrive avant lui",
+                             "Libert\xC3\xA9 : les cases libres autour de chaque pion", "Bloqu\xC3\xA9 : un pion qui ne peut plus bouger"};
+    step_title(a, b, titles[f]);
+    float k = smooth(phase(std::fmod(t, 4), 0, 0.8f));
+    if (f == 0) {
+        for (int side_ : {BLACK, WHITE}) {
+            Yolah yy = y;
+            Yolah::MoveList ml;
+            yy.moves(uint8_t(side_), ml);
+            for (size_t i = 0; i < ml.size(); i++) {
+                draw::circle(mini_c(bd, ml[i].to_sq()) + V2{(side_ == BLACK ? -1 : 1) * q * 0.15f, 0}, q * 0.11f, with_alpha(side_ == BLACK ? C_BLACK : C_WHITE, k));
+            }
+            (side_ == BLACK ? vb : vw) = int(ml.size());
+        }
+    } else if (f == 1) {
+        int db[64], dw[64];
+        king_dist_fill(bl, free, db);
+        king_dist_fill(wh, free, dw);
+        int wave = int(std::fmod(t, 4) / 0.45f);
+        for (int s = 0; s < 64; s++) {
+            if (!(free >> s & 1)) continue;
+            int m = std::min(db[s], dw[s]);
+            if (m > wave || m >= 99) continue;
+            Rgba c = db[s] < dw[s] ? C_BLACK : dw[s] < db[s] ? C_WHITE : hex(0x9aa6b6);
+            draw::rect(mini_sq(bd, s).inset(2), with_alpha(c, 0.45f));
+            if (db[s] < dw[s]) vb++; else if (dw[s] < db[s]) vw++;
+        }
+    } else if (f == 2) {
+        for (int s = 0; s < 64; s++) {
+            if (!((bl | wh) >> s & 1)) continue;
+            int lib = 0;
+            for (int df = -1; df <= 1; df++) for (int dr = -1; dr <= 1; dr++) {
+                int ff = sq_file(s) + df, r = sq_rank(s) + dr;
+                if ((df || dr) && ff >= 0 && ff < 8 && r >= 0 && r < 8 && (free >> (r * 8 + ff) & 1)) lib++;
+            }
+            (bl >> s & 1 ? vb : vw) += lib;
+            V2 c = mini_c(bd, s) + V2{q * 0.3f, -q * 0.3f};
+            draw::circle(c, q * 0.2f, with_alpha(lib == 0 ? C_BAD : bl >> s & 1 ? C_BLACK : C_WHITE, k));
+            a.text.draw(Font::Bold, q * 0.26f, std::to_string(lib), {c.x, c.y - q * 0.16f}, with_alpha(hex(0x0b0f16), k), Align::Center);
+        }
+    } else {
+        for (int s = 0; s < 64; s++) {
+            if (!((bl | wh) >> s & 1)) continue;
+            bool stuck = true;   // it slides like a queen: stuck when no neighbouring square is free
+            for (int df = -1; df <= 1; df++) for (int dr = -1; dr <= 1; dr++) {
+                int ff = sq_file(s) + df, r = sq_rank(s) + dr;
+                if ((df || dr) && ff >= 0 && ff < 8 && r >= 0 && r < 8 && (free >> (r * 8 + ff) & 1)) stuck = false;
+            }
+            if (stuck) {
+                (bl >> s & 1 ? vb : vw)++;
+                V2 c = mini_c(bd, s);
+                draw::line(c + V2{-q * 0.3f, -q * 0.3f}, c + V2{q * 0.3f, q * 0.3f}, 4 * a.s, with_alpha(C_BAD, k));
+                draw::line(c + V2{-q * 0.3f, q * 0.3f}, c + V2{q * 0.3f, -q * 0.3f}, 4 * a.s, with_alpha(C_BAD, k));
+            }
+        }
+    }
+    float x = bd.right() + 36 * a.s, yy0 = bd.y + 10 * a.s;
+    label(a, strf("Noirs  : %d", vb), {x, yy0}, C_BLACK, 18, Font::Bold);
+    label(a, strf("Blancs : %d", vw), {x, yy0 + 30 * a.s}, C_WHITE, 18, Font::Bold);
+    label(a, "h = \xCE\xA3 poids(phase) \xC3\x97 (f(moi) \xE2\x88\x92 f(lui))", {x, yy0 + 90 * a.s}, pal::text, 15, Font::Mono);
+    label(a, "les poids sont appris (m\xC3\xA9thode CEM)", {x, yy0 + 118 * a.s}, pal::dim, 14);
+    for (int i = 0; i < 4; i++) draw::circle({x + i * 18 * a.s, yy0 + 160 * a.s}, 5 * a.s, i == f ? pal::accent : hex(0xffffff, 40));
+}
+
+// ── iterative deepening: depth after depth until the clock runs out ──
+void anim_iterdeep(App& a, Box b, float t) {
+    const float P = 11;
+    t = std::fmod(t, P);
+    const int nodes[8] = {28, 160, 900, 4100, 16000, 61000, 240000, 900000};
+    const char* moves[8] = {"c3\xE2\x86\x92" "f6", "c3\xE2\x86\x92" "f6", "d1\xE2\x86\x92" "d5", "d1\xE2\x86\x92" "d5", "d1\xE2\x86\x92" "d5", "g7\xE2\x86\x92" "g3", "g7\xE2\x86\x92" "g3", "?"};
+    const float budget = 7.5f;   // seconds of animation = the time per move
+    float x0 = b.x + 140 * a.s, w = b.w - 340 * a.s, rh = (b.h - 90 * a.s) / 8;
+    float clock = std::min(t, budget);
+    float cum = 0;
+    int finished = 0;
+    step_title(a, b, t < budget ? "Profondeur 1, puis 2, puis 3... tant qu'il reste du temps" : "Temps \xC3\xA9" "coul\xC3\xA9 : on joue le meilleur coup de la derni\xC3\xA8re profondeur termin\xC3\xA9" "e");
+    for (int d = 0; d < 8; d++) {
+        float need = 0.25f + std::log10(float(nodes[d])) * 0.35f * (d >= 5 ? 1.8f : 1.0f);
+        float start = cum;
+        cum += need;
+        float y = b.y + 54 * a.s + d * rh;
+        if (clock < start) break;
+        float frac = clamp01((clock - start) / need);
+        bool ok = frac >= 1;
+        if (ok) finished = d + 1;
+        label(a, strf("profondeur %d", d + 1), {b.x + 16 * a.s, y + 2 * a.s}, pal::dim, 14);
+        float full = w * std::log10(float(nodes[d])) / 6.0f;
+        draw::round_box({x0, y, full * frac, rh - 8 * a.s}, 5 * a.s, ok ? shade(pal::accent2, -0.2f) : with_alpha(pal::accent, 0.8f));
+        label(a, ok ? strf("%d n\xC5\x93uds  meilleur %s", nodes[d], moves[d]) : (t >= budget ? "abandonn\xC3\xA9" "e" : "..."),
+              {x0 + full * frac + 10 * a.s, y + 2 * a.s}, ok ? pal::text : pal::faint, 13, Font::Mono);
+    }
+    // the clock
+    Box cb{b.x + 16 * a.s, b.bottom() - 30 * a.s, b.w - 32 * a.s, 10 * a.s};
+    draw::round_box(cb, 5 * a.s, hex(0xffffff, 25));
+    draw::round_box({cb.x, cb.y, cb.w * clock / budget, cb.h}, 5 * a.s, clock >= budget ? pal::bad : pal::good);
+    if (t >= budget && finished > 0) label(a, strf("jou\xC3\xA9 : %s (profondeur %d)", moves[finished - 1], finished), {cb.right() - 260 * a.s, cb.y - 26 * a.s}, pal::accent, 15, Font::Bold);
+}
+
+// ── NNUE: the accumulator updated by a move, then the small layers ──
+void anim_nnue(App& a, Box b, float t, bool persp) {
+    static Yolah y0 = sample_position(31, 14, 6, 14);
+    static Move mv = legal(y0).front();
+    const float P = 12;
+    t = std::fmod(t, P);
+    Yolah y = y0;
+    bool moved = t > 3.5f;
+    if (moved) y.play(mv);
+    float g = std::min((b.h - 80 * a.s) / 3.3f, 110 * a.s);   // grid size
+    float gx = b.x + 24 * a.s, gy = b.y + 50 * a.s;
+    const char* names[3] = {persp ? "mes pions" : "Noirs", persp ? "ses pions" : "Blancs", "trous"};
+    bool flip = persp && y0.current_player() == WHITE;
+    uint64_t bbs[3] = {y.bitboard(flip ? WHITE : BLACK), y.bitboard(flip ? BLACK : WHITE), y.empty_bitboard()};
+    uint64_t prev[3] = {y0.bitboard(flip ? WHITE : BLACK), y0.bitboard(flip ? BLACK : WHITE), y0.empty_bitboard()};
+    if (!persp) { bbs[0] = y.bitboard(BLACK); bbs[1] = y.bitboard(WHITE); prev[0] = y0.bitboard(BLACK); prev[1] = y0.bitboard(WHITE); }
+    V2 acc_top{b.x + b.w * 0.42f, b.y + 76 * a.s};
+    float acc_h = b.h - 110 * a.s, cell = acc_h / 24;
+    std::vector<V2> changed_pts;
+    for (int k = 0; k < 3; k++) {
+        Box gb{gx, gy + k * (g + 12 * a.s), g, g};
+        draw::rect(gb, hex(0x0b0f16));
+        float c = g / 8;
+        for (int s = 0; s < 64; s++) {
+            Box r = mini_sq(gb, s).inset(1);
+            bool on = bbs[k] >> s & 1, was = prev[k] >> s & 1;
+            Rgba col = k == 0 ? C_BLACK : k == 1 ? C_WHITE : hex(0x9aa6b6);
+            draw::rect(r, on ? col : hex(0x1d2532));
+            if (moved && on != was) {
+                float pulse = 0.5f + 0.5f * std::sin(t * 8);
+                draw::rect(r.inset(-2), with_alpha(on ? pal::good : pal::bad, 0.5f + 0.4f * pulse));
+                changed_pts.push_back(r.center());
+            }
+        }
+        (void)c;
+        label(a, names[k], {gb.right() + 8 * a.s, gb.y + g / 2 - 8 * a.s}, pal::dim, 13);
+    }
+    // accumulator
+    for (int i = 0; i < 24; i++) {
+        float v = std::sin(i * 1.7f + (moved ? 0.9f * smooth(phase(t, 4.5f, 6.0f)) : 0));
+        Box r{acc_top.x, acc_top.y + i * cell, 26 * a.s, cell - 2};
+        draw::rect(r, mix(hex(0x283244), v > 0 ? pal::accent : pal::accent2, std::abs(v)));
+    }
+    label(a, persp ? "accumulateur (1024 \xC3\x97 2 vues)" : "accumulateur (1024)", {acc_top.x - 30 * a.s, acc_top.y - 26 * a.s}, pal::text, 13, Font::Bold);
+    // links
+    if (t < 3.5f) {
+        step_title(a, b, "D\xC3\xA9part : somme des colonnes des entr\xC3\xA9" "es allum\xC3\xA9" "es");
+        float k = phase(t, 0.5f, 2.5f);
+        for (int kk = 0; kk < 3; kk++) {
+            Box gb{gx, gy + kk * (g + 12 * a.s), g, g};
+            for (int s = 0; s < 64; s++)
+                if (bbs[kk] >> s & 1) flow(mini_c(gb, s), acc_top + V2{0, acc_h * 0.5f}, k + s * 0.01f, pal::accent, 2 * a.s, 1);
+        }
+    } else if (t < 7.0f) {
+        step_title(a, b, strf("Un coup ne change que %zu entr\xC3\xA9" "es : 3 colonnes au lieu de tout recalculer", changed_pts.size()));
+        for (V2 p : changed_pts) flow(p, acc_top + V2{0, acc_h * 0.5f}, t * 0.8f, pal::good, 3.5f * a.s, 2);
+        label(a, "acc \xE2\x86\x90 acc \xE2\x88\x92 W[d\xC3\xA9part] + W[arriv\xC3\xA9" "e] + W[trou]", {gx, b.bottom() - 26 * a.s}, pal::accent, 14, Font::Mono);
+    } else {
+        int heads = persp ? 8 : 1;
+        int free_n = __builtin_popcountll(y.free_squares());
+        int hsel = persp ? std::min(7, (56 - free_n) / 7) : 0;
+        step_title(a, b, persp ? strf("Puis les petites couches : la t\xC3\xAA" "te de la phase (%d cases libres)", free_n) : "Puis les petites couches (64, 32, 1) : la valeur");
+        float x1 = acc_top.x + 90 * a.s, x2 = x1 + 120 * a.s, x3 = b.right() - 90 * a.s;
+        for (int h = 0; h < heads; h++) {
+            float yy = b.y + 60 * a.s + (heads == 1 ? acc_h * 0.4f : h * acc_h / 8.5f);
+            bool on = h == hsel;
+            Box r{x1, yy, 70 * a.s, heads == 1 ? 40 * a.s : acc_h / 10};
+            draw::round_box(r, 5 * a.s, on ? pal::accent : hex(0x283244));
+            if (heads > 1) label(a, strf("t\xC3\xAA" "te %d", h + 1), {r.x + 8 * a.s, r.y + 2 * a.s}, on ? hex(0x1a1206) : pal::faint, 12);
+            if (on) {
+                flow(acc_top + V2{26 * a.s, acc_h * 0.5f}, r.center(), t, pal::accent, 3 * a.s);
+                flow(r.center(), {x3, b.y + b.h * 0.5f}, t + 0.3f, pal::accent, 3 * a.s);
+            }
+        }
+        (void)x2;
+        float v = 0.62f;
+        Box gauge{x3, b.y + 70 * a.s, 22 * a.s, b.h - 140 * a.s};
+        draw::round_box(gauge, 6 * a.s, hex(0xffffff, 25));
+        draw::round_box({gauge.x, gauge.y + gauge.h * (1 - v), gauge.w, gauge.h * v}, 6 * a.s, pal::good);
+        label(a, "valeur", {gauge.x - 8 * a.s, gauge.bottom() + 6 * a.s}, pal::text, 13);
+    }
+}
+void anim_nnue193(App& a, Box b, float t) { anim_nnue(a, b, t, false); }
+void anim_nnue_persp(App& a, Box b, float t) { anim_nnue(a, b, t, true); }
+
+// ── the features network: the space measured (waves), then the network ──
+void anim_features(App& a, Box b, float t) {
+    static Yolah y = sample_position(41, 20, 6, 14);
+    const float P = 12;
+    t = std::fmod(t, P);
+    float side = std::min(b.h - 60 * a.s, b.w * 0.42f);
+    Box bd{b.x + 24 * a.s, b.y + 50 * a.s, side - 10 * a.s, side - 10 * a.s};
+    mini_board(bd, y);
+    uint64_t free = y.free_squares();
+    int db[64], dw[64];
+    king_dist_fill(y.bitboard(BLACK), free, db);
+    king_dist_fill(y.bitboard(WHITE), free, dw);
+    int wave = int(t / 0.6f);
+    int nb = 0, nw = 0;
+    for (int s = 0; s < 64; s++) {
+        if (!(free >> s & 1)) continue;
+        int m = std::min(db[s], dw[s]);
+        if (m > wave || m >= 99) continue;
+        Rgba c = db[s] < dw[s] ? C_BLACK : dw[s] < db[s] ? C_WHITE : hex(0x9aa6b6);
+        draw::rect(mini_sq(bd, s).inset(2), with_alpha(c, 0.45f));
+        if (db[s] < dw[s]) nb++; else if (dw[s] < db[s]) nw++;
+    }
+    step_title(a, b, t < 5 ? "Les deux camps s'\xC3\xA9tendent en m\xC3\xAAme temps : qui arrive le premier ?" : "119 nombres calcul\xC3\xA9s sur la position \xE2\x86\x92 r\xC3\xA9seau \xE2\x86\x92 valeur");
+    float x = bd.right() + 30 * a.s;
+    if (t >= 5) {
+        const char* f[6] = {"cases \xC3\xA0 moi d'abord", "cases \xC3\xA0 lui d'abord", "mes coups", "ses coups", "mes pions bloqu\xC3\xA9s", "zones isol\xC3\xA9" "es"};
+        float vals[6] = {nb / 30.0f, nw / 30.0f, 0.55f, 0.4f, 0.1f, 0.3f};
+        float k = smooth(phase(t, 5, 6.5f));
+        for (int i = 0; i < 6; i++) {
+            float yy = bd.y + i * 30 * a.s;
+            label(a, f[i], {x, yy}, pal::dim, 13);
+            draw::round_box({x + 150 * a.s, yy + 2 * a.s, 90 * a.s * clamp01(vals[i]) * k, 14 * a.s}, 4 * a.s, pal::accent2);
+        }
+        label(a, "... 119 caract\xC3\xA9ristiques", {x, bd.y + 6 * 30 * a.s}, pal::faint, 13);
+        Box net{x + 260 * a.s, bd.y + 20 * a.s, 170 * a.s, 110 * a.s};
+        if (net.right() < b.right() - 10 * a.s) {
+            card(a, net, "r\xC3\xA9seau", "119 \xE2\x86\x92 256 \xE2\x86\x92 64 \xE2\x86\x92 1\nentiers 16 bits", pal::accent2, smooth(phase(t, 6.5f, 7.5f)));
+            if (t > 6.5f) flow({x + 245 * a.s, bd.y + 80 * a.s}, {net.x, net.center().y}, t * 0.7f, pal::accent2, 3 * a.s);
+        }
+    } else {
+        label(a, strf("Noirs d'abord  : %d cases", nb), {x, bd.y}, C_BLACK, 16, Font::Bold);
+        label(a, strf("Blancs d'abord : %d cases", nw), {x, bd.y + 28 * a.s}, C_WHITE, 16, Font::Bold);
+        label(a, "(pas de roi : un pas dans les 8 directions)", {x, bd.y + 60 * a.s}, pal::faint, 13);
+    }
+}
+
+// ── the residual network: a 3×3 filter slides, 30 blocks, two heads ──
+void anim_resnet(App& a, Box b, float t) {
+    static Yolah y = sample_position(51, 10, 8, 16);
+    const float P = 13;
+    t = std::fmod(t, P);
+    float g = std::min(b.h - 90 * a.s, 170 * a.s);
+    Box in{b.x + 24 * a.s, b.y + 56 * a.s, g, g};
+    mini_board(in, y);
+    float q = g / 8;
+    if (t < 5) {
+        step_title(a, b, "Convolution : le m\xC3\xAAme filtre 3\xC3\x97" "3 glisse sur les 64 cases");
+        int pos = int(t / 5 * 64) % 64, f = pos % 8, r = 7 - pos / 8;
+        Box k{in.x + (f - 1) * q, in.y + (7 - r - 1) * q, 3 * q, 3 * q};
+        draw::round_frame(k, 4 * a.s, 3 * a.s, pal::accent);
+        Box out{in.right() + 60 * a.s, in.y, g, g};
+        for (int s = 0; s < 64; s++) {
+            int idx = (7 - sq_rank(s)) * 8 + sq_file(s);
+            if (idx > pos) continue;
+            float v = 0.5f + 0.5f * std::sin(s * 0.7f);
+            draw::rect(mini_sq(out, s).inset(1), mix(hex(0x283244), pal::accent2, v));
+        }
+        flow(k.center(), mini_c(out, r * 8 + f), t * 2, pal::accent, 3 * a.s, 1);
+        label(a, "carte de 256 canaux", {out.x, out.bottom() + 8 * a.s}, pal::dim, 13);
+    } else {
+        float k = smooth(phase(t, 5, 6));
+        step_title(a, b, t < 9 ? "30 blocs r\xC3\xA9siduels : x + F(x), le raccourci laisse passer l'information" : "Deux t\xC3\xAA" "tes : les coups probables (politique) et la valeur");
+        float x = in.right() + 30 * a.s, w = (b.w - (x - b.x) - 220 * a.s) / 6;
+        for (int i = 0; i < 6; i++) {
+            Box r{x + i * w, in.y + 20 * a.s, w - 14 * a.s, g - 40 * a.s};
+            bool lit = int(std::fmod(t * 2.5f, 6)) == i;
+            draw::round_box(r, 6 * a.s, with_alpha(lit ? pal::accent2 : hex(0x283244), k));
+            label(a, i == 5 ? "..." : strf("bloc %d", i + 1), {r.center().x, r.bottom() + 6 * a.s}, with_alpha(pal::faint, k), 12, Font::Regular, Align::Center);
+            // the skip connection arc
+            std::vector<V2> arc;
+            for (int j = 0; j <= 12; j++) {
+                float u = j / 12.0f;
+                arc.push_back({r.x - 7 * a.s + (r.w + 14 * a.s) * u, r.y - 6 * a.s - std::sin(u * 3.14159f) * 16 * a.s});
+            }
+            draw::polyline(arc, 2 * a.s, with_alpha(pal::accent, 0.6f * k));
+        }
+        if (t >= 9) {
+            float k2 = smooth(phase(t, 9, 10));
+            Box pol{b.right() - 190 * a.s, b.y + 50 * a.s, 120 * a.s, 120 * a.s};
+            mini_board(pol, y, k2);
+            auto mv = legal(y);
+            for (size_t i = 0; i < mv.size(); i++) {
+                float p = 0.15f + 0.85f * std::pow(0.6f, float(i));
+                move_arrow(pol, mv[i], with_alpha(pal::accent, k2 * p), 0.06f + 0.08f * p);
+            }
+            label(a, "politique : P(coup)", {pol.x, pol.bottom() + 6 * a.s}, with_alpha(pal::text, k2), 13);
+            Box val{b.right() - 190 * a.s, pol.bottom() + 36 * a.s, 120 * a.s, 14 * a.s};
+            draw::round_box(val, 7 * a.s, with_alpha(hex(0xffffff), 0.1f * k2));
+            draw::round_box({val.x, val.y, val.w * 0.64f * k2, val.h}, 7 * a.s, pal::good);
+            label(a, "valeur : 64 % de gagner", {val.x, val.bottom() + 6 * a.s}, with_alpha(pal::text, k2), 13);
+        }
+    }
+}
+
+// ── PUCT and batches: threads go down the tree, the leaves wait in a batch for the GPU ──
+void anim_batch(App& a, Box b, float t) {
+    const float P = 10;
+    t = std::fmod(t, P);
+    Box area{b.x + 20 * a.s, b.y + 56 * a.s, b.w * 0.55f, b.h - 80 * a.s};
+    V2 root{area.center().x, area.y + 16 * a.s};
+    V2 l1[4], l2[8];
+    for (int i = 0; i < 4; i++) l1[i] = {area.x + area.w * (i + 0.5f) / 4, area.y + area.h * 0.45f};
+    for (int i = 0; i < 8; i++) l2[i] = {area.x + area.w * (i + 0.5f) / 8, area.y + area.h * 0.9f};
+    for (int i = 0; i < 4; i++) draw::line(root, l1[i], 2 * a.s, hex(0x5c6878));
+    for (int i = 0; i < 8; i++) draw::line(l1[i / 2], l2[i], 2 * a.s, hex(0x5c6878));
+    const Rgba th[4] = {hex(0x7aa2ff), hex(0x4ade80), hex(0xf472b6), hex(0xfacc15)};
+    const int leaf_of[4] = {1, 2, 5, 6};
+    float slot_k = 0;
+    int in_batch = 0;
+    for (int i = 0; i < 4; i++) {
+        float st = 0.5f + i * 0.6f, u = clamp01((t - st) / 1.2f);
+        if (t < st) continue;
+        V2 a1 = root, a2 = l1[leaf_of[i] / 2], a3 = l2[leaf_of[i]];
+        V2 p = u < 0.5f ? a1 + (a2 - a1) * (u * 2) : a2 + (a3 - a2) * ((u - 0.5f) * 2);
+        draw::line(a1, u < 0.5f ? p : a2, 4 * a.s, with_alpha(th[i], 0.8f));
+        if (u >= 0.5f) draw::line(a2, p, 4 * a.s, with_alpha(th[i], 0.8f));
+        if (t < 6.5f) draw::circle(p, 7 * a.s, th[i]);
+        if (u >= 1) in_batch++;
+        if (u > 0 && t < 6.5f) label(a, "\xE2\x88\x92" "1", a2 + V2{8 * a.s, -18 * a.s + i * 3 * a.s}, with_alpha(th[i], 0.9f), 12, Font::Bold);
+    }
+    node_disc(a, root, 14 * a.s, C_BLACK, hex(0x0b0f16), "");
+    for (auto& p : l1) node_disc(a, p, 11 * a.s, C_WHITE, hex(0x0b0f16), "");
+    for (auto& p : l2) node_disc(a, p, 9 * a.s, C_BLACK, hex(0x0b0f16), "");
+    // the batch and the GPU
+    float x = area.right() + 30 * a.s;
+    Box batch{x, b.y + 70 * a.s, 4 * 34 * a.s + 10 * a.s, 44 * a.s};
+    draw::round_box(batch, 8 * a.s, hex(0x0b0f16, 180));
+    label(a, "lot de positions", {batch.x, batch.y - 22 * a.s}, pal::dim, 13);
+    for (int i = 0; i < 4; i++) {
+        Box s{batch.x + 6 * a.s + i * 34 * a.s, batch.y + 6 * a.s, 30 * a.s, 32 * a.s};
+        bool full = i < in_batch && t < 6.5f;
+        draw::round_box(s, 5 * a.s, full ? th[i] : hex(0xffffff, 20));
+    }
+    Box gpu{x, batch.bottom() + 40 * a.s, batch.w, 70 * a.s};
+    float glow = t > 4.8f && t < 6.5f ? 0.5f + 0.5f * std::sin(t * 12) : 0;
+    slot_k = glow;
+    card(a, gpu, "GPU", "le r\xC3\xA9seau \xC3\xA9value les 4 d'un coup", pal::accent2, slot_k);
+    if (t > 4.8f && t < 6.5f) flow(batch.center() + V2{0, 22 * a.s}, {gpu.center().x, gpu.y}, t * 2, pal::accent2, 3 * a.s);
+    step_title(a, b, t < 4.8f ? "Plusieurs threads descendent (perte virtuelle \xE2\x88\x92" "1 : ils s'\xC3\xA9" "cartent)"
+                    : t < 6.5f ? "Le lot part sur le GPU" : "Valeurs et politiques remontent, la perte virtuelle est retir\xC3\xA9" "e");
+    if (t >= 6.5f) {
+        float u = smooth(phase(t, 6.5f, 8.5f));
+        for (int i = 0; i < 4; i++) {
+            V2 a3 = l2[leaf_of[i]], a1 = root;
+            draw::circle(a3 + (a1 - a3) * u, 6 * a.s, with_alpha(pal::good, 1 - u * 0.5f));
+        }
+    }
+    label(a, "PUCT : Q + c\xC2\xB7P\xC2\xB7\xE2\x88\x9AN / (1 + n)", {x, gpu.bottom() + 24 * a.s}, pal::text, 14, Font::Mono);
+}
+
+// ── AlphaZero: the loop self-play → training → new network ──
+void anim_selfplay(App& a, Box b, float t) {
+    V2 c = b.center() + V2{0, 14 * a.s};
+    float R = std::min(b.w * 0.32f, b.h * 0.36f);
+    const char* names[4] = {"Parties contre soi-m\xC3\xAAme", "Donn\xC3\xA9" "es", "Entra\xC3\xAEnement", "Nouveau r\xC3\xA9seau"};
+    const char* subs[4] = {"MCTS + r\xC3\xA9seau actuel", "positions, visites du MCTS, r\xC3\xA9sultat", "politique \xE2\x86\x92 visites\nvaleur \xE2\x86\x92 r\xC3\xA9sultat", "remplace l'ancien"};
+    float gen = t / 4.0f;
+    int active = int(std::fmod(t, 4.0f));
+    for (int i = 0; i < 4; i++) {
+        float ang = -3.14159f / 2 + i * 3.14159f / 2;
+        const float rx = b.w * 0.33f, ry = b.h * 0.5f - 52 * a.s;   // the four stations around the plot
+        V2 p = c + V2{std::cos(ang) * rx, std::sin(ang) * ry};
+        V2 nx = c + V2{std::cos(ang + 3.14159f / 2) * rx, std::sin(ang + 3.14159f / 2) * ry};
+        draw::line(p, nx, 2 * a.s, hex(0x5c6878));
+        if (i == active) flow(p, nx, std::fmod(t, 1.0f), pal::accent, 4 * a.s, 2);
+        Box r{p.x - 95 * a.s, p.y - 34 * a.s, 190 * a.s, 68 * a.s};
+        card(a, r, names[i], subs[i], i == active ? pal::accent : pal::accent2, i == active ? 1.0f : 0.0f);
+    }
+    step_title(a, b, strf("G\xC3\xA9n\xC3\xA9ration %d", int(gen) + 1));
+    // Elo climbing in the middle
+    (void)R;
+    Box plot{c.x - 100 * a.s, c.y - 40 * a.s, 200 * a.s, 80 * a.s};
+    draw::round_box(plot.inset(-6 * a.s), 6 * a.s, hex(0x0b0f16, 160));
+    std::vector<V2> pts;
+    int n = std::min(20, int(gen) + 2);
+    for (int i = 0; i < n; i++) {
+        float e = 1 - std::exp(-i * 0.25f);
+        pts.push_back({plot.x + plot.w * i / 19.0f, plot.bottom() - plot.h * e});
+    }
+    if (pts.size() > 1) draw::polyline(pts, 2.5f * a.s, pal::good);
+    label(a, "force", {plot.x, plot.y - 4 * a.s}, pal::faint, 12);
+}
+
+// ── distillation: the teacher labels, the student learns ──
+void anim_distill(App& a, Box b, float t) {
+    Box teacher{b.x + 24 * a.s, b.y + 60 * a.s, 190 * a.s, 110 * a.s};
+    Box student{b.right() - 214 * a.s, b.y + 60 * a.s, 190 * a.s, 110 * a.s};
+    card(a, teacher, "Ma\xC3\xAEtre", "r\xC3\xA9seau convolutif\n30 blocs, lent, pr\xC3\xA9" "cis", pal::accent2, 0.3f);
+    card(a, student, "\xC3\x89l\xC3\xA8ve : NNUE", "petit, en entiers\ntr\xC3\xA8s rapide", pal::accent, 0.3f);
+    step_title(a, b, "Des millions de positions : le ma\xC3\xAEtre donne sa valeur, l'\xC3\xA9l\xC3\xA8ve apprend \xC3\xA0 la reproduire");
+    for (int i = 0; i < 4; i++) {
+        float u = std::fmod(t * 0.35f + i * 0.25f, 1.0f);
+        V2 p = V2{teacher.right(), teacher.center().y} + (V2{student.x, student.center().y} - V2{teacher.right(), teacher.center().y}) * u;
+        Box cardb{p.x - 26 * a.s, p.y - 26 * a.s, 52 * a.s, 52 * a.s};
+        mini_board(cardb.inset(4 * a.s), uint64_t(0x8100001008000001ull) ^ (uint64_t(i) << 20), uint64_t(0x0100001010000080ull), uint64_t(0x0000240000660000ull) >> i, std::sin(u * 3.14159f));
+        label(a, strf("%+.2f", std::sin(i * 2.1f) * 0.8f), {p.x, p.y + 30 * a.s}, with_alpha(pal::text, std::sin(u * 3.14159f)), 13, Font::Mono, Align::Center);
+    }
+    // the loss decreasing
+    Box plot{b.x + b.w * 0.3f, b.bottom() - 110 * a.s, b.w * 0.4f, 80 * a.s};
+    draw::round_box(plot.inset(-6 * a.s), 6 * a.s, hex(0x0b0f16, 160));
+    std::vector<V2> pts;
+    float span = std::fmod(t, 12.0f) / 12.0f;
+    for (int i = 0; i <= int(60 * span); i++) {
+        float u = i / 60.0f, e = 0.15f + 0.85f * std::exp(-u * 4) + 0.03f * std::sin(i * 1.3f);
+        pts.push_back({plot.x + plot.w * u, plot.bottom() - plot.h * (1 - e)});
+    }
+    if (pts.size() > 1) draw::polyline(pts, 2.5f * a.s, pal::accent);
+    label(a, "erreur de l'\xC3\xA9l\xC3\xA8ve (\xC3\xA9poques)", {plot.x, plot.y - 22 * a.s}, pal::dim, 13);
+    label(a, "L = 0,8\xC2\xB7(v \xE2\x88\x92 v_ma\xC3\xAEtre)\xC2\xB2 + 0,2\xC2\xB7(v \xE2\x88\x92 r\xC3\xA9sultat)\xC2\xB2", {b.center().x, b.bottom() - 22 * a.s}, pal::text, 14, Font::Mono, Align::Center);
+}
+
+// ── late move reductions ──
+void anim_lmr(App& a, Box b, float t) {
+    const float P = 10;
+    t = std::fmod(t, P);
+    const int n = 10, full = 8;
+    const int red[n] = {0, 0, 1, 1, 2, 2, 2, 3, 3, 3};
+    const int surprise = 6;   // a late move that turns out good: searched again at full depth
+    step_title(a, b, t < 6 ? "Les coups tard dans l'ordre sont cherch\xC3\xA9s moins profond\xC3\xA9ment" : "Surprise : le coup 7 d\xC3\xA9passe \xCE\xB1, on le recherche \xC3\xA0 pleine profondeur");
+    float rh = (b.h - 80 * a.s) / n, x0 = b.x + 150 * a.s, w = b.w - 340 * a.s;
+    for (int i = 0; i < n; i++) {
+        float y = b.y + 54 * a.s + i * rh;
+        float st = 0.3f + i * 0.5f, k = smooth(phase(t, st, st + 0.45f));
+        label(a, strf("coup %d", i + 1), {b.x + 20 * a.s, y + 1 * a.s}, i < 2 ? pal::text : pal::dim, 14);
+        int d = full - red[i];
+        if (i == surprise && t >= 6) d = full;
+        float frac = d / float(full);
+        Rgba col = i == surprise && t >= 6 ? pal::accent : i < 2 ? pal::accent2 : shade(pal::accent2, -0.35f);
+        draw::round_box({x0, y, w * frac * (i == surprise && t >= 6 ? 1 : k), rh - 8 * a.s}, 4 * a.s, col);
+        if (k > 0.9f) label(a, strf("profondeur %d", d), {x0 + w * frac + 10 * a.s, y + 1 * a.s}, pal::faint, 13, Font::Mono);
+    }
+    label(a, "r = base + ln(profondeur)\xC2\xB7ln(n\xC2\xB0 du coup) / diviseur", {b.x + 20 * a.s, b.bottom() - 24 * a.s}, pal::text, 14, Font::Mono);
+}
+
+// ── aspiration windows ──
+void anim_aspiration(App& a, Box b, float t) {
+    const float P = 10;
+    t = std::fmod(t, P);
+    Box line{b.x + 60 * a.s, b.center().y, b.w - 120 * a.s, 4 * a.s};
+    draw::rect(line, hex(0x5c6878));
+    auto X = [&](float v) { return line.x + line.w * (v + 100) / 200; };
+    for (int v = -100; v <= 100; v += 25) {
+        draw::rect({X(float(v)) - 1, line.y - 6 * a.s, 2, 16 * a.s}, hex(0x5c6878));
+        label(a, std::to_string(v), {X(float(v)), line.y + 14 * a.s}, pal::faint, 12, Font::Mono, Align::Center);
+    }
+    float prev = 10, delta = 12, truth = 38;
+    float lo = prev - delta, hi = prev + delta;
+    std::string title = "On cherche autour de la valeur de la profondeur pr\xC3\xA9" "c\xC3\xA9" "dente : fen\xC3\xAAtre \xC3\xA9troite, plus de coupures";
+    if (t > 3.5f) { hi = prev + delta * 1.25f * 2.5f; title = "La valeur sort par le haut : on \xC3\xA9largit (\xC3\x97" "1,25 \xC3\xA0 chaque \xC3\xA9" "chec) et on recommence"; }
+    if (t > 7) { title = "Trouv\xC3\xA9" "e dans la fen\xC3\xAAtre : valeur exacte, coup jou\xC3\xA9"; }
+    step_title(a, b, title);
+    draw::round_box({X(lo), line.y - 22 * a.s, X(hi) - X(lo), 48 * a.s}, 8 * a.s, with_alpha(pal::accent2, 0.25f));
+    draw::round_frame({X(lo), line.y - 22 * a.s, X(hi) - X(lo), 48 * a.s}, 8 * a.s, 2 * a.s, pal::accent2);
+    label(a, "pr\xC3\xA9" "c\xC3\xA9" "dente", {X(prev), line.y - 50 * a.s}, pal::dim, 13, Font::Regular, Align::Center);
+    draw::circle({X(prev), line.y + 2 * a.s}, 6 * a.s, pal::dim);
+    if (t > 2) {
+        float shown = t < 3.5f ? hi + 4 : truth;
+        draw::circle({X(shown), line.y + 2 * a.s}, 8 * a.s, t < 3.5f ? pal::bad : pal::good);
+        label(a, t < 3.5f ? "\xE2\x89\xA5 " + std::to_string(int(hi)) + " : \xC3\xA9" "chec haut" : "38", {X(shown), line.y - 50 * a.s}, t < 3.5f ? pal::bad : pal::good, 14, Font::Bold, Align::Center);
+    }
+}
+
+// The registry: anim name → drawing function.
+using AnimFn = void (*)(App&, Box, float);
+const std::map<std::string, AnimFn>& anims() {
+    static const std::map<std::string, AnimFn> m = {
+        {"random", anim_random}, {"monte_carlo", anim_monte_carlo}, {"minimax", anim_minimax}, {"alphabeta", anim_alphabeta},
+        {"mcts", anim_mcts}, {"heuristic", anim_heuristic}, {"iterdeep", anim_iterdeep}, {"nnue193", anim_nnue193},
+        {"nnue_persp", anim_nnue_persp}, {"features", anim_features}, {"resnet", anim_resnet}, {"batch", anim_batch},
+        {"selfplay", anim_selfplay}, {"distill", anim_distill}, {"lmr", anim_lmr}, {"aspiration", anim_aspiration}};
+    return m;
+}
+
+// Pseudo-code colouring: keywords, comments, numbers.
+bool is_keyword(const std::string& w) {
+    static const std::set<std::string> k = {"fonction", "si", "sinon", "alors", "pour", "chaque", "dans", "tant", "que", "retourner", "fin",
+                                            "faire", "et", "ou", "non", "r\xC3\xA9p\xC3\xA9ter", "jusqu'\xC3\xA0", "de", "\xC3\xA0", "vrai", "faux"};
+    return k.count(w) > 0;
+}
+void code_line(App& a, const std::string& line, V2 p, float fs) {
+    size_t cpos = line.find("//");
+    std::string code = cpos == std::string::npos ? line : line.substr(0, cpos);
+    float x = p.x;
+    size_t i = 0;
+    while (i < code.size()) {
+        size_t j = i;
+        auto word_char = [&](unsigned char c) { return std::isalnum(c) || c == '_' || c == '\'' || c >= 0x80; };
+        if (word_char(code[i])) while (j < code.size() && word_char(code[j])) j++;
+        else j = i + 1;
+        std::string tok = code.substr(i, j - i);
+        Rgba col = is_keyword(tok) ? pal::accent : std::isdigit((unsigned char)tok[0]) ? hex(0xc4a7ff) : hex(0xdfe6ef);
+        x += a.text.draw(Font::Mono, fs, tok, {x, p.y}, col);
+        i = j;
+    }
+    if (cpos != std::string::npos) a.text.draw(Font::Mono, fs, line.substr(cpos), {x, p.y}, hex(0x7f8ea3));
+}
+
+}   // namespace course
+
+// The course window, drawn above the scene (SDL_AppIterate) while a.course is set.
+void draw_course(App& a) {
+    using namespace course;
+    const float s = a.s;
+    auto it = a.courses.plans.find(a.course);
+    const AiSpec* spec = a.ai(a.course);
+    draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x05070b, 200));
+    Box win{40 * s, 30 * s, a.w - 80 * s, a.h - 60 * s};
+    draw::shadow({win.x, win.y + 10 * s, win.w, win.h}, 22 * s, 40 * s, hex(0x000000, 160));
+    draw::round_box(win, 22 * s, hex(0x161c26), hex(0x10151d));
+    draw::round_frame(win, 22 * s, 1, pal::panel_border);
+    bool close = a.ui.button("course_close", {win.right() - 150 * s, win.y + 20 * s, 126 * s, 44 * s}, "Fermer", Style::Ghost, true, 17)
+                 || a.in.key(SDLK_ESCAPE);
+    if (close) { a.in.eat(SDLK_ESCAPE); a.course.clear(); return; }
+    // the chapters
+    std::vector<const CourseChapter*> chs;
+    if (it != a.courses.plans.end())
+        for (auto& id : it->second) {
+            auto c = a.courses.chapters.find(id);
+            if (c != a.courses.chapters.end()) chs.push_back(&c->second);
+        }
+    // table of contents (left), content (right)
+    Box toc{win.x + 24 * s, win.y + 90 * s, 250 * s, win.h - 110 * s};
+    Box view{toc.right() + 28 * s, win.y + 20 * s, win.right() - toc.right() - 70 * s, win.h - 40 * s};
+    // The header (left top): the AI.
+    if (spec) {
+        draw_piece(a.themed_sprite(spec->id, BLACK), BLACK, {win.x + 54 * s, win.y + 48 * s}, 26 * s, 0, a.time);
+        a.text.draw(Font::Title, 18 * s, "Comprendre", {win.x + 92 * s, win.y + 24 * s}, pal::dim);
+        a.text.draw(Font::Black, 20 * s, spec->name, {win.x + 92 * s, win.y + 46 * s}, pal::text);
+    }
+    // Layout: the y of every block (design: measured each frame, the texts wrap to the width).
+    const float W = std::min(view.w - 30 * s, 980 * s);
+    const float fs_p = 17 * s, fs_code = 15 * s;
+    struct Item { int ch; const CourseBlock* b; float y, h; };
+    std::vector<Item> items;
+    std::vector<float> ch_y;
+    float y = 0;
+    // the summary
+    float sum_h = 0;
+    std::string summary = spec ? spec->description : "";
+    if (spec) {
+        sum_h = 64 * s + a.text.wrap(Font::Regular, 18 * s, summary, W - 40 * s).size() * a.text.line_height(Font::Regular, 18 * s) * 1.3f / 1.2f + 50 * s;
+    }
+    y += sum_h + 20 * s;
+    for (size_t c = 0; c < chs.size(); c++) {
+        ch_y.push_back(y);
+        y += 64 * s;
+        for (auto& b : chs[c]->blocks) {
+            float h = 0;
+            if (b.kind == "h") h = 44 * s;
+            else if (b.kind == "p") h = a.text.wrap(Font::Regular, fs_p, b.text, W).size() * a.text.line_height(Font::Regular, fs_p) * 1.4f / 1.2f + 12 * s;
+            else if (b.kind == "tip") h = a.text.wrap(Font::Regular, 16 * s, b.text, W - 50 * s).size() * a.text.line_height(Font::Regular, 16 * s) * 1.35f / 1.2f + 34 * s;
+            else if (b.kind == "list") {
+                for (auto& l : b.lines) h += a.text.wrap(Font::Regular, fs_p, l, W - 30 * s).size() * a.text.line_height(Font::Regular, fs_p) * 1.35f / 1.2f + 6 * s;
+                h += 10 * s;
+            } else if (b.kind == "code") h = b.lines.size() * a.text.line_height(Font::Mono, fs_code) * 1.3f + 40 * s;
+            else if (b.kind == "anim") h = b.height * s + 50 * s + (b.text.empty() ? 0 : 30 * s);
+            items.push_back({int(c), &b, y, h});
+            y += h + 10 * s;
+        }
+        y += 30 * s;
+    }
+    const float content_h = y;
+    if (!a.course_seek.empty()) {   // tests (--course-anim NAME): scroll to that animation
+        for (auto& itm : items)
+            if (itm.b->kind == "anim" && itm.b->anim == a.course_seek) { a.course_target = a.course_scroll = itm.y - 20 * s; break; }
+        a.course_seek.clear();
+    }
+    const float max_scroll = std::max(0.0f, content_h - view.h + 40 * s);
+    // scrolling: wheel, keys, the bar
+    if (view.contains(a.in.mouse)) a.course_target -= a.in.wheel * 90 * s;
+    if (a.in.key(SDLK_DOWN)) a.course_target += 60 * s;
+    if (a.in.key(SDLK_UP)) a.course_target -= 60 * s;
+    if (a.in.key(SDLK_PAGEDOWN) || a.in.key(SDLK_SPACE)) a.course_target += view.h * 0.85f;
+    if (a.in.key(SDLK_PAGEUP)) a.course_target -= view.h * 0.85f;
+    if (a.in.key(SDLK_HOME)) a.course_target = 0;
+    if (a.in.key(SDLK_END)) a.course_target = max_scroll;
+    Box track{view.right() + 18 * s, view.y + 10 * s, 10 * s, view.h - 20 * s};
+    float thumb_h = std::max(50 * s, track.h * std::min(1.0f, view.h / std::max(content_h, 1.0f)));
+    float thumb_y = track.y + (track.h - thumb_h) * (max_scroll > 0 ? a.course_scroll / max_scroll : 0);
+    Box thumb{track.x - 3 * s, thumb_y, track.w + 6 * s, thumb_h};
+    Box hit{track.x - 12 * s, track.y, track.w + 24 * s, track.h};
+    if (a.in.pressed && hit.contains(a.in.mouse)) {
+        a.course_drag = true;
+        a.course_drag_dy = thumb.contains(a.in.mouse) ? a.in.mouse.y - thumb_y : thumb_h / 2;
+    }
+    if (!a.in.down) a.course_drag = false;
+    if (a.course_drag && track.h > thumb_h) {
+        a.course_target = (a.in.mouse.y - a.course_drag_dy - track.y) / (track.h - thumb_h) * max_scroll;
+        a.course_scroll = std::clamp(a.course_target, 0.0f, max_scroll);
+    }
+    a.course_target = std::clamp(a.course_target, 0.0f, max_scroll);
+    a.course_scroll += (a.course_target - a.course_scroll) * std::min(1.0f, float(a.dt) * 14);
+    if (std::abs(a.course_target - a.course_scroll) < 0.5f) a.course_scroll = a.course_target;
+    if (a.ui.hover(hit)) a.ui.hovering = true;
+    draw::round_box(track, 5 * s, hex(0xffffff, 18));
+    draw::round_box(thumb, 8 * s, a.course_drag || a.ui.hover(thumb) ? pal::accent : hex(0xffffff, 90));
+    // the table of contents
+    int current = 0;
+    for (size_t c = 0; c < ch_y.size(); c++) if (a.course_scroll + 80 * s >= ch_y[c]) current = int(c);
+    float ty = toc.y;
+    {
+        Box r{toc.x, ty, toc.w, 34 * s};
+        bool h = a.ui.hover(r);
+        if (h) a.ui.hovering = true;
+        if (h && a.in.released) a.course_target = 0;
+        a.text.draw(Font::Bold, 15 * s, "R\xC3\xA9sum\xC3\xA9", {r.x + 12 * s, r.y + 8 * s}, a.course_scroll < sum_h * 0.5f ? pal::accent : h ? pal::text : pal::dim);
+        ty += 38 * s;
+    }
+    for (size_t c = 0; c < chs.size(); c++) {
+        auto lines = a.text.wrap(Font::Bold, 15 * s, strf("%zu. ", c + 1) + chs[c]->title, toc.w - 24 * s);
+        Box r{toc.x, ty, toc.w, lines.size() * 21 * s + 14 * s};
+        bool h = a.ui.hover(r), on = int(c) == current && a.course_scroll >= sum_h * 0.5f;
+        if (h) a.ui.hovering = true;
+        if (on) draw::round_box(r, 8 * s, with_alpha(pal::accent, 0.12f));
+        if (on) draw::rect({r.x, r.y + 6 * s, 3 * s, r.h - 12 * s}, pal::accent);
+        if (h && a.in.released) a.course_target = ch_y[c] - 10 * s;
+        float ly = r.y + 7 * s;
+        for (auto& l : lines) { a.text.draw(Font::Bold, 15 * s, l, {r.x + 14 * s, ly}, on ? pal::text : h ? pal::text : pal::dim); ly += 21 * s; }
+        ty += r.h + 4 * s;
+    }
+    // the content, clipped to the view
+    draw::clip(&view);
+    const float x = view.x + std::max(0.0f, (view.w - 30 * s - W) / 2), top = view.y + 20 * s - a.course_scroll;
+    if (spec) {
+        Box sb{x, top, W, sum_h};
+        draw::round_box(sb, 16 * s, hex(0x1d2532), hex(0x171d28));
+        a.text.draw(Font::Title, 30 * s, spec->name, {sb.x + 20 * s, sb.y + 16 * s}, pal::text);
+        a.text.draw(Font::Regular, 16 * s, strf("%s \xE2\x80\xA2 Elo \xE2\x89\x88 %d", spec->family.c_str(), spec->elo), {sb.right() - 20 * s, sb.y + 28 * s}, pal::accent, Align::Right);
+        a.text.paragraph(Font::Regular, 18 * s, summary, {sb.x + 20 * s, sb.y + 64 * s, W - 40 * s, sum_h}, pal::text, 1.3f);
+    }
+    for (size_t c = 0; c < chs.size(); c++) {
+        float cy = top + ch_y[c];
+        if (cy > view.bottom() || cy + 64 * s < view.y) continue;
+        a.text.draw(Font::Title, 26 * s, strf("%zu. ", c + 1) + chs[c]->title, {x, cy + 14 * s}, pal::text);
+        draw::rect({x, cy + 54 * s, W, 2 * s}, with_alpha(pal::accent, 0.5f));
+    }
+    std::set<std::string> visible;
+    for (size_t i = 0; i < items.size(); i++) {
+        const Item& itm = items[i];
+        float by = top + itm.y;
+        if (by > view.bottom() || by + itm.h < view.y) continue;
+        const CourseBlock& b = *itm.b;
+        if (b.kind == "h") a.text.draw(Font::Black, 21 * s, b.text, {x, by + 10 * s}, pal::accent);
+        else if (b.kind == "p") a.text.paragraph(Font::Regular, fs_p, b.text, {x, by, W, itm.h + 10 * s}, hex(0xd9e0ea), 1.4f);
+        else if (b.kind == "tip") {
+            Box r{x, by, W, itm.h};
+            draw::round_box(r, 10 * s, with_alpha(pal::accent2, 0.08f));
+            draw::rect({r.x, r.y + 8 * s, 4 * s, r.h - 16 * s}, pal::accent2);
+            a.text.paragraph(Font::Regular, 16 * s, b.text, {r.x + 28 * s, r.y + 16 * s, W - 50 * s, r.h}, pal::text, 1.35f);
+        } else if (b.kind == "list") {
+            float ly = by;
+            for (auto& l : b.lines) {
+                draw::circle({x + 10 * s, ly + 12 * s}, 3.5f * s, pal::accent);
+                float h = a.text.paragraph(Font::Regular, fs_p, l, {x + 28 * s, ly, W - 30 * s, 1000 * s}, hex(0xd9e0ea), 1.35f);
+                ly += h + 6 * s;
+            }
+        } else if (b.kind == "code") {
+            Box r{x, by, W, itm.h};
+            draw::round_box(r, 10 * s, hex(0x0b0f16), hex(0x090c12));
+            draw::round_frame(r, 10 * s, 1, hex(0xffffff, 20));
+            float lh = a.text.line_height(Font::Mono, fs_code) * 1.3f, ly = r.y + 20 * s;
+            for (auto& l : b.lines) { code_line(a, l, {r.x + 22 * s, ly}, fs_code); ly += lh; }
+        } else if (b.kind == "anim") {
+            Box r{x, by, W, b.height * s + 40 * s};
+            draw::round_box(r, 12 * s, hex(0x121822), hex(0x0d1219));
+            draw::round_frame(r, 12 * s, 1, hex(0xffffff, 22));
+            std::string key = std::to_string(itm.ch) + ":" + std::to_string(i);
+            visible.insert(key);
+            bool paused = a.course_paused.count(key) > 0;
+            // controls: pause / play, restart
+            Box pb{r.right() - 92 * s, r.y + 10 * s, 36 * s, 30 * s}, rb{r.right() - 50 * s, r.y + 10 * s, 36 * s, 30 * s};
+            bool hp = a.ui.hover(pb) && view.contains(a.in.mouse), hr = a.ui.hover(rb) && view.contains(a.in.mouse);
+            bool on_anim = !hp && !hr && a.ui.hover(r) && view.contains(a.in.mouse);
+            if ((hp || on_anim) && a.in.released) { if (paused) a.course_paused.erase(key); else a.course_paused.insert(key); paused = !paused; }
+            if (hr && a.in.released) { a.course_clock[key] = 0; a.course_paused.erase(key); paused = false; }
+            if (hp || hr) a.ui.hovering = true;
+            auto it2 = anims().find(b.anim);
+            Box inner{r.x + 6 * s, r.y + 34 * s, r.w - 12 * s, r.h - 40 * s};
+            draw::clip(nullptr);
+            Box cl{std::max(view.x, r.x), std::max(view.y, r.y), 0, 0};
+            cl.w = std::min(view.right(), r.right()) - cl.x;
+            cl.h = std::min(view.bottom(), r.bottom()) - cl.y;
+            draw::clip(&cl);
+            if (it2 != anims().end()) it2->second(a, inner, a.course_clock[key]);
+            else a.text.draw(Font::Regular, 15 * s, "animation inconnue : " + b.anim, {inner.x + 20 * s, inner.y + 20 * s}, pal::bad);
+            draw::round_box(pb, 8 * s, hp ? hex(0xffffff, 50) : hex(0xffffff, 22));
+            draw::round_box(rb, 8 * s, hr ? hex(0xffffff, 50) : hex(0xffffff, 22));
+            V2 pc = pb.center(), rc = rb.center();
+            if (paused) draw::poly({pc + V2{-5 * s, -8 * s}, pc + V2{9 * s, 0}, pc + V2{-5 * s, 8 * s}}, pal::accent);
+            else { draw::rect({pc.x - 6 * s, pc.y - 7 * s, 4 * s, 14 * s}, pal::text); draw::rect({pc.x + 2 * s, pc.y - 7 * s, 4 * s, 14 * s}, pal::text); }
+            std::vector<V2> arc;
+            for (int k = 0; k <= 16; k++) { float an = 0.6f + k / 16.0f * 4.9f; arc.push_back(rc + V2{std::cos(an), std::sin(an)} * (7 * s)); }
+            draw::polyline(arc, 2 * s, pal::text);
+            draw::poly({arc.back() + V2{-4 * s, -3 * s}, arc.back() + V2{4 * s, -4 * s}, arc.back() + V2{1 * s, 4 * s}}, pal::text);
+            if (paused) a.text.draw(Font::Bold, 13 * s, "en pause", {pb.x - 10 * s, pb.y + 7 * s}, pal::accent, Align::Right);
+            draw::clip(nullptr);
+            draw::clip(&view);
+            if (!b.text.empty()) a.text.paragraph(Font::Regular, 14 * s, b.text, {x + 6 * s, r.bottom() + 8 * s, W - 12 * s, 40 * s}, pal::dim, 1.25f);
+            if (!paused) a.course_clock[key] += float(a.dt);
+            if (a.course_clock[key] < a.course_t_offset) a.course_clock[key] = a.course_t_offset;
+        }
+    }
+    draw::clip(nullptr);
+    (void)visible;
+    if (chs.empty()) a.text.paragraph(Font::Regular, 17 * s, "Pas encore de cours pour cette IA.", {x, top + sum_h + 40 * s, W, 60 * s}, pal::dim);
+}
+
 // ─── @@SCENE_MENU ───────────────────────────────────────────────────────────
 void scene_menu(App& a) {
     const float s = a.s;
@@ -4022,18 +5459,35 @@ void scene_setup(App& a) {
             draw_piece(a.themed_sprite(e.id, side), side, {r.x + 16 * s + pr, r.center().y}, pr, 0.2f * k, a.time, alpha, e.id == "human");
             float tx = r.x + 30 * s + 2 * pr;
             a.text.draw(Font::Bold, 19 * s, e.name, {tx, r.center().y - 22 * s}, with_alpha(pal::text, alpha));
-            a.text.draw(Font::Regular, 14 * s, e.available ? e.sub : "indisponible \xE2\x80\x94 survolez pour savoir pourquoi",
-                        {tx, r.center().y + 2 * s}, with_alpha(e.available ? pal::dim : pal::bad, std::max(alpha, 0.7f)));
+            std::string sub = e.available ? e.sub : "indisponible \xE2\x80\x94 survolez pour savoir pourquoi";
+            const float sub_w = r.right() - 202 * s - tx;   // up to the "?" button
+            if (e.id != "human" && a.text.width(Font::Regular, 14 * s, sub) > sub_w) {   // shortened, with an ellipsis
+                while (!sub.empty() && a.text.width(Font::Regular, 14 * s, sub + "\xE2\x80\xA6") > sub_w) {
+                    size_t k = sub.size() - 1;
+                    while (k > 0 && (uint8_t(sub[k]) & 0xC0) == 0x80) k--;
+                    sub.erase(k);
+                }
+                sub += "\xE2\x80\xA6";
+            }
+            a.text.draw(Font::Regular, 14 * s, sub, {tx, r.center().y + 2 * s}, with_alpha(e.available ? pal::dim : pal::bad, std::max(alpha, 0.7f)));
             bool on_gear = false;
+            if (e.id != "human") {   // "Comprendre cette IA" (@@COURSE)
+                Box qb{r.right() - 194 * s, r.center().y - 15 * s, 30 * s, 30 * s};
+                on_gear = a.ui.hover(qb);
+                if (on_gear) { a.ui.hovering = true; hovered_desc = "Comprendre cette IA : son r\xC3\xA9sum\xC3\xA9 puis un cours (pseudo-code, sch\xC3\xA9mas, animations)."; }
+                draw::circle(qb.center(), 15 * s, on_gear ? a.theme().accent : hex(0xffffff, 30));
+                a.text.draw(Font::Black, 17 * s, "?", {qb.center().x, qb.y + 4 * s}, on_gear ? hex(0x1a1206) : pal::text, Align::Center);
+                if (on_gear && a.in.released && !a.ui.blocked) { a.open_course(e.id); a.in.released = false; }
+            }
             if (e.id != "human" && e.available) {   // strength gauge, settings button
                 float frac = float(i) / (entries.size() - 1);
-                Box gb{r.right() - 150 * s, r.center().y - 4 * s, 60 * s, 8 * s};
+                Box gb{r.right() - 152 * s, r.center().y - 4 * s, 64 * s, 8 * s};
                 draw::round_box(gb, 4 * s, hex(0xffffff, 25));
                 draw::round_box({gb.x, gb.y, gb.w * frac, gb.h}, 4 * s, shade(a.theme().accent, -0.2f), a.theme().accent);
                 const AiSpec* spec = a.ai(e.id);
                 if (spec && !spec->params.empty()) {
                     Box bb{r.right() - 78 * s, r.center().y - 16 * s, 68 * s, 32 * s};
-                    on_gear = a.ui.hover(bb);
+                    on_gear = on_gear || a.ui.hover(bb);
                     if (a.ui.button("setp" + std::to_string(side) + e.id, bb, "R\xC3\xA9gler", Style::Ghost, true, 13)) a.setup_params = e.id;
                 }
             }
@@ -4354,7 +5808,10 @@ void tab_ai(App& a, Box b) {
                     {b.x + 58 * s, y + 26 * s}, pal::dim);
         y += 56 * s;
         float hgt = a.text.paragraph(Font::Regular, 14 * s, sl.spec->description, {b.x, y, b.w, 120 * s}, pal::text);
-        y += hgt + 6 * s;
+        y += hgt + 8 * s;
+        if (a.ui.button("course" + std::to_string(side), {b.x, y, std::min(b.w, 260 * s), 36 * s}, "Comprendre cette IA  \xE2\x86\x92", Style::Primary, true, 15))
+            a.open_course(sl.who);
+        y += 46 * s;
         std::string info = sl.agent ? sl.agent->info() : "";
         if (!info.empty()) {
             hgt = a.text.paragraph(Font::Regular, 12 * s, "Moteur : " + info, {b.x, y, b.w, 70 * s}, pal::faint);
@@ -4639,7 +6096,7 @@ void scene_themes(App& a) {
     const float s = a.s;
     const bool picking = a.picker.open;
     draw_background(a);
-    draw_title(a, "Th\xC3\xA8mes", "Le plateau et les pi\xC3\xA8ces de chaque joueur.");
+    draw_title(a, "Th\xC3\xA8mes", "Le plateau et les pi\xC3\xA8" "ces de chaque joueur.");
     a.ui.blocked = picking;
     if (picking && a.in.key(SDLK_ESCAPE)) { a.picker.open = false; a.in.eat(SDLK_ESCAPE); }
     if (back_button(a)) { a.save_settings(); a.go(Scene::Menu); return; }
@@ -6966,6 +8423,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     load_all_arts();
     register_art_sprites(a->sprites);
     a->roster = load_roster(g_paths.assets / "ai_roster.json");
+    a->courses.load(g_paths.assets / "courses" / "ai_courses.json");
     {
         json j = load_json(g_paths.assets / "sprites" / "assignments.json");
         if (j.is_object() && j.contains("players") && j["players"].is_object())
@@ -6998,6 +8456,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (arg_flag(argc, argv, "--hint")) a->settings.show_hint = true;
     if (!arg_value(argc, argv, "--time").empty()) a->settings.time_index = std::stoi(arg_value(argc, argv, "--time"));
     if (!arg_value(argc, argv, "--theme").empty()) a->settings.theme = arg_value(argc, argv, "--theme");
+    if (!arg_value(argc, argv, "--course").empty()) {   // the course of an AI open (--scroll N: pixels down)
+        a->open_course(arg_value(argc, argv, "--course"));
+        a->course_scroll = a->course_target = std::stof(arg_value(argc, argv, "--scroll", "0"));
+        a->course_seek = arg_value(argc, argv, "--course-anim");
+        if (!arg_value(argc, argv, "--anim-time").empty()) a->course_t_offset = std::stof(arg_value(argc, argv, "--anim-time"));
+    }
     if (scene == "game") {
         int plies = std::stoi(arg_value(argc, argv, "--plies", "0"));
         Yolah y;
@@ -7094,6 +8558,18 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     SDL_SetRenderClipRect(a->renderer, nullptr);
     SDL_SetRenderDrawColor(a->renderer, 0, 0, 0, 255);
     SDL_RenderClear(a->renderer);
+    // The course window (@@COURSE) is above the scene: the scene is drawn without the
+    // mouse, the clicks, the wheel and the keys, which go to the window.
+    Input saved_in;
+    const bool course_open = !a->course.empty();
+    if (course_open) {
+        saved_in = a->in;
+        a->in.mouse = {-1e6f, -1e6f};
+        a->in.pressed = a->in.released = a->in.down = a->in.rpressed = a->in.rdown = false;
+        a->in.wheel = 0;
+        a->in.keys.clear();
+        a->in.text.clear();
+    }
     switch (a->scene) {
     case Scene::Menu: scene_menu(*a); break;
     case Scene::Setup: scene_setup(*a); break;
@@ -7107,6 +8583,11 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     if (a->scene != Scene::Game) {
         a->fx.update(float(a->dt));
         a->fx.draw(a->text);
+    }
+    if (course_open) {
+        a->in = saved_in;
+        a->ui.hovering = false;
+        draw_course(*a);
     }
     // A message on the board (a side that must pass) goes as soon as the game is
     // over: the scores take its place.

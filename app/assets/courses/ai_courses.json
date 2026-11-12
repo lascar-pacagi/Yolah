@@ -1,0 +1,490 @@
+{
+  // The courses of the window "Comprendre cette IA" (@@COURSE in yolah_app.cpp).
+  //   chapters   the chapters: an id, a title, blocks shown in order:
+  //                {"h": "a heading"}          {"p": "a paragraph"}
+  //                {"tip": "a note, framed"}   {"list": ["item", "item"]}
+  //                {"code": ["pseudo-code line", ...]}   (keywords coloured; "//" starts a comment)
+  //                {"anim": "name", "height": 300, "caption": "below it"}   (the animations are in the code)
+  //   ais        for each AI id of ai_roster.json, its chapters in order; the window shows the
+  //              AI's summary (its description in the roster) first.
+  "chapters": [
+    {
+      "id": "random",
+      "title": "Jouer au hasard",
+      "blocks": [
+        { "p": "C'est l'IA la plus simple possible : elle connaît les règles, et rien d'autre. À son tour, elle dresse la liste de tous les coups légaux, en tire un au sort, et le joue. Elle ne regarde ni la position, ni l'adversaire, ni la suite de la partie." },
+        { "anim": "random", "height": 300, "caption": "Les quatre étapes d'un coup : repérer ses pions, lister les coups possibles (chaque pion se déplace comme une dame aux échecs, sans sauter de pion ni de trou), tirer un numéro, jouer. La case quittée devient un trou." },
+        { "h": "L'algorithme" },
+        { "code": [
+          "fonction jouer(position)",
+          "    coups ← coups_légaux(position)      // les 4 pions, les 8 directions",
+          "    i ← entier_aléatoire(0, |coups| − 1)",
+          "    retourner coups[i]"
+        ] },
+        { "p": "Le coût est celui de la génération des coups : quelques nanosecondes avec des bitboards (un entier de 64 bits par ensemble de cases). C'est une base de comparaison : toute IA sérieuse doit la battre presque à chaque partie." },
+        { "tip": "À essayer : faites jouer Hasard contre Hasard. Les parties sont courtes et désordonnées : chaque camp s'enferme lui-même avec ses propres trous. Cela montre que, dans ce jeu, la place compte plus que tout." },
+        { "h": "Pourquoi c'est faible" },
+        { "list": [
+          "Un coup qui enferme un de ses propres pions a autant de chances d'être tiré qu'un bon coup.",
+          "Elle ne voit pas qu'un coup laisse l'adversaire couper le plateau en deux.",
+          "Elle joue aussi vite en fin de partie, où quelques coups bien choisis décident de tout."
+        ] }
+      ]
+    },
+    {
+      "id": "beginner",
+      "title": "Un Monte Carlo bridé",
+      "blocks": [
+        { "p": "Débutant est le même programme que Monte Carlo (le chapitre suivant), volontairement affaibli de deux façons, pour faire un premier adversaire à la portée d'un joueur qui découvre le jeu." },
+        { "list": [
+          "Il ne réfléchit que 2 % du temps donné aux autres IA, sur un seul cœur : il joue donc environ cent fois moins de parties au hasard que Monte Carlo.",
+          "Trois fois sur dix, il ne réfléchit pas du tout et joue un coup au hasard, comme l'IA Hasard."
+        ] },
+        { "code": [
+          "fonction jouer(position)",
+          "    si aléatoire() < 0,3 alors",
+          "        retourner coup_au_hasard(position)",
+          "    retourner monte_carlo(position, temps × 0,02, 1 cœur)"
+        ] },
+        { "tip": "Régler la force d'une IA par son temps de réflexion et par une dose de hasard est une technique classique des jeux vidéo : l'IA reste cohérente (elle ne fait pas exprès de mal jouer), elle se trompe juste plus souvent." }
+      ]
+    },
+    {
+      "id": "monte_carlo",
+      "title": "Monte Carlo : des milliers de parties au hasard",
+      "blocks": [
+        { "p": "Comment juger un coup sans rien savoir du jeu ? Idée de la méthode de Monte Carlo : on joue le coup, puis on termine la partie au hasard, des milliers de fois. Si, après ce coup, les parties au hasard tournent en moyenne à mon avantage, c'est probablement un bon coup." },
+        { "anim": "monte_carlo", "height": 340, "caption": "Une vraie position du jeu et ses coups possibles. Les premières parties au hasard sont montrées coup par coup, puis le programme accélère. Chaque barre est l'écart de points moyen (mes points moins les siens) des parties jouées après ce coup." },
+        { "h": "L'algorithme" },
+        { "code": [
+          "fonction jouer(position)",
+          "    coups ← coups_légaux(position)",
+          "    total[c] ← 0 pour chaque c dans coups",
+          "    tant que le temps n'est pas écoulé faire",
+          "        pour chaque c dans coups faire",
+          "            p ← jouer_le_coup(position, c)",
+          "            total[c] ← total[c] + partie_au_hasard(p)   // mes points − les siens",
+          "    retourner le coup c de plus grand total[c]"
+        ] },
+        { "code": [
+          "fonction partie_au_hasard(p)",
+          "    tant que la partie n'est pas finie faire",
+          "        p ← jouer_le_coup(p, coup_au_hasard(p))",
+          "    retourner score(p)"
+        ] },
+        { "p": "Chaque coup reçoit le même nombre de parties : la boucle les passe tous en revue à chaque tour. Comme tous ont le même nombre de parties, comparer les totaux revient à comparer les moyennes. Le travail se partage très bien entre les cœurs du processeur : chaque thread joue ses propres parties, et on additionne les totaux à la fin." },
+        { "h": "Pourquoi ça marche (un peu)" },
+        { "p": "La moyenne de N parties au hasard est une estimation de la « valeur au hasard » du coup, avec une erreur qui diminue comme 1/√N : quatre fois plus de parties, deux fois moins d'erreur. Sans aucune connaissance du jeu, le programme découvre ainsi qu'enfermer ses propres pions est mauvais : les parties au hasard qui suivent tournent mal." }
+      ]
+    },
+    {
+      "id": "mc_limits",
+      "title": "Les limites de Monte Carlo",
+      "blocks": [
+        { "p": "L'estimation de Monte Carlo répond à la question « que vaut ce coup si ensuite tout le monde joue au hasard ? ». Ce n'est pas la bonne question : l'adversaire, lui, ne joue pas au hasard." },
+        { "list": [
+          "Un coup peut être excellent dans la plupart des suites et perdant contre la seule bonne réponse. La moyenne le trouve bon ; un adversaire qui trouve la réponse le punit.",
+          "Le temps est réparti également entre tous les coups, y compris les coups manifestement mauvais.",
+          "Il ne regarde qu'un coup à l'avance : après mon coup, tout est au hasard."
+        ] },
+        { "tip": "Les deux défauts suivants sont corrigés par MCTS (l'IA suivante) : concentrer les parties sur les coups prometteurs, et construire un arbre pour que les coups suivants soient eux aussi choisis, et pas tirés au hasard." }
+      ]
+    },
+    {
+      "id": "mcts",
+      "title": "L'arbre de recherche Monte Carlo (MCTS)",
+      "blocks": [
+        { "p": "MCTS garde les parties au hasard de Monte Carlo, mais construit en mémoire un arbre des positions déjà visitées. Chaque nœud retient deux nombres : combien de parties sont passées par lui (n) et combien d'entre elles ont été gagnées (w). L'arbre grandit là où il faut : vers les coups prometteurs, sans abandonner tout à fait les autres." },
+        { "p": "Chaque itération a quatre phases :" },
+        { "list": [
+          "Sélection : depuis la racine, descendre dans l'arbre en choisissant à chaque nœud l'enfant au meilleur score UCT (le chapitre suivant).",
+          "Expansion : arrivé au bord de l'arbre, ajouter un nouveau nœud (une position pas encore explorée).",
+          "Simulation : de là, terminer la partie au hasard, comme Monte Carlo.",
+          "Rétropropagation : remonter jusqu'à la racine en ajoutant 1 à n et le résultat à w de chaque nœud du chemin."
+        ] },
+        { "anim": "mcts", "height": 420, "caption": "Un petit exemple sur un arbre abstrait : chaque nœud affiche victoires/parties pour le joueur à la racine (bleu : c'est à moi de choisir, orange : à l'adversaire). Le panneau de droite montre le score UCT des trois coups de la racine : la partie bleue récompense les coups qui gagnent, la partie orange ceux qu'on a peu essayés." },
+        { "h": "L'algorithme" },
+        { "code": [
+          "fonction mcts(racine)",
+          "    tant que le temps n'est pas écoulé faire",
+          "        nœud ← racine",
+          "        tant que nœud est entièrement développé faire     // 1. sélection",
+          "            nœud ← enfant de nœud au meilleur UCT",
+          "        si la partie n'est pas finie en nœud alors",
+          "            nœud ← ajouter_un_enfant(nœud)               // 2. expansion",
+          "        r ← partie_au_hasard(nœud.position)               // 3. simulation",
+          "        tant que nœud ≠ rien faire                         // 4. rétropropagation",
+          "            nœud.n ← nœud.n + 1",
+          "            nœud.w ← nœud.w + r     // victoire 1, nul ½, défaite 0, du point de vue de qui a joué",
+          "            nœud ← nœud.parent",
+          "    retourner l'enfant de la racine le plus visité"
+        ] },
+        { "tip": "Le coup joué est le plus visité, pas celui au meilleur taux de victoire : un coup essayé 3 fois et gagné 3 fois n'est pas fiable. Le nombre de visites mesure la confiance que la recherche a accordée au coup." },
+        { "p": "Dans l'application, plusieurs threads partagent le même arbre. Pour qu'ils ne descendent pas tous par le même chemin, un thread qui passe par un nœud y ajoute provisoirement une « perte virtuelle » : le nœud paraît un peu moins bon aux autres, qui en explorent d'autres." }
+      ]
+    },
+    {
+      "id": "uct",
+      "title": "Choisir où chercher : UCT",
+      "blocks": [
+        { "p": "Au moment de la sélection, il faut un compromis entre l'exploitation (descendre là où l'on gagne le plus) et l'exploration (vérifier les coups peu essayés, qui sont peut-être sous-estimés). C'est le problème du bandit manchot : face à plusieurs machines à sous, laquelle essayer ?" },
+        { "p": "La formule UCT (Upper Confidence bounds applied to Trees, Kocsis et Szepesvári, 2006) donne à chaque enfant i le score :" },
+        { "code": [
+          "UCT(i) = wᵢ / nᵢ  +  C · √( ln N / nᵢ )",
+          "",
+          "// wᵢ / nᵢ    : taux de victoire de l'enfant (exploitation)",
+          "// N          : visites du parent,  nᵢ : visites de l'enfant",
+          "// C          : constante d'exploration (√2 dans le programme)"
+        ] },
+        { "list": [
+          "Le terme d'exploration grandit lentement (ln N) pour tous, et diminue vite (1/nᵢ) pour l'enfant qu'on visite : un coup délaissé finit toujours par être revisité.",
+          "Avec le temps, la proportion de visites des mauvais coups tend vers zéro : la recherche converge vers le meilleur coup (vers le minimax, si on la laisse tourner assez longtemps).",
+          "Au tour de l'adversaire, le taux de victoire est pris de son point de vue : chacun choisit ce qui est bon pour lui."
+        ] },
+        { "tip": "Exercice : à la racine, N = 100. Le coup A a gagné 30 parties sur 50, le coup B 2 sur 4. Lequel UCT choisit-il avec C = √2 ? (A : 0,60 + 0,43 = 1,03 ; B : 0,50 + 1,52 = 2,02 : B, encore peu exploré.)" }
+      ]
+    },
+    {
+      "id": "minimax",
+      "title": "Minimax : je maximise, il minimise",
+      "blocks": [
+        { "p": "Le minimax suppose que l'adversaire joue parfaitement. On développe l'arbre de tous les coups possibles jusqu'à une certaine profondeur. Aux feuilles, on évalue la position par un nombre, d'autant plus grand que la position est bonne pour moi. Puis on remonte : à mon tour, je prends le maximum des enfants ; à son tour, il prend le minimum." },
+        { "anim": "minimax", "height": 380, "caption": "Un arbre de profondeur 3 : 3 coups pour moi, 2 réponses chacun, 2 coups pour moi derrière. Les 12 feuilles sont évaluées, puis les valeurs remontent. La valeur de la racine (7) est ce que je peux garantir, quoi que fasse l'adversaire." },
+        { "h": "Négamax : une seule fonction" },
+        { "p": "Comme le jeu est à somme nulle (ce qui est bon pour l'un est mauvais pour l'autre), max(a, b) = −min(−a, −b). On écrit donc une seule fonction, qui évalue toujours du point de vue du joueur au trait et change de signe en remontant :" },
+        { "code": [
+          "fonction négamax(position, profondeur)",
+          "    si la partie est finie alors retourner score_final(position)",
+          "    si profondeur = 0 alors retourner évaluation(position)",
+          "    meilleur ← −∞",
+          "    pour chaque coup dans coups_légaux(position) faire",
+          "        v ← −négamax(jouer(position, coup), profondeur − 1)",
+          "        meilleur ← max(meilleur, v)",
+          "    retourner meilleur"
+        ] },
+        { "tip": "Dans Yolah, un camp bloqué passe son tour : le programme joue alors un coup « nul » qui ne déplace rien. Le score final est connu exactement : c'est la différence des nombres de coups joués." }
+      ]
+    },
+    {
+      "id": "alphabeta",
+      "title": "Alpha-bêta : couper sans rien perdre",
+      "blocks": [
+        { "p": "Le minimax regarde toutes les feuilles. Or beaucoup ne peuvent pas changer le résultat. Alpha-bêta transporte deux bornes : α, ce que je suis déjà sûr d'obtenir ailleurs, et β, ce que l'adversaire est déjà sûr de m'imposer ailleurs. Dès qu'un nœud prouve qu'il ne sera jamais choisi (sa valeur sort de la fenêtre [α, β]), on arrête d'examiner ses autres enfants : c'est une coupure." },
+        { "anim": "alphabeta", "height": 400, "caption": "Le même arbre, parcouru en profondeur d'abord. La fenêtre [α, β] du nœud courant est affichée à côté de lui. Les branches barrées ne sont jamais examinées. Le résultat est exactement celui du minimax, avec moins de feuilles évaluées." },
+        { "code": [
+          "fonction alphabêta(position, profondeur, α, β)      // négamax",
+          "    si la partie est finie ou profondeur = 0 alors",
+          "        retourner évaluation(position)",
+          "    pour chaque coup dans coups_triés(position) faire",
+          "        v ← −alphabêta(jouer(position, coup), profondeur − 1, −β, −α)",
+          "        si v ≥ β alors retourner v       // coupure : l'adversaire évitera ce nœud",
+          "        α ← max(α, v)",
+          "    retourner α"
+        ] },
+        { "h": "L'ordre des coups est essentiel" },
+        { "p": "Si le meilleur coup est examiné en premier, les coupures arrivent tout de suite. Dans le meilleur cas, alpha-bêta n'examine qu'environ b^(d/2) feuilles au lieu de b^d (b coups par position, profondeur d) : à temps égal, on va presque deux fois plus profond. Dans le pire cas (coups examinés du pire au meilleur), on ne gagne rien." },
+        { "tip": "C'est pour cela que le minimax basique trie les coups avant de les essayer : il joue chaque coup, évalue la position obtenue avec l'heuristique, et commence par les mieux notés." }
+      ]
+    },
+    {
+      "id": "heuristic",
+      "title": "L'heuristique : juger une position sans aller au bout",
+      "blocks": [
+        { "p": "À la profondeur maximale, la partie n'est pas finie : il faut une fonction d'évaluation qui estime qui est en avance. Celle du minimax basique est écrite à la main : une somme pondérée de caractéristiques de la position, calculées pour chaque camp." },
+        { "anim": "heuristic", "height": 360, "caption": "Quatre des caractéristiques mesurées sur une vraie position : la mobilité, les cases atteintes en premier, les cases libres autour des pions, les pions bloqués. L'heuristique en compte d'autres (connexité, zones isolées) et donne à chacune un poids différent en ouverture, en milieu et en fin de partie." },
+        { "code": [
+          "fonction heuristique(position, moi)",
+          "    phase ← ouverture, milieu ou fin   // selon le nombre de cases libres",
+          "    h ← 0",
+          "    pour chaque caractéristique f faire",
+          "        h ← h + poids[f][phase] × (f(position, moi) − f(position, lui))",
+          "    retourner h"
+        ] },
+        { "h": "D'où viennent les poids ?" },
+        { "p": "Ils ne sont pas choisis à la main : ils ont été appris par la méthode d'entropie croisée (CEM). On tire au hasard des jeux de poids autour d'une moyenne, on les fait jouer les uns contre les autres, on garde les meilleurs, et on recentre la distribution sur eux. On recommence jusqu'à ce que la distribution se stabilise." },
+        { "tip": "L'heuristique est le cœur du problème : une recherche parfaite avec une mauvaise évaluation joue mal. Les IA suivantes remplacent cette formule écrite à la main par des réseaux de neurones appris." }
+      ]
+    },
+    {
+      "id": "depth",
+      "title": "Profondeur fixe et explosion combinatoire",
+      "blocks": [
+        { "p": "Le minimax basique cherche toujours à la même profondeur, réglable de 2 à 6 demi-coups (un demi-coup = le coup d'un seul joueur). Il ne tient pas compte du temps : à profondeur 6, il peut réfléchir longtemps en début de partie et très peu à la fin." },
+        { "p": "En début de partie, un camp a souvent 30 à 40 coups possibles. Le nombre de positions grandit comme b^d :" },
+        { "code": [
+          "profondeur 2 :            900 positions   (30²)",
+          "profondeur 4 :        810 000            (30⁴)",
+          "profondeur 6 :    729 000 000            (30⁶)   // sans alpha-bêta",
+          "",
+          "// avec alpha-bêta et un bon ordre : environ 30³ = 27 000 à profondeur 6"
+        ] },
+        { "tip": "À essayer : réglez la profondeur (bouton « Régler » dans le choix des joueurs) et comparez le temps de réflexion et la force. Chaque demi-coup de plus multiplie le temps, mais le jeu devient nettement meilleur." }
+      ]
+    },
+    {
+      "id": "modern_search",
+      "title": "Une recherche moderne",
+      "blocks": [
+        { "p": "Les minimax NNUE reprennent l'alpha-bêta en négamax, avec les techniques des programmes d'échecs actuels. Trois d'entre elles changent tout." },
+        { "h": "Approfondissement itératif" },
+        { "p": "On cherche à profondeur 1, puis 2, puis 3, etc., jusqu'à la fin du temps imparti. On joue le meilleur coup de la dernière profondeur terminée. Refaire les petites profondeurs ne coûte presque rien (la dernière itération domine le coût), et chaque itération fournit à la suivante son meilleur coup, qu'elle essaie en premier : l'ordre des coups s'améliore." },
+        { "anim": "iterdeep", "height": 330, "caption": "Le nombre de nœuds est multiplié à chaque profondeur (échelle logarithmique). Quand le temps est écoulé, l'itération en cours est abandonnée." },
+        { "h": "Table de transposition" },
+        { "p": "Une même position peut être atteinte par des ordres de coups différents. Une table de hachage (clé de Zobrist : un XOR de nombres aléatoires, un par pion et par case, mis à jour à chaque coup) mémorise pour chaque position déjà cherchée sa valeur, la profondeur de la recherche, le type de borne (exacte, au moins, au plus) et le meilleur coup. Si la position revient, on réutilise le résultat, ou au moins le coup, pour l'essayer en premier." },
+        { "code": [
+          "fonction alphabêta(p, profondeur, α, β)",
+          "    e ← table[clé(p)]",
+          "    si e existe et e.profondeur ≥ profondeur alors",
+          "        si e.borne permet de conclure alors retourner e.valeur",
+          "    ... chercher, en essayant e.coup en premier ...",
+          "    table[clé(p)] ← (valeur, profondeur, borne, meilleur coup)"
+        ] },
+        { "h": "Ordre des coups appris pendant la recherche" },
+        { "list": [
+          "Le coup de la table de transposition d'abord.",
+          "Les « coups tueurs » : ceux qui ont provoqué une coupure dans une position voisine, à la même profondeur.",
+          "L'historique : un score par coup (case de départ, case d'arrivée), augmenté à chaque coupure. Les coups qui coupent souvent passent devant."
+        ] },
+        { "tip": "La taille de la table se règle (bouton « Régler ») : plus de mémoire, moins de positions oubliées, surtout aux longues réflexions." }
+      ]
+    },
+    {
+      "id": "nnue193",
+      "title": "Le réseau NNUE",
+      "blocks": [
+        { "p": "NNUE (Efficiently Updatable Neural Network, inventé pour le shogi par Yu Nasu en 2018, puis adopté par Stockfish) est un réseau de neurones conçu pour être évalué des millions de fois par seconde dans une recherche alpha-bêta, sur un simple processeur." },
+        { "h": "Les entrées" },
+        { "p": "La position est donnée par 193 entrées valant 0 ou 1 : 64 pour les cases des pions noirs, 64 pour les pions blancs, 64 pour les trous, et 1 pour le camp au trait. Sur 193, une vingtaine seulement valent 1." },
+        { "h": "L'astuce : la première couche est mise à jour, pas recalculée" },
+        { "p": "La première couche (193 entrées vers 1024 neurones) est de loin la plus grosse. Son résultat, avant activation, est la somme des colonnes de poids des entrées allumées : on l'appelle l'accumulateur. Un coup n'allume ou n'éteint que trois entrées (le pion part, le pion arrive, un trou apparaît) : on met à jour l'accumulateur avec trois colonnes au lieu de tout recalculer. Les couches suivantes sont minuscules (1024 → 64 → 32 → 1)." },
+        { "anim": "nnue193", "height": 380, "caption": "Les trois grilles sont les entrées. Quand un coup est joué, seules les cases qui changent (en vert et en rouge) modifient l'accumulateur. Ensuite, quelques petites couches donnent la valeur." },
+        { "code": [
+          "// au début de la recherche, une seule fois",
+          "acc ← b₁ + Σ W₁[i] pour chaque entrée i allumée",
+          "",
+          "// à chaque coup joué dans l'arbre (et l'inverse au retour)",
+          "acc ← acc − W₁[pion, départ] + W₁[pion, arrivée] + W₁[trou, départ]",
+          "",
+          "// l'évaluation",
+          "h₁ ← clamp(acc, 0, 1)",
+          "h₂ ← clamp(W₂ · h₁ + b₂, 0, 1)",
+          "h₃ ← clamp(W₃ · h₂ + b₃, 0, 1)",
+          "v  ← W₄ · h₃ + b₄"
+        ] },
+        { "tip": "Dans la recherche, chaque nœud fait une mise à jour en descendant et l'annule en remontant : l'accumulateur suit la position comme une pile, en quelques dizaines de nanosecondes par coup avec les instructions vectorielles (AVX2)." }
+      ]
+    },
+    {
+      "id": "quantization",
+      "title": "Calculer en entiers",
+      "blocks": [
+        { "p": "Le réseau est entraîné en nombres flottants, puis quantifié : ses poids sont arrondis sur une grille et stockés en entiers 8 bits (et 16 bits pour l'accumulateur et les biais). Les calculs se font alors en entiers, avec des instructions vectorielles qui traitent 32 octets d'un coup." },
+        { "code": [
+          "w_entier ← arrondi(w_flottant × échelle)        // −128 … 127",
+          "acc (int16) ← Σ w_entier                         // l'accumulateur",
+          "sortie ← (Σ w_entier × x_entier) >> décalage     // retour à l'échelle"
+        ] },
+        { "list": [
+          "Quatre fois moins de mémoire qu'en flottants 32 bits : les poids tiennent mieux dans les caches du processeur.",
+          "Deux à quatre fois plus de valeurs traitées par instruction.",
+          "Le prix : une petite erreur d'arrondi. Pour la réduire, le dernier réseau est entraîné en simulant l'arrondi pendant l'apprentissage (Quantization-Aware Training) : il apprend à être juste malgré lui."
+        ] }
+      ]
+    },
+    {
+      "id": "distill",
+      "title": "D'où vient le réseau : la distillation",
+      "blocks": [
+        { "p": "Le réseau d'évaluation ne vient pas de règles écrites à la main : il a appris en imitant un réseau beaucoup plus gros et plus lent, un réseau convolutif résiduel (le « maître », celui des IA MCTS ResNet et AlphaZero). C'est la distillation : le petit réseau rapide (l'« élève ») apprend à reproduire les valeurs du gros." },
+        { "anim": "distill", "height": 320, "caption": "Le maître étiquette des centaines de millions de positions issues de parties. L'élève apprend par descente de gradient à prédire ces étiquettes." },
+        { "p": "La fonction de perte mélange deux cibles : la valeur du maître (80 %) et le résultat réel de la partie d'où vient la position (20 %). Le résultat réel est exact mais bruité (une seule partie), la valeur du maître est lisse mais peut se tromper : le mélange garde le meilleur des deux." },
+        { "code": [
+          "pour chaque époque faire",
+          "    pour chaque lot de positions p (avec v_maître et résultat z) faire",
+          "        v ← élève(p)",
+          "        perte ← 0,8 · (v − v_maître)² + 0,2 · (v − z)²",
+          "        poids ← poids − η · ∇perte          // descente de gradient (Adam)"
+        ] },
+        { "tip": "Pourquoi ne pas utiliser directement le gros réseau dans l'alpha-bêta ? Il faut des dizaines de milliers de fois plus de calcul par position : la recherche verrait bien moins loin. Le compromis gagnant pour un minimax : une évaluation un peu moins fine, mais des millions de positions par seconde." }
+      ]
+    },
+    {
+      "id": "features",
+      "title": "Un réseau qui lit des caractéristiques",
+      "blocks": [
+        { "p": "Au lieu des cases brutes, ce réseau reçoit 119 nombres calculés sur la position, comme l'heuristique du minimax basique, mais en bien plus grand nombre : territoire de chaque camp, mobilité, cases atteintes en premier, zones isolées, pions enfermés, etc. Le réseau (119 → 256 → 64 → 1, en entiers 16 bits) apprend lui-même comment les combiner, par distillation." },
+        { "anim": "features", "height": 340, "caption": "Exemple de caractéristique : les deux camps s'étendent en même temps, pas à pas, sur les cases libres. Une case revient à celui qui l'atteint le premier. Le nombre de cases de chaque camp entre dans le vecteur de caractéristiques." },
+        { "code": [
+          "fonction évaluation(position)",
+          "    f ← calculer_caractéristiques(position)   // 119 nombres",
+          "    retourner réseau(f)"
+        ] },
+        { "h": "Le compromis" },
+        { "list": [
+          "Avantage : chaque nombre résume une idée stratégique ; un petit réseau suffit.",
+          "Inconvénient : les caractéristiques se recalculent entièrement à chaque position (pas de mise à jour incrémentale comme le NNUE) : l'évaluation est plus lente, la recherche voit moins loin.",
+          "Résultat : à peu près la même force que le NNUE ancien. Le minimax NNUE dev combine les deux idées : les cases brutes, plus quelques caractéristiques d'espace."
+        ] }
+      ]
+    },
+    {
+      "id": "dev_search",
+      "title": "Les raffinements du minimax dev",
+      "blocks": [
+        { "p": "Le minimax dev est le plus travaillé du projet : chaque technique ci-dessous a été mesurée en matchs de milliers de parties, et gardée seulement si elle faisait gagner des points Elo." },
+        { "h": "PVS : chercher d'abord avec une fenêtre nulle" },
+        { "p": "Après le premier coup (supposé le meilleur grâce au bon ordre), les autres sont cherchés avec une fenêtre nulle [α, α + 1] : on demande seulement « ce coup est-il meilleur que α ? ». La réponse est beaucoup moins chère qu'une valeur exacte. Si c'est oui (rare), on recherche le coup avec la fenêtre complète." },
+        { "code": [
+          "v ← −pvs(premier coup, profondeur − 1, −β, −α)",
+          "pour chaque coup suivant faire",
+          "    v ← −pvs(coup, profondeur − 1, −α − 1, −α)     // fenêtre nulle",
+          "    si α < v < β alors",
+          "        v ← −pvs(coup, profondeur − 1, −β, −α)     // il est meilleur : on le cherche vraiment"
+        ] },
+        { "h": "Fenêtres d'aspiration" },
+        { "p": "À la racine, chaque itération commence avec une fenêtre étroite autour de la valeur de l'itération précédente : plus de coupures. Si la valeur sort de la fenêtre, on l'élargit et on recommence. Dans le dev, la largeur s'adapte à la variation constatée d'une profondeur à l'autre et grandit de 25 % à chaque échec." },
+        { "anim": "aspiration", "height": 260, "caption": "La valeur précédente était 10. La fenêtre [−2, 22] échoue par le haut, la fenêtre élargie trouve la valeur exacte, 38." },
+        { "h": "Réductions des coups tardifs (LMR)" },
+        { "p": "Avec un bon ordre, le meilleur coup est presque toujours parmi les premiers. Les coups suivants sont d'abord cherchés à profondeur réduite. Si cette recherche réduite dit qu'ils pourraient battre α, ils sont recherchés à pleine profondeur. La réduction grandit avec la profondeur et le rang du coup, et diminue pour les coups que l'historique juge bons." },
+        { "anim": "lmr", "height": 340, "caption": "Les barres sont la profondeur à laquelle chaque coup est cherché. Le coup 7 se révèle meilleur que prévu : il est recherché à pleine profondeur." },
+        { "h": "ProbCut : couper sur une recherche peu profonde" },
+        { "p": "Si une recherche peu profonde donne une valeur très au-dessus de β (avec une marge qui grandit avec la profondeur), la recherche complète a toutes les chances de couper elle aussi : on coupe sans la faire. C'est un pari statistique, calibré sur des milliers de positions." }
+      ]
+    },
+    {
+      "id": "dev_endgame",
+      "title": "Fin de partie et plusieurs cœurs",
+      "blocks": [
+        { "h": "Prouver le résultat" },
+        { "p": "Chaque coup transforme une case libre en case occupée et une case occupée en trou : avec k cases libres, la partie finit en au plus k coups. Quand k est assez petit, on peut chercher jusqu'à la toute fin. Les valeurs sont alors des scores finaux exacts : plus besoin de réseau ni de réductions, et le résultat est une preuve. Le dev essaie donc d'abord de prouver le résultat (victoire, nul ou défaite), sur une partie du temps de réflexion." },
+        { "code": [
+          "reste(position) = max sur les coups m de  1 − reste(enfant)   // un coup : +1 point",
+          "                                       ou   − reste(enfant)   // un passe",
+          "reste(partie finie) = 0",
+          "",
+          "// ordre des coups : celui de la table, puis « le plus rapide d'abord » :",
+          "// les coups qui laissent le moins de réponses à l'adversaire (comme à Othello)"
+        ] },
+        { "list": [
+          "Victoire ou nul prouvé : le coup de la preuve est joué, sans autre recherche.",
+          "Défaite prouvée, ou pas de preuve à temps : la recherche normale continue avec le temps restant. Contre un adversaire faillible, le coup qui « semble » le meilleur garde plus de chances qu'un coup quelconque de la preuve."
+        ] },
+        { "h": "Lazy SMP : plusieurs cœurs sans se coordonner" },
+        { "p": "Avec plusieurs threads, chacun lance le même approfondissement itératif sur la même racine. Ils ne partagent que la table de transposition : ce qu'un thread prouve, les autres le retrouvent dans la table. Comme leurs ordres de coups diffèrent un peu (et que certains sautent des profondeurs), ils explorent des parties différentes de l'arbre. Simple, sans verrou, et efficace." },
+        { "tip": "Les écritures concurrentes dans la table peuvent laisser une entrée à moitié écrite. C'est rare et sans danger : la clé vérifiée rejette presque toutes ces entrées, et un coup lu dans la table est vérifié avant d'être joué." }
+      ]
+    },
+    {
+      "id": "nnue_persp",
+      "title": "Le NNUE du dev : vu du camp au trait",
+      "blocks": [
+        { "p": "Le réseau du dev améliore le NNUE de trois façons." },
+        { "list": [
+          "Perspective : les entrées ne sont plus « Noirs / Blancs » mais « mes pions / ses pions / trous », vues par le camp au trait (le plateau est retourné pour les Blancs). Un même motif est ainsi appris une seule fois pour les deux camps. Deux accumulateurs (ma vue, sa vue) sont tenus à jour en parallèle.",
+          "Huit têtes de phase : après la première couche, il y a huit petits réseaux, un par phase de jeu (selon le nombre de cases libres). Le début et la fin de partie n'obéissent pas aux mêmes idées : chaque tête se spécialise.",
+          "Caractéristiques d'espace : quelques nombres calculés sur la position (cases atteintes en un, deux ou trois coups de dame ; cases atteintes avant l'adversaire ; influence) entrent directement dans la deuxième couche."
+        ] },
+        { "anim": "nnue_persp", "height": 400, "caption": "Les entrées vues du camp au trait, l'accumulateur mis à jour par le coup, puis la tête de la phase actuelle, choisie par le nombre de cases libres." },
+        { "code": [
+          "fonction évaluation(position)",
+          "    a ← accumulateur[camp au trait],  b ← accumulateur[adversaire]",
+          "    k ← phase(nombre de cases libres)            // 0 … 7",
+          "    x ← [clamp(a), clamp(b), espace(position)]",
+          "    retourner tête[k](x)                          // 3 petites couches"
+        ] },
+        { "tip": "Ce réseau a été entraîné de zéro, par distillation, avec pour maître le réseau d'AlphaZero : l'élève a dépassé le réseau précédent d'environ 15 points Elo à temps égal." }
+      ]
+    },
+    {
+      "id": "resnet",
+      "title": "Le réseau convolutif résiduel",
+      "blocks": [
+        { "p": "Les IA MCTS ResNet et AlphaZero utilisent un tout autre réseau : un réseau convolutif profond, comme ceux qui reconnaissent les images. Le plateau est une image de 8 × 8 pixels à plusieurs canaux (mes pions, ses pions, trous...)." },
+        { "anim": "resnet", "height": 360, "caption": "Une convolution applique le même petit filtre 3 × 3 à chaque case : elle détecte un motif local, où qu'il soit. En empilant les couches, le réseau voit des motifs de plus en plus grands." },
+        { "h": "Les blocs résiduels" },
+        { "p": "Le réseau empile 30 blocs de 256 filtres. Chaque bloc calcule x + F(x) : son entrée plus une correction. Ce raccourci (He et al., 2015) laisse passer l'information et le gradient à travers les 60 couches de convolution, ce qui rend possible l'entraînement d'un réseau aussi profond." },
+        { "code": [
+          "fonction bloc(x)",
+          "    y ← relu(normalisation(conv3×3(x)))",
+          "    y ← normalisation(conv3×3(y))",
+          "    retourner relu(x + y)            // le raccourci"
+        ] },
+        { "h": "Deux têtes" },
+        { "list": [
+          "La politique : une probabilité pour chaque coup, « le coup qu'un bon joueur jouerait ici ».",
+          "La valeur : un nombre entre −1 et 1, « qui va gagner depuis cette position »."
+        ] },
+        { "tip": "Ce réseau fait plus de deux milliards de multiplications-additions par position (256 × 256 × 9 × 64 cases × 60 convolutions) : sur une carte graphique (GPU), il en évalue des dizaines de milliers par seconde ; sur le seul processeur, bien moins. Dans l'application, le MCTS utilise le GPU avec libtorch quand il est disponible." }
+      ]
+    },
+    {
+      "id": "puct",
+      "title": "MCTS guidé par un réseau : PUCT",
+      "blocks": [
+        { "p": "Le réseau transforme MCTS de deux façons, comme dans AlphaGo Zero et AlphaZero (Silver et al., 2017) :" },
+        { "list": [
+          "Plus de parties au hasard : quand on ajoute un nœud, on demande au réseau sa valeur. C'est elle que l'on remonte. Une estimation par un réseau entraîné vaut bien mieux qu'une partie au hasard.",
+          "La politique guide l'exploration : les coups jugés probables par le réseau sont explorés en priorité."
+        ] },
+        { "code": [
+          "PUCT(i) = Qᵢ  +  c · Pᵢ · √N / (1 + nᵢ)",
+          "",
+          "// Qᵢ : valeur moyenne des visites de l'enfant",
+          "// Pᵢ : probabilité du coup donnée par la tête politique",
+          "// N  : visites du parent,  nᵢ : visites de l'enfant"
+        ] },
+        { "h": "Évaluer par lots" },
+        { "p": "Un GPU est efficace quand il évalue beaucoup de positions à la fois. Plusieurs threads descendent donc dans l'arbre en même temps (la perte virtuelle les écarte les uns des autres) ; les positions à évaluer s'accumulent dans un lot, envoyé d'un bloc au réseau. Les résultats remontent ensuite chacun leur chemin." },
+        { "anim": "batch", "height": 340, "caption": "Quatre threads, quatre feuilles différentes grâce à la perte virtuelle (−1), un seul appel au réseau pour les quatre." },
+        { "tip": "Réglage à essayer : la taille des lots. Plus grands, ils occupent mieux le GPU ; trop grands, la perte virtuelle envoie les threads vers des coups moins bons, et la recherche perd en qualité." }
+      ]
+    },
+    {
+      "id": "supervised",
+      "title": "Comment le ResNet a appris",
+      "blocks": [
+        { "p": "Le réseau de MCTS ResNet a appris de manière supervisée, à partir de millions de parties jouées par les IA minimax du projet. Pour chaque position, il apprend deux choses : le coup qui a été joué (la tête politique, par entropie croisée) et le résultat final de la partie (la tête valeur, par erreur quadratique)." },
+        { "code": [
+          "perte ← (v − z)²  −  Σ π_joué · log p        // valeur + politique",
+          "",
+          "// z : résultat de la partie (−1, 0, +1),   π_joué : 1 pour le coup joué"
+        ] },
+        { "tip": "Ce réseau est ensuite le point de départ d'AlphaZero : apprendre d'abord par imitation, puis s'améliorer en jouant contre soi-même." }
+      ]
+    },
+    {
+      "id": "selfplay",
+      "title": "AlphaZero : apprendre en jouant contre soi-même",
+      "blocks": [
+        { "p": "AlphaZero n'a besoin d'aucune partie humaine ni d'aucun expert : il joue contre lui-même. Chaque coup de ces parties est choisi par une recherche MCTS avec le réseau actuel. La recherche est plus forte que le réseau seul : la distribution des visites de la racine est une meilleure politique que la sortie du réseau. On entraîne donc le réseau à prédire ces visites (politique) et le résultat de la partie (valeur). Le nouveau réseau rend la recherche plus forte, qui produit de meilleures parties, et ainsi de suite." },
+        { "anim": "selfplay", "height": 380, "caption": "La boucle d'AlphaZero : parties contre soi-même, données, entraînement, nouveau réseau. Chaque tour de boucle est une génération ; la force progresse de génération en génération." },
+        { "code": [
+          "réseau ← réseau supervisé                  // ici : celui de MCTS ResNet",
+          "répéter",
+          "    parties ← jouer contre soi-même avec mcts(réseau)",
+          "    pour chaque position : (position, visites de la racine, résultat)",
+          "    réseau ← entraîner(réseau, ces données)",
+          "jusqu'à ce que la force ne progresse plus"
+        ] },
+        { "list": [
+          "Pour varier les parties, les premiers coups sont tirés au sort selon les visites (avec une « température »), et un bruit de Dirichlet est ajouté à la politique de la racine.",
+          "Les dernières générations de données sont gardées dans une fenêtre glissante : le réseau n'oublie pas trop vite.",
+          "Ici, l'apprentissage a tourné des semaines sur les GPU d'un cluster de calcul."
+        ] },
+        { "tip": "Pour réfléchir : pourquoi entraîner la politique sur les visites du MCTS plutôt que sur le coup joué ? (Les visites contiennent plus d'information : elles disent aussi quels coups étaient presque aussi bons.)" }
+      ]
+    }
+  ],
+  "ais": {
+    "random": ["random"],
+    "beginner": ["beginner", "monte_carlo", "mc_limits"],
+    "monte_carlo": ["monte_carlo", "mc_limits"],
+    "mcts": ["mcts", "uct"],
+    "basic_minmax": ["minimax", "alphabeta", "heuristic", "depth"],
+    "nnue193": ["minimax", "alphabeta", "modern_search", "nnue193", "quantization", "distill"],
+    "features": ["minimax", "alphabeta", "modern_search", "features", "distill"],
+    "dev": ["minimax", "alphabeta", "modern_search", "dev_search", "dev_endgame", "nnue_persp", "quantization", "distill"],
+    "resnet": ["mcts", "uct", "resnet", "puct", "supervised"],
+    "alphazero": ["mcts", "uct", "resnet", "puct", "selfplay"]
+  }
+}
