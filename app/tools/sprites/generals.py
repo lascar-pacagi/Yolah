@@ -18,7 +18,8 @@ import torch
 from render import Scene, Mat, T, RX, RY, RZ, vec, srgb, sd_sphere, sd_ellipsoid, sd_box, sd_capsule, sd_cylinder, \
     sd_torus, sd_cone, sd_plane_cut, fbm, length
 from models import base, BASE_TOP, TAU, wave, glow, gold, eye_mat
-from legends import humanoid, base_pose, held, leather, cloth, iron, silver, wood, skin
+from legends import base_pose, held, leather, cloth, iron, silver, wood, skin
+from heroic import adult
 
 GOLD = gold
 
@@ -197,20 +198,20 @@ def coat_mats(coat, facing=None, trousers="#f0ece0", boots="#141414"):
 
 def epaulettes(sc, rig, fringe=True):
     for sgn in (-1, 1):
-        e = rig["torso"] * T(0.17 * sgn, 0.26, 0)
-        sc.add(sd_ellipsoid(0.07, 0.025, 0.06), gold(), e)
+        e = rig["torso"] * T(0.15 * rig["bulk"] * sgn, 0.3 * rig["H"] + 0.012, 0)
+        sc.add(sd_ellipsoid(0.055, 0.016, 0.045), gold(), e)
         if fringe:
             for k in range(5):
-                sc.add(sd_capsule((0, 0, 0), (0.01 * sgn, -0.04, 0), 0.008), gold(), e * T(0.06 * sgn, -0.01, -0.04 + 0.02 * k))
+                sc.add(sd_capsule((0, 0, 0), (0.006 * sgn, -0.03, 0), 0.005), gold(), e * T(0.048 * sgn, -0.006, -0.032 + 0.016 * k))
 
 
 def coat_tails(sc, rig, c, ln=0.18):
-    sc.add(sd_plane_cut(sd_cone(ln * 0.5, 0.15, 0.13, 0.01), (0, 0, 1), 0.04), cloth(c, 0.75), rig["torso"] * T(0, -0.03 - ln * 0.25, 0))
+    sc.add(sd_plane_cut(sd_cone(ln * 0.5, 0.125, 0.105, 0.01), (0, 0, 1), 0.03), cloth(c, 0.75), rig["torso"] * T(0, 0.04 - ln * 0.5, 0))
 
 
 def buttons(sc, rig, n=5, c=None):
     for k in range(n):
-        sc.add(sd_sphere(0.009), c or gold(), rig["chest"] * T(0, 0.08 - 0.035 * k, 0.012))
+        sc.add(sd_sphere(0.007), c or gold(), rig["chest"] * T(0, 0.07 - 0.03 * k, 0.004))
 
 
 def stars(sc, n):
@@ -228,9 +229,9 @@ def general(anim, t, side, g):
     p = base_pose(anim, t)
     if "pose" in g:
         g["pose"](p, anim, t)
-    rig = humanoid(sc, p, g["mats"], w=g.get("w", 1.0), h=g.get("h", 1.0), head_r=0.17)
-    r = 0.17
-    x = rig["head"] * RX(-0.12)
+    rig = adult(sc, p, g["mats"], H=g.get("h", 1.0) * 1.04, bulk=g.get("w", 1.0) * 1.05, head=1.02)
+    r = rig["hr"]
+    x = rig["head"]
     face(sc, x, r, g.get("skin", "#e8b49a"), anim, t, g.get("hair", "#3a2a20"), g.get("nose", 1.0), eye_patch=g.get("patch", False),
          iris=g.get("iris", "#5a6a7a"), cheeks=g.get("cheeks", 1.0))
     if "head" in g:
@@ -249,15 +250,15 @@ def pose_hand_in_waistcoat(p, anim, t):
 
 def napoleon_body(sc, rig, anim, t):
     # the grey redingote over the green coat, white waistcoat, a medal; the eagle standard at the back
-    sc.add(sd_box(0.07, 0.11, 0.02, 0.02), cloth("#f2f0ea", 0.7), rig["chest"] * T(0, 0.01, 0.005))
+    sc.add(sd_box(0.05, 0.1, 0.012, 0.012), cloth("#f2f0ea", 0.7), rig["chest"] * T(0, -0.01, -0.004))
     buttons(sc, rig, 4)
-    sc.add(sd_sphere(0.016), glow("#c8242a", 0.6), rig["chest"] * T(-0.07, 0.06, 0.02))
+    sc.add(sd_sphere(0.011), glow("#c8242a", 0.6), rig["chest"] * T(-0.06, 0.05, 0.0))
     coat_tails(sc, rig, "#6a6c70", 0.24)
     for sgn in (-1, 1):
-        sc.add(sd_box(0.03, 0.15, 0.015, 0.012), cloth("#6a6c70", 0.75), rig["chest"] * T(0.085 * sgn, -0.01, 0.0) * RZ(0.1 * sgn))
+        sc.add(sd_box(0.025, 0.13, 0.012, 0.01), cloth("#6a6c70", 0.75), rig["chest"] * T(0.07 * sgn, -0.02, -0.006) * RZ(0.1 * sgn))
     pole = rig["back"] * T(0.08, 0.0, -0.04)
-    sc.add(sd_capsule((0, -0.35, 0), (0, 0.32, 0), 0.008), wood("#3a2a1a"), pole)
-    eagle = pole * T(0, 0.36, 0)
+    sc.add(sd_capsule((0, -0.4, 0), (0, 0.16, 0), 0.007), wood("#3a2a1a"), pole)
+    eagle = pole * T(0, 0.19, 0)
     sc.add(sd_ellipsoid(0.03, 0.04, 0.025), gold(), eagle)
     for sgn in (-1, 1):
         sc.add(sd_ellipsoid(0.05, 0.03, 0.01), gold(), eagle * T(0.04 * sgn, 0.02, 0) * RZ(-0.5 * sgn))
@@ -267,21 +268,22 @@ def napoleon_body(sc, rig, anim, t):
 
 def caesar_body(sc, rig, anim, t):
     cuirass = Mat("#e0d8c0", metal=0.8, rough=0.3)
-    sc.add(sd_ellipsoid(0.155, 0.135, 0.12), cuirass, rig["torso"] * T(0, 0.17, 0.003))
-    sc.add(sd_box(0.15, 0.2, 0.02, 0.015), cloth("#a8242a", 0.8), rig["back"] * T(0, -0.1, -0.02) * RX(0.12))
-    for k in range(7):
-        a = -1.2 + 0.4 * k
-        sc.add(sd_box(0.022, 0.05, 0.008, 0.005), leather("#5a3a1a"), rig["torso"] * T(0.13 * math.sin(a), -0.04, 0.11 * math.cos(a)) * RY(a))
+    sc.add(sd_ellipsoid(0.142, 0.12, 0.092), cuirass, rig["torso"] * T(0, 0.21, 0.005))
+    sc.add(sd_ellipsoid(0.11, 0.08, 0.085), cuirass, rig["torso"] * T(0, 0.1, 0.003), blend=0.03)
+    sc.add(sd_box(0.13, 0.24, 0.012, 0.012), cloth("#a8242a", 0.8), rig["back"] * T(0, -0.2, -0.02) * RX(0.1))
+    for k in range(9):
+        a = -1.6 + 0.4 * k
+        sc.add(sd_box(0.018, 0.05, 0.006, 0.004), leather("#5a3a1a"), rig["torso"] * T(0.11 * math.sin(a), -0.015, 0.085 * math.cos(a)) * RY(a))
     sw = held(rig["r"], -math.pi if anim == "win" else -1.3)
     sc.add(sd_box(0.016, 0.13, 0.004, 0.003), silver(0.15), sw * T(0, 0.17, 0))
     sc.add(sd_box(0.035, 0.008, 0.012, 0.004), gold(), sw * T(0, 0.04, 0))
 
 
 def wellington_body(sc, rig, anim, t):
-    sc.add(sd_ellipsoid(0.045, 0.035, 0.03), cloth("#f2f0ea", 0.7), rig["torso"] * T(0, 0.29, 0.08))          # the cravat
+    sc.add(sd_ellipsoid(0.035, 0.03, 0.025), cloth("#f2f0ea", 0.7), rig["torso"] * T(0, 0.31, 0.07))          # the cravat
     buttons(sc, rig, 5)
     coat_tails(sc, rig, "#1c2236", 0.22)
-    sc.add(sd_box(0.15, 0.2, 0.015, 0.012), cloth("#1c2236", 0.8), rig["back"] * T(0, -0.1, -0.02) * RX(0.1))   # a short cloak
+    sc.add(sd_box(0.13, 0.16, 0.012, 0.012), cloth("#1c2236", 0.8), rig["back"] * T(0, -0.12, -0.02) * RX(0.1))   # a short cloak
     sg = held(rig["r"], -math.pi if anim == "win" else -1.6)
     sc.add(sd_capsule((0, -0.02, 0), (0, 0.14, 0), 0.014, 0.018), Mat("#c8a050", metal=1.0, rough=0.3), sg)       # a telescope
 
@@ -289,10 +291,10 @@ def wellington_body(sc, rig, anim, t):
 def shingen_body(sc, rig, anim, t):
     red = Mat("#a8242a", metal=0.2, rough=0.3, clearcoat=1.0,
               pattern=lambda pl, pw, n: {"albedo": srgb("#a8242a") * (0.75 + 0.3 * (torch.frac(pl[:, 1] * 45) > 0.15).float())[:, None]})
-    sc.add(sd_ellipsoid(0.17, 0.14, 0.13), red, rig["torso"] * T(0, 0.17, 0))
-    sc.add(sd_cone(0.08, 0.18, 0.14, 0.02), red, rig["torso"] * T(0, -0.04, 0))
+    sc.add(sd_ellipsoid(0.15, 0.13, 0.1), red, rig["torso"] * T(0, 0.2, 0))
+    sc.add(sd_cone(0.07, 0.15, 0.12, 0.02), red, rig["torso"] * T(0, -0.02, 0))
     for sgn in (-1, 1):
-        sc.add(sd_box(0.08, 0.06, 0.07, 0.02), red, rig["torso"] * T(0.2 * sgn, 0.25, 0) * RZ(-0.45 * sgn))
+        sc.add(sd_box(0.065, 0.05, 0.06, 0.015), red, rig["torso"] * T(0.19 * sgn, 0.29, 0) * RZ(-0.45 * sgn))
     fan = held(rig["r"], -math.pi if anim == "win" else -1.4)
     sc.add(sd_capsule((0, -0.02, 0), (0, 0.08, 0), 0.01), wood("#2a1a10"), fan)
     sc.add(sd_cylinder(0.006, 0.075, 0.003), Mat("#1a1a1a", rough=0.4, metal=0.6), fan * T(0, 0.15, 0) * RX(math.pi / 2))
@@ -301,9 +303,9 @@ def shingen_body(sc, rig, anim, t):
 
 def khalid_body(sc, rig, anim, t):
     robe = cloth("#2a5a3a", 0.85)
-    sc.add(sd_cone(0.15, 0.17, 0.12, 0.02), robe, rig["torso"] * T(0, -0.04, 0))
-    sc.add(sd_box(0.16, 0.2, 0.015, 0.012), cloth("#f0ece0", 0.85), rig["back"] * T(0, -0.1, -0.02) * RX(0.12))
-    sc.add(sd_torus(0.13, 0.02), cloth("#c8a050", 0.6), rig["torso"] * T(0, 0.07, 0))
+    sc.add(sd_cone(0.17, 0.15, 0.11, 0.02), robe, rig["torso"] * T(0, -0.1, 0))
+    sc.add(sd_box(0.13, 0.26, 0.012, 0.012), cloth("#f0ece0", 0.85), rig["back"] * T(0, -0.22, -0.02) * RX(0.1))
+    sc.add(sd_torus(0.105, 0.016), cloth("#c8a050", 0.6), rig["torso"] * T(0, 0.1, 0))
     sw = held(rig["r"], -math.pi if anim == "win" else -1.3)
     for k in range(5):          # a curved sabre
         a0, a1 = k * 0.12, (k + 1) * 0.12
@@ -314,9 +316,9 @@ def khalid_body(sc, rig, anim, t):
 
 def hannibal_body(sc, rig, anim, t):
     bronze = Mat("#b07a3a", metal=1.0, rough=0.3)
-    sc.add(sd_ellipsoid(0.155, 0.135, 0.12), bronze, rig["torso"] * T(0, 0.17, 0.003))
-    sc.add(sd_box(0.16, 0.2, 0.015, 0.012), cloth("#5a2a6a", 0.8), rig["back"] * T(0, -0.1, -0.02) * RX(0.12))
-    sc.add(sd_cone(0.08, 0.17, 0.14, 0.02), cloth("#f0ece0", 0.8), rig["torso"] * T(0, -0.04, 0))
+    sc.add(sd_ellipsoid(0.142, 0.12, 0.092), bronze, rig["torso"] * T(0, 0.21, 0.005))
+    sc.add(sd_box(0.13, 0.24, 0.012, 0.012), cloth("#5a2a6a", 0.8), rig["back"] * T(0, -0.2, -0.02) * RX(0.1))
+    sc.add(sd_cone(0.06, 0.13, 0.11, 0.02), cloth("#f0ece0", 0.8), rig["torso"] * T(0, -0.02, 0))
     sh = rig["l"] * RX(-1.5) * T(0, 0, 0.06)
     sc.add(sd_cylinder(0.02, 0.14, 0.01), bronze, sh * RX(math.pi / 2))
     sc.add(sd_sphere(0.04), bronze, sh * T(0, 0, 0.02))
@@ -329,23 +331,23 @@ def grant_body(sc, rig, anim, t):
     buttons(sc, rig, 6)
     coat_tails(sc, rig, "#1c2440", 0.26)
     for sgn in (-1, 1):
-        sc.add(sd_box(0.045, 0.012, 0.03, 0.006), Mat("#c8a050", metal=0.8, rough=0.3), rig["torso"] * T(0.16 * sgn, 0.27, 0))
+        sc.add(sd_box(0.04, 0.008, 0.025, 0.004), Mat("#c8a050", metal=0.8, rough=0.3), rig["torso"] * T(0.15 * sgn, 0.315, 0))
     # the cigar, a wisp of smoke
-    x = rig["head"] * RX(-0.12)
-    sc.add(sd_capsule((0, 0, 0), (0.06, -0.01, 0.03), 0.011), Mat("#5a3a1a", rough=0.7), x * T(0.06, -0.09, 0.15))
-    sc.add(sd_sphere(0.01), glow("#ff6a2a", 4.0), x * T(0.12, -0.1, 0.18))
+    x, r = rig["head"], rig["hr"]
+    sc.add(sd_capsule((0, 0, 0), (r * 0.5, -r * 0.08, r * 0.25), r * 0.08), Mat("#5a3a1a", rough=0.7), x * T(r * 0.2, -r * 0.5, r * 0.88))
+    sc.add(sd_sphere(r * 0.07), glow("#ff6a2a", 4.0), x * T(r * 0.72, -r * 0.6, r * 1.12))
     for k in range(3):
         ph = (t + k / 3) % 1
-        sc.add(sd_sphere(0.012 + 0.02 * ph), Mat("#c8c8c8", rough=0.9), x * T(0.13 + 0.03 * ph, -0.06 + 0.2 * ph, 0.18))
+        sc.add(sd_sphere(r * (0.08 + 0.15 * ph)), Mat("#c8c8c8", rough=0.9), x * T(r * (0.75 + 0.2 * ph), r * (-0.4 + 1.4 * ph), r * 1.12))
 
 
 def frederick_body(sc, rig, anim, t):
-    sc.add(sd_box(0.05, 0.11, 0.02, 0.02), cloth("#e8d070", 0.7), rig["chest"] * T(0, 0.0, 0.004))       # the yellow waistcoat
+    sc.add(sd_box(0.045, 0.1, 0.012, 0.012), cloth("#e8d070", 0.7), rig["chest"] * T(0, -0.01, -0.004))       # the yellow waistcoat
     buttons(sc, rig, 4)
     coat_tails(sc, rig, "#1c2a5a", 0.24)
     for sgn in (-1, 1):
-        sc.add(sd_box(0.03, 0.13, 0.015, 0.012), cloth("#a8242a", 0.75), rig["chest"] * T(0.08 * sgn, -0.01, 0.0) * RZ(0.1 * sgn))
-    sc.add(sd_sphere(0.022), glow("#ffa040", 0.6), rig["chest"] * T(-0.07, 0.05, 0.02))           # the Black Eagle's star, gilded
+        sc.add(sd_box(0.025, 0.12, 0.012, 0.01), cloth("#a8242a", 0.75), rig["chest"] * T(0.068 * sgn, -0.02, -0.006) * RZ(0.1 * sgn))
+    sc.add(sd_sphere(0.014), glow("#ffa040", 0.6), rig["chest"] * T(-0.06, 0.04, 0.0))           # the Black Eagle's star, gilded
     cn = held(rig["r"], -math.pi if anim == "win" else -2.6)
     sc.add(sd_capsule((0, -0.02, 0), (0, 0.3, 0), 0.009), wood("#3a2a1a"), cn)
     sc.add(sd_sphere(0.018), gold(), cn * T(0, -0.02, 0))
@@ -353,23 +355,24 @@ def frederick_body(sc, rig, anim, t):
 
 def zhukov_body(sc, rig, anim, t):
     for sgn in (-1, 1):
-        sc.add(sd_box(0.06, 0.012, 0.035, 0.008), gold(), rig["torso"] * T(0.16 * sgn, 0.27, 0))     # shoulder boards
+        sc.add(sd_box(0.05, 0.008, 0.028, 0.005), gold(), rig["torso"] * T(0.15 * sgn, 0.315, 0))     # shoulder boards
     for row in range(4):     # rows of medals and ribbons
         for k in range(4):
             col = ["#c8242a", "#e8c040", "#2a6ac8", "#2a8a4a"][(row + k) % 4]
-            sc.add(sd_box(0.012, 0.008, 0.004, 0.002), flat(col), rig["chest"] * T(-0.09 + 0.022 * k, 0.07 - 0.02 * row, 0.01))
+            sc.add(sd_box(0.009, 0.006, 0.003, 0.0015), flat(col), rig["chest"] * T(-0.075 + 0.018 * k, 0.06 - 0.016 * row, 0.0))
     for k in range(3):
-        sc.add(sd_cone(0.008, 0.016, 0.003, 0.002), gold(), rig["chest"] * T(0.04 + 0.03 * k, 0.07, 0.012) * RX(-1.4))
+        sc.add(sd_cone(0.006, 0.012, 0.003, 0.002), gold(), rig["chest"] * T(0.03 + 0.024 * k, 0.06, 0.004) * RX(-1.4))
     buttons(sc, rig, 4)
 
 
 def alexander_body(sc, rig, anim, t):
     bronze = Mat("#c8903a", metal=1.0, rough=0.25)
-    sc.add(sd_ellipsoid(0.155, 0.135, 0.12), bronze, rig["torso"] * T(0, 0.17, 0.003))
-    sc.add(sd_box(0.15, 0.2, 0.015, 0.012), cloth("#a8242a", 0.8), rig["back"] * T(0, -0.1, -0.02) * RX(0.12))
-    for k in range(7):
-        a = -1.2 + 0.4 * k
-        sc.add(sd_box(0.022, 0.05, 0.008, 0.005), cloth("#f0ece0", 0.8), rig["torso"] * T(0.13 * math.sin(a), -0.04, 0.11 * math.cos(a)) * RY(a))
+    sc.add(sd_ellipsoid(0.142, 0.12, 0.092), bronze, rig["torso"] * T(0, 0.21, 0.005))
+    sc.add(sd_ellipsoid(0.11, 0.08, 0.085), bronze, rig["torso"] * T(0, 0.1, 0.003), blend=0.03)
+    sc.add(sd_box(0.13, 0.24, 0.012, 0.012), cloth("#a8242a", 0.8), rig["back"] * T(0, -0.2, -0.02) * RX(0.1))
+    for k in range(9):
+        a = -1.6 + 0.4 * k
+        sc.add(sd_box(0.018, 0.05, 0.006, 0.004), cloth("#f0ece0", 0.8), rig["torso"] * T(0.11 * math.sin(a), -0.015, 0.085 * math.cos(a)) * RY(a))
     sw = held(rig["r"], -math.pi if anim == "win" else -1.3)
     sc.add(sd_box(0.018, 0.14, 0.004, 0.003), silver(0.15), sw * T(0, 0.18, 0))
     sc.add(sd_box(0.035, 0.008, 0.012, 0.004), gold(), sw * T(0, 0.04, 0))
@@ -404,7 +407,7 @@ G = {
                  body=grant_body),
     "monte_carlo": dict(name="Frédéric le Grand", stars=3, mats=coat_mats("#1c2a5a", trousers="#e8d070"), hair="#e8e4dc", nose=1.2, cheeks=0.8,
                         head=lambda sc, x, r, a, t: (hair_cap(sc, x, r, "#e8e4dc", front=0.25, back=-0.7, bulk=1.1),
-                                                     sc.add(sd_capsule((0, 0, 0), (0, -0.12, -0.04), 0.03, 0.015), flat("#1a1a1a"), x * T(0, -r * 0.1, -r * 1.05)),
+                                                     sc.add(sd_capsule((0, 0, 0), (0, -r * 0.7, -r * 0.25), r * 0.18, r * 0.09), flat("#1a1a1a"), x * T(0, -r * 0.1, -r * 1.05)),
                                                      tricorne(sc, x, r)),
                         body=frederick_body),
     "beginner": dict(name="Gueorgui Joukov", stars=2, mats=coat_mats("#5a5a46", trousers="#2a2a36"), w=1.12, hair="#6a5a4a", cheeks=1.15,
