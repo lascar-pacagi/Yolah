@@ -28,17 +28,17 @@ from render import X, F, DEV
 import random
 
 
-def joints(anim, t, lift=0.0, arms_up=False):
+def joints(anim, t, lift=0.0, arms_up=None, spread=0.32):
     """The joints in the body's frame (y up from the base's top), and the root transform."""
     breathe = 0.004 * math.sin(TAU * t)
     sway = 0.03 * math.sin(TAU * t) if anim == "idle" else 0.0
     hy = 0.48
     J = {"pelvis": (0, hy, 0), "chest": (0, hy + 0.22 + breathe, 0.01), "neck": (0, hy + 0.34, -0.005), "head": (0, hy + 0.43, 0.01)}
     J["spine"] = [(0, hy - 0.02 + k * 0.035, -0.03 + 0.012 * math.sin(k * 0.6)) for k in range(11)]
-    up = arms_up or anim == "win"
+    up = anim == "win" if arms_up is None else arms_up
     for sgn, side in ((-1, "l"), (1, "r")):
         sh = (0.15 * sgn, hy + 0.29, 0)
-        sp = 2.5 if up else 0.32 + (0.15 * math.sin(TAU * t * 2) if anim == "blocked" else 0.0)
+        sp = 2.5 if up else spread + (0.15 * math.sin(TAU * t * 2) if anim == "blocked" else 0.0)
         el = (sh[0] + sgn * 0.17 * math.sin(sp), sh[1] - 0.17 * math.cos(sp), 0.01)
         wr = (el[0] + sgn * 0.155 * math.sin(sp * 1.05), el[1] - 0.155 * math.cos(sp * 1.05), 0.03)
         step = 0.2 * math.sin(TAU * t * 2) * sgn if anim == "move" else 0.0
@@ -456,7 +456,7 @@ def stage(level):
         sc = Scene()
         base(sc, side)
         lift = {8: 0.0, 9: 0.08 + 0.02 * math.sin(TAU * t), 10: 0.14 + 0.03 * math.sin(TAU * t)}.get(level, 0.0)
-        J, root = joints(anim, t, lift, arms_up=level == 10)
+        J, root = joints(anim, t, lift, **({"arms_up": False, "spread": 0.55} if level == 10 else {}))
         if level <= 7:
             scanner(sc, t)
         if level <= 4:
