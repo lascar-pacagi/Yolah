@@ -276,8 +276,8 @@ def nuke(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.15, "beginner": 1.1, "monte_carlo": 1.15, "mcts": 1.15, "basic_minmax": 1.15, "nnue193": 1.15,
-         "features": 1.15, "resnet": 1.1, "dev": 1.1, "alphazero": 1.1}
+SCALE = {"random": 1.4, "beginner": 1.32, "monte_carlo": 1.32, "mcts": 1.28, "basic_minmax": 1.25, "nnue193": 1.22,
+         "features": 1.18, "resnet": 1.1, "dev": 1.1, "alphazero": 1.1}     # the weak ones a little bigger: they start small on the board
 CAST = {"random": ("Pétard", firecracker), "beginner": ("Fusée d'artifice", rocket), "monte_carlo": ("Bâton de dynamite", dynamite),
         "mcts": ("Paquet de dynamite", bundle), "basic_minmax": ("Grenade", grenade), "nnue193": ("Bombe à mèche", round_bomb),
         "features": ("Mine marine", sea_mine), "resnet": ("Bombe d'avion", aerial_bomb), "dev": ("Missile", missile),
