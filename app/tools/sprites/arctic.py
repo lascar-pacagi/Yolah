@@ -350,8 +350,8 @@ def mammoth(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.3, "beginner": 1.2, "monte_carlo": 1.3, "mcts": 1.2, "basic_minmax": 1.15, "nnue193": 1.15,
-         "features": 1.25, "resnet": 1.15, "dev": 1.05, "alphazero": 1.05}
+SCALE = {"random": 1.5, "beginner": 1.45, "monte_carlo": 1.55, "mcts": 1.5, "basic_minmax": 1.5, "nnue193": 1.6,
+         "features": 1.55, "resnet": 1.6, "dev": 1.6, "alphazero": 1.55}   # bigger on their base (the app also grows the strong ones)
 CAST = {"random": ("Phoque", seal), "beginner": ("Manchot empereur", penguin), "monte_carlo": ("Renard polaire", arctic_fox),
         "mcts": ("Harfang des neiges", snowy_owl), "basic_minmax": ("Morse", walrus), "nnue193": ("Loup arctique", arctic_wolf),
         "features": ("Exploratrice polaire", explorer), "resnet": ("Ours blanc", polar_bear), "dev": ("Orque", orca),
