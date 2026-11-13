@@ -35,5 +35,6 @@
       "frames": 16
     }
   ],
+  "plate": "Grant",
   "variant of": "fig_gen_mcts"
 }

@@ -1653,6 +1653,7 @@ struct PieceSet {
     std::vector<std::string> black, white;
     std::string human;       // the human player's pieces in this set (the user's figurine, dressed for it)
     std::map<std::string, std::string> cast;   // "cast": a figurine per player (AI id or "human"), whatever the side
+    float grow = 0;          // "grow": one size on the board for the whole cast (0: by the AI's strength, set_growth)
 };
 
 std::vector<PieceSet> load_piece_sets(const fs::path& file) {
@@ -1666,6 +1667,7 @@ std::vector<PieceSet> load_piece_sets(const fs::path& file) {
             ps.description = jstr(e, "description");
             ps.players = e.value("players", false);
             ps.human = jstr(e, "human");
+            ps.grow = e.value("grow", 0.0f);
             if (e.contains("cast") && e["cast"].is_object())
                 for (auto& [k, v] : e["cast"].items())
                     if (v.is_string()) ps.cast[k] = v.get<std::string>();
@@ -2093,6 +2095,7 @@ struct Art {
     bool smooth = false;           // rendered: linear filter, halved levels (see above)
     float box = 1.0f, ax = 0.5f, ay = 0.5f;   // a figurine: size in squares, anchor in the frame
     std::string white, variant_of; // the white side's drawing; the drawing this one is a variant of
+    std::string plate;             // a figurine: the name written on a plaque at the front of its base, on the board
     std::vector<ArtAnim> anims;
     SDL_Texture* tex = nullptr;    // the frames, rebuilt when `dirty`
     std::vector<SDL_Texture*> levels;   // smooth: the sheet halved 1, 2, ... times
@@ -2241,6 +2244,7 @@ bool load_art(const std::string& id, Art& out) {
     }
     out.white = jstr(j, "white");
     out.variant_of = jstr(j, "variant of");
+    out.plate = jstr(j, "plate");
     int w = 0, h = 0, n = 0;
     unsigned char* px = stbi_load((art_dir() / (id + ".png")).string().c_str(), &w, &h, &n, 4);
     if (j.contains("animations") && j["animations"].is_array()) {
@@ -3500,6 +3504,7 @@ public:
             if (dragging && s2 == drag_from) continue;
             const char* st = look.winner == side ? "win" : blocked(s2) ? "blocked" : "idle";
             draw_piece(piece_sprite(side, s2), side, center(s2), q * 0.4f, 0, now, 1, look.halo[side], st, now + s2 * 0.29, face_left[s2]);
+            name_plate(text, piece_sprite(side, s2), center(s2));
         }
         // Principal variation: numbered faint arrows.
         for (size_t i = 0; i < look.pv.size() && i < 6; i++) {
@@ -3540,6 +3545,20 @@ public:
     V2 drag_pos;
 
 private:
+    // The plaque at the front of a figurine's base with its name ("plate" in
+    // its drawing's file: the Généraux), engraved gold on dark bronze.
+    void name_plate(TextEngine& text, const SpriteDef& sp, V2 c) {
+        using namespace draw;
+        const float q = sq();
+        Art* art = sp.art.empty() ? nullptr : find_art(sp.art);
+        if (!art || art->plate.empty() || q < 40) return;
+        float fs = q * 0.125f;
+        float w = text.width(Font::Bold, fs, art->plate) + q * 0.1f, h = fs * 1.35f;
+        Box b{c.x - w / 2, c.y + q * 0.25f * sp.grow - h / 2, w, h};
+        round_box(b, h * 0.25f, hex(0x2a1e14, 235));
+        round_frame(b, h * 0.25f, std::max(1.0f, q * 0.012f), hex(0xc8a050, 230));
+        text.draw(Font::Bold, fs, art->plate, {b.center().x, b.y + h * 0.1f}, hex(0xf0d890), Align::Center);
+    }
     // The look of a hole: "pit" (the theme's colours), "lava", "water",
     // "void", "ice" or "bush" (HOLE_STYLES); k: its size while it opens.
     void draw_hole(Box b, const Theme& t, float k, float s, const std::string& style, double now, int sq) {
@@ -4212,7 +4231,7 @@ struct App {
                 auto it = ps.cast.find(ai.id);
                 if (it != ps.cast.end())
                     for (auto& sp : sprites)
-                        if (sp.id == it->second) sp.grow = g(ai.elo);
+                        if (sp.id == it->second) sp.grow = ps.grow > 0 ? ps.grow : g(ai.elo);
             }
             for (auto& sp : sprites)
                 if (sp.id == ai.sprite) sp.grow = g(ai.elo);

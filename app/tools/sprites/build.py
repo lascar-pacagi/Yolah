@@ -51,8 +51,8 @@ for _k, _f in arctic.ARCTIC.items():         # the Banquise set (arctic.py)
 for _k, _f in origami.ORIGAMI.items():       # the Origami set (origami.py)
     SCALE[_k] = origami.SCALE[_k[4:]]
     MODELS[_k] = scaled(_k, _f)
-for _k, _f in generals.GENERALS.items():
-    SCALE[_k] = 1.3
+for _k, _f in generals.GENERALS.items():   # the Généraux: all the same size (sets.json "grow"), large
+    SCALE[_k] = 1.42
     MODELS[_k] = scaled(_k, _f)
 TOON = set()                     # the manga set is rendered like painted figures now (shonen.py, fourth version)
 
@@ -104,6 +104,8 @@ def build(model):
         j = {"name": NAMES.get(model, model) + (" (blanc)" if side else ""), "kind": "piece", "size": SIZE,
              "smooth": True, "on stone": False, "box": round(box, 4), "anchor": [round(ax, 4), round(ay, 4)],
              "animations": [{"name": a, "fps": fps, "loop": loop, "frames": n} for a, n, fps, loop in ANIMS]}
+        if model in generals.PLATES:
+            j["plate"] = generals.PLATES[model]
         if side == 0:
             j["white"] = f"fig_{model}_blanc"
         else:
