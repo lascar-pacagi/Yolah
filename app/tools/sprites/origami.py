@@ -320,8 +320,8 @@ def dragon(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.35, "beginner": 1.35, "monte_carlo": 1.35, "mcts": 1.35, "basic_minmax": 1.3, "nnue193": 1.3,
-         "features": 1.25, "resnet": 1.15, "dev": 1.15, "alphazero": 1.1}
+SCALE = {"random": 1.5, "beginner": 1.58, "monte_carlo": 1.65, "mcts": 1.72, "basic_minmax": 1.78, "nnue193": 1.82,
+         "features": 1.88, "resnet": 1.8, "dev": 1.85, "alphazero": 1.85}   # the folds bigger and bigger (the peacock and the dragon touch the frame above that)
 CAST = {"random": ("Bateau en papier", boat), "beginner": ("Grenouille", frog), "monte_carlo": ("Lapin", rabbit),
         "mcts": ("Renard", fox), "basic_minmax": ("Papillon", butterfly), "nnue193": ("Grue", crane),
         "features": ("Cerf", stag), "resnet": ("Paon", peacock), "dev": ("Lion", lion), "alphazero": ("Dragon de papier", dragon)}
