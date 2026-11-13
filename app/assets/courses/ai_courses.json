@@ -516,7 +516,7 @@
             "Les notes elles-mêmes sont bruitées (coups au hasard au départ, parties serrées) : c'est pour cela qu'il faut des centaines de parties par candidat.",
             "Le calcul est énorme : 120 candidats × 580 parties à chaque itération. Les rondes ont tourné des jours sur le cluster (vingt jours pour l'une d'elles, en août 2024). Chaque ronde repartait des meilleurs poids de la précédente, souvent après l'ajout de nouveaux termes à l'heuristique (influence, pions bloqués, connexité).",
             "L'adversaire a été réglé au fil des rondes : MCTS à 1 s par coup, puis 2 s en juillet 2024, puis entre 0,1 et 0,3 s à partir d'août.",
-            "La méthode de Nelder-Mead (un simplexe qui se déforme dans l'espace des poids) a aussi été essayée en juin 2024. La CEM a été gardée : elle supporte mieux des notes bruitées."
+            "La méthode de Nelder-Mead (un simplexe qui se déforme dans l'espace des poids) a été essayée en juin 2024, après les premières rondes de CEM, pour améliorer les poids trouvés. Elle n'a apporté aucune amélioration, et la CEM a été gardée."
           ]
         },
         {
@@ -588,7 +588,7 @@
         },
         {
           "list": [
-            "Juin 2024 : régler les poids de l'heuristique par la méthode de Nelder-Mead, un simplexe qui se déforme dans l'espace des poids. Les notes, tirées de parties, sont trop bruitées pour elle ; la méthode d'entropie croisée l'a remplacée.",
+            "Juin 2024 : après les premières rondes de la méthode d'entropie croisée, la méthode de Nelder-Mead (un simplexe qui se déforme dans l'espace des poids) a été essayée pour améliorer encore les poids de l'heuristique. Elle n'a rien apporté, et la méthode d'entropie croisée a été gardée.",
             "Juillet-août 2025 : un réseau logique au lieu d'un réseau de neurones. Chaque neurone est une porte à deux entrées, qui peut être l'une des 16 fonctions booléennes possibles (ET, OU, OU exclusif, implication…). La sortie compte les portes allumées dans trois groupes : victoire des Noirs, nul, victoire des Blancs. Le premier essai confie le choix des portes au solveur SMT z3 : chaque porte est une inconnue de 4 bits, et chaque position d'apprentissage ajoute une copie complète du circuit et la contrainte « le bon groupe gagne ». Le problème grossit avec chaque position, alors qu'un réseau en apprend des millions : le solveur ne peut en traiter qu'une petite partie. Le deuxième essai cherche les portes et leurs connexions par un algorithme génétique en C++ (août 2025). La piste a ensuite été laissée au profit du NNUE, qui apprend par descente de gradient.",
             "Octobre 2026 : le coup nul (passer son tour pour voir si la position reste trop bonne), une technique classique des échecs, fait perdre 81 Elo à Yolah. La « coupure par procuration » le remplace par un vrai coup ordinaire, joué exprès faible, et gagne 47 à 59 Elo. Un article était prévu. Il a été abandonné quand la même idée, essayée dans Stockfish et dans d'autres jeux, n'a rien apporté de net.",
             "Octobre 2026 : remplacer le NNUE, dans certaines phases de la partie, par une fonction très rapide apprise (des comptes de bits pondérés). Elle se trompe 1,3 à 3,5 fois plus que le réseau, et n'est meilleure qu'à sept cases libres ou moins, où la recherche voit de toute façon la fin.",
