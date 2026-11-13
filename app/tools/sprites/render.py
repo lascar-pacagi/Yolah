@@ -269,6 +269,8 @@ class Scene:
             if part.op == "sub":
                 if d is not None:
                     d = smax(d, -di, part.blend)
+                    if with_id:          # what is cut away no longer claims the surface
+                        best = torch.maximum(best, -di)
                 continue
             if part.op == "int":
                 if d is not None:

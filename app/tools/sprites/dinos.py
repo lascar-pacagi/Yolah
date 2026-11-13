@@ -8,13 +8,12 @@ the most ferocious, bigger and bigger:
   mcts          Ankylosaure       a tank of armour, a club at the end of the tail
   basic_minmax  Tricératops       a frill and three horns, charging
   nnue193       Dilophosaure      the first hunter: slender, two thin crests
-  features      Vélociraptor      feathered, the sickle claw raised
+  features      Quetzalcoatlus    the giant flying reptile, wings raised in threat
   resnet        Allosaure         a big hunter, horns above the eyes, stripes
   dev           Spinosaure        a sail on the back, a long crocodile snout
   alphazero     Tyrannosaure      the king: a huge head, roaring
 
-Shapes after the fossils (no film's look: no frill on the dilophosaur, the
-raptor feathered). Countershaded skins (dark back, light belly). Modelled at
+Shapes after the fossils (no film's look: no frill on the dilophosaur). Countershaded skins (dark back, light belly). Modelled at
 unit size; SCALE makes the stronger ones bigger. The human is never part of a set.
 """
 import math
@@ -24,11 +23,27 @@ from render import Scene, Mat, T, RX, RY, RZ, srgb, sd_sphere, sd_ellipsoid, sd_
 from models import base, BASE_TOP, TAU, glow
 from heroic import chain, bezier, HEAD
 from arctic import fur, EYE, IVORY
+from origami import sheet
 
 YAW = HEAD + 0.6          # a three-quarter profile: the head to the right, the tail behind to the left
 DIR = (math.sin(YAW), 0.0, math.cos(YAW))
 CLAW = Mat("#2a2420", rough=0.35)
 MOUTH = Mat("#6a1e22", rough=0.5)
+PUPIL = Mat("#050404", rough=0.1, clearcoat=1.0)
+
+
+def iris(c):
+    """A reptile's eye: wet, barely lit from inside (no cartoon glow)."""
+    return Mat(c, rough=0.12, clearcoat=1.0, emissive=c, emit=0.12)
+
+
+def reptile_eye(sc, xf, x, y, z, r, sgn, mat, lid=None):
+    """An eye half sunk in its socket: the iris, a vertical slit pupil looking
+    sideways, and (lid) a bony brow hooding its upper half."""
+    sc.add(sd_sphere(r), mat, xf * T(x, y, z))
+    sc.add(sd_ellipsoid(0.24 * r, 0.8 * r, 0.32 * r), PUPIL, xf * T(x + sgn * 0.86 * r, y, z))
+    if lid is not None:
+        sc.add(sd_ellipsoid(1.7 * r, 0.75 * r, 3.4 * r), lid, xf * T(x + sgn * 0.1 * r, y + 0.95 * r, z + 0.3 * r), blend=0.9 * r)
 
 
 def skin(back, belly, k=70, stripes=None, freq=26.0, spots=None, rough=0.72):
@@ -141,9 +156,8 @@ def theropod(sc, anim, t, m, belly=None, leg=1.0, bulk=1.0, tail=1.0, neck=1.0, 
                 if roar > 0.15:
                     sc.add(sd_cone(0.016 * hs, 0.005 * hs, 0.001, 0.001), IVORY, jaw * T(0.033 * hs * width * sgn, 0.004 * hs, z + 0.015 * hs))
     for sgn in (-1, 1):
-        sc.add(sd_sphere(0.014 * hs), eye or EYE, hd * T(0.052 * hs * width * sgn, 0.04 * hs, 0.035 * hs))
-        sc.add(sd_ellipsoid(0.026 * hs, 0.012 * hs, 0.04 * hs), m, hd * T(0.046 * hs * width * sgn, 0.058 * hs, 0.035 * hs), blend=0.012)
-        sc.add(sd_sphere(0.007 * hs), Mat("#1a1414", rough=0.5), hd * T(0.022 * hs * width * sgn, 0.025 * hs, 0.215 * hs * snout))
+        reptile_eye(sc, hd, 0.045 * hs * width * sgn, 0.042 * hs, 0.03 * hs, 0.0105 * hs, sgn, eye or iris("#a8742a"), lid=m)
+        sc.add(sd_ellipsoid(0.004 * hs, 0.0035 * hs, 0.008 * hs), Mat("#1a1414", rough=0.8), hd * T(0.02 * hs * width * sgn, 0.03 * hs, 0.205 * hs * snout))
     return root, hd, nk
 
 
@@ -270,8 +284,6 @@ def stegosaurus(anim, t, side):
         sx = 0.025 if i % 2 else -0.025
         y = 0.14 + 0.03 * math.sin(math.pi * u) - 0.02 * u
         sc.add(sd_thin(0.008, h, h * 0.8), pm, root * T(sx, y + h * 0.55, z) * RZ(-sx * 4))
-    for k in range(3):   # neck plates, small
-        sc.add(sd_thin(0.006, 0.025, 0.02), pm, root * T(0.015 * (-1) ** k, 0.12, 0.3 + 0.04 * k))
     # the thagomizer: four spikes at the end of the tail
     tip = tp[-2]
     for sx in (-1, 1):
@@ -350,36 +362,82 @@ def dilophosaurus(anim, t, side):
     m = skin("#8a8a4a", "#e0d8a8", 80, stripes="#4a3a22", freq=34)
     roar = 0.85 if anim == "win" else 0.1
     root, hd, nk = theropod(sc, anim, t, m, leg=1.05, bulk=0.8, tail=1.0, neck=1.3, head=0.95, snout=1.15, width=0.85,
-                            roar=roar, eye=Mat("#e8c23a", rough=0.2, emissive="#e8c23a", emit=0.3))
-    crest = Mat("#c84a2e", rough=0.5, sss=0.4)
-    for sgn in (-1, 1):   # two thin crests along the top of the head
-        sc.add(sd_thin(0.006, 0.05, 0.11), crest, hd * T(0.02 * sgn, 0.07, 0.07) * RZ(0.12 * sgn), blend=0.006)
+                            roar=roar, eye=iris("#c0922a"))
+    crest = Mat("#a8603a", rough=0.5, sss=0.5)
+    for sgn in (-1, 1):   # two thin parallel crests along the top of the skull and the snout, above the eyes
+        sc.add(sd_thin(0.003, 0.03, 0.13), crest, hd * T(0.016 * sgn, 0.072, 0.08) * RX(0.16) * RZ(0.1 * sgn), blend=0.004)
     return sc
 
 
-# ─── 7 · Vélociraptor ───────────────────────────────────────────────────────
-def velociraptor(anim, t, side):
+# ─── 7 · Quetzalcoatlus ─────────────────────────────────────────────────────
+def quetzalcoatlus(anim, t, side):
+    """Standing on its hind legs, wings raised to look bigger, the long neck up,
+    the huge beak; the membranes translucent, the body furred (pycnofibres)."""
     sc = Scene()
     base(sc, side)
-    m = skin("#7a5a3e", "#d8c8a8", 90)
-    feathers = fur("#6a4a30", 150, 0.7)
-    win = anim == "win"
-    root, hd, nk = theropod(sc, anim, t, m, leg=0.95, bulk=0.75, tail=1.05, neck=1.05, head=0.85, snout=1.25, width=0.8,
-                            roar=0.8 if win else 0.0, crouch=0.0 if win else 0.7, pitch=0.05,
-                            eye=Mat("#e8a23a", rough=0.2, emissive="#e8a23a", emit=0.4))
-    # a coat of feathers on the body and the neck, a fan at the end of the tail, wings on the arms
-    sc.add(sd_ellipsoid(0.085, 0.1, 0.22), feathers, root * T(0, 0.01, 0.08), blend=0.02)
-    sc.add(sd_capsule((0, 0, 0), (0, 0, 0.15), 0.055), feathers, nk, blend=0.02)
-    band = Mat("#e8e0d0", rough=0.8)
-    for k in range(4):
-        sc.add(sd_ellipsoid(0.05 - 0.008 * k, 0.012, 0.03), band, root * T(0, 0.05 - 0.005 * k, -0.25 - 0.13 * k), blend=0.01)
+    walk, win = anim == "move", anim == "win"
+    B = BASE_TOP
+    m = fur("#4e423a", 170, 0.5)
+    pale = skin("#d8d0c0", "#efe8da", 60, rough=0.6)
+    bone = Mat("#d8c8a0", rough=0.4, clearcoat=0.3)
+
+    def memb_pat(pl, pw, n):
+        v = (torch.sin(pl[:, 0] * 70 + 4 * fbm(pl * 6, 2)) > 0.93).float()[:, None]
+        return {"albedo": srgb("#5e3a2c") * (0.85 + 0.3 * fbm(pl * 30, 2))[:, None] * (1 - 0.3 * v)}
+    memb = Mat("#7a4632", rough=0.6, sss=0.7, pattern=memb_pat)
+    crest = Mat("#b8402a", rough=0.5, sss=0.5)
+    hop = 0.05 * math.sin(math.pi * t) if walk else 0.0
+    flap = 0.45 + 0.45 * math.sin(TAU * 2 * t) if win else 0.1 * math.sin(TAU * t)
+    Y = RY(YAW) * T(0, hop, 0)
+    # the body, its front raised
+    sc.add(sd_ellipsoid(0.075, 0.085, 0.13), m, Y * T(0, B + 0.3, 0.0) * RX(-0.7))
+    # the hind legs, short, three toes
     for sgn in (-1, 1):
-        sh = root * T(0.07 * sgn, -0.03, 0.27) * RX(0.5) * RZ((0.9 if win else 0.2) * sgn)
-        sc.add(sd_thin(0.012, 0.09, 0.05), feathers, sh * T(0.02 * sgn, -0.08, 0.02) * RX(-0.6), blend=0.01)
-    # the sickle claw on the second toe, raised
-    hip_y = BASE_TOP + 0.36 * 0.95 * (1 - 0.18 * (0.0 if win else 0.7)) - 0.01
+        foot = (0.065 * sgn, B + 0.014 - hop, 0.0)
+        chain(sc, [(0.055 * sgn, B + 0.25, -0.05), (0.07 * sgn, B + 0.15, 0.02), (0.066 * sgn, B + 0.06, -0.04), foot],
+              [0.034, 0.024, 0.015, 0.012], m, Y, blend=0.02)
+        for k in (-1, 0, 1):
+            toe = Y * T(*foot) * RY(0.35 * k)
+            sc.add(sd_capsule((0, 0, 0), (0, -0.004, 0.05), 0.011, 0.007), m, toe, blend=0.008)
+            sc.add(sd_cone(0.016, 0.006, 0.001, 0.001), CLAW, toe * T(0, -0.006, 0.055) * RX(math.pi / 2 + 0.3))
+    # the wings: arm, wrist with three small clawed fingers, the long fourth finger; membranes to the leg
     for sgn in (-1, 1):
-        sc.add(sd_cone(0.04, 0.012, 0.001, 0.001), CLAW, RY(YAW) * T(0.08 * 0.75 * sgn + 0.015, BASE_TOP + 0.06, 0.07) * RX(-0.5))
+        sh = (0.065 * sgn, B + 0.37, 0.07)
+        el = (0.15 * sgn, B + 0.46 + 0.04 * flap, 0.03)
+        wr = (0.24 * sgn, B + 0.56 + 0.08 * flap, 0.07)
+        tip = ((0.36 + 0.06 * flap) * sgn, B + 0.8 + 0.12 * flap, -0.16)
+        knee = (0.07 * sgn, B + 0.16, 0.0)
+        chain(sc, [sh, el, wr], [0.03, 0.022, 0.017], m, Y, blend=0.015)
+        sc.add(sd_capsule(wr, tip, 0.012, 0.004), pale, Y, blend=0.006)
+        for f in (-1, 0, 1):
+            fx = (wr[0] + 0.012 * f * sgn, wr[1] + 0.01, wr[2] + 0.035)
+            sc.add(sd_capsule(wr, fx, 0.006, 0.004), m, Y, blend=0.004)
+            sc.add(sd_cone(0.012, 0.005, 0.001, 0.001), CLAW, Y * T(*fx) * RX(math.pi / 2 + 0.6))
+        # the membrane: a fan from the shoulder to a trailing edge bowed inward (tip → knee), slightly cupped
+        sc.add(sheet([sh, wr, tip], 0.0025), memb, Y)
+        prev = tip
+        for i in range(1, 6):
+            u = i / 5
+            q = [tip[k] + (knee[k] - tip[k]) * u for k in range(3)]
+            bow = 0.09 * math.sin(math.pi * u)
+            q = (q[0] - sgn * bow * 0.9, q[1] + bow * 0.5, q[2] - 0.05 * math.sin(math.pi * u))
+            sc.add(sheet([sh, prev, q], 0.0025), memb, Y)
+            prev = q
+        sc.add(sheet([sh, (0.05 * sgn, B + 0.44, 0.12), wr], 0.0025), memb, Y)
+    # the neck, long and stiff, and the head
+    sway = 0.015 * math.sin(TAU * t)
+    up = 0.06 if win else 0.0
+    npts = bezier((0, B + 0.38, 0.06), (0, B + 0.5, 0.1), (sway, B + 0.62 + up, 0.12), (sway, B + 0.7 + up, 0.19), 7)
+    chain(sc, npts, [0.042 - 0.003 * i for i in range(7)], pale, Y, blend=0.02)
+    shake = 0.35 * math.sin(TAU * 3 * t) if anim == "blocked" else 0.0
+    hd = Y * T(*npts[-1]) * RY(shake) * RX(0.45 - (0.5 if win else 0.0))
+    sc.add(sd_ellipsoid(0.03, 0.04, 0.06), pale, hd * T(0, 0.0, 0.02), blend=0.02)
+    gape = 0.25 if win else 0.0
+    sc.add(sd_cone(0.14, 0.03, 0.003), bone, hd * T(0, 0.004, 0.2) * RX(math.pi / 2), blend=0.01)
+    sc.add(sd_cone(0.13, 0.022, 0.003), bone, hd * T(0, -0.016, 0.06) * RX(gape) * T(0, 0, 0.13) * RX(math.pi / 2 + 0.03), blend=0.006)
+    sc.add(sheet([(0, 0.02, 0.06), (0, 0.035, -0.02), (0, 0.13, -0.09)], 0.004), crest, hd, blend=0.01)    # a blade crest
+    for sgn in (-1, 1):
+        reptile_eye(sc, hd, 0.026 * sgn, 0.014, 0.035, 0.009, sgn, iris("#b0702a"), lid=pale)
     return sc
 
 
@@ -390,7 +448,7 @@ def allosaurus(anim, t, side):
     m = skin("#a0683a", "#e0c8a0", 60, stripes="#4a2a1a", freq=24)
     roar = 0.95 if anim == "win" else 0.2
     root, hd, nk = theropod(sc, anim, t, m, leg=1.0, bulk=1.0, tail=1.0, neck=1.05, head=1.1, snout=1.1, width=0.9,
-                            roar=roar, eye=Mat("#e8a23a", rough=0.2, emissive="#e8a23a", emit=0.5))
+                            roar=roar, eye=iris("#b87a28"))
     horn = Mat("#c8603a", rough=0.5)
     for sgn in (-1, 1):   # the small horns in front of the eyes, a ridge along the snout
         sc.add(sd_cone(0.03, 0.02, 0.003, 0.003), horn, hd * T(0.042 * sgn, 0.085, 0.06) * RX(-0.2))
@@ -405,7 +463,7 @@ def spinosaurus(anim, t, side):
     m = skin("#3e5458", "#c8c0a0", 60, spots="#2a3a3e")
     roar = 0.9 if anim == "win" else 0.15
     root, hd, nk = theropod(sc, anim, t, m, leg=0.95, bulk=1.05, tail=1.1, neck=1.25, head=1.1, snout=1.6, width=0.65,
-                            roar=roar, pitch=0.25, eye=Mat("#e8c23a", rough=0.2, emissive="#e8c23a", emit=0.5))
+                            roar=roar, pitch=0.25, eye=iris("#c0922a"))
     # the sail: a high membrane along the back, red at the top, crossed by its spines
     def sail_mat():
         def pat(pl, pw, n):
@@ -427,7 +485,7 @@ def tyrannosaurus(anim, t, side):
     m = skin("#3a3430", "#a08a68", 55, stripes="#5a2e1e", freq=20)
     roar = 1.0 if anim in ("win", "blocked") else 0.3
     root, hd, nk = theropod(sc, anim, t, m, leg=1.0, bulk=1.25, tail=1.0, neck=0.8, head=1.45, snout=1.0, width=1.15,
-                            arms="tiny", roar=roar, eye=Mat("#ffaa2a", rough=0.2, emissive="#ff9a2a", emit=1.0))
+                            arms="tiny", roar=roar, eye=iris("#c8741c"))
     return sc
 
 
@@ -436,7 +494,7 @@ SCALE = {"random": 1.0, "beginner": 1.0, "monte_carlo": 1.0, "mcts": 1.05, "basi
 CAST = {"random": ("Brachiosaure", brachiosaurus), "beginner": ("Parasaurolophus", parasaurolophus),
         "monte_carlo": ("Stégosaure", stegosaurus), "mcts": ("Ankylosaure", ankylosaurus),
         "basic_minmax": ("Tricératops", triceratops), "nnue193": ("Dilophosaure", dilophosaurus),
-        "features": ("Vélociraptor", velociraptor), "resnet": ("Allosaure", allosaurus), "dev": ("Spinosaure", spinosaurus),
+        "features": ("Quetzalcoatlus", quetzalcoatlus), "resnet": ("Allosaure", allosaurus), "dev": ("Spinosaure", spinosaurus),
         "alphazero": ("Tyrannosaure", tyrannosaurus)}
 DINOS = {"dino_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"dino_" + k: n for k, (n, _) in CAST.items()}
