@@ -579,6 +579,28 @@
         },
         {
           "tip": "La leçon : en IA des jeux, les données comptent autant que l'algorithme. Une IA un peu meilleure produit de meilleures parties, qui entraînent un meilleur réseau, qui donne une IA meilleure encore."
+        },
+        {
+          "h": "Les pistes qui n'ont pas abouti"
+        },
+        {
+          "p": "Le journal du projet garde aussi les essais abandonnés. Ils ont coûté autant de travail que les réussites et ont appris autant : chacun a été mesuré, puis écarté sur des chiffres."
+        },
+        {
+          "list": [
+            "Juin 2024 : régler les poids de l'heuristique par la méthode de Nelder-Mead, un simplexe qui se déforme dans l'espace des poids. Les notes, tirées de parties, sont trop bruitées pour elle ; la méthode d'entropie croisée l'a remplacée.",
+            "Juillet-août 2025 : un réseau logique au lieu d'un réseau de neurones. Chaque neurone est une porte à deux entrées, qui peut être l'une des 16 fonctions booléennes possibles (ET, OU, OU exclusif, implication…). La sortie compte les portes allumées dans trois groupes : victoire des Noirs, nul, victoire des Blancs. Le premier essai confie le choix des portes au solveur SMT z3 : chaque porte est une inconnue de 4 bits, et chaque position d'apprentissage ajoute une copie complète du circuit et la contrainte « le bon groupe gagne ». Le problème grossit avec chaque position, alors qu'un réseau en apprend des millions : le solveur ne peut en traiter qu'une petite partie. Le deuxième essai cherche les portes et leurs connexions par un algorithme génétique en C++ (août 2025). La piste a ensuite été laissée au profit du NNUE, qui apprend par descente de gradient.",
+            "Octobre 2026 : le coup nul (passer son tour pour voir si la position reste trop bonne), une technique classique des échecs, fait perdre 81 Elo à Yolah. La « coupure par procuration » le remplace par un vrai coup ordinaire, joué exprès faible, et gagne 47 à 59 Elo. Un article était prévu. Il a été abandonné quand la même idée, essayée dans Stockfish et dans d'autres jeux, n'a rien apporté de net.",
+            "Octobre 2026 : remplacer le NNUE, dans certaines phases de la partie, par une fonction très rapide apprise (des comptes de bits pondérés). Elle se trompe 1,3 à 3,5 fois plus que le réseau, et n'est meilleure qu'à sept cases libres ou moins, où la recherche voit de toute façon la fin.",
+            "Octobre 2026 : des tables d'ordre des coups apprises d'avance, à partir des coupures observées dans des millions de positions. Sans effet quand on s'en sert pour initialiser l'historique (l'historique « chaud » d'une partie fait déjà le travail). Elles font perdre 16 à 25 Elo quand on essaie leurs meilleurs coups en premier.",
+            "Octobre 2026 : chercher automatiquement de nouvelles caractéristiques pour le NNUE en générant des programmes. Un petit langage d'opérations sur les bitboards (voisins, portée de la dame, fermeture, boucles de croissance) produit des programmes, dont chacun est noté sur ce qu'il explique de l'erreur du réseau, avec une pénalité pour son temps de calcul. En 23 heures sur le cluster, 9 073 programmes ont été essayés. La recherche a retrouvé seule l'influence, déjà connue, mais rien de nouveau et de bon marché, à part « le nombre de mes pièces qui peuvent encore bouger ».",
+            "Octobre 2026 : de nombreuses caractéristiques d'espace données au NNUE (remplissage corrigé, distance de dame, zones atteintes en premier, connexité…). La version la plus complète a la meilleure erreur de validation, mais perd 60 Elo en partie : elle coûte trop cher à calculer. Une ablation sur 92 colonnes a confirmé qu'une petite sélection suffisait.",
+            "Octobre 2026 : des statistiques de motifs locaux (3×3 et 5×5 autour d'une pièce) sur 4,8 millions de parties. Elles mesurent surtout la mobilité, que le réseau sait déjà. Elles ont servi à comprendre le jeu, pas à le jouer.",
+            "Novembre 2026 : une première couche du NNUE de 512 neurones au lieu de 1024. Elle calcule 30 % de nœuds en plus par seconde, mais perd 34 à 52 Elo : la précision compte plus que la vitesse."
+          ]
+        },
+        {
+          "tip": "Une idée n'est bonne qu'une fois mesurée en parties. Une meilleure erreur de validation, ou un programme plus rapide, ne donne pas toujours une IA plus forte : ici, seuls des milliers de parties sur le cluster ont tranché."
         }
       ]
     }
