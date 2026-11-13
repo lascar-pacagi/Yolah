@@ -54,7 +54,7 @@ for _k, _f in origami.ORIGAMI.items():       # the Origami set (origami.py)
 for _k, _f in generals.GENERALS.items():
     SCALE[_k] = 1.3
     MODELS[_k] = scaled(_k, _f)
-TOON = set(shonen.SHONEN)        # rendered in the manga style
+TOON = set()                     # the manga set is rendered like painted figures now (shonen.py, fourth version)
 
 ART = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "art")
 SIZE = 192
