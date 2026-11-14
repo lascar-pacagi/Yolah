@@ -372,9 +372,9 @@ def lid_mat(edge, upper=True):
     return Mat(SKIN, rough=0.45, sss=0.4, pattern=pat)
 
 
-def human(anim, t, side, outfit="coat"):
-    """outfit: "coat" (an eccentric scientist: a long light-grey coat open on a
-    plain white shirt and a dark polo collar), "hoodie" (a hooded zip sweatshirt) or "legendes" (a tunic, a cloak
+def human(anim, t, side, outfit="plain", shades=True):       # shades: black sunglasses
+    """outfit: "plain" (a plain top, black or white by side; the default),
+    "coat" (a long light-grey coat open on a plain white shirt), "hoodie" (a hooded zip sweatshirt) or "legendes" (a tunic, a cloak
     held by a brooch, a leather strap: the human in the Légendes set)."""
     sc = Scene()
     base(sc, side)
@@ -439,6 +439,13 @@ def human(anim, t, side, outfit="coat"):
         sc.add(sd_cylinder(0.008, 0.032, 0.004), gold(), root * T(0.12, y0 + 0.37, 0.12) * RX(1.1))
         sc.add(sd_sphere(0.013), glow("#ff4a3a" if side == 0 else "#4ad0ff", 3.0), root * T(0.12, y0 + 0.375, 0.128))
         sc.add(sd_box(0.022, 0.19, 0.012, 0.008), Mat("#4a301e", rough=0.6), root * T(-0.03, y0 + 0.24, 0.18) * RX(-0.35) * RZ(0.55))
+    elif outfit == "plain":
+        # a plain top, black for Black and white for White, a ribbed crew neck
+        top_c = "#1a1b20" if side == 0 else "#ecebe6"
+        top = Mat(top_c, rough=0.8, pattern=lambda pl, pw, n: {"albedo": srgb(top_c) * (0.9 + 0.12 * fbm(pl * 60, 2))[:, None]})
+        sc.add(sd_ellipsoid(0.37, 0.2, 0.22), top, root * T(0, y0 + 0.16, 0))
+        sc.add(sd_ellipsoid(0.28, 0.17, 0.18), top, root * T(0, y0 + 0.28, 0), blend=0.06)
+        sc.add(sd_torus(0.09, 0.016), top, root * T(0, y0 + 0.4, 0.02) * RX(0.3))
     elif outfit == "coat":
         # the eccentric scientist: a long light-grey coat, its wide lapels open on a
         # plain white shirt, a dark polo collar
@@ -531,6 +538,15 @@ def human(anim, t, side, outfit="coat"):
         for k in range(4):
             sc.add(lambda q, a_=bp[k], b_=bp[k + 1], r0=0.006 + 0.001 * k: sd_capsule(a_, b_, r0, r0 + 0.001)(q) - 0.003 * fbm(q * 400.0, 2),
                    brow, head, blend=0.003)                                       # bushy
+    if shades:   # black sunglasses: two lenses over the eyes, a bridge, the arms back to the ears
+        lens = Mat("#050506", rough=0.08, clearcoat=1.5, metal=0.3)
+        frame = Mat("#0c0c0e", rough=0.3, clearcoat=0.8)
+        for sgn in (-1, 1):
+            c = head * T(0.085 * sgn, 0.028, 0.252) * RY(0.18 * sgn) * RX(-0.05)
+            sc.add(sd_ellipsoid(0.056, 0.04, 0.008), lens, c)
+            sc.add(sd_torus(0.05, 0.005), frame, c * RX(math.pi / 2) * T(0, 0, 0) , blend=0.0)
+            sc.add(sd_capsule((0.13 * sgn, 0.04, 0.23), (0.19 * sgn, 0.035, 0.0), 0.005), frame, head)
+        sc.add(sd_capsule((-0.032, 0.045, 0.262), (0.032, 0.045, 0.262), 0.006), frame, head)
     # mouth: lips along a curve (smile > 0: corners up), the mouth open by open_m
     mw = 0.074
     pts = []
