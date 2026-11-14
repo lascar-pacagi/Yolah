@@ -372,7 +372,7 @@ def lid_mat(edge, upper=True):
     return Mat(SKIN, rough=0.45, sss=0.4, pattern=pat)
 
 
-def human(anim, t, side, outfit="plain", shades=True):       # shades: black sunglasses
+def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses with a thick black frame
     """outfit: "plain" (a plain top, black or white by side; the default),
     "coat" (a long light-grey coat open on a plain white shirt), "hoodie" (a hooded zip sweatshirt) or "legendes" (a tunic, a cloak
     held by a brooch, a leather strap: the human in the Légendes set)."""
@@ -381,7 +381,7 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: black sun
     lip = Mat("#b08e84", rough=0.5, sss=0.2, clearcoat=0.15)
     mouth_in = Mat("#4a1418", rough=0.6)
     teeth = Mat("#f3efe6", rough=0.25, clearcoat=0.6)
-    brow = Mat("#d6d0c6", rough=0.9)
+    brow = Mat("#d6d0c6" if side == 1 else "#141313", rough=0.9)
     # expression parameters
     yaw, pitch, roll, bob = 0.0, 0.0, 0.0, 0.0
     gaze = (0.1, 0.0, 1.0)
@@ -538,15 +538,18 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: black sun
         for k in range(4):
             sc.add(lambda q, a_=bp[k], b_=bp[k + 1], r0=0.006 + 0.001 * k: sd_capsule(a_, b_, r0, r0 + 0.001)(q) - 0.003 * fbm(q * 400.0, 2),
                    brow, head, blend=0.003)                                       # bushy
-    if shades:   # black sunglasses: two lenses over the eyes, a bridge, the arms back to the ears
-        lens = Mat("#050506", rough=0.08, clearcoat=1.5, metal=0.3)
-        frame = Mat("#0c0c0e", rough=0.3, clearcoat=0.8)
+    if shades:   # glasses with a thick black frame (squarish, rounded corners); the lenses, clear, are not drawn
+        frame = Mat("#0b0b0d", rough=0.25, clearcoat=1.0)
         for sgn in (-1, 1):
-            c = head * T(0.085 * sgn, 0.028, 0.252) * RY(0.18 * sgn) * RX(-0.05)
-            sc.add(sd_ellipsoid(0.056, 0.04, 0.008), lens, c)
-            sc.add(sd_torus(0.05, 0.005), frame, c * RX(math.pi / 2) * T(0, 0, 0) , blend=0.0)
-            sc.add(sd_capsule((0.13 * sgn, 0.04, 0.23), (0.19 * sgn, 0.035, 0.0), 0.005), frame, head)
-        sc.add(sd_capsule((-0.032, 0.045, 0.262), (0.032, 0.045, 0.262), 0.006), frame, head)
+            c = head * T(0.088 * sgn, 0.03, 0.262) * RY(0.16 * sgn) * RX(-0.05)
+
+            def rim(q):
+                outer = sd_box(0.064, 0.05, 0.008, 0.02)(q)
+                inner = sd_box(0.047, 0.034, 0.02, 0.013)(q)
+                return torch.maximum(outer, -inner)
+            sc.add(rim, frame, c)
+            sc.add(sd_capsule((0.148 * sgn, 0.045, 0.232), (0.188 * sgn, 0.04, 0.0), 0.007), frame, head)   # the arms
+        sc.add(sd_capsule((-0.032, 0.045, 0.264), (0.032, 0.045, 0.264), 0.007), frame, head)               # the bridge
     # mouth: lips along a curve (smile > 0: corners up), the mouth open by open_m
     mw = 0.074
     pts = []
@@ -581,7 +584,10 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: black sun
         u = top * (1 - side_w) + sid * side_w
         big = fbm(q * 12.0 + 2.0, 3)
         greyness = (0.75 + 0.2 * side_w + 0.3 * (big - 0.5)).clamp(0, 1)       # white, ivory in the shade
-        dark, mid, light = srgb("#7a756c"), srgb("#b6b1a6"), srgb("#dedbd3")
+        if side == 0:      # Black: black hair
+            dark, mid, light = srgb("#0c0b0b"), srgb("#1e1c1b"), srgb("#3a3836")
+        else:              # White: white hair
+            dark, mid, light = srgb("#7a756c"), srgb("#b6b1a6"), srgb("#dedbd3")
         g = smoothstep(0.75 - greyness, 1.0 - greyness * 0.5, u)
         a = dark * (1 - g[:, None]) + mid * g[:, None]
         a = a * (1 - (smoothstep(0.62, 0.8, u) * greyness)[:, None]) + light * (smoothstep(0.62, 0.8, u) * greyness)[:, None]
