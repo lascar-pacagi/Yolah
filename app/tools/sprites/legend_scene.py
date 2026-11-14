@@ -94,6 +94,14 @@ def cliff_mat():
                            sstep(0.6, 0.68, fbm(torch.stack([x * 0.012, y * 0.006, z * 0.012], 1) + 5, 4)) * sstep(0.45, 0.6, fbm(pw * 0.15, 2)))
         veg = autumn(fbm(pw * 0.09 + 7, 3) * 2.0, fbm(pw * 0.004, 2)) * (0.55 + 0.6 * fbm(pw * 0.5, 3))[:, None]
         up = torch.maximum(up, sstep(0.55, 0.75, n[:, 1]))          # whatever is flat enough is overgrown
+        # the crag's lip: no pale band under its top, the grass and the bushes spill over the edge
+        # and hang down in tongues, the rock just below is darker (shade, damp)
+        rs = torch.sqrt((x - SPUR[0]) ** 2 + ((z - SPUR[1]) * 1.2) ** 2) / SPUR[2]
+        on_spur = sstep(1.3, 1.1, rs)
+        below = SPUR[3] - y
+        hang = sstep(14 + 10 * fbm(torch.stack([x * 0.08, x * 0, z * 0.08], 1), 3), 2, below) * on_spur
+        up = torch.maximum(up, hang * sstep(0.35, 0.5, fbm(torch.stack([x * 0.15, y * 0.03, z * 0.15], 1) + 3, 3) + 0.25 * hang))
+        a = a * (1 - 0.35 * (sstep(30, 8, below) * on_spur))[:, None]
         a = torch.lerp(a, veg, up[:, None])
         # the wet rock behind and around each waterfall
         wet = torch.zeros_like(x)
@@ -307,6 +315,11 @@ def land_mat():
         steep = (1 - n[:, 1]).clamp(0, 1)
         grass = torch.lerp(srgb("#4a5a26"), srgb("#8a7a3a"), fbm(pw * 0.03, 3)[:, None]) * (0.7 + 0.4 * fbm(pw * 0.4, 2))[:, None]
         rock = torch.lerp(srgb("#8a8070"), srgb("#c8bca8"), fbm(pw * 0.05, 3)[:, None])
+        # the plateau's edge on the crag: overgrown and in shade, not a pale band of rock
+        rsp = torch.sqrt((x - SPUR[0]) ** 2 + ((z - SPUR[1]) * 1.2) ** 2) / SPUR[2]
+        crag = sstep(1.15, 0.95, rsp)
+        moss = torch.lerp(srgb("#2e3a1e"), srgb("#5a4a26"), fbm(pw * 0.2, 3)[:, None]) * (0.6 + 0.5 * fbm(pw * 0.8, 2))[:, None]
+        rock = torch.lerp(rock, moss, crag[:, None])
         a = torch.lerp(grass, rock, sstep(0.45, 0.7, steep)[:, None])
         # leaf litter under the trees
         a = torch.lerp(a, srgb("#8a5a2a"), (0.4 * sstep(0.55, 0.7, fbm(pw * 0.08, 3)))[:, None])
@@ -445,12 +458,19 @@ def fall_density(fx, w):
         x, y, z = p[:, 0], p[:, 1], p[:, 2]
         u = (top - y).clamp_min(0)
         out = 14 + 0.035 * u                                  # it leaves the lip and falls clear of the face
-        ww = w * (1 + u / 250)
-        across = (x - fx) / ww
-        along = (z - zc - out) / (3 + u * 0.03)
-        streak = fbm(torch.stack([x * (1.5 / w), y * 0.02, z * 0.1], 1), 4)
-        sheet = torch.exp(-across ** 6 - along ** 2) * (0.35 + 1.3 * streak) * (1 + u / 150)
-        return sheet * (y < top + 1).float() * 0.4
+        ww = w * (1 + u / 160)                                # the fall spreads as it falls...
+        wob = w * 0.6 * (fbm(torch.stack([y * 0.01, y * 0 + fx * 0.1, y * 0], 1), 2) - 0.5)
+        across = (x - fx - wob) / ww
+        along = (z - zc - out) / (2 + u * 0.04)
+        # ...into ribbons (streaks stretched along the fall) with gaps between them
+        rib = fbm(torch.stack([(x - fx) * (2.0 / ww), y * 0.012, z * 0.05], 1), 4)
+        ribbons = sstep(0.35, 0.65, rib)
+        edge = torch.exp(-(across.abs() / (0.8 + 0.4 * fbm(torch.stack([y * 0.03, x * 0.05, z * 0], 1), 2))) ** 4)
+        thin = 1.0 / (1 + u / 160)                            # the same water over a wider sheet
+        lower = sstep(0.0, 0.6, u / (top + 1))                # lower down it breaks into spray
+        spr = 0.5 + 0.5 * fbm(p * 0.12 + 3, 3)
+        sheet = edge * torch.exp(-along ** 2) * (ribbons * (1 - 0.5 * lower) + 0.25 * lower * spr) * thin
+        return sheet * (y < top + 1).float() * 0.55
     zz = zc + 14 + 0.035 * top
     return dens, (fx - w * 5 - 10, -5, zc - 10), (fx + w * 5 + 10, top + 2, zz + 20)
 
@@ -516,7 +536,7 @@ def render(W=2560, H=1440, ss=1):
     el, az = math.radians(11), math.radians(78)
     sun = (math.sin(az) * math.cos(el), math.sin(el), -math.cos(az) * math.cos(el))
     atmo = Atmosphere(sun, sun_power=24.0, mie=18e-6, mie_g=0.8, ground="#4a4a2a")
-    cam = Camera((-20.0, 175.0, -60.0), (25, 95, -440), fov=56)
+    cam = Camera((-20.0, 175.0, -60.0), (-130, 95, -440), fov=56)   # the village on the right (the board covers the left)
     vols = [Volume(valley_mist, (-700, 0, -760), (700, 180, -200), albedo="#f4ece0", g=0.6, steps=48, light_steps=3, light_dist=150),
             Volume(spray, (-450, -5, -720), (450, 160, -360), albedo="#ffffff", g=0.5, steps=48, light_steps=2, light_dist=60),
             Volume(cascade, (CASCADE[0] - 25, 0, CASCADE[1] - 5), (CASCADE[0] + 35, 72, CASCADE[1] + 30), albedo="#f4faff", g=0.4,
