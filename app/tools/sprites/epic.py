@@ -484,18 +484,27 @@ def archmage(anim, t, side):
     if anim == "win":
         p.r = [2.6, 0.2, 0.15]
         p.l = [2.2, 0.8, 0.3]
-    robe = cloth("#f2f0ea", 0.7)
-    sk = skin(ELF, 0.5)
+    robe = cloth("#e6e3ee", 0.7)
+    sk = skin("#f0d4c4", 0.5)
     m = {"skin": sk, "top": robe, "legs": robe, "boots": robe, "arms": robe}
     rig = adult(sc, p, m, H=1.06, bulk=0.92, head=0.95)
     sc.add(sd_cone(0.26, 0.2, 0.09, 0.02), robe, rig["waist"] * T(0, -0.2, 0))                  # the robe down to the feet
     sc.add(sd_torus(0.19, 0.012), gold(), rig["waist"] * T(0, -0.45, 0))
     sc.add(sd_torus(0.088, 0.01), gold(), rig["waist"])
     sc.add(sd_box(0.012, 0.22, 0.004, 0.003), gold(), rig["waist"] * T(0, -0.2, 0.14) * RX(-0.18))
-    for sgn in (-1, 1):   # a high collar
-        sc.add(sd_box(0.07, 0.07, 0.006, 0.004), Mat("#e8e2d0", rough=0.5), rig["torso"] * T(0.07 * sgn, 0.36, -0.03) * RY(0.6 * sgn) * RX(-0.2))
+    # a deep blue mantle on the shoulders, falling down the back, edged with silver
+    mantle = Mat("#25336e", rough=0.8, pattern=lambda pl, pw, n: {"albedo": srgb("#25336e") * (0.85 + 0.25 * fbm(pl * 60, 2))[:, None]})
+    for sgn in (-1, 1):
+        sc.add(sd_ellipsoid(0.085, 0.03, 0.095), mantle, rig["torso"] * T(0.11 * sgn, 0.31, -0.015) * RZ(-0.35 * sgn), blend=0.02)
+    sc.add(sd_box(0.15, 0.3, 0.012, 0.01), mantle, rig["torso"] * T(0, 0.02, -0.13) * RX(0.12), blend=0.03)
+    sc.add(sd_sphere(0.022), glow("#8adfff", 3.0), rig["torso"] * T(0, 0.28, 0.1))          # the mantle's clasp
     x, r = rig["head"], rig["hr"]
-    elf_face(sc, x, r, sk, "#e8eaf0", eye="#8adfff", anim=anim)
+    elf_face(sc, x, r, sk, "#d8dce8", eye="#8adfff", hair="short", anim=anim)
+    hm = Mat("#d8dce8", rough=0.35, clearcoat=0.5)
+    for k in range(5):    # long silver hair in locks down the back, not one mass
+        a = (k - 2) * 0.32
+        sc.add(sd_capsule((r * 0.7 * math.sin(a), r * 0.2, -r * 0.55 * math.cos(a)),
+                          (r * 0.75 * math.sin(a) * 1.1, -r * 1.5, -r * 0.7 * math.cos(a) - r * 0.15), r * 0.16, r * 0.07), hm, x, blend=r * 0.08)
     sc.add(sd_torus(r * 0.92, r * 0.06), gold(), x * T(0, r * 0.35, 0) * RX(0.15))
     sc.add(sd_sphere(r * 0.12), glow("#8adfff", 5.0), x * T(0, r * 0.42, r * 0.9))
     st = held(rig["r"], -math.pi if anim == "win" else -1.55)
