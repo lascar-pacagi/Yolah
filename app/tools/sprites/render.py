@@ -693,9 +693,11 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
             o, dd = org[mi], d[mi]
             tg = -o[:, 1] / dd[:, 1]
             pg = o + dd * tg[:, None]
-            near = length(pg[:, [0, 2]]) < 1.6
+            rg = length(pg[:, [0, 2]])
+            near = rg < 1.6
             sel = mi[near]
             pg = pg[near]
+            rg = rg[near]
             if sel.numel():
                 occ = torch.zeros(sel.shape[0], device=DEV)
                 for k in range(1, 7):
@@ -709,6 +711,11 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
                     ts = ts + q.clamp(0.01, 0.2)
                 sh = sh.clamp(0, 1)
                 a = ((1 - sh) * 0.75 + occ.clamp(0, 1)).clamp(0, 1) * shadow_strength
+                # no hard edge: the shadow fades out before the radius it is computed in,
+                # and before the frame's border (a long shadow would be cut by a straight line)
+                rr, cc = (sel // n).float(), (sel % n).float()
+                edge = torch.minimum(torch.minimum(rr, n - 1 - rr), torch.minimum(cc, n - 1 - cc)) / n
+                a = a * ((1.6 - rg) / 0.45).clamp(0, 1) * (edge / 0.08).clamp(0, 1)
                 alpha[sel] = a
                 color[sel] = 0
     color = color.reshape(n, n, 3).permute(2, 0, 1)
