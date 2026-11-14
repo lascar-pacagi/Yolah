@@ -464,6 +464,7 @@ struct AiParam {
 struct AiSpec {
     std::string id, name, family, sprite, description, config_file;
     int elo = 0;
+    json elo_by;              // "elo by depth": {"3": …, "4": …} (Minimax basique: no clock, the depth decides)
     double time_factor = 1;   // × the time per move chosen in the application
     double random_moves = 0;  // probability of a random legal move instead of a search
     json config;          // the engine configuration, overrides applied, paths absolute
@@ -474,6 +475,19 @@ struct AiSpec {
 };
 
 int hardware_threads() { return std::max(2u, std::thread::hardware_concurrency()); }
+
+// The Elo shown for an AI with the player's settings: for an AI rated per depth
+// (Minimax basique), the one of the chosen depth, else the roster's.
+int shown_elo(const AiSpec& ai, const json& opts) {
+    if (ai.elo_by.is_object()) {
+        json d = opts.is_object() && opts.contains("depth") ? opts["depth"] : (ai.config.is_object() ? ai.config.value("depth", json()) : json());
+        if (d.is_number()) {
+            const std::string k = std::to_string(d.get<int>());
+            if (ai.elo_by.contains(k) && ai.elo_by[k].is_number()) return ai.elo_by[k].get<int>();
+        }
+    }
+    return ai.elo;
+}
 
 // The roster's "params" of an AI, then the two settings every AI but the random
 // one has (time factor, random moves). A default missing from the values is
@@ -574,6 +588,7 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
         s.sprite = jstr(e, "sprite", "default");
         s.config_file = jstr(e, "config");
         s.elo = int(jnum(e, "elo", 0));
+        if (e.contains("elo by depth") && e["elo by depth"].is_object()) s.elo_by = e["elo by depth"];
         s.time_factor = jnum(e, "time factor", 1);
         s.random_moves = jnum(e, "random moves", 0);
         s.config = load_json(g_paths.root / "config" / s.config_file);
@@ -4314,10 +4329,10 @@ struct App {
             if (ps.id == id) return &ps;
         return nullptr;
     }
-    // The figurines grow with the strength of their AI (Elo 600 -> 0.85, 2250 -> 1.22):
+    // The figurines grow with the strength of their AI (Elo 600 -> 0.85, 3200 -> 1.22, the tournament's scale):
     // every cast's figurine and each AI's own sprite. The human keeps 1.
     void set_growth() {
-        auto g = [](int elo) { return 0.85f + 0.37f * std::clamp((elo - 600) / 1650.0f, 0.0f, 1.0f); };
+        auto g = [](int elo) { return 0.85f + 0.37f * std::clamp((elo - 600) / 2600.0f, 0.0f, 1.0f); };
         for (auto& ai : roster) {
             for (auto& ps : piece_sets) {
                 auto it = ps.cast.find(ai.id);
@@ -4482,7 +4497,7 @@ struct App {
         g.match.play(m);
         // How hard the square breaks: the player's strength (Elo 600 → 0, 2250 → 1; the human: 0.6).
         const Slot& sl = g.slot[side];
-        float power = sl.human() ? 0.6f : std::clamp((sl.spec->elo - 600) / 1650.0f, 0.0f, 1.0f);
+        float power = sl.human() ? 0.6f : std::clamp((sl.spec->elo - 600) / 2600.0f, 0.0f, 1.0f);
         g.board.on_move(m, side, time, fx, game_theme(), rng, power);
         if (m != Move::none()) {
             float q = g.board.sq();
@@ -6112,7 +6127,7 @@ void scene_setup(App& a) {
     entries.push_back({"human", "Humain", "Vous jouez \xC3\xA0 la souris", "human", true, "", "Cliquez sur un de vos pions puis sur la case d'arriv\xC3\xA9" "e, ou faites-le glisser."});
     for (auto& ai : a.roster) {
         const bool set = a.settings.ai_options.contains(ai.id);
-        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", ai.elo, tr(ai.family).c_str()) + (set ? tr(" \xE2\x80\xA2 r\xC3\xA9gl\xC3\xA9") : std::string()),
+        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", shown_elo(ai, set ? a.settings.ai_options[ai.id] : json()), tr(ai.family).c_str()) + (set ? tr(" \xE2\x80\xA2 r\xC3\xA9gl\xC3\xA9") : std::string()),
                            ai.sprite, ai.available, ai.reason, ai.description});
     }
 
@@ -6376,7 +6391,7 @@ void draw_player_card(App& a, Box b, int side, bool active) {
     draw_piece(a.game_sprite(side), side, {b.x + 18 * s + pr, b.center().y}, pr, 0.3f * k, a.time, 1, sl.human());
     float tx = b.x + 34 * s + 2 * pr;
     a.text.draw(Font::Bold, 19 * s, a.slot_name(sl), {tx, b.y + 14 * s}, pal::text);
-    std::string sub = sl.human() ? strf("Humain \xE2\x80\xA2 %s", side_name(side)) : strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", sl.spec->elo, side_name(side));
+    std::string sub = sl.human() ? strf("Humain \xE2\x80\xA2 %s", side_name(side)) : strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", shown_elo(*sl.spec, (a.settings.ai_options.contains(sl.who) ? a.settings.ai_options[sl.who] : json())), side_name(side));
     a.text.draw(Font::Regular, 14 * s, sub, {tx, b.y + 40 * s}, pal::dim);
     std::string status;
     if (active && !g.match.over()) {
@@ -6488,7 +6503,7 @@ void tab_ai(App& a, Box b) {
         any = true;
         draw_piece(a.game_sprite(side), side, {b.x + 24 * s, y + 24 * s}, 22 * s, 0, a.time);
         a.text.draw(Font::Bold, 18 * s, sl.spec->name, {b.x + 58 * s, y + 2 * s}, pal::text);
-        a.text.draw(Font::Regular, 14 * s, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s \xE2\x80\xA2 joue les %s", sl.spec->elo, tr(sl.spec->family).c_str(), side_name(side)),
+        a.text.draw(Font::Regular, 14 * s, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s \xE2\x80\xA2 joue les %s", shown_elo(*sl.spec, (a.settings.ai_options.contains(sl.who) ? a.settings.ai_options[sl.who] : json())), tr(sl.spec->family).c_str(), side_name(side)),
                     {b.x + 58 * s, y + 26 * s}, pal::dim);
         y += 56 * s;
         float hgt = a.text.paragraph(Font::Regular, 14 * s, sl.spec->description, {b.x, y, b.w, 120 * s}, pal::text);
