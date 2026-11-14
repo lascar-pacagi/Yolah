@@ -1,0 +1,20 @@
+# The AIs of the application (app/assets/ai_roster.json), with the application's settings, for the
+# ranking tournament (nnue/tournament.sh PLAYERS=/Yolah/config/app_tournament/players.txt).
+# Every player: the tournament's time per move (TIME_US), the roster's "time factor" and
+# "random moves" included (Débutant). Minimax basique has no clock: it plays at a fixed depth,
+# 3, 4 (the application's default) and 5, so that the ratings place each depth.
+# The CPU players get THREADS threads; the two MCTS on the GPU keep 16 threads x batch 16.
+random.cfg
+beginner.cfg
+monte_carlo.cfg
+mcts.cfg
+basic_minmax_d3.cfg
+basic_minmax_d4.cfg
+basic_minmax_d5.cfg
+minmax.cfg
+mcts_nnue.cfg
+nnue193.cfg
+features.cfg
+resnet.cfg
+dev.cfg
+alphazero.cfg

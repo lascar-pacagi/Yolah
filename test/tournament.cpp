@@ -227,15 +227,25 @@ namespace test {
         // Configs, with the common time control and thread count.
         vector<json> cfgs;
         vector<string> names;
+        // The application's own keys (assets/ai_roster.json), so that its AIs play here as in the
+        // application: "time factor" multiplies the time per move, "random moves" is the share of
+        // moves played at random instead of searching. Not engine keys: taken out of the config.
+        vector<double> random_moves;
         for (const string& path : opt.configs) {
             ifstream in(path);
             if (!in) throw invalid_argument("tournament: cannot open " + path);
             json j = json::parse(in);
+            const double factor = j.value("time factor", 1.0);
+            random_moves.push_back(j.value("random moves", 0.0));
+            j.erase("time factor");
+            j.erase("random moves");
             if (opt.microseconds && j.contains("microseconds")) {
-                j["microseconds"] = opt.microseconds;
+                j["microseconds"] = uint64_t(std::max(1.0, double(opt.microseconds) * factor));
                 if (j.contains("nb simulations")) j["nb simulations"] = 0;   // time-limited search
+            } else if (j.contains("microseconds") && factor != 1.0) {
+                j["microseconds"] = uint64_t(std::max(1.0, j["microseconds"].get<double>() * factor));
             }
-            if (opt.threads && j.contains("nb threads")) j["nb threads"] = opt.threads;
+            if (opt.threads && j.contains("nb threads") && !uses_gpu(j)) j["nb threads"] = opt.threads;   // a GPU MCTS keeps its threads (its batches)
             if (j.contains("verbose")) j["verbose"] = false;
             Player::create(j);                  // fail now, not in the middle of the night
             cfgs.push_back(j);
@@ -301,9 +311,19 @@ namespace test {
             Yolah y;
             for (Move m : g.opening) y.play(m);
             const auto t0 = chrono::steady_clock::now();
+            mt19937_64 rng(opt.seed * 1000003 + g.round * 7919 + g.pair * 31 + g.index);
             while (!y.game_over()) {
                 if (stop_requested.load()) return;
-                const Move m = (y.current_player() == Yolah::BLACK ? black : white)->play(y);
+                const bool b_turn = y.current_player() == Yolah::BLACK;
+                const double pr = random_moves[b_turn ? g.black : g.white];
+                Move m;
+                if (pr > 0 && uniform_real_distribution<double>(0, 1)(rng) < pr) {     // the application's "random moves"
+                    Yolah::MoveList ml;
+                    y.moves(ml);
+                    m = ml[rng() % ml.size()];
+                } else {
+                    m = (b_turn ? black : white)->play(y);
+                }
                 y.play(m);
             }
             black->game_over(y);
