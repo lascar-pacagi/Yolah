@@ -2279,10 +2279,8 @@ void draw_art_frame(Art& art, double t, Box b, float border) {
     SDL_RenderTexture9Grid(draw::R, art.tex, &*src, third, third, third, third, border / third, &dst);
 }
 
-const fs::path& art_dir() {
-    static fs::path d;
-    d = g_paths.assets / "art";
-    return d;
+fs::path art_dir() {          // by value: load_all_arts calls it from several threads
+    return g_paths.assets / "art";
 }
 
 bool load_art(const std::string& id, Art& out) {
@@ -2357,14 +2355,30 @@ bool save_art(Art& art) {
     return ok && write_file(art_dir() / (art.id + ".json"), j.dump(2));
 }
 
+// All the drawings of assets/art. Decoding the PNG sheets (about 260, 140 MB)
+// is most of the start-up time: it runs on every core (load_art makes no SDL
+// call; the textures are created at the first draw), about 8× faster than in turn.
 void load_all_arts() {
     std::error_code ec;
-    for (auto& e : fs::directory_iterator(art_dir(), ec)) {
-        if (e.path().extension() != ".json") continue;
-        auto art = std::make_unique<Art>();
-        std::string id = e.path().stem().string();
-        if (load_art(id, *art)) g_arts[id] = std::move(art);
+    std::vector<std::string> ids;
+    for (auto& e : fs::directory_iterator(art_dir(), ec))
+        if (e.path().extension() == ".json") ids.push_back(e.path().stem().string());
+    std::vector<std::unique_ptr<Art>> arts(ids.size());
+    std::vector<char> ok(ids.size(), 0);
+    std::atomic<size_t> next{0};
+    const unsigned nt = std::clamp(std::thread::hardware_concurrency(), 1u, 16u);
+    {
+        std::vector<std::jthread> pool;
+        for (unsigned t = 0; t < nt; t++)
+            pool.emplace_back([&] {
+                for (size_t i; (i = next.fetch_add(1)) < ids.size();) {
+                    arts[i] = std::make_unique<Art>();
+                    ok[i] = load_art(ids[i], *arts[i]);
+                }
+            });
     }
+    for (size_t i = 0; i < ids.size(); i++)
+        if (ok[i]) g_arts[ids[i]] = std::move(arts[i]);
 }
 // The drawings of a kind, by name (smooth_too: also the rendered ones, which
 // the workshop does not edit; never the white variants).
@@ -9096,6 +9110,16 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (!a->text.load(g_paths.assets / "fonts")) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Yolah", (tr("Polices introuvables dans ") + (g_paths.assets / "fonts").string()).c_str(), a->window);
         return SDL_APP_FAILURE;
+    }
+    {   // a first frame at once: the loading below takes a moment (the drawings)
+        SDL_SetRenderDrawColor(a->renderer, 14, 16, 24, 255);
+        SDL_RenderClear(a->renderer);
+        int ww = 0, wh = 0;
+        SDL_GetCurrentRenderOutputSize(a->renderer, &ww, &wh);
+        const float fs = std::max(18.0f, wh / 28.0f);
+        a->text.draw(Font::Title, fs * 1.8f, "Yolah", {ww * 0.5f, wh * 0.42f}, Rgba{235, 225, 200, 255}, Align::Center);
+        a->text.draw(Font::Regular, fs, "Chargement…", {ww * 0.5f, wh * 0.42f + fs * 2.6f}, Rgba{170, 170, 185, 255}, Align::Center);
+        SDL_RenderPresent(a->renderer);
     }
     a->themes = load_themes(g_paths.assets / "themes");
     a->sprites = load_sprites(g_paths.assets / "sprites" / "sprites.json");
