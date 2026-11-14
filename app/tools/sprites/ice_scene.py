@@ -1,152 +1,32 @@
 """
-ice_scene.py — the Banquise's background in 3D (scenery.py): the sea ice at
-night under the aurora.
+ice_scene.py — the Banquise background in 3D (scenery.py): a polar sea at night,
+icebergs adrift under the aurora.
 
-  the sky       deep blue night, the stars, the aurora: curtains of green
-                light with purple tops, folding across the sky, fine
-                vertical rays
-  the ice       a plain of sea ice: snow drifts, pressure ridges of broken
-                blocks, open leads of black water reflecting the sky
-  icebergs      tabular and broken ones, their ice glowing faintly blue
-  mountains     snow-covered peaks on the horizon
-  the light     the moon low, cold; the aurora's green on the snow; mist
+  the aurora    curtains of light in perspective: each a folded ribbon hanging
+                100 to 300 km up, marched through its height (green at the
+                foot, red and violet above), fine rays along it; reflected by
+                the sea
+  the sky       the stars (colours, sizes), the Milky Way and its dust lanes
+  the icebergs  long tabular bergs on the horizon, a great dry-dock berg (two
+                peaks, a saddle, flat calving faces), a nearer berg pierced by
+                an arch, bergy bits; snow on their tops, walls of blue ice with
+                darker bands, crevasses glowing deep blue, a wet waterline
+  the sea       calm black water mirroring the sky, floes and pancake ice
+                drifting near the eye, frost smoke lying on the water
+  the light     the moon behind the viewer, the aurora's green in the shadows
 
-    cd app/tools/sprites && python3 ice_scene.py [W H out]
+    cd app/tools/sprites && python3 ice_scene.py [W H out [ss]]
 """
 import math
 import os
 import sys
 import torch
 from PIL import Image
-from render import Scene, Mat, T, RX, RY, RZ, vec, norm, srgb, sd_sphere, sd_box, sd_ellipsoid, sd_cone, fbm, hash3
+from render import Scene, Mat, vec, norm, srgb, sd_ellipsoid, fbm, hash3
 from scenery import Camera, render_view, Volume
-from origami import sd_hull
 
 ASSETS = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
-MOON = (-0.72, 0.3, 0.42)
-
-
-def aurora_sky():
-    zen, hor = srgb("#02040c"), srgb("#0a1c2e")
-    green, violet = srgb("#3affa0"), srgb("#9a4aff")
-
-    def sky(d):
-        y = d[:, 1].clamp(-1, 1)
-        el = torch.asin(y)
-        az = torch.atan2(d[:, 0], -d[:, 2])
-        up = y.clamp(0, 1)
-        c = hor * (1 - up[:, None] ** 0.4) + zen * up[:, None] ** 0.4
-        # stars
-        cell = torch.floor(torch.stack([az * 260, el * 260, az * 0], 1))
-        h = hash3(cell)
-        star = (h > 0.993).float() * (y > 0.02).float() * (0.3 + 3.0 * (h - 0.993) / 0.007)
-        tint = torch.lerp(srgb("#ffd8b0"), srgb("#c8dcff"), hash3(cell + 3.3)[:, None])
-        c = c + star[:, None] * tint * 0.8
-        # the Milky Way: a soft band across the sky, dust lanes, a haze of faint stars
-        mw_n = norm(vec(0.35, 0.55, 0.76))
-        band = torch.exp(-((d @ mw_n) / 0.16) ** 2) * (y > 0).float()
-        dust = fbm(d * 9 + 2, 4)
-        faint = (hash3(torch.floor(torch.stack([az * 700, el * 700, az * 0], 1))) > 0.97).float()
-        c = c + srgb("#4a5470")[None] * (band * (0.25 + 0.5 * dust) * (1 - 0.6 * (fbm(d * 22, 3) > 0.6).float()) * 0.35)[:, None]
-        c = c + srgb("#c8d4ff")[None] * (band * faint * 0.35)[:, None]
-        # the moon, low in the north-east, and its halo
-        md = norm(vec(*MOON))
-        cm = (d @ md)
-        c = c + srgb("#e8ecf4") * ((cm > 0.99985).float() * 6.0 * (0.8 + 0.2 * fbm(d * 400, 3)))[:, None]
-        c = c + srgb("#8aa0c8") * (cm.clamp(0, 1) ** 400 * 0.6 + cm.clamp(0, 1) ** 30 * 0.08)[:, None]
-        # the aurora: two folded curtains; the base of each at a height that wanders with the azimuth
-        aur = torch.zeros_like(y)
-        top = torch.zeros_like(y)
-        for k, (a0, amp, base, w) in enumerate(((0.0, 0.9, 0.2, 1.0), (1.9, 0.7, 0.34, 0.65))):
-            fold = base + amp * torch.sin(az * 2.2 + a0) * 0.3 + 0.06 * fbm(torch.stack([az * 3 + k, az * 0, az * 0 + k * 7], 1), 3)
-            rel = el - fold
-            body = torch.exp(-(rel.clamp_min(0) / (0.16 * w))) * (rel > -0.08).float() * torch.exp(-((rel.clamp_max(0)) / 0.025) ** 2)
-            rays = 0.55 + 0.45 * torch.sin(az * 90 + 14 * fbm(torch.stack([az * 4, el * 0.8, az * 0 + k], 1), 3)) * fbm(torch.stack([az * 20, el * 2, az * 0 + k], 1), 2)
-            bright = 0.5 + 0.8 * fbm(torch.stack([az * 1.7 + k * 3, az * 0, az * 0], 1), 3)
-            aur = aur + body * rays * bright * w
-            top = top + (rel / 0.4).clamp(0, 1) * body * w
-        c = c + green * (aur * (1 - top))[:, None] * 0.9 + violet * (aur * top)[:, None] * 0.7
-        below = (y < 0).float()[:, None]
-        return c * (1 - below) + hor * 0.5 * below
-    return sky
-
-
-def snow():
-    def pat(pl, pw, n):
-        a = srgb("#e8eef6") * (0.85 + 0.15 * fbm(pw * 3, 3))[:, None]
-        # wind-scoured patches where the old blue ice shows through, crusts of older, greyer snow
-        bare = sstep(0.62, 0.68, fbm(torch.stack([pw[:, 0] * 0.12 + 2, pw[:, 1] * 0, pw[:, 2] * 0.2], 1), 4)) * (pw[:, 1] < 0.35).float()
-        a = torch.lerp(a, srgb("#7aa4c4") * (0.8 + 0.3 * fbm(pw * 6, 2))[:, None], (bare * 0.85)[:, None])
-        a = a * (1 - 0.12 * sstep(0.55, 0.7, fbm(pw * 0.5 + 9, 3)))[:, None]
-        sparkle = (hash3(torch.floor(pw * 120)) > 0.997).float()[:, None] * 2.0
-        return {"albedo": a, "emissive": srgb("#ffffff") * sparkle * 0.05}
-    return Mat("#e8eef6", rough=0.75, sss=0.6, pattern=pat)
-
-
-def ice_m():
-    def pat(pl, pw, n):
-        layers = fbm(torch.stack([pw[:, 1] * 1.4, pw[:, 0] * 0.02, pw[:, 2] * 0.02], 1), 3)
-        a = torch.lerp(srgb("#5aa6d6"), srgb("#d8f0fa"), (layers * 1.3 - 0.15).clamp(0, 1)[:, None]) * (0.8 + 0.25 * fbm(pw * 2, 3))[:, None]
-        glow = torch.exp(-(pw[:, 1].clamp_min(0)) / 3.0)
-        stripe = sstep(0.66, 0.7, fbm(torch.stack([pw[:, 1] * 1.8 + pw[:, 0] * 0.01, pw[:, 0] * 0.02, pw[:, 2] * 0.02], 1), 3))
-        a = torch.lerp(a, srgb("#2a6aa8"), (0.5 * stripe)[:, None])
-        a = torch.lerp(a, srgb("#eaf6fc"), (0.35 * sstep(0.4, 0.8, fbm(pw * vec(0.6, 0.08, 0.6), 3)))[:, None])
-        side = (1 - n[:, 1].abs()).clamp(0, 1)
-        return {"albedo": a, "emissive": srgb("#1a7ad0") * ((0.05 + 0.2 * glow + 0.15 * stripe) * side + 0.02)[:, None]}
-    return Mat("#8ac8e8", rough=0.35, clearcoat=0.3, sss=0.9, pattern=pat)
-
-
-def fract_(x):
-    return x - torch.floor(x)
-
-
-def ridged(p, octaves=5):
-    return 1 - (2 * fbm(p, octaves) - 1).abs()
-
-
-def range_h(x, z):
-    """The mountains on the horizon: ridged noise, sharp crests, valleys between."""
-    q = torch.stack([x * 0.0016, x * 0 + 5, z * 0.0016], 1)
-    m = ridged(q, 5) ** 2.2 * 300 + 50 * fbm(q * 4, 3)
-    far = ((-z - 1400) / 500).clamp(0, 1)
-    return m * (fbm(torch.stack([x * 0.0006, x * 0, z * 0.0006], 1), 2) * 1.6).clamp(0, 1) * far - 40
-
-
-def mountains(p):
-    return torch.maximum((p[:, 1] - range_h(p[:, 0], p[:, 2])) * 0.3, p[:, 2] + 1300)
-
-
-def mountain_mat():
-    def pat(pl, pw, n):
-        steep = (1 - n[:, 1]).clamp(0, 1)
-        rock = srgb("#2a2c32") * (0.6 + 0.5 * fbm(pw * 0.05, 3))[:, None]
-        snowc = srgb("#e8eef6") * (0.85 + 0.15 * fbm(pw * 0.02, 3))[:, None]
-        k = ((steep - 0.45 + 0.25 * (fbm(pw * 0.03, 3) - 0.5)) * 6).clamp(0, 1)[:, None]
-        return {"albedo": snowc * (1 - k) + rock * k}
-    return Mat("#e8eef6", rough=0.8, pattern=pat)
-
-
-def drift_mist(p):
-    """Frost smoke over the leads and blowing snow, close to the ice."""
-    n = fbm(p * vec(0.04, 0.2, 0.04), 4)
-    base = torch.exp(-(p[:, 1] + 0.2).clamp_min(0) / 1.6) * ((n - 0.35) * 2).clamp_min(0) * 0.06
-    # frost smoke: the open water steams into the cold air, wisps rising and leaning with the wind
-    ld = lead_line(p[:, 0] - 0.4 * p[:, 1], p[:, 2])
-    wisp = ((fbm(p * vec(0.15, 0.35, 0.15) + 5, 4) - 0.4) * 2.5).clamp_min(0)
-    smoke = torch.exp(-(ld.clamp_min(0) / 2.0) ** 2) * torch.exp(-p[:, 1].clamp_min(0) / 2.5) * wisp * 0.25
-    return base + smoke
-
-
-def ridge_line(x, z):
-    """Signed distance (roughly, along z) to the pressure ridge crossing the foreground."""
-    return z + 16 + 6 * torch.sin(x * 0.05) + 12 * (fbm(torch.stack([x * 0.03, x * 0, x * 0 + 1], 1), 2) - 0.5)
-
-
-def lead_line(x, z):
-    """The open lead: a long winding crack of black water across the middle distance."""
-    w = 1.6 + 1.6 * fbm(torch.stack([x * 0.04 + 4, x * 0, x * 0 + 3], 1), 3)
-    c = z + 5 + 3 * torch.sin(x * 0.05 + 1.0) + 14 * (fbm(torch.stack([x * 0.015, x * 0 + 2, x * 0], 1), 3) - 0.5)
-    return c.abs() - w * (0.4 + 0.8 * sstep(-120, -20, x) * sstep(140, 40, x) + 0.4)
+MOON = (-0.55, 0.32, 0.77)
 
 
 def sstep(a, b, x):
@@ -154,130 +34,266 @@ def sstep(a, b, x):
     return t * t * (3 - 2 * t)
 
 
-def sea_ice(p):
-    """The ice plain: drifts, a snow berm along the pressure ridge, sastrugi, and one long lead cut into it."""
-    x, z = p[:, 0], p[:, 2]
-    q2 = torch.stack([x * 0.15, x * 0, z * 0.15], 1)
-    h = 0.12 * fbm(q2, 4) + 0.03 * fbm(p * 1.5, 3) + 0.25 * fbm(torch.stack([x * 0.02, x * 0 + 8, z * 0.02], 1), 3)
-    # floes: old plates of ice slightly raised, their edges softened by snow
-    fl = fbm(torch.stack([x * 0.06 + 1, x * 0 + 4, z * 0.06], 1), 3)
-    h = h + 0.18 * sstep(0.48, 0.56, fl)
-    # the berm of snow and rubble along the pressure ridge
-    rl = ridge_line(x, z)
-    h = h + (0.55 + 0.4 * fbm(p * 0.3, 2)) * torch.exp(-(rl / 2.6) ** 2)
-    # sastrugi: sharp wind-carved ridges in the snow, near the eye
-    near = torch.exp(-((z + 10) / 45) ** 2)
-    w = x * 0.9 + z * 0.35 + 2.5 * fbm(torch.stack([x * 0.08, x * 0, z * 0.08], 1), 3)
-    h = h + near * 0.07 * (1 - (2 * fract_(w * 0.6) - 1).abs()) ** 3 * (0.4 + fbm(p * 0.3 + 4, 2))
-    # the lead: its banks drop to the water, a rim of broken ice along them
-    ld = lead_line(x, z)
-    rim = 0.12 * torch.exp(-((ld - 0.6) / 0.5) ** 2) * fbm(p * 1.2 + 3, 2)
-    cut = ((0.3 - ld) / 0.5).clamp(0, 1)
-    # pans of broken ice drifting in the lead
-    pan = sstep(0.6, 0.63, fbm(torch.stack([x * 0.5 + 7, x * 0 + 1, z * 0.7], 1), 3))
-    h = (h + rim) * (1 - cut) + (-0.3 * (1 - pan) + 0.04 * pan) * cut
-    return (p[:, 1] - h) * 0.6
+def ridged(p, o=5):
+    return 1 - (2 * fbm(p, o) - 1).abs()
 
 
-def tab_berg(q, sx, sz, hgt, seed):
-    """A tabular iceberg: an irregular outline (coves, broken corners), a calved terrace on one side,
-    walls fluted by melt streams, a wave-cut notch at the waterline, a gently undulating top."""
-    x, y, z = q[:, 0], q[:, 1], q[:, 2]
-
-    def outline(cx, s_, k):
-        u, v = (x - cx) / (sx * s_), z / (sz * s_)
-        rho = torch.sqrt(u * u + v * v) + 1e-6
-        cu, cv = u / rho, v / rho
-        rr = 1 + 0.45 * (fbm(torch.stack([cu * 1.3 + seed + k, cv * 1.3, y * 0 + k], 1), 4) - 0.5) \
-            + 0.08 * (fbm(torch.stack([cu * 5 + seed, cv * 5 + k, y * 0], 1), 3) - 0.5)
-        return (rho - rr) * min(sx, sz) * s_ * 0.55
-    # vertical grooves cut by meltwater, and large facets where slabs have calved off
-    flute = 0.6 * ridged(torch.stack([x * 0.9, y * 0.04, z * 0.9], 1), 3) ** 2 \
-        + 0.05 * min(sx, sz) * fbm(torch.stack([x * (3.0 / sx), y * (0.6 / hgt), z * (3.0 / sz)], 1) + seed, 3)
-    top = y - hgt * (1 + 0.05 * (fbm(q * (0.6 / sx), 3) - 0.5))
-    k = 0.05 * hgt
-    smax = lambda a, b: 0.5 * (a + b) + torch.sqrt(((a - b) * 0.5) ** 2 + k * k * 0.25)
-    main = smax(outline(sx * 0.12, 0.88, 0.0) + flute, top)
-    terrace = smax(outline(-sx * 0.05, 1.0, 3.0) + flute, y - hgt * 0.42 * (1 + 0.1 * fbm(q * (1.0 / sx), 2)))
-    d = torch.minimum(main, terrace)
-    notch = 0.06 * hgt * torch.exp(-((y - 0.25) / (0.08 * hgt)) ** 2)
-    return torch.maximum(d + notch, -y - 2.0) * 0.8
+def P3(a, b, c):
+    return torch.stack([a, b, c], 1)
 
 
-def water():
-    return Mat("#2a3644", rough=0.04, clearcoat=1.0, metal=1.0)
+# ─── the sky ────────────────────────────────────────────────────────────────
+#  curtains: (distance to the north in km, fold amplitude km, fold wavelength km, brightness, phase)
+CURTAINS = [(170.0, 35.0, 210.0, 1.0, 0.0), (300.0, 60.0, 330.0, 0.9, 2.1), (520.0, 90.0, 420.0, 0.8, 4.0), (800.0, 120.0, 600.0, 0.8, 5.5)]
+
+
+def aurora(d):
+    """The aurora's radiance along the directions d: emission summed through the curtains' height."""
+    y = d[:, 1].clamp_min(0.012)
+    out = torch.zeros_like(d)
+    green, red, violet = srgb("#43ff8c"), srgb("#ff3a4a"), srgb("#8a4aff")
+    n = 64
+    jit = hash3(torch.floor(d * 4000.0))                      # a random offset per ray: no banding between the slices
+    for k in range(n):
+        h = 95 + (k + jit) * (230 / n)                        # km
+        t = h / y
+        x, z = d[:, 0] * t, -d[:, 2] * t                      # the ground point under the sample, km (z: north)
+        far = (t < 2600).float()
+        e = torch.zeros_like(y)
+        for (z0, amp, lam, b, ph) in CURTAINS:
+            zc = z0 + amp * torch.sin(x / lam * 6.283 + ph) + 0.4 * amp * torch.sin(x / lam * 15.1 + 2 * ph) \
+                + 30 * (fbm(P3(x * 0.004 + ph, x * 0, x * 0), 3) - 0.5)
+            dist = (z - zc).abs()
+            sheet = torch.exp(-(dist / 7.0) ** 2) + 0.06 * torch.exp(-(dist / 30.0) ** 2)
+            # rays: brightness along the curtain, in fine vertical striations
+            along = x + 0.3 * (z - zc)
+            rays = (0.15 + 1.6 * fbm(P3(along * 0.05 + ph * 3, ph + 0.0 * along, along * 0), 3) ** 3) \
+                * (0.45 + 0.55 * ridged(P3(along * 0.6 + ph, along * 0 + ph * 2, along * 0), 2) ** 3)
+            # the foot of the curtain: sharp, wavering in height; above it the glow fades
+            foot = 100 + 14 * fbm(P3(x * 0.01 + ph, x * 0 + 2, x * 0), 2)
+            prof = sstep(foot - 3, foot + 4, h) * torch.exp(-((h - foot).clamp_min(0)) / 55)
+            e = e + sheet * rays * prof * b
+        hs = h
+        col = torch.lerp(green, red * 0.7, sstep(170, 250, hs)[:, None])
+        col = torch.lerp(col, violet, (0.5 * sstep(230, 300, hs))[:, None])
+        out = out + col * (e * far)[:, None] * (230 / n) * 0.11
+    return out * (d[:, 1] > 0).float()[:, None]
+
+
+def night_sky(d):
+    y = d[:, 1].clamp(-1, 1)
+    el = torch.asin(y)
+    az = torch.atan2(d[:, 0], -d[:, 2])
+    up = y.clamp(0, 1)
+    c = srgb("#071424") * (1 - up[:, None] ** 0.35) + srgb("#01030a") * up[:, None] ** 0.35
+    # stars: three layers, colours
+    for (res, thr, gain) in ((900, 0.982, 0.25), (380, 0.992, 0.9), (150, 0.996, 3.0)):
+        cell = torch.floor(torch.stack([az * res / math.pi, el * res / math.pi, az * 0 + res], 1))
+        h = hash3(cell)
+        fx = (az * res / math.pi) - cell[:, 0] - hash3(cell + 1.7)
+        fy = (el * res / math.pi) - cell[:, 1] - hash3(cell + 4.1)
+        spot = torch.exp(-(fx * fx + fy * fy) / (0.03 if res > 300 else 0.008))
+        temp = hash3(cell + 9.3)
+        col = torch.where((temp < 0.2)[:, None], srgb("#ffc29a"), torch.where((temp > 0.8)[:, None], srgb("#b0c8ff"), srgb("#fff6ec")))
+        c = c + col * ((h > thr).float() * spot * gain * (0.4 + (h - thr) / (1 - thr)) * sstep(0.0, 0.08, y))[:, None]
+    # the Milky Way: a band, its dust lanes
+    mw = norm(vec(0.42, 0.5, 0.76))
+    k = d @ mw
+    band = torch.exp(-(k / 0.18) ** 2) * sstep(0.0, 0.15, y)
+    lanes = ((fbm(d * 8 + 3, 5) - 0.45) * 3).clamp(0, 1) * torch.exp(-(k / 0.06) ** 2)
+    c = c + srgb("#3a4260") * (band * (0.3 + 0.6 * fbm(d * 5, 4)) * (1 - 0.7 * lanes) * 0.35)[:, None]
+    c = c + aurora(d)
+    return torch.where((y < 0)[:, None], srgb("#030810").expand_as(c), c)
+
+
+# ─── ice ────────────────────────────────────────────────────────────────────
+def ice_mat():
+    def pat(pl, pw, n):
+        x, y, z = pw[:, 0], pw[:, 1], pw[:, 2]
+        # walls: white compact snow-ice, bluer where the ice is old and clear, dark bands of marine ice
+        bands = sstep(0.66, 0.7, fbm(P3(y * 0.6, x * 0.004, z * 0.004), 3))
+        clear = sstep(0.4, 0.75, fbm(pw * 0.03 + 4, 4))
+        a = torch.lerp(srgb("#d6ecf6"), srgb("#7ab8e0"), (0.3 * clear)[:, None])
+        a = torch.lerp(a, srgb("#2a7ab0"), (0.4 * bands)[:, None])
+        a = a * (0.85 + 0.2 * fbm(pw * 0.6, 3))[:, None]
+        # snow on what faces up
+        snow = sstep(0.7, 0.9, n[:, 1] + 0.1 * (fbm(pw * 0.2, 2) - 0.5))
+        a = torch.lerp(a, srgb("#eef4fa") * (0.9 + 0.1 * fbm(pw * 2, 2))[:, None], snow[:, None])
+        # the waterline: wet, darker
+        a = a * (1 - 0.35 * sstep(1.6, 0.2, y))[:, None]
+        # crevasses and the blue light through the ice (the walls glow faintly)
+        crev = sstep(0.72, 0.85, ridged(P3(x * 0.08, y * 0.02, z * 0.08), 3)) * (1 - snow)
+        a = torch.lerp(a, srgb("#0a4a8a"), (0.7 * crev)[:, None])
+        side = (1 - snow) * (1 - n[:, 1].abs()).clamp(0, 1)
+        em = srgb("#1a78d8") * (0.04 * side + 0.12 * crev + 0.05 * clear * side)[:, None]
+        return {"albedo": a, "emissive": em, "rough": 0.35 + 0.4 * snow}
+    return Mat("#d6ecf6", rough=0.4, sss=0.9, clearcoat=0.2, pattern=pat)
+
+
+def facets(q, planes):
+    """Cut a body by planes (n, c): the flat faces left where slabs of ice calved off."""
+    d = None
+    for (nx, ny, nz, c) in planes:
+        k = q[:, 0] * nx + q[:, 1] * ny + q[:, 2] * nz - c
+        d = k if d is None else torch.maximum(d, k)
+    return d
+
+
+def drydock(cx, cz, s):
+    """The great berg: two peaks and a saddle between them, flat calving faces, fluted walls."""
+    def f(p):
+        q = (p - vec(cx, 0, cz)) / s
+        a = sd_ellipsoid(1.0, 1.15, 0.8)(q - vec(-0.75, 0, 0))
+        b = sd_ellipsoid(0.85, 1.6, 0.75)(q - vec(0.8, 0, 0.1))
+        saddle = sd_ellipsoid(1.9, 0.45, 0.75)(q)
+        body = torch.minimum(torch.minimum(a, b), saddle)
+        cut = facets(q, [(0.25, 0.3, 0.92, 0.62), (-0.6, 0.35, 0.72, 0.7), (0.85, 0.2, 0.5, 1.35), (-0.9, 0.1, 0.4, 1.45),
+                         (0.1, 0.95, 0.3, 1.35), (0.5, 0.86, 0.1, 1.38)])
+        body = torch.maximum(body, cut)
+        flute = 0.035 * ridged(P3(q[:, 0] * 7, q[:, 1] * 0.6, q[:, 2] * 7), 3) + 0.03 * fbm(q * 5, 3)
+        scallop = 0.025 * (1 - ridged(q * 12 + 3, 2))           # the dimples melt carves in the walls
+        return (body + flute + scallop) * s * 0.7
+    return f
+
+
+def arch_berg(cx, cz, s):
+    """A nearer berg, worn by the sea into an arch."""
+    def f(p):
+        q = (p - vec(cx, 0, cz)) / s
+        body = sd_ellipsoid(1.6, 0.95, 0.75)(q - vec(0, 0.05, 0))
+        body = torch.minimum(body, sd_ellipsoid(0.6, 1.5, 0.55)(q - vec(-1.0, 0, 0.05)))
+        body = torch.maximum(body, facets(q, [(0.15, 0.4, 0.9, 0.55), (0.95, 0.3, 0.1, 1.3), (-0.3, 0.95, 0.1, 0.95)]))
+        hole = sd_ellipsoid(0.45, 0.5, 2.0)(q - vec(0.35, 0.1, 0))
+        body = torch.maximum(body, -hole)
+        body = body + 0.06 * ridged(P3(q[:, 0] * 7, q[:, 1] * 1.2, q[:, 2] * 7), 3) + 0.03 * fbm(q * 6, 2)
+        return body * s * 0.7
+    return f
+
+
+def tabular(cx, cz, sx, sz, h):
+    """A long tabular berg: an irregular outline, sheer fluted walls, a flat snowy top."""
+    def f(p):
+        x, y, z = p[:, 0] - cx, p[:, 1], p[:, 2] - cz
+        u, v = x / sx, z / sz
+        r = torch.sqrt(u * u + v * v) + 1e-6
+        rr = 1 + 0.25 * (fbm(P3(u / r * 1.4 + 3, v / r * 1.4, u * 0), 4) - 0.5)
+        side = (r - rr) * min(sx, sz) * 0.5
+        side = side + 0.8 * ridged(P3(x * 0.35, y * 0.03, z * 0.35), 3)
+        top = y - h * (1 + 0.04 * fbm(P3(x * 0.02, z * 0.02, x * 0), 2))
+        return torch.maximum(torch.maximum(side, top), -y - 4) * 0.8
+    return f
+
+
+def bits(p):
+    """Bergy bits and growlers scattered on the water (2×2 nearest cells)."""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    cell = 30.0
+    d = torch.full_like(x, 1e9)
+    i0, k0 = torch.floor(x / cell - 0.5), torch.floor(z / cell - 0.5)
+    for di in (0, 1):
+        for dk in (0, 1):
+            i, k = i0 + di, k0 + dk
+            idv = P3(i, k, i * 0 + 2)
+            cx = (i + 0.5 + (hash3(idv) - 0.5) * 0.4) * cell
+            cz = (k + 0.5 + (hash3(idv + 1.3) - 0.5) * 0.4) * cell
+            r = 1.0 + 3.0 * hash3(idv + 2.2) ** 2
+            keep = (hash3(idv + 5.5) < 0.35).float()
+            q = P3((x - cx) / r, y / (r * (0.5 + 0.6 * hash3(idv + 7.1))), (z - cz) / r)
+            b = (torch.sqrt((q * q).sum(1)) - 1) * r * 0.6
+            b = b - 0.25 * r * ridged(P3(x, y, z) / r[:, None] + idv * 0.3, 3)
+            d = torch.minimum(d, torch.where(keep > 0, b * 0.7, torch.full_like(b, 1e9)))
+    bound = torch.maximum(y - 9, -y - 3)
+    return torch.maximum(d.clamp_max(cell * 0.3), bound)
+
+
+def floes(p):
+    """Floes and pancake ice near the eye: flat plates at the waterline, their rims raised."""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    cell = 7.0
+    d = torch.full_like(x, 1e9)
+    i0, k0 = torch.floor(x / cell - 0.5), torch.floor(z / cell - 0.5)
+    for di in (0, 1):
+        for dk in (0, 1):
+            i, k = i0 + di, k0 + dk
+            idv = P3(i, k, i * 0 + 9)
+            cx = (i + 0.5 + (hash3(idv) - 0.5) * 0.5) * cell
+            cz = (k + 0.5 + (hash3(idv + 1.3) - 0.5) * 0.5) * cell
+            r = 1.2 + 2.0 * hash3(idv + 2.2)
+            dens = 0.8 * sstep(0.5, 0.62, fbm(P3(cx * 0.02, cz * 0.02, cx * 0 + 3), 3))
+            keep = (hash3(idv + 5.5) < dens).float()
+            # an angular plate: the intersection of a few half planes turned at random
+            lx, lz = x - cx, z - cz
+            rad = torch.sqrt(lx * lx + lz * lz)
+            edge = torch.full_like(x, -1e9)
+            for j in range(5):
+                a = hash3(idv + 11.1 * (j + 1)) * 6.283
+                edge = torch.maximum(edge, lx * torch.cos(a) + lz * torch.sin(a) - r * (0.6 + 0.5 * hash3(idv + 3.7 * (j + 1))))
+            edge = edge + 0.15 * (fbm(P3(x * 1.5, z * 1.5, idv[:, 0] * 0.1), 2) - 0.5)
+            plate = torch.maximum(edge, (y - 0.12).abs() - 0.16 - 0.06 * fbm(P3(x * 2, z * 2, y * 0), 2))
+            d = torch.minimum(d, torch.where(keep > 0, plate * 0.8, torch.full_like(plate, 1e9)))
+    region = torch.maximum(z - 20, -z - 160)
+    bound = torch.maximum(y - 1.0, -y - 1.0)
+    return torch.maximum(torch.maximum(d.clamp_max(cell * 0.3), bound), region)
+
+
+def sea(p):
+    return p[:, 1] + 0.02 * fbm(p * vec(0.3, 0, 0.1), 2)
+
+
+def sea_mat():
+    def pat(pl, pw, n):
+        return {"albedo": srgb("#0a1420").expand(pw.shape[0], 3), "rough": 0.03 + 0.05 * fbm(pw * 0.02, 2)}
+    return Mat("#0a1420", rough=0.04, metal=1.0, pattern=pat)
+
+
+def mountains(p):
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    q = P3(x * 0.0007, x * 0 + 5, z * 0.0007)
+    h = ridged(q, 6) ** 2.2 * 420 + 60 * fbm(q * 5, 3) - 120
+    h = h * sstep(-4500, -6000, z)
+    return torch.maximum((y - h) * 0.3, z + 4500)
+
+
+def mountain_mat():
+    def pat(pl, pw, n):
+        steep = (1 - n[:, 1]).clamp(0, 1)
+        rock = srgb("#22252c") * (0.6 + 0.5 * fbm(pw * 0.02, 3))[:, None]
+        snowc = srgb("#dfe8f2") * (0.85 + 0.15 * fbm(pw * 0.01, 3))[:, None]
+        k = ((steep - 0.5 + 0.3 * (fbm(pw * 0.01, 3) - 0.5)) * 5).clamp(0, 1)[:, None]
+        return {"albedo": snowc * (1 - k) + rock * k}
+    return Mat("#dfe8f2", rough=0.8, pattern=pat)
+
+
+def frost_smoke(p):
+    n = fbm(p * vec(0.02, 0.15, 0.02), 4)
+    return torch.exp(-p[:, 1].clamp_min(0) / 3.0) * ((n - 0.45) * 2.5).clamp_min(0) * 0.03
 
 
 def scene():
     sc = Scene()
-    sc.add(sea_ice, snow())
-    sc.add(sd_box(400, 0.1, 400), water(), T(0, -0.12, -100))
-    ice = ice_m()
-    # icebergs: tabular ones (flat tops, sheer walls carved by the sea, a wave-cut notch at the waterline)
-    # and weathered ones (domes and pinnacles), their walls glowing faintly blue
-    import random
-    rnd = random.Random(5)
-    for (cx, cz, sx, sz, hgt, kind) in ((-38, -80, 20, 11, 11, "tab"), (30, -64, 9, 7, 9, "pin"), (85, -160, 48, 24, 20, "tab"),
-                                         (-120, -210, 40, 28, 26, "pin"), (16, -44, 3.5, 2.6, 3.0, "pin"), (-18, -32, 3, 2.2, 3.2, "pin")):
-        if kind == "tab":
-            def berg(q, sx=sx, sz=sz, hgt=hgt, sd=rnd.random() * 10):
-                return tab_berg(q, sx, sz, hgt, sd)
-        else:
-            def berg(q, sx=sx, sz=sz, hgt=hgt):
-                d = sd_ellipsoid(sx, hgt * 1.1, sz)(q)
-                spire = sd_ellipsoid(sx * 0.3, hgt * 2.6, sz * 0.35)(q - vec(sx * 0.3, 0, 0))
-                spire2 = sd_ellipsoid(sx * 0.22, hgt * 1.8, sz * 0.3)(q - vec(-sx * 0.35, 0, sz * 0.2))
-                d = torch.minimum(torch.minimum(d, spire), spire2)
-                r = ridged(q * (1.0 / sz), 5)
-                return (d - 0.22 * sz * r ** 2 + 0.06 * sz) * 0.8
-        sc.add(berg, ice, T(cx, 0, cz))
-        sc.add(lambda q, b=berg, hgt=hgt: torch.maximum(b(q - vec(0, 0.04 * hgt, 0)) - 0.04 * hgt, 0.85 * hgt - q[:, 1] + 0.2 * hgt * fbm(q * (1.0 / hgt), 2)),
-               snow(), T(cx, 0, cz))
-    # a pressure ridge in the foreground: slabs of sea ice pushed up and tilted, crossing the view
-    def slabs(q):
-        x, y, z = q[:, 0], q[:, 1], q[:, 2]
-        rl = ridge_line(x, z)
-        rise = (0.25 + 1.1 * fbm(torch.stack([x * 0.04, x * 0 + 3, x * 0], 1), 3)).clamp_min(0)
-        d = torch.full_like(x, 1e9)
-        for row, (cell, zo, seed) in enumerate(((1.5, 0.0, 0.0), (1.15, 1.3, 31.0), (1.9, -1.4, 57.0))):
-            for off in (-1, 0, 1):
-                i = torch.floor(x / cell) + off
-                hs = [hash3(torch.stack([i, i * 0 + seed + k, i * 0], 1)) for k in range(7)]
-                cx = (i + 0.5 + (hs[0] - 0.5) * 0.5) * cell
-                sx_, sz_, th = 0.45 + 0.6 * hs[1], 0.6 + 0.9 * hs[2], 0.12 + 0.18 * hs[3]
-                a1, a2, a3 = (hs[4] - 0.5) * 2.6, (hs[5] - 0.5) * 1.2, (hs[6] - 0.5) * 1.4
-                lx = x - cx
-                ly = y - (0.2 + 0.9 * hs[3]) * rise * (1.0 - 0.3 * row)
-                lz = rl + zo + (hs[6] - 0.5) * 1.0
-                ca, sa, cb, sb, cc_, sc_ = torch.cos(a1), torch.sin(a1), torch.cos(a2), torch.sin(a2), torch.cos(a3), torch.sin(a3)
-                z1, y1 = lz * ca - ly * sa, lz * sa + ly * ca
-                x2, y2 = lx * cb - y1 * sb, lx * sb + y1 * cb
-                x3, z3 = x2 * cc_ - z1 * sc_, x2 * sc_ + z1 * cc_
-                w = torch.stack([x3, y2, z3], 1)
-                b = sd_box(1.0, 1.0, 1.0, 0.0)(w / torch.stack([sx_, th, sz_], 1)) * torch.minimum(torch.minimum(sx_, th), sz_)
-                d = torch.minimum(d, b)
-        d = d - 0.04 * fbm(q * 2.5, 2)
-        return torch.maximum(d * 0.6, (x.abs() - 70))
-    sc.add(slabs, ice)
-    # big blocks pushed up near the viewer, framing the lead, half buried in drifted snow
-    for (bx, bz, sx_, sy_, sz_, ax, ay, az_) in ((-11.5, 1.5, 1.6, 0.35, 1.2, 0.5, 0.3, 0.35), (-9.2, 3.2, 0.9, 0.25, 0.8, -0.3, 1.1, 0.6),
-                                                  (12.5, 0.5, 1.8, 0.4, 1.3, -0.45, -0.4, -0.3), (10.0, 2.8, 0.8, 0.22, 0.7, 0.6, 0.9, -0.5),
-                                                  (14.5, -2.5, 1.2, 0.3, 1.0, 0.3, 0.2, 0.7)):
-        blk = lambda q, sx_=sx_, sy_=sy_, sz_=sz_: (sd_box(sx_, sy_, sz_, 0.06)(q) - 0.08 * fbm(q * 1.6, 3)) * 0.8
-        sc.add(blk, ice, T(bx, 0.2, bz) * RY(ay) * RX(ax) * RZ(az_))
-        sc.add(lambda q, b=blk: torch.maximum(b(q) - 0.05, -(q[:, 1] - 0.1 - 0.1 * fbm(q * 2, 2))) , snow(), T(bx, 0.2, bz) * RY(ay) * RX(ax) * RZ(az_))
+    ice = ice_mat()
+    sc.add(sea, sea_mat())
+    sc.add(drydock(70, -300, 55), ice)
+    sc.add(arch_berg(-150, -190, 36), ice)
+    sc.add(tabular(330, -720, 170, 60, 38), ice)
+    sc.add(tabular(-700, -1600, 420, 90, 55), ice)
+    sc.add(tabular(900, -2300, 300, 70, 45), ice)
+    sc.add(bits, ice)
+    sc.add(floes, ice)
     sc.add(mountains, mountain_mat())
     return sc
 
 
+NOVOL = os.environ.get("NOVOL") is not None
+
+
 def render(W=2560, H=1440, ss=1):
-    cam = Camera((0, 4.6, 12), (0, 4.6, -60), fov=62)
-    sky = aurora_sky()
-    vols = [Volume(drift_mist, (-300, -1, -400), (300, 8, 14), albedo="#d8e4f0", g=0.5, steps=32, light_steps=2, light_dist=8)]
-    img = render_view(scene(), W, H, cam, sky, sun_dir=MOON, sun_col="#a8c4ff", sun_soft=0.03, volumes=vols,
-                      ambient=("#3a7a86", "#1a2a3a"), fog=(0.006, "#0e2236", 0.02, 0.0), exposure=1.3, steps=220,
-                      tmax=4000, ao_scale=0.6, bloom=0.9, dof=(60.0, 0.25), vignette=0.35, grain=0.015,
-                      grade=("#2a5a8a", "#d8fff0"), ss=ss)
+    cam = Camera((0, 6.0, 30), (0, 30, -400), fov=62)
+    vols = [Volume(frost_smoke, (-600, 0, -900), (600, 14, 25), albedo="#d8e4f0", g=0.5, steps=40, light_steps=2, light_dist=10)]
+    img = render_view(scene(), W, H, cam, night_sky, sun_dir=MOON, sun_col="#8aa4d8", sun_soft=0.02,
+                      ambient=("#2a6a5a", "#0a1622"), exposure=1.5, steps=320, tmax=9000, ao_scale=2.0, bloom=1.0,
+                      dof=None, vignette=0.35, grain=0.012, grade=("#0a2a4a", "#d8fff0"), ss=ss,
+                      volumes=[] if NOVOL else vols, fog=(0.0002, "#0a1a2a", 0.002, 0.0))
     return img
 
 

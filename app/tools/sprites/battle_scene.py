@@ -312,6 +312,331 @@ def caisson(sc, x, z, rot, hb):
     sc.add(sd_capsule((0, 0.75, -0.9), (0, 0.15, -3.0), 0.05), wood, X)
 
 
+# ─── the bivouac ────────────────────────────────────────────────────────────
+D0 = vec(0).device
+
+
+_GMEMO = {}
+
+
+def ground_at(x, z):
+    """The land's height at (x, z), memoised: the SDFs below call it with constants (no GPU sync per call)."""
+    k = (round(float(x), 3), round(float(z), 3))
+    if k not in _GMEMO:
+        _GMEMO[k] = float(land_h(torch.tensor([float(x)], device=D0), torch.tensor([float(z)], device=D0))[0])
+    return _GMEMO[k]
+
+
+TCX, TCZ = 5.0, 10.0                 # the tent grid: one tent per cell, streets between the rows
+CAMP_REGIONS = [(-95.0, -12.0, -100.0, -36.0), (12.0, 95.0, -100.0, -36.0), (-60.0, -30.0, -32.0, -24.0)]
+
+
+def _camp_cell(p, seed):
+    x, z = p[:, 0], p[:, 2]
+    ix, iz = torch.floor(x / TCX), torch.floor(z / TCZ)
+    idv = torch.stack([ix, iz, ix * 0 + seed], 1)
+    cx = (ix + 0.5) * TCX + (hash3(idv) - 0.5) * 0.6
+    cz = (iz + 0.5) * TCZ
+    inside = torch.zeros_like(x, dtype=torch.bool)
+    for (x0, x1, z0, z1) in CAMP_REGIONS:
+        inside = inside | ((cx > x0) & (cx < x1) & (cz > z0) & (cz < z1))
+    keep = inside & (hash3(idv + 5.5) < 0.88)
+    g = land_h(cx, cz)
+    edge = torch.minimum(TCX / 2 - (x - (ix + 0.5) * TCX).abs(), TCZ / 2 - (z - (iz + 0.5) * TCZ).abs())
+    # away from the camp the distance to its regions bounds the step (no false hits far off)
+    away = torch.full_like(x, 1e9)
+    for (x0, x1, z0, z1) in CAMP_REGIONS:
+        away = torch.minimum(away, torch.maximum(torch.maximum(x0 - 3 - x, x - x1 - 3), torch.maximum(z0 - 6 - z, z - z1 - 6)))
+    edge = torch.maximum(edge, away)
+    return idv, cx, cz, g, keep, edge
+
+
+def tents(p):
+    """The soldiers' tents: ridge tents of canvas, their doors on the street, in rows on the slope and the plain."""
+    idv, cx, cz, g, keep, edge = _camp_cell(p, 1.0)
+    a = (hash3(idv + 2.2) - 0.5) * 0.25
+    lx, lz = p[:, 0] - cx, p[:, 2] - cz
+    lx, lz = torch.cos(a) * lx - torch.sin(a) * lz, torch.sin(a) * lx + torch.cos(a) * lz
+    ly = p[:, 1] - g
+    w, d, h = 1.05, 1.3, 1.35
+    # the canvas sags between the poles, a little ridge rope at the top
+    sag = 0.06 * (1 - (lz / d) ** 2) * (lx.abs() / w)
+    roof = (lx.abs() * h + ly * w - h * w) / math.hypot(h, w) + sag
+    t = torch.maximum(torch.maximum(roof, -ly), lz.abs() - d)
+    pole = torch.maximum(torch.sqrt(lx * lx + (lz.abs() - d - 0.05) ** 2) - 0.04, torch.maximum(ly - h - 0.25, -ly))
+    t = torch.minimum(t, pole)
+    bound = torch.maximum(edge + 0.5, ly - 2.0)
+    return torch.where(keep, torch.minimum(t * 0.8, bound), bound)
+
+
+def canvas_mat():
+    def pat(pl, pw, n):
+        a = torch.lerp(srgb("#cfc4a8"), srgb("#ece4d0"), fbm(pw * 0.8, 3)[:, None]) * (0.85 + 0.2 * fbm(pw * 6, 2))[:, None]
+        dirt = sstep(0.4, 0.9, 1 - (pw[:, 1] - land_h(pw[:, 0], pw[:, 2])).clamp(0, 1))
+        a = a * (1 - 0.3 * dirt)[:, None]
+        # the door: a dark slit on the street side
+        idv = torch.stack([torch.floor(pw[:, 0] / TCX), torch.floor(pw[:, 2] / TCZ), pw[:, 0] * 0 + 1.0], 1)
+        lx = pw[:, 0] - ((idv[:, 0] + 0.5) * TCX + (hash3(idv) - 0.5) * 0.6)
+        door = (lx.abs() < 0.28).float() * (n[:, 2] > 0.6).float() * (pw[:, 1] - land_h(pw[:, 0], pw[:, 2]) < 1.0).float()
+        return {"albedo": a * (1 - 0.85 * door)[:, None]}
+    return Mat("#e2d8c2", rough=0.85, sss=0.5, pattern=pat)
+
+
+def muskets(p):
+    """Muskets piled in front of each tent: three leaning together, bayonets crossed."""
+    idv, cx, cz, g, keep, edge = _camp_cell(p, 1.0)
+    keep = keep & (hash3(idv + 8.8) < 0.8)
+    lx, ly, lz = p[:, 0] - cx - 0.4, p[:, 1] - g, p[:, 2] - cz - 3.0
+    q = torch.stack([lx, ly, lz], 1)
+    d = torch.full_like(lx, 1e9)
+    for k in range(3):
+        ang = k * math.tau / 3 + 0.3
+        b = vec(0.42 * math.cos(ang), 0.0, 0.42 * math.sin(ang))
+        L = math.sqrt(0.42 ** 2 + 1.55 ** 2)
+        u = vec(-0.42 * math.cos(ang) / L, 1.55 / L, -0.42 * math.sin(ang) / L)
+        t = ((q - b) @ u).clamp(0, L * 1.22)
+        rad = torch.where(t > L * 1.02, torch.full_like(t, 0.012), torch.where(t < 0.35, torch.full_like(t, 0.045), torch.full_like(t, 0.028)))
+        d = torch.minimum(d, torch.linalg.norm(q - b - u * t[:, None], dim=1) - rad)
+    bound = torch.maximum(edge + 0.5, ly - 2.2)
+    return torch.where(keep, torch.minimum(d, bound), bound)
+
+
+def campers(p):
+    idv, cx, cz, g, keep, edge = _camp_cell(p, 1.0)
+    keep = keep & (hash3(idv + 12.1) < 0.45)
+    ox = (hash3(idv + 13.3) - 0.5) * 3.0
+    oz = 2.2 + hash3(idv + 14.7) * 2.5
+    l = torch.stack([p[:, 0] - cx - ox, p[:, 1] - g, p[:, 2] - cz - oz], 1)
+    body = sd_capsule((0, 0.25, 0), (0, 1.3, 0), 0.24, 0.17)(l)
+    legs = sd_capsule((0, 0.0, 0), (0, 0.4, 0), 0.12)(l)
+    head = sd_sphere(0.12)(l - vec(0, 1.55, 0))
+    hat = sd_cylinder(0.13, 0.12)(l - vec(0, 1.75, 0))
+    d = torch.minimum(torch.minimum(body, legs), torch.minimum(head, hat))
+    bound = torch.maximum(edge + 0.5, l[:, 1] - 2.2)
+    return torch.where(keep, torch.minimum(d, bound), bound)
+
+
+def camper_mat():
+    def pat(pl, pw, n):
+        idv = torch.stack([torch.floor(pw[:, 0] / TCX), torch.floor(pw[:, 2] / TCZ), pw[:, 0] * 0 + 1.0], 1)
+        k = hash3(idv + 15.5)
+        pal = torch.stack([srgb(c) for c in ("#1e3270", "#3e4a62", "#5a5a58", "#e6e0d0")])
+        a = pal[(k * 4).long().clamp(0, 3)]
+        h = pw[:, 1] - land_h(pw[:, 0], pw[:, 2])
+        a = torch.where((h > 1.43)[:, None], srgb("#c8987a").expand_as(a), a)
+        a = torch.where((h > 1.62)[:, None], srgb("#141416").expand_as(a), a)
+        a = torch.where((h < 0.35)[:, None], srgb("#2a2420").expand_as(a), a)
+        return {"albedo": a * (0.8 + 0.3 * fbm(pw * 5, 2))[:, None]}
+    return Mat("#1e3270", rough=0.8, pattern=pat)
+
+
+def musket_mat():
+    def pat(pl, pw, n):
+        h = pw[:, 1] - land_h(pw[:, 0], pw[:, 2])
+        wood = srgb("#5a3a22") * (0.8 + 0.3 * fbm(pw * 8, 2))[:, None]
+        steel = srgb("#b8bcc4")
+        return {"albedo": torch.where((h > 1.15)[:, None], steel.expand_as(wood), wood), "rough": torch.where(h > 1.15, 0.3, 0.7)}
+    return Mat("#5a3a22", rough=0.6, pattern=pat)
+
+
+# the fires of the bivouac: (x, z, soldiers around it)
+FIRES = [(-5.0, -10.0, 5), (9.0, -19.0, 4), (-21.0, -24.0, 5), (22.0, -9.0, 3), (1.0, -29.0, 4), (33.0, -25.0, 4),
+         (-30.0, -50.0, 0), (35.0, -45.0, 0), (-55.0, -70.0, 0), (55.0, -66.0, 0), (-20.0, -88.0, 0), (28.0, -92.0, 0),
+         (-75.0, -48.0, 0), (75.0, -80.0, 0)]
+
+
+def fires(p):
+    """Each fire: a ring of stones, logs, the embers; a tripod with its cauldron over it."""
+    d = torch.full_like(p[:, 0], 1e9)
+    for (fx, fz, _) in FIRES:
+        g = ground_at(fx, fz)
+        q = p - vec(fx, g, fz)
+        r = torch.sqrt(q[:, 0] ** 2 + q[:, 2] ** 2)
+        ring = torch.sqrt((r - 0.75) ** 2 + (q[:, 1] - 0.08) ** 2) - 0.14 - 0.04 * fbm(q * 6, 2)
+        embers = torch.maximum(r - 0.6, (q[:, 1] - 0.08).abs() - 0.12) - 0.06 * fbm(q * 5, 2)
+        logs = torch.minimum(sd_capsule((-0.5, 0.15, -0.2), (0.45, 0.3, 0.15), 0.08)(q), sd_capsule((0.1, 0.15, -0.5), (-0.1, 0.32, 0.45), 0.08)(q))
+        tri = torch.full_like(r, 1e9)
+        for k in range(3):
+            a = k * math.tau / 3
+            tri = torch.minimum(tri, sd_capsule((0.9 * math.cos(a), 0, 0.9 * math.sin(a)), (0, 1.55, 0), 0.03)(q))
+        pot = torch.maximum(sd_sphere(0.32)(q - vec(0, 0.85, 0)), q[:, 1] - 1.05)
+        chain = sd_capsule((0, 1.05, 0), (0, 1.55, 0), 0.012)(q)
+        d = torch.minimum(d, torch.minimum(torch.minimum(torch.minimum(ring, embers), logs), torch.minimum(torch.minimum(tri, pot), chain)))
+    return d
+
+
+def fire_mat():
+    def pat(pl, pw, n):
+        em = torch.zeros_like(pw)
+        a = srgb("#3a3430").expand_as(pw).clone() * (0.6 + 0.6 * fbm(pw * 4, 2))[:, None]
+        for (fx, fz, _) in FIRES:
+            g = ground_at(fx, fz)
+            q = pw - vec(fx, g, fz)
+            r = torch.sqrt(q[:, 0] ** 2 + q[:, 2] ** 2)
+            hot = sstep(0.65, 0.2, r) * sstep(0.5, 0.1, q[:, 1])
+            em = em + srgb("#ff6a1a") * (hot * 6.0 * (0.4 + fbm(pw * 8, 2) ** 2 * 2))[:, None]
+        return {"albedo": a, "emissive": em}
+    return Mat("#3a3430", rough=0.8, pattern=pat)
+
+
+def soldiers_list():
+    rnd = random.Random(17)
+    out = []
+    for (fx, fz, n) in FIRES:
+        for k in range(n):
+            a = k * math.tau / max(n, 1) + rnd.uniform(-0.3, 0.3)
+            rr = rnd.uniform(1.3, 1.9)
+            x, z = fx + math.cos(a) * rr, fz + math.sin(a) * rr
+            pose = rnd.choice(("sit", "sit", "stand", "crouch"))
+            out.append((x, z, a + math.pi, pose, rnd.choice(("#3e4a62", "#5a5a58", "#6a6252", "#1e3270")), rnd.random() < 0.6))
+    for (x, z) in ((-12.0, -4.0), (16.0, -27.0), (-30.0, -31.0), (5.0, -36.0)):      # sentries and men walking
+        out.append((x, z, rnd.uniform(0, math.tau), "stand", "#1e3270", True))
+    return out
+
+
+SOLDIERS = soldiers_list()
+
+
+def soldiers(p):
+    d = torch.full_like(p[:, 0], 1e9)
+    for (x, z, a, pose, _, sh) in SOLDIERS:
+        g = ground_at(x, z)
+        q = p - vec(x, g, z)
+        c, s_ = math.cos(a), math.sin(a)
+        l = torch.stack([c * q[:, 0] + s_ * q[:, 2], q[:, 1], -s_ * q[:, 0] + c * q[:, 2]], 1)     # local x: facing the fire
+        if pose == "stand":
+            body = sd_capsule((0, 0.25, 0), (0, 1.3, 0), 0.24, 0.17)(l)        # the greatcoat, wider at the hem
+            legs = sd_capsule((0, 0.0, 0), (0, 0.4, 0), 0.12)(l)
+            hy = 1.55
+        elif pose == "crouch":
+            body = sd_capsule((0, 0.45, 0), (0.15, 1.0, 0), 0.24, 0.17)(l)
+            legs = sd_capsule((0, 0.05, 0), (0.25, 0.45, 0), 0.12)(l)
+            hy = 1.22
+        else:
+            body = sd_capsule((-0.05, 0.35, 0), (0.05, 0.95, 0), 0.22, 0.16)(l)
+            legs = torch.minimum(sd_capsule((0.0, 0.32, -0.12), (0.45, 0.35, -0.12), 0.09)(l), sd_capsule((0.0, 0.32, 0.12), (0.45, 0.35, 0.12), 0.09)(l))
+            legs = torch.minimum(legs, torch.minimum(sd_capsule((0.45, 0.35, -0.12), (0.5, 0.0, -0.12), 0.07)(l), sd_capsule((0.45, 0.35, 0.12), (0.5, 0.0, 0.12), 0.07)(l)))
+            legs = torch.minimum(legs, sd_box(0.2, 0.15, 0.2)(l - vec(-0.05, 0.15, 0)))       # a pack he sits on
+            hy = 1.18
+        arms = sd_capsule((0, hy - 0.3, -0.2), (0.35, hy - 0.6, -0.12), 0.07)(l)
+        arms = torch.minimum(arms, sd_capsule((0, hy - 0.3, 0.2), (0.35, hy - 0.6, 0.12), 0.07)(l))
+        head = sd_sphere(0.12)(l - vec(0.02, hy, 0))
+        hat = sd_cylinder(0.13, 0.12)(l - vec(0.02, hy + 0.2, 0)) if sh else sd_ellipsoid(0.17, 0.08, 0.13)(l - vec(0.02, hy + 0.1, 0))
+        d = torch.minimum(d, smin(torch.minimum(torch.minimum(body, legs), arms), torch.minimum(head, hat), 0.04))
+    return d
+
+
+def soldier_mat():
+    def pat(pl, pw, n):
+        a = srgb("#3e4a62").expand_as(pw).clone()
+        hgt = torch.zeros_like(pw[:, 0])
+        best = torch.full_like(pw[:, 0], 1e9)
+        for (x, z, ang, pose, coat, sh) in SOLDIERS:
+            dd = (pw[:, 0] - x) ** 2 + (pw[:, 2] - z) ** 2
+            m = dd < best
+            best = torch.where(m, dd, best)
+            a = torch.where(m[:, None], srgb(coat).expand_as(a), a)
+            top = {"stand": 1.55, "crouch": 1.22, "sit": 1.18}[pose]
+            hgt = torch.where(m, (pw[:, 1] - ground_at(x, z)) / top, hgt)
+        a = a * (0.75 + 0.3 * fbm(pw * 6, 2))[:, None]
+        a = torch.where((hgt > 0.93)[:, None], srgb("#c8987a").expand_as(a), a)            # faces
+        a = torch.where((hgt > 1.06)[:, None], srgb("#141416").expand_as(a), a)            # shakos, bicornes
+        a = torch.where((hgt < 0.22)[:, None], srgb("#2a2420").expand_as(a), a)            # gaiters, boots
+        return {"albedo": a}
+    return Mat("#3e4a62", rough=0.8, pattern=pat)
+
+
+def marquee(sc, x, z, rot):
+    """The general's marquee: a large wall tent with a striped valance, its flap open."""
+    g = ground_at(x, z)
+    X = T(x, g, z) * RY(rot)
+    def walls(q):
+        box = sd_box(3.2, 1.2, 2.4, 0.05)(q - vec(0, 1.2, 0))
+        door = sd_box(0.7, 1.0, 0.5)(q - vec(0, 1.0, 2.4))
+        return torch.maximum(box, -door)
+    def roof(q):
+        return roof_f(q - vec(0, 2.35, 0), 3.5, 2.6, 1.6) - 0.02 * fbm(q * 3, 2)
+    def pat(pl, pw, n):
+        a = srgb("#ece4d2") * (0.85 + 0.2 * fbm(pw * 2, 2))[:, None]
+        stripe = ((pl[:, 0] * 1.6 - torch.floor(pl[:, 0] * 1.6)) < 0.5).float() * (pl[:, 1] > 2.05).float() * (pl[:, 1] < 2.45).float()
+        return {"albedo": torch.lerp(a, srgb("#1e3a8a"), stripe[:, None])}
+    m = Mat("#ece4d2", rough=0.85, sss=0.5, pattern=pat)
+    sc.add(walls, m, X)
+    sc.add(roof, m, X)
+    sc.add(sd_box(0.8, 0.4, 0.5), Mat("#4a3020", rough=0.6), X * T(1.0, 0.4, 3.6))          # a camp table outside, a chest
+    sc.add(sd_box(0.5, 0.3, 0.35), Mat("#2a3a5a", rough=0.6), X * T(-1.6, 0.3, 3.2))
+
+
+def tree(cx, cz, h, rnd, kind="oak"):
+    """A tree: a trunk, main branches, and a crown of leafy clusters (each lumpy, leaves at two scales)."""
+    g = ground_at(cx, cz)
+    clusters = []
+    if kind == "poplar":
+        for k in range(9):
+            t = 0.25 + 0.75 * k / 8
+            clusters.append((rnd.uniform(-0.4, 0.4), h * t, rnd.uniform(-0.4, 0.4), h * 0.11 * (1.2 - 0.6 * abs(t - 0.55) * 2)))
+        trunk = (0.0, 0.0, 0.0, 0.0, h * 0.85, 0.0, h * 0.025)
+    else:
+        for k in range(14):
+            a = rnd.uniform(0, math.tau)
+            rr = rnd.uniform(0, h * 0.32)
+            clusters.append((math.cos(a) * rr, h * rnd.uniform(0.5, 0.85) - rr * 0.3, math.sin(a) * rr, h * rnd.uniform(0.14, 0.22)))
+        trunk = (0.0, 0.0, 0.0, 0.0, h * 0.55, 0.0, h * 0.04)
+    branches = [(trunk[3] * 0, h * 0.4, 0.0, c[0] * 0.8, c[1] * 0.95, c[2] * 0.8) for c in clusters[::3]]
+
+    def wood(p):
+        q = p - vec(cx, g, cz)
+        d = sd_capsule(trunk[:3], trunk[3:6], trunk[6], trunk[6] * 0.5)(q)
+        for b in branches:
+            d = torch.minimum(d, sd_capsule(b[:3], b[3:], trunk[6] * 0.45, trunk[6] * 0.15)(q))
+        return d
+
+    def crown(p):
+        q = p - vec(cx, g, cz)
+        d = torch.full_like(q[:, 0], 1e9)
+        for (x, y, z, r) in clusters:
+            d = smin(d, sd_ellipsoid(r, r * 0.8, r)(q - vec(x, y, z)), r * 0.3)
+        d = d - h * 0.05 * fbm(q * (6.0 / h), 3) - h * 0.012 * fbm(q * (30.0 / h), 2)
+        return d * 0.6
+    return wood, crown
+
+
+def foliage(c1="#26381a", c2="#6a7a32"):
+    def pat(pl, pw, n):
+        k = fbm(pw * 0.9, 3)
+        a = torch.lerp(srgb(c1), srgb(c2), (0.55 * k + 0.45 * n[:, 1].clamp(0, 1))[:, None]) * (0.6 + 0.5 * fbm(pw * 4, 2))[:, None]
+        return {"albedo": a}
+    return Mat(c1, rough=0.8, sss=0.8, pattern=pat)
+
+
+def wagon(sc, x, z, rot):
+    g = ground_at(x, z)
+    X = T(x, g, z) * RY(rot)
+    wood = Mat("#4a3a28", rough=0.75, pattern=lambda pl, pw, n: {"albedo": srgb("#4a3a28") * (0.7 + 0.4 * fbm(pw * 4, 2))[:, None]})
+    sc.add(sd_box(0.9, 0.35, 2.0, 0.04), wood, X * T(0, 1.15, 0))
+    sc.add(lambda q: torch.maximum(torch.maximum((torch.sqrt(q[:, 0] ** 2 + q[:, 1] ** 2) - 1.05).abs() - 0.03, -q[:, 1]), q[:, 2].abs() - 1.9),
+           canvas_mat(), X * T(0, 1.45, 0))
+    for sx in (-1, 1):
+        for sz in (-1.3, 1.3):
+            sc.add(sd_torus(0.55, 0.06), wood, X * T(sx * 1.0, 0.6, sz) * RZ(math.pi / 2))
+    sc.add(sd_capsule((0, 0.8, -2.0), (0, 0.4, -4.0), 0.05), wood, X)
+
+
+def horse_line(p):
+    """Horses tethered along a picket rope, heads to the rope."""
+    d = torch.full_like(p[:, 0], 1e9)
+    for k in range(7):
+        x, z = 38.0 + k * 1.6, -14.0 + 0.3 * math.sin(k * 2.1)
+        g = ground_at(x, z)
+        q = p - vec(x, g, z)
+        a = 0.08 * math.sin(k * 3.7)
+        c, s_ = math.cos(a), math.sin(a)
+        l = torch.stack([c * q[:, 0] + s_ * q[:, 2], q[:, 1], -s_ * q[:, 0] + c * q[:, 2]], 1)
+        d = torch.minimum(d, horse_sdf(l, rider=False))
+    rope = sd_capsule((37.0, ground_at(37, -15.6) + 1.3, -15.6), (49.0, ground_at(49, -15.6) + 1.3, -15.6), 0.02)(p)
+    return torch.minimum(d, rope)
+
+
 def scene():
     sc = Scene()
     sc.add(land, fields())
@@ -319,38 +644,42 @@ def scene():
     sc.add(woods, leaves("#2e4224"))
     rnd = random.Random(3)
     farm(sc, -40.0, -190.0, 0.3)
-    poplars(sc, -160, -260, 120, -300, 16, rnd)
-    poplars(sc, 60, -120, 160, -200, 8, rnd)
-    hb = lambda x, z: float(land_h(torch.tensor([x], device=vec(0).device), torch.tensor([z], device=vec(0).device))[0])
-    cannon(sc, -13.0, -10.0, 0.35, hb(-13.0, -10.0))
-    cannon(sc, 14.0, -14.0, -0.3, hb(14.0, -14.0))
+    hb = lambda x, z: ground_at(x, z)
+    # trees: a row of poplars along the road, oaks on the ridge's flanks
+    fol, bark = foliage(), Mat("#3a2e24", rough=0.9, pattern=lambda pl, pw, n: {"albedo": srgb("#3a2e24") * (0.6 + 0.5 * fbm(pw * torch.tensor([6.0, 0.8, 6.0], device=D0), 3))[:, None]})
+    trees = [tree(-160 + 17 * k + rnd.uniform(-2, 2), -260 - 3 * k, rnd.uniform(17, 22), rnd, "poplar") for k in range(16)]
+    trees += [tree(x, z, h, rnd) for (x, z, h) in ((-46.0, -14.0, 13.0), (-58.0, -22.0, 15.0), (62.0, -6.0, 14.0), (74.0, -24.0, 16.0),
+                                                   (-110.0, -60.0, 14.0), (120.0, -70.0, 15.0), (90.0, -150.0, 13.0))]
+    for (w, c) in trees:
+        sc.add(w, bark)
+        sc.add(c, fol)
+    # the bivouac: streets of tents, muskets piled before them, fires with their cauldrons, the men round them
+    sc.add(tents, canvas_mat())
+    sc.add(muskets, musket_mat())
+    sc.add(campers, camper_mat())
+    sc.add(fires, fire_mat())
+    sc.add(soldiers, soldier_mat())
+    marquee(sc, -16.0, -15.0, 0.35)
+    flag(sc, -12.5, hb(-12.5, -11.0), -11.0, ["#1e3a8a", "#f2f0ea", "#c8242a"], 0.2)
+    sc.add(horse_line, horse_mat("#5a3a24"))
+    for (x, z, r) in ((-27.0, -27.0, 0.4), (-32.0, -22.0, 0.2), (-24.0, -19.0, 0.9)):
+        wagon(sc, x, z, r)
+    # the artillery park on the right: guns in a row, their caissons behind
+    for k, x in enumerate((9.0, 14.0, 19.0)):
+        cannon(sc, x, -15.0 - k * 1.2, -0.3, hb(x, -15.0 - k * 1.2))
+    caisson(sc, 16.0, -10.0, 0.6, hb)
     iron = Mat("#1e1e22", metal=0.9, rough=0.4)
-    b0 = hb(-8.0, -7.0)
+    b0 = hb(5.0, -11.0)
     for i in range(4):
         for j in range(4 - i):
             for k in range(4 - i):
-                sc.add(sd_sphere(0.2), iron, T(-8.0 + (j - (3 - i) / 2) * 0.4, b0 + 0.2 + i * 0.33, -7.0 + (k - (3 - i) / 2) * 0.4))
-    # tents on the slope
-    canvas = Mat("#e8e0cc", rough=0.85, sss=0.4, pattern=lambda pl, pw, n: {"albedo": srgb("#e2d8c2") * (0.8 + 0.25 * fbm(pw * 1.2, 2))[:, None]})
-    for (x, z) in ((40, -70), (48, -78), (56, -68), (34, -84), (62, -88)):
-        sc.add(lambda q: roof_f(q, 1.8, 2.2, 2.0), canvas, T(x, hb(x, z), z) * RY(0.4))
-    flag(sc, -19.0, hb(-19.0, -16.0), -16.0, ["#1e3a8a", "#f2f0ea", "#c8242a"], 0.2)
-    flag(sc, 46.0, hb(46.0, -74.0), -74.0, ["#1e3a8a", "#f2f0ea", "#c8242a"], 0.1)
-    # two battalions drawn up on the plain, in line, three ranks deep
-    battalion(sc, -36.0, -72.0, 0.12, 40, hb)
+                sc.add(sd_sphere(0.2), iron, T(5.0 + (j - (3 - i) / 2) * 0.4, b0 + 0.2 + i * 0.33, -11.0 + (k - (3 - i) / 2) * 0.4))
+    # far off, the army forming up on the plain; across the valley, the enemy
     battalion(sc, 12.0, -128.0, -0.08, 36, hb)
     battalion(sc, -95.0, -160.0, 0.2, 40, hb)
     squadron(sc, 70.0, -120.0, -0.35, 18, hb)
     squadron(sc, 105.0, -175.0, -0.3, 18, hb)
-    # an officer on horseback by the battery, an ammunition caisson behind the guns
-    sc.add(lambda q: horse_sdf(q), horse_mat("#6a4028", "#1e2a5a", "#141414"), T(-24.0, hb(-24.0, -6.0), -6.0) * RY(0.9))
-    caisson(sc, 6.0, -4.0, 0.6, hb)
     village(sc, -230.0, -420.0, hb, random.Random(9))
-    # tufts of grass and wild flowers on the ridge
-    lh = lambda x, z: land_h(x, z)
-    grass = Mat("#6a7a34", rough=0.8, sss=0.7, pattern=lambda pl, pw, n: {
-        "albedo": torch.lerp(srgb("#3e5222"), srgb("#a09a52"), (fbm(pw * 0.7, 3) * 1.2 - 0.25).clamp(0, 1)[:, None]) * (0.55 + 0.6 * fbm(pw * 9, 2))[:, None]})
-    # the enemy across the valley: red-coated battalions in line, their colours
     for (x, z, r) in ((-60.0, -265.0, 0.1), (-5.0, -280.0, 0.05), (50.0, -270.0, -0.05), (100.0, -290.0, -0.1)):
         battalion(sc, x, z, r + math.pi, 40, hb, "#a8221c", ("#c8242a", "#f2f0ea", "#1e3a8a"))
     return sc
@@ -453,19 +782,15 @@ def render(W=2560, H=1440, ss=1):
     hb = lambda x, z: float(land_h(torch.tensor([float(x)], device=vec(0).device), torch.tensor([float(z)], device=vec(0).device))[0])
     vols = [Volume(cumulus, (-20000, 900, -30000), (20000, 2200, 500), albedo="#ffffff", g=0.65, steps=40, light_steps=5, light_dist=500)]
     vols.append(Volume(mist, (-1500, -12, -2500), (1500, 25, -30), albedo="#f0ece4", g=0.6, steps=36, light_steps=2, light_dist=20))
-    for (x, z) in ((44, -76), (58, -86)):
-        f, lo, hi = smoke_column(x, z, hb(x, z) + 0.5, 28.0, 0.7)
-        vols.append(Volume(f, lo, hi, albedo="#d8d4cc", g=0.5, steps=40, light_steps=4))
-    # banks of powder smoke drifting along the two firing lines
-    for (z0, x0, x1, hgt) in ((-122.0, -80.0, 60.0, 10.0), (-255.0, -90.0, 130.0, 14.0)):
-        f, lo, hi = smoke_bank(x0, x1, z0, hb(0.5 * (x0 + x1), z0), hgt)
-        vols.append(Volume(f, lo, hi, albedo="#e8e4dc", g=0.55, steps=48, light_steps=4))
-    # the farm on fire: flames at its foot, a column of black smoke leaning with the wind
-    f, lo, hi, em = fire_column(-40.0, -190.0, hb(-40.0, -190.0), 90.0, 9.0)
-    vols.append(Volume(f, lo, hi, albedo="#4a4440", g=0.4, emission=em, steps=56, light_steps=5))
-    f, lo, hi = gun_smoke(17.5, hb(14.0, -14.0) + 1.6, -17.5, 2.6)
-    vols.append(Volume(f, lo, hi, albedo="#f2f0ea", g=0.45, steps=48, light_steps=5))
-    img = render_view(scene(), W, H, cam, None, sun_dir=sun, atmo=atmo, aerial=(0.0009, 0.004, 0.0), sun_soft=0.04,
+    for (fx, fz, _) in FIRES:
+        f, lo, hi = smoke_column(fx, fz, hb(fx, fz) + 0.6, 20.0, 0.8, (0.7, -0.12))
+        vols.append(Volume(f, lo, hi, albedo="#cfcac2", g=0.5, steps=40, light_steps=3))
+    # the farm's chimney, the village's
+    for (x, z) in ((-40.0, -190.0), (-230.0, -420.0)):
+        f, lo, hi = smoke_column(x, z, hb(x, z) + 9.0, 60.0, 1.2, (0.3, -0.05))
+        vols.append(Volume(f, lo, hi, albedo="#b8b2aa", g=0.5, steps=40, light_steps=3))
+    lights = [((fx, hb(fx, fz) + 0.6, fz), "#ff7a2a", -2.2) for (fx, fz, n) in FIRES if n > 0]
+    img = render_view(scene(), W, H, cam, None, sun_dir=sun, atmo=atmo, lights=lights, aerial=(0.0009, 0.004, 0.0), sun_soft=0.04,
                       exposure=1.35, steps=360, tmax=5000, ao_scale=0.6, bloom=0.6, dof=(22.0, 0.15), vignette=0.32, grain=0.012,
                       grade=("#4a5a7a", "#ffe6c0"), ss=ss, volumes=[] if NOVOL else vols)
     return img

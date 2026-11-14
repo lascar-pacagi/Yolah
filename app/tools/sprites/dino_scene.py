@@ -119,27 +119,86 @@ def frond_mat(c="#3e6a26"):
     return Mat(c, rough=0.6, sss=0.7, pattern=lambda pl, pw, n: {"albedo": srgb(c) * (0.6 + 0.6 * fbm(pw * 3, 2))[:, None]})
 
 
+def fronds(top, n, L, up, rnd, pinnae=22, width=0.11, droop=0.9):
+    """A rosette of pinnate fronds springing from `top`: each arches out and droops, its leaflets
+    shown by a serrated outline; one SDF for the whole crown."""
+    spec = []
+    for i in range(n):
+        a = math.tau * i / n + rnd.uniform(-0.25, 0.25)
+        spec.append((math.cos(a), math.sin(a), L * rnd.uniform(0.8, 1.1), up * rnd.uniform(0.7, 1.3), rnd.uniform(-0.15, 0.15)))
+    tx, ty, tz = top
+
+    def f(p):
+        qx, qy, qz = p[:, 0] - tx, p[:, 1] - ty, p[:, 2] - tz
+        d = torch.full_like(qx, 1e9)
+        for (ca, sa, Li, ui, tw) in spec:
+            u = qx * ca + qz * sa
+            v = -qx * sa + qz * ca
+            t = (u / Li).clamp(0, 1)
+            yr = Li * (ui * t * 2.2 - droop * t * t)
+            s_ = pinnae * t - torch.floor(pinnae * t)
+            teeth = 0.55 + 0.45 * (2 * s_ - 1).abs()                    # the leaflets: a serrated edge
+            w = width * Li * torch.sin(math.pi * t.clamp(0.02, 0.999)).clamp_min(0) ** 0.6 * teeth
+            ydev = qy - yr + 0.5 * v * v / Li - tw * v                     # leaflets droop either side of the rachis
+            blade = torch.maximum(torch.maximum(v.abs() - w, ydev.abs() - 0.012 * Li), torch.maximum(-u, u - Li))
+            d = torch.minimum(d, blade)
+        return d * 0.5
+    return f
+
+
+def frond_mat2(c1="#2e5a1e", c2="#7aa83a"):
+    def pat(pl, pw, n):
+        k = fbm(pw * 0.6, 3)
+        a = torch.lerp(srgb(c1), srgb(c2), (0.5 * k + 0.5 * n[:, 1].clamp(0, 1))[:, None]) * (0.7 + 0.4 * fbm(pw * 6, 2))[:, None]
+        brown = sstep(0.68, 0.75, fbm(pw * 0.3 + 5, 3))
+        return {"albedo": torch.lerp(a, srgb("#8a6a32"), (0.8 * brown)[:, None])}
+    return Mat(c1, rough=0.6, sss=0.8, pattern=pat)
+
+
 def tree_fern(sc, x, y, z, h, rnd, fm, bm):
     lean = rnd.uniform(-0.15, 0.15)
     top = (x + lean * h, y + h, z)
     k = h / 8
-    sc.add(lambda q: sd_capsule((x, y - 1, z), top, 0.32 * k, 0.24 * k)(q) - 0.05 * k * fbm(q * 6, 2), bm)
-    n = 13
-    for i in range(n):
-        a = math.tau * i / n + rnd.uniform(-0.25, 0.25)
-        L = h * rnd.uniform(0.5, 0.65)
-        up = rnd.uniform(0.15, 0.4)
-        ca, sa = math.cos(a), math.sin(a)
-        # an arching frond: up, out, then drooping; the leaflets as a flat, notched blade
-        pts = [top]
-        for s_ in (0.33, 0.66, 1.0):
-            pts.append((top[0] + ca * L * s_, top[1] + L * (up * s_ * 2.2 - 0.9 * s_ * s_), top[2] + sa * L * s_))
-        for j in range(3):
-            w0, w1 = (0.55, 0.45, 0.3)[j] * k, (0.45, 0.3, 0.06)[j] * k
-            sc.add(lambda q, a_=pts[j], b_=pts[j + 1], w0=w0, w1=w1: torch.maximum(
-                       sd_capsule(a_, b_, w0, w1)(q) - 0.25 * k * (torch.sin(q[:, 0] * 9 / k + q[:, 2] * 9 / k) > 0.3).float() * 0,
-                       (q[:, 1] - (a_[1] + b_[1]) / 2 - (q[:, 0] - (a_[0] + b_[0]) / 2) * 0).abs() - 0.6 * k) - 0.06 * k * fbm(q * (5 / k), 2),
-                   fm, blend=0.08 * k)
+    # the trunk: shaggy with the bases of old fronds
+    sc.add(lambda q: sd_capsule((x, y - 1, z), top, 0.32 * k, 0.26 * k)(q) - 0.06 * k * ridged(q * vec(5 / k, 2 / k, 5 / k), 2), bm)
+    sc.add(fronds(top, 14, h * 0.62, 0.3, rnd, 24), fm)
+
+
+def cycad(sc, x, y, z, h, rnd, fm, bm):
+    """A cycad: a stout scaly trunk and a crown of stiff, straight fronds."""
+    top = (x, y + h, z)
+    sc.add(lambda q: sd_capsule((x, y - 0.5, z), top, 0.28 * h, 0.22 * h)(q) - 0.04 * h * ridged(q * (8 / h), 2), bm)
+    sc.add(fronds(top, 16, h * 1.3, 0.55, rnd, 30, 0.09, 0.4), fm)
+
+
+def horsetails(cx, cz, r, n, rnd):
+    """A clump of horsetails: thin jointed stems, whorls of needles at the joints (one SDF)."""
+    stems = [(cx + rnd.uniform(-r, r), cz + rnd.uniform(-r, r), rnd.uniform(1.0, 2.2), rnd.uniform(-0.08, 0.08)) for _ in range(n)]
+
+    def f(p):
+        d = torch.full_like(p[:, 0], 1e9)
+        for (x, z, h, lean) in stems:
+            g = TH.get((x, z))
+            q = p - vec(x, g, z)
+            qx = q[:, 0] - lean * q[:, 1]
+            rr = torch.sqrt(qx * qx + q[:, 2] ** 2)
+            seg = q[:, 1] * 5 - torch.floor(q[:, 1] * 5)
+            stem = torch.maximum(rr - 0.025 - 0.012 * sstep(0.85, 1.0, seg), torch.maximum(q[:, 1] - h, -q[:, 1]))
+            whorl = torch.maximum(torch.maximum(rr - 0.22 * (1 - q[:, 1] / h).clamp(0.2, 1), (seg - 0.92).abs() - 0.03),
+                                  torch.maximum(q[:, 1] - h * 0.9, 0.2 - q[:, 1]))
+            d = torch.minimum(d, torch.minimum(stem, whorl * 0.7))
+        return d
+    return f
+
+
+class _TH(dict):
+    def get(self, k):
+        if k not in self:
+            self[k] = terrain_h(*k)
+        return self[k]
+
+
+TH = _TH()
 
 
 def araucaria(sc, x, y, z, h, rnd, fm, bm):
@@ -157,15 +216,50 @@ def araucaria(sc, x, y, z, h, rnd, fm, bm):
                    T(*tip), blend=0.02 * h)
 
 
+def forest_canopy(x, z):
+    """Heights of the crowns over the hills: umbrellas of araucarias, conifer spires, round crowns (2×2 nearest cells)."""
+    cell = 9.0
+    c = torch.zeros_like(x)
+    kind = torch.zeros_like(x)
+    i0, k0 = torch.floor(x / cell - 0.5), torch.floor(z / cell - 0.5)
+    for di in (0, 1):
+        for dk in (0, 1):
+            i, k = i0 + di, k0 + dk
+            idv = torch.stack([i, k, i * 0 + 7], 1)
+            cx = (i + 0.5 + (hash3(idv) - 0.5) * 0.6) * cell
+            cz = (k + 0.5 + (hash3(idv + 1.3) - 0.5) * 0.6) * cell
+            t = hash3(idv + 2.2)
+            rad = cell * (0.35 + 0.25 * hash3(idv + 3.3))
+            H = 8 + 14 * hash3(idv + 4.4)
+            u = torch.sqrt((x - cx) ** 2 + (z - cz) ** 2) / rad
+            umb = H * sstep(1.0, 0.75, u) * (0.85 + 0.15 * (1 - u).clamp_min(0))          # flat-topped umbrella
+            con = H * 1.3 * (1 - u).clamp_min(0) ** 1.2                                   # spire
+            rnd_ = H * 0.8 * (1 - u * u).clamp_min(0) ** 0.6                               # round
+            h = torch.where(t < 0.35, umb, torch.where(t < 0.7, con, rnd_)) * (hash3(idv + 6.6) < 0.85).float()
+            win = h > c
+            c = torch.where(win, h, c)
+            kind = torch.where(win, t, kind)
+    return c * (0.85 + 0.3 * fbm(torch.stack([x * 0.4, z * 0.4, x * 0 + 2], 1), 2)), kind
+
+
 def forest(p):
-    """The forest on the hills as a canopy: a lumpy layer above the terrain (distant trees)."""
+    """The forest on the hills, beyond the lake: a canopy of crowns over the ground."""
     x, z = p[:, 0], p[:, 2]
     q = torch.stack([x * 0.012, x * 0, z * 0.012], 1)
     h = 26 * (fbm(q, 5) - 0.35) + 2.5 * fbm(p * 0.15, 3)
     lake = torch.exp(-((x / 60) ** 2 + ((z + 70) / 45) ** 2))
     h = h * (1 - 0.9 * lake) - 3.0 * lake
-    canopy = h + 9 * (fbm(p * 0.09, 3) - 0.2) * (1 - lake * 1.4).clamp(0, 1) * ((-z - 60) / 60).clamp(0, 1) * (fbm(q * 3, 2) > 0.45).float()
-    return (p[:, 1] - canopy) * 0.5
+    mask = (1 - lake * 1.4).clamp(0, 1) * ((-z - 60) / 60).clamp(0, 1) * sstep(0.4, 0.5, fbm(q * 3, 2))
+    c, _ = forest_canopy(x, z)
+    return (p[:, 1] - h - c * mask + 0.5) * 0.35
+
+
+def forest_mat():
+    def pat(pl, pw, n):
+        _, kind = forest_canopy(pw[:, 0], pw[:, 2])
+        a = torch.where((kind < 0.35)[:, None], srgb("#2a4220").expand_as(pw), torch.where((kind < 0.7)[:, None], srgb("#1e3220").expand_as(pw), srgb("#46602a").expand_as(pw)))
+        return {"albedo": a * (0.6 + 0.6 * fbm(pw * 0.8, 3))[:, None] * (0.75 + 0.35 * n[:, 1].clamp(0, 1))[:, None]}
+    return Mat("#2e4a1e", rough=0.8, sss=0.6, pattern=pat)
 
 
 def scatter(cell, rmax, jit, region, make, seed, keep, top=2.5, ext=1.3, rot=0.0, clumps=0.0):
@@ -238,24 +332,29 @@ def rock(loc, r, h):
 def scene():
     sc = Scene()
     sc.add(terrain, ground_mat())
-    sc.add(forest, frond_mat("#2e4a1e"))
+    sc.add(forest, forest_mat())
     sc.add(sd_box(80, 0.1, 60), lake_mat(), T(0, -2.1, -70))
     sc.add(volcano, volcano_mat(), T(40, -10, -620))
     # ferns covering the ground near the eye, stones, a forest of araucarias on the far hills
     ferns = fern_mat()
-    sc.add(scatter(5.0, 1.15, 0.35, (-70.0, 70.0, -70.0, 12.0), fern_clump, 1.0, 0.8, top=1.0, ext=1.4, rot=0.47, clumps=0.4), ferns)
-    sc.add(scatter(6.6, 1.5, 0.5, (-80.0, 80.0, -80.0, 12.0), fern_clump, 4.0, 0.6, top=1.0, ext=1.4, rot=-0.93, clumps=0.5), ferns)
-    sc.add(scatter(2.6, 0.55, 0.2, (-50.0, 50.0, -45.0, 12.0), fern_clump, 7.0, 0.5, top=1.0, ext=1.4, rot=1.31, clumps=0.5), ferns)
+    sc.add(scatter(5.0, 1.15, 0.35, (-70.0, 70.0, -70.0, 12.0), fern_clump, 1.0, 0.95, top=1.0, ext=1.4, rot=0.47, clumps=0.4), ferns)
+    sc.add(scatter(6.6, 1.5, 0.5, (-80.0, 80.0, -80.0, 12.0), fern_clump, 4.0, 0.85, top=1.0, ext=1.4, rot=-0.93, clumps=0.5), ferns)
+    sc.add(scatter(2.6, 0.55, 0.2, (-50.0, 50.0, -45.0, 12.0), fern_clump, 7.0, 0.8, top=1.0, ext=1.4, rot=1.31, clumps=0.5), ferns)
+    sc.add(scatter(1.8, 0.38, 0.12, (-40.0, 40.0, -40.0, 12.0), fern_clump, 9.0, 0.7, top=1.0, ext=1.4, rot=2.1, clumps=0.4), ferns)
     sc.add(scatter(5.0, 0.6, 1.2, (-80.0, 80.0, -90.0, 10.0), rock, 2.0, 0.35), Mat("#5a5048", rough=0.85, pattern=lambda pl, pw, n: {
         "albedo": torch.lerp(srgb("#3a322c"), srgb("#7a6e60"), fbm(pw * 1.5, 3)[:, None])}))
     sc.add(scatter(20.0, 6.0, 2.0, (-600.0, 600.0, -480.0, -150.0), far_tree, 3.0, 0.55, top=4.2, ext=0.95), frond_mat("#2a4a20"))
     rnd = random.Random(11)
-    fm, bm = frond_mat(), bark()
+    fm, bm = frond_mat2(), bark()
     spots = [(-22, -18, 9), (-30, -26, 11), (24, -20, 8), (31, -30, 12), (-14, -40, 7), (18, -44, 8), (-44, -60, 13), (46, -58, 12)]
     spots += [(rnd.uniform(-90, 90), rnd.uniform(-160, -30), rnd.uniform(7, 13)) for _ in range(14)]
     spots = [s_ for s_ in spots if abs(s_[0]) > 35 or s_[1] > -30 or s_[1] < -120]
     for (x, z, h) in spots:
         tree_fern(sc, x, terrain_h(x, z), z, h, rnd, fm, bm)
+    for (x, z, h) in ((-12, -8, 1.4), (15, -6, 1.2), (-38, -40, 1.8), (40, -36, 1.6), (-6, -30, 1.1)):
+        cycad(sc, x, terrain_h(x, z), z, h, rnd, frond_mat2("#3a5a1e", "#8aa840"), bark("#5a4a32"))
+    for (x, z, r, n) in ((-30, -48, 2.5, 14), (24, -52, 2.0, 12), (-8, -46, 1.5, 9)):
+        sc.add(horsetails(x, z, r, n, rnd), Mat("#5a7a2a", rough=0.6, pattern=lambda pl, pw, n: {"albedo": torch.lerp(srgb("#3a5a1e"), srgb("#8aa042"), fbm(pw * 3, 2)[:, None])}))
     for (x, z, h) in ((-60, -110, 34), (-48, -130, 30), (70, -120, 38), (58, -150, 32)):
         araucaria(sc, x, terrain_h(x, z), z, h, rnd, frond_mat("#2a4a20"), bark("#3a2a1e"))
     return sc
