@@ -202,18 +202,62 @@ TH = _TH()
 
 
 def araucaria(sc, x, y, z, h, rnd, fm, bm):
-    sc.add(sd_capsule((x, y - 1, z), (x, y + h, z), 0.012 * h, 0.006 * h), bm)
-    # whorls of horizontal branches near the top, each ending in a dense tuft: the umbrella crown
-    for k in range(5):
-        yy = y + h * (0.62 + 0.08 * k)
-        r = h * (0.27 - 0.035 * k)
-        m = 7 - k
-        for i in range(m):
-            a = math.tau * i / m + rnd.uniform(-0.3, 0.3) + k
-            tip = (x + math.cos(a) * r, yy + rnd.uniform(-0.03, 0.04) * h, z + math.sin(a) * r)
-            sc.add(sd_capsule((x, yy, z), tip, 0.006 * h), bm)
-            sc.add(lambda q, s_=0.07 * h: sd_ellipsoid(s_ * 1.5, s_ * 0.32, s_ * 1.5)(q) - 0.2 * s_ * fbm(q * (4 / s_), 2), fm,
-                   T(*tip), blend=0.02 * h)
+    """An araucaria: a tall straight trunk, whorls of branches over its upper
+    half, curving down then up, each ending in a ragged clump of scale-leaved
+    branchlets (irregular, lumpy, with gaps). One SDF for the branches and one
+    for the clumps: each whorl is a polar repetition (the sector's own length,
+    droop and size from a hash), so a tree costs a few evaluations."""
+    sc.add(sd_capsule((x, y - 1, z), (x, y + h, z), 0.013 * h, 0.005 * h), bm)
+    whorls = []
+    nw = 8
+    for k in range(nw):
+        f = k / (nw - 1)
+        if rnd.random() < 0.18 and 0 < k < nw - 1:
+            continue                                     # a missing whorl: gaps in the crown
+        whorls.append((y + h * (0.6 + 0.38 * f), h * (0.16 + 0.1 * math.sin(math.pi * (0.25 + 0.6 * f))) * rnd.uniform(0.85, 1.1),
+                       6 + (k % 2), rnd.uniform(0, 6.3), k))
+
+    def sector(q, yy, r, m, ph, k):
+        """The point in its sector's frame: u along the branch, its length, droop and size factors."""
+        ang = torch.atan2(q[:, 2], q[:, 0]) - ph
+        idx = torch.floor(ang / (math.tau / m) + 0.5)
+        a = idx * (math.tau / m) + ph
+        idv = torch.stack([idx, idx * 0 + k, idx * 0 + x], 1)
+        a = a + (hash3(idv) - 0.5) * 0.6
+        ca, sa = torch.cos(a), torch.sin(a)
+        u = ca * q[:, 0] + sa * q[:, 2]
+        v = -sa * q[:, 0] + ca * q[:, 2]
+        rl = r * (0.8 + 0.4 * hash3(idv + 1.7))
+        droop = h * (0.02 + 0.05 * hash3(idv + 3.1))
+        return u, v, q[:, 1] - yy, rl, droop, hash3(idv + 5.3)
+
+    def branches(q):
+        q = q - vec(x, 0, z)
+        d = torch.full_like(q[:, 0], 1e9)
+        for (yy, r, m, ph, k) in whorls:
+            u, v, w, rl, droop, _ = sector(q, yy, r, m, ph, k)
+            t = (u / rl).clamp(0, 1)
+            curve = -droop * 4 * t * (1 - t) * 0.9 + droop * 0.6 * t * t      # down, then up at the tip
+            dd = torch.sqrt((u - t * rl) ** 2 + v ** 2 + (w - curve) ** 2) - h * (0.005 - 0.002 * t)
+            d = torch.minimum(d, dd)
+        return d
+
+    def clumps(q):
+        q = q - vec(x, 0, z)
+        d = torch.full_like(q[:, 0], 1e9)
+        for (yy, r, m, ph, k) in whorls:
+            u, v, w, rl, droop, hz = sector(q, yy, r, m, ph, k)
+            s_ = 0.032 * h * (0.8 + 0.4 * hz)
+            l = torch.stack([(u - rl * 0.78) / (rl * 0.3 / s_), (w - droop * 0.45) / 0.6, v / 0.9], 1)
+            e = (torch.sqrt((l * l).sum(-1)) - s_) * 0.5
+            d = torch.minimum(d, e)
+        p3 = q
+        return d - 0.5 * 0.032 * h * fbm(p3 * (3.0 / (0.032 * h)), 3) - 0.2 * 0.032 * h * fbm(p3 * (10.0 / (0.032 * h)) + 4, 2)
+    sc.add(branches, bm)
+    sc.add(clumps, fm)
+    # the leader: a narrow tuft at the top
+    sc.add(lambda q, s_=0.05 * h: sd_ellipsoid(s_ * 0.7, s_ * 1.6, s_ * 0.7)(q) - 0.35 * s_ * fbm(q * (3.0 / s_), 3), fm,
+           T(x, y + h * 1.0, z), blend=0.01 * h)
 
 
 def forest_canopy(x, z):
@@ -232,14 +276,18 @@ def forest_canopy(x, z):
             rad = cell * (0.35 + 0.25 * hash3(idv + 3.3))
             H = 8 + 14 * hash3(idv + 4.4)
             u = torch.sqrt((x - cx) ** 2 + (z - cz) ** 2) / rad
-            umb = H * sstep(1.0, 0.75, u) * (0.85 + 0.15 * (1 - u).clamp_min(0))          # flat-topped umbrella
-            con = H * 1.3 * (1 - u).clamp_min(0) ** 1.2                                   # spire
-            rnd_ = H * 0.8 * (1 - u * u).clamp_min(0) ** 0.6                               # round
+            lob = fbm(torch.stack([(x - cx) / 1.6, (z - cz) / 1.6, x * 0 + t * 50], 1), 3)
+            ul = u * (1 + 0.4 * (lob - 0.5))
+            umb = H * sstep(1.0, 0.6, ul) * (0.8 + 0.3 * lob) * (0.9 + 0.1 * (1 - u).clamp_min(0))   # umbrella of pads
+            w = (1 - u).clamp_min(0)
+            con = H * 1.3 * (w - 0.12 * (w * 6 - torch.floor(w * 6)) * sstep(0.05, 0.2, w)).clamp_min(0) ** 1.1 \
+                * (0.85 + 0.3 * lob)                                                    # spire of tiers, ragged
+            rnd_ = H * 0.8 * (1 - ul * ul).clamp_min(0) ** 0.5 * (0.8 + 0.4 * lob)          # round, lobed
             h = torch.where(t < 0.35, umb, torch.where(t < 0.7, con, rnd_)) * (hash3(idv + 6.6) < 0.85).float()
             win = h > c
             c = torch.where(win, h, c)
             kind = torch.where(win, t, kind)
-    return c * (0.85 + 0.3 * fbm(torch.stack([x * 0.4, z * 0.4, x * 0 + 2], 1), 2)), kind
+    return c * (0.9 + 0.15 * fbm(torch.stack([x * 0.8, z * 0.8, x * 0 + 2], 1), 3)), kind
 
 
 def forest(p):
@@ -258,7 +306,8 @@ def forest_mat():
     def pat(pl, pw, n):
         _, kind = forest_canopy(pw[:, 0], pw[:, 2])
         a = torch.where((kind < 0.35)[:, None], srgb("#2a4220").expand_as(pw), torch.where((kind < 0.7)[:, None], srgb("#1e3220").expand_as(pw), srgb("#46602a").expand_as(pw)))
-        return {"albedo": a * (0.6 + 0.6 * fbm(pw * 0.8, 3))[:, None] * (0.75 + 0.35 * n[:, 1].clamp(0, 1))[:, None]}
+        a = a * (0.5 + 0.75 * fbm(pw * 0.9, 3))[:, None] * (0.85 + 0.3 * fbm(pw * 3.5, 2))[:, None]
+        return {"albedo": a * (0.7 + 0.4 * n[:, 1].clamp(0, 1))[:, None]}
     return Mat("#2e4a1e", rough=0.8, sss=0.6, pattern=pat)
 
 

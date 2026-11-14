@@ -440,7 +440,7 @@ def musket_mat():
 
 
 # the fires of the bivouac: (x, z, soldiers around it)
-FIRES = [(-5.0, -10.0, 5), (9.0, -19.0, 4), (-21.0, -24.0, 5), (22.0, -9.0, 3), (1.0, -29.0, 4), (33.0, -25.0, 4),
+FIRES = [(-5.0, -10.0, 0), (9.0, -19.0, 0), (-21.0, -24.0, 5), (22.0, -9.0, 0), (1.0, -29.0, 4), (33.0, -25.0, 4),
          (-30.0, -50.0, 0), (35.0, -45.0, 0), (-55.0, -70.0, 0), (55.0, -66.0, 0), (-20.0, -88.0, 0), (28.0, -92.0, 0),
          (-75.0, -48.0, 0), (75.0, -80.0, 0)]
 
@@ -489,7 +489,7 @@ def soldiers_list():
             x, z = fx + math.cos(a) * rr, fz + math.sin(a) * rr
             pose = rnd.choice(("sit", "sit", "stand", "crouch"))
             out.append((x, z, a + math.pi, pose, rnd.choice(("#3e4a62", "#5a5a58", "#6a6252", "#1e3270")), rnd.random() < 0.6))
-    for (x, z) in ((-12.0, -4.0), (16.0, -27.0), (-30.0, -31.0), (5.0, -36.0)):      # sentries and men walking
+    for (x, z) in ((16.0, -27.0), (-30.0, -31.0), (5.0, -36.0)):      # sentries and men walking (none near: at that size they look like toys)
         out.append((x, z, rnd.uniform(0, math.tau), "stand", "#1e3270", True))
     return out
 

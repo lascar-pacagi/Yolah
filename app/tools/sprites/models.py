@@ -374,7 +374,7 @@ def lid_mat(edge, upper=True):
 
 def human(anim, t, side, outfit="coat"):
     """outfit: "coat" (an eccentric scientist: a long light-grey coat open on a
-    printed white shirt and a dark polo collar), "hoodie" (a hooded zip sweatshirt) or "legendes" (a tunic, a cloak
+    plain white shirt and a dark polo collar), "hoodie" (a hooded zip sweatshirt) or "legendes" (a tunic, a cloak
     held by a brooch, a leather strap: the human in the Légendes set)."""
     sc = Scene()
     base(sc, side)
@@ -441,27 +441,18 @@ def human(anim, t, side, outfit="coat"):
         sc.add(sd_box(0.022, 0.19, 0.012, 0.008), Mat("#4a301e", rough=0.6), root * T(-0.03, y0 + 0.24, 0.18) * RX(-0.35) * RZ(0.55))
     elif outfit == "coat":
         # the eccentric scientist: a long light-grey coat, its wide lapels open on a
-        # white shirt printed with small dark and amber marks, a dark polo collar
+        # plain white shirt, a dark polo collar
         coat_c = "#8c8b87" if side == 0 else "#a9a7a1"
         coat = Mat(coat_c, rough=0.7, pattern=lambda pl, pw, n: {"albedo": srgb(coat_c) * (0.86 + 0.18 * fbm(pl * 40, 3))[:, None]})
 
-        def shirt_pat(pl, pw, n):
-            q = root.to_local(pw) * 60.0
-            cell = torch.floor(q)
-            f = q - cell - 0.5
-            h = hash3(cell)
-            mark = (torch.abs(f[:, 0]) < 0.28).float() * (torch.abs(f[:, 1]) < 0.12).float() * (h > 0.55).float()
-            col = torch.where((h > 0.8)[:, None], srgb("#c87a2a").expand_as(pw), srgb("#2a2a30").expand_as(pw))
-            a = srgb("#f2efe6").expand_as(pw) * (1 - mark[:, None]) + col * mark[:, None]
-            return {"albedo": a * (0.9 + 0.1 * fbm(pl * 50, 2))[:, None]}
-        shirt = Mat("#f2efe6", rough=0.8, pattern=shirt_pat)
+        shirt = Mat("#ece9e1", rough=0.8, pattern=lambda pl, pw, n: {"albedo": srgb("#ece9e1") * (0.9 + 0.1 * fbm(pl * 50, 2))[:, None]})   # plain
         lapel = Mat(coat_c, rough=0.65, pattern=lambda pl, pw, n: {"albedo": srgb(coat_c) * (0.95 + 0.1 * fbm(pl * 40, 2))[:, None]
                                                                          * (1 - 0.35 * smoothstep(0.045, 0.055, pl[:, 0].abs()))[:, None]})
         polo = Mat("#33343a", rough=0.85)
         sc.add(sd_ellipsoid(0.37, 0.2, 0.22), coat, root * T(0, y0 + 0.16, 0))
         sc.add(sd_ellipsoid(0.28, 0.17, 0.18), coat, root * T(0, y0 + 0.28, 0), blend=0.06)
         # the opening: a V of shirt down the front, the polo's collar and placket at the top
-        sc.add(sd_ellipsoid(0.12, 0.2, 0.06), shirt, root * T(0, y0 + 0.2, 0.17) * RX(-0.15), blend=0.01)
+        sc.add(sd_ellipsoid(0.17, 0.2, 0.065), shirt, root * T(0, y0 + 0.21, 0.165) * RX(-0.15), blend=0.01)   # a wide opening (not a tie)
         sc.add(sd_torus(0.085, 0.016), polo, root * T(0, y0 + 0.39, 0.02) * RX(0.3))
         sc.add(sd_box(0.03, 0.06, 0.01, 0.006), polo, root * T(0, y0 + 0.34, 0.15) * RX(-0.5))
         for sgn in (-1, 1):
