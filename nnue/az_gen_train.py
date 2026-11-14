@@ -244,7 +244,10 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cudnn.benchmark = True
     if a.amp == "auto":
-        amp_dtype = torch.bfloat16 if device.type == "cuda" and torch.cuda.is_bf16_supported() else torch.float16
+        # bf16 only where the hardware has it (Ampere+: A40); on Turing (RTX 8000)
+        # torch reports it "supported" but emulates it: ~50x slower (54 samples/s)
+        amp_dtype = (torch.bfloat16 if device.type == "cuda" and torch.cuda.get_device_capability(device)[0] >= 8
+                     else torch.float16)
     else:
         amp_dtype = torch.bfloat16 if a.amp == "bf16" else torch.float16
     scaler = torch.amp.GradScaler(enabled=device.type == "cuda" and amp_dtype == torch.float16)
@@ -275,7 +278,9 @@ def main():
     step = 0
     if os.path.exists(ckpt_path):
         c = torch.load(ckpt_path, map_location=device, weights_only=False)
-        net.load_state_dict(c["net"]); opt.load_state_dict(c["opt"]); scaler.load_state_dict(c["scaler"])
+        net.load_state_dict(c["net"]); opt.load_state_dict(c["opt"])
+        if c["scaler"] and scaler.is_enabled():          # an empty state (a bf16 run) must not be loaded by fp16
+            scaler.load_state_dict(c["scaler"])
         if ema is not None and c.get("ema") is not None:
             ema.load_state_dict(c["ema"])
         step = c["step"]
