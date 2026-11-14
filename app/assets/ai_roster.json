@@ -63,8 +63,8 @@
     { "id": "alphazero", "name": "AlphaZero", "family": "MCTS + réseau AlphaZero", "elo": 2250, "sprite": "fig_core",
       "config": "az_vs_nnue/az256.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "batch size", "label": "Positions par lot", "values": [8, 16, 32, 64, 128], "help": "évaluées ensemble par le réseau" } ],
       "description": "Le même MCTS, avec le réseau qu'AlphaZero a entraîné en jouant contre lui-même à partir du réseau supervisé.",
-      "overrides": { "backend": "cpu", "weights": "models/cnn_resnet_256x30_value_policy.bin", "nb threads": 8, "batch size": 16 },
-      "torch overrides": { "backend": "torch", "weights": "models/cnn_resnet_256x30_value_policy.ts", "nb threads": 16, "batch size": 64 } }
+      "overrides": { "backend": "cpu", "weights": "models/az_00271360.bin", "nb threads": 8, "batch size": 16 },
+      "torch overrides": { "backend": "torch", "weights": "models/az_00271360.ts", "nb threads": 16, "batch size": 64 } }
   ],
   // The engine behind the evaluation bar, the hint and the principal variation.
   "analysis": { "config": "search_study/dev_final.cfg", "overrides": { "tt size": 64 } }
