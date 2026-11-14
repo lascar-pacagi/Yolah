@@ -94,14 +94,13 @@ def cliff_mat():
                            sstep(0.6, 0.68, fbm(torch.stack([x * 0.012, y * 0.006, z * 0.012], 1) + 5, 4)) * sstep(0.45, 0.6, fbm(pw * 0.15, 2)))
         veg = autumn(fbm(pw * 0.09 + 7, 3) * 2.0, fbm(pw * 0.004, 2)) * (0.55 + 0.6 * fbm(pw * 0.5, 3))[:, None]
         up = torch.maximum(up, sstep(0.55, 0.75, n[:, 1]))          # whatever is flat enough is overgrown
-        # the crag's lip: no pale band under its top, the grass and the bushes spill over the edge
-        # and hang down in tongues, the rock just below is darker (shade, damp)
+        # the crag: darker just below the plateau (shade, damp)
         rs = torch.sqrt((x - SPUR[0]) ** 2 + ((z - SPUR[1]) * 1.2) ** 2) / SPUR[2]
         on_spur = sstep(1.3, 1.1, rs)
         below = SPUR[3] - y
-        hang = sstep(14 + 10 * fbm(torch.stack([x * 0.08, x * 0, z * 0.08], 1), 3), 2, below) * on_spur
-        up = torch.maximum(up, hang * sstep(0.35, 0.5, fbm(torch.stack([x * 0.15, y * 0.03, z * 0.15], 1) + 3, 3) + 0.25 * hang))
         a = a * (1 - 0.35 * (sstep(30, 8, below) * on_spur))[:, None]
+        # the bushes: fine mottling of light and shade, not patches with smooth outlines
+        veg = veg * (0.5 + 0.7 * fbm(pw * 0.9 + 1, 3))[:, None] * (0.8 + 0.35 * fbm(pw * 3.0, 2))[:, None]
         a = torch.lerp(a, veg, up[:, None])
         # the wet rock behind and around each waterfall
         wet = torch.zeros_like(x)
@@ -436,6 +435,37 @@ def wall_mat():
     return Mat("#e4dccc", rough=0.75, pattern=pat)
 
 
+def rampart(p):
+    """A stone rampart around the plateau's edge, with merlons: the village's edge is a wall, not a
+    band of grass. Grounded down into the crag."""
+    x, y, z = p[:, 0] - SPUR[0], p[:, 1], p[:, 2] - SPUR[1]
+    re = torch.sqrt(x * x + (z * 1.2) ** 2) / SPUR[2]
+    band = (re - 0.762).abs() * SPUR[2] - 1.5                       # 3 m thick
+    top = BASES[(0, 0)] + 3.2
+    ang = torch.atan2(z * 1.2, x)
+    merlon = ((torch.sin(ang * 70) > 0.1).float()) * 1.3
+    d = torch.maximum(band, torch.maximum(y - (top + merlon), BASES[(0, 0)] - 40 - y))
+    # the terrace's arcades replace the wall in front of it
+    tx, tz = _rot(x - 2, z - 34, 0.2)
+    gap = torch.maximum(tx.abs() - 27, tz.abs() - 9)
+    return torch.maximum(d, -gap) * 0.8
+
+
+def rampart_mat():
+    def pat(pl, pw, n):
+        x, y, z = pw[:, 0], pw[:, 1], pw[:, 2]
+        a = torch.lerp(srgb("#8a8274"), srgb("#c8bea8"), fbm(pw * 0.3, 3)[:, None])
+        # courses of blocks: mortar lines
+        cy = (y / 0.9) - torch.floor(y / 0.9)
+        u = (x + z) / 1.6
+        cx = (u + 0.5 * torch.floor(y / 0.9)) - torch.floor(u + 0.5 * torch.floor(y / 0.9))
+        mortar = torch.maximum(sstep(0.9, 0.97, cy), sstep(0.92, 0.98, cx) * (n[:, 1].abs() < 0.5).float())
+        a = a * (1 - 0.35 * mortar)[:, None]
+        a = torch.lerp(a, srgb("#4a5a2e"), (0.45 * sstep(0.6, 0.78, fbm(pw * 0.2 + 5, 3)) * sstep(BASES[(0, 0)] - 4, BASES[(0, 0)] - 20, y))[:, None])
+        return {"albedo": a}
+    return Mat("#a89e8a", rough=0.85, pattern=pat)
+
+
 def roof_mat():
     def pat(pl, pw, n):
         rows = 0.5 + 0.5 * torch.sin(pw[:, 1] * 9.0)
@@ -516,6 +546,7 @@ def scene():
     sc.add(spur_rock, cliff_mat())
     sc.add(river, water_mat())
     sc.add(walls, wall_mat())
+    sc.add(rampart, rampart_mat())
     sc.add(roofs, roof_mat())
     return sc
 
