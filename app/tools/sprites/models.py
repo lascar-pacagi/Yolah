@@ -257,7 +257,7 @@ def hairline(q):
     the nape at the back."""
     front = smoothstep(-0.02, 0.15, q[:, 2])
     temple = torch.exp(-((q[:, 0].abs() - 0.11) / 0.045) ** 2)
-    fr = 0.265 + 0.05 * temple + 0.15 * (q[:, 0].abs() - 0.15).clamp_min(0)
+    fr = 0.205 + 0.03 * temple + 0.15 * (q[:, 0].abs() - 0.15).clamp_min(0)      # a forehead of normal height
     side = -0.08 - 0.08 * smoothstep(-0.02, -0.2, q[:, 2])          # the mane hangs to the jaw on the sides
     return front * fr + (1 - front) * side + 0.014 * (vnoise(q * 28.0) - 0.5)
 
@@ -370,6 +370,21 @@ def lid_mat(edge, upper=True):
         o["albedo"] = o["albedo"] * (1 - k[:, None]) + dark * k[:, None]
         return o
     return Mat(SKIN, rough=0.45, sss=0.4, pattern=pat)
+
+
+def curls(q, f=27.0):
+    """Round curls: 1 at the centre of each cell of a jittered grid (the 2×2×2
+    nearest), 0 between them; q in head units, f curls per unit."""
+    p = q * f
+    c0 = torch.floor(p - 0.5)
+    best = torch.full_like(p[:, 0], 9.0)
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                c = c0 + vec(dx, dy, dz)
+                g = c + 0.2 + 0.6 * torch.stack([hash3(c), hash3(c + 3.1), hash3(c + 7.7)], 1)
+                best = torch.minimum(best, ((p - g) ** 2).sum(-1))
+    return (1 - torch.sqrt(best) / 0.75).clamp(0, 1)
 
 
 def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses with a thick black frame
@@ -591,6 +606,8 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
         g = smoothstep(0.75 - greyness, 1.0 - greyness * 0.5, u)
         a = dark * (1 - g[:, None]) + mid * g[:, None]
         a = a * (1 - (smoothstep(0.62, 0.8, u) * greyness)[:, None]) + light * (smoothstep(0.62, 0.8, u) * greyness)[:, None]
+        cu = curls(q)
+        a = a * (0.55 + 0.6 * cu)[:, None]                       # each curl lit, the hollows between them dark
         return {"albedo": a, "rough": 0.68 + 0.15 * u}
     hair_m = Mat("#7a756f", rough=0.7, pattern=hair_pat)
 
@@ -601,17 +618,16 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
         side_w = smoothstep(0.1, 0.17, p[:, 0].abs())
         # clumps, and grooves along the strands (front to back on top, down the sides)
         flow = torch.where(side_w > 0.5, p[:, 2] * 140.0, p[:, 0] * 140.0)
-        tousle = 0.05 * (fbm(p * 6.0 + 1.0, 3) - 0.5) * 2 + 0.025 * (1 - (2 * vnoise(p * 11.0) - 1).abs()) \
-            + 0.004 * torch.sin(flow + 8.0 * fbm(p * 7.0, 2))
+        tousle = 0.016 * (fbm(p * 6.0 + 1.0, 3) - 0.5) * 2 + 0.016 * curls(p) ** 0.7     # tidy, curly
         back = smoothstep(0.05, -0.2, p[:, 2])
         low = smoothstep(0.25, 0.0, p[:, 1])                         # fuller low on the sides, around the ears
-        thick = 0.02 + 0.07 * side_w * (0.5 + 0.5 * low) + 0.06 * back   # swept back: flat on top, puffs at the sides
+        thick = 0.03 + 0.035 * side_w * (0.5 + 0.5 * low) + 0.035 * back + 0.01 * smoothstep(0.1, 0.3, p[:, 1])
         d = cran - (0.004 + (thick + tousle) * ramp)
         return torch.maximum(d, -above * 0.5)
     sc.add(hair, hair_m, head)
     import random
     rng = random.Random(7)
-    for k in range(34):             # locks: swept back and out, sticking out wildly at the sides and the back
+    for k in range(0):              # (no wild locks any more: a tidy curly head)
         th = rng.uniform(-2.6, 2.6)                   # around the head (0 = front)
         el = rng.uniform(-0.45, 0.85)                 # height above the ear line
         if abs(th) < 1.0:
