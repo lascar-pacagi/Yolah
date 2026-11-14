@@ -192,6 +192,7 @@ details.mobile-toc ol { columns: 1; }
 <tr><td><code>nnue/resnet.{h,cpp}</code></td><td>the CPU backend (Eigen, OpenMP, folded BatchNorm)</td><td><code>ResNetCPU::evaluate</code></td></tr>
 <tr><td><code>nnue/cnn_resnet_value_policy_chunked.py</code></td><td>the network in PyTorch, supervised training</td><td><code>Net</code>, <code>ResBlock</code></td></tr>
 <tr><td><code>player/alphazero_selfplay.{h,cpp}</code>, <code>nnue/alphazero_learn.py</code></td><td>the self-play learning loop</td><td>self-play driver, trainer</td></tr>
+<tr><td><code>nnue/az_gen_loop.sh</code>, <code>nnue/az_gen_train.py</code>, <code>nnue/az_gen_data.py</code></td><td>the generations loop: self-play, training on the new positions and a pool of older ones, matches</td><td>stages selfplay, train, eval, next</td></tr>
 </tbody></table></div>
 
 <h3 id="s1-pseudo"><span class="num">1.4</span>The whole search in forty lines</h3>
@@ -844,7 +845,7 @@ for (size_t i = 0; i < nb; i++) {
 
 <h3 id="s6-cap"><span class="num">6.5</span>Self-play: playout cap randomization and temperature</h3>
 <div class="col">
-<p>Self-play needs many games for the value head and good searches for the policy target. KataGo's playout cap randomization gives both: each move is a <strong>full</strong> search (1600 simulations, noise, forced playouts, π recorded) with probability 0.25, and a <strong>fast</strong> search (200 simulations, no noise, no π) otherwise. Only the full searches produce policy targets; all the positions get the game's result. In the first 20 plies the move is drawn with probability proportional to π (temperature 1), so that the games differ; after that the best move is played.</p>
+<p>Self-play needs many games for the value head and good searches for the policy target. KataGo's playout cap randomization gives both: each move is a <strong>full</strong> search (1600 simulations, noise, forced playouts, π recorded) with probability 0.25, and a <strong>fast</strong> search (200 simulations, no noise, no π) otherwise. Only the full searches produce policy targets; all the positions get the game's result. In the generations loop every position is recorded, those of the fast searches for the value only, and a position with at most 22 free squares gets the endgame solver's exact result instead of the game's. In the first 20 plies the move is drawn with probability proportional to π (temperature 1), so that the games differ; after that the best move is played.</p>
 </div>
 <script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · search, the playout cap">
 full_search = true;
@@ -873,11 +874,11 @@ if (prm.nb_simulations && prm.nb_simulations_fast && prm.playout_cap_fast_prob >
 <tr><td>16 × 64 instead of 16 × 16 (both MCTS players)</td><td class="num-r">about −50</td><td>against g046, same time</td></tr>
 </tbody></table></div>
 <div class="col">
-<p>The self-play run moved the network little: about +17 Elo over weeks of GPU time. The distillation loop (its own document) takes the other road: games of the minimax dev player, searched deep, label positions on which the ResNet is trained, and the ResNet then teaches the NNUE.</p>
+<p>The self-play run moved the network little: about +17 Elo over weeks of GPU time. The distillation loop (its own document) then tried another road, deep searches of the minimax dev player as labels: one round trained the ResNet of the next one, +22 [+7, +36] against its start. It stopped after that round. The ResNet now improves by its own self-play again, in generations (<code>nnue/az_gen_loop.sh</code>, its own document): from that ResNet, each generation plays 12.5 M positions with this search (4 GPUs, 256 games each, 1600 / 200 simulations), every move recorded, the fast searches for the value only, and the exact result from the endgame solver for the positions with at most 22 free squares; the network then trains 10 epochs on these positions and 37.5 M drawn from a pool of 200 M older ones, and plays a match against the previous generation. The ResNet no longer learns from the minimax player's games; it is the teacher from which the minimax player's NNUE is distilled.</p>
 </div>
 </section>
 <footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
-Repository state: commit 96c1670. Speeds: CPU backend on a desktop CPU under WSL2, GPU backend on an RTX 3080; matches on the cluster (crn25: 2× EPYC 9534 and an L40S), 95 % intervals.
+Repository state: commit 96c1670 (section 7 and the generations loop: e687acc). Speeds: CPU backend on a desktop CPU under WSL2, GPU backend on an RTX 3080; matches on the cluster (crn25: 2× EPYC 9534 and an L40S), 95 % intervals.
 </footer>
 </main>
 </div>

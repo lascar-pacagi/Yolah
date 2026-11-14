@@ -29,7 +29,7 @@ cmake -S app -B app/build -DYOLAH_APP_TORCH=OFF
 <tr><td><code>app/assets/sprites/</code></td><td><code>sprites.json</code> (the library of piece looks), <code>assignments.json</code> (the sprite of each player)</td></tr>
 <tr><td><code>app/assets/art/</code></td><td>pixel-art drawings of the workshop: <code>&lt;id&gt;.json</code> + <code>&lt;id&gt;.png</code></td></tr>
 <tr><td><code>app/assets/puzzles/</code>, <code>levels/</code></td><td>one puzzle per file; a level lists puzzles; <code>levels/order.json</code> orders the levels</td></tr>
-<tr><td><code>app/assets/backgrounds/</code></td><td>images behind the puzzles</td></tr>
+<tr><td><code>app/assets/backgrounds/</code></td><td>the pictures behind the boards of the themes and the puzzles (rendered by <code>app/tools/sprites/*_scene.py</code>)</td></tr>
 <tr><td><code>~/.local/share/Yolah/YolahApp/settings.json</code></td><td>the user's settings and progress (<code>SDL_GetPrefPath</code>)</td></tr>
 </table></div>
 

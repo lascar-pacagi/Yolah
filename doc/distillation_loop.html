@@ -156,7 +156,7 @@ details.mobile-toc ol { columns: 1; }
     <div class="stat"><b>~100 M</b><span>positions in a round's training cache</span></div>
   </div>
 </header>
-<div class="note"><strong>Stopped after round 0.</strong> The ResNet is now improved by the generations loop, <code>nnue/az_gen_loop.sh</code>: see <a href="az_gen_loop.html">az_gen_loop.html</a>. This page describes the distillation loop as it ran; section 7 of the new page gives its results.</div>
+<div class="note"><strong>Stopped after round 0.</strong> The ResNet is now improved by the generations loop, <code>nnue/az_gen_loop.sh</code>: see <a href="az_gen_loop.html">az_gen_loop.html</a>. This page describes the distillation loop as it ran; section 7 of the new page gives its results. The two players no longer feed each other: the ResNet learns from its own self-play only, and the NNUE of the dev player is distilled from the ResNet alone (the teacher's values, <code>nnue/nnue_persp_distill.sh</code>), without the dev player's searches. Since 2026-11-14 the dev player's network is <code>k8_them_g046_qat_ib4f_ref2u_az20</code>, with a first layer per phase (see minmax_nnue_dev_player.html).</div>
 <details class="mobile-toc"><summary>Contents</summary><ol id="toc-list-m"></ol></details>
 
 <section id="s1">
@@ -169,7 +169,7 @@ details.mobile-toc ol { columns: 1; }
 <h3 id="s1-round"><span class="num">1.1</span>One round</h3>
 <div class="diagram wide" id="d-round"></div>
 <div class="col">
-<p>Round r starts from the networks NNUE<sub>r</sub> and ResNet<sub>r</sub> and ends with NNUE<sub>r+1</sub> and ResNet<sub>r+1</sub>. Round 0 starts from the NNUE g046 (the network of the final dev player) and the latest network of the AlphaZero 256 run.</p>
+<p>Round r starts from the networks NNUE<sub>r</sub> and ResNet<sub>r</sub> and ends with NNUE<sub>r+1</sub> and ResNet<sub>r+1</sub>. Round 0 starts from the NNUE g046 (then the network of the final dev player) and the latest network of the AlphaZero 256 run.</p>
 </div>
 
 <h3 id="s1-map"><span class="num">1.2</span>The code map</h3>

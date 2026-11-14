@@ -152,7 +152,7 @@ details.mobile-toc ol { columns: 1; }
   <div class="stat-row">
     <div class="stat"><b>1.2–2 M</b><span>nodes per second, one thread</span></div>
     <div class="stat"><b>depth ~20</b><span>reached in 1 s in the middle game</span></div>
-    <div class="stat"><b>1.27 M</b><span>network parameters (int8 trunk)</span></div>
+    <div class="stat"><b>1.86 M</b><span>network parameters (int8 trunk)</span></div>
     <div class="stat"><b>36 %</b><span>of leaf values served by the evaluation cache</span></div>
   </div>
 </header>
@@ -313,7 +313,7 @@ int negamax(pos, α, β, depth):                                              //
 <tr><td rowspan="3">Evaluation</td><td><code>lazy accumulator</code></td><td>on</td><td>7.2</td></tr>
 <tr><td><code>eval cache</code></td><td>20 (2<sup>20</sup> entries, 8 MB)</td><td>7.1</td></tr>
 <tr><td><code>sparse h1</code></td><td>on</td><td>8.7</td></tr>
-<tr><td>Network</td><td><code>weights</code></td><td><code>nnue_persp_k8_them_g046_qat_scratch_az20_distill.quantized.txt</code></td><td>8, 9</td></tr>
+<tr><td>Network</td><td><code>weights</code></td><td><code>nnue_persp_k8_them_g046_qat_ib4f_ref2u_az20_distill.quantized.txt</code></td><td>8, 9</td></tr>
 </tbody></table></div>
 </section>
 <section id="s2">
@@ -1269,6 +1269,7 @@ int MinMaxNNUE_DevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash)
 <div class="col">
 <p>The network's first layer (section 8) is a sum of weight rows, one per feature of the position: the <strong>accumulator</strong>, 2 × 1024 int16 numbers. A move changes three features per point of view (the piece leaves its square, arrives on another, the origin becomes a hole), so a child's accumulator is the parent's plus or minus three rows of 1024 numbers per view, much cheaper than a full computation, which adds one row per piece and per hole.</p>
 <p>Updating the accumulator at every move searched would waste work on children that never need a value: answered by the table, finished games, inner nodes. Instead the search keeps a stack of accumulators, one per ply of the current line, each with a "valid" flag. <code>search_move</code> only marks the child's accumulator invalid. When a value is needed, <code>raw_network_value</code> walks up the line to the last valid accumulator, then down again, one fused pass per ply. A parent's accumulator is never modified, so there is nothing to undo.</p>
+<p><strong>A change of phase.</strong> The first layer has one set of weights per quarter of the game (section 8.2). An accumulator holds the sums of its own position's set, so a move into the next quarter cannot be an update: the accumulator is recomputed in the new set. This happens three times per game line. To make it cheap, the accumulator also keeps its position (three bitboards after the int16 values), and each search thread has a refresh cache, the "finny tables" of Stockfish: for each set, the last accumulator recomputed in that set and its position. A refresh starts from it and applies only the squares that differ, few within one search, instead of every piece and hole (60 to 120 rows). Without the cache 9 % of the updates are refreshes and the search is 11 % slower; with it, the speed is that of a single set.</p>
 </div>
 <div class="widget" id="w-lazy">
   <div class="widget-head">
@@ -1328,42 +1329,52 @@ void NNUE_Persp::update(const int16_t* __restrict in, int16_t* __restrict out, u
 <div class="tbl wide"><table>
 <thead><tr><th>Layer</th><th>Shape</th><th>Parameters</th><th>Stored as</th><th>Computed</th></tr></thead>
 <tbody>
-<tr><td>fc1, shared by both views</td><td>192 → 1024</td><td class="num-r">197,632</td><td>int8 weights ×64, int16 biases ×64</td><td>incrementally, in the accumulator (7.2)</td></tr>
+<tr><td>fc1, shared by both views, 4 sets by phase</td><td>192 → 1024 per set</td><td class="num-r">790,528</td><td>int8 weights ×64, int16 biases ×64</td><td>incrementally, in the accumulator, in the position's set (7.2)</td></tr>
 <tr><td>fc2, 8 heads</td><td>(2 × 1024 + 10) → 64 per head</td><td class="num-r">1,054,208</td><td>int8 ×64, int16 biases ×4096</td><td>sparse SIMD product, one head (8.7)</td></tr>
 <tr><td>fc3, 8 heads</td><td>64 → 32 per head</td><td class="num-r">16,640</td><td>int8 ×64, int16 biases ×4096</td><td>dense SIMD product (8.6)</td></tr>
 <tr><td>value, 8 heads</td><td>32 → 1, tanh</td><td class="num-r">264</td><td>float</td><td>scalar loop</td></tr>
-<tr><td colspan="2"><strong>Total</strong></td><td class="num-r"><strong>1,268,744</strong></td><td colspan="2">about 1.3 MB of int8 weights (fc2 is kept a second time in the sparse layout); one evaluation reads fc2 of one head (133 KB) and fc3 of that head (2 KB)</td></tr>
+<tr><td colspan="2"><strong>Total</strong></td><td class="num-r"><strong>1,861,640</strong></td><td colspan="2">about 1.9 MB of int8 weights (fc2 is kept a second time in the sparse layout); one evaluation reads fc2 of one head (133 KB) and fc3 of that head (2 KB)</td></tr>
 </tbody></table></div>
 
 <h3 id="s7-persp"><span class="num">8.2</span>Points of view and phase heads</h3>
 <div class="col">
 <p><strong>Inputs.</strong> The network does not know the colours. It sees the position from a point of view: 192 binary inputs, <em>my</em> pieces (rows 0–63), <em>his</em> pieces (64–127), the holes (128–191). There are two points of view, one per colour, and both accumulators are kept up to date. The white view is mirrored a ↔ h so that both colours start from the same squares (black starts on a1, h8, d5, e4, white on h1, a8, e5, d4) and share the weights. With the squares numbered most significant bit first, as in the training cache, the row of square <code>sq</code> is <code>63 − sq</code> for black and <code>(63 − sq) ^ 7</code> for white: XOR with 7 flips the file.</p>
 <p><strong>Us and them.</strong> The value is for the side to move: the second layer reads the clipped accumulator of the side to move ("us") and then that of the other side ("them"), always in this order. In campaign P1 the perspective network reading both views beat a fairly retrained copy of the old 193-input network by +68 Elo, while the same network reading "us" alone lost 75.</p>
-<p><strong>Phase heads.</strong> A Yolah position at 10 holes and one at 45 holes need different judgement. The number of holes (one per move played) chooses one of 8 heads: <code>bucket = min(7, holes · 8 / 57)</code>, so heads 0–7 cover about 7 holes each. Each head has its own fc2, fc3 and value weights; fc1 is shared. Only the head of the position is computed.</p>
+<p><strong>Phase heads.</strong> A Yolah position at 10 holes and one at 45 holes need different judgement. The number of holes (one per move played) chooses one of 8 heads: <code>bucket = min(7, holes · 8 / 57)</code>, so heads 0–7 cover about 7 holes each. Each head has its own fc2, fc3 and value weights. Only the head of the position is computed.</p>
+<p><strong>A first layer per phase.</strong> The first layer, too, has its own weights by phase, but coarser: 4 sets, <code>set = holes · 4 / 57</code> (0–14, 15–28, 29–42, 43–56 holes), shared by both views. In training each set is factorised: a shared set plus a correction of its own, learnt together, so that every position trains the shared part and the corrections only learn what differs; the exporter adds them up, and C++ only sees 4 plain sets. The opening gains the most from it (−11 % of validation error in the opening, −5 % over all positions).</p>
 </div>
-<script type="text/x-code" data-lang="cpp" data-title="nnue/nnue_persp.h · row, bucket; nnue/nnue_persp.cpp · init">
+<script type="text/x-code" data-lang="cpp" data-title="nnue/nnue_persp.h · row, fc1_bucket, bucket; nnue/nnue_persp.cpp · init_n">
 static int row(int view, int sq) { return view == Yolah::BLACK ? 63 - sq : (63 - sq) ^ 7; }
+int fc1_bucket(uint64_t holes) const {
+    return std::min(fc1_buckets - 1, std::popcount(holes) * fc1_buckets / (MAX_HOLES + 1));   // 4 sets
+}
 int bucket(const Yolah& yolah) const {
     const int holes = std::popcount(yolah.empty_bitboard());
     return std::min(k - 1, holes * k / (MAX_HOLES + 1));       // k = 8, MAX_HOLES = 56
 }
 
-void NNUE_Persp::init(const Yolah& yolah, int16_t* acc) const {
-    const uint64_t pieces[2] = { yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE) };
-    const uint64_t holes = yolah.empty_bitboard();
+template<int H>
+void NNUE_Persp::init_n(const uint64_t* pos, int16_t* acc) const {
+    const uint64_t pieces[2] = { pos[0], pos[1] };
+    const uint64_t holes = pos[2];
+    const int set = fc1_bucket(holes);
+    const int8_t* w1 = input_to_h1 + size_t(set) * INPUT_SIZE * H;
+    const int16_t* b1 = h1_bias + set * H;
     for (int v : { Yolah::BLACK, Yolah::WHITE }) {
-        int16_t* a = acc + v * H1_SIZE;
-        for (int j = 0; j < H1_SIZE; j++) a[j] = h1_bias[j];
+        int16_t* a = acc + v * H;
+        for (int j = 0; j < H; j++) a[j] = b1[j];
         auto add = [&](uint64_t bb, int plane) {
             for (; bb; bb &= bb - 1) {
-                const int8_t* w = input_to_h1 + (plane + row(v, std::countr_zero(bb))) * H1_SIZE;
-                for (int j = 0; j < H1_SIZE; j++) a[j] += w[j];
+                const int8_t* w = w1 + (plane + row(v, std::countr_zero(bb))) * H;
+                for (int j = 0; j < H; j++) a[j] += w[j];
             }
         };
         add(pieces[v], 0);          // mine
         add(pieces[1 - v], 64);     // his
         add(holes, 128);
     }
+    uint64_t* p = position_of(acc);
+    p[0] = pos[0]; p[1] = pos[1]; p[2] = pos[2];
 }
 </script>
 
@@ -1741,7 +1752,7 @@ static inline void matvec(const int8_t* __restrict__ w, const int8_t* __restrict
 
 <h3 id="s8-model"><span class="num">9.2</span>The network in PyTorch</h3>
 <div class="col">
-<p>The cache stores colours (black, white, holes, turn). <code>perspective()</code> converts each batch on the GPU into the two views: the black view is the cache row as it is, the white view swaps the piece planes and mirrors every square (<code>i ^ 7</code>). "Us" is the view of the side to move. Every head is computed for every position, and <code>gather</code> keeps the right one; the cost is small next to fc1.</p>
+<p>The cache stores colours (black, white, holes, turn). <code>perspective()</code> converts each batch on the GPU into the two views: the black view is the cache row as it is, the white view swaps the piece planes and mirrors every square (<code>i ^ 7</code>). "Us" is the view of the side to move. Every head is computed for every position, and <code>gather</code> keeps the right one; the cost is small next to fc1. The first layer does the same with its 4 sets: all four are computed and the set of the position's phase is kept.</p>
 </div>
 <script type="text/x-code" data-lang="python" data-title="nnue/nnue_persp.py · NetPersp.perspective and forward (excerpt: no direct path)">
 def mirror_index():
@@ -1770,13 +1781,22 @@ class NetPersp(nn.Module):
     def forward(self, x):
         us, them, bucket = self.perspective(x[:, :CACHE_INPUT_SIZE])
         if self.qat:     # what the C++ computes (section 9.3)
-            w1, b1 = q_weight(self.fc1.weight), q_bias(self.fc1.bias, Q)
+            w1, b1 = self.merged_fc1()          # the 4 sets: shared + correction of each phase
+            w1, b1 = q_weight(w1), q_bias(b1, Q)
             w2, b2 = q_weight(self.fc2.weight), q_bias(self.fc2.bias, Q * Q)
             w3, b3 = q_weight(self.w3), q_bias(self.b3, Q * Q)
             act = q_floor
-        h1 = torch.clamp(nn.functional.linear(us, w1, b1), 0.0, 1.0)
+        h1 = nn.functional.linear(us, w1, b1)
+        h1t = nn.functional.linear(them, w1, b1) if self.them else None
+        if self.fc1_buckets > 1:     # the set of the position's phase
+            ib = bucket_of(x[:, 128:192].sum(dim=1).round().long(), self.fc1_buckets)
+            ib = ib.view(-1, 1, 1).expand(-1, 1, self.l1_size)
+            h1 = h1.view(-1, self.fc1_buckets, self.l1_size).gather(1, ib).squeeze(1)
+            if self.them:
+                h1t = h1t.view(-1, self.fc1_buckets, self.l1_size).gather(1, ib).squeeze(1)
+        h1 = torch.clamp(h1, 0.0, 1.0)
         if self.them:
-            h1 = torch.cat([h1, torch.clamp(nn.functional.linear(them, w1, b1), 0.0, 1.0)], dim=1)
+            h1 = torch.cat([h1, torch.clamp(h1t, 0.0, 1.0)], dim=1)
         if self.n_space:
             space = (x[:, self.space_idx] / SPACE_SCALE).to(h1.dtype)          # the 10 features / 64
             h1 = torch.cat([h1, space], dim=1)
@@ -1822,7 +1842,8 @@ def q_floor(x):
 <div class="col">
 <p>The loss pulls the student towards the teacher and keeps the game result as an anchor, so that the student does not inherit all of the teacher's systematic errors:</p>
 <div class="formula">L = 0.8 · MSE(v_student, v_teacher) + 0.2 · MSE(v_student, z)</div>
-<p>Settings of the final network (campaign P7): initialised from the older distilled 193-input network (fc1 without its turn row, each head a copy of its fc2 to fc4, the "them" half and the space columns of fc2 at zero, so that it starts with the old network's values on positions with black to move); 20 epochs; Adam, learning rate 3·10<sup>−4</sup> with a cosine decay to 10<sup>−5</sup>; batches of 1024 positions; float32 (the bfloat16 used for other networks cannot hold the 1/64 grid exactly); PyTorch DDP and <code>torch.compile</code>. After every step the trunk weights are clamped to ±127/64 so that they stay representable as int8; the value heads are free (they stay float in C++). Final validation error against the teacher: 0.0764.</p>
+<p>Settings of the final network (campaign P7): initialised from the older distilled 193-input network (fc1 without its turn row, each head a copy of its fc2 to fc4, the "them" half and the space columns of fc2 at zero, so that it starts with the old network's values on positions with black to move); 20 epochs; Adam, learning rate 3·10<sup>−4</sup> with a cosine decay to 10<sup>−5</sup>; batches of 1024 positions; float32 (the bfloat16 used for other networks cannot hold the 1/64 grid exactly); PyTorch DDP and <code>torch.compile</code>. After every step the trunk weights are clamped to ±127/64 so that they stay representable as int8; the value heads are free (they stay float in C++). Final validation error against the teacher: 0.0764 (the g046 network).</p>
+<p>The present network went on from there in three steps. The same network was first retrained from PyTorch's random start with the same budget (0.0735, campaign W1). Then its first layer was split into the 4 sets by phase of section 8.2, factorised, and trained 10 epochs with the rest of the network frozen (learning rate 10<sup>−4</sup>), then 20 more epochs with everything learning (learning rate 3·10<sup>−5</sup>): validation error 0.0696, −5 % against a control trained the same 30 epochs without sets.</p>
 </div>
 <script type="text/x-code" data-lang="python" data-title="nnue/nnue_persp_distill.py · loss, one training step, clip (excerpt)">
 ALPHA = float(os.environ.get("YOLAH_DISTILL_ALPHA", "0.8"))
@@ -1873,8 +1894,9 @@ def export_persp(path, out_dir):
     with open(os.path.join(out_dir, name + ".quantized.txt"), "w") as f:
         f.write(f"PERSPC\n{net.k}\n{int(net.them)}\n{net.l1_size}\n{net.l2_size}\n{net.l3_size}\n"
                 f"{len(cols)}\n" + "".join(f"{c}\n" for c in cols))
-        write_matrix(f, net.fc1.weight.data, w8("fc1 weight"))
-        write_bias(f, net.fc1.bias.data, b16("fc1 bias", SCALE))
+        w1, b1 = net.merged_fc1()          # the N sets by phase (factorised: shared + correction)
+        write_matrix(f, w1.data, w8("fc1 weight"))
+        write_bias(f, b1.data, b16("fc1 bias", SCALE))
         write_matrix(f, net.fc2.weight.data, w8("fc2 weight"))
         write_bias(f, net.fc2.bias.data, b16("fc2 bias", SCALE * SCALE))
         for k in range(net.k):
@@ -1904,14 +1926,15 @@ def export_persp(path, out_dir):
 <tr><td>Root fix + LMR on history alone + no table cut at PV nodes</td><td class="num-r">+22.4 (1 s)</td><td>Yolah table + aspiration k 1.25</td></tr>
 <tr><td>Lazy SMP, 4 threads (an early version of the player)</td><td class="num-r">+84</td><td>the same player with 1 thread (61.8 %)</td></tr>
 <tr><td><strong>Final player</strong></td><td class="num-r"><strong>+18.8</strong> [+9.0, +28.6]</td><td>g046 before campaigns A1–A5 (1 s, 2000 games)</td></tr>
-<tr><td>The same network retrained from a random start (g046_qat_scratch_az20, validation mse 0.0735 against 0.0764)</td><td class="num-r">+12.3 [+2.4, +22.3] (1 s), +15.5 [+4.5, +26.5] (0.2 s)</td><td>the final player above, with the g046 network (2000 games each); this network is now the one of the final player</td></tr>
+<tr><td>The same network retrained from a random start (g046_qat_scratch_az20, validation mse 0.0735 against 0.0764)</td><td class="num-r">+12.3 [+2.4, +22.3] (1 s), +15.5 [+4.5, +26.5] (0.2 s)</td><td>the final player above, with the g046 network (2000 games each); the network of the final player until 2026-11-14</td></tr>
+<tr><td>First layer per phase, 4 factorised sets, everything retrained (ib4f_ref2u)</td><td class="num-r"><strong>+32.4</strong> [+22.3, +42.6] (1 s), +37.8 [+27.0, +48.7] (0.2 s)</td><td>the final player with the previous network (about 2000 games each); the control trained as long without sets: +3.8 and +8.7. This network is now the one of the final player</td></tr>
 </tbody></table></div>
 <div class="col">
 <p>Against the MCTS players at one second per move (before campaigns A1–A5), the g046 network in this search was level with the AlphaZero 256 network (+1 [−15, +17] for AlphaZero over 1273 games) when the MCTS players kept 1024 descents in flight, and about 35 Elo behind both MCTS players with 256 descents in flight, a setting that suits them better.</p>
 </div>
 </section>
 <footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
-Repository state: commit cf97613 (dev player defaults = the final configuration). Speeds measured on an i7-12700K, one thread; Elo figures from the cluster matches of the search and NNUE campaigns, 95 % intervals.
+Repository state: commit e687acc (dev_final with the network of the first layer per phase; search defaults since cf97613). Speeds measured on an i7-12700K, one thread; Elo figures from the cluster matches of the search and NNUE campaigns, 95 % intervals.
 </footer>
 </main>
 </div>
@@ -2155,7 +2178,7 @@ function svg(id, w, h, body, label) {
   s += B(220, 86, 170, 56, "view of them", "192 inputs, mirrored", "k-w");
   s += A(170, 62, 219, 38); s += A(170, 88, 219, 114);
   s += B(430, 10, 170, 56, "fc1 → acc (us)", "1024 int16", "k-acc");
-  s += B(430, 86, 170, 56, "fc1 → acc (them)", "1024 int16 (same fc1)", "k-acc");
+  s += B(430, 86, 170, 56, "fc1 → acc (them)", "1024 int16 (same set)", "k-acc");
   s += A(390, 38, 429, 38); s += A(390, 114, 429, 114);
   s += B(640, 10, 120, 56, "clamp 0..64", "1024 bytes", "");
   s += B(640, 86, 120, 56, "clamp 0..64", "1024 bytes", "");
@@ -2164,7 +2187,7 @@ function svg(id, w, h, body, label) {
   s += B(800, 70, 100, 90, "h1", ["2080 bytes", "us · them · space"], "");
   s += A(760, 38, 799, 90); s += A(760, 114, 799, 114); s += A(760, 190, 799, 140);
   s += T(20, 150, "incremental: updated move by move (7.2)", "dg-lbl");
-  s += T(20, 166, "fc1 weights shared by both views", "dg-lbl");
+  s += T(20, 166, "fc1: 4 sets by phase, shared by both views", "dg-lbl");
   s += B(800, 220, 100, 50, "head b", "holes · 8 / 57", "k-b");
   s += A(850, 160, 850, 219);
   s += B(560, 290, 180, 56, "fc2 of head b", "2080 → 64, sparse (8.7)", "k-acc");

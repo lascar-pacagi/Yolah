@@ -301,7 +301,9 @@ SDL_RenderClear(a->renderer);
 <figcaption>An atlas is built on first use of a (font, size) pair and kept. Text at 18 px and at 40 px are two atlases: glyphs are never scaled, so they are always sharp.</figcaption>
 </figure>
 
-<pre data-extract="float draw(Font f, float size, const std::string& s, V2 p, Rgba col, Align al = Align::Left) {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="float draw(Font f, float size, const std::string& s0, V2 p, Rgba col, Align al = Align::Left) {" data-file="app/yolah_app.cpp"></pre>
+
+<p><strong>Two languages.</strong> Every text of the application is written in French in the code. <code>draw</code> first passes it to <code>tr</code> (tag <code>@@I18N</code>): with <em>English</em> chosen in the menu, <code>tr</code> looks the French string up in <code>assets/i18n/en.json</code> (French → English) and draws the English one; a string missing from the file is drawn in French. So the translation needs no change at the call sites, only a line in the file for each new text, the texts of the roster and the courses included. <code>trf</code> translates first, then replaces each <code>{}</code> by its argument, so that the numbers stay out of the strings to translate.</p>
 
 <p>Details worth knowing:</p>
 <ul>
