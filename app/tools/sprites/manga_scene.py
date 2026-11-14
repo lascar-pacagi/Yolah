@@ -243,7 +243,7 @@ def scene():
     return sc
 
 
-def puffs(x, z, cell, seed, amp, keep=1.0):
+def puffs(x, z, cell, seed, amp, keep=1.0, soft=0.0):
     """A heightfield of rounded cloud heads on a jittered grid (the 2×2 nearest cells)."""
     acc = torch.zeros_like(x)
     i0, k0 = torch.floor(x / cell - 0.5), torch.floor(z / cell - 0.5)
@@ -256,23 +256,26 @@ def puffs(x, z, cell, seed, amp, keep=1.0):
             rr = cell * (0.55 + 0.35 * hash3(idv + 2.1))
             u = ((x - cx) ** 2 + (z - cz) ** 2) / (rr * rr)
             on = (hash3(idv + 5.7) < keep).float()
-            hi = on * amp * (0.4 + 0.6 * hash3(idv + 3.3)) * (1 - u).clamp_min(0) ** 0.75
-            acc = torch.maximum(acc, hi)
+            w = (1 - u).clamp_min(0)
+            hi = on * amp * (0.4 + 0.6 * hash3(idv + 3.3)) * w * (1.7 - 0.7 * w)      # a round dome, finite slope at its foot
+            acc = torch.logaddexp(acc / soft, hi / soft) * soft if soft > 0 else torch.maximum(acc, hi)
     return acc
 
 
 def cloud_top(x, z):
     big = fbm(torch.stack([x * 0.0006, z * 0.0006, x * 0 + 4], 1), 3)
-    heads = puffs(x, z, 320.0, 1.0, 120, 0.7)
-    on_head = sstep(10, 60, heads)                       # the smaller puffs grow on the heads, the valleys stay smooth
-    return -330 + 60 * sstep(0.3, 0.7, big) + heads + on_head * (puffs(x, z, 110.0, 2.0, 40) + puffs(x, z, 38.0, 3.0, 12)) \
-        + (1 - on_head) * puffs(x, z, 70.0, 4.0, 12, 0.6)
+    # big rounded towers, a few domes swelling on them, the deck between them smooth (no small puffs:
+    # anime cloud seas are drawn in big soft masses)
+    heads = puffs(x, z, 300.0, 1.0, 210, 0.7, soft=14.0)
+    on_head = sstep(20, 100, heads)
+    return -330 + 60 * sstep(0.3, 0.7, big) + heads + on_head * puffs(x, z, 120.0, 2.0, 70, 0.8, soft=8.0) \
+        + 18 * (fbm(torch.stack([x * 0.004, z * 0.004, x * 0 + 2], 1), 3) - 0.5)
 
 
 def cloud_sea(p):
     x, z = p[:, 0], p[:, 2]
-    top = cloud_top(x, z) + 5 * fbm(p * 0.05, 3)
-    return (p[:, 1] - top) * 0.3
+    top = cloud_top(x, z) + 3 * fbm(p * 0.02, 2)
+    return (p[:, 1] - top) * 0.2
 
 
 def cloud_mat():
@@ -281,10 +284,12 @@ def cloud_mat():
     def pat(pl, pw, n):
         nl = (n * L).sum(-1)
         # the anime look: white where the sun strikes, a soft lavender-blue in the shade, warm at the edge of light
-        lit = sstep(-0.15, 0.35, nl)
-        a = torch.lerp(srgb("#8a9cd0"), srgb("#ffffff"), lit[:, None])
-        a = torch.lerp(a, srgb("#ffe8d0"), (sstep(-0.15, 0.05, nl) * sstep(0.3, 0.05, nl) * 0.6)[:, None])
-        return {"albedo": a * (0.72 + 0.08 * fbm(pw * 0.05, 2))[:, None]}
+        lit = sstep(-0.2, 0.45, nl)                      # a soft gradient, two tones blended
+        a = torch.lerp(srgb("#7f90cc"), srgb("#ffffff"), lit[:, None])
+        a = torch.lerp(a, srgb("#ffe8d0"), (sstep(-0.25, 0.0, nl) * sstep(0.35, 0.05, nl) * 0.5)[:, None])
+        deep = sstep(60, 0, pw[:, 1] - (-330 + 20))      # the deck between the towers: in their shade
+        a = torch.lerp(a, srgb("#8090c8"), (0.35 * deep)[:, None])
+        return {"albedo": a * 0.74}
     return Mat("#ffffff", rough=1.0, sss=0.5, pattern=pat)
 
 
@@ -300,7 +305,68 @@ def fluff(p):
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
     above = y - cloud_top(x, z)
     n = fbm(p * 0.04 + 2, 4)
-    return torch.exp(-(above.clamp_min(0) / 6.0)) * (above > -4).float() * ((n - 0.35) * 2).clamp_min(0) * 0.012
+    return torch.exp(-(above.clamp_min(0) / 12.0)) * (above > -4).float() * ((n - 0.3) * 2).clamp_min(0) * 0.02
+
+
+# ─── the sea of clouds: volumetric, after Guerrilla's Nubis (Schneider 2015-2022) ───
+# A weather map gives the coverage and the height of each mass; a height profile
+# makes cumulus (flat bases, rounded tops); a Perlin-Worley noise gives the
+# billowed shape, and a finer Worley noise erodes the edges (more at the tops,
+# wispy at the bases). Lit by the Volume renderer: Beer's law towards the sun,
+# the powder term (dark edges facing the light), two phase lobes (the silver
+# lining), the sky's light from above.
+def worley(p):
+    """1 − F1 of a jittered grid (the 2×2×2 nearest cells): round cells, bright at their centres."""
+    c0 = torch.floor(p - 0.5)
+    best = torch.full_like(p[:, 0], 9.0)
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                c = c0 + vec(dx, dy, dz)
+                f = c + torch.stack([hash3(c), hash3(c + 3.1), hash3(c + 7.7)], 1)
+                best = torch.minimum(best, ((p - f) ** 2).sum(-1))
+    return (1 - torch.sqrt(best)).clamp(0, 1)
+
+
+def worley_fbm(p):
+    return 0.625 * worley(p) + 0.25 * worley(p * 2.03 + 5.1) + 0.125 * worley(p * 4.1 + 9.3)
+
+
+def remap(v, lo, hi, a, b):
+    return a + (v - lo) / (hi - lo).clamp_min(1e-4) * (b - a) if torch.is_tensor(hi) or torch.is_tensor(lo) else a + (v - lo) / (hi - lo) * (b - a)
+
+
+CLOUD_BASE = -390.0
+
+
+def cloud_density(p):
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    out = torch.zeros_like(x)
+    # the weather map: where the towers stand and how high (a deck everywhere below them)
+    wm = fbm(torch.stack([x * 0.0014, z * 0.0014, x * 0 + 1.5], 1), 3)
+    tower = sstep(0.42, 0.68, wm)
+    top = CLOUD_BASE + 120 + 340 * tower
+    h = (y - CLOUD_BASE) / (top - CLOUD_BASE)
+    grad = sstep(0.0, 0.12, h) * sstep(1.0, 0.55, h)                 # flat base, rounded top
+    cov = 0.4 + 0.45 * tower                                         # gaps in the deck, dense towers
+    live = ((grad > 0.01) & (h < 1)).nonzero().squeeze(1)
+    if live.numel() == 0:
+        return out
+    q = p[live]
+    # the shape: low-frequency Perlin noise made billowy by a Worley noise (Perlin-Worley)
+    per = fbm(q * 0.0032 + vec(2, 0, 5), 4)
+    wor = worley_fbm(q * 0.006)
+    pw = remap(per, wor - 1, torch.ones_like(per), 0.0, 1.0).clamp(0, 1)
+    d = remap(pw * grad[live], 1 - cov[live], torch.ones_like(pw), 0.0, 1.0).clamp(0, 1)
+    k = (d > 0).nonzero().squeeze(1)
+    if k.numel():
+        qq = q[k]
+        hh = h[live][k]
+        det = worley_fbm(qq * 0.03 + vec(1.3, 0, 2.1))
+        det = torch.lerp(1 - det, det, sstep(0.1, 0.5, hh))             # wispy at the base, billowed higher
+        d[k] = remap(d[k], det * 0.42, torch.ones_like(det), 0.0, 1.0).clamp(0, 1)
+    out[live] = d * 0.25
+    return out
 
 
 def sea_of_clouds(p):
@@ -367,14 +433,14 @@ def render(W=2560, H=1440, ss=1):
     atmo = Atmosphere(sun, sun_power=22.0, mie=6e-6, mie_g=0.8, ground="#d8dce8", rayleigh=1.25)
     cam = Camera((0.0, 60.0, 0.0), (0, 40, -600), fov=62)
     sc = scene()
-    sc.add(cloud_sea, cloud_mat())
-    vols = [Volume(fluff, (-2500, -340, -4000), (2500, -100, 100), albedo="#ffffff", g=0.6, steps=128, light_steps=3, light_dist=40, ambient=1.0),
+    vols = [Volume(cloud_density, (-3500, CLOUD_BASE, -6000), (3500, CLOUD_BASE + 470, 300), albedo="#ffffff", g=0.6,
+                   steps=192, light_steps=6, light_dist=260, ambient=0.7),
             Volume(towers, (-12000, -200, -14000), (12000, 1800, -2500), albedo="#ffffff", g=0.6, steps=40, light_steps=5, light_dist=700),
             Volume(spray, (-500, -250, -1200), (600, 120, -200), albedo="#ffffff", g=0.5, steps=40, light_steps=2, light_dist=40)]
     for fx in FALLS:
         lo, hi = fall_box(fx)
         vols.append(Volume(falls_density(fx), lo, hi, albedo="#f4faff", g=0.4, steps=64, light_steps=3, light_dist=20, ambient=1.2))
-    img = render_view(sc, W, H, cam, sky_planet(atmo.sky), sun_dir=sun, atmo=atmo, aerial=(0.00008, 0.001, 0.0), sun_soft=0.03,
+    img = render_view(sc, W, H, cam, sky_planet(atmo.sky), sun_dir=sun, atmo=atmo, aerial=(0.00008, 0.001, 0.0), sun_soft=0.12,
                       exposure=0.75, steps=480, tmax=16000, ao_scale=2.0, bloom=0.7, dof=None, vignette=0.2, grain=0.008,
                       grade=("#3a6ad0", "#fffaf2"), ss=ss, volumes=[] if NOVOL else vols)
     return img

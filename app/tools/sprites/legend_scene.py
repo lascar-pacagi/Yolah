@@ -136,6 +136,109 @@ def in_village(x, z):
     return torch.sqrt((x - SPUR[0]) ** 2 + (z - SPUR[1]) ** 2) < 66
 
 
+def forest_mask(x, z):
+    """Where the forest grows: woods and glades, not on the crag's rocky sides, the village or the river."""
+    dens = sstep(0.18, 0.3, fbm(P2(x * 0.006, z * 0.006, 11), 3))
+    rs = torch.sqrt((x - SPUR[0]) ** 2 + ((z - SPUR[1]) * 1.2) ** 2) / SPUR[2]
+    rs = rs / (1 + 0.4 * (fbm(P2(x * 0.012, z * 0.012, 6), 3) - 0.5))
+    cliffs = 1 - sstep(0.7, 0.76, rs) * sstep(0.95, 0.88, rs)
+    rx = x - (120 + 60 * torch.sin(z * 0.006))
+    return sstep(12, 20, rx.abs()) * dens * cliffs * (1 - in_village(x, z).float()) * sstep(-45, -80, z) * (z > cliff_z(x) + 8).float()
+
+
+TREE_CELL = 11.0
+
+
+def trees(p):
+    """The forest as real trees (the 2×2 nearest cells of a jittered grid): broadleaves, a trunk and
+    a crown of foliage clumps where the main branches end (placed by a golden-angle spiral on the
+    crown's ellipsoid, each tree its own), the clumps' edges leafy; conifers, a trunk and stacked
+    tiers of drooping branches. Returns the distance (a few units Lipschitz-safe)."""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    d = torch.full_like(x, 1e9)
+    i0, k0 = torch.floor(x / TREE_CELL - 0.5), torch.floor(z / TREE_CELL - 0.5)
+    pfir = 0.2 + 0.5 * sstep(-160, -70, z) + 0.3 * sstep(0.5, 0.7, fbm(P2(x * 0.004, z * 0.004, 13), 2))
+    for di in (0, 1):
+        for dk in (0, 1):
+            i, k = i0 + di, k0 + dk
+            idv = torch.stack([i, k, i * 0 + 5], 1)
+            cx = (i + 0.5 + (hash3(idv) - 0.5) * 0.6) * TREE_CELL
+            cz = (k + 0.5 + (hash3(idv + 1.3) - 0.5) * 0.6) * TREE_CELL
+            on = (forest_mask(cx, cz) > 0.5) & (hash3(idv + 6.6) < 0.92)
+            g = ground_h(cx, cz)
+            isf = hash3(idv + 8.1) < pfir
+            rad = (4.5 + 3.0 * hash3(idv + 4.4)) * torch.where(isf, 0.7, 1.0)
+            H = rad * (1.9 + 0.5 * hash3(idv + 2.9)) * torch.where(isf, 2.2, 1.0)
+            lx, ly, lz = x - cx, y - g, z - cz
+            r = torch.sqrt(lx * lx + lz * lz)
+            trunk = torch.maximum(r - 0.06 * rad * (1.6 - ly / H).clamp(0.6, 1.6), torch.maximum(ly - H * 0.7, -ly - 1))
+            # broadleaf: clumps on a spiral over the crown's ellipsoid (centre at 0.62 H)
+            ccy = H * 0.62
+            seed = hash3(idv + 3.3) * 6.28
+            bl = torch.full_like(x, 1e9)
+            for j in range(7):
+                f = (j + 0.5) / 7
+                el = 1.2 * (f - 0.35)                                  # from a little below the middle to the top
+                az = seed + j * 2.39996                                 # golden angle
+                cr = rad * (0.62 * math.cos(el))
+                px = cx + cr * torch.cos(az)
+                pz = cz + cr * torch.sin(az)
+                py = g + ccy + H * 0.3 * math.sin(el)
+                rr = rad * (0.42 + 0.12 * hash3(idv + 9.0 + j))
+                bl = torch.minimum(bl, torch.sqrt((x - px) ** 2 + (y - py) ** 2 * 1.2 + (z - pz) ** 2) - rr)
+            core = torch.sqrt(lx * lx + ((ly - ccy) / 0.8) ** 2 + lz * lz) - rad * 0.55
+            bl = torch.minimum(bl, core)
+            # conifer: a spire of drooping tiers
+            u = (ly / H).clamp(0, 1)
+            tier = (ly / (H * 0.12)) - torch.floor(ly / (H * 0.12))
+            cone_r = rad * (1 - u) * (0.75 + 0.35 * tier) * (ly > H * 0.15).float()
+            fir = torch.maximum(r - cone_r, torch.maximum(ly - H, H * 0.15 - ly)) * 0.7
+            crown = torch.where(isf, fir, bl)
+            tree = torch.minimum(trunk, crown)
+            d = torch.where(on, torch.minimum(d, tree), d)
+    # leafy edges: small bumps and holes on the crowns
+    leaf = 0.55 * (fbm(p * 0.6, 3) - 0.5) + 0.25 * (fbm(p * 2.2 + 4, 2) - 0.5)
+    d = d - leaf
+    # a safe bound where there is no tree near
+    return torch.minimum(d * 0.6, torch.full_like(d, TREE_CELL))
+
+
+def tree_mat():
+    def pat(pl, pw, n):
+        x, y, z = pw[:, 0], pw[:, 1], pw[:, 2]
+        i, k = torch.floor(x / TREE_CELL - 0.5), torch.floor(z / TREE_CELL - 0.5)
+        # the nearest tree's key (by the 4 candidate centres)
+        best = torch.full_like(x, 1e9)
+        key = torch.zeros_like(x)
+        fir = torch.zeros_like(x)
+        gref = torch.zeros_like(x)
+        pfir = 0.2 + 0.5 * sstep(-160, -70, z) + 0.3 * sstep(0.5, 0.7, fbm(P2(x * 0.004, z * 0.004, 13), 2))
+        for di in (0, 1):
+            for dk in (0, 1):
+                idv = torch.stack([i + di, k + dk, i * 0 + 5], 1)
+                cx = (i + di + 0.5 + (hash3(idv) - 0.5) * 0.6) * TREE_CELL
+                cz = (k + dk + 0.5 + (hash3(idv + 1.3) - 0.5) * 0.6) * TREE_CELL
+                dd = (x - cx) ** 2 + (z - cz) ** 2
+                m = dd < best
+                best = torch.where(m, dd, best)
+                key = torch.where(m, hash3(idv + 9.7), key)
+                fir = torch.where(m, (hash3(idv + 8.1) < pfir).float(), fir)
+                gref = torch.where(m, ground_h(cx, cz), gref)
+        hgt = y - gref
+        bark = srgb("#3a2e24") * (0.7 + 0.4 * fbm(pw * 3, 2))[:, None]
+        leafc = autumn(key, fbm(pw * 0.003, 2))
+        leafc = torch.lerp(leafc, srgb("#5a5230"), 0.2)
+        leafc = torch.lerp(leafc, autumn((key + 0.37) % 1.0, fbm(pw * 0.003, 2)), (0.3 * sstep(0.6, 0.75, fbm(pw * 0.5 + 3, 2)))[:, None])
+        firc = torch.lerp(srgb("#16261a"), srgb("#2a3a22"), key[:, None])
+        a = torch.lerp(leafc, firc, fir[:, None])
+        # clumps of leaves in light and shade, the inner crown darker
+        a = a * (0.5 + 0.7 * fbm(pw * 1.3, 3))[:, None] * (0.85 + 0.3 * fbm(pw * 5.0, 2))[:, None]
+        trunkish = (hgt < 2.5).float() * (1 - fir) + 0.0
+        a = torch.lerp(a, bark, (trunkish * sstep(0.3, -0.3, n[:, 1].abs() - 0.5))[:, None])
+        return {"albedo": a, "rough": torch.full_like(x, 0.85)}
+    return Mat("#4a5a26", rough=0.85, sss=0.45, pattern=pat)
+
+
 def canopy(x, z):
     """The forest: crowns over the ground, on the 2×2 nearest cells of a jittered grid; returns the
     canopy's height over the ground and each point's tree (a key for its colour, and fir or not)."""
@@ -161,15 +264,21 @@ def canopy(x, z):
             rad = (5.5 + 3.5 * hash3(idv + 4.4)) * (1 - 0.3 * isf)
             H = rad * (1.4 + 0.4 * hash3(idv + 2.9)) * (1 + 1.6 * isf)
             u = torch.sqrt((x - cx) ** 2 + (z - cz) ** 2) / rad
-            dome = (1 - u * u).clamp_min(0) ** 0.6
-            cone = (1 - u).clamp_min(0) ** 1.1
+            # broadleaves: a dome broken into lobes (the big limbs' clumps), different for each tree
+            lob = fbm(P2((x - cx) / 2.4, (z - cz) / 2.4, hash3(idv + 3.3) * 40), 3)
+            ul = u * (1 + 0.35 * (lob - 0.5))
+            dome = (1 - ul * ul).clamp_min(0) ** 0.55 * (0.82 + 0.36 * lob)
+            # conifers: a spire of drooping tiers (each whorl a ledge), ragged
+            w = (1 - u).clamp_min(0)
+            tiers = w - 0.11 * (w * 7 - torch.floor(w * 7)) * sstep(0.05, 0.25, w)
+            cone = tiers.clamp_min(0) ** 1.05
             h = H * torch.lerp(dome, cone, isf) * (hash3(idv + 6.6) < 0.9).float()
             win = h > c
             c = torch.where(win, h, c)
             key = torch.where(win, hash3(idv + 9.7), key)
             fir = torch.where(win, isf, fir)
     # leaves and needles break the outline
-    c = c * (0.72 + 0.5 * fbm(P2(x * 0.7, z * 0.7, 4), 3))
+    c = c * (0.88 + 0.16 * fbm(P2(x * 0.9, z * 0.9, 4), 3) + 0.08 * (fbm(P2(x * 3.0, z * 3.0, 9), 2) - 0.5))
     return c * mask, key, fir
 
 
@@ -187,15 +296,14 @@ def spur_rock(p):
 
 def land(p):
     x, z = p[:, 0], p[:, 2]
-    c, _, _ = canopy(x, z)
-    return (p[:, 1] - ground_h(x, z) - c) * 0.3
+    return (p[:, 1] - ground_h(x, z)) * 0.3
 
 
 def land_mat():
     def pat(pl, pw, n):
         x, y, z = pw[:, 0], pw[:, 1], pw[:, 2]
         g = ground_h(x, z)
-        c, key, fir = canopy(x, z)
+        c, key, fir = torch.zeros_like(x), torch.zeros_like(x), torch.zeros_like(x)     # the trees are their own part now
         steep = (1 - n[:, 1]).clamp(0, 1)
         grass = torch.lerp(srgb("#4a5a26"), srgb("#8a7a3a"), fbm(pw * 0.03, 3)[:, None]) * (0.7 + 0.4 * fbm(pw * 0.4, 2))[:, None]
         rock = torch.lerp(srgb("#8a8070"), srgb("#c8bca8"), fbm(pw * 0.05, 3)[:, None])
@@ -204,9 +312,13 @@ def land_mat():
         a = torch.lerp(a, srgb("#8a5a2a"), (0.4 * sstep(0.55, 0.7, fbm(pw * 0.08, 3)))[:, None])
         # the trees: the autumn palette, firs dark, the crowns lighter at the top (sky light, sun)
         top = sstep(0.2, 1.0, (y - g) / (c + 1e-3))
-        leaf = autumn(key, fbm(pw * 0.003, 2)) * (0.65 + 0.5 * fbm(pw * 0.7, 2))[:, None]
+        leaf = autumn(key, fbm(pw * 0.003, 2))
+        leaf = torch.lerp(leaf, srgb("#5a5230"), 0.22)                     # less saturated: real autumn woods
+        leaf = leaf * (0.55 + 0.7 * fbm(pw * 1.1, 3))[:, None] * (0.85 + 0.3 * fbm(pw * 4.0, 2))[:, None]
+        # a few leaves turned in an otherwise green crown, and the reverse
+        leaf = torch.lerp(leaf, autumn((key + 0.37) % 1.0, fbm(pw * 0.003, 2)), (0.35 * sstep(0.6, 0.75, fbm(pw * 0.5 + 3, 2)))[:, None])
         firc = torch.lerp(srgb("#16261a"), srgb("#2a3a22"), key[:, None]) * (0.7 + 0.5 * fbm(pw * 0.9, 2))[:, None]
-        clump = 0.6 + 0.6 * fbm(pw * 1.6, 2)                    # clumps of leaves in light and shade
+        clump = 0.55 + 0.7 * fbm(pw * 1.6, 3)                   # clumps of leaves in light and shade
         tree = torch.lerp(leaf, firc, fir[:, None]) * ((0.45 + 0.75 * top) * clump)[:, None]
         a = torch.lerp(a, tree, (sstep(0.6, 1.6, y - g) * sstep(0.3, 1.0, c))[:, None])
         return {"albedo": a}
@@ -379,6 +491,7 @@ def cascade(p):
 def scene():
     sc = Scene()
     sc.add(land, land_mat())
+    sc.add(trees, tree_mat())
     sc.add(cliff, cliff_mat())
     sc.add(spur_rock, cliff_mat())
     sc.add(river, water_mat())
