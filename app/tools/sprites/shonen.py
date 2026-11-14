@@ -8,6 +8,8 @@ in the toon mode. From a lone wolf to a dragon god, bigger and more powerful:
   monte_carlo   Kitsune     a white fox spirit, red markings, three tails of blue foxfire
   mcts          Samouraï    red lacquered armour laced in black, a golden crescent, katana on guard
   basic_minmax  Oni         a huge red ogre, ivory horns, a studded iron club, a tiger skin
+  minmax        Tengu       red face, the long nose, crow wings, the feather fan, the ascetic's robe
+  mcts_nnue     Nue         monkey face, tanuki body, tiger legs, a snake tail, a black thunder cloud
   nnue193       Onmyōji     a sorcerer in white, a lacquered hat, paper talismans, a star seal of light
   features      Raijū       a great thunder wolf, a mane of lightning, arcs around it
   resnet        Hōō         the phoenix, wings of red and gold feathers, long eyed plumes, embers
@@ -327,6 +329,122 @@ def oni(anim, t, side):
     return sc
 
 
+# ─── 5b · Tengu (minmax) ────────────────────────────────────────────────────
+def tengu(anim, t, side):
+    """A daitengu, the great mountain goblin: a red face with the very long
+    nose, fierce eyes, a white mane and beard, the small black cap (tokin) of
+    the mountain ascetics, their robe with the big pompons (ochre and white),
+    black crow wings, a fan of feathers that raises the wind, one-toothed
+    geta."""
+    sc = Scene()
+    base(sc, side)
+    p = base_pose(anim, t)
+    p.r = [0.9, 0.3, 1.1]            # the fan raised before the chest
+    p.l = [0.4, 0.4, 0.8]
+    if anim == "win":
+        p.r = [2.6, 0.25, 0.15]
+    red = Mat("#c42a22", rough=0.4, sss=0.3, clearcoat=0.4)
+    ochre = cloth("#d89a3a", 0.75)
+    white = cloth("#f2f0ea", 0.75)
+    m = {"skin": red, "top": white, "legs": ochre, "boots": lacquer("#1a1418"), "arms": white}
+    rig = adult(sc, p, m, H=1.08, bulk=1.15, head=1.05)
+    sc.add(sd_cone(0.2, 0.16, 0.09, 0.02), ochre, rig["waist"] * T(0, -0.16, 0))                     # hakama
+    for k, y in enumerate((0.27, 0.17, 0.07)):   # the pompons of the yamabushi down the chest
+        for sgn in (-1, 1):
+            sc.add(sd_sphere(0.022), fur("#f2f0ea", 140, 0.3) if k % 2 else Mat("#e8a020", rough=0.9), rig["torso"] * T(0.05 * sgn, y, 0.1))
+    x, r = rig["head"], rig["hr"]
+    sc.add(sd_ellipsoid(r * 0.9, r * 1.0, r * 0.95), red, x)
+    sc.add(sd_ellipsoid(r * 0.95, r * 0.22, r * 0.32), red, x * T(0, r * 0.25, r * 0.74), blend=r * 0.12)     # the brow
+    sc.add(sd_capsule((0, 0, 0), (0, -r * 0.15, r * 1.25), r * 0.17, r * 0.1), red, x * T(0, r * 0.02, r * 0.85), blend=r * 0.05)   # the long nose
+    for sgn in (-1, 1):
+        sc.add(sd_sphere(r * 0.1), Mat("#ffd02a", rough=0.1, emissive="#ffb02a", emit=0.8), x * T(r * 0.34 * sgn, r * 0.08, r * 0.83))
+        sc.add(sd_sphere(r * 0.045), INKM, x * T(r * 0.34 * sgn, r * 0.08, r * 0.92))
+        sc.add(sd_capsule((-r * 0.2, 0, 0), (r * 0.2, 0, 0), r * 0.07), fur("#f2f0ea", 140, 0.3), x * T(r * 0.34 * sgn, r * 0.3, r * 0.8) * RZ(-0.45 * sgn))   # white brows
+    mane = fur("#f2f0ea", 120, 0.35)
+    sc.add(sd_ellipsoid(r * 1.05, r * 0.9, r * 0.9), mane, x * T(0, r * 0.1, -r * 0.35), blend=r * 0.1)
+    sc.add(sd_ellipsoid(r * 0.75, r * 0.9, r * 0.45), mane, x * T(0, -r * 0.85, r * 0.4) * RX(0.3), blend=r * 0.15)   # the beard
+    sc.add(sd_cylinder(r * 0.28, r * 0.26, r * 0.05), lacquer("#16141a"), x * T(0, r * 1.0, r * 0.3) * RX(0.2))   # the tokin
+    for sgn in (-1, 1):   # the crow wings, black feathers
+        root = rig["torso"] * T(0.07 * sgn, 0.26, -0.1) * RY(-0.4 * sgn)
+        open_ = 0.6 if anim == "win" else 0.15 * math.sin(TAU * t)
+        for i in range(9):
+            u = i / 8
+            a = 0.3 + 1.2 * u + open_
+            L = 0.38 * (0.55 + 0.45 * math.sin(math.pi * (0.25 + 0.6 * u)))
+            sc.add(thin_ellipsoid(0.022, L * 0.5, 0.006), Mat("#16161e", rough=0.3, clearcoat=0.6), root * RZ(-a * sgn) * T(0, L * 0.5, 0))
+    fan = held(rig["r"], -1.6 if anim != "win" else -math.pi)
+    sc.add(sd_capsule((0, -0.04, 0), (0, 0.06, 0), 0.01), lacquer("#8a1a14"), fan)
+    for i in range(9):   # the feather fan (hauchiwa)
+        a = (i / 8 - 0.5) * 1.6
+        sc.add(thin_ellipsoid(0.02, 0.07, 0.004), Mat("#f4f0e4", rough=0.6), fan * T(0, 0.06, 0) * RZ(a) * T(0, 0.07, 0))
+    if anim == "win":   # the wind it raises: pale streaks curling round
+        for i in range(5):
+            a = TAU * (t + i / 5)
+            sc.add(sd_torus(0.34, 0.004), glow("#cfefff", 2.0), RY(a) * T(0, BASE_TOP + 0.2 + 0.1 * i, 0) * RX(0.3))
+    flame_aura(sc, t, "#7ad8ff", 8, 0.22, 0.3, 1.4, seed=11)
+    return sc
+
+
+# ─── 5c · Nue (mcts_nnue) ───────────────────────────────────────────────────
+def nue(anim, t, side):
+    """The nue of the Heike Monogatari: the face of a monkey, the body of a
+    tanuki, the legs of a tiger, a snake for a tail; it comes in a black cloud
+    of thunder over the palace at night."""
+    sc = Scene()
+    base(sc, side)
+    fm = fur("#7a5a3a", 120, 0.45)
+    bm = fur("#c8a878", 120, 0.4)
+    tiger = Mat("#e8a020", rough=0.8, pattern=lambda pl, pw, n: {
+        "albedo": torch.where((torch.sin(pl[:, 1] * 90 + pl[:, 0] * 30 + fbm(pl * 8, 2) * 4) > 0.45)[:, None],
+                              srgb("#1a1410").expand_as(pl), srgb("#e8a020").expand_as(pl))})
+    root, head = quadruped(sc, anim, t, fm, bm, s=1.3, leg=1.0, bulk=1.15, snout=0.35, ears=0.6, ear_round=True)
+    s_ = 1.3
+    gait = TAU * t * (2 if anim == "move" else 0.5)
+    for i, (sx, sz) in enumerate(((-1, 1), (1, 1), (-1, -1), (1, -1))):   # tiger legs over the tanuki's
+        ph = gait + (math.pi if i in (1, 2) else 0)
+        sw = 0.4 * math.sin(ph) if anim == "move" else 0.0
+        hip = root * T(0.065 * s_ * sx * 1.15, -0.02 * s_, (0.13 if sz > 0 else -0.15) * s_) * RX(sw)
+        L = 0.23 * s_
+        sc.add(sd_capsule((0, -0.04 * s_, 0), (0, -L, 0.01 * s_), 0.034 * s_, 0.024 * s_), tiger, hip, blend=0.01)
+        for c in (-1, 0, 1):
+            sc.add(sd_cone(0.014, 0.005, 0.001, 0.001), Mat("#f2ead8", rough=0.3), hip * T(0.012 * c, -L - 0.01, 0.045) * RX(math.pi / 2 + 0.5))
+    # the monkey face: a bare reddish face, a ruff of fur round it
+    face = Mat("#b8503e", rough=0.5, sss=0.4)
+    sc.add(sd_ellipsoid(0.055, 0.06, 0.03), face, head * T(0, 0.0, 0.06), blend=0.015)
+    sc.add(sd_ellipsoid(0.035, 0.025, 0.025), face, head * T(0, -0.035, 0.075), blend=0.01)
+    sc.add(sd_torus(0.065, 0.02), fur("#5a4028", 120, 0.4), head * T(0, 0, 0.04) * RX(math.pi / 2))
+    roar = True        # it always snarls
+    for sgn in (-1, 1):
+        sc.add(sd_sphere(0.013), Mat("#ffd02a", rough=0.1, emissive="#ffc02a", emit=1.5 if anim == "win" else 0.9), head * T(0.025 * sgn, 0.012, 0.085))
+        sc.add(sd_sphere(0.006), INKM, head * T(0.025 * sgn, 0.012, 0.097))
+        sc.add(sd_capsule((-0.016, 0, 0), (0.016, 0, 0), 0.006), Mat("#3a2418", rough=0.6), head * T(0.025 * sgn, 0.03, 0.088) * RZ(0.5 * sgn))   # angry brows
+    if roar:
+        sc.add(sd_ellipsoid(0.025, 0.015, 0.01), Mat("#3a0a0a", rough=0.6), head * T(0, -0.04, 0.095))
+        for sgn in (-1, 1):
+            sc.add(sd_cone(0.014, 0.004, 0.001, 0.001), Mat("#f6f0e0", rough=0.3), head * T(0.012 * sgn, -0.03, 0.1) * RX(math.pi))
+    # the snake tail, rising and turning to look forward
+    sway = 0.06 * math.sin(TAU * t)
+    pts = bezier((0, 0.03, -0.28), (sway, 0.16, -0.46), (sway * 2, 0.34, -0.42), (sway, 0.4, -0.28), 9)
+    snake = scales("#3a6a3a", "#c8c87a") if False else Mat("#3a6a3a", rough=0.3, clearcoat=0.7, pattern=lambda pl, pw, n: {
+        "albedo": srgb("#3a6a3a") * (0.8 + 0.3 * (torch.sin(pl[:, 1] * 160) * torch.sin(pl[:, 0] * 160 + pl[:, 2] * 160) > 0).float())[:, None]})
+    chain(sc, pts, [0.036 - 0.002 * i for i in range(9)], snake, root, blend=0.02)
+    sh = root * T(*pts[-1]) * RX(-0.3)
+    sc.add(sd_ellipsoid(0.03, 0.022, 0.045), snake, sh * T(0, 0, 0.02), blend=0.01)
+    for sgn in (-1, 1):
+        sc.add(sd_sphere(0.007), Mat("#ff3a1a", rough=0.1, emissive="#ff3a1a", emit=1.0), sh * T(0.02 * sgn, 0.012, 0.035))
+    sc.add(sd_capsule((0, -0.005, 0.06), (0, -0.01, 0.085), 0.002), Mat("#c81e2a", rough=0.4), sh)          # the forked tongue
+    # the black cloud of thunder under it, a few sparks
+    cloud = Mat("#1a1622", rough=0.9, pattern=lambda pl, pw, n: {"albedo": srgb("#2a2434") * (0.6 + 0.6 * fbm(pl * 12, 3))[:, None]})
+    for k in range(7):
+        a = TAU * k / 7 + t * 0.6
+        sc.add(sd_sphere(0.07 + 0.02 * math.sin(k * 1.7)), cloud, T(0.3 * math.cos(a), BASE_TOP + 0.04, 0.3 * math.sin(a)))
+    for i in range(2 + (3 if anim == "win" else 0)):
+        a = TAU * i / 3 + t * 3
+        lightning(sc, (0.3 * math.cos(a), 0.06, 0.3 * math.sin(a)), (0.32 * math.cos(a + 0.4), 0.45, 0.32 * math.sin(a + 0.4)), i + 3, t, "#c8a0ff", 4.0, 0.004, T(0, BASE_TOP, 0))
+    flame_aura(sc, t, "#a87aff", 9, 0.25, 0.32, 1.5, seed=12)
+    return sc
+
+
 # ─── 6 · Onmyōji ────────────────────────────────────────────────────────────
 def onmyoji(anim, t, side):
     sc = Scene()
@@ -540,10 +658,11 @@ def tenryu(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.2, "beginner": 1.2, "monte_carlo": 1.2, "mcts": 1.15, "basic_minmax": 1.05, "nnue193": 1.15,
+SCALE = {"random": 1.2, "beginner": 1.2, "monte_carlo": 1.2, "mcts": 1.15, "basic_minmax": 1.05, "minmax": 1.15, "mcts_nnue": 1.1, "nnue193": 1.15,
          "features": 1.05, "resnet": 1.1, "dev": 1.15, "alphazero": 1.0}
 CAST = {"random": ("Ōkami", okami), "beginner": ("Shinobi", shinobi), "monte_carlo": ("Kitsune", kitsune),
-        "mcts": ("Samouraï", samurai), "basic_minmax": ("Oni", oni), "nnue193": ("Onmyōji", onmyoji),
+        "mcts": ("Samouraï", samurai), "basic_minmax": ("Oni", oni), "minmax": ("Tengu", tengu), "mcts_nnue": ("Nue", nue),
+        "nnue193": ("Onmyōji", onmyoji),
         "features": ("Raijū", raiju), "resnet": ("Hōō", hoo), "dev": ("Kaigen", kaigen), "alphazero": ("Tenryū", tenryu)}
 SHONEN = {"manga_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"manga_" + k: n for k, (n, _) in CAST.items()}

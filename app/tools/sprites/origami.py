@@ -8,6 +8,8 @@ folder):
   monte_carlo   Lapin       a rabbit, long ears
   mcts          Renard      the classic fox face on a body
   basic_minmax  Papillon    a butterfly, wings beating
+  minmax        Cygne       the swan, wings raised, the neck in an S
+  mcts_nnue     Éléphant    pillar legs, fan-folded ears, the trunk in folds
   nnue193       Grue        the crane, orizuru
   features      Cerf        a stag, branching antlers
   resnet        Paon        a peacock, its tail spread in a fan
@@ -320,10 +322,79 @@ def dragon(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.5, "beginner": 1.58, "monte_carlo": 1.65, "mcts": 1.72, "basic_minmax": 1.78, "nnue193": 1.82,
+# ─── 5b · Cygne (minmax) ────────────────────────────────────────────────────
+def swan(anim, t, side):
+    """The folded swan: a boat-shaped body, the wings two broad pleated sheets
+    rising along the flanks, the tail a short point, the neck a tall straight
+    column at the front with the head bent forward, an orange beak and its
+    black knob."""
+    sc = Scene()
+    base(sc, side)
+    root = root_of(anim, t, lift=0.02)
+    w, w2 = paper("#f4f2ec"), paper("#e2ded2")
+    sc.add(sd_hull([(0, 0.0, -0.19), (0, 0.0, 0.15), (0.1, 0.07, -0.02), (-0.1, 0.07, -0.02), (0, 0.06, -0.22), (0.05, 0.08, 0.12), (-0.05, 0.08, 0.12)]), w, root)
+    sc.add(sheet([(0, 0.06, -0.18), (0.01, 0.07, -0.18), (0, 0.12, -0.26)], 0.004), w2, root)     # the tail
+    lift = 0.3 if anim == "win" else 0.05 * math.sin(TAU * t)
+    for sgn in (-1, 1):   # the wings: broad, rising along the flanks, the tips curled in
+        wing = root * T(0.07 * sgn, 0.07, -0.02) * RZ(-sgn * (0.35 + lift))
+        sc.add(sheet([(0, 0, 0.09), (0, 0, -0.17), (0.01 * sgn, 0.13, -0.16), (0.01 * sgn, 0.1, 0.02)], 0.004), w, wing)
+        sc.add(sheet([(0.004 * sgn, 0.0, 0.05), (0.004 * sgn, 0.0, -0.13), (-0.03 * sgn, 0.09, -0.12)], 0.004), w2, wing)
+    bow = 0.35 if anim == "blocked" else 0.0
+    nk = root * T(0, 0.06, 0.12) * RX(-0.12 + bow)
+    sc.add(sd_hull([(-0.022, 0.0, -0.02), (0.022, 0.0, -0.02), (0, 0.0, 0.03), (-0.009, 0.26, 0.0), (0.009, 0.26, 0.0), (0, 0.26, 0.015)]), w, nk)   # the neck
+    head = nk * T(0, 0.26, 0.0) * RX(0.9 - (0.5 if anim == "win" else 0.0))
+    sc.add(sd_hull([(-0.016, 0.0, -0.015), (0.016, 0.0, -0.015), (0, 0.02, 0.0), (0, -0.012, 0.05)]), w, head)
+    sc.add(sd_hull([(-0.008, -0.006, 0.045), (0.008, -0.006, 0.045), (0, 0.003, 0.045), (0, -0.014, 0.09)]), paper("#e8782a"), head)  # the beak
+    sc.add(sd_hull([(-0.007, -0.002, 0.035), (0.007, -0.002, 0.035), (0, 0.01, 0.048), (0, -0.008, 0.052)]), paper("#1e1e22"), head)
+    for sgn in (-1, 1):
+        sc.add(sd_sphere(0.005), Mat("#141414", rough=0.2), head * T(0.014 * sgn, 0.006, 0.018))
+    return sc
+
+
+# ─── 5c · Éléphant (mcts_nnue) ──────────────────────────────────────────────
+def elephant(anim, t, side):
+    """The folded elephant: a block of a body on four pillar legs, the great
+    ears in two fan-folded sheets, the trunk in five folds (raised when it
+    wins), two small tusks, the tail; grey paper printed with fine dots."""
+    sc = Scene()
+    base(sc, side)
+    root = root_of(anim, t, hop=0.02)
+    m, d = paper("#6e727c", "#565a64"), paper("#5a5e68")
+    L = 0.16
+    body = root * T(0, L, 0)
+    sc.add(sd_hull([(-0.1, 0.0, -0.17), (0.1, 0.0, -0.17), (-0.1, 0.0, 0.12), (0.1, 0.0, 0.12), (0, 0.17, -0.12), (0, 0.19, 0.06),
+                    (-0.07, 0.13, 0.12), (0.07, 0.13, 0.12), (0, -0.05, -0.02)]), m, body)
+    for sx, sz in ((-1, 1), (1, 1), (-1, -1), (1, -1)):
+        sw = 0.22 * math.sin(TAU * t * 2 + (sx * sz > 0) * math.pi) if anim == "move" else 0.0
+        leg = body * T(0.06 * sx, 0.02, 0.08 * sz) * RX(sw)
+        sc.add(sd_hull([(-0.035, 0.0, -0.035), (0.035, 0.0, -0.035), (-0.035, 0.0, 0.035), (0.035, 0.0, 0.035),
+                        (-0.03, -L - 0.02, -0.03), (0.03, -L - 0.02, -0.03), (-0.03, -L - 0.02, 0.03), (0.03, -L - 0.02, 0.03)]), d, leg)
+    head = body * T(0, 0.15, 0.13) * RX(0.15 if anim == "blocked" else 0.0)
+    sc.add(sd_hull([(-0.06, -0.06, -0.04), (0.06, -0.06, -0.04), (-0.065, 0.06, -0.04), (0.065, 0.06, -0.04), (0, 0.08, 0.02),
+                    (-0.04, -0.04, 0.07), (0.04, -0.04, 0.07), (0, 0.03, 0.08)]), m, head)
+    flap = 0.25 * math.sin(TAU * t * (2 if anim == "win" else 1))
+    for sgn in (-1, 1):   # the ears: two pleats each, flapping
+        ear = head * T(0.06 * sgn, 0.02, -0.02) * RY(sgn * (0.5 + flap))
+        sc.add(sheet([(0, 0.07, 0), (0, -0.09, 0), (0.1 * sgn, -0.13, -0.01), (0.15 * sgn, -0.02, -0.02), (0.11 * sgn, 0.08, -0.015)], 0.004),
+               paper("#767a84", "#5e626c"), ear)
+        sc.add(sheet([(0.002 * sgn, 0.04, 0.004), (0.002 * sgn, -0.07, 0.004), (0.09 * sgn, -0.1, -0.006)], 0.003), d, ear)   # a pleat
+        sc.add(sd_sphere(0.008), Mat("#141414", rough=0.2), head * T(0.05 * sgn, 0.025, 0.05))
+        sc.add(sd_hull([(0.025 * sgn, -0.05, 0.05), (0.04 * sgn, -0.05, 0.05), (0.03 * sgn, -0.04, 0.06),
+                        (0.045 * sgn, -0.1, 0.13)]), paper("#f2ecd8"), head)                       # the tusks
+    raise_ = 1.0 if anim == "win" else 0.15 * (1 + math.sin(TAU * t))
+    seg = head * T(0, -0.02, 0.08)
+    for i in range(5):    # the trunk: five folds, curling up at the end when it trumpets
+        w = 0.03 - 0.004 * i
+        sc.add(sd_hull([(-w, 0.0, -w), (w, 0.0, -w), (-w, 0.0, w), (w, 0.0, w), (-w * 0.8, -0.055, 0.0), (w * 0.8, -0.055, 0.0)]), m, seg)
+        seg = seg * T(0, -0.05, 0) * RX(-0.12 - raise_ * 0.45)
+    sc.add(sheet([(0, 0.12, -0.17), (0.006, 0.12, -0.17), (0, 0.03, -0.22)], 0.003), d, body)   # the tail
+    return sc
+
+
+SCALE = {"random": 1.5, "beginner": 1.58, "monte_carlo": 1.65, "mcts": 1.72, "basic_minmax": 1.78, "minmax": 1.8, "mcts_nnue": 1.82, "nnue193": 1.82,
          "features": 1.88, "resnet": 1.8, "dev": 1.85, "alphazero": 1.85}   # the folds bigger and bigger (the peacock and the dragon touch the frame above that)
 CAST = {"random": ("Bateau en papier", boat), "beginner": ("Grenouille", frog), "monte_carlo": ("Lapin", rabbit),
-        "mcts": ("Renard", fox), "basic_minmax": ("Papillon", butterfly), "nnue193": ("Grue", crane),
+        "mcts": ("Renard", fox), "basic_minmax": ("Papillon", butterfly), "minmax": ("Cygne", swan), "mcts_nnue": ("\u00c9l\u00e9phant", elephant), "nnue193": ("Grue", crane),
         "features": ("Cerf", stag), "resnet": ("Paon", peacock), "dev": ("Lion", lion), "alphazero": ("Dragon de papier", dragon)}
 ORIGAMI = {"ori_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"ori_" + k: n for k, (n, _) in CAST.items()}

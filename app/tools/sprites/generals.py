@@ -1,7 +1,8 @@
 """
 generals.py — the "Généraux" set: the ten best generals of Ethan Arsht's
 statistical ranking (WAR, 3,580 battles, 2020; "all in good fun" in its
-author's words), one per AI, the strongest AI the best general — Napoleon
+author's words) and two great captains outside it (Genghis Khan, Vercingetorix,
+for the AIs added later), one per AI, the strongest AI the best general — Napoleon
 for AlphaZero — and the user as a marshal.
 
 Likeness at the size of a square comes from silhouettes and attributes more
@@ -11,7 +12,7 @@ waistcoat, Caesar's laurel, Wellington's bicorne worn front to back and his
 nose, Shingen's horned helmet with a white mane and his war fan, Khalid's
 turban over mail, Hannibal's crested helmet and lost eye, Grant's beard and
 cigar, Frederick's tricorne and cane, Zhukov's cap and medals, Alexander's
-curls and diadem). Gold stars on the base tell the rank.
+curls and diadem). Gold stars over the name plaque tell the rank (STARS).
 """
 import math
 import torch
@@ -563,6 +564,49 @@ def alexander_body(sc, rig, anim, t):
     sc.add(sd_box(0.03, 0.007, 0.012, 0.004), gold(), sw * T(0, 0.04, 0))
 
 
+def mongol_hat(sc, x, r):
+    """A Mongol hat: a rounded crown of dark blue silk, a wide upturned brim of
+    brown fur, a red tassel and a knob on top."""
+    furm = Mat("#6a4a2e", rough=0.95, pattern=lambda pl, pw, n: {"albedo": srgb("#6a4a2e") * (0.6 + 0.6 * fbm(pl * 140, 2))[:, None]})
+    sc.add(sd_plane_cut(sd_ellipsoid(r * 1.0, r * 1.05, r * 1.0), (0, -1, 0), 0.0), wool("#1e2a5a", 0.6), x * T(0, r * 0.35, 0))
+    sc.add(sd_torus(r * 1.02, r * 0.2), furm, x * T(0, r * 0.38, 0) * RX(-0.1))
+    sc.add(sd_sphere(r * 0.12), gold(), x * T(0, r * 1.38, 0))
+    sc.add(sd_cone(r * 0.35, r * 0.2, r * 0.02, 0.003), Mat("#b8241e", rough=0.8), x * T(0, r * 1.35, 0) * RX(math.pi) * T(0, r * 0.3, 0))
+
+
+def winged_helm(sc, x, r):
+    """The winged helmet of the 19th-century statues of Vercingetorix: a
+    rounded iron cap, a bronze band, a white wing on each side."""
+    sc.add(sd_plane_cut(sd_ellipsoid(r * 1.08, r * 1.02, r * 1.08), (0, -1, 0), -r * 0.05), iron("#7a7e86", 0.3), x * T(0, r * 0.22, 0))
+    sc.add(sd_torus(r * 1.05, r * 0.07), Mat("#b07a3a", metal=1.0, rough=0.3), x * T(0, r * 0.2, 0))
+    feather = Mat("#f2f0ea", rough=0.6)
+    for sgn in (-1, 1):
+        w = x * T(r * 1.0 * sgn, r * 0.4, -r * 0.05) * RZ(-0.6 * sgn)
+        for k in range(6):
+            a = 0.1 + 0.25 * k
+            L = r * (1.7 - 0.18 * k)
+            sc.add(sd_ellipsoid(r * 0.1, L * 0.5, r * 0.24), feather, w * RX(-a) * T(0, L * 0.5, 0), blend=r * 0.05)
+
+
+def genghis_body(sc, rig, anim, t):
+    # the deel: the robe crossed over to the right, a gold trim, a wide sash; a curved sabre and a composite bow on the back
+    sw = held(rig["r"], -math.pi if anim == "win" else -1.3)
+    for k in range(5):
+        a0, a1 = k * 0.08, (k + 1) * 0.08
+        sc.add(sd_capsule((0.15 * (1 - math.cos(a0)), 0.06 + 0.24 * math.sin(a0), 0),
+                          (0.15 * (1 - math.cos(a1)), 0.06 + 0.24 * math.sin(a1), 0), 0.009, 0.007), silver(0.15), sw)
+    sc.add(sd_box(0.028, 0.006, 0.012, 0.004), gold(), sw * T(0, 0.05, 0))
+
+
+def vercingetorix_body(sc, rig, anim, t):
+    # a tunic belted with bronze, a long cloak pinned on the shoulder with a fibula, a gold torc, a long Gaulish sword
+    sc.add(sd_box(0.13, 0.28, 0.01, 0.01), wool("#2a4a32", 0.8), rig["back"] * T(0, -0.22, -0.018) * RX(0.08))   # the cloak
+    sc.add(sd_sphere(0.016), gold(), rig["torso"] * T(-0.09, rig["sh_y"] - 0.01, 0.06))                        # the fibula
+    sw = held(rig["r"], -math.pi if anim == "win" else -1.25)
+    sc.add(sd_box(0.016, 0.24, 0.004, 0.003), silver(0.18), sw * T(0, 0.3, 0))
+    sc.add(sd_box(0.03, 0.007, 0.012, 0.004), Mat("#b07a3a", metal=1.0, rough=0.3), sw * T(0, 0.05, 0))
+
+
 def queue_wig(sc, x, r):
     """Frederick's powdered wig: rolls over the ears, the queue tied in black."""
     wig = Mat("#ece8e2", rough=0.7, pattern=lambda pl, pw, n: {"albedo": srgb("#ece8e2") * (0.82 + 0.25 * fbm(pl * 90, 2))[:, None]})
@@ -603,6 +647,24 @@ G = {
     "nnue193": dict(name="Khalid ibn al-Walid", plate="Khalid", skin="#c08c64", hair="#1a1210", jaw=1.05,
                     dress=dict(coat="#2a4a36", legs="#e8e2d0", boots="#4a3020", skirt="robe", belt="#c8a050"),
                     head=lambda sc, x, r, a, t: (beard(sc, x, r, "#1a1210"), turban(sc, x, r)), body=khalid_body),
+    "mcts_nnue": dict(name="Vercingétorix", plate="Vercingétorix", hair="#8a5a2a", nose=1.1, long=1.05, jaw=1.05,
+                      dress=dict(coat="#8a3a24", legs="#a88a4a", skirt="frock", boots="#3a2416", boot="shoe", sleeve="coat",
+                                 belt=Mat("#b07a3a", metal=1.0, rough=0.3)),
+                      head=lambda sc, x, r, a, t: (hair_cap(sc, x, r, "#8a5a2a", front=0.4, back=-1.2, bulk=1.1),
+                                                   sc.add(sd_ellipsoid(r * 0.75, r * 1.0, r * 0.45), Mat("#8a5a2a", rough=0.6), x * T(0, -r * 0.6, -r * 0.55)),
+                                                   sc.add(sd_capsule((-r * 0.45, -r * 0.75, r * 0.85), (r * 0.45, -r * 0.75, r * 0.85), r * 0.1), Mat("#8a5a2a", rough=0.7), x),
+                                                   [sc.add(sd_capsule((r * 0.45 * sg, -r * 0.75, r * 0.85), (r * 0.5 * sg, -r * 1.15, r * 0.7), r * 0.09, r * 0.04),
+                                                           Mat("#8a5a2a", rough=0.7), x) for sg in (-1, 1)],
+                                                   winged_helm(sc, x, r)),
+                      body=vercingetorix_body),
+    "minmax": dict(name="Gengis Khan", plate="Gengis Khan", hair="#2a2420", skin="#d8a87a", jaw=1.1, cheeks=1.15, age=0.6,
+                   dress=dict(coat="#1e2a5a", legs="#1e2a5a", collar="#c8a040", skirt="robe", boots="#3a2416", w=1.05, belt="#c8a040"),
+                   head=lambda sc, x, r, a, t: (beard(sc, x, r, "#8a8480", full=False, moustache=True),
+                                                [sc.add(sd_capsule((r * 0.15 * sg, -r * 0.4, r * 0.9), (r * 0.42 * sg, -r * 0.85, r * 0.75), r * 0.05, r * 0.025),
+                                                        Mat("#8a8480", rough=0.7), x) for sg in (-1, 1)],
+                                                sc.add(sd_ellipsoid(r * 0.2, r * 0.32, r * 0.14), Mat("#8a8480", rough=0.7), x * T(0, -r * 0.85, r * 0.7)),
+                                                mongol_hat(sc, x, r)),
+                   body=genghis_body),
     "basic_minmax": dict(name="Hannibal", plate="Hannibal", skin="#c8946a", hair="#2a1e16", patch=True, nose=1.1, long=1.05,
                          dress=dict(coat="#e8e0d0", legs="#c8946a", boot="sandal", skirt="pteruges", pteruges="#e8dcc0", tunic="#e8e0d0", sleeve="bare"),
                          head=lambda sc, x, r, a, t: (beard(sc, x, r, "#2a1e16", full=True, moustache=True), crested_helm(sc, x, r)),
@@ -642,9 +704,13 @@ def marshal_user(anim, t, side):
     return general(anim, t, side, g)
 
 
-ORDER = ["random", "beginner", "monte_carlo", "mcts", "basic_minmax", "nnue193", "features", "resnet", "dev", "alphazero"]
+ORDER = ["random", "beginner", "monte_carlo", "mcts", "basic_minmax", "minmax", "mcts_nnue", "nnue193", "features", "resnet", "dev", "alphazero"]
 GENERALS = {"gen_" + k: (lambda k: lambda anim, t, side: general(anim, t, side, G[k]))(k) for k in ORDER}
 GENERALS["gen_human"] = marshal_user
 NAMES = {"gen_" + k: G[k]["name"] for k in ORDER}
 NAMES["gen_human"] = "Vous (maréchal)"
 PLATES = {"gen_" + k: G[k]["plate"] for k in ORDER}
+# the rank, as gold stars over the plaque (drawn by the application, "stars" in the
+# drawing's file): 1 to 5 by the place in the set, five for Napoleon alone
+RANKS = ["random", "beginner", "monte_carlo", "mcts", "basic_minmax", "minmax", "mcts_nnue", "nnue193", "features", "resnet", "dev", "alphazero"]
+STARS = {"gen_" + k: 1 + i * 4 // (len(RANKS) - 1) for i, k in enumerate(RANKS)}

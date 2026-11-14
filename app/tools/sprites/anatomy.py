@@ -8,6 +8,8 @@ blue skin, no symbol on the forehead):
   monte_carlo   Squelette          + the bones
   mcts          Organes            + lungs, liver, stomach, intestines
   basic_minmax  Écorché            + the muscles
+  minmax        Fascias            the muscles under the deep fascia, a thin glistening sheath
+  mcts_nnue     Hypoderme          the yellow lobules of subcutaneous fat spreading over them
   nnue193       Peau               the skin spreading in patches over the muscles
   features      Corps achevé       smooth, eyes closed, like a cast
   resnet        Éveil              veins of light under the skin, the eyes light up
@@ -438,6 +440,30 @@ def skin_mat(cover=1.0, veins=0.0, glow_k=0.0):
     return Mat(SKIN, rough=0.5, sss=0.6, pattern=pat)
 
 
+def fascia_mat():
+    """The deep fascia: a thin silvery-white sheath of collagen over the
+    muscles, which show through it, pink, with the grain of their fibres."""
+    def pat(pl, pw, n):
+        fib = (0.72 + 0.28 * torch.sin((pl[:, 0] + pl[:, 2]) * 300))[:, None]
+        mus = srgb("#b8463e") * fib
+        sheen = (0.2 + 0.15 * fbm(pl * 30, 2))[:, None]
+        return {"albedo": mus * (1 - sheen) + srgb("#eef0f4") * sheen}
+    return Mat("#d8b8b8", rough=0.2, sss=0.4, clearcoat=0.9, pattern=pat)
+
+
+def fat_mat(cover=0.5):
+    """The subcutaneous fat: pale yellow lobules (cells in clusters, small
+    vessels between them), over the muscles where it does not cover yet."""
+    def pat(pl, pw, n):
+        lob = fbm(pl * 70, 2)
+        a = srgb("#e8c46a") * (0.8 + 0.3 * lob)[:, None]
+        a = a * (1 - 0.35 * (lob < 0.32).float()[:, None]) + srgb("#c86a4a") * 0.35 * (lob < 0.32).float()[:, None]
+        m = (fbm(pl * 9, 3) < cover).float()[:, None]
+        mus = srgb("#a8302a") * (0.72 + 0.28 * torch.sin((pl[:, 0] + pl[:, 2]) * 300))[:, None]
+        return {"albedo": a * m + mus * (1 - m)}
+    return Mat("#e8c46a", rough=0.35, sss=0.6, clearcoat=0.4, pattern=pat)
+
+
 def scanner(sc, t):
     h = BASE_TOP + 0.05 + 0.85 * (0.5 - 0.5 * math.cos(TAU * t))
     sc.add(sd_torus(0.32, 0.006), glow("#5ad8ff", 6.0), T(0, h, 0))
@@ -467,8 +493,12 @@ def stage(level):
             bones(sc, J, root)
         if level == 4:
             organs(sc, J, root)
-        if level == 5:
+        if level in (5, 5.3, 5.6):
             muscles(sc, J, root)
+        if level == 5.3:     # the deep fascia: a thin glistening sheath over every muscle
+            body_volume(sc, J, root, fascia_mat(), blend=0.02, face=Mat("#3a2a24"))
+        if level == 5.6:     # the hypodermis: yellow lobules of fat spreading over the muscles
+            body_volume(sc, J, root, fat_mat(cover=0.55 + 0.08 * math.sin(TAU * t)), blend=0.02, face=Mat("#3a2a24"))
         if level == 6:
             body_volume(sc, J, root, skin_mat(cover=0.5 + 0.1 * math.sin(TAU * t)), blend=0.02, face=Mat("#3a2a24"))
         if level == 7:
@@ -495,9 +525,10 @@ def stage(level):
     return f
 
 
-SCALE = {k: 1.3 for k in ("random", "beginner", "monte_carlo", "mcts", "basic_minmax", "nnue193", "features", "resnet", "dev", "alphazero")}
+SCALE = {k: 1.3 for k in ("random", "beginner", "monte_carlo", "mcts", "basic_minmax", "minmax", "mcts_nnue", "nnue193", "features", "resnet", "dev", "alphazero")}
 CAST = {"random": ("Système nerveux", stage(1)), "beginner": ("Circulation", stage(2)), "monte_carlo": ("Squelette", stage(3)),
-        "mcts": ("Organes", stage(4)), "basic_minmax": ("Écorché", stage(5)), "nnue193": ("Peau", stage(6)),
+        "mcts": ("Organes", stage(4)), "basic_minmax": ("Écorché", stage(5)), "minmax": ("Fascias", stage(5.3)), "mcts_nnue": ("Hypoderme", stage(5.6)),
+        "nnue193": ("Peau", stage(6)),
         "features": ("Corps achevé", stage(7)), "resnet": ("Éveil", stage(8)), "dev": ("Lévitation", stage(9)),
         "alphazero": ("Être de lumière", stage(10))}
 ANATOMY = {"lab_" + k: f for k, (_, f) in CAST.items()}

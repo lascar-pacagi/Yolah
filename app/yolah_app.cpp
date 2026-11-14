@@ -19,6 +19,7 @@
 //                   the evaluation bar, the hint and the principal variation
 //   @@DRAW          anti-aliased vector drawing with SDL_RenderGeometry
 //                   (rounded boxes, circles, rings, gradients, soft shadows)
+//   @@I18N          the language: French texts, English from assets/i18n/en.json
 //   @@TEXT          text with stb_truetype (glyph atlases, UTF-8, wrapping)
 //   @@THEME         board themes (assets/themes/*.json) and the procedural
 //                   board textures (wood, marble, stone, neon, flat)
@@ -71,6 +72,7 @@
 //   --tab N               tab of the game scene (0 moves, 1 analysis, 2 AI)
 //   --time N              time per move: index in 0,5 s, 1 s, 2 s, 5 s
 //   --theme ID            board theme
+//   --lang fr|en          language of the interface
 //   --verbose             let the AI players print to the terminal
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -249,11 +251,44 @@ inline float smoothstep(float a, float b, float x) {
 // Seconds since SDL started (SDL_GetTicksNS: nanoseconds).
 inline double now_seconds() { return SDL_GetTicksNS() * 1e-9; }
 
-std::string strf(const char* format, ...) {
+// The language (@@I18N): declared here, before strf, which translates its format.
+namespace i18n {
+inline std::string lang = "fr";                               // "fr" or "en" (Settings::lang)
+inline std::unordered_map<std::string, std::string> en;       // French → English (assets/i18n/en.json)
+}  // namespace i18n
+
+// The text in the current language (the French text when no translation).
+inline std::string tr(const std::string& fr) {
+    if (i18n::lang == "fr") return fr;
+    auto it = i18n::en.find(fr);
+    return it == i18n::en.end() ? fr : it->second;
+}
+// tr, then each "{}" replaced by the next argument.
+template <class... A>
+std::string trf(const std::string& fr, const A&... args) {
+    std::string s = tr(fr);
+    std::vector<std::string> v;
+    (v.push_back([](const auto& x) {
+        if constexpr (std::is_arithmetic_v<std::decay_t<decltype(x)>>) return std::to_string(x);
+        else return std::string(x);
+    }(args)), ...);
+    std::string out;
+    size_t k = 0;
+    for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] == '{' && i + 1 < s.size() && s[i + 1] == '}' && k < v.size()) { out += v[k++]; i++; }
+        else out += s[i];
+    }
+    return out;
+}
+
+// printf into a std::string; the format is translated first (tr): the
+// English of "%d coups" is "%d moves", same conversions in the same order.
+std::string strf(const char* format0, ...) {
+    std::string format = tr(format0);
     char buf[1024];
     va_list args;
-    va_start(args, format);
-    std::vsnprintf(buf, sizeof buf, format, args);
+    va_start(args, format0);
+    std::vsnprintf(buf, sizeof buf, format.c_str(), args);
     va_end(args);
     return buf;
 }
@@ -344,7 +379,10 @@ std::string move_name(Move m) {
     if (m == Move::none()) return "passe";
     return sq_name(m.from_sq()) + "\xE2\x86\x92" + sq_name(m.to_sq());   // "e4→f3"
 }
-const char* side_name(int side) { return side == BLACK ? "Noirs" : "Blancs"; }
+const char* side_name(int side) {
+    if (i18n::lang == "en") return side == BLACK ? "Black" : "White";
+    return side == BLACK ? "Noirs" : "Blancs";
+}
 
 // Legal moves of the side to move ({Move::none()} when it must pass).
 std::vector<Move> legal_moves(const Yolah& y) {
@@ -540,7 +578,7 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
         s.random_moves = jnum(e, "random moves", 0);
         s.config = load_json(g_paths.root / "config" / s.config_file);
         if (!s.config.is_object()) {
-            s.reason = "configuration introuvable : config/" + s.config_file;
+            s.reason = tr("configuration introuvable : config/") + s.config_file;
             list.push_back(s);
             continue;
         }
@@ -560,7 +598,7 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
             s.config["weights"] = w.string();
             if (!fs::exists(w)) {
                 s.available = false;
-                s.reason = "réseau introuvable : " + w.string() + (e.contains("missing hint") ? "\n" + jstr(e, "missing hint") : "");
+                s.reason = tr("réseau introuvable : ") + w.string() + (e.contains("missing hint") ? "\n" + jstr(e, "missing hint") : "");
             }
         }
         list.push_back(s);
@@ -1041,6 +1079,21 @@ void clip(const Box* b) {
 
 }   // namespace draw
 
+// ─── @@I18N ─────────────────────────────────────────────────────────────────
+// The language of the interface. The texts are written in French in the code
+// and in the assets; assets/i18n/en.json maps each French text to its English
+// translation. The text engine (@@TEXT) translates every string it draws or
+// measures (tr), so literals, JSON contents (courses, roster, puzzles, sets)
+// and labels all follow the setting. Texts built from pieces use trf with
+// "{}" holes: the whole sentence is translated, then the holes filled.
+inline void i18n_load(const fs::path& file) {
+    i18n::en.clear();
+    json j = load_json(file);
+    if (!j.is_object()) return;
+    for (auto& [k, v] : j.items())
+        if (v.is_string() && !v.get<std::string>().empty()) i18n::en[k] = v.get<std::string>();
+}
+
 // ─── @@TEXT ─────────────────────────────────────────────────────────────────
 // stb_truetype rasterises the glyphs of a font at a given pixel size into one
 // texture (an "atlas"); a string is then drawn glyph by glyph, each glyph a
@@ -1084,7 +1137,8 @@ public:
 
     // Draws `s` with its top-left (Align::Left) / top-centre / top-right at p;
     // returns the width.
-    float draw(Font f, float size, const std::string& s, V2 p, Rgba col, Align al = Align::Left) {
+    float draw(Font f, float size, const std::string& s0, V2 p, Rgba col, Align al = Align::Left) {
+        const std::string s = tr(s0);
         Atlas& a = atlas(f, size);
         float w = width(f, size, s);
         float x = p.x - (al == Align::Center ? w * 0.5f : al == Align::Right ? w : 0.0f);
@@ -1110,7 +1164,8 @@ public:
         draw(f, size, s, p + V2{0, off}, sh, al);
         return draw(f, size, s, p, col, al);
     }
-    float width(Font f, float size, const std::string& s) {
+    float width(Font f, float size, const std::string& s0) {
+        const std::string s = tr(s0);
         Atlas& a = atlas(f, size);
         float w = 0;
         for (size_t i = 0; i < s.size();) {
@@ -1126,7 +1181,8 @@ public:
         return a.ascent - a.descent + a.gap;
     }
     // Splits `s` into lines of at most `max_w` pixels (on spaces; "\n" breaks).
-    std::vector<std::string> wrap(Font f, float size, const std::string& s, float max_w) {
+    std::vector<std::string> wrap(Font f, float size, const std::string& s0, float max_w) {
+        const std::string s = tr(s0);
         std::vector<std::string> lines;
         std::string para;
         std::stringstream ss(s);
@@ -2096,6 +2152,7 @@ struct Art {
     float box = 1.0f, ax = 0.5f, ay = 0.5f;   // a figurine: size in squares, anchor in the frame
     std::string white, variant_of; // the white side's drawing; the drawing this one is a variant of
     std::string plate;             // a figurine: the name written on a plaque at the front of its base, on the board
+    int stars = 0;                 // gold stars above the plaque (the Généraux: the rank in the set, 1 to 5)
     std::vector<ArtAnim> anims;
     SDL_Texture* tex = nullptr;    // the frames, rebuilt when `dirty`
     std::vector<SDL_Texture*> levels;   // smooth: the sheet halved 1, 2, ... times
@@ -2245,6 +2302,7 @@ bool load_art(const std::string& id, Art& out) {
     out.white = jstr(j, "white");
     out.variant_of = jstr(j, "variant of");
     out.plate = jstr(j, "plate");
+    out.stars = int(jnum(j, "stars", 0));
     int w = 0, h = 0, n = 0;
     unsigned char* px = stbi_load((art_dir() / (id + ".png")).string().c_str(), &w, &h, &n, 4);
     if (j.contains("animations") && j["animations"].is_array()) {
@@ -3558,6 +3616,19 @@ private:
         round_box(b, h * 0.25f, hex(0x2a1e14, 235));
         round_frame(b, h * 0.25f, std::max(1.0f, q * 0.012f), hex(0xc8a050, 230));
         text.draw(Font::Bold, fs, art->plate, {b.center().x, b.y + h * 0.1f}, hex(0xf0d890), Align::Center);
+        // the rank: gold stars in a row, just above the plaque
+        const float sr = fs * 0.42f, gap = sr * 2.3f;
+        for (int i = 0; i < art->stars; i++) {
+            V2 sc{b.center().x + (i - (art->stars - 1) * 0.5f) * gap, b.y - sr * 1.15f};
+            std::vector<V2> pts, in;
+            for (int k = 0; k < 10; k++) {
+                float a = -float(M_PI) / 2 + k * float(M_PI) / 5, rr = (k % 2 ? 0.45f : 1.0f);
+                pts.push_back(sc + V2{std::cos(a), std::sin(a)} * (sr * 1.25f * rr));
+                in.push_back(sc + V2{std::cos(a), std::sin(a)} * (sr * rr));
+            }
+            poly_around(sc, pts, hex(0x2a1e14, 220));
+            poly_around(sc, in, hex(0xf0c850));
+        }
     }
     // The look of a hole: "pit" (the theme's colours), "lava", "water",
     // "void", "ice" or "bush" (HOLE_STYLES); k: its size while it opens.
@@ -3896,11 +3967,12 @@ struct Settings {
     std::vector<std::string> puzzles_done;    // puzzles solved
     json ai_options = json::object();         // AI id → {setting: value} (AiParam), games only
     std::string piece_set = "auto";           // "auto": the board's set (Theme::piece_set), else a set's id
+    std::string lang = "fr";                  // language of the interface (@@I18N): "fr", "en"
     json to_json() const {
         return {{"theme", theme}, {"show eval", show_eval}, {"show hint", show_hint}, {"show coordinates", show_coords},
                 {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white},
                 {"tutorial done", tutorial_done}, {"puzzles done", puzzles_done}, {"ai options", ai_options},
-                {"piece set", piece_set}};
+                {"piece set", piece_set}, {"language", lang}};
     }
     void from_json(const json& j) {
         if (!j.is_object()) return;
@@ -3916,6 +3988,8 @@ struct Settings {
         if (j.contains("puzzles done") && j["puzzles done"].is_array()) puzzles_done = j["puzzles done"].get<std::vector<std::string>>();
         if (j.contains("ai options") && j["ai options"].is_object()) ai_options = j["ai options"];
         piece_set = j.value("piece set", piece_set);
+        lang = j.value("language", lang);
+        if (lang != "en") lang = "fr";
     }
 };
 
@@ -4164,14 +4238,14 @@ struct App {
         std::string ext = src.extension().string();
         for (auto& c : ext) c = char(std::tolower(uint8_t(c)));
         int w, h, n;
-        if (!stbi_info(path.c_str(), &w, &h, &n)) { notify("Ce fichier n'est pas une image lisible : " + src.filename().string()); return ""; }
+        if (!stbi_info(path.c_str(), &w, &h, &n)) { notify(tr("Ce fichier n'est pas une image lisible : ") + src.filename().string()); return ""; }
         fs::path dir = g_paths.assets / folder;
         std::error_code ec;
         fs::create_directories(dir, ec);
         std::string base = slug(src.stem().string()), name = base + ext;
         for (int k = 2; fs::exists(dir / name); k++) name = base + "_" + std::to_string(k) + ext;
         fs::copy_file(src, dir / name, ec);
-        if (ec) { notify("Copie impossible : " + ec.message()); return ""; }
+        if (ec) { notify(tr("Copie impossible : ") + ec.message()); return ""; }
         return name;
     }
 
@@ -4180,9 +4254,13 @@ struct App {
     std::map<std::string, std::string> assigned;
 
     // ── helpers ──
+    // The tutorial always plays on the classic board with the classic stones,
+    // whatever the player's theme (theme_override, set by go()).
+    std::string theme_override;
     const Theme& theme() const {
+        const std::string& id = theme_override.empty() ? settings.theme : theme_override;
         for (auto& t : themes)
-            if (t.id == settings.theme) return t;
+            if (t.id == id) return t;
         return themes.front();
     }
     const SpriteDef& sprite(const std::string& id) const {
@@ -4241,6 +4319,7 @@ struct App {
     // ("Selon le plateau"), the classic stones when the board has none.
     const PieceSet& active_set(const Theme& t) const {
         std::string id = settings.piece_set == "auto" ? (t.piece_set.empty() ? "classique" : t.piece_set) : settings.piece_set;
+        if (!theme_override.empty()) id = "classique";
         if (const PieceSet* ps = piece_set(id)) return *ps;
         return piece_sets.front();
     }
@@ -4327,6 +4406,7 @@ struct App {
     void go(Scene sc) {
         if (scene == Scene::Game && sc != Scene::Game) leave_game();
         if (sc == Scene::Puzzles || sc == Scene::Editor) reload_puzzles();
+        theme_override = sc == Scene::Tutorial ? "bois" : "";
         scene = sc;
         scene_t0 = time;
         fx.clear();
@@ -4396,7 +4476,7 @@ struct App {
             fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0xb6c2d6) : hex(0xffffff), q * 0.32f));
             fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, game_theme().accent));
         } else {
-            notify_at(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.", g.board.area.center());
+            notify_at(strf("%s ne peuvent plus bouger : ils passent.", side_name(side)), g.board.area.center());
         }
         g.token++;
         g.move_scroll = 1e9f;   // scroll the move list to its end
@@ -4624,7 +4704,7 @@ void anim_random(App& a, Box b, float t) {
     if (t >= 3.0f) {
         label(a, strf("i = hasard() mod %zu = %d", mv.size(), pick), {x, yy}, pal::text, 15, Font::Mono);
         yy += 26 * a.s;
-        label(a, "jouer coups[i] = " + sq_name(mv[pick].from_sq()) + "\xE2\x86\x92" + sq_name(mv[pick].to_sq()), {x, yy}, pal::accent, 15, Font::Mono);
+        label(a, tr("jouer coups[i] = ") + sq_name(mv[pick].from_sq()) + "\xE2\x86\x92" + sq_name(mv[pick].to_sq()), {x, yy}, pal::accent, 15, Font::Mono);
     }
 }
 
@@ -5571,7 +5651,7 @@ void anim_aspiration(App& a, Box b, float t) {
     if (t > 2) {
         float shown = t < 3.5f ? hi + 4 : truth;
         draw::circle({X(shown), line.y + 2 * a.s}, 8 * a.s, t < 3.5f ? pal::bad : pal::good);
-        label(a, t < 3.5f ? "\xE2\x89\xA5 " + std::to_string(int(hi)) + " : \xC3\xA9" "chec haut" : "38", {X(shown), line.y - 50 * a.s}, t < 3.5f ? pal::bad : pal::good, 14, Font::Bold, Align::Center);
+        label(a, t < 3.5f ? "\xE2\x89\xA5 " + std::to_string(int(hi)) + tr(" : \xC3\xA9" "chec haut") : "38", {X(shown), line.y - 50 * a.s}, t < 3.5f ? pal::bad : pal::good, 14, Font::Bold, Align::Center);
     }
 }
 
@@ -5663,7 +5743,7 @@ void anim_lineage(App& a, Box b, float t) {
     struct N { const char* title; const char* sub; float x, y; Rgba c; };
     const N nodes[] = {
         {"Heuristique + CEM", "mai-sept. 2024 : 46 poids appris contre MCTS", 0.13f, 0.14f, pal::accent2},
-        {"Bon minimax", "juillet 2024 : profondeur it\xC3\xA9rative, table, r\xC3\xA9" "ductions, 9 c\xC5\x93urs", 0.13f, 0.47f, pal::accent2},
+        {"Bon minimax (Minimax)", "juillet 2024 : profondeur it\xC3\xA9rative, table, r\xC3\xA9" "ductions, 9 c\xC5\x93urs", 0.13f, 0.47f, pal::accent2},
         {"Parties du minimax", "oct. 2024 : contre lui-m\xC3\xAAme, 1 s par coup, 2 \xC3\xA0 9 premiers coups au hasard", 0.13f, 0.80f, hex(0xaab3c3)},
         {"Premier NNUE", "oct. 2024 \xE2\x86\x92 mai 2025 : 193 entr\xC3\xA9" "es, gagne / nul / perd, puis en entiers", 0.38f, 0.80f, pal::accent},
         {"Parties du minimax NNUE", "ao\xC3\xBBt-d\xC3\xA9" "c. 2025 : 2 s par coup, 8 c\xC5\x93urs", 0.38f, 0.47f, hex(0xaab3c3)},
@@ -5673,8 +5753,9 @@ void anim_lineage(App& a, Box b, float t) {
         {"AlphaZero", "sept. 2026 : joue contre lui-m\xC3\xAAme, part du ResNet", 0.87f, 0.47f, pal::good},
         {"NNUE perspective (dev)", "oct. 2026 : distill\xC3\xA9 d'AlphaZero, recherche retravaill\xC3\xA9" "e", 0.87f, 0.80f, pal::good},
         {"Boucle de distillation", "nov. 2026 : les parties du dev \xC3\xA9tiquet\xC3\xA9" "es, le ResNet, puis le NNUE", 0.87f, 0.14f, pal::good},
+        {"MCTS NNUE", "d\xC3\xA9" "c. 2025 : l'arbre du MCTS, le premier NNUE juge les feuilles", 0.63f, 0.14f, pal::accent},
     };
-    const int E[][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {4, 6}, {6, 7}, {6, 8}, {8, 9}, {9, 10}};
+    const int E[][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {4, 6}, {6, 7}, {6, 8}, {8, 9}, {9, 10}, {3, 11}};
     const int nn = int(sizeof(nodes) / sizeof(nodes[0])), ne = int(sizeof(E) / sizeof(E[0]));
     const float P = 16;
     float tt = std::fmod(t, P);
@@ -5717,10 +5798,14 @@ const std::map<std::string, AnimFn>& anims() {
 // Pseudo-code colouring: keywords, comments, numbers.
 bool is_keyword(const std::string& w) {
     static const std::set<std::string> k = {"fonction", "si", "sinon", "alors", "pour", "chaque", "dans", "tant", "que", "retourner", "fin",
-                                            "faire", "et", "ou", "non", "r\xC3\xA9p\xC3\xA9ter", "jusqu'\xC3\xA0", "de", "\xC3\xA0", "vrai", "faux"};
+                                            "faire", "et", "ou", "non", "r\xC3\xA9p\xC3\xA9ter", "jusqu'\xC3\xA0", "de", "\xC3\xA0", "vrai", "faux",
+                                            // the English of the pseudo-code (@@I18N)
+                                            "function", "if", "else", "then", "for", "each", "in", "while", "return", "end", "do",
+                                            "and", "or", "not", "repeat", "until", "from", "to", "true", "false"};
     return k.count(w) > 0;
 }
-void code_line(App& a, const std::string& line, V2 p, float fs) {
+void code_line(App& a, const std::string& line0, V2 p, float fs) {
+    const std::string line = tr(line0);     // the whole line translated, then drawn word by word
     size_t cpos = line.find("//");
     std::string code = cpos == std::string::npos ? line : line.substr(0, cpos);
     float x = p.x;
@@ -5850,7 +5935,7 @@ void draw_course(App& a) {
         ty += 38 * s;
     }
     for (size_t c = 0; c < chs.size(); c++) {
-        auto lines = a.text.wrap(Font::Bold, 15 * s, strf("%zu. ", c + 1) + chs[c]->title, toc.w - 24 * s);
+        auto lines = a.text.wrap(Font::Bold, 15 * s, strf("%zu. ", c + 1) + tr(chs[c]->title), toc.w - 24 * s);
         Box r{toc.x, ty, toc.w, lines.size() * 21 * s + 14 * s};
         bool h = a.ui.hover(r), on = int(c) == current && a.course_scroll >= sum_h * 0.5f;
         if (h) a.ui.hovering = true;
@@ -5868,13 +5953,13 @@ void draw_course(App& a) {
         Box sb{x, top, W, sum_h};
         draw::round_box(sb, 16 * s, hex(0x1d2532), hex(0x171d28));
         a.text.draw(Font::Title, 30 * s, spec->name, {sb.x + 20 * s, sb.y + 16 * s}, pal::text);
-        a.text.draw(Font::Regular, 16 * s, strf("%s \xE2\x80\xA2 Elo \xE2\x89\x88 %d", spec->family.c_str(), spec->elo), {sb.right() - 20 * s, sb.y + 28 * s}, pal::accent, Align::Right);
+        a.text.draw(Font::Regular, 16 * s, strf("%s \xE2\x80\xA2 Elo \xE2\x89\x88 %d", tr(spec->family).c_str(), spec->elo), {sb.right() - 20 * s, sb.y + 28 * s}, pal::accent, Align::Right);
         a.text.paragraph(Font::Regular, 18 * s, summary, {sb.x + 20 * s, sb.y + 64 * s, W - 40 * s, sum_h}, pal::text, 1.3f);
     }
     for (size_t c = 0; c < chs.size(); c++) {
         float cy = top + ch_y[c];
         if (cy > view.bottom() || cy + 64 * s < view.y) continue;
-        a.text.draw(Font::Title, 26 * s, strf("%zu. ", c + 1) + chs[c]->title, {x, cy + 14 * s}, pal::text);
+        a.text.draw(Font::Title, 26 * s, strf("%zu. ", c + 1) + tr(chs[c]->title), {x, cy + 14 * s}, pal::text);
         draw::rect({x, cy + 54 * s, W, 2 * s}, with_alpha(pal::accent, 0.5f));
     }
     std::set<std::string> visible;
@@ -5968,13 +6053,12 @@ void scene_menu(App& a) {
     V2 tp{a.w * 0.5f, 75 * s};
     draw::circle({a.w * 0.5f, 150 * s}, 330 * s, with_alpha(a.theme().accent, 0.16f), with_alpha(a.theme().accent, 0), 0);
     a.text.draw_shadowed(Font::Title, 140 * s, "YOLAH", tp, pal::text, Align::Center, hex(0x000000, 150), 6 * s);
-    a.text.draw(Font::Regular, 21 * s, "Quatre pions, soixante-quatre cases : chaque pas creuse un trou.", {a.w * 0.5f, 250 * s}, pal::dim, Align::Center);
 
     struct Item { const char* label; std::function<void()> act; Style st; };
     std::vector<Item> items = {
         {"Jouer", [&] { a.go(Scene::Setup); }, Style::Primary},
         {"Apprendre \xC3\xA0 jouer", [&] { start_lesson(a, first_lesson_to_do(a)); }, Style::Normal},
-        {"Puzzles et qu\xC3\xAA" "tes", [&] { a.go(Scene::Puzzles); }, Style::Normal},
+        {"Puzzles", [&] { a.go(Scene::Puzzles); }, Style::Normal},
         {"\xC3\x89" "diteur de puzzles", [&] { a.go(Scene::Editor); }, Style::Normal},
         {"Th\xC3\xA8mes", [&] { a.go(Scene::Themes); }, Style::Normal},
         // {"Atelier : dessins et plateaux", [&] { a.go(Scene::Studio); }, Style::Normal},   // the workshop, put aside for now
@@ -5986,8 +6070,15 @@ void scene_menu(App& a) {
         Box b{a.w * 0.5f - bw / 2, y + i * (bh + gap) + (1 - appear) * 30 * s, bw, bh};
         if (a.ui.button(std::string("menu") + std::to_string(i), b, items[i].label, items[i].st, true, 21)) items[i].act();
     }
-    a.text.draw(Font::Regular, 14 * s, strf("Yolah %s \xE2\x80\xA2 %zu IA \xE2\x80\xA2 th\xC3\xA8me %s", APP_VERSION, a.roster.size(), a.theme().name.c_str()),
+    a.text.draw(Font::Regular, 14 * s, trf("Yolah {} \xE2\x80\xA2 {} IA \xE2\x80\xA2 th\xC3\xA8me {}", APP_VERSION, a.roster.size(), tr(a.theme().name)),
                 {a.w * 0.5f, a.h - 34 * s}, pal::faint, Align::Center);
+    // The language of the interface, top right.
+    int cur = a.settings.lang == "en" ? 1 : 0;
+    int sel = a.ui.segmented("lang", {a.w - 24 * s - 168 * s, 22 * s, 168 * s, 38 * s}, {"Fran\xC3\xA7" "ais", "English"}, cur, 15);
+    if (sel != cur) {
+        a.settings.lang = i18n::lang = sel == 1 ? "en" : "fr";
+        a.save_settings();
+    }
 }
 
 // ─── @@SCENE_SETUP ──────────────────────────────────────────────────────────
@@ -6007,7 +6098,7 @@ void scene_setup(App& a) {
     entries.push_back({"human", "Humain", "Vous jouez \xC3\xA0 la souris", "human", true, "", "Cliquez sur un de vos pions puis sur la case d'arriv\xC3\xA9" "e, ou faites-le glisser."});
     for (auto& ai : a.roster) {
         const bool set = a.settings.ai_options.contains(ai.id);
-        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", ai.elo, ai.family.c_str()) + (set ? " \xE2\x80\xA2 r\xC3\xA9gl\xC3\xA9" : ""),
+        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", ai.elo, tr(ai.family).c_str()) + (set ? tr(" \xE2\x80\xA2 r\xC3\xA9gl\xC3\xA9") : std::string()),
                            ai.sprite, ai.available, ai.reason, ai.description});
     }
 
@@ -6111,7 +6202,7 @@ void draw_ai_params(App& a) {
     Box m{a.w * 0.5f - 340 * s, 0, 680 * s, 104 * s + row * spec->params.size() + 96 * s};
     m.y = a.h * 0.5f - m.h / 2;
     a.ui.panel(m, 20, hex(0x1a202b));
-    a.text.draw(Font::Black, 24 * s, "R\xC3\xA9glages : " + spec->name, {m.x + 30 * s, m.y + 24 * s}, pal::text);
+    a.text.draw(Font::Black, 24 * s, tr("R\xC3\xA9glages : ") + spec->name, {m.x + 30 * s, m.y + 24 * s}, pal::text);
     a.text.draw(Font::Regular, 14 * s, "Pour les parties ; les puzzles gardent les IA telles qu'elles sont pr\xC3\xA9vues.", {m.x + 30 * s, m.y + 62 * s}, pal::dim);
     float y = m.y + 104 * s;
     for (const AiParam& p : spec->params) {
@@ -6123,7 +6214,7 @@ void draw_ai_params(App& a) {
         a.text.draw(Font::Bold, 17 * s, p.label, {m.x + 30 * s, y + 6 * s}, pal::text);
         std::string sub = p.help;
         if (!sub.empty()) sub += " \xE2\x80\xA2 ";
-        sub += "d\xC3\xA9" "faut : " + p.value_text(p.def);
+        sub += tr("d\xC3\xA9" "faut : ") + p.value_text(p.def);
         a.text.draw(Font::Regular, 13 * s, sub, {m.x + 30 * s, y + 32 * s}, pal::dim);
         Box c{m.right() - 30 * s - 300 * s, y + 6 * s, 300 * s, 40 * s};
         if (p.values.size() <= 5) {
@@ -6136,7 +6227,7 @@ void draw_ai_params(App& a) {
             if (widest > c.w / p.values.size() - 12 * s && !p.unit.empty()) {   // too wide: the numbers alone, the unit above
                 for (size_t i = 0; i < labels.size(); i++)
                     if (p.values[i].is_number()) labels[i] = strf("%g", p.values[i].get<double>());
-                a.text.draw(Font::Regular, 12 * s, "en " + p.unit, {c.right(), c.y - 16 * s}, pal::dim, Align::Right);
+                a.text.draw(Font::Regular, 12 * s, tr("en ") + p.unit, {c.right(), c.y - 16 * s}, pal::dim, Align::Right);
             }
             sel = a.ui.segmented("prm" + p.key, c, labels, cur, 15);
         } else {
@@ -6216,10 +6307,10 @@ void game_logic(App& a) {
             if (!err.empty()) {
                 sl.error = err;
                 g.paused = true;
-                a.notify(sl.spec->name + " : erreur (" + err + ")");
+                a.notify(sl.spec->name + tr(" : erreur (") + err + ")");
             } else if (!is_legal(g.match.pos, m)) {
                 g.paused = true;
-                a.notify(sl.spec->name + " a propos un coup ill\xC3\xA9gal : " + move_name(m));
+                a.notify(sl.spec->name + tr(" a propos un coup ill\xC3\xA9gal : ") + move_name(m));
             } else {
                 a.play_move(m);
             }
@@ -6271,7 +6362,7 @@ void draw_player_card(App& a, Box b, int side, bool active) {
     draw_piece(a.game_sprite(side), side, {b.x + 18 * s + pr, b.center().y}, pr, 0.3f * k, a.time, 1, sl.human());
     float tx = b.x + 34 * s + 2 * pr;
     a.text.draw(Font::Bold, 19 * s, a.slot_name(sl), {tx, b.y + 14 * s}, pal::text);
-    std::string sub = sl.human() ? std::string("Humain \xE2\x80\xA2 ") + side_name(side) : strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", sl.spec->elo, side_name(side));
+    std::string sub = sl.human() ? strf("Humain \xE2\x80\xA2 %s", side_name(side)) : strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", sl.spec->elo, side_name(side));
     a.text.draw(Font::Regular, 14 * s, sub, {tx, b.y + 40 * s}, pal::dim);
     std::string status;
     if (active && !g.match.over()) {
@@ -6330,12 +6421,12 @@ void tab_analysis(App& a, Box b, const Analyzer::Snapshot& snap) {
         return;
     }
     if (!fresh) {
-        a.text.draw(Font::Regular, 16 * s, snap.error.empty() ? "Analyse en cours\xE2\x80\xA6" : "Analyse impossible : " + snap.error, {b.x, y}, pal::dim);
+        a.text.draw(Font::Regular, 16 * s, snap.error.empty() ? "Analyse en cours\xE2\x80\xA6" : tr("Analyse impossible : ") + snap.error, {b.x, y}, pal::dim);
         return;
     }
     bool black = snap.value >= 0;
-    std::string who = std::abs(snap.value) > EVAL_WIN ? strf("%s gagnent \xC3\xA0 coup s\xC3\xBBr", black ? "Les Noirs" : "Les Blancs")
-                                                      : (std::abs(snap.value) < 600 ? std::string("Position \xC3\xA9quilibr\xC3\xA9" "e") : strf("Avantage %s", black ? "Noirs" : "Blancs"));
+    std::string who = std::abs(snap.value) > EVAL_WIN ? strf("%s gagnent \xC3\xA0 coup s\xC3\xBBr", tr(black ? "Les Noirs" : "Les Blancs").c_str())
+                                                      : (std::abs(snap.value) < 600 ? std::string("Position \xC3\xA9quilibr\xC3\xA9" "e") : strf("Avantage %s", side_name(black ? BLACK : WHITE)));
     a.text.draw(Font::Black, 26 * s, eval_text(snap.value), {b.x, y}, pal::text);
     a.text.draw(Font::Bold, 17 * s, who, {b.x + 120 * s, y + 6 * s}, pal::dim);
     y += 44 * s;
@@ -6383,7 +6474,7 @@ void tab_ai(App& a, Box b) {
         any = true;
         draw_piece(a.game_sprite(side), side, {b.x + 24 * s, y + 24 * s}, 22 * s, 0, a.time);
         a.text.draw(Font::Bold, 18 * s, sl.spec->name, {b.x + 58 * s, y + 2 * s}, pal::text);
-        a.text.draw(Font::Regular, 14 * s, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s \xE2\x80\xA2 joue les %s", sl.spec->elo, sl.spec->family.c_str(), side_name(side)),
+        a.text.draw(Font::Regular, 14 * s, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s \xE2\x80\xA2 joue les %s", sl.spec->elo, tr(sl.spec->family).c_str(), side_name(side)),
                     {b.x + 58 * s, y + 26 * s}, pal::dim);
         y += 56 * s;
         float hgt = a.text.paragraph(Font::Regular, 14 * s, sl.spec->description, {b.x, y, b.w, 120 * s}, pal::text);
@@ -6393,7 +6484,7 @@ void tab_ai(App& a, Box b) {
         y += 46 * s;
         std::string info = sl.agent ? sl.agent->info() : "";
         if (!info.empty()) {
-            hgt = a.text.paragraph(Font::Regular, 12 * s, "Moteur : " + info, {b.x, y, b.w, 70 * s}, pal::faint);
+            hgt = a.text.paragraph(Font::Regular, 12 * s, tr("Moteur : ") + info, {b.x, y, b.w, 70 * s}, pal::faint);
             y += hgt + 4 * s;
         }
         y += 16 * s;
@@ -6463,7 +6554,7 @@ void draw_game_over(App& a, Box area) {
     int win = g.match.winner();
     std::string title = win < 0 ? "\xC3\x89" "galit\xC3\xA9 !" : strf("Victoire des %s !", side_name(win));
     if (win >= 0 && g.slot[win].human() && !g.slot[1 - win].human()) title = "Vous avez gagn\xC3\xA9 !";
-    if (win >= 0 && !g.slot[win].human() && g.slot[1 - win].human()) title = g.slot[win].spec->name + " gagne";
+    if (win >= 0 && !g.slot[win].human() && g.slot[1 - win].human()) title = strf("%s gagne", tr(g.slot[win].spec->name).c_str());
     a.text.draw_shadowed(Font::Title, 34 * s, title, {card.center().x, card.y + 30 * s}, with_alpha(pal::text, k), Align::Center, hex(0x000000, 100), 2 * s);
     a.text.draw(Font::Black, 54 * s, strf("%d \xE2\x80\x93 %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 88 * s}, with_alpha(a.theme().accent, k), Align::Center);
     a.text.draw(Font::Regular, 16 * s, strf("Noirs \xE2\x80\x94 Blancs \xE2\x80\xA2 %zu coups", g.match.history.size()), {card.center().x, card.y + 158 * s}, with_alpha(pal::dim, k), Align::Center);
@@ -6590,7 +6681,7 @@ void scene_game(App& a) {
     draw_player_card(a, card_bottom, 1 - top_side, side != top_side && !g.match.over());
     float tabs_y = card_top.bottom() + 14 * s;
     if (g.puzzle_mode) {   // the puzzle's goal, always in sight
-        a.text.paragraph(Font::Bold, 15 * s, "Objectif : " + goal_text(a, g.puzzle), {panel.x + 24 * s, tabs_y, panel.w - 48 * s, 44 * s}, a.game_theme().accent);
+        a.text.paragraph(Font::Bold, 15 * s, tr("Objectif : ") + goal_text(a, g.puzzle), {panel.x + 24 * s, tabs_y, panel.w - 48 * s, 44 * s}, a.game_theme().accent);
         tabs_y += 48 * s;
     }
     Box tabs{panel.x + 20 * s, tabs_y, panel.w - 40 * s, 38 * s};
@@ -6756,9 +6847,9 @@ void scene_themes(App& a) {
         y += ((ids.size() + pc - 1) / pc) * (ch + 8 * s) + 6 * s;
         const PieceSet& act = a.active_set(a.theme());
         std::string why = a.settings.piece_set == "auto"
-            ? "Chaque plateau prend son jeu : ici \xC2\xAB " + act.name + " \xC2\xBB."
-            : "Ce jeu sert sur tous les plateaux.";
-        if (!act.description.empty()) why += " " + act.description;
+            ? strf("Chaque plateau prend son jeu : ici \xC2\xAB %s \xC2\xBB.", tr(act.name).c_str())
+            : tr("Ce jeu sert sur tous les plateaux.");
+        if (!act.description.empty()) why += " " + tr(act.description);
         y += a.text.paragraph(Font::Regular, 14 * s, why, {gal.x + 22 * s, y, gal.w - 44 * s, 90 * s}, pal::dim) + 14 * s;
     }
     // The pieces of each player on the chosen board, as they will be played.
@@ -6792,7 +6883,7 @@ void scene_themes(App& a) {
         a.text.draw(Font::Bold, 15 * s, "Changer \xE2\x86\x92", {r.right() - 12 * s, r.center().y - 9 * s}, mix(pal::faint, a.theme().accent, k), Align::Right);
         if (h && a.in.released) {
             std::string pid = id, pname = name;
-            a.open_picker("Sprite de " + name, sp.id, id == "human", [&a, pid, pname](const std::string& sid) {
+            a.open_picker(tr("Sprite de ") + name, sp.id, id == "human", [&a, pid, pname](const std::string& sid) {
                 a.assign_sprite(pid, sid);
                 a.notify(pname + " : " + a.sprite(sid).name);
             });
@@ -7074,7 +7165,7 @@ void tutorial_play(App& a, Move m) {
         a.fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0x7ff0ff) : hex(0xffffff), q * 0.32f));
         a.fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, a.theme().accent));
     } else {
-        a.notify_at(std::string(side_name(side)) + " ne peuvent plus bouger : ils passent.", t.board.area.center());
+        a.notify_at(strf("%s ne peuvent plus bouger : ils passent.", side_name(side)), t.board.area.center());
     }
 }
 
@@ -7099,11 +7190,11 @@ void tutorial_human_move(App& a, Move m) {
     switch (l.goal) {
     case Lesson::Goal::Reach:
         if (goal_reached(l, t.match.pos, m, t.targets, t.victim)) tutorial_result(a, true, l.success);
-        else tutorial_result(a, false, "Ce coup arrive en " + sq_name(m.to_sq()) + ", pas sur la case dor\xC3\xA9" "e. On recommence !");
+        else tutorial_result(a, false, strf("Ce coup arrive en %s, pas sur la case dor\xC3\xA9" "e. On recommence !", sq_name(m.to_sq()).c_str()));
         break;
     case Lesson::Goal::Immobilize:
         if (goal_reached(l, t.match.pos, m, t.targets, t.victim)) tutorial_result(a, true, l.success);
-        else tutorial_result(a, false, "Le pion de " + sq_name(t.victim) + " peut encore bouger. On recommence !");
+        else tutorial_result(a, false, strf("Le pion de %s peut encore bouger. On recommence !", sq_name(t.victim).c_str()));
         break;
     case Lesson::Goal::Moves:
         if (++t.moves_done >= l.moves) tutorial_result(a, true, l.success);
@@ -7303,7 +7394,7 @@ void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bo
 }
 std::string goal_text(const App& a, const Puzzle& p) {
     const AiSpec* ai = a.ai(p.opponent);
-    std::string vs = ai ? ai->name : p.opponent;
+    std::string vs = ai ? tr(ai->name) : p.opponent;
     if (p.margin <= 1) return strf("Gagne avec les %s contre %s.", side_name(p.human), vs.c_str());
     return strf("Gagne avec les %s contre %s, avec au moins %d points d'avance.", side_name(p.human), vs.c_str(), p.margin);
 }
@@ -7342,7 +7433,7 @@ void scene_puzzles(App& a) {
     const float s = a.s;
     auto& st = a.puzzles_ui;
     draw_background(a);
-    draw_title(a, "Puzzles et qu\xC3\xAA" "tes", "Des positions \xC3\xA0 r\xC3\xA9soudre, regroup\xC3\xA9" "es en niveaux : chaque puzzle r\xC3\xA9ussi ouvre le suivant.");
+    draw_title(a, "Puzzles", "Des positions \xC3\xA0 r\xC3\xA9soudre, regroup\xC3\xA9" "es en niveaux : chaque puzzle r\xC3\xA9ussi ouvre le suivant.");
     a.ui.blocked = !a.ui.focus.empty() && false;
     if (a.ui.focus.empty() && back_button(a)) {
         if (!st.open_level.empty()) st.open_level.clear();
@@ -7387,7 +7478,7 @@ void scene_puzzles(App& a) {
             if (!l.puzzles.empty()) draw::round_box({bar.x, bar.y, bar.w * done / l.puzzles.size(), bar.h}, 4 * s, pal::good);
             if (!unlocked) {
                 draw::round_box(cc, 18 * s, hex(0x000000, 130));
-                a.text.draw(Font::Black, 17 * s, strf("verrouill\xC3\xA9 : terminez \xC2\xAB %s \xC2\xBB", shown[i - 1].name.c_str()), {cc.center().x, cc.center().y - 10 * s}, pal::dim, Align::Center);
+                a.text.draw(Font::Black, 17 * s, strf("verrouill\xC3\xA9 : terminez \xC2\xAB %s \xC2\xBB", tr(shown[i - 1].name).c_str()), {cc.center().x, cc.center().y - 10 * s}, pal::dim, Align::Center);
             }
             if (h && a.in.released) { st.open_level = l.id; st.scroll = 0; }
         }
@@ -7414,7 +7505,7 @@ void scene_puzzles(App& a) {
             if (h) a.ui.hovering = true;
             float k = a.ui.anim("pz" + l.puzzles[i], h);
             a.ui.panel({c.x, c.y - 4 * s * k, c.w, c.h}, 16);
-            if (!p) { a.text.draw(Font::Regular, 14 * s, "introuvable : " + l.puzzles[i], {c.x + 16 * s, c.y + 20 * s}, pal::bad); continue; }
+            if (!p) { a.text.draw(Font::Regular, 14 * s, tr("introuvable : ") + l.puzzles[i], {c.x + 16 * s, c.y + 20 * s}, pal::bad); continue; }
             Box mb{c.x + 25 * s, c.y + 22 * s - 4 * s * k, 180 * s, 180 * s};
             draw_mini_board(a, mb, *p);
             if (!unlocked) {
@@ -7468,7 +7559,7 @@ void editor_new(App& a, const std::string& level, const Puzzle* model = nullptr)
     auto& ed = a.editor;
     if (editor_dirty(a) && !ed.p.id.empty()) editor_save(a);
     ed.p = model ? *model : Puzzle{};
-    if (model) { ed.p.id.clear(); ed.p.name = model->name + " (variante)"; }
+    if (model) { ed.p.id.clear(); ed.p.name = model->name + tr(" (variante)"); }
     ed.level = level;
     editor_save(a);   // it appears at once in the list (and in its level)
     ed.confirm_delete = false;
@@ -7543,7 +7634,7 @@ void editor_new_dialog(App& a) {
         ed.choose_new = false;
         editor_new(a, ed.new_level, chosen ? &model : nullptr);
         if (!ed.new_level.empty()) ed.open_levels.insert(ed.new_level);
-        a.notify(chosen ? "Variante cr\xC3\xA9\xC3\xA9" "e : " + ed.p.name : std::string("Nouveau puzzle cr\xC3\xA9\xC3\xA9 : peignez le plateau."));
+        a.notify(chosen ? tr("Variante cr\xC3\xA9\xC3\xA9" "e : ") + ed.p.name : std::string("Nouveau puzzle cr\xC3\xA9\xC3\xA9 : peignez le plateau."));
     }
 }
 
@@ -7596,7 +7687,7 @@ void scene_editor(App& a) {
         bool h = a.ui.hover(r) && list.contains(a.in.mouse);
         if (h) a.ui.hovering = true;
         draw::round_box(r, 7 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.3f : (h ? 0.08f : 0.0f)));
-        a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, pz ? pz->name : pid + " (introuvable)", {r.x + 10 * s, r.y + 8 * s}, pz ? pal::text : pal::bad);
+        a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, pz ? pz->name : pid + tr(" (introuvable)"), {r.x + 10 * s, r.y + 8 * s}, pz ? pal::text : pal::bad);
         if (cur && !lid.empty()) {
             // × : out of this level (the puzzle itself stays, in "Hors niveau" if no level has it).
             if (a.ui.button("mx" + pid, {r.right() - 92 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xC3\x97", Style::Ghost, true, 15)) { action = "unlink"; action_level = lid; action_puzzle = pid; }
@@ -7619,7 +7710,7 @@ void scene_editor(App& a) {
             if (open) draw::poly({c + V2{-t, -t * 0.6f}, c + V2{t, -t * 0.6f}, c + V2{0, t * 0.8f}}, pal::dim);
             else draw::poly({c + V2{-t * 0.6f, -t}, c + V2{t * 0.8f, 0}, c + V2{-t * 0.6f, t}}, pal::dim);
         }
-        a.text.draw(Font::Bold, 15 * s, strf("%s  (%zu)", l.name.c_str(), l.puzzles.size()), {hr.x + 28 * s, hr.y + 8 * s}, pal::text);
+        a.text.draw(Font::Bold, 15 * s, strf("%s  (%zu)", tr(l.name).c_str(), l.puzzles.size()), {hr.x + 28 * s, hr.y + 8 * s}, pal::text);
         const int li = int(&l - &a.levels[0]);
         bool on_arrows = false;
         if (ed.level_selected == l.id) {   // the order of the levels: the order in which they are played
@@ -7643,7 +7734,7 @@ void scene_editor(App& a) {
             if (a.ui.button("addp" + l.id, add, "+ nouveau puzzle dans ce niveau\xE2\x80\xA6", Style::Ghost, true, 13)) { action = "new"; action_level = l.id; }
             y += rh;
             if (p.id.size() && std::find(l.puzzles.begin(), l.puzzles.end(), p.id) == l.puzzles.end()) {
-                if (a.ui.button("addc" + l.id, {list.x + 18 * s, y, list.w - 18 * s, rh - 4 * s}, "+ ajouter \xC2\xAB " + p.name + " \xC2\xBB", Style::Ghost, true, 13)) { action = "add"; action_level = l.id; }
+                if (a.ui.button("addc" + l.id, {list.x + 18 * s, y, list.w - 18 * s, rh - 4 * s}, strf("+ ajouter \xC2\xAB %s \xC2\xBB", tr(p.name).c_str()), Style::Ghost, true, 13)) { action = "add"; action_level = l.id; }
                 y += rh;
             }
         } else {
@@ -7741,7 +7832,7 @@ void scene_editor(App& a) {
         const char want = ed.tool == 0 ? '.' : ed.tool == 1 ? '#' : ed.tool == 2 ? 'B' : 'W';
         char& c = p.cells[hover_sq];
         if ((want == 'B' || want == 'W') && c != want && p.count(want) >= 4)
-            a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord (pinceau Libre).", want == 'B' ? "noirs" : "blancs"));
+            a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord (pinceau Libre).", tr(want == 'B' ? "noirs" : "blancs").c_str()));
         else if (a.in.pressed && (want == 'B' || want == 'W') && c == want) c = '.';   // a click on a piece removes it
         else c = want;
     }
@@ -7855,7 +7946,7 @@ void scene_editor(App& a) {
     std::vector<std::string> hs_names, hs_ids;
     int hs_idx = 0;
     for (auto& [id, name] : HOLE_STYLES) { hs_ids.push_back(id); hs_names.push_back(name); }
-    for (Art* ha : arts_of("hole")) { hs_ids.push_back("art:" + ha->id); hs_names.push_back(ha->name + " (dessin)"); }
+    for (Art* ha : arts_of("hole")) { hs_ids.push_back("art:" + ha->id); hs_names.push_back(ha->name + tr(" (dessin)")); }
     for (size_t i = 0; i < hs_ids.size(); i++) if (hs_ids[i] == p.hole_style) hs_idx = int(i);
     p.hole_style = hs_ids[a.ui.cycler("ed_holes", {x, y, w, 34 * s}, "Trous", hs_names, hs_idx)];
     y += 40 * s;
@@ -7874,7 +7965,7 @@ void scene_editor(App& a) {
         if (a.ui.button(side == BLACK ? "ed_sb" : "ed_sw", r, "", Style::Normal)) {
             Puzzle* pp = &p;
             bool black = side == BLACK;
-            a.open_picker(strf("Sprite des pions %s du puzzle", black ? "noirs" : "blancs"), cur.id, p.human == side,
+            a.open_picker(strf("Sprite des pions %s du puzzle", tr(black ? "noirs" : "blancs").c_str()), cur.id, p.human == side,
                           [pp, black](const std::string& sid) { (black ? pp->sprite_black : pp->sprite_white) = sid; });
         }
         draw_piece(cur, side, {r.x + 24 * s, r.center().y}, 16 * s, 0, a.time, 1, p.human == side);
@@ -7918,14 +8009,14 @@ void scene_editor(App& a) {
     // File actions.
     Box fb{x, panel.bottom() - 62 * s, w, 46 * s};
     float fw = (w - 2 * 8 * s) / 3;
-    if (a.ui.button("ed_save", {fb.x, fb.y, fw, fb.h}, "Enregistrer", Style::Normal, true, 15)) { editor_save(a); a.notify("Enregistr\xC3\xA9 : assets/puzzles/" + p.id + ".json"); }
+    if (a.ui.button("ed_save", {fb.x, fb.y, fw, fb.h}, "Enregistrer", Style::Normal, true, 15)) { editor_save(a); a.notify(tr("Enregistr\xC3\xA9 : assets/puzzles/") + p.id + ".json"); }
     if (a.ui.button("ed_dup", {fb.x + fw + 8 * s, fb.y, fw, fb.h}, "Dupliquer", Style::Normal, true, 15)) action = "dup";
     // An image given to the editor (dialog or dropped on the window): the puzzle's background.
     for (auto& [purpose, path] : a.in.files) {
         if (purpose == "dialog-error") { a.notify("Pas de s\xC3\xA9lecteur de fichiers ici : glissez l'image sur la fen\xC3\xAAtre."); continue; }
         if (purpose != "puzzle-background" && purpose != "drop") continue;
         std::string name = a.import_image(path, "backgrounds");
-        if (!name.empty()) { p.background = name; a.notify("Image de fond : " + name + " (copi\xC3\xA9" "e dans assets/backgrounds)"); }
+        if (!name.empty()) { p.background = name; a.notify(tr("Image de fond : ") + name + tr(" (copi\xC3\xA9" "e dans assets/backgrounds)")); }
     }
     if (a.ui.button("ed_del", {fb.x + 2 * (fw + 8 * s), fb.y, fw, fb.h}, ed.confirm_delete ? "Confirmer ?" : "Supprimer", Style::Danger, !p.id.empty(), 15)) {
         if (ed.confirm_delete) action = "delete";
@@ -7995,7 +8086,7 @@ void scene_editor(App& a) {
         copy.name += " (copie)";
         ed.p = copy;
         editor_save(a);
-        a.notify("Copie cr\xC3\xA9\xC3\xA9" "e : " + ed.p.name);
+        a.notify(tr("Copie cr\xC3\xA9\xC3\xA9" "e : ") + ed.p.name);
     } else if (action == "delete") {
         std::error_code ec;
         fs::remove(g_paths.assets / "puzzles" / (p.id + ".json"), ec);
@@ -8003,7 +8094,7 @@ void scene_editor(App& a) {
             auto it = std::remove(l.puzzles.begin(), l.puzzles.end(), p.id);
             if (it != l.puzzles.end()) { l.puzzles.erase(it, l.puzzles.end()); save_level(l); }
         }
-        a.notify("Puzzle supprim\xC3\xA9 : " + p.name);
+        a.notify(tr("Puzzle supprim\xC3\xA9 : ") + p.name);
         a.reload_puzzles();
         ed.saved.clear();
         ed.p = Puzzle{};
@@ -8255,7 +8346,7 @@ void studio_import(App& a, const std::string& path) {
     auto& st = a.studio;
     int w, h, n;
     unsigned char* px = stbi_load(path.c_str(), &w, &h, &n, 4);
-    if (!px) { a.notify("Image illisible : " + fs::path(path).filename().string()); return; }
+    if (!px) { a.notify(tr("Image illisible : ") + fs::path(path).filename().string()); return; }
     studio_push_undo(a);
     ArtAnim& an = studio_anim(a);
     if (w > h && w % h == 0 && w / h <= 64) {
@@ -8358,7 +8449,7 @@ void studio_drawings(App& a) {
     draw::clip(&list);
     for (auto& k : ART_KINDS) {
         auto v = arts_of(k.id, false);
-        a.text.draw(Font::Bold, 13 * s, strf("%s (%zu)", k.label, v.size()), {list.x + 6 * s, y + 6 * s}, a.theme().accent);
+        a.text.draw(Font::Bold, 13 * s, strf("%s (%zu)", tr(k.label).c_str(), v.size()), {list.x + 6 * s, y + 6 * s}, a.theme().accent);
         y += 28 * s;
         for (Art* x : v) {
             Box r{list.x, y, list.w, 40 * s};
@@ -8393,7 +8484,7 @@ void studio_drawings(App& a) {
         st.edit = copy;
         st.edit.dirty = true;
         studio_save(a);
-        a.notify("Copie : " + st.edit.name);
+        a.notify(tr("Copie : ") + st.edit.name);
     }
     if (a.ui.button("st_del", {lib.x + 20 * s + bw, lib.bottom() - 70 * s, bw, 40 * s}, st.confirm_delete ? "Confirmer ?" : "Supprimer", Style::Danger, true, 14)) {
         if (!st.confirm_delete) st.confirm_delete = true;
@@ -8404,7 +8495,7 @@ void studio_drawings(App& a) {
             if (Art* old = find_art(art.id); old && old->tex) SDL_DestroyTexture(old->tex);
             g_arts.erase(art.id);
             register_art_sprites(a.sprites);
-            a.notify("Dessin supprim\xC3\xA9 : " + art.name);
+            a.notify(tr("Dessin supprim\xC3\xA9 : ") + art.name);
             st.loaded = false;
             st.modified = false;
             st.confirm_delete = false;
@@ -8684,7 +8775,7 @@ void studio_drawings(App& a) {
     draw::round_frame(pv, 6 * s, 1, pal::panel_border);
     if (a.ui.button("st_save", {x, right.bottom() - 58 * s, w, 44 * s}, "Enregistrer", Style::Primary, true, 16)) {
         studio_save(a);
-        a.notify("Enregistr\xC3\xA9 : assets/art/" + art.id + ".png");
+        a.notify(tr("Enregistr\xC3\xA9 : assets/art/") + art.id + ".png");
     }
     if (!typing && ctrl && a.in.key(SDLK_S)) { studio_save(a); a.notify("Enregistr\xC3\xA9"); }
     a.ui.blocked = false;
@@ -8777,11 +8868,11 @@ void studio_boards(App& a) {
         studio_theme_save(a);
         Theme copy = t;
         copy.file.clear();
-        copy.name = t.name + " (copie)";
+        copy.name = t.name + tr(" (copie)");
         st.theme = copy;
         st.theme_modified = true;
         studio_theme_save(a);
-        a.notify("Nouveau th\xC3\xA8me : " + st.theme.name);
+        a.notify(tr("Nouveau th\xC3\xA8me : ") + st.theme.name);
     }
     bool can_delete = a.themes.size() > 1;
     if (a.ui.button("th_del", {lib.x + 10 * s, lib.bottom() - 70 * s, lib.w - 20 * s, 40 * s}, st.confirm_theme_delete ? "Confirmer la suppression ?" : "Supprimer ce th\xC3\xA8me", Style::Danger, can_delete, 14)) {
@@ -8793,7 +8884,7 @@ void studio_boards(App& a) {
             a.board_textures.clear();
             st.theme_loaded = false;
             st.theme_modified = false;
-            a.notify("Th\xC3\xA8me supprim\xC3\xA9 : " + t.name);
+            a.notify(tr("Th\xC3\xA8me supprim\xC3\xA9 : ") + t.name);
             return;
         }
     }
@@ -8907,7 +8998,7 @@ void studio_boards(App& a) {
     }
     if (a.ui.button("th_save", {x, right.bottom() - 56 * s, w, 44 * s}, "Enregistrer le th\xC3\xA8me", Style::Primary, true, 16)) {
         studio_theme_save(a);
-        a.notify("Th\xC3\xA8me enregistr\xC3\xA9 : assets/themes/" + t.file);
+        a.notify(tr("Th\xC3\xA8me enregistr\xC3\xA9 : assets/themes/") + t.file);
     }
     if (open) studio_theme_open(a, *open);
 }
@@ -9003,7 +9094,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     magic::init();
     zobrist::init();
     if (!a->text.load(g_paths.assets / "fonts")) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Yolah", ("Polices introuvables dans " + (g_paths.assets / "fonts").string()).c_str(), a->window);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Yolah", (tr("Polices introuvables dans ") + (g_paths.assets / "fonts").string()).c_str(), a->window);
         return SDL_APP_FAILURE;
     }
     a->themes = load_themes(g_paths.assets / "themes");
@@ -9034,6 +9125,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         }
     }
     a->settings.from_json(load_json(g_paths.prefs / "settings.json"));
+    if (!arg_value(argc, argv, "--lang").empty()) a->settings.lang = arg_value(argc, argv, "--lang");
+    i18n::lang = a->settings.lang;
+    i18n_load(g_paths.assets / "i18n" / "en.json");
     a->cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
     a->cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
 
@@ -9074,7 +9168,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     else if (scene == "themes") {
         a->go(Scene::Themes);
         std::string who = arg_value(argc, argv, "--pick");   // open the sprite picker for this player
-        if (!who.empty()) a->open_picker("Sprite de " + who, a->player_sprite(who).id, who == "human", nullptr);
+        if (!who.empty()) a->open_picker(tr("Sprite de ") + who, a->player_sprite(who).id, who == "human", nullptr);
     }
     else if (scene == "tutorial" || scene == "rules") start_lesson(*a, std::stoi(arg_value(argc, argv, "--lesson", "0")));
     else if (scene == "puzzles") {

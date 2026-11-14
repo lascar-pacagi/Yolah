@@ -15,15 +15,44 @@ filmic tone mapping. Rendered SS times larger, then averaged down
 
 A model is a function frame(t) → Scene; t in [0, 1) along the animation.
 """
+import ctypes
+import glob
 import math
+import os
 import torch
+
+
+def _blocking_sync():
+    """The CPU sleeps while it waits for the GPU (cudaDeviceScheduleBlockingSync)
+    instead of spinning on a core. Must run before CUDA is initialised."""
+    libs = glob.glob(os.path.join(os.path.dirname(torch.__file__), "..", "nvidia", "cuda_runtime", "lib", "libcudart.so*"))
+    for name in libs + ["libcudart.so.12", "libcudart.so"]:
+        try:
+            ctypes.CDLL(name).cudaSetDeviceFlags(0x04)
+            return
+        except OSError:
+            continue
+
+
+if torch.cuda.is_available() and not torch.cuda.is_initialized():
+    _blocking_sync()
 
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 F = torch.float32
+GRAPHS = True        # replay Scene.dist from CUDA graphs (see Scene.dist)
 
 
 # ─── vectors ────────────────────────────────────────────────────────────────
+_LAST = None         # the event after the last graph replayed (Scene.dist)
+_VEC_MEMO = None     # set while a CUDA graph is warmed up then captured (Scene.dist)
+
+
 def vec(*a):
+    if _VEC_MEMO is not None:          # the same constants in the warm-up run and the capture: no copy while capturing
+        v = _VEC_MEMO.get(a)
+        if v is None:
+            v = _VEC_MEMO[a] = torch.tensor(a, dtype=F, device=DEV)
+        return v
     return torch.tensor(a, dtype=F, device=DEV)
 
 
@@ -127,7 +156,7 @@ def sd_capsule(a, b, r, r2=None):
 def sd_cylinder(h, r, rr=0.0):
     """Vertical (y), half height h, radius r, edges rounded by rr."""
     def f(p):
-        d = torch.stack([length(p[:, [0, 2]]) - r + rr, p[:, 1].abs() - h + rr], dim=-1)
+        d = torch.stack([torch.hypot(p[:, 0], p[:, 2]) - r + rr, p[:, 1].abs() - h + rr], dim=-1)
         return length(d.clamp_min(0)) + d.max(dim=-1).values.clamp_max(0) - rr
     return f
 
@@ -135,7 +164,7 @@ def sd_cylinder(h, r, rr=0.0):
 def sd_torus(R, r):
     """In the xz plane."""
     def f(p):
-        q = torch.stack([length(p[:, [0, 2]]) - R, p[:, 1]], dim=-1)
+        q = torch.stack([torch.hypot(p[:, 0], p[:, 2]) - R, p[:, 1]], dim=-1)
         return length(q) - r
     return f
 
@@ -145,7 +174,7 @@ def sd_cone(h, r1, r2, rr=0.0):
     def f(p):
         y = p[:, 1].clamp(-h, h)
         r = r1 + (r2 - r1) * (y + h) / (2 * h)
-        d = torch.stack([length(p[:, [0, 2]]) - r + rr, p[:, 1].abs() - h + rr], dim=-1)
+        d = torch.stack([torch.hypot(p[:, 0], p[:, 2]) - r + rr, p[:, 1].abs() - h + rr], dim=-1)
         return (length(d.clamp_min(0)) + d.max(dim=-1).values.clamp_max(0)) * 0.9 - rr
     return f
 
@@ -182,6 +211,9 @@ def hash3(p):
     return h - torch.floor(h)
 
 
+_CORNERS = {}
+
+
 def vnoise(p):
     i = torch.floor(p)
     f = p - i
@@ -191,11 +223,45 @@ def vnoise(p):
         for dy in (0, 1):
             for dz in (0, 1):
                 w = (u[..., 0] if dx else 1 - u[..., 0]) * (u[..., 1] if dy else 1 - u[..., 1]) * (u[..., 2] if dz else 1 - u[..., 2])
-                n = n + w * hash3(i + vec(dx, dy, dz))
+                c = _CORNERS.get((dx, dy, dz))      # made once: no copy to the GPU per call (graph capture)
+                if c is None:
+                    c = _CORNERS[(dx, dy, dz)] = vec(dx, dy, dz)
+                n = n + w * hash3(i + c)
     return n
 
 
+_CORNER_LIST = [(dx, dy, dz) for dx in (0, 1) for dy in (0, 1) for dz in (0, 1)]
+
+
+def _fbm_fused(p, octaves: int):
+    """fbm with the corners as Python constants: torch.compile fuses it into one kernel."""
+    s, a, tot = 0, 0.5, 0
+    for _ in range(octaves):
+        i = torch.floor(p)
+        f = p - i
+        u = f * f * (3 - 2 * f)
+        n = 0
+        for dx, dy, dz in _CORNER_LIST:
+            w = (u[..., 0] if dx else 1 - u[..., 0]) * (u[..., 1] if dy else 1 - u[..., 1]) * (u[..., 2] if dz else 1 - u[..., 2])
+            q = (i[..., 0] + dx, i[..., 1] + dy, i[..., 2] + dz)
+            q = [(c * 0.3183099 + 0.1) for c in q]
+            q = [(c - torch.floor(c)) * 17.0 for c in q]
+            h = q[0] * q[1] * q[2] * (q[0] + q[1] + q[2])
+            n = n + w * (h - torch.floor(h))
+        s = s + a * n
+        tot += a
+        p = p * 2.03 + 1.7
+        a *= 0.5
+    return s / tot
+
+
+FUSED_NOISE = DEV == "cuda" and os.environ.get("RENDER_NO_COMPILE") is None
+_fbm_compiled = torch.compile(_fbm_fused, dynamic=True) if FUSED_NOISE else None
+
+
 def fbm(p, octaves=4):
+    if _fbm_compiled is not None and p.is_cuda and p.shape[0] >= 64:
+        return _fbm_compiled(p, octaves)
     s, a, tot = 0, 0.5, 0
     for _ in range(octaves):
         s = s + a * vnoise(p)
@@ -258,7 +324,53 @@ class Scene:
         return any(part.mat.glass for part in self.parts)
 
     def dist(self, p, with_id=False, glass=False):
-        """Distance to the opaque parts (glass=False) or to the glass ones."""
+        """Distance to the opaque parts (glass=False) or to the glass ones.
+        On CUDA, the plain distance is replayed from a CUDA graph (one graph
+        per input size bucket): one launch instead of thousands, so the
+        CPU stays nearly idle and the GPU does the work."""
+        if with_id or not GRAPHS or p.device.type != "cuda" or p.shape[0] < 1024:
+            return self._dist(p, with_id, glass)
+        m = p.shape[0]
+        cap = 1024
+        while cap < m:                 # buckets 1024 · 4^k: few captures per frame (each costs one eager pass)
+            cap *= 4
+        key = (cap, glass)
+        g = self.__dict__.setdefault("_graphs", {}).get(key)
+        if g is None:
+            global _VEC_MEMO
+            memo = _VEC_MEMO = self.__dict__.setdefault("_memo", {})
+            try:
+                buf = torch.zeros(cap, 3, dtype=F, device=DEV)
+                if glass not in self.__dict__.setdefault("_warm", set()):    # one warm-up per scene: fills the memo
+                    self._warm.add(glass)
+                    s = torch.cuda.Stream()
+                    s.wait_stream(torch.cuda.current_stream())
+                    with torch.cuda.stream(s):
+                        self._dist(buf, False, glass)
+                    torch.cuda.current_stream().wait_stream(s)
+                gr = torch.cuda.CUDAGraph()
+                with torch.cuda.graph(gr):
+                    out = self._dist(buf, False, glass)
+                g = (gr, buf, out, memo)       # the memo (the scene's) keeps the captured constants alive
+            except Exception:
+                g = False
+            finally:
+                _VEC_MEMO = None
+            self._graphs[key] = g
+        if g is False:
+            return self._dist(p, with_id, glass)
+        gr, buf, out, _ = g
+        global _LAST
+        if _LAST is not None:          # at most two graphs queued: the CPU sleeps here (blocking sync)
+            _LAST.synchronize()        # instead of spinning in a full launch queue
+        buf[:m] = p
+        gr.replay()
+        r = out[:m].clone()
+        _LAST = torch.cuda.Event(blocking=True)
+        _LAST.record()
+        return r
+
+    def _dist(self, p, with_id=False, glass=False):
         d = None
         best = None
         ids = None

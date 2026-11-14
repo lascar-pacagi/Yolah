@@ -7,6 +7,8 @@
     "features": "fig_geometer",
     "human": "fig_human",
     "mcts": "fig_tree_bot",
+    "mcts_nnue": "fig_sylve",
+    "minmax": "fig_chrono",
     "monte_carlo": "fig_dicer",
     "nnue193": "fig_crt",
     "random": "fig_tin_toy",

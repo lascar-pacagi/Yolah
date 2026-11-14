@@ -7,6 +7,8 @@ powerful, bigger and bigger (cartoon objects, no real device):
   monte_carlo   Bâton de dynamite    one red stick, a paper band, a lit fuse
   mcts          Paquet de dynamite   three sticks tied with rope
   basic_minmax  Grenade              olive, grooved, its lever and ring
+  minmax        Obus                 brass case, copper band, olive ogive, fuze
+  mcts_nnue     Pain de plastic      putty bricks, tape, a blinking detonator
   nnue193       Bombe à mèche        the round black cartoon bomb, a curly fuse
   features      Mine marine          a rusty sphere with its horns
   resnet        Bombe d'avion        a finned bomb lying on its wooden cradle
@@ -276,10 +278,57 @@ def nuke(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.8, "beginner": 1.45, "monte_carlo": 1.32, "mcts": 1.28, "basic_minmax": 1.25, "nnue193": 1.22,
+# ─── 5b · Obus (minmax) ─────────────────────────────────────────────────────
+def shell(anim, t, side):
+    """An artillery shell standing on its base: the brass case, the copper
+    driving band, the olive body tapering to the ogive, the steel fuze at the
+    tip, yellow marking bands."""
+    sc = Scene()
+    base(sc, side)
+    S = stand(anim, t)
+    brass = Mat("#c8a050", metal=0.9, rough=0.28, pattern=lambda pl, pw, n: {"albedo": srgb("#c8a050") * (0.9 + 0.15 * fbm(pl * 40, 2))[:, None]})
+    sc.add(sd_cylinder(0.11, 0.095, 0.008), brass, S * T(0, 0.11, 0))                               # the case
+    sc.add(sd_cylinder(0.008, 0.1, 0.003), brass, S * T(0, 0.012, 0))                            # its rim
+    sc.add(sd_cylinder(0.012, 0.098, 0.003), Mat("#b8643a", metal=0.9, rough=0.3), S * T(0, 0.235, 0))   # the copper band
+    sc.add(sd_cylinder(0.08, 0.093, 0.004), bands("#4e5a32", "#e8c838", 0.035, 0.05), S * T(0, 0.32, 0))  # the body, a yellow band
+    sc.add(sd_cone(0.17, 0.093, 0.022, 0.006), Mat("#4e5a32", rough=0.5, clearcoat=0.3), S * T(0, 0.48, 0))   # the ogive
+    sc.add(sd_cone(0.05, 0.025, 0.007, 0.003), STEEL, S * T(0, 0.6, 0))                              # the fuze
+    if anim == "win":   # it glows hot when it wins
+        sc.add(sd_sphere(0.012), glow("#ff8a3a", 5.0 + 3.0 * math.sin(TAU * 2 * t)), S * T(0, 0.64, 0))
+    return sc
+
+
+# ─── 5c · Pain de plastic (mcts_nnue) ───────────────────────────────────────
+def c4(anim, t, side):
+    """A cartoon block of plastic explosive: off-white putty bricks wrapped in
+    olive film, taped, a detonator on top with a red countdown display and two
+    wires, red and blue."""
+    sc = Scene()
+    base(sc, side)
+    S = stand(anim, t)
+    putty = Mat("#e2dccb", rough=0.75, pattern=lambda pl, pw, n: {"albedo": srgb("#e2dccb") * (0.9 + 0.12 * fbm(pl * 45, 2))[:, None]})
+    film = Mat("#5a6238", rough=0.45, clearcoat=0.4)
+    for k, x in enumerate((-0.07, 0.07)):   # two bricks side by side, a strip of film round each
+        sc.add(sd_box(0.065, 0.06, 0.13, 0.012), putty, S * T(x, 0.065, 0))
+        sc.add(sd_box(0.068, 0.063, 0.03, 0.006), film, S * T(x, 0.065, 0.06))
+        sc.add(sd_box(0.068, 0.063, 0.03, 0.006), film, S * T(x, 0.065, -0.06))
+    sc.add(sd_box(0.145, 0.066, 0.014, 0.004), Mat("#3a3a3e", rough=0.6), S * T(0, 0.065, 0))      # the black tape
+    box = S * T(0, 0.15, 0)
+    sc.add(sd_box(0.06, 0.025, 0.045, 0.006), DARK_STEEL, box)                                     # the detonator
+    blink = 1.0 if (t * (8 if anim == "win" else 4)) % 1 < 0.5 else 0.25
+    sc.add(sd_box(0.04, 0.004, 0.022, 0.002), glow("#ff2a2a", 5.0 * blink), box * T(0, 0.025, 0.0))  # the countdown
+    for col, dz in (("#c8242a", 0.03), ("#2a4ac8", -0.03)):
+        p0 = box.point(0.06, 0.0, dz).tolist()
+        pts = bezier(tuple(p0), (p0[0] + 0.05, p0[1] + 0.04, p0[2]), (p0[0] + 0.06, p0[1] - 0.08, p0[2] + dz), (p0[0] + 0.02, p0[1] - 0.1, p0[2] + dz * 2), 6)
+        chain(sc, pts, [0.006] * 6, Mat(col, rough=0.35, clearcoat=0.5), T(), blend=0.002)
+    return sc
+
+
+SCALE = {"random": 1.8, "beginner": 1.45, "monte_carlo": 1.32, "mcts": 1.28, "basic_minmax": 1.25, "minmax": 1.24, "mcts_nnue": 1.6, "nnue193": 1.22,
          "features": 1.18, "resnet": 1.1, "dev": 1.1, "alphazero": 1.1}     # the weak ones a little bigger: they start small on the board
 CAST = {"random": ("Pétard", firecracker), "beginner": ("Fusée d'artifice", rocket), "monte_carlo": ("Bâton de dynamite", dynamite),
-        "mcts": ("Paquet de dynamite", bundle), "basic_minmax": ("Grenade", grenade), "nnue193": ("Bombe à mèche", round_bomb),
+        "mcts": ("Paquet de dynamite", bundle), "basic_minmax": ("Grenade", grenade), "minmax": ("Obus", shell), "mcts_nnue": ("Pain de plastic", c4),
+        "nnue193": ("Bombe à mèche", round_bomb),
         "features": ("Mine marine", sea_mine), "resnet": ("Bombe d'avion", aerial_bomb), "dev": ("Missile", missile),
         "alphazero": ("Bombe nucléaire", nuke)}
 BOMBS = {"bomb_" + k: f for k, (_, f) in CAST.items()}

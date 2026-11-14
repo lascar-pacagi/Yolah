@@ -7,6 +7,7 @@ One row per animation (idle, move, blocked, win), one column per frame.
 Without arguments: every model of models.MODELS.
 
     cd app/tools/sprites && python3 build.py sentinel human
+    python3 build.py ice_mcts:blanc      (one side only: noir or blanc)
 """
 import json
 import math
@@ -65,7 +66,8 @@ BASE_ON_SQUARE = 0.8            # the base's diameter in squares
 ANIMS = [("idle", 16, 10, True), ("move", 8, 24, False), ("blocked", 12, 12, True), ("win", 16, 12, True)]
 NAMES = {"sentinel": "Sentinelle", "human": "Humain", "tin_toy": "Jouet m\u00e9canique", "roller": "Roulix",
          "dicer": "T\u00eate de d\u00e9", "tree_bot": "Arborescent", "retro": "R\u00e9tro 1955", "crt": "Cathodique",
-         "geometer": "G\u00e9om\u00e8tre", "android": "Androïde", "core": "Noyau"}
+         "geometer": "G\u00e9om\u00e8tre", "android": "Androïde", "core": "Noyau",
+         "chrono": "Chrono", "sylve": "Sylve"}
 
 
 NAMES.update(legends.NAMES)
@@ -87,12 +89,14 @@ def anchor():
     return 0.5, 0.5 - v / VIEW
 
 
-def build(model):
+def build(model, sides=(0, 1)):
     t0 = time.time()
     box = BASE_ON_SQUARE * VIEW / BASE_DIAMETER
     ax, ay = anchor()
     cols = max(n for _, n, _, _ in ANIMS)
     for side, suffix in ((0, ""), (1, "_blanc")):
+        if side not in sides:
+            continue
         sheet = np.zeros((SIZE * len(ANIMS), SIZE * cols, 4), np.uint8)
         for r, (anim, n, fps, loop) in enumerate(ANIMS):
             for k in range(n):
@@ -106,6 +110,8 @@ def build(model):
              "animations": [{"name": a, "fps": fps, "loop": loop, "frames": n} for a, n, fps, loop in ANIMS]}
         if model in generals.PLATES:
             j["plate"] = generals.PLATES[model]
+        if model in generals.STARS:
+            j["stars"] = generals.STARS[model]
         if side == 0:
             j["white"] = f"fig_{model}_blanc"
         else:
@@ -116,5 +122,6 @@ def build(model):
 
 
 if __name__ == "__main__":
-    for m in sys.argv[1:] or list(MODELS):
-        build(m)
+    for m in sys.argv[1:] or list(MODELS):          # "model:blanc" / "model:noir" = one side only
+        m, _, only = m.partition(":")
+        build(m, {"": (0, 1), "noir": (0,), "blanc": (1,)}[only])

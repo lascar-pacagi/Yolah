@@ -489,11 +489,53 @@ def tyrannosaurus(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.0, "beginner": 1.0, "monte_carlo": 1.0, "mcts": 1.05, "basic_minmax": 1.08, "nnue193": 1.05,
+# ─── 5b · Pachycéphalosaure (minmax) ────────────────────────────────────────
+def pachycephalosaurus(anim, t, side):
+    """A bipedal plant eater with the thickest skull of all: the high bony
+    dome over the head, ringed at the back and on the snout by knobs and short
+    spikes, a short beaked snout without the big teeth of a predator, short
+    arms; it charges head down (win), as it is thought to have sparred."""
+    sc = Scene()
+    base(sc, side)
+    m = skin("#7a6a48", "#d8c8a0", 70, stripes="#4a3a26", freq=28)
+    charge = 1.0 if anim == "win" else 0.0
+    root, hd, nk = theropod(sc, anim, t, m, leg=0.95, bulk=0.95, tail=0.9, neck=0.8, head=0.85, snout=0.55, width=1.0,
+                            arms="tiny", teeth=False, roar=0.0, crouch=0.6 * charge, eye=iris("#b08a3a"), pitch=0.18 + 0.25 * charge)
+    dome = Mat("#8a7650", rough=0.5, clearcoat=0.2, pattern=lambda pl, pw, n: {"albedo": srgb("#8e7a52") * (0.75 + 0.35 * fbm(pl * 50, 2))[:, None]})
+    sc.add(sd_ellipsoid(0.062, 0.07, 0.075), dome, hd * T(0, 0.07, -0.005), blend=0.02)          # the dome
+    knob = Mat("#5a4a32", rough=0.6)
+    for k in range(9):   # the ring of knobs and spikes around the back of the dome
+        a = math.pi * (k / 8)
+        sc.add(sd_cone(0.022 + 0.008 * (k % 2), 0.008, 0.001, 0.001), knob,
+               hd * T(0.06 * math.cos(a), 0.04, -0.05 - 0.02 * math.sin(a)) * RX(-0.9) * RZ(-(a - math.pi / 2) * 0.9))
+    for sgn in (-1, 1):   # knobs on the snout
+        for z in (0.06, 0.09):
+            sc.add(sd_sphere(0.008), knob, hd * T(0.022 * sgn, 0.028, z))
+    sc.add(sd_cone(0.025, 0.02, 0.003, 0.002), flat("#3a322a"), hd * T(0, -0.03, 0.1) * RX(2.2))   # the small beak
+    return sc
+
+
+# ─── 5c · Cœlophysis (mcts_nnue) ────────────────────────────────────────────
+def coelophysis(anim, t, side):
+    """One of the first dinosaur hunters (late Triassic): light and slender,
+    hollow bones, a long S-shaped neck, a long narrow head with many small
+    serrated teeth, long grasping arms with three clawed fingers, a very long
+    tail; quick rather than strong."""
+    sc = Scene()
+    base(sc, side)
+    m = skin("#6a7a4a", "#d8d4a8", 90, stripes="#3a3a22", freq=40)
+    roar = 0.8 if anim == "win" else 0.08
+    theropod(sc, anim, t, m, leg=1.08, bulk=0.62, tail=0.95, neck=1.45, head=0.8, snout=1.4, width=0.7,
+             arms="long", roar=roar, eye=iris("#d8a830"), pitch=0.12)
+    return sc
+
+
+SCALE = {"random": 1.0, "beginner": 1.0, "monte_carlo": 1.0, "mcts": 1.05, "basic_minmax": 1.08, "minmax": 1.1, "mcts_nnue": 1.12, "nnue193": 1.05,
          "features": 1.08, "resnet": 1.12, "dev": 1.12, "alphazero": 1.15}
 CAST = {"random": ("Brachiosaure", brachiosaurus), "beginner": ("Parasaurolophus", parasaurolophus),
         "monte_carlo": ("Stégosaure", stegosaurus), "mcts": ("Ankylosaure", ankylosaurus),
-        "basic_minmax": ("Tricératops", triceratops), "nnue193": ("Dilophosaure", dilophosaurus),
+        "basic_minmax": ("Tricératops", triceratops), "minmax": ("Pachycéphalosaure", pachycephalosaurus), "mcts_nnue": ("Cœlophysis", coelophysis),
+        "nnue193": ("Dilophosaure", dilophosaurus),
         "features": ("Quetzalcoatlus", quetzalcoatlus), "resnet": ("Allosaure", allosaurus), "dev": ("Spinosaure", spinosaurus),
         "alphazero": ("Tyrannosaure", tyrannosaurus)}
 DINOS = {"dino_" + k: f for k, (_, f) in CAST.items()}

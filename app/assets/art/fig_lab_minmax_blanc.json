@@ -1,0 +1,39 @@
+{
+  "name": "Fascias (blanc)",
+  "kind": "piece",
+  "size": 192,
+  "smooth": true,
+  "on stone": false,
+  "box": 1.4286,
+  "anchor": [
+    0.5,
+    0.7163
+  ],
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 10,
+      "loop": true,
+      "frames": 16
+    },
+    {
+      "name": "move",
+      "fps": 24,
+      "loop": false,
+      "frames": 8
+    },
+    {
+      "name": "blocked",
+      "fps": 12,
+      "loop": true,
+      "frames": 12
+    },
+    {
+      "name": "win",
+      "fps": 12,
+      "loop": true,
+      "frames": 16
+    }
+  ],
+  "variant of": "fig_lab_minmax"
+}

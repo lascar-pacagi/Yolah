@@ -7,6 +7,8 @@ proportions (heroic.adult), from a goblin thief to an ancient dragon:
   monte_carlo   Rôdeuse elfe            a hooded elf ranger drawing her longbow
   mcts          Guerrier orque          black iron, a horned helm, cleaver and shield
   basic_minmax  Troll des collines      a hunched hill troll dragging a tree-trunk club
+  minmax        Guerrier nain           short and broad, a braided red beard, an iron helm, a two-headed axe
+  mcts_nnue     Chaman orque            hides and a wolf pelt, war paint, a skull staff with green fire
   nnue193       Chevalier elfe          silver plate, a blue cloak, a winged helm, a long sword
   features      Seigneur de guerre orque  spiked black armour, a red cloak, a great axe
   resnet        Troll de guerre         a giant troll in bolted plates, a rune maul
@@ -254,6 +256,105 @@ def hill_troll(anim, t, side):
     return sc
 
 
+# ─── 5b · the dwarf warrior (minmax) ────────────────────────────────────────
+DWARF = "#d8a888"
+
+
+def dwarf_warrior(anim, t, side):
+    """A dwarf warrior: short, broad and deep-chested, a long braided red
+    beard tucked in his belt, a round iron helm with a nasal and cheek guards,
+    mail under a leather jerkin, a broad belt with a gold buckle, a heavy
+    two-headed axe."""
+    sc = Scene()
+    base(sc, side)
+    p = base_pose(anim, t)
+    p.r = [0.5, 0.25, 0.85]
+    p.l = [0.45, 0.35, 0.95]
+    if anim == "win":
+        p.r = [2.6, 0.25, 0.1]
+    sk = skin(DWARF, 0.4)
+    mail = Mat("#7a7e86", metal=0.85, rough=0.45, pattern=lambda pl, pw, n: {
+        "albedo": srgb("#7a7e86") * (0.75 + 0.35 * (torch.sin(pl[:, 0] * 420) * torch.sin(pl[:, 1] * 420) > 0).float())[:, None]})
+    m = {"skin": sk, "top": leather("#3e2818"), "legs": cloth("#4a3a5a"), "boots": leather("#2a1a10"), "arms": mail}
+    rig = adult(sc, p, m, H=0.8, bulk=1.3, head=1.55, leg=0.72, neck=0.9)
+    sc.add(sd_ellipsoid(0.15, 0.06, 0.12), mail, rig["waist"] * T(0, -0.08, 0.0), blend=0.02)                     # mail skirt
+    sc.add(sd_torus(0.125, 0.022), leather("#2a1a10"), rig["waist"] * T(0, 0.0, 0.0))                            # the broad belt
+    sc.add(sd_box(0.035, 0.03, 0.01, 0.006), gold(), rig["waist"] * T(0, 0.0, 0.125))                            # its buckle
+    x, r = rig["head"], rig["hr"]
+    sc.add(sd_ellipsoid(r * 0.95, r * 0.98, r * 0.95), sk, x)
+    sc.add(sd_capsule((0, 0, 0), (0, -r * 0.3, r * 0.25), r * 0.2, r * 0.24), sk, x * T(0, r * 0.05, r * 0.88), blend=r * 0.08)   # a big nose
+    for sgn in (-1, 1):
+        sc.add(sd_sphere(r * 0.1), Mat("#2a4a6a", rough=0.1, clearcoat=1.0), x * T(r * 0.34 * sgn, r * 0.12, r * 0.82))
+        sc.add(sd_ellipsoid(r * 0.3, r * 0.1, r * 0.15), Mat("#a8481e", rough=0.9), x * T(r * 0.34 * sgn, r * 0.32, r * 0.78) * RZ(-0.2 * sgn))   # bushy brows
+    beard = fur("#a8481e")
+    sc.add(sd_ellipsoid(r * 0.95, r * 0.85, r * 0.62), beard, x * T(0, -r * 0.75, r * 0.5), blend=r * 0.15)
+    for sgn in (-1, 0, 1):   # three braids down to the belt
+        pts = bezier((r * 0.35 * sgn, -r * 1.1, r * 0.75), (r * 0.4 * sgn, -r * 1.6, r * 1.0), (r * 0.3 * sgn, -r * 2.1, r * 1.05), (r * 0.3 * sgn, -r * 2.5, r * 1.0), 6)
+        chain(sc, pts, [r * 0.24, r * 0.22, r * 0.2, r * 0.18, r * 0.15, r * 0.11], beard, x, blend=r * 0.08)
+        sc.add(sd_cylinder(r * 0.06, r * 0.13, r * 0.02), gold(), x * T(*pts[-1]))
+    helm = iron("#6a6e76", 0.3)
+    sc.add(sd_plane_cut(sd_ellipsoid(r * 1.08, r * 1.0, r * 1.08), (0, -1, 0), -r * 0.15), helm, x * T(0, r * 0.12, 0))
+    sc.add(sd_torus(r * 1.04, r * 0.08), gold(), x * T(0, r * 0.22, 0))
+    sc.add(sd_box(r * 0.08, r * 0.4, r * 0.06, r * 0.02), helm, x * T(0, -r * 0.05, r * 1.02))                  # the nasal
+    for sgn in (-1, 1):
+        sc.add(sd_box(r * 0.06, r * 0.4, r * 0.3, r * 0.03), helm, x * T(r * 0.98 * sgn, -r * 0.25, r * 0.2))     # cheek guards
+    ax = held(rig["r"], -math.pi if anim == "win" else -1.35)
+    sc.add(sd_capsule((0, -0.12, 0), (0, 0.32, 0), 0.016), wood("#4a3020"), ax)
+    for sgn in (-1, 1):   # the two blades, crescents
+        sc.add(sd_plane_cut(sd_cylinder(0.006, 0.1, 0.002), (-sgn, 0, 0), -0.02), iron("#a8acb4", 0.2), ax * T(0.03 * sgn, 0.27, 0) * RX(math.pi / 2))
+    sc.add(sd_cylinder(0.03, 0.025, 0.006), gold(), ax * T(0, 0.27, 0))
+    return sc
+
+
+# ─── 5c · the orc shaman (mcts_nnue) ────────────────────────────────────────
+def orc_shaman(anim, t, side):
+    """An old orc shaman: bent, robed in hides and a wolf pelt over the
+    shoulders, bone fetishes and feathers, red war paint, a staff topped with
+    a horned skull whose eyes burn with green fire, spirits of green smoke
+    curling around him."""
+    sc = Scene()
+    base(sc, side)
+    p = base_pose(anim, t)
+    p.r = [0.6, 0.3, 0.8]
+    p.l = [0.9, 0.5, 1.2]
+    if anim == "win":
+        p.r = [2.6, 0.2, 0.15]
+        p.l = [2.0, 0.7, 0.4]
+    sk = skin("#55683a", 0.35)
+    hide = Mat("#7a5a3a", rough=0.9, pattern=lambda pl, pw, n: {"albedo": srgb("#7a5a3a") * (0.7 + 0.4 * fbm(pl * 25, 3))[:, None]})
+    m = {"skin": sk, "top": hide, "legs": hide, "boots": leather("#2a1a10"), "arms": sk}
+    rig = adult(sc, p, m, H=1.0, bulk=1.1, head=1.1, hunch=0.15)
+    sc.add(sd_cone(0.24, 0.17, 0.08, 0.02), hide, rig["waist"] * T(0, -0.18, 0))                  # the hide robe
+    for sgn in (-1, 1):   # the wolf pelt over the shoulders
+        sc.add(sd_ellipsoid(0.08, 0.045, 0.08), fur("#6a6458"), rig["torso"] * T(0.1 * sgn, 0.3, -0.03), blend=0.03)
+    for k in range(7):    # a string of small bones and claws
+        a = -0.9 + 0.3 * k
+        sc.add(sd_capsule((0, 0, 0), (0, -0.03, 0), 0.006), Mat("#e8dcc0", rough=0.5), rig["torso"] * T(0.09 * math.sin(a), 0.24, 0.095 * math.cos(a)))
+    x, r = rig["head"], rig["hr"]
+    orc_face(sc, x, r, sk, anim, eye="#7aff5a", tusk=1.2)
+    for sgn in (-1, 1):   # red war paint: a stripe down each eye
+        sc.add(sd_box(r * 0.06, r * 0.3, r * 0.03, r * 0.01), Mat("#a8201a", rough=0.7), x * T(r * 0.36 * sgn, -r * 0.08, r * 0.86))
+    for k, a in enumerate((-0.5, 0.0, 0.5)):   # feathers in the hair
+        sc.add(sd_ellipsoid(r * 0.08, r * 0.55, r * 0.02), Mat(["#2a2a2e", "#c8c0b0", "#8a2a1a"][k], rough=0.8),
+               x * T(r * 0.3 * math.sin(a), r * 0.9, -r * 0.5) * RZ(-a) * RX(-0.5) * T(0, r * 0.4, 0))
+    st = held(rig["r"], -math.pi if anim == "win" else -1.55)
+    sc.add(sd_capsule((0, -0.42, 0), (0, 0.42, 0), 0.013), wood("#3a2818"), st)
+    sk_x = st * T(0, 0.48, 0)
+    bone = Mat("#e2d6b8", rough=0.5)
+    sc.add(sd_ellipsoid(0.045, 0.05, 0.055), bone, sk_x)                                             # the skull
+    sc.add(sd_ellipsoid(0.035, 0.025, 0.04), bone, sk_x * T(0, -0.035, 0.025), blend=0.01)
+    kk = 5.0 + 3.0 * wave(t, 2) + (6.0 if anim == "win" else 0.0)
+    for sgn in (-1, 1):
+        sc.add(sd_sphere(0.012), glow("#7aff5a", kk), sk_x * T(0.018 * sgn, 0.005, 0.045))
+        hp = bezier((0, 0, 0), (0.04 * sgn, 0.02, -0.01), (0.07 * sgn, 0.06, -0.03), (0.06 * sgn, 0.1, -0.05), 4)
+        chain(sc, hp, [0.012, 0.01, 0.007, 0.003], bone, sk_x * T(0.035 * sgn, 0.03, 0), blend=0.004)
+    for i in range(4):   # spirits of green smoke curling around
+        a = TAU * (t + i / 4)
+        q = T(0.3 * math.cos(a), BASE_TOP + 0.3 + 0.25 * ((t + i / 4) % 1), 0.3 * math.sin(a))
+        sc.add(sd_sphere(0.022 * (1 - ((t + i / 4) % 1)) + 0.006), glow("#7aff5a", 3.0), q)
+    return sc
+
+
 # ─── 6 · the elf knight ─────────────────────────────────────────────────────
 def elf_knight(anim, t, side):
     sc = Scene()
@@ -487,11 +588,12 @@ def dragon(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.25, "mcts": 1.3, "basic_minmax": 1.25, "nnue193": 1.3,
+SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.25, "mcts": 1.3, "basic_minmax": 1.25, "minmax": 1.3, "mcts_nnue": 1.3, "nnue193": 1.3,
          "features": 1.3, "resnet": 1.25, "dev": 1.25, "alphazero": 1.15}
 CAST = {"random": ("Gobelin chapardeur", goblin), "beginner": ("Orque éclaireur", orc_scout),
         "monte_carlo": ("Rôdeuse elfe", elf_ranger), "mcts": ("Guerrier orque", orc_warrior),
-        "basic_minmax": ("Troll des collines", hill_troll), "nnue193": ("Chevalier elfe", elf_knight),
+        "basic_minmax": ("Troll des collines", hill_troll), "minmax": ("Guerrier nain", dwarf_warrior), "mcts_nnue": ("Chaman orque", orc_shaman),
+        "nnue193": ("Chevalier elfe", elf_knight),
         "features": ("Seigneur de guerre orque", orc_warlord), "resnet": ("Troll de guerre", war_troll),
         "dev": ("Archimage elfe", archmage), "alphazero": ("Dragon ancien", dragon)}
 EPIC = {"leg_" + k: f for k, (_, f) in CAST.items()}
