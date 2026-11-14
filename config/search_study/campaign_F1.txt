@@ -1,0 +1,19 @@
+# Campaign F1 (NNUE, 2026-11-14): first layer per phase (4 fc1 sets, ib4f, factorised: a shared set + one
+# correction per phase, merged at export; C++ 0358b73 with the refresh cache) on the dev network
+# k8_them_g046_qat_scratch_az20 (dev_final). Validation mse (P7): the dev network 0.0735; ib4f_ref2u lowest.
+#   f1_ib4f_ref2    the dev network frozen, the sets learnt on top (10 epochs lr 1e-4, then 20 at 3e-5)
+#   f1_ib4f_ref2u   the same, the last 20 epochs with everything learning
+#   f1_ref2         control: the same trainings without the sets (frozen), separates sets from extra epochs
+#   f1_ref2u        control: without the sets, everything learning
+# Exported, bit-exact against PyTorch (nets_check, 2000 positions). Same search for all (dev_final).
+# BOOK=balanced. Lines 1-8: each against dev_final; 9-10: each set network against its control.
+f1_ib4f_ref2u dev_final 200000 1000
+f1_ib4f_ref2u dev_final 1000000 1000
+f1_ib4f_ref2 dev_final 200000 1000
+f1_ib4f_ref2 dev_final 1000000 1000
+f1_ref2u dev_final 200000 1000
+f1_ref2u dev_final 1000000 1000
+f1_ref2 dev_final 200000 1000
+f1_ref2 dev_final 1000000 1000
+f1_ib4f_ref2u f1_ref2u 1000000 1000
+f1_ib4f_ref2 f1_ref2 1000000 1000
