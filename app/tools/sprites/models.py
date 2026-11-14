@@ -262,7 +262,7 @@ def hairline(q):
     return front * fr + (1 - front) * side + 0.014 * (vnoise(q * 28.0) - 0.5)
 
 
-def skin_mat(head=None):
+def skin_mat(head=None, side=0):
     """Skin; with `head` (the head's transform): the stubble beard and moustache,
     and faint lines on the forehead, placed in the head's coordinates."""
     base_c = srgb(SKIN)
@@ -285,8 +285,11 @@ def skin_mat(head=None):
             beard = beard * smoothstep(-0.36, -0.3, q[:, 1])              # fades on the neck
             speck = fbm(q * 260.0, 2)
             grey = (fbm(q * 300.0 + 7.0, 2) > 0.45).float()
-            stubble = srgb("#6c6058") * (1 - 0.75 * grey[:, None]) + srgb("#d2cdc8") * 0.75 * grey[:, None]
-            w = (beard * (0.35 + 0.35 * speck))[:, None] * 0.15
+            if side == 0:      # a three-day beard, black for Black, light grey for White
+                stubble = srgb("#211d1b") * (1 - 0.3 * grey[:, None]) + srgb("#3e3834") * 0.3 * grey[:, None]
+            else:
+                stubble = srgb("#a8a29c") * (1 - 0.6 * grey[:, None]) + srgb("#dcd8d2") * 0.6 * grey[:, None]
+            w = (beard * (0.6 + 0.35 * speck))[:, None]
             rough = rough + 0.25 * beard
             fore = smoothstep(0.115, 0.135, q[:, 1]) * smoothstep(0.23, 0.2, q[:, 1]) * (q[:, 2] > 0.1).float()
             lines = smoothstep(0.75, 0.95, torch.sin(q[:, 1] * 150 + 1.3 + 30 * q[:, 0] ** 2 + 2 * fbm(q * 20, 2))) * fore \
@@ -301,7 +304,7 @@ def skin_mat(head=None):
             lw = vec(0.2126, 0.7152, 0.0722)
             r = ((ph @ lw) / (srgb(SKIN) @ lw)).clamp(0.2, 2.0)
             ph = ph * (r ** 1.1)[:, None] * (0.97 + 0.06 * mott)[:, None]      # the detail, more marked
-            wf = wf * 0.55                                                      # the photo's stubble faded: clean shaven
+            wf = wf * 0.75
             a = a * (1 - wf[:, None]) + ph * wf[:, None]
             a = a * (1 - w) + stubble * w
             a = a * (1 - 0.3 * lines[:, None])
@@ -396,7 +399,7 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
     lip = Mat("#b08e84", rough=0.5, sss=0.2, clearcoat=0.15)
     mouth_in = Mat("#4a1418", rough=0.6)
     teeth = Mat("#f3efe6", rough=0.25, clearcoat=0.6)
-    brow = Mat("#d6d0c6" if side == 1 else "#141313", rough=0.9)
+    brow = Mat("#cfc9c0" if side == 1 else "#141313", rough=0.9)
     # expression parameters
     yaw, pitch, roll, bob = 0.0, 0.0, 0.0, 0.0
     gaze = (0.1, 0.0, 1.0)
@@ -520,10 +523,10 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
             sc.add(sd_capsule(end, (end[0], end[1] - 0.028, end[2] + 0.004), 0.0075), metal, root)   # the aglet
     sc.add(sd_capsule((0, 0, 0), (0, 0.15, 0.01), 0.078), skin_mat(), root * T(0, y0 + 0.38, 0))
     head = root * T(0, y0 + 0.72, 0.02) * RY(yaw) * RX(pitch - 0.42) * RZ(roll)   # faces the camera
-    skin = skin_mat(head)
+    skin = skin_mat(head, side)
     # head: the face (from the photos), the cranium, the jaw behind the face, the ears
     sc.add(sd_face, skin, head)
-    sc.add(sd_ellipsoid(0.178, 0.29, 0.265), skin, head * T(0, 0.06, -0.045), blend=0.04)
+    sc.add(sd_ellipsoid(0.186, 0.258, 0.262), skin, head * T(0, 0.045, -0.04), blend=0.04)   # a rounder skull
     sc.add(sd_ellipsoid(0.13, 0.12, 0.15), skin, head * T(0, -0.13, -0.045), blend=0.05)
     for sgn in (-1, 1):
         ear = head * T(0.18 * sgn, -0.01, -0.02) * RY(0.6 * sgn)
@@ -565,6 +568,12 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
             sc.add(rim, frame, c)
             sc.add(sd_capsule((0.148 * sgn, 0.045, 0.232), (0.188 * sgn, 0.04, 0.0), 0.007), frame, head)   # the arms
         sc.add(sd_capsule((-0.032, 0.045, 0.264), (0.032, 0.045, 0.264), 0.007), frame, head)               # the bridge
+    # AirPods: a glossy white bud in each ear, its stem down along the cheek
+    pod = Mat("#f6f6f4", rough=0.12, clearcoat=1.2)
+    for sgn in (-1, 1):
+        ear = head * T(0.18 * sgn, -0.01, -0.02) * RY(0.6 * sgn)
+        sc.add(sd_ellipsoid(0.017, 0.015, 0.014), pod, ear * T(0, -0.012, 0.024))
+        sc.add(sd_capsule((0, -0.016, 0.03), (0.004 * sgn, -0.062, 0.042), 0.0065, 0.006), pod, ear)
     # mouth: lips along a curve (smile > 0: corners up), the mouth open by open_m
     mw = 0.074
     pts = []
@@ -593,36 +602,17 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
     # the hairline, with locks; strands run front to back on top, down on the sides
     def hair_pat(pl, pw, n):
         q = head.to_local(pw)
-        side_w = smoothstep(0.1, 0.2, q[:, 0].abs()) * smoothstep(0.3, 0.15, q[:, 1])
-        top = fbm(torch.stack([q[:, 0] * 380, q[:, 1] * 40, q[:, 2] * 30], -1), 3)
-        sid = fbm(torch.stack([q[:, 0] * 30, q[:, 1] * 40, q[:, 2] * 380], -1) + 5.0, 3)
-        u = top * (1 - side_w) + sid * side_w
-        big = fbm(q * 12.0 + 2.0, 3)
-        greyness = (0.75 + 0.2 * side_w + 0.3 * (big - 0.5)).clamp(0, 1)       # white, ivory in the shade
-        if side == 0:      # Black: black hair
-            dark, mid, light = srgb("#0c0b0b"), srgb("#1e1c1b"), srgb("#3a3836")
-        else:              # White: white hair
-            dark, mid, light = srgb("#7a756c"), srgb("#b6b1a6"), srgb("#dedbd3")
-        g = smoothstep(0.75 - greyness, 1.0 - greyness * 0.5, u)
-        a = dark * (1 - g[:, None]) + mid * g[:, None]
-        a = a * (1 - (smoothstep(0.62, 0.8, u) * greyness)[:, None]) + light * (smoothstep(0.62, 0.8, u) * greyness)[:, None]
-        cu = curls(q)
-        a = a * (0.55 + 0.6 * cu)[:, None]                       # each curl lit, the hollows between them dark
-        return {"albedo": a, "rough": 0.68 + 0.15 * u}
+        hc = srgb("#141210") if side == 0 else srgb("#d8d4cc")        # black for Black, white for White
+        above = q[:, 1] - hairline(q)
+        k = smoothstep(0.0, 0.03, above) * (0.96 + 0.04 * fbm(q * 220.0, 2))     # sparser at the hairline
+        a = srgb(SKIN) * 0.92 * (1 - k[:, None]) + hc * (0.85 + 0.3 * fbm(q * 300.0 + 2, 2))[:, None] * k[:, None]
+        return {"albedo": a, "rough": 0.75 + 0.15 * k}
     hair_m = Mat("#7a756f", rough=0.7, pattern=hair_pat)
 
-    def hair(p):
-        cran = sd_ellipsoid(0.178, 0.29, 0.265)(p - vec(0, 0.06, -0.045))
+    def hair(p):    # nearly shaved: a thin shell over the cranium, above the hairline
+        cran = sd_ellipsoid(0.186, 0.258, 0.262)(p - vec(0, 0.045, -0.04))
         above = p[:, 1] - hairline(p)
-        ramp = smoothstep(-0.005, 0.1, above)                     # thin at the hairline, full above
-        side_w = smoothstep(0.1, 0.17, p[:, 0].abs())
-        # clumps, and grooves along the strands (front to back on top, down the sides)
-        flow = torch.where(side_w > 0.5, p[:, 2] * 140.0, p[:, 0] * 140.0)
-        tousle = 0.016 * (fbm(p * 6.0 + 1.0, 3) - 0.5) * 2 + 0.016 * curls(p) ** 0.7     # tidy, curly
-        back = smoothstep(0.05, -0.2, p[:, 2])
-        low = smoothstep(0.25, 0.0, p[:, 1])                         # fuller low on the sides, around the ears
-        thick = 0.03 + 0.035 * side_w * (0.5 + 0.5 * low) + 0.035 * back + 0.01 * smoothstep(0.1, 0.3, p[:, 1])
-        d = cran - (0.004 + (thick + tousle) * ramp)
+        d = cran - (0.002 + 0.006 * smoothstep(-0.005, 0.04, above))
         return torch.maximum(d, -above * 0.5)
     sc.add(hair, hair_m, head)
     import random
