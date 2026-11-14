@@ -48,7 +48,42 @@ def land_h(x, z):
     # the height the eye stands on: a rocky ledge in the foreground
     ledge = sstep(-60, -10, z)
     h = h * (1 - ledge) + (40 + 6 * fbm(torch.stack([x * 0.05, x * 0, z * 0.05], 1), 4)) * ledge
+    # the lake in the valley's floor: a basin under the water's level
+    e = lake_e(x, z)
+    h = torch.lerp(h, torch.minimum(h, -60 + 20 * e), sstep(1.12, 0.92, e))
     return h
+
+
+LAKE = (-150.0, -720.0, 560.0, 380.0)      # centre x, z, radii
+WATER = -42.0
+
+
+def lake_e(x, z):
+    u, v = (x - LAKE[0]) / LAKE[2], (z - LAKE[1]) / LAKE[3]
+    r = torch.sqrt(u * u + v * v) + 1e-6
+    return r * (1 + 0.55 * (fbm(torch.stack([u / r * 1.2 + 3, v / r * 1.2, u * 0], 1), 4) - 0.5)) + 0.15 * (fbm(torch.stack([x * 0.004, z * 0.004, x * 0 + 9], 1), 3) - 0.5)
+
+
+def canopy(x, z, h):
+    """Forests of firs on the valley's floor: a canopy of cones over the ground (2×2 nearest cells)."""
+    cell = 13.0
+    fm = sstep(0.47, 0.55, fbm(torch.stack([x * 0.0025 + 1, x * 0 + 5, z * 0.0025], 1), 4) + 0.12 * (fbm(torch.stack([x * 0.012, x * 0 + 2, z * 0.012], 1), 3) - 0.5)) * sstep(90, 10, h) \
+        * sstep(1.0, 1.2, lake_e(x, z)) * sstep(-140, -260, z)
+    c = torch.zeros_like(x)
+    i0, k0 = torch.floor(x / cell - 0.5), torch.floor(z / cell - 0.5)
+    for di in (0, 1):
+        for dk in (0, 1):
+            i, k = i0 + di, k0 + dk
+            idv = torch.stack([i, k, i * 0 + 3], 1)
+            cx = (i + 0.5 + (hash3(idv) - 0.5) * 0.5) * cell
+            cz = (k + 0.5 + (hash3(idv + 1.3) - 0.5) * 0.5) * cell
+            H = 11 + 9 * hash3(idv + 2.9)
+            rad = 6.5 + 2.5 * hash3(idv + 4.4)
+            d = torch.sqrt((x - cx) ** 2 + (z - cz) ** 2)
+            c = torch.maximum(c, H * (1 - d / rad).clamp_min(0) ** 1.2 * (hash3(idv + 6.6) < 0.7).float())
+    # needles: the cones' surfaces broken by branches
+    c = c * (0.85 + 0.3 * fbm(torch.stack([x * 0.6, z * 0.6, x * 0 + 4], 1), 2))
+    return c * fm, fm
 
 
 def land_at(x, z):
@@ -56,7 +91,9 @@ def land_at(x, z):
 
 
 def land(p):
-    return (p[:, 1] - land_h(p[:, 0], p[:, 2])) * 0.4
+    h = land_h(p[:, 0], p[:, 2])
+    c, fm = canopy(p[:, 0], p[:, 2], h)
+    return (p[:, 1] - h - c) * 0.4 / (1 + 1.6 * fm)
 
 
 def land_mat():
@@ -71,6 +108,18 @@ def land_mat():
         a = torch.lerp(rock, veg, low * (1 - sstep(0.35, 0.6, steep))[:, None])
         snow = sstep(520, 640, y + 80 * fbm(pw * 0.004, 3)) * sstep(0.75, 0.45, steep)
         a = torch.lerp(a, srgb("#e8ecf2") * (0.85 + 0.15 * fbm(pw * 0.03, 2))[:, None], snow[:, None])
+        # the firs: dark needles, the tips catching the low sun; shingle beaches round the lake
+        g = land_h(pw[:, 0], pw[:, 2])
+        c, fm = canopy(pw[:, 0], pw[:, 2], g)
+        tree = sstep(0.8, 2.0, y - g)
+        fir = torch.lerp(srgb("#0e2a22"), srgb("#24402a"), hash3(torch.floor(pw * vec(0.08, 0, 0.08)))[:, None]) \
+            * (0.7 + 0.5 * fbm(pw * 0.3, 2))[:, None] * (1 + 0.6 * sstep(0.5, 1.0, (y - g) / (c + 1e-3)))[:, None]
+        a = torch.lerp(a, fir, tree[:, None])
+        e = lake_e(pw[:, 0], pw[:, 2])
+        beach = sstep(1.08, 1.0, e + 0.06 * (fbm(pw * 0.02, 2) - 0.5)) * sstep(WATER + 4, WATER + 1, y)
+        meadow = sstep(1.3, 1.05, e) * (1 - beach) * (1 - tree)
+        a = torch.lerp(a, torch.lerp(srgb("#3a4a22"), srgb("#6a6a32"), fbm(pw * 0.02, 3)[:, None]), (meadow * 0.8)[:, None])
+        a = torch.lerp(a, srgb("#8a7e6a") * (0.8 + 0.3 * fbm(pw * 0.2, 2))[:, None], beach[:, None])
         return {"albedo": a}
     return Mat("#4a4440", rough=0.9, pattern=pat)
 
@@ -183,13 +232,27 @@ def clouds(p):
 def valley_mist(p):
     g = land_h(p[:, 0], p[:, 2])
     n = fbm(p * vec(0.002, 0.01, 0.002), 4)
-    return torch.exp(-(p[:, 1] - g).clamp_min(0) / 25.0) * sstep(20, -50, g) * ((n - 0.35) * 2).clamp_min(0) * 0.003
+    return torch.exp(-(p[:, 1] - g).clamp_min(0) / 25.0) * sstep(20, -50, g) * ((n - 0.4) * 2).clamp_min(0) * 0.0012
+
+
+def lake(p):
+    e = lake_e(p[:, 0], p[:, 2])
+    return torch.maximum((p[:, 1] - WATER).abs() - 0.5, (e - 1.25) * 300)
+
+
+def water_mat():
+    def pat(pl, pw, n):
+        # the wind's ripples: patches of a rougher surface, darker, between calm mirror-like ones
+        rip = sstep(0.45, 0.65, fbm(torch.stack([pw[:, 0] * 0.004, pw[:, 1] * 0, pw[:, 2] * 0.012], 1), 4))
+        return {"albedo": srgb("#0a1218").expand(pw.shape[0], 3), "rough": 0.02 + 0.2 * rip}
+    return Mat("#0a1218", rough=0.03, clearcoat=1.0, pattern=pat)
 
 
 def scene():
     sc = Scene()
     sc.add(land, land_mat())
-    sc.add(river, Mat("#0a1218", rough=0.05, clearcoat=1.0))
+    sc.add(river, water_mat())
+    sc.add(lake, water_mat())
     sc.add(volcano, volcano_mat())
     citadel(sc)
     return sc
@@ -199,7 +262,7 @@ NOVOL = os.environ.get("NOVOL") is not None
 
 
 def render(W=2560, H=1440, ss=1):
-    el, az = math.radians(1.8), math.radians(-62)
+    el, az = math.radians(3.2), math.radians(-62)
     sun = (math.sin(az) * math.cos(el), math.sin(el), -math.cos(az) * math.cos(el))
     atmo = Atmosphere(sun, sun_power=26.0, mie=40e-6, mie_g=0.8, ground="#3a3a2a")
     cam = Camera((0.0, land_at(0, 0) + 90, 0.0), (120, 120, -2000), fov=58)

@@ -38,7 +38,9 @@ def terrain(p):
 def ground_mat():
     def pat(pl, pw, n):
         slope = (1 - n[:, 1]).clamp(0, 1)
-        moss = srgb("#3a5a22") * (0.6 + 0.5 * fbm(pw * 0.6, 3))[:, None]
+        moss = torch.lerp(srgb("#2a4418"), srgb("#5a6a2a"), fbm(pw * 0.25 + 3, 3)[:, None]) * (0.6 + 0.5 * fbm(pw * 0.6, 3))[:, None]
+        litter = sstep(0.55, 0.65, fbm(pw * 1.7 + 8, 2))
+        moss = torch.lerp(moss, srgb("#5a4228"), (0.5 * litter)[:, None])
         rock = srgb("#5a4a3a") * (0.6 + 0.5 * fbm(pw * 1.3, 3))[:, None]
         mud = srgb("#3a2e22")
         wet = ((pw[:, 1] + 2.6) / 1.2).clamp(0, 1)[:, None]
@@ -98,6 +100,17 @@ def lake_mat():
     return Mat("#0a1418", rough=0.03, clearcoat=1.0, pattern=lambda pl, pw, n: {"albedo": srgb("#0a1418").expand(pw.shape[0], 3)})
 
 
+def fern_mat():
+    """Fronds: pinnae (stripes across the frond), lighter young tips, some fronds browned."""
+    def pat(pl, pw, n):
+        k = 0.5 + 0.5 * torch.sin(pw[:, 0] * 23 + pw[:, 2] * 19 + 2 * fbm(pw * 2, 2))
+        c = torch.lerp(srgb("#2a4a1a"), srgb("#6a9a34"), (0.4 * k + 0.6 * fbm(pw * 0.8, 2))[:, None])
+        brown = sstep(0.62, 0.7, fbm(pw * 0.35 + 5, 3))
+        c = torch.lerp(c, srgb("#7a5a2a"), (0.7 * brown)[:, None])
+        return {"albedo": c}
+    return Mat("#3a6224", rough=0.6, sss=0.7, pattern=pat)
+
+
 def bark(c="#4a3a2a"):
     return Mat(c, rough=0.9, pattern=lambda pl, pw, n: {"albedo": srgb(c) * (0.6 + 0.6 * (0.5 + 0.5 * torch.sin(pw[:, 1] * 9 + 3 * fbm(pw * 2, 2))))[:, None]})
 
@@ -155,8 +168,10 @@ def forest(p):
     return (p[:, 1] - canopy) * 0.5
 
 
-def scatter(cell, rmax, jit, region, make, seed, keep, top=2.5, ext=1.3):
-    """One object per cell (domain repetition), standing on the terrain; see bomb_scene.scatter."""
+def scatter(cell, rmax, jit, region, make, seed, keep, top=2.5, ext=1.3, rot=0.0, clumps=0.0):
+    """One object per cell (domain repetition), standing on the terrain; see bomb_scene.scatter.
+    rot turns the grid (two scatters with different angles hide each other's rows); clumps makes
+    the density vary (thickets and clearings) instead of a uniform keep."""
     margin = cell / 2 - jit - rmax * ext          # the widest reach of an object: rmax · ext
     assert margin > 0.1 * cell, margin
     x0, x1, z0, z1 = region
@@ -164,26 +179,44 @@ def scatter(cell, rmax, jit, region, make, seed, keep, top=2.5, ext=1.3):
     def f(p):
         x, y, z = p[:, 0], p[:, 1], p[:, 2]
         out = torch.maximum(torch.maximum(x0 - x, x - x1), torch.maximum(z0 - z, z - z1))
+        if rot:
+            c_, s_ = math.cos(rot), math.sin(rot)
+            x, z = c_ * x - s_ * z, s_ * x + c_ * z
         ix, iz = torch.floor(x / cell), torch.floor(z / cell)
         id3 = torch.stack([ix, ix * 0 + seed, iz], 1)
         h1, h2, h3 = hash3(id3), hash3(id3 + 3.7), hash3(id3 + 11.3)
         cx = (ix + 0.5) * cell + (h1 - 0.5) * 2 * jit
         cz = (iz + 0.5) * cell + (h2 - 0.5) * 2 * jit
-        g = -terrain(torch.stack([cx, cx * 0, cz], 1)) / 0.55
+        if rot:      # the cell's centre back in the world, for the terrain's height
+            wx, wz = c_ * cx + s_ * cz, -s_ * cx + c_ * cz
+        else:
+            wx, wz = cx, cz
+        g = -terrain(torch.stack([wx, wx * 0, wz], 1)) / 0.55
         r = rmax * (0.5 + 0.5 * h3)
         d = make(torch.stack([x - cx, y - g, z - cz], 1), r, h3)
         edge = cell / 2 - torch.maximum((x - (ix + 0.5) * cell).abs(), (z - (iz + 0.5) * cell).abs())
         bound = torch.maximum(edge + margin, y - g - top * rmax - 1.0)
-        d = torch.where(hash3(id3 + 5.1) < keep, torch.minimum(d, bound), bound)
+        kp = keep + clumps * (fbm(torch.stack([wx * 0.05, wz * 0.05, wx * 0 + seed], 1), 3) - 0.5) * 2
+        d = torch.where(hash3(id3 + 5.1) < kp, torch.minimum(d, bound), bound)
         return torch.maximum(d, out)
     return f
 
 
 def fern_clump(loc, r, h):
-    q = loc / torch.stack([r * 1.3, r * 0.45, r * 1.3], 1)
-    d = (torch.sqrt((q * q).sum(-1)) - 1) * r * 0.4
-    fr = fbm(torch.stack([loc[:, 0] * (9 / r), loc[:, 1] * (3 / r), loc[:, 2] * (9 / r)], 1) + h[:, None] * 5, 2)
-    return d + (0.5 - fr) * r * 0.35
+    """A rosette of fronds arching out from the centre and drooping at their tips."""
+    x, y, z = loc[:, 0], loc[:, 1], loc[:, 2]
+    R = r * 1.35
+    rho = torch.sqrt(x * x + z * z) + 1e-5
+    n = 7.0
+    a = torch.atan2(z, x) * (n / math.tau) + h * 13.0
+    da = (a - torch.round(a)) * (math.tau / n)           # the angle to the nearest frond's axis
+    tilt = 0.85 + 0.5 * hash3(torch.stack([torch.round(a), h * 31, h * 0], 1))
+    u = (rho / R).clamp(0, 1)
+    yf = R * tilt * (0.75 * u - 0.7 * u * u)             # the frond's arch
+    lat = rho * torch.sin(da)
+    w = 0.16 * R * (1 - u) ** 0.7 * torch.sqrt(u + 0.02) * 2.2
+    d = torch.maximum(torch.maximum(lat.abs() - w, (y - yf).abs() - 0.03 * R), rho - R)
+    return d * 0.6
 
 
 def far_tree(loc, r, h):
@@ -209,7 +242,10 @@ def scene():
     sc.add(sd_box(80, 0.1, 60), lake_mat(), T(0, -2.1, -70))
     sc.add(volcano, volcano_mat(), T(40, -10, -620))
     # ferns covering the ground near the eye, stones, a forest of araucarias on the far hills
-    sc.add(scatter(3.6, 0.85, 0.3, (-70.0, 70.0, -70.0, 12.0), fern_clump, 1.0, 0.9, top=1.0), frond_mat("#3a6224"))
+    ferns = fern_mat()
+    sc.add(scatter(5.0, 1.15, 0.35, (-70.0, 70.0, -70.0, 12.0), fern_clump, 1.0, 0.8, top=1.0, ext=1.4, rot=0.47, clumps=0.4), ferns)
+    sc.add(scatter(6.6, 1.5, 0.5, (-80.0, 80.0, -80.0, 12.0), fern_clump, 4.0, 0.6, top=1.0, ext=1.4, rot=-0.93, clumps=0.5), ferns)
+    sc.add(scatter(2.6, 0.55, 0.2, (-50.0, 50.0, -45.0, 12.0), fern_clump, 7.0, 0.5, top=1.0, ext=1.4, rot=1.31, clumps=0.5), ferns)
     sc.add(scatter(5.0, 0.6, 1.2, (-80.0, 80.0, -90.0, 10.0), rock, 2.0, 0.35), Mat("#5a5048", rough=0.85, pattern=lambda pl, pw, n: {
         "albedo": torch.lerp(srgb("#3a322c"), srgb("#7a6e60"), fbm(pw * 1.5, 3)[:, None])}))
     sc.add(scatter(20.0, 6.0, 2.0, (-600.0, 600.0, -480.0, -150.0), far_tree, 3.0, 0.55, top=4.2, ext=0.95), frond_mat("#2a4a20"))
