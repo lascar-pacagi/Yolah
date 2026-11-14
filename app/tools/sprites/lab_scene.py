@@ -21,7 +21,7 @@ import sys
 import torch
 from PIL import Image
 from render import Scene, Mat, T, RX, RY, RZ, vec, srgb, sd_sphere, sd_box, sd_capsule, sd_cylinder, sd_torus, fbm
-from scenery import Camera, render_view
+from scenery import Camera, render_view, Volume
 
 def fract(x):
     """x - floor(x): in [0, 1) also for negative x (torch.frac keeps the sign)."""
@@ -211,7 +211,51 @@ def scene():
         sc.add(sd_cylinder(0.45, 0.32, 0.03), drum, T(x, 0.45, z))
     sc.add(sd_cylinder(1.4, 1.0, 0.1), steel("#9aa0a8", 0.3), T(10.5, 1.4, -14))
     sc.add(repeat_x(sd_torus(1.02, 0.05), 1.0, 0, 0), steel("#7a8088", 0.3), T(10.5, 2.0, -14))
+    # radiation warning signs on the pilasters: the trefoil on yellow
+    def trefoil(pl, pw, n):
+        u, v = pl[:, 2], pl[:, 1]
+        r = torch.sqrt(u * u + v * v) / 0.9
+        ang = torch.atan2(v, u) + math.pi / 2
+        blade = (fract(ang / (2 * math.pi / 3)) < 0.5).float() * (r > 0.22).float() * (r < 0.62).float()
+        dot = (r < 0.15).float()
+        k = torch.maximum(blade, dot)[:, None]
+        a = srgb("#e8c020") * (1 - k) + srgb("#141010") * k
+        a = a * (0.75 + 0.3 * fbm(pw * 4, 2))[:, None]
+        return {"albedo": a}
+    for sgn in (-1, 1):
+        for z in (-8.0, -23.0, -33.0):
+            sc.add(sd_box(0.03, 0.9, 0.9, 0.05), Mat("#e8c020", rough=0.5, pattern=trefoil), T(sgn * 13.27, 3.6, z))
     return sc
+
+
+LAMPS = [(x, 22.8, z) for x in (-7.0, 0.0, 7.0) for z in (-6.0, -11.0, -16.0, -21.0, -26.0, -31.0, -36.0)]
+
+
+def hall_haze(p):
+    """Dust hanging in the hall: thin, a little thicker low down."""
+    n = fbm(p * 0.15, 3)
+    return (0.0012 + 0.002 * torch.exp(-p[:, 1].clamp_min(0) / 6.0)) * (0.5 + n)
+
+
+def lamp_beams(p, s):
+    """The light of the high-bay lamps through the dust: soft cones under each lamp."""
+    e = torch.zeros(p.shape[0], device=p.device)
+    for (lx, ly, lz) in LAMPS:
+        dy = (ly - p[:, 1]).clamp_min(0.01)
+        r = torch.sqrt((p[:, 0] - lx) ** 2 + (p[:, 2] - lz) ** 2)
+        cone = torch.exp(-(r / (0.4 + 0.3 * dy)) ** 4) * (p[:, 1] < ly).float()
+        e = e + cone / (1 + dy * 0.12) ** 2
+    return srgb("#fff0dc") * (e * 12.0)[:, None]
+
+
+def cherenkov(p):
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    inside = torch.exp(-((x / 6.0) ** 8 + ((z + 18) / 8.0) ** 8))
+    return inside * torch.exp(-(y + 0.7).clamp_min(0) / 2.0) * 0.25 * (0.6 + 0.6 * fbm(p * 0.6, 3))
+
+
+def cherenkov_glow(p, s):
+    return srgb("#2a8aff") * 2.2
 
 
 def render(W=2560, H=1440, ss=1):
@@ -219,14 +263,17 @@ def render(W=2560, H=1440, ss=1):
     sky = lambda d: srgb("#05080e").expand(d.shape[0], 3) * 1.0
     lights = [((x, 21.5, z), "#fff0dc", 7.0) for x in (-7.0, 7.0) for z in (-6.0, -16.0, -26.0, -36.0)]
     lights += [((0, 0.5, -18), "#2a9aff", 9.0), ((0, 0.5, -12), "#2a9aff", 6.0), ((0, 0.5, -24), "#2a9aff", 6.0)]
+    vols = [Volume(hall_haze, (-14.5, -0.5, -40.5), (14.5, 26.0, 6.0), albedo="#c8ccd0", g=0.3, emission=lamp_beams, steps=48, light_steps=0, ambient=0.6),
+            Volume(cherenkov, (-6.8, -0.8, -27), (6.8, 8.0, -9), albedo="#4aa0ff", g=0.3, emission=cherenkov_glow, steps=40, light_steps=0, ambient=0.2)]
     img = render_view(scene(), W, H, cam, sky, sun_dir=None, lights=lights, ambient=("#1a2230", "#0a0e14"),
-                      fog=(0.035, "#123048", 0.07, 0.0), exposure=0.95, steps=200, tmax=90, ao_scale=0.25, bloom=1.0,
-                      dof=(16.0, 0.6), vignette=0.4, grain=0.015, grade=("#3a6a9a", "#ffe8c8"), ss=ss)
+                      fog=(0.02, "#123048", 0.07, 0.0), exposure=0.95, steps=200, tmax=90, ao_scale=0.25, bloom=1.0,
+                      dof=(16.0, 0.4), vignette=0.4, grain=0.012, grade=("#3a6a9a", "#ffe8c8"), ss=ss, volumes=vols)
     return img
 
 
 if __name__ == "__main__":
     W, H = (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (2560, 1440)
     out = sys.argv[3] if len(sys.argv) > 3 else os.path.join(ASSETS, "backgrounds", "laboratoire.jpg")
-    Image.fromarray(render(W, H)).save(out, quality=93)
+    ss = int(sys.argv[4]) if len(sys.argv) > 4 else 2
+    Image.fromarray(render(W, H, ss)).save(out, quality=94)
     print("saved", out)

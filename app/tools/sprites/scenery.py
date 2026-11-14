@@ -539,7 +539,7 @@ def _render_volumes(vols, o, d, depth, sun, sun_col, amb_up, haze_fn):
             L = torch.zeros(idx.numel(), 3, device=DEV)
             if sun is not None:
                 od = torch.zeros(idx.numel(), device=DEV)
-                ls = v.light_dist / v.light_steps
+                ls = v.light_dist / max(v.light_steps, 1)       # light_steps 0: no self-shadowing
                 for j in range(v.light_steps):
                     od = od + v.density(pp + sun * ((j + 0.5) * ls)).clamp_min(0) * ls
                 Tl = torch.exp(-od) * 0.7 + torch.exp(-od * 0.25) * 0.3          # multiple scattering, cheaply

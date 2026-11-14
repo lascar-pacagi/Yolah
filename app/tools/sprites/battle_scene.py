@@ -34,7 +34,10 @@ def land_h(x, z):
     h = 14 * (fbm(q, 4) - 0.4) + 1.2 * fbm(torch.stack([x * 0.08, x * 0, z * 0.08], 1), 3)
     # the battery's ridge in the foreground, the plain falling away below it
     ridge = torch.sigmoid((z + 34) / 7)
-    return h * (1 - 0.8 * ridge) + 16 * ridge - 6
+    h = h * (1 - 0.8 * ridge) + 16 * ridge - 6
+    # the meadow's lumps and tussocks on the ridge (near the eye)
+    near = torch.sigmoid((z + 40) / 4)
+    return h + near * (0.25 * (fbm(torch.stack([x * 0.6, x * 0, z * 0.6], 1), 3) - 0.5) + 0.08 * (fbm(torch.stack([x * 3.0, x * 0 + 1, z * 3.0], 1), 2) - 0.5))
 
 
 def land(p):
@@ -53,7 +56,8 @@ def fields():
         plough = srgb("#6a4a30") * (0.75 + 0.3 * fbm(pw * 0.5, 3))[:, None] * furrow[:, None]
         a = torch.where((kind == 0)[:, None], wheat, torch.where((kind == 1)[:, None], grass, plough))
         # the ridge: a meadow, trampled paths, wild flowers
-        meadow = srgb("#4e6e2c") * (0.6 + 0.5 * fbm(pw * 0.5, 4))[:, None] * (0.85 + 0.2 * fbm(pw * 4, 2))[:, None]
+        blades = fbm(torch.stack([pw[:, 0] * 22, pw[:, 1] * 2, pw[:, 2] * 22], 1), 2)
+        meadow = torch.lerp(srgb("#2e4a1a"), srgb("#6e8a3a"), fbm(pw * 0.5, 4)[:, None]) * (0.6 + 0.5 * blades)[:, None] * (0.85 + 0.25 * fbm(pw * 3, 2))[:, None]
         dry = srgb("#9a8a52") * (0.7 + 0.4 * fbm(pw * 0.8, 3))[:, None]
         meadow = torch.lerp(meadow, dry, (fbm(pw * 0.15 + 5, 3) - 0.45).clamp(0, 0.3)[:, None] * 2.5)
         fl = (fbm(pw * 6 + 9, 2) > 0.82).float()[:, None]
@@ -164,7 +168,7 @@ def smoke_mat():
     return Mat("#d8d4cc", rough=1.0, sss=1.0, pattern=lambda pl, pw, n: {"albedo": srgb("#cfc8bc") * (0.8 + 0.3 * fbm(pw * 0.15, 3))[:, None]})
 
 
-def battalion(sc, cx, cz, rot, files, hb):
+def battalion(sc, cx, cz, rot, files, hb, coat_c="#1e3270", flag_cols=("#1e3a8a", "#f2f0ea", "#c8242a"), shako=True):
     """A battalion in line: `files` × 3 men by domain repetition (one shape for all)."""
     S, R = 0.75, 0.95                                   # spacing along the line, between ranks
     def men(q):
@@ -178,14 +182,14 @@ def battalion(sc, cx, cz, rot, files, hb):
         return torch.minimum(torch.minimum(torch.minimum(body, head), shako), musket)
     def pat(pl, pw, n):
         y = pl[:, 1]
-        coat, trou, black, skin = srgb("#1e3270"), srgb("#e6e0d0"), srgb("#141418"), srgb("#c89878")
+        coat, trou, black, skin = srgb(coat_c), srgb("#e6e0d0"), srgb("#141418"), srgb("#c89878")
         c = torch.where((y < 0.75)[:, None], trou, coat.expand(y.shape[0], 3))
         c = torch.where(((y > 1.12) & (y < 1.32))[:, None], torch.where(((pl[:, 0] / S) - torch.round(pl[:, 0] / S)).abs()[:, None] < 0.2, trou, coat), c)
         c = torch.where((y > 1.45)[:, None], skin.expand(y.shape[0], 3), c)
         c = torch.where((y > 1.67)[:, None], black.expand(y.shape[0], 3), c)
         return {"albedo": c}
     sc.add(men, Mat("#1e3270", rough=0.7, pattern=pat), T(cx, hb(cx, cz), cz) * RY(rot))
-    flag(sc, cx + 0.4, hb(cx, cz) + 0.2, cz - 0.6, ["#1e3a8a", "#f2f0ea", "#c8242a"], rot)
+    flag(sc, cx + 0.4, hb(cx, cz) + 0.2, cz - 0.6, list(flag_cols), rot)
 
 
 def horse_sdf(l, rider=True):
@@ -346,8 +350,9 @@ def scene():
     lh = lambda x, z: land_h(x, z)
     grass = Mat("#6a7a34", rough=0.8, sss=0.7, pattern=lambda pl, pw, n: {
         "albedo": torch.lerp(srgb("#3e5222"), srgb("#a09a52"), (fbm(pw * 0.7, 3) * 1.2 - 0.25).clamp(0, 1)[:, None]) * (0.55 + 0.6 * fbm(pw * 9, 2))[:, None]})
-    sc.add(scatter(lh, 0.9, 0.13, 0.18, (-40.0, 40.0, -26.0, 6.0), tuft, 4.0, 0.8), grass)
-    sc.add(scatter(lh, 1.37, 0.16, 0.3, (-40.0, 40.0, -26.0, 6.0), tuft, 6.0, 0.7), grass)
+    # the enemy across the valley: red-coated battalions in line, their colours
+    for (x, z, r) in ((-60.0, -265.0, 0.1), (-5.0, -280.0, 0.05), (50.0, -270.0, -0.05), (100.0, -290.0, -0.1)):
+        battalion(sc, x, z, r + math.pi, 40, hb, "#a8221c", ("#c8242a", "#f2f0ea", "#1e3a8a"))
     return sc
 
 
@@ -366,13 +371,41 @@ def sstep(a, b, x):
     return t * t * (3 - 2 * t)
 
 
+def smoke_bank(x0, x1, z0, base, H):
+    """A long low bank of musket smoke along a firing line, torn by the wind."""
+    def f(p):
+        x, y, z = p[:, 0], p[:, 1] - base, p[:, 2] - z0
+        along = sstep(x0 - 10, x0 + 25, x) * sstep(x1 + 10, x1 - 25, x)
+        prof = torch.exp(-(z / 14.0) ** 2) * torch.exp(-(y.clamp_min(0) / H)) * (y > -2).float()
+        n = fbm(p * vec(0.05, 0.08, 0.05) + vec(0, -0.2, 0), 5) + 0.4 * (fbm(p * 0.18 + 5, 3) - 0.5)
+        return (prof * along * 1.9 + (n - 0.6) * 2.2).clamp_min(0) * 0.12 * along
+    return f, (x0 - 15, base - 3, z0 - 40), (x1 + 15, base + 3 * H, z0 + 40)
+
+
+def fire_column(cx, cz, base, H, R):
+    def f(p):
+        x, y, z = p[:, 0] - cx, p[:, 1] - base, p[:, 2] - cz
+        u = (y / H).clamp(0, 1)
+        rx = x - 0.45 * H * u * u
+        r = torch.sqrt(rx * rx + z * z)
+        shape = 1 - r / (R * (0.5 + 1.8 * u)) - (y < 0).float() * 4 - (y > H).float() * 4
+        n = fbm(p * (2.0 / R) + vec(0, -0.4, 0), 5)
+        return (shape + 0.8 * (n - 0.5)).clamp_min(0) * 0.12
+
+    def em(p, s):
+        y = p[:, 1] - base
+        heat = torch.exp(-y / (R * 0.9)).clamp(0, 1)
+        return srgb("#ff6a18") * (heat * heat * 30 * fbm(p * (4 / R), 3) ** 2)[:, None]
+    return f, (cx - R * 2, base - 1, cz - R * 2), (cx + R * 2 + 0.45 * H, base + H, cz + R * 2), em
+
+
 def cumulus(p):
     y = p[:, 1]
     q = p * vec(0.0009, 0.0016, 0.0009)
     layer = sstep(900, 1100, y) * sstep(2200, 1500, y)
     n = fbm(q + vec(2, 0, 7), 6)
     cover = fbm(p * 0.00012 + 4, 3)
-    return ((n - 0.5 + 0.4 * (cover - 0.5)) * 5).clamp_min(0) * layer * 0.006
+    return ((n - 0.46 + 0.4 * (cover - 0.5)) * 5).clamp_min(0) * layer * 0.01
 
 
 def mist(p):
@@ -423,6 +456,13 @@ def render(W=2560, H=1440, ss=1):
     for (x, z) in ((44, -76), (58, -86)):
         f, lo, hi = smoke_column(x, z, hb(x, z) + 0.5, 28.0, 0.7)
         vols.append(Volume(f, lo, hi, albedo="#d8d4cc", g=0.5, steps=40, light_steps=4))
+    # banks of powder smoke drifting along the two firing lines
+    for (z0, x0, x1, hgt) in ((-122.0, -80.0, 60.0, 10.0), (-255.0, -90.0, 130.0, 14.0)):
+        f, lo, hi = smoke_bank(x0, x1, z0, hb(0.5 * (x0 + x1), z0), hgt)
+        vols.append(Volume(f, lo, hi, albedo="#e8e4dc", g=0.55, steps=48, light_steps=4))
+    # the farm on fire: flames at its foot, a column of black smoke leaning with the wind
+    f, lo, hi, em = fire_column(-40.0, -190.0, hb(-40.0, -190.0), 90.0, 9.0)
+    vols.append(Volume(f, lo, hi, albedo="#4a4440", g=0.4, emission=em, steps=56, light_steps=5))
     f, lo, hi = gun_smoke(17.5, hb(14.0, -14.0) + 1.6, -17.5, 2.6)
     vols.append(Volume(f, lo, hi, albedo="#f2f0ea", g=0.45, steps=48, light_steps=5))
     img = render_view(scene(), W, H, cam, None, sun_dir=sun, atmo=atmo, aerial=(0.0009, 0.004, 0.0), sun_soft=0.04,
