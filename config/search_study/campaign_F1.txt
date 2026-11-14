@@ -7,6 +7,7 @@
 #   f1_ref2u        control: without the sets, everything learning
 # Exported, bit-exact against PyTorch (nets_check, 2000 positions). Same search for all (dev_final).
 # BOOK=balanced. Lines 1-8: each against dev_final; 9-10: each set network against its control.
+# The dev_final of these games is now dev_final_scratch (dev_final took f1_ib4f_ref2u's network on 2026-11-14).
 f1_ib4f_ref2u dev_final 200000 1000
 f1_ib4f_ref2u dev_final 1000000 1000
 f1_ib4f_ref2 dev_final 200000 1000

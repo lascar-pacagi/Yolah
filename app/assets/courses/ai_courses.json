@@ -382,11 +382,12 @@
       "id": "nnue_persp",
       "title": "Le NNUE du dev : vu du camp au trait",
       "blocks": [
-        { "p": "Le réseau du dev améliore le NNUE de trois façons." },
+        { "p": "Le réseau du dev améliore le NNUE de quatre façons." },
         { "list": [
           "Perspective : les entrées ne sont plus « Noirs / Blancs » mais « mes pions / ses pions / trous », vues par le camp au trait (le plateau est retourné pour les Blancs). Un même motif est ainsi appris une seule fois pour les deux camps. Deux accumulateurs (ma vue, sa vue) sont tenus à jour en parallèle.",
           "Huit têtes de phase : après la première couche, il y a huit petits réseaux, un par phase de jeu (selon le nombre de cases libres). Le début et la fin de partie n'obéissent pas aux mêmes idées : chaque tête se spécialise.",
-          "Caractéristiques d'espace : quelques nombres calculés sur la position (cases atteintes en un, deux ou trois coups de dame ; cases atteintes avant l'adversaire ; influence) entrent directement dans la deuxième couche."
+          "Caractéristiques d'espace : quelques nombres calculés sur la position (cases atteintes en un, deux ou trois coups de dame ; cases atteintes avant l'adversaire ; influence) entrent directement dans la deuxième couche.",
+          "Une première couche par phase (novembre 2026) : la grande couche d'entrée existe en quatre versions, une par quart de la partie. Chacune est la somme d'une partie commune et d'une petite correction propre à sa phase, apprises ensemble ; on les additionne une fois pour toutes avant de jouer. Quand un coup fait changer de phase, l'accumulateur est recalculé, à partir d'un cache qui garde le dernier accumulateur de chaque phase (les « tables de Finny » de Stockfish) : la vitesse ne change pas."
         ] },
         { "anim": "nnue_persp", "height": 400, "caption": "Les entrées vues du camp au trait, l'accumulateur mis à jour par le coup, puis la tête de la phase actuelle, choisie par le nombre de cases libres." },
         { "code": [
@@ -396,7 +397,7 @@
           "    x ← [clamp(a), clamp(b), espace(position)]",
           "    retourner tête[k](x)                          // 3 petites couches"
         ] },
-        { "tip": "Ce réseau a été entraîné de zéro, par distillation, avec pour maître le réseau d'AlphaZero : l'élève a dépassé le réseau précédent d'environ 15 points Elo à temps égal." }
+        { "tip": "Ce réseau a été entraîné de zéro, par distillation, avec pour maître le réseau d'AlphaZero : l'élève a dépassé le réseau précédent d'environ 15 points Elo à temps égal. La première couche par phase a ajouté environ 30 points Elo, sur 2000 parties par cadence ; le même réseau réentraîné aussi longtemps, mais sans les quatre versions, ne gagnait rien : le gain vient bien de la phase." }
       ]
     },
     {
@@ -576,7 +577,8 @@
             "Juillet 2026 : la distillation. Le ResNet, trop lent pour un minimax, devient le maître : il étiquette des centaines de millions de positions, et deux petits réseaux rapides apprennent à l'imiter. Ce sont eux qui jouent dans l'application : Minimax NNUE (ancien), avec 193 entrées, et Minimax Features, avec 119 caractéristiques.",
             "Septembre 2026 : AlphaZero part du ResNet et s'améliore en jouant contre lui-même, avec une recherche à la manière de KataGo, sur les GPU du cluster.",
             "Octobre 2026 : le réseau d'AlphaZero devient le maître à son tour. Il étiquette environ un milliard de positions, et le NNUE vu du camp au trait du Minimax NNUE dev en est distillé. La recherche du dev est retravaillée étape par étape, chaque idée mesurée sur des milliers de parties.",
-            "Novembre 2026 : la boucle de distillation. Les parties du dev sont étiquetées, elles améliorent le ResNet, qui enseigne le NNUE suivant. En fin de partie (22 cases libres ou moins), la cible devient le résultat exact, plus fiable que le maître."
+            "Novembre 2026 : la boucle de distillation. Les parties du dev sont étiquetées, elles améliorent le ResNet, qui enseigne le NNUE suivant. En fin de partie (22 cases libres ou moins), la cible devient le résultat exact, plus fiable que le maître.",
+            "Novembre 2026 : le NNUE du dev reçoit une première couche par phase de la partie (quatre versions de sa couche d'entrée). Mesuré contre l'ancien réseau avec la même recherche : +38 Elo à 0,2 s par coup et +32 à 1 s. Il devient le réseau du Minimax NNUE dev."
           ]
         },
         {
