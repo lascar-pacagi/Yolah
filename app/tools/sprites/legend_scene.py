@@ -453,11 +453,13 @@ def rampart(p):
     # 3 m thick at the top, its outer face flaring out lower down (a glacis of stone down
     # into the crag: the crag's bushes and the ground's lumps no longer show on the wall)
     inner = (0.762 - re) * SPUR[2] - 1.5
-    outer = (re - 0.762) * SPUR[2] - 1.5 - 0.75 * (top - 3 - y).clamp_min(0)
+    outer = (re - 0.762) * SPUR[2] - 1.5 - 0.75 * (top - 3 - y).clamp(0, 10)
     band = torch.maximum(inner, outer)
     ang = torch.atan2(z * 1.2, x)
     merlon = ((torch.sin(ang * 70) > 0.1).float()) * 1.3
-    d = torch.maximum(band, torch.maximum(y - (top + merlon), top - 15 - y))
+    # the wall's foot goes down to the ground wherever it is (on the right the crag falls away)
+    foot = ground_h(p[:, 0], p[:, 2]) - 3.0
+    d = torch.maximum(band, torch.maximum(y - (top + merlon), foot - y))
     # the terrace's arcades replace the wall in front of it
     tx, tz = _rot(x - 2, z - 34, 0.2)
     gap = torch.maximum(tx.abs() - 27, tz.abs() - 9)
