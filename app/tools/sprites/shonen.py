@@ -136,7 +136,7 @@ def shards(sc, n, rad, h0, t, xf, seed=0, size=0.045):
             nv = math.sqrt(sum(c * c for c in v)) or 1
             s_ = size * rng.uniform(0.6, 1.2)
             pts.append(tuple(c / nv * s_ for c in v))
-        a = TAU * (i / n + t * 0.15) + seed
+        a = TAU * (i / n + 0.03 * math.sin(TAU * t)) + seed          # a sway, periodic in t (no jump at the loop)
         y = h0 + 0.25 * ((i * 0.37) % 1) + 0.04 * math.sin(TAU * (t + i * 0.3))
         q = (rad * math.cos(a), BASE_TOP + y, rad * math.sin(a))
         sc.add(sd_hull(pts), STONE, xf * T(*q) * RY(a * 2 + t) * RX(i + t * 2))
@@ -613,8 +613,10 @@ def tenryu(anim, t, side):
     pts, radii = [], []
     for i in range(n):
         u = i / (n - 1)
-        a = TAU * (u * 2.2 + t * (0.25 if anim != "blocked" else 0.05))
-        rr = 0.3 * (1 - 0.35 * u)
+        # a wave running up the coils (periodic in t: the loop has no jump)
+        amp = 0.35 if anim == "blocked" else 1.0
+        a = TAU * u * 2.2 + amp * 0.22 * math.sin(TAU * (u * 1.5 - t))
+        rr = 0.3 * (1 - 0.35 * u) * (1 + amp * 0.06 * math.sin(TAU * (u * 2.0 - t) + 1.0))
         pts.append((rr * math.cos(a), BASE_TOP + 0.06 + u * 1.02, rr * math.sin(a)))
         radii.append(0.068 * (0.45 + 0.75 * math.sin(math.pi * min(1.0, u * 1.25 + 0.08))))
     chain(sc, pts, radii, scale, root, blend=0.03)
@@ -652,7 +654,7 @@ def tenryu(anim, t, side):
     sc.add(sd_torus(0.4, 0.006), glow("#ffe88a", 3.0), root * T(0, BASE_TOP + 0.95, 0) * RX(0.35) * RY(TAU * t))
     shards(sc, 7, 0.48, 0.15, t, root, seed=11, size=0.05)
     for i in range(3):
-        a = TAU * i / 3 + t * 2
+        a = TAU * i / 3 + TAU * t
         lightning(sc, (0.0, 1.15, 0.0), (0.5 * math.cos(a), 0.3, 0.5 * math.sin(a)), i + 7, t, "#fff0a0", 4.0, 0.005, root)
     flame_aura(sc, t, "#ffd24a", 16, 0.6, 0.42, 1.8, seed=10)
     return sc
