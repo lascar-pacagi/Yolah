@@ -57,7 +57,8 @@ def armor(hexcol, rough=0.38, lines=7.0, wear=0.35):
 
 
 def glow(hexcol, k=6.0):
-    return Mat(hexcol, metal=0.0, rough=0.2, emissive=hexcol, emit=k * 0.4)
+    """A glowing material: it gives light, so it casts no shadow (sparks, embers, runes)."""
+    return Mat(hexcol, metal=0.0, rough=0.2, emissive=hexcol, emit=k * 0.4, shadow=False)
 
 
 # ─── NNUE dev: the Sentinel, a heavy war robot ──────────────────────────────

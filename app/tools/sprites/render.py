@@ -278,8 +278,9 @@ class Mat:
     pw world point, n world normal, all (M, 3); returns a dict of overrides."""
 
     def __init__(self, albedo="#888888", metal=0.0, rough=0.5, emissive=None, emit=0.0, pattern=None,
-                 sss=0.0, clearcoat=0.0, glass=False):
+                 sss=0.0, clearcoat=0.0, glass=False, shadow=True):
         self.albedo = srgb(albedo)
+        self.shadow = shadow         # False: casts no shadow (sparks, embers, motes of light)
         self.metal, self.rough = metal, rough
         self.emissive = srgb(emissive) * emit if emissive else None
         self.pattern = pattern
@@ -319,6 +320,18 @@ class Scene:
         for part in self.parts[first:]:
             part.scale = (s, c)
         return self
+
+    def casters(self):
+        """The scene for the shadows: without the parts whose material casts none
+        (the same scene when every part casts)."""
+        if all(part.mat.shadow or part.op != "add" for part in self.parts):
+            return self
+        sc = self.__dict__.get("_casters")
+        if sc is None:
+            sc = Scene()
+            sc.parts = [part for part in self.parts if part.mat.shadow or part.op != "add"]
+            self._casters = sc
+        return sc
 
     def has_glass(self):
         return any(part.mat.glass for part in self.parts)
@@ -546,13 +559,13 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
         ao = torch.ones_like(met)
         for k in range(1, 6):
             h = 0.03 * k
-            ao = ao - (h - scene.dist(p + nrm * h)).clamp_min(0) * (0.5 ** k) * 9.0
+            ao = ao - (h - scene.casters().dist(p + nrm * h)).clamp_min(0) * (0.5 ** k) * 9.0
         ao = ao.clamp(0.15, 1)
         # soft shadow from the key light
         sh = torch.ones_like(met)
         ts = torch.full_like(met, 0.02)
         for _ in range(48):
-            dd = scene.dist(p + nrm * 0.004 + KEY * ts[:, None])
+            dd = scene.casters().dist(p + nrm * 0.004 + KEY * ts[:, None])
             sh = torch.minimum(sh, 10.0 * dd / ts)
             ts = ts + dd.clamp(0.01, 0.15)
         sh = sh.clamp(0, 1)
@@ -702,11 +715,11 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
                 occ = torch.zeros(sel.shape[0], device=DEV)
                 for k in range(1, 7):
                     h = 0.05 * k
-                    occ = occ + (h - scene.dist(pg + vec(0, h, 0))).clamp_min(0) * (0.6 ** k) * 6.0
+                    occ = occ + (h - scene.casters().dist(pg + vec(0, h, 0))).clamp_min(0) * (0.6 ** k) * 6.0
                 sh = torch.ones(sel.shape[0], device=DEV)
                 ts = torch.full_like(sh, 0.02)
                 for _ in range(40):
-                    q = scene.dist(pg + KEY * ts[:, None])
+                    q = scene.casters().dist(pg + KEY * ts[:, None])
                     sh = torch.minimum(sh, 6.0 * q / ts)
                     ts = ts + q.clamp(0.01, 0.2)
                 sh = sh.clamp(0, 1)
