@@ -572,15 +572,42 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
     if shades:   # glasses with a thick black frame (squarish, rounded corners); the lenses, clear, are not drawn
         frame = Mat("#0b0b0d", rough=0.25, clearcoat=1.0)
         for sgn in (-1, 1):
-            c = head * T(0.088 * sgn, 0.03, 0.262) * RY(0.16 * sgn) * RX(-0.05)
+            c = head * T(0.094 * sgn, 0.03, 0.264) * RY(0.16 * sgn) * RX(-0.05)
 
             def rim(q):
-                outer = sd_box(0.064, 0.05, 0.008, 0.02)(q)
-                inner = sd_box(0.047, 0.034, 0.02, 0.013)(q)
+                outer = sd_box(0.074, 0.058, 0.009, 0.022)(q)
+                inner = sd_box(0.058, 0.043, 0.02, 0.015)(q)
                 return torch.maximum(outer, -inner)
             sc.add(rim, frame, c)
-            sc.add(sd_capsule((0.148 * sgn, 0.045, 0.232), (0.188 * sgn, 0.04, 0.0), 0.007), frame, head)   # the arms
-        sc.add(sd_capsule((-0.032, 0.045, 0.264), (0.032, 0.045, 0.264), 0.007), frame, head)               # the bridge
+            # the arms: from the frame's outer corner along the side of the head to the ear
+            sc.add(sd_capsule((0.166 * sgn, 0.05, 0.245), (0.212 * sgn, 0.045, 0.1), 0.009, 0.008), frame, head)
+            sc.add(sd_capsule((0.212 * sgn, 0.045, 0.1), (0.212 * sgn, 0.03, -0.02), 0.008, 0.007), frame, head)
+        sc.add(sd_capsule((-0.034, 0.045, 0.268), (0.034, 0.045, 0.268), 0.008), frame, head)               # the bridge
+    # a real beard and moustache: a layer over the face's surface, the lips left bare
+    beard_dark = srgb("#141210") if side == 0 else srgb("#2a2622")
+    beard_light = srgb("#2c2824") if side == 0 else srgb("#dcd8d2")
+
+    def beard_pat(pl, pw, n):
+        q = head.to_local(pw)
+        strands = fbm(torch.stack([q[:, 0] * 260, q[:, 1] * 40, q[:, 2] * 260], 1), 3)
+        hair_mix = fbm(torch.stack([q[:, 0] * 420, q[:, 1] * 90, q[:, 2] * 420], 1) + 9, 2)       # strand by strand
+        mix = smoothstep(0.38, 0.62, hair_mix)[:, None] * (0.25 if side == 0 else 0.8)
+        a = beard_dark * (1 - mix) + beard_light * mix
+        a = a * (0.7 + 0.5 * strands)[:, None]
+        return {"albedo": a, "rough": torch.full_like(q[:, 0], 0.85)}
+
+    def beard(q):
+        x, y, z = q[:, 0], q[:, 1], q[:, 2]
+        ax = x.abs()
+        thick = 0.011 + 0.01 * smoothstep(-0.16, -0.27, y)                 # fuller on the chin
+        surf = sd_face(q) - thick * 0.35 - 0.004
+        bline = -0.115 - 0.45 * (0.15 - ax).clamp_min(0)                  # the beard's upper edge, low on the cheeks
+        region = y - bline
+        stache = torch.maximum(torch.maximum((y + 0.122).abs() - 0.013 - 0.006 * smoothstep(0.03, 0.07, ax), ax - 0.075), -z + 0.2)
+        region = torch.minimum(region, stache)
+        lips = (torch.sqrt((x / 0.07) ** 2 + ((y + 0.153) / 0.019) ** 2) - 1) * 0.02
+        return torch.maximum(torch.maximum(surf, region), torch.maximum(-lips, -(y + 0.36)))
+    sc.add(beard, Mat("#141210", rough=0.85, pattern=beard_pat), head)
     # AirPods: a glossy white bud in each ear, its stem down along the cheek
     pod = Mat("#f6f6f4", rough=0.12, clearcoat=1.2)
     for sgn in (-1, 1):
