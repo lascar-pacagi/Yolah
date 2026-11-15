@@ -43,18 +43,28 @@ def rust(c="#5a4a40"):
 
 # ─── faces ──────────────────────────────────────────────────────────────────
 def orc_face(sc, x, r, sk, anim, eye="#ff5a1a", tusk=1.0):
-    sc.add(sd_ellipsoid(r, r * 1.0, r * 1.05), sk, x)
-    sc.add(sd_ellipsoid(r * 0.98, r * 0.58, r * 0.85), sk, x * T(0, -r * 0.55, r * 0.22), blend=r * 0.3)     # a heavy jaw
-    sc.add(sd_ellipsoid(r * 0.92, r * 0.2, r * 0.35), sk, x * T(0, r * 0.22, r * 0.76), blend=r * 0.15)     # brow ridge
-    sc.add(sd_ellipsoid(r * 0.3, r * 0.2, r * 0.25), sk, x * T(0, -r * 0.08, r * 0.98), blend=r * 0.1)     # a flat nose
+    """An orc's head: a low skull, a heavy brow ridge over deep sockets with glowing
+    eyes, a wide flat nose, a jutting jaw with tusks pointing up, long ears."""
     roar = anim in ("win", "blocked")
+    r = r * 1.15                                                      # a bigger head: the face reads on the board
+    sc.add(sd_ellipsoid(r * 0.95, r * 0.88, r * 1.0), sk, x * T(0, r * 0.05, -r * 0.05))                       # the skull
+    sc.add(sd_ellipsoid(r * 1.0, r * 0.55, r * 0.78), sk, x * T(0, -r * 0.5, r * 0.28), blend=r * 0.25)        # the jaw, jutting
+    sc.add(sd_capsule((-r * 0.6, 0, 0), (r * 0.6, 0, 0), r * 0.17), sk, x * T(0, r * 0.22, r * 0.78), blend=r * 0.12)   # brow ridge
     for sgn in (-1, 1):
-        sc.add(sd_sphere(r * 0.12), glow(eye, 4.0 if roar else 2.5), x * T(r * 0.35 * sgn, r * 0.07, r * 0.84))
-        sc.add(sd_cone(r * 0.2 * tusk, r * 0.09 * tusk, r * 0.012, 0.003), Mat("#e8dcc0", rough=0.4),
-               x * T(r * 0.36 * sgn, -r * 0.5, r * 0.9) * RZ(-0.15 * sgn) * T(0, r * 0.12 * tusk, 0))
-        sc.add(sd_cone(r * 0.32, r * 0.16, r * 0.015, 0.006), sk, x * T(r * 0.95 * sgn, r * 0.1, -r * 0.1) * RZ(-1.3 * sgn) * RX(0.35) * T(0, r * 0.28, 0))
+        sc.add(sd_sphere(r * 0.17), sk, x * T(r * 0.32 * sgn, r * 0.03, r * 0.92), op="sub", blend=r * 0.05)   # the socket
+        sc.add(sd_sphere(r * 0.095), glow(eye, 5.0 if roar else 3.5), x * T(r * 0.32 * sgn, r * 0.04, r * 0.8))
+        # tusks from the lower jaw, pointing up past the upper lip
+        sc.add(sd_cone(r * 0.38 * tusk, r * 0.095 * tusk, r * 0.014, 0.003), Mat("#e8dcc0", rough=0.4),
+               x * T(r * 0.36 * sgn, -r * 0.62, r * 0.9) * RZ(0.12 * sgn) * RX(-0.2) * T(0, r * 0.16 * tusk, 0))
+        # long pointed ears, swept back
+        sc.add(sd_cone(r * 0.42, r * 0.15, r * 0.015, 0.006), sk, x * T(r * 0.92 * sgn, r * 0.08, -r * 0.05) * RZ(-1.35 * sgn) * RX(0.45) * T(0, r * 0.36, 0))
+        sc.add(sd_sphere(r * 0.05), Mat("#1a1210", rough=0.6), x * T(r * 0.09 * sgn, -r * 0.2, r * 1.12), op="sub", blend=r * 0.02)   # nostrils
+    sc.add(sd_ellipsoid(r * 0.28, r * 0.2, r * 0.2), sk, x * T(0, -r * 0.12, r * 1.0), blend=r * 0.08)          # a wide flat nose
     if roar:
-        sc.add(sd_ellipsoid(r * 0.42, r * 0.2, r * 0.3), Mat("#2a0808", rough=0.6), x * T(0, -r * 0.55, r * 0.8))
+        sc.add(sd_ellipsoid(r * 0.45, r * 0.18, r * 0.3), Mat("#2a0808", rough=0.6), x * T(0, -r * 0.5, r * 0.85))
+    else:     # the mouth: a hard line, its corners down
+        sc.add(sd_capsule((-r * 0.42, -r * 0.5, r * 1.02), (0, -r * 0.46, r * 1.06), r * 0.025), Mat("#1e1410", rough=0.7), x)
+        sc.add(sd_capsule((0, -r * 0.46, r * 1.06), (r * 0.42, -r * 0.5, r * 1.02), r * 0.025), Mat("#1e1410", rough=0.7), x)
 
 
 def elf_face(sc, x, r, sk, hair_c, eye="#6ad8a8", hair="long", anim="idle"):
