@@ -11,8 +11,8 @@ proportions (heroic.adult), from a goblin thief to an ancient dragon:
   mcts_nnue     Chaman orque            hides and a wolf pelt, war paint, a skull staff with green fire
   nnue193       Chevalier elfe          silver plate, a blue cloak, a winged helm, a long sword
   features      Seigneur de guerre orque  spiked black armour, a red cloak, a great axe
-  resnet        Troll de guerre         a giant troll in bolted plates, a rune maul
-  dev           Archimage elfe          white and gold robes, levitating, a staff of light, runes
+  dev           Troll de guerre         a giant troll in bolted plates, a rune maul
+  resnet        Archimage elfe          white and gold robes, levitating, a staff of light, runes
   alphazero     Dragon ancien           wings spread, horns, fire in the throat
 
 The human is never part of a set: always the user's own figurine.
@@ -613,7 +613,7 @@ CAST = {"random": ("Gobelin chapardeur", goblin), "beginner": ("Orque éclaireur
         "monte_carlo": ("Rôdeuse elfe", elf_ranger), "mcts": ("Guerrier orque", orc_warrior),
         "basic_minmax": ("Troll des collines", hill_troll), "minmax": ("Guerrier nain", dwarf_warrior), "mcts_nnue": ("Chaman orque", orc_shaman),
         "nnue193": ("Chevalier elfe", elf_knight),
-        "features": ("Seigneur de guerre orque", orc_warlord), "resnet": ("Troll de guerre", war_troll),
-        "dev": ("Archimage elfe", archmage), "alphazero": ("Dragon ancien", dragon)}
+        "features": ("Seigneur de guerre orque", orc_warlord), "dev": ("Troll de guerre", war_troll),
+        "resnet": ("Archimage elfe", archmage), "alphazero": ("Dragon ancien", dragon)}
 EPIC = {"leg_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"leg_" + k: n for k, (n, _) in CAST.items()}
