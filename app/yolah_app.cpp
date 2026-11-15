@@ -6416,11 +6416,11 @@ void tab_moves(App& a, Box b) {
     const int n_rows = int((hist.size() + first + 1) / 2);
     const float rh = 30 * s;
     float content = n_rows * rh;
+    Box list{b.x, b.y + 26 * s, b.w, b.h - 26 * s};     // the rows, under the header
     if (a.ui.hover(b)) g.move_scroll -= a.in.wheel * rh * 3;
-    g.move_scroll = std::clamp(g.move_scroll, 0.0f, std::max(0.0f, content - b.h + 10 * s));
+    g.move_scroll = std::clamp(g.move_scroll, 0.0f, std::max(0.0f, content - list.h + 10 * s));
     a.text.draw(Font::Bold, 14 * s, "Noirs", {b.x + 70 * s, b.y}, pal::faint);
     a.text.draw(Font::Bold, 14 * s, "Blancs", {b.x + 230 * s, b.y}, pal::faint);
-    Box list{b.x, b.y + 26 * s, b.w, b.h - 26 * s};
     draw::clip(&list);
     for (int row = 0; row < n_rows; row++) {
         float y = list.y + row * rh - g.move_scroll;
