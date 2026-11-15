@@ -726,6 +726,7 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
     col = to_srgb(col)
     pre = torch.cat([col * alpha, alpha], 0)[None]
     pre = torch.nn.functional.avg_pool2d(pre, ss)[0]
+    pre_nob = pre.clone()
     if bloom > 0:
         em = torch.nn.functional.avg_pool2d(emis[None], ss)[0]
         glow = gauss_blur(em, size / 40) * 0.9 + gauss_blur(em, size / 14) * 0.6
@@ -734,6 +735,12 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
         rgb = pre[:3] + glow * (1 - pre[3:4]) + glow * 0.12 * pre[3:4]
         a = (pre[3:4] + ga * (1 - pre[3:4])).clamp(0, 1)
         pre = torch.cat([rgb.clamp(0, 1), a], 0)
+        # the glow fades out before the frame's border (a glow reaching it would be cut in a line)
+        yy, xx = torch.meshgrid(torch.arange(size, device=DEV, dtype=F), torch.arange(size, device=DEV, dtype=F), indexing="ij")
+        edge = torch.minimum(torch.minimum(yy, size - 1 - yy), torch.minimum(xx, size - 1 - xx)) / size
+        fade = (edge / 0.08).clamp(0, 1)[None]
+        glow_part = (pre - torch.cat([pre_nob[:3], pre_nob[3:4]], 0)).clamp_min(0)
+        pre = pre - glow_part * (1 - fade)
     a = pre[3:4]
     rgb = torch.where(a > 1e-4, pre[:3] / a.clamp_min(1e-4), torch.zeros_like(pre[:3])).clamp(0, 1)
     out = torch.cat([rgb, a], 0).permute(1, 2, 0)
