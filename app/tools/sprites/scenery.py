@@ -122,7 +122,7 @@ def _materials(scene, p, ids, nrm):
     return alb, met, rou, emi, sss, cc
 
 
-def _shade(scene, o, d, t, hit, sky, sun_dir, sun_col, sun_soft, lights, amb, ao_scale, tmax):
+def _shade(scene, o, d, t, hit, sky, sun_dir, sun_col, sun_soft, lights, amb, ao_scale, tmax, refl_occ=0.0):
     N = o.shape[0]
     col = sky(d)
     emis = torch.zeros(N, 3, device=DEV)
@@ -175,7 +175,10 @@ def _shade(scene, o, d, t, hit, sky, sun_dir, sun_col, sun_soft, lights, amb, ao
     R = norm(-V - 2 * ((-V * nrm).sum(-1, keepdim=True)) * nrm)
     ndv = (nrm * V).sum(-1).clamp(0, 1)
     fr = F0 + (1 - F0) * ((1 - ndv) ** 5)[:, None]
-    out = out + sky(R) * fr * ((1 - rou)[:, None] ** 2 * 0.8 + 0.1) * ao[:, None]
+    # the sky seen in the reflection; with refl_occ (a distance), hidden where the reflected ray meets the
+    # scenery within it (without it, the foot of a cliff can mirror a sky the cliff hides)
+    vis = _soft_shadow(scene, p, nrm, R, refl_occ, 0.3, steps=48)[:, None] if refl_occ > 0 else 1.0
+    out = out + sky(R) * fr * ((1 - rou)[:, None] ** 2 * 0.8 + 0.1) * ao[:, None] * vis
     up = (nrm[:, 1:2] * 0.5 + 0.5)
     out = out + dif_c * (amb[0] * up + amb[1] * (1 - up)) * ao[:, None]
     out = out + emi
@@ -186,13 +189,14 @@ def _shade(scene, o, d, t, hit, sky, sun_dir, sun_col, sun_soft, lights, amb, ao
 
 def render_view(scene, W, H, cam, sky, sun_dir=None, sun_col=None, sun_soft=0.06, lights=(), ambient=None,
                 fog=None, shafts=0.0, exposure=1.0, steps=220, tmax=80.0, ao_scale=0.08, bloom=0.8, dof=None, vignette=0.35,
-                grain=0.02, grade=None, tile=1 << 18, ss=1, atmo=None, aerial=None, volumes=(), vol_scale=0.5):
+                grain=0.02, grade=None, tile=1 << 18, ss=1, atmo=None, aerial=None, volumes=(), vol_scale=0.5, refl_occ=0.0):
     """fog: (density, colour, height falloff, base height). dof: (focus distance, strength).
     grade: (shadows tint, highlights tint) as hex. Returns uint8 (H, W, 3).
     atmo: an Atmosphere (then sky, sun_col and ambient default to its own);
     aerial: (density, height falloff, base height): the distance hazed into
     the colour of the air (atmo.haze); volumes: Volume list, marched at
-    vol_scale of the resolution."""
+    vol_scale of the resolution. refl_occ: how far the reflections look for the
+    scenery hiding the sky (0: not at all)."""
     if atmo is not None:
         sky = sky or atmo.sky
         sun_col = atmo.sun_col if sun_col is None else sun_col
@@ -213,7 +217,7 @@ def render_view(scene, W, H, cam, sky, sun_dir=None, sun_col=None, sun_soft=0.06
         sl = slice(s0, min(M, s0 + tile))
         o, d = cam.rays(Ws, Hs, js[sl], is_[sl])
         t, hit = _march(scene, o, d, tmax, steps, pix)
-        c, em = _shade(scene, o, d, t, hit, sky, sun_dir, sun_col, sun_soft, lights, amb, ao_scale, tmax)
+        c, em = _shade(scene, o, d, t, hit, sky, sun_dir, sun_col, sun_soft, lights, amb, ao_scale, tmax, refl_occ)
         tt = torch.where(hit, t, torch.full_like(t, tmax))
         if fog is not None:
             dens, fcol, fall, y0 = fog

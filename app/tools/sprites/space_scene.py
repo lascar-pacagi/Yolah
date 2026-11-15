@@ -251,7 +251,7 @@ def rock_mat():
         a = a * (1 - 0.45 * wet)[:, None]
         algae = sstep(0.8, -0.2, y) * sstep(0.45, 0.6, fbm(pw * 2.0, 3))
         a = torch.lerp(a, srgb("#1e2a1a"), (0.6 * algae)[:, None])
-        rough = 0.85 - 0.6 * wet
+        rough = 0.85 - 0.3 * wet                                            # damp, not a mirror (it showed the planet's clouds)
         return {"albedo": a, "rough": rough}
     return Mat("#3a3632", rough=0.85, pattern=pat)
 
@@ -284,7 +284,15 @@ def sea_mat():
         foam = (0.9 * surf + 0.7 * lace + 0.7 * crest).clamp(0, 1)
         a = torch.lerp(srgb("#020a12"), srgb("#08252e"), near[:, None])
         a = torch.lerp(a, srgb("#b4c0c8"), foam[:, None])
-        rough = 0.16 + 0.75 * foam
+        far = sstep(120.0, 400.0, torch.sqrt((x - CAM_POS[0]) ** 2 + (z - CAM_POS[2]) ** 2))
+        # the choppy water by the rocks and far off blurs its reflection (sharp, the planet's glints
+        # on it looked like the planet's clouds on the land)
+        rough = (0.16 + 0.45 * near + 0.3 * far + 0.75 * foam).clamp_max(0.95)
+        # the pools caught in the cracks of the rock shelves: dark and still, no mirror (they showed the planet's
+        # clouds, broken by the ripples, on the land)
+        pool = sstep(-0.6, -0.1, h)
+        a = a * (1 - 0.6 * pool)[:, None]
+        rough = torch.maximum(rough, 0.75 * pool)
         return {"albedo": a, "rough": rough}
     return Mat("#04101a", rough=0.16, pattern=pat)
 
@@ -319,8 +327,8 @@ def render(W=2560, H=1440, ss=1):
     vols = [Volume(spray_density, (-60, -1, -160), (40, 6, -8), albedo="#dfe6ec", g=0.4, steps=40, light_steps=0),
             Volume(mist_density, (-1500, -1, -3000), (1500, 30, -100), albedo="#9ab0c8", g=0.3, steps=24, light_steps=0)]
     img = render_view(scene(), W, H, cam, sky, sun_dir=sd, sun_col=srgb("#d8f4ff") * 0.8, sun_soft=0.04,
-                      lights=[(far_planet, "#5a7aa8", -1e9)],
-                      ambient=("#2a3a55", "#0c1018"), exposure=1.35, steps=300, tmax=3000, ao_scale=0.6, bloom=1.0,
+                      lights=[(far_planet, "#5a7aa8", 1e9)],             # with shadows (without, its glints lit the foot of the cliffs)
+                      ambient=("#2a3a55", "#0c1018"), exposure=1.35, steps=900, tmax=3000, refl_occ=40.0, ao_scale=0.6, bloom=1.0,
                       vignette=0.3, grain=0.01, grade=("#0e1a2a", "#f0fff8"), ss=ss,
                       volumes=[] if NOVOL else vols, vol_scale=0.5)
     return img
