@@ -21,6 +21,7 @@ import torch
 from PIL import Image
 from render import Scene, Mat, T, RX, RY, RZ, vec, norm, srgb, sd_sphere, sd_ellipsoid, sd_capsule, sd_cone, sd_box, fbm, hash3
 from scenery import Camera, render_view, Atmosphere, Volume
+from render import DEV
 
 ASSETS = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
 _EL, _AZ = math.radians(42), math.radians(115)
@@ -44,23 +45,47 @@ ISLANDS = [  # x, y (top), z, radius
     (380.0, 260.0, -1700.0, 30.0), (-140.0, -60.0, -330.0, 12.0)]
 
 
-def island_sdf(R):
+def river_dip(q, R, river):
+    """How deep the river's bed is cut into the lawn (0 off the river), and the
+    distance across it: a channel from the island's middle out to the rim at the
+    angle `river`, meandering a little."""
+    ca, sa = math.cos(river), math.sin(river)
+    along = q[:, 0] * ca + q[:, 2] * sa
+    across = -q[:, 0] * sa + q[:, 2] * ca + 0.06 * R * torch.sin(along * (5.0 / R)) * sstep(0.6 * R, 0.25 * R, along)
+    w = RIVER_W * R * (0.8 + 0.4 * sstep(0.2 * R, 0.9 * R, along))
+    dip = 0.035 * R * torch.exp(-(across / w) ** 4) * sstep(0.12 * R, 0.3 * R, along)
+    return dip, across, w, along
+
+
+RIVER_W = 0.065
+
+
+def island_parts(q, R):
+    """The lawn's height H at q (y - H < 0 below it) and the rock's distance."""
+    x, y, z = q[:, 0], q[:, 1], q[:, 2]
+    r0 = torch.sqrt(x * x + z * z) + 1e-6
+    cu, cv = x / r0, z / r0
+    # an irregular outline: bays and headlands
+    r = r0 / (1 + 0.3 * (fbm(torch.stack([cu * 1.4 + R, cv * 1.4, cu * 0], 1), 3) - 0.5))
+    # the top: a rolling lawn with a knoll; below: rock tapering in hanging lobes, lumpy
+    H = (0.06 * R * (1 - (r / R) ** 2).clamp_min(0) + 0.08 * R * fbm(q * (1.6 / R) + 2, 3) * (1 - r / R).clamp_min(0)
+         + 0.02 * R * fbm(q * (5 / R), 2))
+    depth = 1.6 * R * (0.8 + 0.5 * fbm(torch.stack([x * (1.5 / R), x * 0 + 1, z * (1.5 / R)], 1), 3))
+    cone = r - R * (1 + y / depth).clamp(0, 1) ** 0.6 - 0.14 * R * ridged(q * vec(2.5 / R, 1.0 / R, 2.5 / R), 4)
+    # ledges: the harder layers stand out
+    lay = (y + 0.12 * x) * (5 / R) + 1.5 * fbm(q * (1.5 / R), 3)
+    cone = cone - 0.02 * R * sstep(0.0, 0.25, lay - torch.floor(lay))
+    return H, cone, depth
+
+
+def island_sdf(R, river=None):
     def f(q):
-        x, y, z = q[:, 0], q[:, 1], q[:, 2]
-        r0 = torch.sqrt(x * x + z * z) + 1e-6
-        cu, cv = x / r0, z / r0
-        # an irregular outline: bays and headlands
-        r = r0 / (1 + 0.3 * (fbm(torch.stack([cu * 1.4 + R, cv * 1.4, cu * 0], 1), 3) - 0.5))
-        # the top: a rolling lawn with a knoll; below: rock tapering in hanging lobes, lumpy
-        top = y - (0.06 * R * (1 - (r / R) ** 2).clamp_min(0) + 0.08 * R * fbm(q * (1.6 / R) + 2, 3) * (1 - r / R).clamp_min(0)
-                   + 0.02 * R * fbm(q * (5 / R), 2))
-        depth = 1.6 * R * (0.8 + 0.5 * fbm(torch.stack([x * (1.5 / R), x * 0 + 1, z * (1.5 / R)], 1), 3))
-        cone = r - R * (1 + y / depth).clamp(0, 1) ** 0.6 - 0.14 * R * ridged(q * vec(2.5 / R, 1.0 / R, 2.5 / R), 4)
-        # ledges: the harder layers stand out
-        lay = (y + 0.12 * x) * (5 / R) + 1.5 * fbm(q * (1.5 / R), 3)
-        cone = cone - 0.02 * R * sstep(0.0, 0.25, lay - torch.floor(lay))
+        H, cone, depth = island_parts(q, R)
+        top = q[:, 1] - H
+        if river is not None:
+            top = top + river_dip(q, R, river)[0]
         d = torch.maximum(cone * 0.6, top)
-        return torch.maximum(d, -y - depth * 1.2) * 0.8
+        return torch.maximum(d, -q[:, 1] - depth * 1.2) * 0.8
     return f
 
 
@@ -100,7 +125,7 @@ def smin_(a, b, k):
     return torch.lerp(b, a, h) - k * h * (1 - h)
 
 
-def crowns(R, seed):
+def crowns(R, seed, river=None):
     """Round tree crowns over an island's lawn (domain repetition, the 3×3 neighbouring cells
     searched so that no artificial bound is needed: far islands stay clean)."""
     cell = R * 0.28
@@ -113,6 +138,9 @@ def crowns(R, seed):
         cz = (iz + 0.5) * cell + (hash3(id3 + 3.1) - 0.5) * cell * 0.2
         keep = (hash3(id3 + 7.7) < 0.62 + 0.3 * (fbm(torch.stack([cx * (2 / R), cz * (2 / R), cx * 0 + seed], 1), 2) - 0.5)) \
             & (torch.sqrt(cx * cx + cz * cz) < R * 0.72)
+        if river is not None:                               # no tree in the river
+            ca_, sa_ = math.cos(river), math.sin(river)
+            keep = keep & (((-cx * sa_ + cz * ca_).abs() > RIVER_W * R * 2.5 + cell * 0.25) | (cx * ca_ + cz * sa_ < 0.08 * R))
         rr = cell * (0.15 + 0.12 * hash3(id3 + 5.5))
         conifer = (hash3(id3 + 2.2) < 0.2).float()
         sy = 1.0 + 1.3 * conifer                          # conifers: tall narrow crowns
@@ -166,11 +194,14 @@ FALLS = []      # (x0, y0, z0, ang, length, width): filled by scene()
 
 
 def fall_path(u, ang):
-    return 0.06 * u + 0.0012 * u * u
+    """How far out the water is when it has fallen u below the lip: it leaves the
+    lip at speed and falls along a parabola (clear of the tapering rock)."""
+    return 1.6 * torch.sqrt(u + 0.3) + 0.03 * u if torch.is_tensor(u) else 1.6 * math.sqrt(u + 0.3) + 0.03 * u
 
 
 def falls_density(fx):
-    x0, y0, z0, ang, length, width = fx
+    """Below the solid sheet: the water breaking into strands and a long trail of mist."""
+    x0, y0, z0, ang, length, width, top = fx
     ca, sa = math.cos(ang), math.sin(ang)
 
     def dens(p):
@@ -179,59 +210,118 @@ def falls_density(fx):
         lx, lz = p[:, 0] - x0 - ca * out, p[:, 2] - z0 - sa * out
         across = -sa * lx + ca * lz
         along = ca * lx + sa * lz
-        w = width * (1 + u / length * 1.2)
-        th = 0.6 + u * 0.12
-        streak = fbm(torch.stack([across * (2.5 / width), p[:, 1] * 0.025, along * 0.2], 1), 4)
-        core = torch.exp(-(across / w) ** 8) * torch.exp(-(along / th) ** 2) * (0.3 + 1.4 * streak)
-        # the fall breaks into mist: its sheet fades, a cloud of spray grows around it
-        k = (u / length).clamp(0, 1.4)
-        mist = torch.exp(-(across / (w * 1.6)) ** 2 - (along / (th * 6 + 6)) ** 2) * fbm(p * 0.05 + 3, 4) * k
-        dens = core * (1 - k).clamp_min(0) * 0.9 + mist * 0.12
-        return dens * (p[:, 1] < y0 + 0.5).float()
+        w = width * (1 + u / length * 0.8)
+        th = 0.8 + u * 0.05
+        strands = fbm(torch.stack([across * (3.0 / width), p[:, 1] * 0.012, along * 0.2], 1), 4)
+        core = torch.exp(-(across / w) ** 6) * torch.exp(-(along / th) ** 2) * ((strands - 0.35) * 2.5).clamp(0, 1)
+        k = ((u - top) / (length - top)).clamp(0, 1.3)              # 0 where the solid sheet ends
+        on = sstep(top * 0.8, top, u)
+        mist = torch.exp(-(across / (w * 1.8)) ** 2 - (along / (th * 4 + 5)) ** 2) * fbm(p * 0.06 + 3, 4) * sstep(0.0, 0.4, k)
+        dens = core * (1 - k).clamp_min(0) * 1.4 * on + mist * 0.18 * (1.3 - k).clamp_min(0)
+        # the spray at the lip, where the river tips over
+        lip = torch.exp(-(across / (w * 1.3)) ** 2 - (along / 2.5) ** 2 - ((p[:, 1] - y0) / 2.0) ** 2) * fbm(p * 0.4, 2)
+        return dens + lip * 0.6
     return dens
 
 
 def fall_box(fx):
-    x0, y0, z0, ang, length, width = fx
-    ex = fall_path(length * 1.3, ang)
+    x0, y0, z0, ang, length, width, top = fx
+    ex = fall_path(length * 1.05, ang)
     xs = [x0, x0 + math.cos(ang) * ex]
     zs = [z0, z0 + math.sin(ang) * ex]
-    m = width * 3.5 + 12
-    return (min(xs) - m, y0 - length * 1.35, min(zs) - m), (max(xs) + m, y0 + 1, max(zs) + m)
+    m = width * 4 + 14
+    return (min(xs) - m, y0 - length * 1.05, min(zs) - m), (max(xs) + m, y0 + 6, max(zs) + m)
 
 
-def waterfall(x, y, z, R, ang, length):
-    """A sheet of water leaving the rim and falling, fanning out (a thin ribbon)."""
-    ex, ez = x + math.cos(ang) * R * 0.95, z + math.sin(ang) * R * 0.95
+def waterfall(x0, y0, z0, ang, length, width):
+    """The solid sheet of water from the lip down: a curved band leaving the lip,
+    fanning a little, streaked white and cyan, its lower edge torn into strands."""
+    ca, sa = math.cos(ang), math.sin(ang)
 
     def f(q):
-        u = (-q[:, 1]).clamp(0, length)
-        out = 0.06 * u + 0.0012 * u * u                 # the arc away from the rim
-        lx = q[:, 0] - math.cos(ang) * out
-        lz = q[:, 2] - math.sin(ang) * out
-        across = (-math.sin(ang) * lx + math.cos(ang) * lz).abs() - (1.4 + 0.04 * u) * (1 - u / length * 0.7)
-        thick = (math.cos(ang) * lx + math.sin(ang) * lz).abs() - 0.25
-        return torch.maximum(torch.maximum(across, thick), torch.maximum(q[:, 1], -q[:, 1] - length)) * 0.8
+        u = (-q[:, 1]).clamp(0, length * 1.2)
+        out = fall_path(u, ang)
+        lx = q[:, 0] - ca * out
+        lz = q[:, 2] - sa * out
+        acr = -sa * lx + ca * lz
+        w = width * (1 + 0.25 * u / length)
+        across = acr.abs() - w
+        thick = (ca * lx + sa * lz).abs() - (0.35 + 0.012 * u)
+        # the lower end torn: each strand ends at its own height
+        tear = length * (0.7 + 0.45 * fbm(torch.stack([acr * (2.5 / width), acr * 0, acr * 0 + 1.3], 1), 2))
+        d = torch.maximum(torch.maximum(across, thick), torch.maximum(q[:, 1] - 0.4, -q[:, 1] - tear))
+        return d * 0.6
 
     def pat(pl, pw, n):
-        streak = fbm(torch.stack([pl[:, 0] * 0.8, pl[:, 1] * 0.06, pl[:, 2] * 0.8], 1), 3)
-        a = torch.lerp(srgb("#9ad8f0"), srgb("#ffffff"), streak[:, None])
-        return {"albedo": a, "emissive": srgb("#ffffff") * (0.15 * streak)[:, None]}
-    return f, Mat("#ffffff", rough=0.3, sss=0.8, pattern=pat), T(ex, y - 1.0, ez)
+        acr = -sa * pl[:, 0] + ca * pl[:, 2]
+        streak = fbm(torch.stack([acr * (2.2 / width), pl[:, 1] * 0.035, acr * 0], 1), 4)
+        fine = fbm(torch.stack([acr * (9.0 / width), pl[:, 1] * 0.12, acr * 0 + 2], 1), 2)
+        s = sstep(0.35, 0.75, 0.7 * streak + 0.3 * fine)
+        a = torch.lerp(srgb("#5ab4e0"), srgb("#f4fcff"), s[:, None])
+        # white water right at the lip, and where the sheet starts to break up
+        foam = sstep(-2.0, 0.0, pl[:, 1]) + sstep(0.55 * length, 0.85 * length, -pl[:, 1])
+        a = torch.lerp(a, srgb("#ffffff"), foam.clamp(0, 1)[:, None])
+        return {"albedo": a, "emissive": srgb("#e8f8ff") * (0.18 * s + 0.1)[:, None]}
+    return f, Mat("#ffffff", rough=0.2, sss=0.9, clearcoat=0.6, pattern=pat), T(x0, y0, z0)
+
+
+def river(R, ang):
+    """The water in the river's bed: a surface a little below the lawn's level."""
+    def f(q):
+        H, cone, depth = island_parts(q, R)
+        dip, across, w, along = river_dip(q, R, ang)
+        surf = q[:, 1] - (H - 0.022 * R)
+        d = torch.maximum(torch.maximum(across.abs() - w * 0.9, 0.16 * R - along), torch.maximum(surf, -surf - 0.03 * R))
+        return torch.maximum(d, cone * 0.6 + 0.3) * 0.6
+    return f
+
+
+def river_mat(R, ang):
+    ca, sa = math.cos(ang), math.sin(ang)
+
+    def pat(pl, pw, n):
+        along = pl[:, 0] * ca + pl[:, 2] * sa
+        across = -pl[:, 0] * sa + pl[:, 2] * ca
+        rip = fbm(torch.stack([along * (0.5 / (RIVER_W * R)), across * (2.0 / (RIVER_W * R)), along * 0], 1), 3)
+        a = torch.lerp(srgb("#2a8ac8"), srgb("#bfeeff"), sstep(0.5, 0.8, rip)[:, None])
+        return {"albedo": a, "emissive": srgb("#ffffff") * (0.15 * sstep(0.62, 0.8, rip))[:, None]}
+    return Mat("#2a8ac8", rough=0.08, clearcoat=1.0, sss=0.3, pattern=pat)
+
+
+def rim_point(R, ang):
+    """Where the river leaves the island: the lip (radius and height) at the angle `ang`."""
+    f = island_sdf(R, ang)
+    ca, sa = math.cos(ang), math.sin(ang)
+    rs = torch.linspace(0.3 * R, 1.4 * R, 1200, device=DEV)
+    ys = torch.linspace(0.12 * R, -0.08 * R, 400, device=DEV)
+    rr, yy = torch.meshgrid(rs, ys, indexing="ij")
+    q = torch.stack([rr.reshape(-1) * ca, yy.reshape(-1), rr.reshape(-1) * sa], 1)
+    inside = (f(q) < 0).reshape(rr.shape)
+    has = inside.any(1)
+    r_lip = rs[has].max().item()
+    # the lawn's height near the lip: the highest solid point a little inland
+    j = int(((rs - (r_lip - 0.03 * R)).abs()).argmin().item())
+    col = inside[j]
+    y_lip = ys[col].max().item()
+    return r_lip, y_lip
 
 
 def scene():
     sc = Scene()
     rnd = random.Random(4)
     for k, (x, y, z, R) in enumerate(ISLANDS):
-        sc.add(island_sdf(R), island_mat(R), T(x, y, z))
-        sc.add(crowns(R, k + 1.0), leaves(), T(x, y, z))
-        if R > 40:
-            ang = rnd.uniform(1.2, 2.0)
-            f, m, X = waterfall(x, y, z, R, ang, R * 0.25)
+        ang = rnd.uniform(1.2, 2.0) if R > 40 else None
+        sc.add(island_sdf(R, ang), island_mat(R), T(x, y, z))
+        sc.add(crowns(R, k + 1.0, ang), leaves(), T(x, y, z))
+        if ang is not None:
+            r_lip, y_lip = rim_point(R, ang)
+            sc.add(river(R, ang), river_mat(R, ang), T(x, y, z))
+            lx, lz = x + math.cos(ang) * (r_lip - 0.4), z + math.sin(ang) * (r_lip - 0.4)
+            ly = y + y_lip + 0.013 * R            # the water's level over the bed at the lip
+            length, width = R * 0.8, RIVER_W * R * 1.2
+            f, m, X = waterfall(lx, ly, lz, ang, length, width)
             sc.add(f, m, X)
-            ex, ez = x + math.cos(ang) * R * 0.95, z + math.sin(ang) * R * 0.95
-            FALLS.append((ex, y - 1.0, ez, ang, R * 1.4, 0.05 * R))
+            FALLS.append((lx, ly, lz, ang, R * 2.2, width, length * 0.75))
     # a red torii on the near large island, looking out over the void
     tx, ty, tz = ISLANDS[0][0] + 30, ISLANDS[0][1] + 2.5, ISLANDS[0][2] + 42
     lac = Mat("#c8281e", rough=0.4, clearcoat=0.4)
