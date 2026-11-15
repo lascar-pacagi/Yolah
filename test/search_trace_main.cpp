@@ -3,7 +3,7 @@
 // deepening, the table, the network's values, the history, with breakpoints).
 //
 //   make search_trace
-//   ./search_trace [--player ../config/search_study/nnue_k8_them_spacelite.cfg]
+//   ./search_trace [--player ../config/search_study/dev_final.cfg]
 //                  (--positions ../test/bench_positions.txt --index K | --position JSON | --moves "a1:b2 h8:g7 ...")
 //                  [--depth 7] [--warm N [--warm-depth D | --warm-time US]] [--child-evals-depth 1] [--max-mb 256]
 //                  [--check 1] --out trace.ytrace
@@ -179,7 +179,7 @@ namespace {
 
     // ── --game 1 ──
     int run_game(const std::map<string, string>& kv) {
-        const string cfg_black = get(kv, "player", "../config/search_study/nnue_k8_them_spacelite.cfg");
+        const string cfg_black = get(kv, "player", "../config/search_study/dev_final.cfg");
         const string cfg_white = get(kv, "opponent", cfg_black);
         const string out = get(kv, "out", "game.ytrace");
         const int depth = std::stoi(get(kv, "depth", "7"));
@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
     zobrist::init();
     const auto kv = parse(argc, argv);
     if (get(kv, "game", "0") == "1") return run_game(kv);
-    const string cfg = get(kv, "player", "../config/search_study/nnue_k8_them_spacelite.cfg");
+    const string cfg = get(kv, "player", "../config/search_study/dev_final.cfg");
     const string out = get(kv, "out", "trace.ytrace");
     const int depth = std::stoi(get(kv, "depth", "7"));
     const int warm = std::stoi(get(kv, "warm", "0"));

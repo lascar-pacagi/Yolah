@@ -1628,7 +1628,7 @@ function welcome() {
 // entries, network values, iterative deepening), against the recorded events.
 // It also checks the page's own reconstructions (history, killers, table, α of
 // the frames, subtree sizes). Written for the default options of the dev
-// player (those of spacelite); other options are reported, not checked.
+// player (those of dev_final); other options are reported, not checked.
 // ═══════════════════════════════════════════════════════════════════════════
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 function legalMoves(pos, player) {
@@ -2123,7 +2123,7 @@ make search_trace</pre>
 <tr><td>--warm-depth D</td><td>Profondeur de ces recherches d'échauffement (défaut : la même que --depth). Profondeur fixe : la même trace à chaque exécution.</td></tr>
 <tr><td>--warm-time US</td><td>Ou bien : échauffement au temps (µs par recherche), comme en partie. <b>Pas reproductible</b> : deux exécutions laissent une table un peu différente (l'horloge), donc des traces différentes, et --check 1 dit alors DIFFERENT sans que l'enregistreur y soit pour rien.
 Sans --warm : table et historique vides (comme search_bench). Les entrées laissées dans la table par l'échauffement n'apparaissent dans la page que quand une sonde les lit.</td></tr>
-<tr><td>--player CFG</td><td>Le joueur (défaut <code>../config/search_study/nnue_k8_them_spacelite.cfg</code>, la meilleure version actuelle). Doit être un MinMaxNNUE_DevPlayer ; « nb threads » est forcé à 1.</td></tr>
+<tr><td>--player CFG</td><td>Le joueur (défaut <code>../config/search_study/dev_final.cfg</code>, le dev actuel : réseau à première couche par phase, <code>k8_them_g046_qat_ib4f_ref2u_az20</code>). Doit être un MinMaxNNUE_DevPlayer ; « nb threads » est forcé à 1.</td></tr>
 <tr><td>--child-evals-depth N</td><td>Aux nœuds de profondeur ≥ N, la valeur du réseau de <b>chaque enfant</b> est calculée à part (la recherche ne la voit pas) et montrée dans l'onglet Coups. Défaut 1 : tous les nœuds internes. 0 : jamais (trace ~40 % plus petite). La valeur du réseau du nœud lui-même est toujours enregistrée.</td></tr>
 <tr><td>--max-mb M</td><td>Taille maximale de l'enregistrement (défaut 256 Mo). Au-delà, la recherche est arrêtée et la page indique « trace tronquée ».</td></tr>
 <tr><td>--check 1</td><td>Refait la même recherche sans l'enregistreur et affiche IDENTICAL si le coup, la valeur, la profondeur et les nœuds sont les mêmes (l'enregistrement ne change rien).</td></tr>
