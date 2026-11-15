@@ -4329,10 +4329,10 @@ struct App {
             if (ps.id == id) return &ps;
         return nullptr;
     }
-    // The figurines grow with the strength of their AI (Elo 600 -> 0.85, 3200 -> 1.22, the tournament's scale):
+    // The figurines grow with the strength of their AI (Elo 600 -> 0.85, 3600 -> 1.22, the tournament's scale):
     // every cast's figurine and each AI's own sprite. The human keeps 1.
     void set_growth() {
-        auto g = [](int elo) { return 0.85f + 0.37f * std::clamp((elo - 600) / 2600.0f, 0.0f, 1.0f); };
+        auto g = [](int elo) { return 0.85f + 0.37f * std::clamp((elo - 600) / 3000.0f, 0.0f, 1.0f); };
         for (auto& ai : roster) {
             for (auto& ps : piece_sets) {
                 auto it = ps.cast.find(ai.id);
@@ -4497,7 +4497,7 @@ struct App {
         g.match.play(m);
         // How hard the square breaks: the player's strength (Elo 600 → 0, 2250 → 1; the human: 0.6).
         const Slot& sl = g.slot[side];
-        float power = sl.human() ? 0.6f : std::clamp((sl.spec->elo - 600) / 2600.0f, 0.0f, 1.0f);
+        float power = sl.human() ? 0.6f : std::clamp((sl.spec->elo - 600) / 3000.0f, 0.0f, 1.0f);
         g.board.on_move(m, side, time, fx, game_theme(), rng, power);
         if (m != Move::none()) {
             float q = g.board.sq();
