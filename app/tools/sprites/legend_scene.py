@@ -303,7 +303,16 @@ def spur_rock(p):
 
 def land(p):
     x, z = p[:, 0], p[:, 2]
-    return (p[:, 1] - ground_h(x, z)) * 0.3
+    d = (p[:, 1] - ground_h(x, z)) * 0.3
+    # no ground in front of the rampart's face: the crag's lumps would show on the wall
+    if "terrace" in BASES:
+        y = p[:, 1]
+        re = torch.sqrt((x - SPUR[0]) ** 2 + ((z - SPUR[1]) * 1.2) ** 2) / SPUR[2]
+        top = BASES[(0, 0)] + 3.2
+        face = (re - 0.762) * SPUR[2] - 1.5 - 0.75 * (top - 3 - y).clamp_min(0)
+        carve = torch.maximum(torch.maximum(face - 2.5, (0.70 - re) * SPUR[2]), torch.maximum(y - top, top - 13 - y))
+        d = torch.maximum(d, -carve * 0.8)
+    return d
 
 
 def land_mat():
@@ -440,11 +449,15 @@ def rampart(p):
     band of grass. Grounded down into the crag."""
     x, y, z = p[:, 0] - SPUR[0], p[:, 1], p[:, 2] - SPUR[1]
     re = torch.sqrt(x * x + (z * 1.2) ** 2) / SPUR[2]
-    band = (re - 0.762).abs() * SPUR[2] - 1.5                       # 3 m thick
     top = BASES[(0, 0)] + 3.2
+    # 3 m thick at the top, its outer face flaring out lower down (a glacis of stone down
+    # into the crag: the crag's bushes and the ground's lumps no longer show on the wall)
+    inner = (0.762 - re) * SPUR[2] - 1.5
+    outer = (re - 0.762) * SPUR[2] - 1.5 - 0.75 * (top - 3 - y).clamp_min(0)
+    band = torch.maximum(inner, outer)
     ang = torch.atan2(z * 1.2, x)
     merlon = ((torch.sin(ang * 70) > 0.1).float()) * 1.3
-    d = torch.maximum(band, torch.maximum(y - (top + merlon), BASES[(0, 0)] - 40 - y))
+    d = torch.maximum(band, torch.maximum(y - (top + merlon), top - 15 - y))
     # the terrace's arcades replace the wall in front of it
     tx, tz = _rot(x - 2, z - 34, 0.2)
     gap = torch.maximum(tx.abs() - 27, tz.abs() - 9)
