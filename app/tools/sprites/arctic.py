@@ -21,7 +21,7 @@ The human is never part of a set.
 """
 import math
 import torch
-from render import X as X_, Scene, Mat, T, RX, RY, RZ, srgb, vec, sd_plane_cut, sd_sphere, sd_ellipsoid, sd_box, sd_capsule, sd_cylinder, \
+from render import DEV, X as X_, Scene, Mat, T, RX, RY, RZ, srgb, vec, sd_plane_cut, sd_sphere, sd_ellipsoid, sd_box, sd_capsule, sd_cylinder, \
     sd_torus, sd_cone, fbm
 from models import base, BASE_TOP, TAU, wave, glow
 from legends import base_pose, held, skin
@@ -567,24 +567,64 @@ def orca(anim, t, side):
     rise = {"win": 0.06 * math.sin(TAU * t), "move": 0.05 * math.sin(math.pi * t)}.get(anim, 0.012 * math.sin(TAU * t))
     roll = 0.25 * math.sin(TAU * 3 * t) if anim == "blocked" else 0.0
     Xr = RY(YAW) * T(0, BASE_TOP + rise, 0) * RZ(roll)
-    # the spine: from the flukes under the water up to the snout
-    spine = bezier((0, -0.35, -0.3), (0, 0.05, -0.2), (0, 0.42, -0.05), (0, 0.6, 0.22), 10)
-    radii = [0.035, 0.06, 0.09, 0.115, 0.125, 0.12, 0.11, 0.095, 0.075, 0.045]
-    for i in range(len(spine) - 1):
-        p0, p1 = spine[i], spine[i + 1]
-        mid = tuple((p0[k] + p1[k]) / 2 for k in range(3))
-        tg = tuple(p1[k] - p0[k] for k in range(3))
-        half = 0.5 * math.sqrt(sum(v * v for v in tg))
-        r = (radii[i] + radii[i + 1]) / 2
-        sc.add(sd_capsule((0, 0, -half), (0, 0, half), radii[i], radii[i + 1]), orca_mat(i / 9, (i + 1) / 9, half), Xr * along(mid, tg), blend=0.03)
-    # the head: rounded melon at the snout
-    hp, ht = spine[-1], tuple(spine[-1][k] - spine[-2][k] for k in range(3))
-    sc.add(sd_ellipsoid(0.05, 0.045, 0.06), orca_mat(0.92, 1.0, 0.06), Xr * along(hp, ht), blend=0.04)
+    # one smooth body along the spine: from the flukes under the water up to the snout,
+    # the radius a smooth function of the position (no segments, no knob at the head)
+    N = 28
+    spine = bezier((0, -0.35, -0.3), (0, 0.05, -0.2), (0, 0.42, -0.05), (0, 0.62, 0.24), N)
+    def rad(u):
+        return 0.13 * math.sin(math.pi * (0.06 + 0.8 * u)) ** 0.6 * (1 - 0.3 * u) + 0.01
+    radii = [rad(i / (N - 1)) for i in range(N)]
+    radii[-1] = radii[-2] * 0.85                                       # the rounded snout
+    P = torch.tensor(spine, dtype=torch.float32, device=DEV)
+    RR = torch.tensor(radii, dtype=torch.float32, device=DEV)
+
+    def body(q):
+        d = torch.full_like(q[:, 0], 1e9)
+        for i in range(N - 1):
+            a0, a1 = P[i], P[i + 1]
+            ba = a1 - a0
+            h = (((q - a0) @ ba) / (ba @ ba)).clamp(0, 1)
+            r = RR[i] + (RR[i + 1] - RR[i]) * h
+            di = torch.linalg.norm(q - a0 - ba * h[:, None], dim=-1) - r
+            k = 0.03                                                    # a smooth union: no ridge between the pieces
+            hh = (0.5 + 0.5 * (di - d) / k).clamp(0, 1)
+            d = di + (d - di) * hh - k * hh * (1 - hh)
+        return d
+
+    def body_pat(pl, pw, n):
+        # u along the body (0 tail → 1 snout) and `up` around it, from the nearest spine point
+        best = torch.full_like(pl[:, 0], 1e9)
+        u = torch.zeros_like(best)
+        up = torch.zeros_like(best)
+        for i in range(N - 1):
+            a0, a1 = P[i], P[i + 1]
+            ba = a1 - a0
+            h = (((pl - a0) @ ba) / (ba @ ba)).clamp(0, 1)
+            off = pl - a0 - ba * h[:, None]
+            dist = torch.linalg.norm(off, dim=-1)
+            m = dist < best
+            best = torch.where(m, dist, best)
+            t_ = ba / torch.linalg.norm(ba)
+            yv = torch.tensor([0.0, 1.0, 0.0], device=DEV) - t_ * t_[1]
+            yv = yv / torch.linalg.norm(yv)
+            u = torch.where(m, (i + h) / (N - 1), u)
+            up = torch.where(m, (off @ yv) / (dist + 1e-6), up)
+        xv = pl[:, 0] / (best + 1e-6)
+        belly = ((up < -0.3) & (u > 0.4) & (u < 0.985)).float()
+        sweep = torch.sin(((u - 0.16) / 0.28).clamp(0, 1) * math.pi)
+        flank = ((up < -0.15 + 0.5 * sweep) & (u > 0.16) & (u < 0.44)).float() * (xv.abs() > 0.2).float()
+        patch = ((((u - 0.83) / 0.055) ** 2 + ((up - 0.3) / 0.2) ** 2) < 1).float() * (xv.abs() > 0.3).float()   # the oval eye patch
+        saddle = ((((u - 0.52) / 0.07) ** 2 + ((up - 0.96) / 0.2) ** 2) < 1).float()
+        eye = ((((u - 0.875) / 0.012) ** 2 + ((up - 0.05) / 0.06) ** 2) < 1).float() * (xv.abs() > 0.5).float()
+        white = (belly + flank + patch).clamp(0, 1) * (1 - eye)
+        black = srgb("#0b0c0f") * (1 - saddle)[:, None] + srgb("#6e737c") * saddle[:, None]
+        return {"albedo": black * (1 - white)[:, None] + srgb("#f0f0ec") * white[:, None]}
+    sc.add(body, Mat("#0b0c0f", rough=0.2, clearcoat=0.9, pattern=body_pat), Xr)
     # the dorsal fin on the back at the widest point, the paddles, the flukes
-    fp, ft = spine[5], tuple(spine[6][k] - spine[4][k] for k in range(3))
+    fp, ft = spine[14], tuple(spine[15][k] - spine[13][k] for k in range(3))
     black = Mat("#0b0c0f", rough=0.2, clearcoat=0.9)
     sc.add(sd_thin_fin(0.2, 0.11, 0.014), black, Xr * along(fp, ft) * T(0, 0.1, 0))
-    pp, pt = spine[7], tuple(spine[8][k] - spine[6][k] for k in range(3))
+    pp, pt = spine[20], tuple(spine[21][k] - spine[19][k] for k in range(3))
     for sgn in (-1, 1):
         sc.add(sd_ellipsoid(0.014, 0.05, 0.075), black, Xr * along(pp, pt) * T(0.09 * sgn, -0.07, 0) * RZ(-0.9 * sgn) * T(0, -0.04, 0) * RX(-0.3))
     # the spray: droplets thrown up around the body
