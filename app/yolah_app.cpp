@@ -4100,6 +4100,7 @@ struct App {
         std::vector<int> targets;         // squares to reach
         int victim = -1;                  // the white piece to shut in
         int moves_done = 0;
+        std::vector<int> found;           // Goal::Find: own pieces clicked
         enum class Phase { Play, Success, Failed } phase = Phase::Play;
         double phase_t = 0, reply_at = -1, pass_at = -1;
         std::string feedback;
@@ -7001,7 +7002,7 @@ void sprite_picker(App& a) {
 // small solver (one solution for "reach", the endgame lesson won by 2 with the
 // big zone and lost by 2 with the small one).
 struct Lesson {
-    enum class Goal { Read, Reach, Moves, Immobilize, Win };
+    enum class Goal { Read, Find, Reach, Moves, Immobilize, Win };   // Find: click each of one's own pieces
     std::string title, text, task, success, failure;
     std::vector<std::string> board;    // empty: the starting position
     Goal goal = Goal::Read;
@@ -7019,7 +7020,9 @@ const std::vector<Lesson>& lessons() {
         l = {};
         l.title = "Bienvenue dans Yolah !";
         l.text = "Yolah se joue \xC3\xA0 deux sur un plateau de 8 \xC3\x97 8 cases. Tu joues les Noirs : tes pions sont noirs, ou pos\xC3\xA9s sur un socle noir. L'adversaire joue les Blancs. Chaque camp a 4 pions, et les Noirs commencent toujours.";
-        l.task = "Rep\xC3\xA8re tes 4 pions, puis clique sur Continuer.";
+        l.task = "Clique sur chacun de tes 4 pions.";
+        l.success = "Bravo, tu as trouv\xC3\xA9 tes 4 pions : deux dans les coins (a1 et h8), deux au centre (d5 et e4).";
+        l.goal = G::Find;
         v.push_back(l);
 
         l = {};
@@ -7174,6 +7177,7 @@ void start_lesson(App& a, int i) {
     t.match.reset(lesson_position(lessons()[t.index], t.targets, t.victim));
     t.board.reset();
     t.moves_done = 0;
+    t.found.clear();
     t.phase = App::TutorialState::Phase::Play;
     t.reply_at = t.pass_at = -1;
     t.feedback.clear();
@@ -7300,7 +7304,26 @@ void scene_tutorial(App& a) {
     // Board.
     const bool human_turn = t.phase == Phase::Play && l.goal != Lesson::Goal::Read && !t.match.over() &&
                             pos.current_player() == BLACK && !must_pass(pos) && !anim;
-    auto mv = t.board.input(a.in, pos, human_turn, false);
+    const bool finding = l.goal == Lesson::Goal::Find;
+    auto mv = t.board.input(a.in, pos, human_turn && !finding, false);
+    if (finding && t.phase == Phase::Play) {   // clicking one's pieces
+        int sq = t.board.at(a.in.mouse);
+        bool mine = sq >= 0 && (pos.bitboard(BLACK) >> sq & 1), theirs = sq >= 0 && (pos.bitboard(WHITE) >> sq & 1);
+        if (mine || theirs) a.ui.hovering = true;
+        if (a.in.pressed && mine && std::find(t.found.begin(), t.found.end(), sq) == t.found.end()) {
+            t.found.push_back(sq);
+            float q = t.board.sq();
+            V2 c = t.board.center(sq);
+            a.fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, strf("%zu / 4", t.found.size()), hex(0x7ff0ff), q * 0.32f));
+            a.fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, pal::good));
+            t.feedback.clear();
+            t.hint = false;
+            if (int(t.found.size()) >= std::popcount(pos.bitboard(BLACK))) tutorial_result(a, true, l.success);
+        } else if (a.in.pressed && theirs) {
+            t.feedback = strf("Le pion en %s est blanc : c'est un pion de l'adversaire.", sq_name(sq).c_str());
+            t.phase_t = a.time;
+        }
+    }
     t.board.drag_pos = a.in.mouse;
     if (mv) tutorial_human_move(a, *mv);
     if (t.hint && t.hint_ply != t.match.history.size()) {
@@ -7329,6 +7352,15 @@ void scene_tutorial(App& a) {
         draw::round_box(b, b.w * 0.18f, hex(0xffd36b, uint8_t(70 * pulse)));
         draw::round_frame(b, b.w * 0.18f, std::max(2.0f, b.w * 0.06f), hex(0xffd36b, uint8_t(255 * pulse)));
     }
+    if (finding) {
+        for (int sq : t.found) draw::ring(t.board.center(sq), t.board.sq() * 0.48f, t.board.sq() * 0.06f, pal::good);
+        if (t.hint)
+            for (int sq = 0; sq < 64; sq++)
+                if ((pos.bitboard(BLACK) >> sq & 1) && std::find(t.found.begin(), t.found.end(), sq) == t.found.end()) {
+                    draw::ring(t.board.center(sq), t.board.sq() * 0.5f, t.board.sq() * 0.07f, hex(0xffd36b, uint8_t(255 * pulse)));
+                    break;
+                }
+    }
     if (t.victim >= 0 && (pos.bitboard(WHITE) >> t.victim & 1))
         draw::ring(t.board.center(t.victim), t.board.sq() * 0.5f, t.board.sq() * 0.06f, hex(0xff5a5a, uint8_t(255 * pulse)));
     a.fx.update(float(a.ui.dt));
@@ -7354,6 +7386,10 @@ void scene_tutorial(App& a) {
     a.text.draw(Font::Black, 15 * s, "\xC3\x80 TOI !", {panel.x + 24 * s, y}, a.theme().accent);
     y += 24 * s;
     y += a.text.paragraph(Font::Bold, 18 * s, l.task, {panel.x + 24 * s, y, panel.w - 48 * s, 90 * s}, pal::text) + 10 * s;
+    if (finding) {
+        a.text.draw(Font::Regular, 16 * s, strf("Pions trouv\xC3\xA9s : %zu / %d", t.found.size(), std::popcount(pos.bitboard(BLACK))), {panel.x + 24 * s, y}, pal::dim);
+        y += 30 * s;
+    }
     if (l.goal == Lesson::Goal::Moves || l.goal == Lesson::Goal::Win) {
         std::string sc = strf("Score : Noirs %d \xE2\x80\x93 Blancs %d", t.match.score(BLACK), t.match.score(WHITE));
         if (l.goal == Lesson::Goal::Moves) sc += strf("   \xE2\x80\xA2   coups : %d / %d", t.moves_done, l.moves);
