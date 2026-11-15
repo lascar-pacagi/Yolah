@@ -348,6 +348,8 @@ def orc_shaman(anim, t, side):
         sc.add(sd_ellipsoid(r * 0.08, r * 0.55, r * 0.02), Mat(["#2a2a2e", "#c8c0b0", "#8a2a1a"][k], rough=0.8),
                x * T(r * 0.3 * math.sin(a), r * 0.9, -r * 0.5) * RZ(-a) * RX(-0.5) * T(0, r * 0.4, 0))
     st = held(rig["r"], -math.pi if anim == "win" else -1.55)
+    if anim == "win":                 # raised: held high on the shaft, so its head stays in the frame
+        st = st * T(0, -0.3, 0)
     sc.add(sd_capsule((0, -0.42, 0), (0, 0.42, 0), 0.013), wood("#3a2818"), st)
     sk_x = st * T(0, 0.48, 0)
     bone = Mat("#e2d6b8", rough=0.5)
@@ -518,6 +520,8 @@ def archmage(anim, t, side):
     sc.add(sd_torus(r * 0.92, r * 0.06), gold(), x * T(0, r * 0.35, 0) * RX(0.15))
     sc.add(sd_sphere(r * 0.12), glow("#8adfff", 5.0), x * T(0, r * 0.42, r * 0.9))
     st = held(rig["r"], -math.pi if anim == "win" else -1.55)
+    if anim == "win":                 # raised: held high on the shaft, so its head stays in the frame
+        st = st * T(0, -0.3, 0)
     sc.add(sd_capsule((0, -0.4, 0), (0, 0.42, 0), 0.011), Mat("#e8e2d0", rough=0.3, clearcoat=0.6), st)
     for k in range(4):
         a = TAU * k / 4
