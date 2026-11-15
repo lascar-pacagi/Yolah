@@ -287,8 +287,8 @@ def skin_mat(head=None, side=0):
             grey = (fbm(q * 300.0 + 7.0, 2) > 0.45).float()
             if side == 0:      # a three-day beard, black for Black, light grey for White
                 stubble = srgb("#211d1b") * (1 - 0.3 * grey[:, None]) + srgb("#3e3834") * 0.3 * grey[:, None]
-            else:
-                stubble = srgb("#a8a29c") * (1 - 0.6 * grey[:, None]) + srgb("#dcd8d2") * 0.6 * grey[:, None]
+            else:          # salt and pepper
+                stubble = srgb("#3a3430") * (1 - 0.55 * grey[:, None]) + srgb("#dcd8d2") * 0.55 * grey[:, None]
             w = (beard * (0.6 + 0.35 * speck))[:, None]
             rough = rough + 0.25 * beard
             fore = smoothstep(0.115, 0.135, q[:, 1]) * smoothstep(0.23, 0.2, q[:, 1]) * (q[:, 2] > 0.1).float()
@@ -399,7 +399,7 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
     lip = Mat("#b08e84", rough=0.5, sss=0.2, clearcoat=0.15)
     mouth_in = Mat("#4a1418", rough=0.6)
     teeth = Mat("#f3efe6", rough=0.25, clearcoat=0.6)
-    brow = Mat("#cfc9c0" if side == 1 else "#141313", rough=0.9)
+    brow = Mat("#8a847c" if side == 1 else "#141313", rough=0.9)
     # expression parameters
     yaw, pitch, roll, bob = 0.0, 0.0, 0.0, 0.0
     gaze = (0.1, 0.0, 1.0)
@@ -526,7 +526,7 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
     skin = skin_mat(head, side)
     # head: the face (from the photos), the cranium, the jaw behind the face, the ears
     sc.add(sd_face, skin, head)
-    sc.add(sd_ellipsoid(0.186, 0.258, 0.262), skin, head * T(0, 0.045, -0.04), blend=0.04)   # a rounder skull
+    sc.add(sd_ellipsoid(0.2, 0.236, 0.262), skin, head * T(0, 0.05, -0.04), blend=0.04)   # a round skull, wide, flatter on top
     sc.add(sd_ellipsoid(0.13, 0.12, 0.15), skin, head * T(0, -0.13, -0.045), blend=0.05)
     for sgn in (-1, 1):
         ear = head * T(0.18 * sgn, -0.01, -0.02) * RY(0.6 * sgn)
@@ -602,7 +602,11 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
     # the hairline, with locks; strands run front to back on top, down on the sides
     def hair_pat(pl, pw, n):
         q = head.to_local(pw)
-        hc = srgb("#141210") if side == 0 else srgb("#d8d4cc")        # black for Black, white for White
+        if side == 0:      # black for Black
+            hc = srgb("#141210")
+        else:              # salt and pepper for White: dark and white hairs mixed
+            mix = (fbm(q * 320.0 + 9, 2) > 0.48).float()[:, None]
+            hc = srgb("#2a2622") * (1 - mix) + srgb("#e2ded8") * mix
         above = q[:, 1] - hairline(q)
         k = smoothstep(0.0, 0.03, above) * (0.96 + 0.04 * fbm(q * 220.0, 2))     # sparser at the hairline
         a = srgb(SKIN) * 0.92 * (1 - k[:, None]) + hc * (0.85 + 0.3 * fbm(q * 300.0 + 2, 2))[:, None] * k[:, None]
@@ -610,9 +614,10 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
     hair_m = Mat("#7a756f", rough=0.7, pattern=hair_pat)
 
     def hair(p):    # nearly shaved: a thin shell over the cranium, above the hairline
-        cran = sd_ellipsoid(0.186, 0.258, 0.262)(p - vec(0, 0.045, -0.04))
+        cran = sd_ellipsoid(0.2, 0.236, 0.262)(p - vec(0, 0.05, -0.04))
         above = p[:, 1] - hairline(p)
-        d = cran - (0.002 + 0.006 * smoothstep(-0.005, 0.04, above))
+        side_w = smoothstep(0.08, 0.17, p[:, 0].abs())                  # short hair is a little fuller on the sides
+        d = cran - (0.002 + (0.008 + 0.006 * side_w) * smoothstep(-0.005, 0.04, above))
         return torch.maximum(d, -above * 0.5)
     sc.add(hair, hair_m, head)
     import random
