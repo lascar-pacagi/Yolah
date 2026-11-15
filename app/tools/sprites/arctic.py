@@ -531,142 +531,162 @@ def along(p, tng):
     return X_(torch.stack([x, y, z], 1), vec(*p))
 
 
-def orca_mat(u0, u1, half):
-    """The killer whale's pattern by the position u along the body (0 tail → 1 snout)
-    and the angle around it, in the frame of one segment."""
+_ORCA = {}
+
+
+def orca_grid():
+    """The orca's distance grid (bake_orca.py: from a free low-poly model, smoothed), on
+    the device, with the height of its back and belly along the body (for the pattern)."""
+    if not _ORCA:
+        import os
+        import numpy as np
+        z = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ref", "orca_sdf.npz"))
+        s = z["sdf"]
+        lo, hi = z["lo"].astype(np.float64), z["hi"].astype(np.float64)
+        D, H, W = s.shape
+        mid = s[:, :, W // 2]                                           # the body's profile at x = 0
+        zs = lo[2] + (hi[2] - lo[2]) * np.arange(D) / (D - 1)
+        top = np.array([zs[mid[:, j] < 0].max() if (mid[:, j] < 0).any() else 0.55 for j in range(H)])
+        bot = np.array([zs[mid[:, j] < 0].min() if (mid[:, j] < 0).any() else 0.55 for j in range(H)])
+        _ORCA.update(sdf=torch.tensor(s, device=DEV)[None, None], lo=torch.tensor(lo, dtype=torch.float32, device=DEV),
+                     hi=torch.tensor(hi, dtype=torch.float32, device=DEV),
+                     top=torch.tensor(top, dtype=torch.float32, device=DEV), bot=torch.tensor(bot, dtype=torch.float32, device=DEV))
+    return _ORCA
+
+
+ORCA_TIP, ORCA_LEN, ORCA_AXIS = 11.75, 12.15, 0.55      # the flukes' tip (mesh y), the length, the body's axis (mesh z)
+
+
+class OrcaPose:
+    """The orca bent along a circular arc in the plane x = 0 (local frame: z forward,
+    y up): its flukes' tip at `tail`, leaving it at the angle a0 above the horizontal,
+    the curvature k bending the head down (the back on the outside of the arc)."""
+    def __init__(self, tail, a0, k, length):
+        self.a0, self.k, self.R = a0, k, 1.0 / k
+        self.sc = length / ORCA_LEN
+        self.cz = tail[1] + self.R * math.sin(a0)                      # the arc's centre (z, y)
+        self.cy = tail[0] - self.R * math.cos(a0)
+
+    def mesh(self, q):
+        """Local points → the model's coordinates (mx, my, mz), mesh units."""
+        vz, vy = q[:, 2] - self.cz, q[:, 1] - self.cy
+        rho = torch.sqrt(vz * vz + vy * vy) + 1e-9
+        beta = torch.atan2(vy, vz)
+        s = (self.a0 + math.pi / 2 - beta) / self.k
+        h = rho - self.R
+        return q[:, 0] / self.sc, ORCA_TIP - s / self.sc, ORCA_AXIS + h / self.sc
+
+    def at(self, s, h=0.0):
+        """The local point at arc length s from the tip, h out along the back's normal; and the angle of the body there."""
+        a = self.a0 - self.k * s
+        return (self.cy + (self.R + h) * math.cos(a), self.cz - (self.R + h) * math.sin(a)), a
+
+
+def orca_body(pose):
+    G = orca_grid()
+
+    def f(q):
+        mx, my, mz = pose.mesh(q)
+        m = torch.stack([mx, my, mz], 1)
+        g = (m - G["lo"]) / (G["hi"] - G["lo"]) * 2 - 1
+        d = torch.nn.functional.grid_sample(G["sdf"], g[None, :, None, None, :], align_corners=True, padding_mode="border").reshape(-1)
+        out = (m - G["hi"]).clamp_min(0) + (G["lo"] - m).clamp_min(0)
+        return (d + torch.sqrt((out * out).sum(-1))) * pose.sc * 0.8
+    return f
+
+
+def orca_skin(pose):
+    """The killer whale's pattern, placed on the model (mesh units: the snout at
+    my ≈ -0.4, the flukes at 11.75; hn = height between the belly and the back)."""
+    G = orca_grid()
+    lo, hi = G["lo"], G["hi"]
+
     def pat(pl, pw, n):
-        u = u0 + (pl[:, 2] / (2 * half) + 0.5).clamp(0, 1) * (u1 - u0)
-        r = torch.sqrt(pl[:, 0] ** 2 + pl[:, 1] ** 2) + 1e-6
-        up = pl[:, 1] / r
-        belly = ((up < -0.35) & (u > 0.42) & (u < 0.97)).float()
-        flank = ((up < 0.05 + 0.25 * torch.sin(((u - 0.18) / 0.26).clamp(0, 1) * math.pi)) & (u > 0.18) & (u < 0.44) & (up < 0.2)).float()
-        flank = flank * (up < -0.1 + 0.4 * torch.sin(((u - 0.18) / 0.26).clamp(0, 1) * math.pi)).float()
-        patch = ((((u - 0.84) / 0.06) ** 2 + ((up - 0.35) / 0.16) ** 2) < 1).float()
-        saddle = ((((u - 0.5) / 0.08) ** 2 + ((up - 0.95) / 0.18) ** 2) < 1).float()
-        white = (belly + flank + patch).clamp(0, 1)
-        black = srgb("#0b0c0f") * (1 - saddle)[:, None] + srgb("#6e737c") * saddle[:, None]
-        return {"albedo": black * (1 - white)[:, None] + srgb("#f0f0ec") * white[:, None]}
-    return Mat("#0b0c0f", rough=0.2, clearcoat=0.9, pattern=pat)
+        mx, my, mz = pose.mesh(pl)
+        nj = G["top"].shape[0] - 1
+        fj = ((my - lo[1]) / (hi[1] - lo[1]) * nj).clamp(0, nj - 1e-3)
+        j0 = fj.floor().long(); w = fj - j0
+        top = torch.lerp(G["top"][j0], G["top"][(j0 + 1).clamp_max(nj)], w)
+        bot = torch.lerp(G["bot"][j0], G["bot"][(j0 + 1).clamp_max(nj)], w)
+        hn = ((mz - bot) / (top - bot + 1e-3)).clamp(0, 1.2)
+        side = (mx.abs() > 0.25).float()
+        # the white: the lower jaw and throat, the belly narrowing between the flippers,
+        # the lobe sweeping up the rear flank, the oval patch above and behind the eye
+        jaw = ((my < 1.1) & (hn < 0.44 - 0.06 * ((my - 0.2) / 0.9).clamp(0, 1))).float()
+        bw = torch.where(my < 2.2, 0.4 - 0.1 * ((my - 1.1) / 1.1).clamp(0, 1), torch.where(my < 4.0, 0.22 + 0.0 * my, 0.3 + 0.0 * my))
+        belly = ((my > 0.5) & (my < 8.6) & (hn < bw)).float()
+        lobe = ((my > 5.6) & (my < 8.8) & (hn < 0.28 + 0.36 * torch.sin(((my - 5.6) / 3.2).clamp(0, 1) * math.pi) ** 0.8)).float() * side
+        patch = ((((my - 1.95) / 0.62) ** 2 + ((hn - 0.69) / 0.12) ** 2) < 1).float() * side
+        flukes = ((my > 10.3) & (n[:, 1] < -0.3) & (mx.abs() > 0.35)).float()          # their underside, pale
+        fins = ((my > 1.6) & (my < 4.6) & (mx.abs() > 0.98)).float()     # the flippers: black all over
+        white = (jaw + belly + lobe + patch).clamp(0, 1) * (1 - fins)
+        saddle = ((((my - 5.95) / 0.75) ** 2 + ((hn - 0.98) / 0.3) ** 2) < 1).float() * (1 - white)
+        black = srgb("#0a0b0e") * (1 - saddle)[:, None] + srgb("#7d838c") * saddle[:, None]
+        a = black * (1 - white)[:, None] + srgb("#f2f2ee") * white[:, None]
+        a = a * (1 - flukes)[:, None] + srgb("#d8dadc") * flukes[:, None]
+        # the eye: a dark glossy spot just in front of and below the patch
+        eye = ((((my - 1.08) / 0.09) ** 2 + ((hn - 0.5) / 0.06) ** 2) < 1).float() * side
+        a = a * (1 - eye)[:, None] + srgb("#20160f") * eye[:, None]
+        return {"albedo": a}
+    return Mat("#0a0b0e", rough=0.22, clearcoat=0.9, pattern=pat)
 
 
 def orca(anim, t, side):
-    """A killer whale leaping in an arc through a hole in the ice: the head out
-    in front, the back in the water with the tall dorsal fin, the tail rising
-    behind with its flukes. Black, the white eye patch, chin and belly, the
-    white patch sweeping up the rear flank, the grey saddle behind the fin."""
+    """A killer whale leaping out of a hole in the ice (the body from a real model:
+    see bake_orca.py), its flukes still at the water, water streaming off them,
+    a crown of splash round them. Black, the white eye patch, jaw and belly, the
+    white lobe up the rear flank, the grey saddle behind the tall dorsal fin."""
     sc = Scene()
     base(sc, side)
     # the hole: dark water, foam, slabs of broken ice (kept inside the base's rim
     # so the base shows the side; black ice for Black)
     sc.add(sd_cylinder(0.005, 0.36, 0.004), Mat("#0a1622", rough=0.04, clearcoat=1.0), T(0, BASE_TOP + 0.004, 0))
     foam = Mat("#f4f8fc", rough=0.6, sss=0.5)
-    sc.add(lambda q: sd_torus(0.24, 0.026)(q) - 0.012 * fbm(q * 40, 2), foam, T(0, BASE_TOP + 0.01, 0))
+    sc.add(lambda q: sd_torus(0.3, 0.02)(q) - 0.01 * fbm(q * 40, 2), foam, T(0, BASE_TOP + 0.01, 0))
     slab = ICE if side else Mat("#1c2a3a", rough=0.08, clearcoat=1.0, sss=0.2)
     for k in range(8):
         a = TAU * k / 8 + 0.3
         rr = 0.4 + 0.015 * math.sin(k * 2.7)
         pts = [(math.cos(a + d) * (rr + e), 0.0, math.sin(a + d) * (rr + e)) for d, e in ((-0.26, -0.05), (0.24, -0.04), (0.22, 0.04), (-0.2, 0.05))]
         sc.add(sheet([(x * 0.85, y, z * 0.85) for x, y, z in pts], 0.01 + 0.004 * (k % 3)), slab, T(0, BASE_TOP + 0.02, 0) * RZ(0.05 * math.sin(k * 1.9)) * RX(0.04 * math.cos(k * 2.3)))
-    rise = {"win": 0.06 * math.sin(TAU * t), "move": 0.05 * math.sin(math.pi * t)}.get(anim, 0.012 * math.sin(TAU * t))
-    roll = 0.25 * math.sin(TAU * 3 * t) if anim == "blocked" else 0.0
-    beat = {"win": 0.12 * math.sin(TAU * 2 * t), "move": 0.08 * math.sin(TAU * t)}.get(anim, 0.04 * math.sin(TAU * t))
-    Xr = RY(YAW) * T(0, BASE_TOP + rise, 0) * RZ(roll)
-    # the spine from the tail (u = 0) to the snout (u = 1), an arc over the water
-    N = 30
-    spine = bezier((0, 0.24 + beat, -0.46), (0, 0.40, -0.22), (0, 0.50, 0.04), (0, 0.66, 0.28), N)
-    def rad(u):
-        # a thin tail stock, the widest just behind the head, a blunt conical head
-        rmax = 0.115
-        if u < 0.62:
-            f = 0.2 + 0.8 * math.sin(0.5 * math.pi * u / 0.62) ** 1.3
-        else:
-            f = max(1 - ((u - 0.62) / 0.4) ** 2, 0.0) ** 0.5
-        return rmax * f + 0.006
-    radii = [rad(i / (N - 1)) for i in range(N)]
-    radii[-1] = max(radii[-1], radii[-2] * 0.7)                        # the rounded snout
-    P = torch.tensor(spine, dtype=torch.float32, device=DEV)
-    RR = torch.tensor(radii, dtype=torch.float32, device=DEV)
-
-    def body(q):
-        d = torch.full_like(q[:, 0], 1e9)
-        for i in range(N - 1):
-            a0, a1 = P[i], P[i + 1]
-            ba = a1 - a0
-            h = (((q - a0) @ ba) / (ba @ ba)).clamp(0, 1)
-            r = RR[i] + (RR[i + 1] - RR[i]) * h
-            di = torch.linalg.norm(q - a0 - ba * h[:, None], dim=-1) - r
-            k = 0.03                                                    # a smooth union: no ridge between the pieces
-            hh = (0.5 + 0.5 * (di - d) / k).clamp(0, 1)
-            d = di + (d - di) * hh - k * hh * (1 - hh)
-        return d
-
-    YV = []
-    for i in range(N - 1):
-        tv = P[i + 1] - P[i]
-        tv = tv / torch.linalg.norm(tv)
-        yv = torch.tensor([0.0, 1.0, 0.0], device=DEV) - tv * tv[1]
-        YV.append(yv / torch.linalg.norm(yv))
-
-    def body_pat(pl, pw, n):
-        # u along the body (0 tail → 1 snout) and `up` around it, from the nearest spine point
-        best = torch.full_like(pl[:, 0], 1e9)
-        u = torch.zeros_like(best)
-        up = torch.zeros_like(best)
-        for i in range(N - 1):
-            a0, a1 = P[i], P[i + 1]
-            ba = a1 - a0
-            h = (((pl - a0) @ ba) / (ba @ ba)).clamp(0, 1)
-            off = pl - a0 - ba * h[:, None]
-            dist = torch.linalg.norm(off, dim=-1)
-            m = dist < best
-            best = torch.where(m, dist, best)
-            u = torch.where(m, (i + h) / (N - 1), u)
-            up = torch.where(m, (off @ YV[i]) / (dist + 1e-6), up)
-        xv = pl[:, 0] / (best + 1e-6)
-        belly = ((up < -0.35 + 0.25 * ((u - 0.62) / 0.3).clamp(0, 1)) & (u > 0.36) & (u < 0.995)).float()
-        sweep = torch.sin(((u - 0.14) / 0.26).clamp(0, 1) * math.pi)
-        flank = ((up < -0.2 + 0.55 * sweep) & (u > 0.14) & (u < 0.40)).float() * (xv.abs() > 0.2).float()
-        patch = ((((u - 0.86) / 0.04) ** 2 + ((up - 0.42) / 0.2) ** 2) < 1).float() * (xv.abs() > 0.3).float()   # the oval eye patch
-        saddle = ((((u - 0.41) / 0.06) ** 2 + ((up - 0.96) / 0.22) ** 2) < 1).float()
-        eye = ((((u - 0.9) / 0.01) ** 2 + ((up - 0.12) / 0.07) ** 2) < 1).float() * (xv.abs() > 0.5).float()
-        white = (belly + flank + patch).clamp(0, 1) * (1 - eye)
-        black = srgb("#0b0c0f") * (1 - saddle)[:, None] + srgb("#6e737c") * saddle[:, None]
-        return {"albedo": black * (1 - white)[:, None] + srgb("#f0f0ec") * white[:, None]}
-    sc.add(body, Mat("#0b0c0f", rough=0.2, clearcoat=0.9, pattern=body_pat), Xr)
-    black = Mat("#0b0c0f", rough=0.2, clearcoat=0.9)
-    def frame(i):
-        return along(spine[i], tuple(spine[i + 1][k] - spine[i - 1][k] for k in range(3)))
-    # the tall dorsal fin on the back, at the top of the arc
-    fi = int(0.47 * (N - 1))
-    sc.add(sd_thin_fin(0.2, 0.11, 0.013), black, Xr * frame(fi) * T(0, radii[fi] * 0.8, 0))
-    # the broad paddle-shaped pectoral fins behind the head, low on the sides, out and back
-    pi_ = int(0.72 * (N - 1))
-    flap = 0.15 * math.sin(TAU * t)
-    for sgn in (-1, 1):
-        sc.add(sd_ellipsoid(0.09, 0.012, 0.048), black,
-               Xr * frame(pi_) * T(radii[pi_] * 0.7 * sgn, -radii[pi_] * 0.55, 0) * RZ(-(0.55 + flap) * sgn) * RY(0.6 * sgn) * T(0.075 * sgn, 0, 0))
-    # the flukes at the tail's tip: two swept lobes, flat across the body
-    fx = frame(1) * RZ(0.7)                                     # a twist of the leap: the flukes seen
-    for sgn in (-1, 1):
-        sc.add(sd_ellipsoid(0.12, 0.012, 0.045), black, Xr * fx * T(0, 0, -0.02) * RY(-0.5 * sgn) * T(0.1 * sgn, 0, -0.012), blend=0.02)
-    # the splash it leaps out of: a column of foaming water from the hole to the belly
-    ci = int(0.42 * (N - 1))
-    ctop = spine[ci][1] - radii[ci] * 0.6
-    def column(q):
-        y = q[:, 1].clamp(0, ctop)
-        r = 0.085 - 0.04 * y / ctop + 0.01 * torch.sin(7 * torch.atan2(q[:, 0], q[:, 2]))
-        d = torch.sqrt(q[:, 0] ** 2 + q[:, 2] ** 2) - r
-        d = torch.maximum(d, torch.maximum(-q[:, 1], q[:, 1] - ctop))
-        return d - 0.012 * fbm(q * 30, 2)
-    sc.add(column, Mat("#e6f3fb", rough=0.35, clearcoat=1.0, sss=0.7, emissive="#d8eefa", emit=0.08),
-           RY(YAW) * T(0, BASE_TOP + 0.004, spine[ci][2]), blend=0.02)
-    # the spray: droplets thrown up around the body
+    rise = {"win": 0.05 * math.sin(TAU * t), "move": 0.04 * math.sin(math.pi * t)}.get(anim, 0.01 * math.sin(TAU * t))
+    roll = 0.2 * math.sin(TAU * 3 * t) if anim == "blocked" else 0.0
+    bend = {"win": 0.12 * math.sin(TAU * t)}.get(anim, 0.04 * math.sin(TAU * t))
+    Xr = RY(YAW) * T(0, BASE_TOP, 0) * RZ(roll)
+    # the leap: the flukes' tip just under the water at the back, the body rising
+    # forward at 60°, its arc bringing the head level
+    tail = (-0.03 + rise, -0.27)
+    pose = OrcaPose(tail, 1.05 + bend, 0.8, 0.9)
+    sc.add(orca_body(pose), orca_skin(pose), Xr)
+    # the splash where the flukes leave the water: a crown of water, jets, drops
+    water = Mat("#eef8ff", rough=0.12, clearcoat=1.0, sss=0.8, emissive="#dff2ff", emit=0.08)
+    (fy, fz), _ = pose.at(0.06)
+    def crown(q):
+        r = torch.sqrt(q[:, 0] ** 2 + q[:, 2] ** 2)
+        ang = torch.atan2(q[:, 0], q[:, 2])
+        hgt = 0.04 + 0.03 * torch.sin(ang * 8 + 1.3) ** 2
+        wall = (r - 0.1 - 0.025 * (q[:, 1] / 0.07).clamp(0, 1)).abs() - 0.009 * (1 - q[:, 1] / 0.09).clamp(0.2, 1)
+        return torch.maximum(wall, torch.maximum(-q[:, 1], q[:, 1] - hgt)) * 0.7 - 0.006 * fbm(q * 50, 2)
+    sc.add(crown, water, Xr * T(0, 0.0, fz))
+    for k in range(9):                                                  # the crown's spikes, tipped with drops
+        a = TAU * k / 9 + 0.35
+        r0 = 0.12
+        tip = (r0 * 1.2 * math.sin(a), 0.085 + 0.035 * ((k * 0.37) % 1), fz + r0 * 1.2 * math.cos(a))
+        sc.add(sd_capsule((r0 * math.sin(a), 0.03, fz + r0 * math.cos(a)), tip, 0.009, 0.004), water, Xr, blend=0.01)
+        sc.add(sd_sphere(0.007), water, Xr * T(tip[0] * 1.06, tip[1] + 0.018 + 0.01 * math.sin(TAU * (t + k * 0.2)), fz + (tip[2] - fz) * 1.06))
+    for k in range(7):                                                  # water streaming off the flukes
+        x = -0.15 + 0.05 * k
+        (y0, z0), _ = pose.at(0.04 + 0.02 * abs(k - 3), 0.0)
+        drip = 0.5 + 0.5 * math.sin(TAU * (t + k * 0.31))
+        sc.add(sd_capsule((x, y0, z0), (x * 1.1, 0.0, z0 - 0.01), 0.006, 0.0035), water, Xr, blend=0.005)
+        sc.add(sd_sphere(0.007), water, Xr * T(x * 1.05, y0 * (0.3 + 0.5 * drip), z0 - 0.005))
     drop = Mat("#ffffff", rough=0.15, clearcoat=1.0, sss=0.6, emissive="#e8f6ff", emit=0.15)
-    for k in range(22):
-        a = TAU * k / 22 + 0.7 * k
-        h = 0.04 + 0.22 * ((k * 0.37 + t) % 1) * (0.5 + 0.5 * math.sin(k * 1.3))
-        rr = 0.14 + 0.1 * ((k * 0.61) % 1)
-        sc.add(sd_sphere(0.008 + 0.006 * (k % 3)), drop, T(rr * math.cos(a), BASE_TOP + h, rr * math.sin(a)))
+    for k in range(16):                                                 # spray thrown up along the body
+        s_ = 0.15 + 0.45 * ((k * 0.61) % 1)
+        (y0, z0), a_ = pose.at(s_, -0.06)
+        ph = (k * 0.37 + t) % 1
+        sc.add(sd_sphere(0.006 + 0.004 * (k % 3)), drop,
+               Xr * T((0.09 + 0.06 * ph) * (1 if k % 2 else -1), y0 - 0.1 * ph * ph, z0 - 0.03 * ph))
     return sc
 
 
