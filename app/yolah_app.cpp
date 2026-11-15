@@ -3992,7 +3992,7 @@ struct Settings {
     bool show_eval = true, show_hint = false, show_coords = true, show_pv = false;
     int time_index = 1;                       // index in TIMES
     std::string black = "human", white = "dev";
-    std::vector<int> tutorial_done;           // lessons completed
+    std::vector<int> tutorial_done;           // lessons completed in this session (not saved: the tutorial starts over at each launch)
     std::vector<std::string> puzzles_done;    // puzzles solved
     json ai_options = json::object();         // AI id → {setting: value} (AiParam), games only
     std::string piece_set = "auto";           // "auto": the board's set (Theme::piece_set), else a set's id
@@ -4000,7 +4000,7 @@ struct Settings {
     json to_json() const {
         return {{"theme", theme}, {"show eval", show_eval}, {"show hint", show_hint}, {"show coordinates", show_coords},
                 {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white},
-                {"tutorial done", tutorial_done}, {"puzzles done", puzzles_done}, {"ai options", ai_options},
+                {"puzzles done", puzzles_done}, {"ai options", ai_options},
                 {"piece set", piece_set}, {"language", lang}};
     }
     void from_json(const json& j) {
@@ -4013,7 +4013,6 @@ struct Settings {
         time_index = j.value("time index", time_index);
         black = j.value("black", black);
         white = j.value("white", white);
-        if (j.contains("tutorial done") && j["tutorial done"].is_array()) tutorial_done = j["tutorial done"].get<std::vector<int>>();
         if (j.contains("puzzles done") && j["puzzles done"].is_array()) puzzles_done = j["puzzles done"].get<std::vector<std::string>>();
         if (j.contains("ai options") && j["ai options"].is_object()) ai_options = j["ai options"];
         piece_set = j.value("piece set", piece_set);
