@@ -1241,7 +1241,7 @@ def core(anim, t, side):
     sc.add(sd_cone(0.06, 0.16, 0.08, 0.01), obsidian, T(0, y0 + 0.06, 0))
     sc.add(sd_cylinder(0.012, 0.085, 0.004), glow(col, 4.0), T(0, y0 + 0.125, 0))
     sc.add(sd_cylinder(0.2, 0.02, 0.0), glow(col, 1.5), T(0, y0 + 0.33, 0))
-    c = T(0, y0 + 0.55 + hover, 0) * RY(spin * 0.25)
+    c = T(0, y0 + 0.55 + hover, 0) * RY(spin / 6)          # the cage has 6 bars: 1/6 turn per loop joins up (1/4 jumped)
     # the core: a bright sphere in a faceted dark crystal cage
     sc.add(sd_sphere(0.085), glow("#ffffff", k_core * 0.7), c)
     sc.add(sd_sphere(0.11), Mat("#bfe6ff", glass=True), c)
