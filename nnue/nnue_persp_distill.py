@@ -44,8 +44,8 @@ Env (in addition to those of nnue193x1024x64x32x1_distill.py):
                           NNUE_Persp reads 1024 or 512)
     YOLAH_L2_SIZE         outputs of fc2 per head (default 64)
     YOLAH_L2_SQUARE       1: w3 reads [h2, h2²] (nnue_persp.py; random start, no C++ yet)
-    YOLAH_INPUT_BUCKETS   N > 1: N sets of fc1 weights by phase (nnue_persp.py; random
-                          start, no C++ yet)
+    YOLAH_INPUT_BUCKETS   N > 1: N sets of fc1 weights by phase (nnue_persp.py; read by
+                          nnue_persp.cpp, merged by the exporter)
     YOLAH_FC1_FACTOR      1 (with YOLAH_INPUT_BUCKETS > 1): the sets are a shared set plus
                           a correction per phase starting at 0 (Stockfish's factoriser)
     YOLAH_FREEZE          1: only fc1 learns, every other weight stays as YOLAH_INIT_MODEL
