@@ -461,7 +461,7 @@ def rampart_mat():
         cx = (u + 0.5 * torch.floor(y / 0.9)) - torch.floor(u + 0.5 * torch.floor(y / 0.9))
         mortar = torch.maximum(sstep(0.9, 0.97, cy), sstep(0.92, 0.98, cx) * (n[:, 1].abs() < 0.5).float())
         a = a * (1 - 0.35 * mortar)[:, None]
-        a = torch.lerp(a, srgb("#4a5a2e"), (0.45 * sstep(0.6, 0.78, fbm(pw * 0.2 + 5, 3)) * sstep(BASES[(0, 0)] - 4, BASES[(0, 0)] - 20, y))[:, None])
+        a = a * (0.85 + 0.2 * fbm(pw * 0.08 + 5, 3))[:, None]      # weathered stone, no grass
         return {"albedo": a}
     return Mat("#a89e8a", rough=0.85, pattern=pat)
 

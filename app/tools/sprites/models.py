@@ -258,6 +258,7 @@ def hairline(q):
     front = smoothstep(-0.02, 0.15, q[:, 2])
     temple = torch.exp(-((q[:, 0].abs() - 0.11) / 0.045) ** 2)
     fr = 0.205 + 0.03 * temple + 0.15 * (q[:, 0].abs() - 0.15).clamp_min(0)      # a forehead of normal height
+    fr = fr - 0.04 * (1 - q[:, 0].abs() / 0.06).clamp_min(0)                    # a small V of hair in the middle (widow's peak)
     side = -0.08 - 0.08 * smoothstep(-0.02, -0.2, q[:, 2])          # the mane hangs to the jaw on the sides
     return front * fr + (1 - front) * side + 0.014 * (vnoise(q * 28.0) - 0.5)
 
@@ -308,6 +309,18 @@ def skin_mat(head=None, side=0):
             a = a * (1 - wf[:, None]) + ph * wf[:, None]
             a = a * (1 - w) + stubble * w
             a = a * (1 - 0.3 * lines[:, None])
+            # the short hair over the forehead's top (the face's surface covers the hair's shell
+            # there): painted above the hairline, its V in the middle included
+            if side == 0:
+                hc = srgb("#141210").expand_as(a)
+            else:
+                mix = (fbm(q * 320.0 + 9, 2) > 0.48).float()[:, None]
+                hc = srgb("#2a2622") * (1 - mix) + srgb("#e2ded8") * mix
+            hk = smoothstep(0.0, 0.03, q[:, 1] - hairline(q)) * (0.96 + 0.04 * fbm(q * 220.0, 2))
+            hair_col = srgb(SKIN) * 0.92 * (1 - hk[:, None]) + hc * (0.85 + 0.3 * fbm(q * 300.0 + 2, 2))[:, None] * hk[:, None]
+            hpaint = smoothstep(0.0, 0.006, q[:, 1] - hairline(q))
+            a = a * (1 - hpaint[:, None]) + hair_col * hpaint[:, None]          # the same mix as the shell's
+            rough = rough + 0.3 * hpaint
         return {"albedo": a, "rough": rough}
     return Mat(SKIN, rough=0.45, sss=0.55, pattern=pat)
 
