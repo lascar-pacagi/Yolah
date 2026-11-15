@@ -20,7 +20,7 @@ The human is never part of a set: always the user's own figurine.
 import math
 import torch
 from render import Scene, Mat, T, RX, RY, RZ, srgb, sd_sphere, sd_ellipsoid, sd_box, sd_capsule, sd_cylinder, \
-    sd_torus, sd_cone, sd_plane_cut, fbm
+    sd_torus, sd_cone, sd_plane_cut, fbm, vec
 from models import base, BASE_TOP, TAU, wave, glow, gold
 from legends import leather, cloth, iron, silver, wood, skin, base_pose, held
 from heroic import adult, chain, bezier, membrane_wing, scales, HEAD
@@ -534,6 +534,37 @@ def archmage(anim, t, side):
 
 
 # ─── 10 · the ancient dragon ────────────────────────────────────────────────
+def fire_breath(L, r0, r1, t):
+    """A jet of fire along +z from the origin, L long, widening from r0 to r1: its
+    edge billowing in a turbulence that streams forward (periodic in t: the loop
+    has no jump), a white-yellow core, orange, a dark red torn edge."""
+    D = 0.35                                           # how far the turbulence streams in one loop
+    sh = vec(0, 0, 1)                                  # (built once: no tensor made inside the SDF)
+    st = vec(16, 16, 5)                                # the turbulence stretched along the jet: tongues
+
+    def turb(p):
+        a = fbm(p * st - sh * (t * D * 5), 3)
+        b = fbm(p * st - sh * ((t - 1) * D * 5) + 7.3, 3)
+        return a * (1 - t) + b * t
+
+    def f(p):
+        u = (p[:, 2] / L).clamp(0, 1)
+        r = r0 + (r1 - r0) * u ** 0.7
+        rad = torch.sqrt(p[:, 0] ** 2 + p[:, 1] ** 2)
+        d = rad - r * (0.3 + 1.3 * turb(p)) * (1.0 - 0.35 * u)
+        d = torch.maximum(d, torch.maximum(-p[:, 2], p[:, 2] - L * (0.85 + 0.25 * turb(p * 0.7))))
+        return d * 0.6
+
+    def pat(pl, pw, n):
+        u = (pl[:, 2] / L).clamp(0, 1)
+        rad = torch.sqrt(pl[:, 0] ** 2 + pl[:, 1] ** 2) / (r0 + (r1 - r0) * u ** 0.7)
+        heat = (1.05 - 1.0 * u - 0.55 * rad + 0.5 * (turb(pl) - 0.5)).clamp(0, 1)
+        c = torch.where((heat > 0.6)[:, None], torch.lerp(srgb("#ff9a20"), srgb("#fff6c8"), ((heat - 0.6) / 0.4)[:, None]),
+                        torch.lerp(srgb("#7a1206"), srgb("#ff9a20"), (heat / 0.6)[:, None]))
+        return {"albedo": c, "emissive": c * (0.5 + 2.2 * heat * heat)[:, None]}
+    return f, Mat("#ff9a20", rough=0.9, emissive="#ff9a20", emit=1.0, pattern=pat)
+
+
 def dragon(anim, t, side):
     sc = Scene()
     base(sc, side)
@@ -586,10 +617,16 @@ def dragon(anim, t, side):
         chain(sc, hp2, [0.014, 0.01, 0.006, 0.002], horn, hx * T(0.06 * sgn, 0.0, -0.03), blend=0.003)
         for k in range(3):
             sc.add(sd_cone(0.014, 0.005, 0.001, 0.001), Mat("#f2ead8", rough=0.4), hx * T(0.03 * sgn, -0.04, 0.12 + 0.03 * k) * RX(math.pi))
-    if anim == "win":    # the breath
-        for k in range(3):
-            sc.add(sd_cone(0.18 + 0.06 * k, 0.05 + 0.03 * k, 0.012, 0.01), glow("#ff7a1a" if k else "#ffe08a", 10.0 - 2 * k),
-                   hx * T(0, -0.05, 0.3 + 0.08 * k) * RX(math.pi / 2 + 0.25))
+    if anim == "win":    # the breath: a jet of fire out of the jaws
+        f, m = fire_breath(0.62, 0.018, 0.12, t)
+        mouth = hx * T(0, -0.045, 0.17) * RX(-0.05)
+        sc.add(f, m, mouth)
+        ember = glow("#ffb04a", 8.0)
+        for k in range(10):
+            u = (k * 0.37 + t) % 1
+            a = TAU * ((k * 0.61) % 1)
+            rr = 0.03 + 0.14 * u
+            sc.add(sd_sphere(0.006 + 0.004 * (k % 2)), ember, mouth * T(rr * math.cos(a), rr * math.sin(a), 0.06 + 0.5 * u))
     # the tail, curling around the base, spikes on top
     tail = bezier((0, 0.32, -0.28), (0.05, 0.2, -0.55), (0.45, 0.12, -0.45), (0.5, 0.13, 0.05 + 0.04 * math.sin(TAU * t)), 10)
     chain(sc, tail, [0.075 * (1 - 0.09 * i) for i in range(10)], hide, root, blend=0.03)
