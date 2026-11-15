@@ -24,9 +24,6 @@
   "hole art": "legendes_trou",
   "frame art": "legendes_cadre",
   "background image": "legendes.jpg",
-  "planet image": "legendes_roc.png",
-  "planet size": 1.9,
-  "planet top": 0.62,
   "embers": true,
   "piece set": "legendes",
   "break fx": "stone"
