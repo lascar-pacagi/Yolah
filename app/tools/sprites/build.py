@@ -64,6 +64,8 @@ CENTER = (0.0, 0.62, 0.0)       # world point at the frame's centre
 BASE_DIAMETER = 1.12            # world units (models.base)
 BASE_ON_SQUARE = 0.8            # the base's diameter in squares
 ANIMS = [("idle", 16, 10, True), ("move", 8, 24, False), ("blocked", 12, 12, True), ("win", 16, 12, True)]
+# figures whose idle is slower than 1.6 s: a longer loop (the owl turning its head)
+ANIMS_FOR = {"ice_mcts": [("idle", 32, 8, True)] + ANIMS[1:]}
 NAMES = {"sentinel": "Sentinelle", "human": "Humain", "tin_toy": "Jouet m\u00e9canique", "roller": "Roulix",
          "dicer": "T\u00eate de d\u00e9", "tree_bot": "Arborescent", "retro": "R\u00e9tro 1955", "crt": "Cathodique",
          "geometer": "G\u00e9om\u00e8tre", "android": "Androïde", "core": "Noyau",
@@ -93,12 +95,13 @@ def build(model, sides=(0, 1)):
     t0 = time.time()
     box = BASE_ON_SQUARE * VIEW / BASE_DIAMETER
     ax, ay = anchor()
-    cols = max(n for _, n, _, _ in ANIMS)
+    anims = ANIMS_FOR.get(model, ANIMS)
+    cols = max(n for _, n, _, _ in anims)
     for side, suffix in ((0, ""), (1, "_blanc")):
         if side not in sides:
             continue
-        sheet = np.zeros((SIZE * len(ANIMS), SIZE * cols, 4), np.uint8)
-        for r, (anim, n, fps, loop) in enumerate(ANIMS):
+        sheet = np.zeros((SIZE * len(anims), SIZE * cols, 4), np.uint8)
+        for r, (anim, n, fps, loop) in enumerate(anims):
             for k in range(n):
                 t = k / n if loop else k / (n - 1)
                 sheet[r * SIZE:(r + 1) * SIZE, k * SIZE:(k + 1) * SIZE] = draw(MODELS[model](anim, t, side), size=SIZE,
@@ -107,7 +110,7 @@ def build(model, sides=(0, 1)):
         Image.fromarray(sheet).save(os.path.join(ART, aid + ".png"), optimize=True)
         j = {"name": NAMES.get(model, model) + (" (blanc)" if side else ""), "kind": "piece", "size": SIZE,
              "smooth": True, "on stone": False, "box": round(box, 4), "anchor": [round(ax, 4), round(ay, 4)],
-             "animations": [{"name": a, "fps": fps, "loop": loop, "frames": n} for a, n, fps, loop in ANIMS]}
+             "animations": [{"name": a, "fps": fps, "loop": loop, "frames": n} for a, n, fps, loop in anims]}
         if model in generals.PLATES:
             j["plate"] = generals.PLATES[model]
         if model in generals.STARS:

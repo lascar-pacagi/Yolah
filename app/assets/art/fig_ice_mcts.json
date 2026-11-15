@@ -12,9 +12,9 @@
   "animations": [
     {
       "name": "idle",
-      "fps": 10,
+      "fps": 8,
       "loop": true,
-      "frames": 16
+      "frames": 32
     },
     {
       "name": "move",

@@ -361,7 +361,9 @@ def snowy_owl(anim, t, side):
     flap = anim == "win"
     sc.add(furry(sd_ellipsoid(0.12, 0.15, 0.11), 0.004, 120), pm, X * T(0, 0.3, 0) * RX(0.12))
     sc.add(furry(sd_ellipsoid(0.1, 0.1, 0.1), 0.004, 120), pm, X * T(0, 0.37, 0.025), blend=0.05)
-    turn = 0.9 * math.sin(TAU * t) if anim == "idle" else (0.6 * math.sin(TAU * 3 * t) if anim == "blocked" else 0.0)
+    # idle (a 4 s loop): a slow turn to one side, a pause, the other side
+    sw = math.sin(TAU * t)
+    turn = 0.75 * (1.5 * sw - 0.5 * sw ** 3) if anim == "idle" else (0.35 * math.sin(TAU * t) if anim == "blocked" else 0.0)
     hd = X * T(0, 0.49, 0.02) * RY(turn)
     sc.add(furry(sd_ellipsoid(0.1, 0.085, 0.09), 0.004, 130), pm, hd)
     sc.add(sd_ellipsoid(0.075, 0.06, 0.02), Mat("#fbfaf6", rough=0.9), hd * T(0, -0.005, 0.075), blend=0.03)           # the facial disc
