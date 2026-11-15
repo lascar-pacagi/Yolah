@@ -146,9 +146,9 @@ details.mobile-toc ol { columns: 1; }
 </nav>
 <main>
 <header class="hero">
-  <div class="eyebrow">Yolah · distillation loop · dev player → ResNet → NNUE (nnue/distill_loop.sh)</div>
+  <div class="eyebrow">Yolah · distillation · ResNet → NNUE (nnue/nnue_persp_distill.sh), and the loop of round 0 (nnue/distill_loop.sh)</div>
   <h1>Yolah Distillation Loop Internals</h1>
-  <p class="lede">How the two Yolah players improve each other, round after round: the minimax dev player plays games and labels the positions with its search, the value/policy ResNet of the MCTS player learns from them, the ResNet becomes the teacher of the NNUE, and the dev player plays the next round with the new NNUE. Every stage is shown with its code and its targets.</p>
+  <p class="lede">How the NNUE of the minimax dev player is made today, distilled from the ResNet of the MCTS player (section 0), and the loop that was tried before (sections 1 to 8): the minimax dev player plays games and labels the positions with its search, the value/policy ResNet of the MCTS player learns from them, the ResNet becomes the teacher of the NNUE, and the dev player plays the next round with the new NNUE. It ran one round. Every stage is shown with its code and its targets.</p>
   <div class="stat-row">
     <div class="stat"><b>200 k</b><span>games of the dev player per round</span></div>
     <div class="stat"><b>650 k</b><span>search nodes per move (0.5 s on an i7)</span></div>
@@ -156,11 +156,44 @@ details.mobile-toc ol { columns: 1; }
     <div class="stat"><b>~100 M</b><span>positions in a round's training cache</span></div>
   </div>
 </header>
-<div class="note"><strong>Stopped after round 0.</strong> The ResNet is now improved by the generations loop, <code>nnue/az_gen_loop.sh</code>: see <a href="az_gen_loop.html">az_gen_loop.html</a>. This page describes the distillation loop as it ran; section 7 of the new page gives its results. The two players no longer feed each other: the ResNet learns from its own self-play only, and the NNUE of the dev player is distilled from the ResNet alone (the teacher's values, <code>nnue/nnue_persp_distill.sh</code>), without the dev player's searches. Since 2026-11-14 the dev player's network is <code>k8_them_g046_qat_ib4f_ref2u_az20</code>, with a first layer per phase (see minmax_nnue_dev_player.html).</div>
+<div class="note"><strong>The loop of sections 1 to 8 stopped after round 0.</strong> The two players no longer feed each other: the ResNet improves by its own self-play (the generations loop, <code>nnue/az_gen_loop.sh</code>, see <a href="az_gen_loop.html">az_gen_loop.html</a>), and the NNUE is distilled from the ResNet alone (section 0).</div>
 <details class="mobile-toc"><summary>Contents</summary><ol id="toc-list-m"></ol></details>
 
+<section id="s0">
+<h2><span class="num">0</span>The distillation today</h2>
+<div class="col">
+<p>The chain has two links, each with its own job, and nothing goes back from the NNUE to the ResNet:</p>
+<ol>
+<li><strong>The ResNet learns by itself.</strong> The generations loop (<code>nnue/az_gen_loop.sh</code>) makes the MCTS player play against itself with its ResNet, 12.5 M positions per generation, and trains the network on them and on a pool of older positions. The minimax player's games are no longer used.</li>
+<li><strong>The NNUE learns from the ResNet.</strong> A large, slow, accurate network, the teacher, gives its value for every position of a big cache; the small, fast network of the dev player learns to reproduce these values (<code>nnue/nnue_persp_distill.sh</code>). The dev player's search plays no part in it.</li>
+</ol>
+<p>When a generation of the ResNet is clearly stronger, it relabels the cache (<code>nnue/relabel_teacher.sh</code>) and the NNUE is distilled again: that is the loop now, one link at a time, each step measured in matches.</p>
+</div>
+
+<h3 id="s0-teacher"><span class="num">0.1</span>The teacher and the cache</h3>
+<div class="col">
+<p>The cache <code>cache_az256</code> holds about 988 M positions of engine games (<code>data/games</code>, games of the minimax players), with the game's result z for the side to move. The teacher is the AlphaZero 256 network <code>az_00237568</code>: <code>relabel_teacher.sh</code> ran it once on every position (one GPU, 59,938 s) and stored its value as float16. The last 5 % of the cache is the validation set.</p>
+</div>
+
+<h3 id="s0-student"><span class="num">0.2</span>The student and its training</h3>
+<div class="col">
+<p>The student is the perspective network of the dev player (minmax_nnue_dev_player.html, section 8): both points of view, 8 phase heads, the 10 space features of group 0x46, trained quantization-aware so that the C++ integer network plays as it was trained, and since November 2026 a first layer in 4 sets by phase. The loss is the one of section 6.1, without the search: <code>L = 0.8 · (v − teacher)² + 0.2 · (v − z)²</code>. Since 2026-11-12 the positions with at most 22 free squares take z alone as their target (<code>Z_FREE=22</code>): there z is exact, and the teacher errs on 5 to 14 % of them.</p>
+<p>The network of the dev player came in three steps:</p>
+</div>
+<div class="tbl"><table>
+<thead><tr><th>Step</th><th>Training</th><th>Validation error</th><th>Against the previous one (same search)</th></tr></thead>
+<tbody>
+<tr><td>P7, <code>g046_qat_az20</code></td><td>20 epochs from the older 193-input network, learning rate 3·10<sup>−4</sup>, cosine</td><td class="num-r">0.0764</td><td>+66 Elo at 1 s (against the network before it)</td></tr>
+<tr><td>W1, <code>g046_qat_scratch_az20</code></td><td>the same 20 epochs from a random start</td><td class="num-r">0.0735</td><td>+12.3 [+2.4, +22.3] at 1 s, +15.5 at 0.2 s</td></tr>
+<tr><td>F1, <code>g046_qat_ib4f_ref2u_az20</code></td><td>the first layer split into 4 sets by phase (a shared set + a correction each), 10 epochs with the rest frozen (10<sup>−4</sup>), then 20 epochs with everything learning (3·10<sup>−5</sup>)</td><td class="num-r">0.0696</td><td>+32.6 [+23.1, +42.1] at 1 s, +37.8 at 0.2 s (2000 games; the control trained as long without the sets: +4.3)</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The last network is the dev player's since 2026-11-14 (<code>config/search_study/dev_final.cfg</code>). In the ranking tournament of the application's AIs (21,852 games at 1 s per move, 4 threads), the dev player is level with the two MCTS players on the GPU: AlphaZero +1087, MCTS ResNet +1060, dev +1045, within their intervals.</p>
+</div>
+</section>
+
 <section id="s1">
-<h2><span class="num">1</span>The loop at a glance</h2>
+<h2><span class="num">1</span>The loop at a glance (round 0)</h2>
 <div class="col">
 <p>Two players share one game. The <strong>dev player</strong> is a minimax search with a small NNUE network at the leaves; it searches to depth 20 in half a second. The <strong>MCTS player</strong> is guided by a large value/policy ResNet; it sees few positions but judges each one better. Until now each player was trained on its own: the NNUE by distillation of a fixed ResNet, the ResNet by AlphaZero self-play, which gained about 17 Elo over weeks of GPU time.</p>
 <p>The distillation loop connects them. A deep search is a much better label than the result of a self-play game: it is precise for the position itself, it is available for every position the search looked at, and the dev player produces it cheaply on CPUs. Each round, the dev player's games label tens of millions of positions; the ResNet learns from these labels; the ResNet, now better, re-labels the positions as the NNUE's teacher; the NNUE learns, and the dev player plays the next round with it. Both players are measured after each round, against the previous round and against round 0.</p>
@@ -737,7 +770,7 @@ se = math.sqrt(var / n)
 </tbody></table></div>
 </section>
 <footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
-Repository state: commit 96c1670. Measurements of the targets on 192 games generated on an i7-12700K; generation speeds from round 0 on the cluster.
+Repository state: commit 96c1670 for the loop (sections 1 to 8); section 0: 0e1a371 and after. Measurements of the targets on 192 games generated on an i7-12700K; generation speeds from round 0 on the cluster.
 </footer>
 </main>
 </div>
