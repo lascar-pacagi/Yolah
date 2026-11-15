@@ -4005,7 +4005,7 @@ struct Settings {
     }
     void from_json(const json& j) {
         if (!j.is_object()) return;
-        theme = j.value("theme", theme);
+        // the theme is not restored: the application always opens on the default one (espace)
         show_eval = j.value("show eval", show_eval);
         show_hint = j.value("show hint", show_hint);
         show_coords = j.value("show coordinates", show_coords);
