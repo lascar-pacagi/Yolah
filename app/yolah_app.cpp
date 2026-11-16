@@ -2722,7 +2722,7 @@ struct Shatter : Effect {
             }
             for (int i = 0; i < 5 + int(6 * P); i++)
                 add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, 0}, V2{(U(rng) - 0.5f) * sq * 0.5f, -sq * (0.3f + 0.4f * U(rng))},
-                    1.2f + 0.6f * U(rng), sq * (0.25f + 0.2f * U(rng)), hex(0x3a3030, 190), 2);
+                    0.7f + 0.4f * U(rng), sq * (0.25f + 0.2f * U(rng)), hex(0x3a3030, 190), 2);
         } else if (style == "atoms") {
             // the square disintegrates: glowing cubes drift up and fade; the strong add electric arcs
             for (int i = 0; i < 16 + int(30 * P); i++) {
@@ -3031,16 +3031,19 @@ struct Shatter : Effect {
         if (style == "lava") {   // a hot flash, glowing cracks running out then cooling
             float fl = std::exp(-t * 5);
             circle(c, sq * (0.55f + 0.5f * P), hex(0xffd080, uint8_t(240 * fl)), hex(0xff6a1a, 0), 0);
-            float grow = std::min(1.0f, t / 0.15f), cool = std::clamp(1 - (t - 0.3f) / 0.5f, 0.0f, 1.0f);
-            for (auto& cr : cracks) {
-                std::vector<V2> pts;
-                int m = 1 + int(grow * (cr.size() - 1));
-                for (int i = 0; i <= m && i < int(cr.size()); i++) pts.push_back(c + cr[i] * sq);
-                if (pts.size() > 1) {
-                    polyline(pts, sq * 0.06f, hex(0x1a1010, uint8_t(200 * cool)));
-                    polyline(pts, sq * 0.028f, mix(hex(0xff4a1a), hex(0xffd080), cool));
+            // the cracks cool from yellow to red then fade out (the glowing line used to stay on, red, as long as the smoke)
+            float grow = std::min(1.0f, t / 0.15f), cool = std::clamp(1 - (t - 0.2f) / 0.3f, 0.0f, 1.0f);
+            float fade = std::clamp(1 - (t - 0.35f) / 0.25f, 0.0f, 1.0f);
+            if (fade > 0)
+                for (auto& cr : cracks) {
+                    std::vector<V2> pts;
+                    int m = 1 + int(grow * (cr.size() - 1));
+                    for (int i = 0; i <= m && i < int(cr.size()); i++) pts.push_back(c + cr[i] * sq);
+                    if (pts.size() > 1) {
+                        polyline(pts, sq * 0.06f, hex(0x1a1010, uint8_t(200 * fade)));
+                        polyline(pts, sq * 0.028f, with_alpha(mix(hex(0xff4a1a), hex(0xffd080), cool), fade));
+                    }
                 }
-            }
         }
         if (style == "atoms") {   // a blue flash, a ring, electric arcs for the strong
             float fl = std::exp(-t * 6);
