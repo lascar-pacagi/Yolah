@@ -1,5 +1,5 @@
 {
-  "name": "Khalid ibn al-Walid",
+  "name": "Takeda Shingen",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,7 +35,7 @@
       "frames": 16
     }
   ],
-  "plate": "Khalid",
+  "plate": "Takeda Shingen",
   "white": "fig_gen_nnue193_blanc",
   "stars": 3
 }

@@ -1,5 +1,5 @@
 {
-  "name": "Ulysses Grant (blanc)",
+  "name": "Hannibal (blanc)",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,7 +35,7 @@
       "frames": 16
     }
   ],
-  "plate": "Grant",
-  "stars": 2,
-  "variant of": "fig_gen_mcts"
+  "plate": "Hannibal",
+  "variant of": "fig_gen_mcts",
+  "stars": 2
 }

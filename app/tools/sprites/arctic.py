@@ -6,14 +6,14 @@ the heads) with fur as a displacement of the surface:
   random        Phoque gris         hauled out on the ice, arched, mottled
   beginner      Manchot empereur    upright, the golden ear patches
   monte_carlo   Renard polaire      the winter coat, a huge tail
-  mcts          Harfang des neiges  on a block of ice, yellow eyes, the head turning
-  basic_minmax  Morse               a bull, wrinkled skin, tusks, bristles
+  basic_minmax  Harfang des neiges  on a block of ice, yellow eyes, the head turning
+  mcts          Morse               a bull, wrinkled skin, tusks, bristles
   minmax        Renne               the great antlers, the pale mane, broad hooves
-  mcts_nnue     Narval              surfacing, dappled grey, the spiral tusk
-  nnue193       Loup arctique       tall and lean, a ruff
-  features      Bœuf musqué         the skirt of long hair, the horns' boss
-  resnet        Ours blanc          long neck, small head carried low, huge paws
-  dev           Orque               breaching through a hole in the ice
+  features      Narval              surfacing, dappled grey, the spiral tusk
+  mcts_nnue     Loup arctique       tall and lean, a ruff
+  nnue193       Bœuf musqué         the skirt of long hair, the horns' boss
+  dev           Ours blanc          long neck, small head carried low, huge paws
+  resnet        Orque               breaching through a hole in the ice
   alphazero     Mammouth laineux    the domed head, the hump, spiralling tusks
 
 The quadruped of the first version (quadruped) stays for the Manga set.
@@ -894,12 +894,12 @@ def narwhal(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.45, "mcts": 1.4, "basic_minmax": 1.35, "minmax": 1.4, "mcts_nnue": 1.45, "nnue193": 1.4,
-         "features": 1.4, "resnet": 1.45, "dev": 1.5, "alphazero": 1.45}
+SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.45, "basic_minmax": 1.4, "mcts": 1.35, "minmax": 1.4, "features": 1.45, "mcts_nnue": 1.4,
+         "nnue193": 1.4, "dev": 1.45, "resnet": 1.5, "alphazero": 1.45}
 CAST = {"random": ("Phoque gris", seal), "beginner": ("Manchot empereur", penguin), "monte_carlo": ("Renard polaire", arctic_fox),
-        "mcts": ("Harfang des neiges", snowy_owl), "basic_minmax": ("Morse", walrus), "minmax": ("Renne", reindeer), "mcts_nnue": ("Narval", narwhal),
-        "nnue193": ("Loup arctique", arctic_wolf),
-        "features": ("Bœuf musqué", muskox), "resnet": ("Ours blanc", polar_bear), "dev": ("Orque", orca),
+        "basic_minmax": ("Harfang des neiges", snowy_owl), "mcts": ("Morse", walrus), "minmax": ("Renne", reindeer), "features": ("Narval", narwhal),
+        "mcts_nnue": ("Loup arctique", arctic_wolf),
+        "nnue193": ("Bœuf musqué", muskox), "dev": ("Ours blanc", polar_bear), "resnet": ("Orque", orca),
         "alphazero": ("Mammouth laineux", mammoth)}
 ARCTIC = {"ice_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"ice_" + k: n for k, (n, _) in CAST.items()}

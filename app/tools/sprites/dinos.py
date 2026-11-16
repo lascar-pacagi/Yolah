@@ -5,12 +5,12 @@ the most ferocious, bigger and bigger:
   random        Brachiosaure      a gentle long neck, grazing high
   beginner      Parasaurolophus   a duck bill and a long tube crest, calling
   monte_carlo   Stégosaure        plates along the back, spikes on the tail
-  mcts          Ankylosaure       a tank of armour, a club at the end of the tail
-  basic_minmax  Tricératops       a frill and three horns, charging
-  nnue193       Dilophosaure      the first hunter: slender, two thin crests
-  features      Quetzalcoatlus    the giant flying reptile, wings raised in threat
-  resnet        Allosaure         a big hunter, horns above the eyes, stripes
-  dev           Spinosaure        a sail on the back, a long crocodile snout
+  basic_minmax  Ankylosaure       a tank of armour, a club at the end of the tail
+  mcts          Tricératops       a frill and three horns, charging
+  mcts_nnue     Dilophosaure      the first hunter: slender, two thin crests
+  nnue193       Quetzalcoatlus    the giant flying reptile, wings raised in threat
+  dev           Allosaure         a big hunter, horns above the eyes, stripes
+  resnet        Spinosaure        a sail on the back, a long crocodile snout
   alphazero     Tyrannosaure      the king: a huge head, roaring
 
 Shapes after the fossils (no film's look: no frill on the dilophosaur). Countershaded skins (dark back, light belly). Modelled at
@@ -530,13 +530,13 @@ def coelophysis(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.0, "beginner": 1.0, "monte_carlo": 1.0, "mcts": 1.05, "basic_minmax": 1.08, "minmax": 1.1, "mcts_nnue": 1.12, "nnue193": 1.05,
-         "features": 1.08, "resnet": 1.12, "dev": 1.12, "alphazero": 1.15}
+SCALE = {"random": 1.0, "beginner": 1.0, "monte_carlo": 1.0, "basic_minmax": 1.05, "mcts": 1.08, "minmax": 1.1, "features": 1.12, "mcts_nnue": 1.05,
+         "nnue193": 1.08, "dev": 1.12, "resnet": 1.12, "alphazero": 1.15}
 CAST = {"random": ("Brachiosaure", brachiosaurus), "beginner": ("Parasaurolophus", parasaurolophus),
-        "monte_carlo": ("Stégosaure", stegosaurus), "mcts": ("Ankylosaure", ankylosaurus),
-        "basic_minmax": ("Tricératops", triceratops), "minmax": ("Pachycéphalosaure", pachycephalosaurus), "mcts_nnue": ("Cœlophysis", coelophysis),
-        "nnue193": ("Dilophosaure", dilophosaurus),
-        "features": ("Quetzalcoatlus", quetzalcoatlus), "resnet": ("Allosaure", allosaurus), "dev": ("Spinosaure", spinosaurus),
+        "monte_carlo": ("Stégosaure", stegosaurus), "basic_minmax": ("Ankylosaure", ankylosaurus),
+        "mcts": ("Tricératops", triceratops), "minmax": ("Pachycéphalosaure", pachycephalosaurus), "features": ("Cœlophysis", coelophysis),
+        "mcts_nnue": ("Dilophosaure", dilophosaurus),
+        "nnue193": ("Quetzalcoatlus", quetzalcoatlus), "dev": ("Allosaure", allosaurus), "resnet": ("Spinosaure", spinosaurus),
         "alphazero": ("Tyrannosaure", tyrannosaurus)}
 DINOS = {"dino_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"dino_" + k: n for k, (n, _) in CAST.items()}

@@ -1,5 +1,5 @@
 {
-  "name": "Morse (blanc)",
+  "name": "Harfang des neiges (blanc)",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -12,9 +12,9 @@
   "animations": [
     {
       "name": "idle",
-      "fps": 10,
+      "fps": 8,
       "loop": true,
-      "frames": 16
+      "frames": 32
     },
     {
       "name": "move",

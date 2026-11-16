@@ -5,12 +5,12 @@ proportions (heroic.adult), from a goblin thief to an ancient dragon:
   random        Gobelin chapardeur      a hunched goblin, a rusty knife, a stolen sack
   beginner      Orque éclaireur         a lean orc, a fur mantle, a spear
   monte_carlo   Rôdeuse elfe            a hooded elf ranger drawing her longbow
-  mcts          Guerrier orque          black iron, a horned helm, cleaver and shield
-  basic_minmax  Troll des collines      a hunched hill troll dragging a tree-trunk club
+  basic_minmax  Guerrier orque          black iron, a horned helm, cleaver and shield
+  mcts          Troll des collines      a hunched hill troll dragging a tree-trunk club
   minmax        Guerrier nain           short and broad, a braided red beard, an iron helm, a two-headed axe
-  mcts_nnue     Chaman orque            hides and a wolf pelt, war paint, a skull staff with green fire
-  nnue193       Chevalier elfe          silver plate, a blue cloak, a winged helm, a long sword
-  features      Seigneur de guerre orque  spiked black armour, a red cloak, a great axe
+  features      Chaman orque            hides and a wolf pelt, war paint, a skull staff with green fire
+  mcts_nnue     Chevalier elfe          silver plate, a blue cloak, a winged helm, a long sword
+  nnue193       Seigneur de guerre orque  spiked black armour, a red cloak, a great axe
   dev           Troll de guerre         a giant troll in bolted plates, a rune maul
   resnet        Archimage elfe          white and gold robes, levitating, a staff of light, runes
   alphazero     Dragon ancien           wings spread, horns, fire in the throat
@@ -648,13 +648,13 @@ def dragon(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.25, "mcts": 1.3, "basic_minmax": 1.25, "minmax": 1.3, "mcts_nnue": 1.3, "nnue193": 1.3,
-         "features": 1.3, "resnet": 1.25, "dev": 1.25, "alphazero": 1.15}
+SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.25, "basic_minmax": 1.3, "mcts": 1.25, "minmax": 1.3, "features": 1.3, "mcts_nnue": 1.3,
+         "nnue193": 1.3, "resnet": 1.25, "dev": 1.25, "alphazero": 1.15}
 CAST = {"random": ("Gobelin chapardeur", goblin), "beginner": ("Orque éclaireur", orc_scout),
-        "monte_carlo": ("Rôdeuse elfe", elf_ranger), "mcts": ("Guerrier orque", orc_warrior),
-        "basic_minmax": ("Troll des collines", hill_troll), "minmax": ("Guerrier nain", dwarf_warrior), "mcts_nnue": ("Chaman orque", orc_shaman),
-        "nnue193": ("Chevalier elfe", elf_knight),
-        "features": ("Seigneur de guerre orque", orc_warlord), "dev": ("Troll de guerre", war_troll),
+        "monte_carlo": ("Rôdeuse elfe", elf_ranger), "basic_minmax": ("Guerrier orque", orc_warrior),
+        "mcts": ("Troll des collines", hill_troll), "minmax": ("Guerrier nain", dwarf_warrior), "features": ("Chaman orque", orc_shaman),
+        "mcts_nnue": ("Chevalier elfe", elf_knight),
+        "nnue193": ("Seigneur de guerre orque", orc_warlord), "dev": ("Troll de guerre", war_troll),
         "resnet": ("Archimage elfe", archmage), "alphazero": ("Dragon ancien", dragon)}
 EPIC = {"leg_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"leg_" + k: n for k, (n, _) in CAST.items()}

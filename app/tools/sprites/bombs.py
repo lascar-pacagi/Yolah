@@ -5,14 +5,14 @@ powerful, bigger and bigger (cartoon objects, no real device):
   random        Pétard               a small red firecracker, its fuse fizzing
   beginner      Fusée d'artifice     a striped rocket on its stick
   monte_carlo   Bâton de dynamite    one red stick, a paper band, a lit fuse
-  mcts          Paquet de dynamite   three sticks tied with rope
-  basic_minmax  Grenade              olive, grooved, its lever and ring
+  basic_minmax  Paquet de dynamite   three sticks tied with rope
+  mcts          Grenade              olive, grooved, its lever and ring
   minmax        Obus                 brass case, copper band, olive ogive, fuze
-  mcts_nnue     Pain de plastic      putty bricks, tape, a blinking detonator
-  nnue193       Bombe à mèche        the round black cartoon bomb, a curly fuse
-  features      Mine marine          a rusty sphere with its horns
-  resnet        Bombe d'avion        a finned bomb lying on its wooden cradle
-  dev           Missile              white and red, on its launch pad
+  features      Pain de plastic      putty bricks, tape, a blinking detonator
+  mcts_nnue     Bombe à mèche        the round black cartoon bomb, a curly fuse
+  nnue193       Mine marine          a rusty sphere with its horns
+  dev           Bombe d'avion        a finned bomb lying on its wooden cradle
+  resnet        Missile              white and red, on its launch pad
   alphazero     Bombe nucléaire      a huge fat bomb, the radiation sign, a green glow
 
 The app blows up the square left with an explosion of the same strength
@@ -324,12 +324,12 @@ def c4(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.8, "beginner": 1.45, "monte_carlo": 1.32, "mcts": 1.28, "basic_minmax": 1.25, "minmax": 1.24, "mcts_nnue": 1.6, "nnue193": 1.22,
-         "features": 1.18, "resnet": 1.1, "dev": 1.1, "alphazero": 1.1}     # the weak ones a little bigger: they start small on the board
+SCALE = {"random": 1.8, "beginner": 1.45, "monte_carlo": 1.32, "basic_minmax": 1.28, "mcts": 1.25, "minmax": 1.24, "features": 1.6, "mcts_nnue": 1.22,
+         "nnue193": 1.18, "dev": 1.1, "resnet": 1.1, "alphazero": 1.1}     # the weak ones a little bigger: they start small on the board
 CAST = {"random": ("Pétard", firecracker), "beginner": ("Fusée d'artifice", rocket), "monte_carlo": ("Bâton de dynamite", dynamite),
-        "mcts": ("Paquet de dynamite", bundle), "basic_minmax": ("Grenade", grenade), "minmax": ("Obus", shell), "mcts_nnue": ("Pain de plastic", c4),
-        "nnue193": ("Bombe à mèche", round_bomb),
-        "features": ("Mine marine", sea_mine), "resnet": ("Bombe d'avion", aerial_bomb), "dev": ("Missile", missile),
+        "basic_minmax": ("Paquet de dynamite", bundle), "mcts": ("Grenade", grenade), "minmax": ("Obus", shell), "features": ("Pain de plastic", c4),
+        "mcts_nnue": ("Bombe à mèche", round_bomb),
+        "nnue193": ("Mine marine", sea_mine), "dev": ("Bombe d'avion", aerial_bomb), "resnet": ("Missile", missile),
         "alphazero": ("Bombe nucléaire", nuke)}
 BOMBS = {"bomb_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"bomb_" + k: n for k, (n, _) in CAST.items()}

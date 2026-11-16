@@ -1,5 +1,5 @@
 {
-  "name": "Takeda Shingen (blanc)",
+  "name": "Vercingétorix (blanc)",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,7 +35,7 @@
       "frames": 16
     }
   ],
-  "plate": "Takeda Shingen",
-  "variant of": "fig_gen_features",
-  "stars": 3
+  "plate": "Vercingétorix",
+  "stars": 3,
+  "variant of": "fig_gen_features"
 }

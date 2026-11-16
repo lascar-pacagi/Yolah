@@ -6,14 +6,14 @@ folder):
   random        Bateau      the paper boat everyone has folded
   beginner      Grenouille  a jumping frog
   monte_carlo   Lapin       a rabbit, long ears
-  mcts          Renard      the classic fox face on a body
-  basic_minmax  Papillon    a butterfly, wings beating
+  basic_minmax  Renard      the classic fox face on a body
+  mcts          Papillon    a butterfly, wings beating
   minmax        Cygne       the swan, wings raised, the neck in an S
-  mcts_nnue     Éléphant    pillar legs, fan-folded ears, the trunk in folds
-  nnue193       Grue        the crane, orizuru
-  features      Cerf        a stag, branching antlers
-  resnet        Paon        a peacock, its tail spread in a fan
-  dev           Lion        a lion, a mane of folded rays
+  features      Éléphant    pillar legs, fan-folded ears, the trunk in folds
+  mcts_nnue     Grue        the crane, orizuru
+  nnue193       Cerf        a stag, branching antlers
+  dev           Paon        a peacock, its tail spread in a fan
+  resnet        Lion        a lion, a mane of folded rays
   alphazero     Dragon      a dragon of red and gold paper, wings spread
 
 Every piece is a convex polyhedron (sd_hull: the intersection of its face
@@ -391,10 +391,10 @@ def elephant(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.5, "beginner": 1.58, "monte_carlo": 1.65, "mcts": 1.72, "basic_minmax": 1.78, "minmax": 1.8, "mcts_nnue": 1.82, "nnue193": 1.82,
-         "features": 1.88, "resnet": 1.8, "dev": 1.85, "alphazero": 1.85}   # the folds bigger and bigger (the peacock and the dragon touch the frame above that)
+SCALE = {"random": 1.5, "beginner": 1.58, "monte_carlo": 1.65, "basic_minmax": 1.72, "mcts": 1.78, "minmax": 1.8, "features": 1.82, "mcts_nnue": 1.82,
+         "nnue193": 1.88, "dev": 1.8, "resnet": 1.85, "alphazero": 1.85}   # the folds bigger and bigger (the peacock and the dragon touch the frame above that)
 CAST = {"random": ("Bateau en papier", boat), "beginner": ("Grenouille", frog), "monte_carlo": ("Lapin", rabbit),
-        "mcts": ("Renard", fox), "basic_minmax": ("Papillon", butterfly), "minmax": ("Cygne", swan), "mcts_nnue": ("\u00c9l\u00e9phant", elephant), "nnue193": ("Grue", crane),
-        "features": ("Cerf", stag), "resnet": ("Paon", peacock), "dev": ("Lion", lion), "alphazero": ("Dragon de papier", dragon)}
+        "basic_minmax": ("Renard", fox), "mcts": ("Papillon", butterfly), "minmax": ("Cygne", swan), "features": ("\u00c9l\u00e9phant", elephant), "mcts_nnue": ("Grue", crane),
+        "nnue193": ("Cerf", stag), "dev": ("Paon", peacock), "resnet": ("Lion", lion), "alphazero": ("Dragon de papier", dragon)}
 ORIGAMI = {"ori_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"ori_" + k: n for k, (n, _) in CAST.items()}

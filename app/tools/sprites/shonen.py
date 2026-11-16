@@ -6,14 +6,14 @@ in the toon mode. From a lone wolf to a dragon god, bigger and more powerful:
   random        Ōkami       a lean grey wolf, scarred, a sacred rope round its neck
   beginner      Shinobi     a ninja crouched to spring, a long red scarf, a kunai
   monte_carlo   Kitsune     a white fox spirit, red markings, three tails of blue foxfire
-  mcts          Samouraï    red lacquered armour laced in black, a golden crescent, katana on guard
-  basic_minmax  Oni         a huge red ogre, ivory horns, a studded iron club, a tiger skin
+  basic_minmax  Samouraï    red lacquered armour laced in black, a golden crescent, katana on guard
+  mcts          Oni         a huge red ogre, ivory horns, a studded iron club, a tiger skin
   minmax        Tengu       red face, the long nose, crow wings, the feather fan, the ascetic's robe
-  mcts_nnue     Nue         monkey face, tanuki body, tiger legs, a snake tail, a black thunder cloud
-  nnue193       Onmyōji     a sorcerer in white, a lacquered hat, paper talismans, a star seal of light
-  features      Raijū       a great thunder wolf, a mane of lightning, arcs around it
-  resnet        Hōō         the phoenix, wings of red and gold feathers, long eyed plumes, embers
-  dev           Kaigen      a martial artist at full power, golden hair, an energy sphere, shards of rock lifted
+  features      Nue         monkey face, tanuki body, tiger legs, a snake tail, a black thunder cloud
+  mcts_nnue     Onmyōji     a sorcerer in white, a lacquered hat, paper talismans, a star seal of light
+  nnue193       Raijū       a great thunder wolf, a mane of lightning, arcs around it
+  dev           Hōō         the phoenix, wings of red and gold feathers, long eyed plumes, embers
+  resnet        Kaigen      a martial artist at full power, golden hair, an energy sphere, shards of rock lifted
   alphazero     Tenryū      the celestial dragon coiled round a pillar of light, a pearl in its claw
 
 Power shows as flames of aura, lightning and rocks torn from the ground, more
@@ -660,11 +660,11 @@ def tenryu(anim, t, side):
     return sc
 
 
-SCALE = {"random": 1.2, "beginner": 1.2, "monte_carlo": 1.2, "mcts": 1.15, "basic_minmax": 1.05, "minmax": 1.15, "mcts_nnue": 1.1, "nnue193": 1.15,
-         "features": 1.05, "resnet": 1.1, "dev": 1.15, "alphazero": 1.0}
+SCALE = {"random": 1.2, "beginner": 1.2, "monte_carlo": 1.2, "basic_minmax": 1.15, "mcts": 1.05, "minmax": 1.15, "features": 1.1, "mcts_nnue": 1.15,
+         "nnue193": 1.05, "dev": 1.1, "resnet": 1.15, "alphazero": 1.0}
 CAST = {"random": ("Ōkami", okami), "beginner": ("Shinobi", shinobi), "monte_carlo": ("Kitsune", kitsune),
-        "mcts": ("Samouraï", samurai), "basic_minmax": ("Oni", oni), "minmax": ("Tengu", tengu), "mcts_nnue": ("Nue", nue),
-        "nnue193": ("Onmyōji", onmyoji),
-        "features": ("Raijū", raiju), "resnet": ("Hōō", hoo), "dev": ("Kaigen", kaigen), "alphazero": ("Tenryū", tenryu)}
+        "basic_minmax": ("Samouraï", samurai), "mcts": ("Oni", oni), "minmax": ("Tengu", tengu), "features": ("Nue", nue),
+        "mcts_nnue": ("Onmyōji", onmyoji),
+        "nnue193": ("Raijū", raiju), "dev": ("Hōō", hoo), "resnet": ("Kaigen", kaigen), "alphazero": ("Tenryū", tenryu)}
 SHONEN = {"manga_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"manga_" + k: n for k, (n, _) in CAST.items()}

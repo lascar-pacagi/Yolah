@@ -1,5 +1,5 @@
 {
-  "name": "Vercingétorix",
+  "name": "Khalid ibn al-Walid",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,7 +35,7 @@
       "frames": 16
     }
   ],
-  "plate": "Vercingétorix",
-  "stars": 3,
-  "white": "fig_gen_mcts_nnue_blanc"
+  "plate": "Khalid",
+  "white": "fig_gen_mcts_nnue_blanc",
+  "stars": 3
 }

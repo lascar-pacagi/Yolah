@@ -6,14 +6,14 @@ blue skin, no symbol on the forehead):
   random        Système nerveux    the brain, the spinal cord, the nerves, glowing cyan
   beginner      Circulation        + the heart beating, arteries red, veins blue
   monte_carlo   Squelette          + the bones
-  mcts          Organes            + lungs, liver, stomach, intestines
-  basic_minmax  Écorché            + the muscles
+  basic_minmax  Organes            + lungs, liver, stomach, intestines
+  mcts          Écorché            + the muscles
   minmax        Fascias            the muscles under the deep fascia, a thin glistening sheath
-  mcts_nnue     Hypoderme          the yellow lobules of subcutaneous fat spreading over them
-  nnue193       Peau               the skin spreading in patches over the muscles
-  features      Corps achevé       smooth, eyes closed, like a cast
-  resnet        Éveil              veins of light under the skin, the eyes light up
-  dev           Lévitation         the skin glows, rings of light turn around it, it floats
+  features      Hypoderme          the yellow lobules of subcutaneous fat spreading over them
+  mcts_nnue     Peau               the skin spreading in patches over the muscles
+  nnue193       Corps achevé       smooth, eyes closed, like a cast
+  dev           Éveil              veins of light under the skin, the eyes light up
+  resnet        Lévitation         the skin glows, rings of light turn around it, it floats
   alphazero     Être de lumière    a radiant body of white and gold, a halo, floating high
 
 The layers add up (each stage keeps the ones before, inside); the seven first
@@ -30,7 +30,7 @@ from render import X, F, DEV
 import random
 
 
-def joints(anim, t, lift=0.0, arms_up=None, spread=0.32):
+def joints(anim, t, lift=0.0, arms_up=None, spread=0.32, up_angle=2.5):
     """The joints in the body's frame (y up from the base's top), and the root transform."""
     breathe = 0.004 * math.sin(TAU * t)
     sway = 0.03 * math.sin(TAU * t) if anim == "idle" else 0.0
@@ -40,7 +40,7 @@ def joints(anim, t, lift=0.0, arms_up=None, spread=0.32):
     up = anim == "win" if arms_up is None else arms_up
     for sgn, side in ((-1, "l"), (1, "r")):
         sh = (0.15 * sgn, hy + 0.29, 0)
-        sp = 2.5 if up else spread + (0.15 * math.sin(TAU * t * 2) if anim == "blocked" else 0.0)
+        sp = up_angle if up else spread + (0.15 * math.sin(TAU * t * 2) if anim == "blocked" else 0.0)
         el = (sh[0] + sgn * 0.17 * math.sin(sp), sh[1] - 0.17 * math.cos(sp), 0.01)
         wr = (el[0] + sgn * 0.155 * math.sin(sp * 1.05), el[1] - 0.155 * math.cos(sp * 1.05), 0.03)
         step = 0.2 * math.sin(TAU * t * 2) * sgn if anim == "move" else 0.0
@@ -482,7 +482,9 @@ def stage(level):
         sc = Scene()
         base(sc, side)
         lift = {8: 0.0, 9: 0.08 + 0.02 * math.sin(TAU * t), 10: 0.14 + 0.03 * math.sin(TAU * t)}.get(level, 0.0)
-        J, root = joints(anim, t, lift, **({"arms_up": False, "spread": 0.55} if level == 10 else {}))
+        if level == 10 and anim == "win":   # arms raised in a V like the others, floating lower so the hands stay in the frame
+            lift = 0.06 + 0.02 * math.sin(TAU * t)
+        J, root = joints(anim, t, lift, **({"spread": 0.55, "up_angle": 2.2} if level == 10 else {}))
         if level <= 7:
             scanner(sc, t)
         if level <= 4:
@@ -527,9 +529,9 @@ def stage(level):
 
 SCALE = {k: 1.3 for k in ("random", "beginner", "monte_carlo", "mcts", "basic_minmax", "minmax", "mcts_nnue", "nnue193", "features", "resnet", "dev", "alphazero")}
 CAST = {"random": ("Système nerveux", stage(1)), "beginner": ("Circulation", stage(2)), "monte_carlo": ("Squelette", stage(3)),
-        "mcts": ("Organes", stage(4)), "basic_minmax": ("Écorché", stage(5)), "minmax": ("Fascias", stage(5.3)), "mcts_nnue": ("Hypoderme", stage(5.6)),
-        "nnue193": ("Peau", stage(6)),
-        "features": ("Corps achevé", stage(7)), "resnet": ("Éveil", stage(8)), "dev": ("Lévitation", stage(9)),
+        "basic_minmax": ("Organes", stage(4)), "mcts": ("Écorché", stage(5)), "minmax": ("Fascias", stage(5.3)), "features": ("Hypoderme", stage(5.6)),
+        "mcts_nnue": ("Peau", stage(6)),
+        "nnue193": ("Corps achevé", stage(7)), "dev": ("Éveil", stage(8)), "resnet": ("Lévitation", stage(9)),
         "alphazero": ("Être de lumière", stage(10))}
 ANATOMY = {"lab_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"lab_" + k: n for k, (n, _) in CAST.items()}
