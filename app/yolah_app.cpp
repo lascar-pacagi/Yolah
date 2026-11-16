@@ -6437,12 +6437,18 @@ void draw_eval_bar(App& a, Box bar, const Analyzer::Snapshot& snap) {
     draw::round_frame(bar, bar.w / 2, 1, hex(0xffffff, 40));
     if (snap.valid && snap.token == g.token) {
         bool black_ahead = snap.value >= 0;
-        std::string lbl = eval_text(snap.value);
+        // a won game: "Gain", "+", the margin on three lines (on one they overflow the bar)
+        std::vector<std::string> lines;
+        if (std::abs(snap.value) > EVAL_WIN) lines = {tr("Gain"), "+", std::to_string(std::abs(snap.value) - EVAL_WIN)};
+        else lines = {eval_text(snap.value)};
         bool lead_bottom = (black_ahead == (bottom_side == BLACK));
         float fs = 12 * s;
-        V2 p = lead_bottom ? V2{bar.center().x, bar.bottom() - 22 * s} : V2{bar.center().x, bar.y + 8 * s};
+        for (auto& l : lines)   // shrunk until the widest line fits in the bar
+            fs = std::min(fs, 12 * s * (bar.w - 4 * s) / std::max(1.0f, a.text.width(Font::Black, 12 * s, l)));
+        const float lh = a.text.line_height(Font::Black, fs) * 0.9f, th = lh * lines.size();
+        float y = lead_bottom ? bar.bottom() - 8 * s - th : bar.y + 8 * s;
         Rgba fg = (lead_bottom ? col_bottom : col_top).r > 128 ? hex(0x20242c) : hex(0xf1f3f6);
-        a.text.draw(Font::Black, fs, lbl, p, fg, Align::Center);
+        for (auto& l : lines) { a.text.draw(Font::Black, fs, l, {bar.center().x, y}, fg, Align::Center); y += lh; }
     }
 }
 
