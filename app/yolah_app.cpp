@@ -6176,18 +6176,22 @@ void scene_setup(App& a) {
             float pr = std::min(row_h * 0.36f, 27 * s);
             draw_piece(a.themed_sprite(e.id, side), side, {r.x + 16 * s + pr, r.center().y}, pr, 0.2f * k, a.time, alpha, e.id == "human");
             float tx = r.x + 30 * s + 2 * pr;
-            a.text.draw(Font::Bold, 19 * s, e.name, {tx, r.center().y - 22 * s}, with_alpha(pal::text, alpha));
+            // name over subtitle, centred in the row and shrunk when the rows are tight (they must stay inside the selection frame)
+            const float fz = std::clamp((r.h - 6 * s) / (a.text.line_height(Font::Bold, 19 * s) + a.text.line_height(Font::Regular, 14 * s)), 0.75f, 1.0f);
+            const float name_lh = a.text.line_height(Font::Bold, 19 * s * fz), sub_lh = a.text.line_height(Font::Regular, 14 * s * fz);
+            const float ty = r.center().y - (name_lh + sub_lh) / 2;
+            a.text.draw(Font::Bold, 19 * s * fz, e.name, {tx, ty}, with_alpha(pal::text, alpha));
             std::string sub = e.available ? e.sub : "indisponible \xE2\x80\x94 survolez pour savoir pourquoi";
             const float sub_w = r.right() - 202 * s - tx;   // up to the "?" button
-            if (e.id != "human" && a.text.width(Font::Regular, 14 * s, sub) > sub_w) {   // shortened, with an ellipsis
-                while (!sub.empty() && a.text.width(Font::Regular, 14 * s, sub + "\xE2\x80\xA6") > sub_w) {
+            if (e.id != "human" && a.text.width(Font::Regular, 14 * s * fz, sub) > sub_w) {   // shortened, with an ellipsis
+                while (!sub.empty() && a.text.width(Font::Regular, 14 * s * fz, sub + "\xE2\x80\xA6") > sub_w) {
                     size_t k = sub.size() - 1;
                     while (k > 0 && (uint8_t(sub[k]) & 0xC0) == 0x80) k--;
                     sub.erase(k);
                 }
                 sub += "\xE2\x80\xA6";
             }
-            a.text.draw(Font::Regular, 14 * s, sub, {tx, r.center().y + 2 * s}, with_alpha(e.available ? pal::dim : pal::bad, std::max(alpha, 0.7f)));
+            a.text.draw(Font::Regular, 14 * s * fz, sub, {tx, ty + name_lh}, with_alpha(e.available ? pal::dim : pal::bad, std::max(alpha, 0.7f)));
             bool on_gear = false;
             if (e.id != "human") {   // "Comprendre cette IA" (@@COURSE)
                 Box qb{r.right() - 194 * s, r.center().y - 15 * s, 30 * s, 30 * s};
