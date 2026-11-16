@@ -19,9 +19,10 @@
 #     bash ~/Yolah/nnue/az_score_match.sh status     # sum of the tasks so far
 #     U=0.1 bash ~/Yolah/nnue/az_score_match.sh status
 #
-# status: A's W/D/L, score, Elo with its 95 % interval, and the mean final
-# margin of A's wins and of B's wins (A should win by more if the utility
-# does what it is meant to).
+# status (also while the tasks run: it reads their logs): each task's games so
+# far, A's W/D/L, score, Elo with its 95 % interval, and the mean final margin
+# of A's wins and of B's wins (A should win by more if the utility does what it
+# is meant to). JOB=<array job id> to keep one submission only.
 # ────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -39,25 +40,36 @@ NAME=$(printf "az_%08d" "${STEP}")
 mkdir -p "${WORK_DIR}/logs"
 
 if [[ "${1:-submit}" == "status" ]]; then
-    python3 - "${WORK_DIR}/evals" "${NAME}+${TAG}" "${NAME}" <<'EOF'
-import glob, json, math, sys
-d, a, b = sys.argv[1:4]
-files = sorted(glob.glob(f"{d}/match_{a}_vs_{b}_*.json"))
-if not files:
-    sys.exit(f"no finished task yet ({d}/match_{a}_vs_{b}_*.json)")
+    # Read from the tasks' logs: running tasks count too (every finished game prints a line).
+    # JOB=<array job id> keeps one submission only (default: every submission of this U).
+    python3 - "${WORK_DIR}/logs" "${TAG}" "${JOB:-}" <<'EOF'
+import glob, math, re, sys
+d, tag, job = sys.argv[1:4]
+logs = sorted(glob.glob(f"{d}/az_score_{tag}_{job or '*'}_*.out"))
+if not logs:
+    sys.exit(f"no log yet ({d}/az_score_{tag}_*.out)")
+pat = re.compile(r"^game (\d+)/(\d+): A (black|white) score (\d+)-(\d+) \(\d+ plies\) -> A (win|draw|loss)")
 w = dr = l = 0; win_a = []; win_b = []
-for f in files:
-    r = json.load(open(f))
-    w += r["wins"]; dr += r["draws"]; l += r["losses"]
-    for g in r["records"]:
-        m = abs(g["black_score"] - g["white_score"])
-        if g["result_for_a"] == "win": win_a.append(m)
-        elif g["result_for_a"] == "loss": win_b.append(m)
-n = w + dr + l; s = (w + dr / 2) / n
+print(f"score utility {tag[2:]} (A) vs none (B)")
+for f in logs:
+    done = total = 0
+    for line in open(f, errors="replace"):
+        m = pat.match(line)
+        if not m: continue
+        done, total = int(m.group(1)), int(m.group(2))
+        margin = abs(int(m.group(4)) - int(m.group(5)))
+        res = m.group(6)
+        if res == "win": w += 1; win_a.append(margin)
+        elif res == "loss": l += 1; win_b.append(margin)
+        else: dr += 1
+    print(f"  {f.rsplit('/', 1)[1]}: {done}/{total or '?'} games")
+n = w + dr + l
+if n == 0:
+    sys.exit("no finished game yet")
+s = (w + dr / 2) / n
 se = math.sqrt(max((w + dr / 4) / n - s * s, 0) / n)
 elo = lambda x: 400 * math.log10(min(max(x, 1e-3), 1 - 1e-3) / (1 - min(max(x, 1e-3), 1 - 1e-3)))
-print(f"{a} vs {b}: {len(files)} task(s) finished, {n} games")
-print(f"A {w}W {dr}D {l}L, score {s:.3f} ± {1.96 * se:.3f}  →  Elo {elo(s):+.0f}  [{elo(s - 1.96 * se):+.0f}, {elo(s + 1.96 * se):+.0f}]")
+print(f"{n} games: A {w}W {dr}D {l}L, score {s:.3f} ± {1.96 * se:.3f}  →  Elo {elo(s):+.0f}  [{elo(s - 1.96 * se):+.0f}, {elo(s + 1.96 * se):+.0f}]")
 mean = lambda v: sum(v) / len(v) if v else float("nan")
 print(f"mean margin of A's wins {mean(win_a):.1f} ({len(win_a)} games), of B's wins {mean(win_b):.1f} ({len(win_b)} games)")
 EOF
