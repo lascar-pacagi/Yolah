@@ -6716,7 +6716,7 @@ void scene_game(App& a) {
         g.analyzer.analyse(g.match.pos, g.token, 20.0);
         g.analysed = g.token;
     }
-    if (!need && g.analysed == g.token) { g.analyzer.stop(); g.analysed = 0; }
+    if ((!need && g.analysed == g.token) || (g.match.over() && g.analysed)) { g.analyzer.stop(); g.analysed = 0; }   // also at the end: the last position's search would run on
     Analyzer::Snapshot snap = g.analyzer.snapshot();
     bool fresh = snap.valid && snap.token == g.token;
 
