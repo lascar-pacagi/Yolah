@@ -914,10 +914,10 @@ void fan(V2 c, Rgba cc, const std::vector<V2>& ring, const std::vector<Rgba>& co
     SDL_RenderGeometry(R, nullptr, v.data(), int(v.size()), idx.data(), int(idx.size()));
 }
 
-std::vector<V2> round_box_outline(Box b, float r) {
+std::vector<V2> round_box_outline(Box b, float r, int seg = 0) {   // seg 0: from the radius
     r = std::max(0.0f, std::min(r, std::min(b.w, b.h) * 0.5f));
     std::vector<V2> pts;
-    const int seg = std::clamp(int(r * 0.6f), 2, 18);
+    if (seg <= 0) seg = std::clamp(int(r * 0.6f), 2, 18);
     const V2 corners[4] = {{b.x + b.w - r, b.y + r}, {b.x + b.w - r, b.y + b.h - r}, {b.x + r, b.y + b.h - r}, {b.x + r, b.y + r}};
     for (int c = 0; c < 4; c++) {
         float a0 = -float(M_PI) / 2 + c * float(M_PI) / 2;
@@ -950,8 +950,12 @@ void shadow(Box b, float r, float blur, Rgba c) {
 
 // A rounded outline (frame) of thickness t, drawn as a ring of quads.
 void round_frame(Box b, float r, float t, Rgba c) {
-    auto outer = round_box_outline(b, r);
-    auto inner = round_box_outline(b.inset(t), std::max(0.0f, r - t));
+    // Both outlines with the same number of points (a smaller inner radius gave
+    // fewer, and the frame was silently not drawn).
+    const float ro = std::max(0.0f, std::min(r, std::min(b.w, b.h) * 0.5f));
+    const int seg = std::clamp(int(ro * 0.6f), 2, 18);
+    auto outer = round_box_outline(b, r, seg);
+    auto inner = round_box_outline(b.inset(t), std::max(0.0f, r - t), seg);
     if (outer.size() != inner.size()) return;
     const int n = int(outer.size());
     std::vector<SDL_Vertex> v;
@@ -7036,7 +7040,7 @@ const std::vector<Lesson>& lessons() {
         l = {};
         l.title = "Comme une dame";
         l.text = "Un pion se d\xC3\xA9place en ligne droite ou en diagonale, comme la dame aux \xC3\xA9" "checs, d'autant de cases libres qu'il veut. Clique sur un pion : des points montrent o\xC3\xB9 il peut aller.";
-        l.task = "Am\xC3\xA8ne ton pion de d4 sur la case dor\xC3\xA9" "e.";
+        l.task = "Am\xC3\xA8ne ton pion de d4 sur la case bleue.";
         l.success = "Parfait ! Toute une diagonale en un seul coup.";
         l.board = {"W......W", "......*.", "........", "........", "...B....", "........", "........", "BBB...WW"};
         l.goal = G::Reach;
@@ -7045,7 +7049,7 @@ const std::vector<Lesson>& lessons() {
         l = {};
         l.title = "Pas de saut !";
         l.text = "Un pion ne saute jamais : ni par-dessus un autre pion, ni par-dessus un trou (les cases creus\xC3\xA9" "es). Les trous coupent les lignes.";
-        l.task = "Un seul de tes pions peut atteindre la case dor\xC3\xA9" "e. Trouve-le !";
+        l.task = "Un seul de tes pions peut atteindre la case bleue. Trouve-le !";
         l.success = "Bien vu : les trous barraient la route aux trois autres.";
         l.board = {"W..W...W", "........", "........", "B.#.*...", "....#...", "..#.....", ".......B", "B...B.W."};
         l.goal = G::Reach;
@@ -7230,7 +7234,7 @@ void tutorial_human_move(App& a, Move m) {
     switch (l.goal) {
     case Lesson::Goal::Reach:
         if (goal_reached(l, t.match.pos, m, t.targets, t.victim)) tutorial_result(a, true, l.success);
-        else tutorial_result(a, false, strf("Ce coup arrive en %s, pas sur la case dor\xC3\xA9" "e. On recommence !", sq_name(m.to_sq()).c_str()));
+        else tutorial_result(a, false, strf("Ce coup arrive en %s, pas sur la case bleue. On recommence !", sq_name(m.to_sq()).c_str()));
         break;
     case Lesson::Goal::Immobilize:
         if (goal_reached(l, t.match.pos, m, t.targets, t.victim)) tutorial_result(a, true, l.success);
@@ -7352,20 +7356,21 @@ void scene_tutorial(App& a) {
     look.coords = true;
     if (t.hint && human_turn && t.hint_move != Move::none()) { look.hint = t.hint_move; look.hint_label = "indice"; }
     t.board.draw(a.text, a.board_textures, a.theme(), pos, look, a.time, s);
-    // Targets (golden squares) and the piece to shut in (red ring).
+    // Target squares: bright azure, with a white frame inside a dark navy rim.
+    // Blue keeps apart from the wood, stone and grass colours for every kind of
+    // colour blindness (red/green ones confuse gold with tan and brown), and the
+    // white/navy frame gives a contrast of lightness on the blue boards too.
     float pulse = 0.75f + 0.25f * float(std::sin(a.time * 4));
     for (int sq : t.targets) {
         if (!pos.free_squares() || !((pos.free_squares() >> sq) & 1)) continue;
-        // Visible on light and dark squares of every theme: a dark rim around a
-        // saturated gold fill and a bright frame, with a halo that breathes.
-        const float q = t.board.sq();
+        const float q = t.board.sq(), rim = std::max(1.5f, q * 0.03f);
         Box b = t.board.square(sq).inset(q * 0.05f);
         const float r = b.w * 0.18f, wf = std::max(2.0f, q * 0.07f);
         for (int i = 3; i >= 1; i--)   // halo, spilling over the neighbours
-            draw::round_frame(b.inset(-q * 0.05f * i * pulse), r + q * 0.05f * i, q * 0.05f, hex(0xffc23a, uint8_t(60 * pulse / i)));
-        draw::round_box(b, r, hex(0xf2a900, uint8_t(150 + 60 * pulse)));
-        draw::round_frame(b, r, wf + std::max(1.5f, q * 0.025f), hex(0x3a2400, 220));   // dark rim
-        draw::round_frame(b.inset(std::max(1.5f, q * 0.025f)), r, wf, hex(0xffe58a, uint8_t(200 + 55 * pulse)));
+            draw::round_frame(b.inset(-q * 0.05f * i * pulse), r + q * 0.05f * i, q * 0.05f, hex(0x5ab8ff, uint8_t(70 * pulse / i)));
+        draw::round_box(b, r, hex(0x1e88f0, uint8_t(190 + 50 * pulse)));
+        draw::round_frame(b, r, wf + rim, hex(0x081a33, 235));   // dark rim
+        draw::round_frame(b.inset(rim), r, wf, hex(0xffffff, uint8_t(210 + 45 * pulse)));
     }
     if (finding) {
         for (int sq : t.found) draw::ring(t.board.center(sq), t.board.sq() * 0.48f, t.board.sq() * 0.06f, pal::good);
