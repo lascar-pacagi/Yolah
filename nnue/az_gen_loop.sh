@@ -6,7 +6,7 @@
 #
 #     bash ~/Yolah/nnue/az_gen_loop.sh 1              # on the login node: submits generation 1
 #     bash ~/Yolah/nnue/az_gen_loop.sh 3 train        # generation 3 again from its training (then eval, next)
-#     bash ~/Yolah/nnue/az_gen_loop.sh 3 eval         # only its matches
+#     bash ~/Yolah/nnue/az_gen_loop.sh 3 eval         # only its matches (EVAL_AFTER=JOBID: once that job is done)
 #     bash ~/Yolah/nnue/az_gen_loop.sh status         # the progress so far
 #
 # Generation G (ROOT/gen_<G>, the network ROOT/models/az_<G>):
@@ -27,9 +27,13 @@
 #              leave it) → az_<G> (nnue/az_gen_train.py; resumes from its
 #              checkpoint). The policy is learnt on the rows of the full
 #              searches only, the value on every row (z).
-#   eval       GPU array: az_<G> against az_<G-1> (task 0) and az_0 (task 1),
-#              EVAL_GAMES games at EVAL_SECONDS s per move, the balanced book
-#              (alphazero_match.sh) → ROOT/matches.csv
+#   eval       GPU array of EVAL_TASKS tasks: az_<G> against az_0, EVAL_GAMES
+#              games in all (EVAL_GAMES / EVAL_TASKS per task: the games of a
+#              match are played one after the other), EVAL_SECONDS s per move,
+#              the balanced book shuffled by each task's seed
+#              (alphazero_match.sh) → ROOT/matches.csv, one line per task;
+#              status sums them per pair (with ~85 % draws, 400 games could
+#              not tell two neighbouring generations apart)
 #   next       (after train, with eval running) submits generation G + 1, until MAX_GEN
 #
 # Generation 0 is START_PT / START_TS (ResNet_1 of the distillation loop),
@@ -62,7 +66,8 @@ SIMS="${SIMS:-1600}"                            # simulations of a full search
 SIMS_FAST="${SIMS_FAST:-200}"                   # of a fast search
 EXACT_FREE="${EXACT_FREE:-22}"
 EXACT_MS="${EXACT_MS:-300}"
-EVAL_GAMES="${EVAL_GAMES:-400}"
+EVAL_GAMES="${EVAL_GAMES:-2000}"                # in all, against az_0
+EVAL_TASKS="${EVAL_TASKS:-5}"                   # GPUs sharing them
 EVAL_SECONDS="${EVAL_SECONDS:-1}"
 MAX_GEN="${MAX_GEN:-20}"
 AUTO="${AUTO:-1}"                               # 0: no next stage
@@ -100,8 +105,31 @@ if os.path.exists(p):
 p = os.path.join(root, "matches.csv")
 if os.path.exists(p):
     print("\nmatches")
-    for line in open(p):
-        print("  " + line.rstrip())
+    rows = [line.rstrip() for line in open(p) if line.strip()]
+    for line in rows:
+        print("  " + line)
+    # the tasks of a pair summed: score, Elo and its 95 % interval over all their games
+    tot = {}
+    for line in rows[1:]:
+        f = line.split(",")
+        if len(f) < 8:
+            continue
+        k = (f[1], f[2], f[4])
+        w, d, l = (int(x) for x in f[5:8])
+        t = tot.setdefault(k, [0, 0, 0])
+        t[0] += w; t[1] += d; t[2] += l
+    if tot:
+        import math
+        print("\nper pair (all its matches summed)")
+        print("  a            b            s/move   games     W     D     L   score     Elo      95% interval")
+        def elo(s):
+            s = min(max(s, 0.001), 0.999)
+            return 400 * math.log10(s / (1 - s))
+        for (a, b, sec), (w, d, l) in tot.items():
+            n = w + d + l
+            s = (w + d / 2) / n
+            se = math.sqrt(max((w + d / 4) / n - s * s, 0) / n)
+            print(f"  {a:12} {b:12} {sec:>6} {n:7d} {w:5d} {d:5d} {l:5d}   {s:.3f}  {elo(s):+6.0f}   [{elo(s - 1.96 * se):+5.0f}, {elo(s + 1.96 * se):+5.0f}]")
 EOF
     squeue -u "${USER}" -o "%.12i %.14j %.8T %.10M %R" 2>/dev/null | grep -E "JOBID|ag[0-9]" || true
     exit 0
@@ -155,11 +183,12 @@ submit)
         dep=(--dependency=afterok:"${j_tr}")
         echo "train ${j_tr} (${EPOCHS} epochs on the new rows + ${OTHERS} of the pool of ${POOL}, lr ${LR})"
     fi
-    LAST=$(( GEN >= 2 ? 1 : 0 ))
-    j_ev=$(sbatch "${common[@]}" ${dep[@]+"${dep[@]}"} --export="${env_base},STAGE=eval" --array=0-${LAST} \
+    if [[ "${FROM}" == "eval" && -n "${EVAL_AFTER:-}" ]]; then dep=(--dependency=afterok:"${EVAL_AFTER}"); fi
+    (( EVAL_GAMES % (2 * EVAL_TASKS) == 0 )) || { echo "EVAL_GAMES must be a multiple of 2 × EVAL_TASKS" >&2; exit 1; }
+    j_ev=$(sbatch "${common[@]}" ${dep[@]+"${dep[@]}"} --export="${env_base},STAGE=eval" --array=0-$(( EVAL_TASKS - 1 )) \
         --cpus-per-task=8 --mem=16G --time=16:00:00 \
         --job-name="ag${G}_eval" --output="${L}/${G}_eval_%A_%a.out" "${SCRIPT}")
-    echo "eval ${j_ev}"
+    echo "eval ${j_ev} (${EVAL_GAMES} games against az_0 on ${EVAL_TASKS} GPUs)"
     if [[ "${AUTO}" == "1" && "${FROM}" != "eval" ]] && (( GEN < MAX_GEN )); then
         j_nx=$(sbatch --parsable -p insa-cpu --exclude=crn04,crn05,crn07,crn13,crn14,crn15 ${dep[@]+"${dep[@]}"} \
             --export="${env_base},STAGE=next" --cpus-per-task=1 --mem=1G --time=00:10:00 \
@@ -216,11 +245,10 @@ train)
     echo "[$(date '+%F %T')] done: models/$(printf 'az_%08d' "${GEN}")"
     ;;
 
-# ── az_<GEN> against az_<GEN-1> (task 0) and az_0 (task 1) ──────────────────
+# ── az_<GEN> against az_0: this task's share of the games ───────────────────
 eval)
     header
-    B=$([[ "${SLURM_ARRAY_TASK_ID:-0}" == "0" ]] && echo $(( GEN - 1 )) || echo 0)
-    A="${GEN}" B="${B}" GAMES="${EVAL_GAMES}" MOVE_SECONDS="${EVAL_SECONDS}" bash "${YOLAH_DIR}/nnue/alphazero_match.sh"
+    A="${GEN}" B=0 GAMES=$(( EVAL_GAMES / EVAL_TASKS )) MOVE_SECONDS="${EVAL_SECONDS}" bash "${YOLAH_DIR}/nnue/alphazero_match.sh"
     ;;
 
 next)
