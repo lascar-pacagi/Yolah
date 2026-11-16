@@ -51,10 +51,10 @@ def fuse(sc, pts, t, anim, r=0.008, spark=1.0):
     k = 1.6 if anim == "win" else 1.0
     sc.add(sd_sphere(r * 1.6), glow("#ffd060", 6.0 * k), T(*tip))
     for i in range(6):
-        a = TAU * (i / 6) + t * 17 + i * 1.3
+        a = TAU * (i / 6) + TAU * t * 3 + i * 1.3
         u = (t * 9 + i * 0.37) % 1
         d = 0.03 * spark * k * (0.4 + u)
-        p = (tip[0] + d * math.cos(a), tip[1] + d * (0.6 + 0.8 * math.sin(a * 1.7)), tip[2] + d * math.sin(a))
+        p = (tip[0] + d * math.cos(a), tip[1] + d * (0.6 + 0.8 * math.sin(a * 2)), tip[2] + d * math.sin(a))   # whole multiples of a: periodic
         sc.add(sd_sphere(0.006 * spark * (1 - u) + 0.002), glow("#ffe08a" if i % 2 else "#ff9a3a", 7.0), T(*p))
 
 

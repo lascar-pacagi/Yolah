@@ -150,7 +150,10 @@ def forest_mask(x, z):
     rs = rs / (1 + 0.4 * (fbm(P2(x * 0.012, z * 0.012, 6), 3) - 0.5))
     cliffs = 1 - sstep(0.7, 0.76, rs) * sstep(0.95, 0.88, rs)
     rx = x - (120 + 60 * torch.sin(z * 0.006))
-    return sstep(12, 20, rx.abs()) * dens * cliffs * (1 - in_village(x, z).float()) * sstep(-45, -80, z) * (z > cliff_z(x) + 8).float()
+    # not at the foot of the cliffs where their columns and buttresses stand forward: a tree rooted
+    # in the rock showed only its crown, floating against the face
+    rock = (cliff(torch.stack([x, ground_h(x, z), z], 1)) * 2 > 10).float()
+    return sstep(12, 20, rx.abs()) * dens * cliffs * (1 - in_village(x, z).float()) * sstep(-45, -80, z) * (z > cliff_z(x) + 8).float() * rock
 
 
 TREE_CELL = 11.0

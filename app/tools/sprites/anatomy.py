@@ -516,7 +516,7 @@ def stage(level):
             hd = J["head"]
             sc.add(sd_torus(0.1, 0.008), glow("#ffe0a0", 9.0), root * T(*off(hd, 0, 0.02, -0.06)))      # the halo
             for k in range(10):   # rays around it
-                a = TAU * k / 10 + t
+                a = TAU * (k + t) / 10    # one ray per loop: seamless (+ t radians jumped at the loop)
                 sc.add(sd_capsule((0, 0, 0), (0.12 * math.cos(a), 0.12 * math.sin(a), 0), 0.004, 0.001), glow("#fff2c8", 6.0),   # short: inside the frame
                        root * T(*off(hd, 0, 0.02, -0.07)))
             light_rings(sc, t, 3, 7.0, r=0.38, y0=0.15)

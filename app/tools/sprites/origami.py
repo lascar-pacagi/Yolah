@@ -93,9 +93,9 @@ def root_of(anim, t, lift=0.0, hop=0.05):
 
 def gold_ring(sc, t, k=4.0):
     for i in range(10):
-        a = TAU * (i / 10 + t * 0.2)
+        a = TAU * (i + t) / 10    # one place per loop: leaf i ends where leaf i+1 started (seamless)
         sc.add(sheet([(0, 0, 0), (0.03, 0.02, 0), (0.0, 0.05, 0)], 0.002), paper("#e0b860", gold=True),
-               T(0.46 * math.cos(a), BASE_TOP + 0.1 + 0.05 * math.sin(TAU * t + i), 0.46 * math.sin(a)) * RY(-a))
+               T(0.46 * math.cos(a), BASE_TOP + 0.1 + 0.05 * math.sin(TAU * t + 3 * a), 0.46 * math.sin(a)) * RY(-a))
 
 
 # ─── 1 · Bateau ─────────────────────────────────────────────────────────────
@@ -291,7 +291,7 @@ def dragon(anim, t, side):
     base(sc, side)
     root = root_of(anim, t)
     red, gold_ = paper("#c8282a", "#e0b860"), paper("#e0b860", gold=True)
-    flap = 0.35 * math.sin(TAU * t * (2 if anim in ("move", "win") else 0.7))
+    flap = 0.35 * math.sin(TAU * t * (2 if anim in ("move", "win") else 1))   # whole periods per loop (0.7 jumped)
     # the body: segments along a curve rising from the tail to the neck
     path = [(-0.0, 0.05, -0.38), (0.12, 0.08, -0.2), (0.0, 0.2, 0.0), (-0.06, 0.38, 0.1), (0.0, 0.56, 0.16)]
     for i in range(len(path) - 1):

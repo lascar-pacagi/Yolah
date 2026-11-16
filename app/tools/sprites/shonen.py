@@ -120,7 +120,7 @@ def flame_aura(sc, t, col, n, h, rad, k=2.2, y0=0.0, xf=None, seed=0):
     if h >= 0.4:
         for i in range(n // 4):
             a = TAU * (i + 0.5) / (n // 4) + 0.3 * math.sin(TAU * t + i)
-            ph = (t * 0.7 + i * 0.29) % 1
+            ph = (t + i * 0.29) % 1          # one rise per loop (0.7 jumped at the loop)
             y_lo = BASE_TOP + y0 + 0.05 + h * 0.5 * ph
             sc.add(sd_capsule((rad * math.cos(a), y_lo, rad * math.sin(a)), (rad * 0.85 * math.cos(a + 0.2), y_lo + h * 0.45, rad * 0.85 * math.sin(a + 0.2)), 0.003, 0.001),
                    glow(col, k * 1.2 * math.sin(math.pi * ph) + 0.1), xf)
@@ -139,7 +139,8 @@ def shards(sc, n, rad, h0, t, xf, seed=0, size=0.045):
         a = TAU * (i / n + 0.03 * math.sin(TAU * t)) + seed          # a sway, periodic in t (no jump at the loop)
         y = h0 + 0.25 * ((i * 0.37) % 1) + 0.04 * math.sin(TAU * (t + i * 0.3))
         q = (rad * math.cos(a), BASE_TOP + y, rad * math.sin(a))
-        sc.add(sd_hull(pts), STONE, xf * T(*q) * RY(a * 2 + t) * RX(i + t * 2))
+        # a slow tumble back and forth, periodic in t (a turn of t radians jumped back at the loop)
+        sc.add(sd_hull(pts), STONE, xf * T(*q) * RY(a * 2 + 0.5 * math.sin(TAU * t + i)) * RX(i + 0.7 * math.sin(TAU * t + 2 * i)))
         for j in range(2):   # crumbs falling
             sc.add(sd_sphere(0.006), STONE, xf * T(q[0] + 0.02 * (j - 0.5), q[1] - 0.05 - 0.08 * ((t * 2 + j * 0.5 + i * 0.2) % 1), q[2]))
 
@@ -232,7 +233,7 @@ def kitsune(anim, t, side):
             sc.add(sd_cone(0.04 + 0.015 * math.sin(TAU * t * 3 + k + j), 0.012, 0.001, 0.001), glow("#4ac8ff", 2.5),
                    tl * T(0.01 * (j - 1.5), 0.36, 0.08) * RZ(0.3 * (j - 1.5)) * T(0, 0.03, 0))
     for k in range(3):   # kitsunebi: wisps of foxfire around
-        a = TAU * (t * 0.5 + k / 3)
+        a = TAU * (k + t) / 3     # one place per loop (seamless)
         c = RY(HEAD) * T(0.34 * math.cos(a), BASE_TOP + 0.3 + 0.06 * math.sin(2 * a), 0.34 * math.sin(a))
         sc.add(sd_sphere(0.018), glow("#7ad8ff", 3.0), c)
         sc.add(sd_cone(0.03, 0.014, 0.001, 0.001), glow("#4ac8ff", 2.0), c * T(0, 0.03, 0))
@@ -436,10 +437,10 @@ def nue(anim, t, side):
     # the black cloud of thunder under it, a few sparks
     cloud = Mat("#1a1622", rough=0.9, pattern=lambda pl, pw, n: {"albedo": srgb("#2a2434") * (0.6 + 0.6 * fbm(pl * 12, 3))[:, None]})
     for k in range(7):
-        a = TAU * k / 7 + t * 0.6
+        a = TAU * k / 7 + 0.12 * math.sin(TAU * t)      # the cloud sways, periodic (t * 0.6 jumped at the loop)
         sc.add(sd_sphere(0.07 + 0.02 * math.sin(k * 1.7)), cloud, T(0.3 * math.cos(a), BASE_TOP + 0.04, 0.3 * math.sin(a)))
     for i in range(2 + (3 if anim == "win" else 0)):
-        a = TAU * i / 3 + t * 3
+        a = TAU * i / 3 + 0.25 * math.sin(TAU * t + i)
         lightning(sc, (0.3 * math.cos(a), 0.06, 0.3 * math.sin(a)), (0.32 * math.cos(a + 0.4), 0.45, 0.32 * math.sin(a + 0.4)), i + 3, t, "#c8a0ff", 4.0, 0.004, T(0, BASE_TOP, 0))
     flame_aura(sc, t, "#a87aff", 9, 0.25, 0.32, 1.5, seed=12)
     return sc
@@ -468,8 +469,8 @@ def onmyoji(anim, t, side):
     sc.add(sd_ellipsoid(r * 0.55, r * 1.3, r * 0.3), hair_mat("#16141c"), x * T(0, -r * 0.9, -r * 0.65) * RX(0.15))   # long hair tied behind
     sc.add(sd_box(r * 0.5, r * 0.85, r * 0.5, r * 0.3), lacquer("#16141c"), x * T(0, r * 1.35, -r * 0.2) * RX(-0.35))   # the eboshi
     for i in range(6):    # paper talismans (ofuda) orbiting, red ink
-        a = TAU * (t * 0.6 + i / 6)
-        q = rig["body"] * T(0.36 * math.cos(a), BASE_TOP + 0.38 + 0.14 * math.sin(2 * a + i), 0.36 * math.sin(a)) * RY(-a + math.pi / 2) * RZ(0.2 * math.sin(TAU * t + i))
+        a = TAU * (i + t) / 6     # one place per loop: talisman i ends where talisman i+1 started (seamless)
+        q = rig["body"] * T(0.36 * math.cos(a), BASE_TOP + 0.38 + 0.14 * math.sin(TAU * t + 3 * a), 0.36 * math.sin(a)) * RY(-a + math.pi / 2) * RZ(0.2 * math.sin(TAU * t + 5 * a))
         sc.add(sd_box(0.022, 0.055, 0.0015, 0.001), Mat("#f2e8c8", rough=0.7), q)
         sc.add(sd_box(0.006, 0.04, 0.002, 0.001), Mat("#c81e2a", rough=0.6), q)
     seal = RY(TAU * t * 0.2) * T(0, BASE_TOP + 0.004, 0)
@@ -502,8 +503,8 @@ def raiju(anim, t, side):
     for i, (a, b) in enumerate(zip(tail[:-1], tail[1:])):   # a zigzag tail, like a bolt
         sc.add(sd_capsule(a, (b[0] + 0.03 * (-1) ** i, b[1], b[2]), 0.035 * (1 - 0.15 * i), 0.03 * (1 - 0.15 * i)), fm, root, blend=0.01)
     for i in range(3 + (3 if anim == "win" else 0)):
-        a = TAU * i / 3
-        lightning(sc, (0.0, 0.15, 0.0), (0.45 * math.cos(a + t * 2), 0.5 + 0.2 * math.sin(a), 0.45 * math.sin(a + t * 2)), i + 1, t, "#fff07a", 4.0, 0.005, root)
+        a = TAU * i / 3 + 0.3 * math.sin(TAU * t + i)   # periodic sway (+ 2t radians jumped at the loop)
+        lightning(sc, (0.0, 0.15, 0.0), (0.45 * math.cos(a), 0.5 + 0.2 * math.sin(TAU * i / 3), 0.45 * math.sin(a)), i + 1, t, "#fff07a", 4.0, 0.005, root)
     flame_aura(sc, t, "#ffe84a", 10, 0.3, 0.34, 1.6, seed=7)
     return sc
 
@@ -592,7 +593,7 @@ def kaigen(anim, t, side):
     sc.add(sd_sphere(0.075 * k), Mat("#7ac8ff", rough=0.1, emissive="#5ab8ff", emit=1.6), ball)
     sc.add(sd_torus(0.1 * k, 0.005), glow("#bfe8ff", 3.0), ball * RX(TAU * t) * RZ(0.5))
     for i in range(3):
-        a = TAU * i / 3 + t * 3
+        a = TAU * i / 3 + 0.3 * math.sin(TAU * t + i)
         lightning(sc, (0.0, 0.5, 0.0), (0.42 * math.cos(a), 0.2 + 0.6 * ((i * 0.37 + t) % 1), 0.42 * math.sin(a)), i + 3, t, "#fff0a0", 4.0, 0.005, rig["body"])
     shards(sc, 6, 0.42, 0.1, t, RY(HEAD), seed=3)
     flame_aura(sc, t, "#ffd23a", 14, 0.55, 0.3, 1.8, seed=9)

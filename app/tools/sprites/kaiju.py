@@ -48,7 +48,7 @@ def lightning(sc, a, b, seed, t, col="#bfe8ff", k=9.0, w=0.008, xf=None):
     pts = []
     for i in range(n + 1):
         u = i / n
-        j = 0 if i in (0, n) else 0.06 * math.sin(seed * 12.9 + i * 7.3 + math.floor(t * 12) * 3.1)
+        j = 0 if i in (0, n) else 0.06 * math.sin(seed * 12.9 + i * 7.3 + (math.floor(t * 12) % 12) * 3.1)   # % 12: the flicker repeats each loop
         pts.append(tuple(a[c] + (b[c] - a[c]) * u + (j if c != 1 else j * 0.5) for c in range(3)))
     for p, q in zip(pts[:-1], pts[1:]):
         sc.add(sd_capsule(p, q, w), glow(col, k), xf)

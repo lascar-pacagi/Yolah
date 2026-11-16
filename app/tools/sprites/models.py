@@ -924,7 +924,7 @@ def tree_bot(anim, t, side):
         hop = 0.05 * math.sin(math.pi * t)
     elif anim == "blocked":
         col = "#ff6a4a"
-        lit = lambda i: 1.0 if (int(t * 16) + i) % 3 == 0 else 0.1
+        lit = lambda i: 1.0 if (int(t * 15) + i) % 3 == 0 else 0.1   # 15 steps: whole 3-cycles per loop
         sway = 0.05 * wave(t, 4)
     elif anim == "win":
         lit = lambda i: 1.0
@@ -969,7 +969,7 @@ def retro(anim, t, side):
     steel = chrome(0.16)
     red = paint("#c7322c", rough=0.3, metal=0.5, clearcoat=1.0)
     dark = Mat("#202225", rough=0.5)
-    blink = lambda i: 1.0 if (int(t * 8) + i) % 3 else 0.2
+    blink = lambda i: 1.0 if (int(t * 9) + i) % 3 else 0.2       # 9 steps: a whole number of 3-cycles per loop
     hop = 0.0
     arm = (0.0, 0.0)
     smoke = []
@@ -1039,10 +1039,10 @@ def crt(anim, t, side):
 
     def screen_pat(pl, pw, n):
         x, y = pl[:, 0] / 0.13, pl[:, 1] / 0.1
-        scan = 0.75 + 0.25 * torch.sin((y + phase * 4) * 40) ** 2
+        scan = 0.75 + 0.25 * torch.sin(y * 40 + math.pi * 51 * phase) ** 2   # sin² has period π: a whole number of periods per loop
         g = srgb("#46ff8a")
         if mode == "blocked":     # static
-            v = vnoise(torch.stack([x * 40, y * 40, torch.full_like(x, phase * 97.0)], -1))
+            v = vnoise(torch.stack([x * 40, y * 40, torch.full_like(x, (phase % 1.0) * 97.0)], -1))
             return {"albedo": vec(0, 0, 0).expand_as(pl), "emissive": (vec(1, 1, 1) * v[:, None] * 1.2)}
         if mode == "win":         # a big smile
             smile = ((torch.sqrt(x * x + (y + 0.1) ** 2) - 0.55).abs() < 0.08) & (y < -0.1)
@@ -1061,7 +1061,7 @@ def crt(anim, t, side):
                     hh = ((x - ax) / (bx - ax)).clamp(0, 1)
                     yy = ya + (yb - ya) * hh
                     on = torch.maximum(on, ((y - yy).abs() < 0.025).float() * ((x > ax) & (x < bx)).float() * 0.45)
-        pulse = 0.6 + 0.4 * torch.sin((x - phase * 2) * 6)
+        pulse = 0.6 + 0.4 * torch.sin(x * 6 - TAU * 2 * phase)               # two pulses per loop (periodic)
         return {"albedo": vec(0, 0, 0).expand_as(pl), "emissive": g * (0.08 + on * pulse * 2.2)[:, None] * scan[:, None]}
     screen = Mat("#05140a", rough=0.05, clearcoat=1.5, pattern=screen_pat)
     hop = 0.0
@@ -1242,7 +1242,8 @@ def core(anim, t, side):
     sc.add(sd_cone(0.06, 0.16, 0.08, 0.01), obsidian, T(0, y0 + 0.06, 0))
     sc.add(sd_cylinder(0.012, 0.085, 0.004), glow(col, 4.0), T(0, y0 + 0.125, 0))
     sc.add(sd_cylinder(0.2, 0.02, 0.0), glow(col, 1.5), T(0, y0 + 0.33, 0))
-    c = T(0, y0 + 0.55 + hover, 0) * RY(spin / 6)          # the cage has 6 bars: 1/6 turn per loop joins up (1/4 jumped)
+    c0 = T(0, y0 + 0.55 + hover, 0)
+    c = c0 * RY(spin / 6)          # the cage has 6 bars: 1/6 turn per loop joins up (1/4 jumped)
     # the core: a bright sphere in a faceted dark crystal cage
     sc.add(sd_sphere(0.085), glow("#ffffff", k_core * 0.7), c)
     sc.add(sd_sphere(0.11), Mat("#bfe6ff", glass=True), c)
@@ -1252,7 +1253,7 @@ def core(anim, t, side):
     # three rings in orbit, each tilted differently, with beads of light
     for i, (ax, az, sp) in enumerate(((1.2, 0.0, 1), (0.3, 1.1, -1), (-0.9, 0.5, 1))):
         j = jitter * math.sin(TAU * (t * 6 + i * 0.3))
-        rx = c * RX(ax + tilt + j) * RZ(az) * RY(spin * sp)
+        rx = c0 * RX(ax + tilt + j) * RZ(az) * RY(spin * sp)   # not turned with the cage: the tilted rings would not join up
         R = (0.2 + 0.05 * i) * ring_r
         sc.add(sd_torus(R, 0.012), platinum, rx)
         for b in range(3):

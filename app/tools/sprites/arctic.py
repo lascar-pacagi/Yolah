@@ -54,9 +54,9 @@ ICE = Mat("#a8d8f0", rough=0.12, clearcoat=1.0, sss=0.5,
 def frost(sc, n, t, r=0.42, h=0.35, k=4.0):
     """n frost crystals turning around the figure (the power)."""
     for i in range(n):
-        a = TAU * (t * 0.5 + i / n)
-        y = BASE_TOP + h + 0.12 * math.sin(TAU * t + i * 1.7)
-        xf = T(r * math.cos(a), y, r * math.sin(a)) * RY(HEAD) * RZ(TAU * t * 0.3 + i)   # a snowflake facing the camera
+        a = TAU * (i + t) / n     # one place per loop: crystal i ends where crystal i+1 started (seamless)
+        y = BASE_TOP + h + 0.12 * math.sin(TAU * t + 2 * a)
+        xf = T(r * math.cos(a), y, r * math.sin(a)) * RY(HEAD) * RZ(3 * a)   # a snowflake facing the camera
         for j in range(3):
             sc.add(sd_box(0.045, 0.006, 0.004, 0.002), glow("#cfeeff", k), xf * RZ(j * math.pi / 3))
 
