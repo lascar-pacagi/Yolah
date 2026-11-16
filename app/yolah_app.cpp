@@ -6131,10 +6131,18 @@ void scene_setup(App& a) {
                            ai.sprite, ai.available, ai.reason, ai.description});
     }
 
-    const float top = 122 * s, bottom_bar = 150 * s, desc_h = 52 * s;
+    const float top = 122 * s, bottom_bar = 150 * s;
     const float col_w = std::min(560 * s, (a.w - 180 * s) / 2), gap = 40 * s;
+    float desc_h = 52 * s;   // tall enough for the longest description (minimax's takes 3 lines)
+    {
+        const float lh = a.text.line_height(Font::Regular, 16 * s) * 1.25f / 1.2f;
+        for (auto& e : entries) {
+            const std::string& d = e.available ? e.description : e.reason;
+            desc_h = std::max(desc_h, lh * a.text.wrap(Font::Regular, 16 * s, d, 2 * col_w + gap).size() + 4 * s);
+        }
+    }
     const float x0 = a.w * 0.5f - col_w - gap / 2;
-    const float avail = a.h - top - bottom_bar - desc_h - 60 * s;
+    const float avail = a.h - top - bottom_bar - desc_h - 80 * s;   // the description sits 80 below the rows and ends above the bar
     const float row_h = std::min(74 * s, avail / entries.size());
     std::string* choice[2] = {&a.settings.black, &a.settings.white};
     std::string hovered_desc;
