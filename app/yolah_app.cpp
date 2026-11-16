@@ -70,6 +70,7 @@
 //   --plies N             random moves played before the game scene starts
 //   --hint                show the hint (game scene)
 //   --tab N               tab of the game scene (0 moves, 1 analysis, 2 AI)
+//   --mouse X,Y           the mouse at that point (to show a hover)
 //   --time N              time per move: index in 0,5 s, 1 s, 2 s, 5 s
 //   --theme ID            board theme
 //   --lang fr|en          language of the interface
@@ -4622,7 +4623,8 @@ void draw_background(App& a, bool decorated = true, const Theme* th = nullptr) {
 void draw_title(App& a, const std::string& title, const std::string& subtitle = "") {
     float s = a.s;
     a.text.draw_shadowed(Font::Title, 44 * s, title, {60 * s, 34 * s}, pal::text, Align::Left, hex(0x000000, 120), 3 * s);
-    if (!subtitle.empty()) a.text.draw(Font::Regular, 18 * s, subtitle, {62 * s, 92 * s}, pal::dim);
+    if (!subtitle.empty())   // light text with a dark shadow: readable on the light backgrounds too (Origami)
+        a.text.draw_shadowed(Font::Regular, 18 * s, subtitle, {62 * s, 92 * s}, hex(0xdfe5ee), Align::Left, hex(0x000000, 170), 2 * s);
 }
 bool back_button(App& a) {
     float s = a.s;
@@ -6260,7 +6262,12 @@ void scene_setup(App& a) {
     }
     // Description of the hovered player.
     Box db{x0, top + row_h * entries.size() + 80 * s, 2 * col_w + gap, desc_h};
-    if (!hovered_desc.empty()) a.text.paragraph(Font::Regular, 16 * s, hovered_desc, db, pal::dim);
+    if (!hovered_desc.empty()) {   // on a dark plate: over a light background (Origami, Banquise) the text was hard to read
+        const float lh = a.text.line_height(Font::Regular, 16 * s) * 1.25f / 1.2f;
+        const float th = lh * a.text.wrap(Font::Regular, 16 * s, hovered_desc, db.w).size();
+        draw::round_box({db.x - 16 * s, db.y - 10 * s, db.w + 32 * s, th + 20 * s}, 12 * s, hex(0x10151d, 225));
+        a.text.paragraph(Font::Regular, 16 * s, hovered_desc, db, pal::text);
+    }
 
     // Bottom bar: options and start.
     Box bar{x0, a.h - bottom_bar + 10 * s, 2 * col_w + gap, bottom_bar - 40 * s};
@@ -9308,6 +9315,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (arg_flag(argc, argv, "--hint")) a->settings.show_hint = true;
     if (!arg_value(argc, argv, "--time").empty()) a->settings.time_index = std::stoi(arg_value(argc, argv, "--time"));
     if (!arg_value(argc, argv, "--theme").empty()) a->settings.theme = arg_value(argc, argv, "--theme");
+    if (std::string m = arg_value(argc, argv, "--mouse"); !m.empty()) std::sscanf(m.c_str(), "%f,%f", &a->in.mouse.x, &a->in.mouse.y);   // screenshots: the mouse there (hover)
     if (!arg_value(argc, argv, "--course").empty()) {   // the course of an AI open (--scroll N: pixels down)
         a->open_course(arg_value(argc, argv, "--course"));
         a->course_scroll = a->course_target = std::stof(arg_value(argc, argv, "--scroll", "0"));
