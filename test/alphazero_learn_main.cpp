@@ -147,7 +147,7 @@ int match_main(Args& a) {
     string config, model_a, model_b, out, book_path;
     size_t games = 10, opening_plies = 4;
     uint64_t time_us = 2'000'000, seed = 1;
-    std::vector<string> sets;
+    std::vector<string> sets, sets_a, sets_b;
     while (a.more()) {
         const string o = a.next("");
         if (o == "--config") config = a.next(o);
@@ -160,6 +160,8 @@ int match_main(Args& a) {
         else if (o == "--seed") seed = std::stoull(a.next(o));
         else if (o == "--out") out = a.next(o);
         else if (o == "--set") sets.push_back(a.next(o));
+        else if (o == "--set-a") sets_a.push_back(a.next(o));   // A's player only (B keeps the config)
+        else if (o == "--set-b") sets_b.push_back(a.next(o));
         else { std::cerr << "unknown option " << o << "\n"; return 2; }
     }
     if (config.empty() || model_a.empty() || model_b.empty()) {
@@ -173,6 +175,8 @@ int match_main(Args& a) {
     json cfg_a = cfg, cfg_b = cfg;
     cfg_a["weights"] = model_a;
     cfg_b["weights"] = model_b;
+    for (const string& kv : sets_a) apply_set(cfg_a, kv);
+    for (const string& kv : sets_b) apply_set(cfg_b, kv);
     AlphaZeroMCTSPlayer player_a(cfg_a), player_b(cfg_b);
 
     std::mt19937_64 rng(seed);
@@ -234,6 +238,7 @@ int match_main(Args& a) {
     const double score = games ? (wins + 0.5 * draws) / games : 0.0;
     json res = {{"a", model_a}, {"b", model_b}, {"games", games}, {"time_us", time_us},
                 {"opening_plies", opening_plies}, {"book", book_path}, {"seed", seed},
+                {"set_a", sets_a}, {"set_b", sets_b},
                 {"wins", wins}, {"draws", draws}, {"losses", losses}, {"score", score},
                 {"records", records}};
     if (!out.empty()) {

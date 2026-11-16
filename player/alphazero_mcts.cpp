@@ -123,10 +123,12 @@ namespace {
     }
 }
 
-float Search::terminal_value(const Yolah& state) {
+float Search::terminal_value(const Yolah& state) const {
     const auto [black, white] = state.score();
     const int diff = (state.current_player() == Yolah::BLACK ? 1 : -1) * (int(black) - int(white));
-    return diff > 0 ? 1.0f : (diff < 0 ? -1.0f : 0.0f);
+    const float outcome = diff > 0 ? 1.0f : (diff < 0 ? -1.0f : 0.0f);
+    if (prm.score_utility <= 0.0f) return outcome;
+    return (1.0f - prm.score_utility) * outcome + prm.score_utility * std::tanh(float(diff) / prm.score_scale);
 }
 
 // ── construction / node table ──────────────────────────────────────────────

@@ -190,6 +190,17 @@ struct SearchParams {
     float    playout_cap_fast_prob = 0.0f;
     uint64_t nb_simulations_fast   = 0;
 
+    // ── score utility (KataGo-like) ──
+    // The value of a finished game is ±1 for a win/loss, 0 for a draw. With
+    // score_utility u > 0 it becomes (1 − u)·sign(d) + u·tanh(d / score_scale),
+    // d the final point margin for the player to move: still in [−1, 1], a win
+    // still beats a draw, but among won (or lost) endings the bigger margin is
+    // preferred, so the search keeps playing purposeful moves once the game is
+    // decided. Only finished games carry it (the network predicts no score).
+    // 0 = off (pure win/draw/loss).
+    float    score_utility    = 0.0f;
+    float    score_scale      = 10.0f;
+
     // ── misc ──
     bool     reuse_tree       = true;
     uint64_t seed             = 0;           // 0 = random_device
@@ -282,7 +293,7 @@ private:
     void  expand(Node& node, const Yolah::MoveList& moves, const float* priors, float value);
     void  backup(const PathStep* path, size_t length, float leaf_value);
     void  undo_pending(const PathStep* path, size_t length);
-    static float terminal_value(const Yolah& state);
+    float terminal_value(const Yolah& state) const;
     // result
     SearchResult make_result(const Yolah& state, double seconds, uint64_t sims,
                              uint64_t collisions, Worker& w) const;

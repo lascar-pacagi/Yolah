@@ -8,6 +8,8 @@
 #     sbatch --export=ALL,A=7168,B=4096 alphazero_match.sh
 #     sbatch --export=ALL,GAMES=400,MOVE_SECONDS=1 alphazero_match.sh
 #     sbatch --export=ALL,BOOK=none alphazero_match.sh   # random openings, as before
+#     SET_A="score utility=0.05;score scale=10" TAG=su0.05 sbatch --export=ALL,A=271360,B=271360 alphazero_match.sh
+#                                 # A's player with other settings (";"-separated key=value), TAG in A's name
 #
 # A and B are training steps (the numbers of models/az_<step>), or "latest"
 # (the network self-play is using) or "initial" (step 0). A network whose .ts
@@ -66,11 +68,15 @@ STEP_A=$(resolve "${A}")
 STEP_B=$(resolve "${B}")
 NAME_A=$(printf "az_%08d" "${STEP_A}")
 NAME_B=$(printf "az_%08d" "${STEP_B}")
+SET_ARGS=()
+if [[ -n "${SET_A:-}" ]]; then IFS=';' read -ra KVS <<< "${SET_A}"; for kv in "${KVS[@]}"; do SET_ARGS+=(--set-a "${kv}"); done; fi
+LABEL_A="${NAME_A}${TAG:++${TAG}}"   # the name of A in the results
 
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job        : ${JOB} on $(hostname), GPU ${CUDA_VISIBLE_DEVICES:-?}"
 echo "  Work dir   : ${WORK_DIR}"
-echo "  Match      : A = ${NAME_A} (${A})  vs  B = ${NAME_B} (${B})"
+echo "  Match      : A = ${LABEL_A} (${A})  vs  B = ${NAME_B} (${B})"
+[[ -n "${SET_A:-}" ]] && echo "  A's settings: ${SET_A}"
 if [[ "${BOOK}" == "none" ]]; then BOOK_ARGS=(); OPENINGS="${OPENING_PLIES}-ply random openings"
 else BOOK_ARGS=(--book "${BOOK}"); OPENINGS="openings of ${BOOK}"; fi
 echo "  Games      : ${GAMES} (${OPENINGS}, both colours), ${SECONDS_PER_MOVE} s/move"
@@ -103,14 +109,14 @@ export_model(make_net(load_state_dict('/work/models/\$NAME.pt')), '${MDIR}', \$S
         fi
     done"
 
-OUT="/work/evals/match_${NAME_A}_vs_${NAME_B}_${JOB}.json"
+OUT="/work/evals/match_${LABEL_A}_vs_${NAME_B}_${JOB}.json"
 TIME_US=$(awk -v s="${SECONDS_PER_MOVE}" 'BEGIN { printf "%d", s * 1000000 }')
 echo "[$(date '+%F %T')] === Match ==="
 start_in_container ${BUILD_DIR}/alphazero_learn match \
     --config /Yolah/config/alphazero_mcts_eval_player.cfg \
     --a "${MDIR}/${NAME_A}.ts" --b "${MDIR}/${NAME_B}.ts" \
     --games "${GAMES}" --time "${TIME_US}" --opening-plies "${OPENING_PLIES}" \
-    "${BOOK_ARGS[@]}" --seed "${SEED}" --out "${OUT}"
+    "${BOOK_ARGS[@]}" ${SET_ARGS[@]+"${SET_ARGS[@]}"} --seed "${SEED}" --out "${OUT}"
 wait_forwarding_signals
 rm -rf "${WORK_DIR}/evals/match_${JOB}"
 [[ "${RC}" == "0" ]] || { echo "match failed (exit code ${RC})"; exit "${RC}"; }
@@ -118,11 +124,11 @@ rm -rf "${WORK_DIR}/evals/match_${JOB}"
 # ── Result: score, Elo difference and its 95 % confidence interval ──────────
 # Per-game results x ∈ {1, ½, 0}: mean s, variance E[x²] − s², standard error
 # √(var/n). The interval of s maps to Elo through Δ = 400·log10(s/(1−s)).
-RES="${WORK_DIR}/evals/match_${NAME_A}_vs_${NAME_B}_${JOB}.json"
+RES="${WORK_DIR}/evals/match_${LABEL_A}_vs_${NAME_B}_${JOB}.json"
 # By name: the JSON keys are written in alphabetical order, not W/D/L.
 count() { grep -oE "\"$1\": *[0-9]+" "${RES}" | head -1 | grep -oE '[0-9]+$'; }
 W=$(count wins); D=$(count draws); L=$(count losses)
-awk -v w="$W" -v d="$D" -v l="$L" -v a="${NAME_A}" -v b="${NAME_B}" -v t="${SECONDS_PER_MOVE}" \
+awk -v w="$W" -v d="$D" -v l="$L" -v a="${LABEL_A}" -v b="${NAME_B}" -v t="${SECONDS_PER_MOVE}" \
     -v csv="${WORK_DIR}/matches.csv" -v date="$(date '+%F %T')" 'BEGIN {
     n = w + d + l; s = (w + d / 2) / n
     var = (w + d / 4) / n - s * s; se = sqrt(var / n)
