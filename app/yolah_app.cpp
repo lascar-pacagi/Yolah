@@ -434,6 +434,12 @@ public:
     }
     // The side that played history[i].
     int side_of(size_t i) const { return (start.nb_plies() + i) % 2 == 0 ? BLACK : WHITE; }
+    // Whether side has already passed (a blocked side stays blocked: holes never fill).
+    bool has_passed(int side) const {
+        for (size_t i = 0; i < history.size(); i++)
+            if (history[i] == Move::none() && side_of(i) == side) return true;
+        return false;
+    }
 };
 
 // ─── @@AI ───────────────────────────────────────────────────────────────────
@@ -3426,9 +3432,9 @@ public:
     }
     // A move was played (match already updated): animate it.
     void on_move(Move m, int side, double now, FxLayer& fx, const Theme& theme, std::mt19937& rng, float power = 0.4f) {
-        last = m;
         selected = -1;
-        if (m == Move::none()) return;
+        if (m == Move::none()) return;   // a pass: the other side's last move stays marked
+        last = m;
         anim = {true, m, side, now, 0.34};
         hole_since[m.from_sq()] = now + 0.08;
         float dx = center(m.to_sq()).x - center(m.from_sq()).x;     // on screen (the board may be flipped)
@@ -4498,6 +4504,7 @@ struct App {
     void play_move(Move m) {
         auto& g = game;
         const int side = g.match.to_move();
+        const bool first_pass = m == Move::none() && !g.match.has_passed(side);
         g.match.play(m);
         // How hard the square breaks: the player's strength (Elo 600 → 0, 2250 → 1; the human: 0.6).
         const Slot& sl = g.slot[side];
@@ -4508,7 +4515,7 @@ struct App {
             V2 c = g.board.center(m.to_sq());
             fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0xb6c2d6) : hex(0xffffff), q * 0.32f));
             fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, game_theme().accent));
-        } else {
+        } else if (first_pass) {   // told once; then the other side plays on without waiting
             notify_at(strf("%s ne peuvent plus bouger : ils passent.", side_name(side)), g.board.area.center());
         }
         g.token++;
@@ -6328,7 +6335,8 @@ void game_logic(App& a) {
     const int side = g.match.to_move();
     Slot& sl = g.slot[side];
     if (must_pass(g.match.pos)) {
-        if (g.pass_at < 0) g.pass_at = a.time + 0.8;
+        // the first pass waits a moment (the message); the next ones are immediate
+        if (g.pass_at < 0) g.pass_at = a.time + (g.match.has_passed(side) ? 0.0 : 0.8);
         if (a.time >= g.pass_at) {
             g.pass_at = -1;
             a.play_move(Move::none());
@@ -7201,6 +7209,7 @@ void start_lesson(App& a, int i) {
 void tutorial_play(App& a, Move m) {
     auto& t = a.tuto;
     const int side = t.match.to_move();
+    const bool first_pass = m == Move::none() && !t.match.has_passed(side);
     t.match.play(m);
     t.board.on_move(m, side, a.time, a.fx, a.theme(), a.rng);
     if (m != Move::none()) {
@@ -7208,7 +7217,7 @@ void tutorial_play(App& a, Move m) {
         V2 c = t.board.center(m.to_sq());
         a.fx.add(std::make_unique<FloatText>(c + V2{0, -q * 0.3f}, "+1", side == BLACK ? hex(0x7ff0ff) : hex(0xffffff), q * 0.32f));
         a.fx.add(std::make_unique<Ripple>(c, q * 0.35f, q * 0.62f, a.theme().accent));
-    } else {
+    } else if (first_pass) {
         a.notify_at(strf("%s ne peuvent plus bouger : ils passent.", side_name(side)), t.board.area.center());
     }
 }
@@ -7263,7 +7272,7 @@ void scene_tutorial(App& a) {
             if (l.goal == Lesson::Goal::Win)
                 tutorial_result(a, t.match.score(BLACK) > t.match.score(WHITE), t.match.score(BLACK) > t.match.score(WHITE) ? l.success : l.failure);
         } else if (must_pass(pos)) {
-            if (t.pass_at < 0) t.pass_at = a.time + 0.8;
+            if (t.pass_at < 0) t.pass_at = a.time + (t.match.has_passed(t.match.to_move()) ? 0.0 : 0.8);
             if (a.time >= t.pass_at) { t.pass_at = -1; tutorial_play(a, Move::none()); }
         } else if (pos.current_player() == WHITE && l.replies) {
             if (t.reply_at < 0) t.reply_at = a.time + 0.55;
