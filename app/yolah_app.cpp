@@ -2169,6 +2169,8 @@ struct ArtAnim {
     double duration() const { return frames.empty() ? 0 : frames.size() / std::max(0.1f, fps); }
 };
 
+fs::path art_dir();
+
 struct Art {
     std::string id, name = "Nouveau dessin", kind = "piece";
     int size = 32;
@@ -2182,6 +2184,7 @@ struct Art {
     SDL_Texture* tex = nullptr;    // the frames, rebuilt when `dirty`
     std::vector<SDL_Texture*> levels;   // smooth: the sheet halved 1, 2, ... times
     bool dirty = true;
+    bool lazy = false;             // rendered sheet whose pixels stay on disk: read from the PNG when the texture is made, then dropped (the frames are empty vectors)
     int cols = 1;                  // frames per row in the texture
 
     ArtAnim* anim(const std::string& n) {
@@ -2205,10 +2208,19 @@ struct Art {
         for (auto& a : anims) cols = std::max(cols, int(a.frames.size()));
         int rows = std::max(1, int(anims.size()));
         std::vector<Pixel> sheet(size_t(cols) * size * rows * size, 0);
-        for (int r = 0; r < int(anims.size()); r++)
-            for (int c = 0; c < int(anims[r].frames.size()); c++)
-                for (int y = 0; y < size; y++)
-                    std::memcpy(&sheet[(size_t(r) * size + y) * cols * size + size_t(c) * size], &anims[r].frames[c][size_t(y) * size], size * sizeof(Pixel));
+        if (lazy) {   // the sheet as saved: rows = animations, columns = frames
+            int w = 0, h = 0, n = 0;
+            if (unsigned char* px = stbi_load((art_dir() / (id + ".png")).string().c_str(), &w, &h, &n, 4)) {
+                const int cw = std::min(w, cols * size);
+                for (int y = 0; y < std::min(h, rows * size); y++)
+                    std::memcpy(&sheet[size_t(y) * cols * size], px + size_t(y) * w * 4, size_t(cw) * 4);
+                stbi_image_free(px);
+            }
+        } else
+            for (int r = 0; r < int(anims.size()); r++)
+                for (int c = 0; c < int(anims[r].frames.size()); c++)
+                    for (int y = 0; y < size; y++)
+                        std::memcpy(&sheet[(size_t(r) * size + y) * cols * size + size_t(c) * size], &anims[r].frames[c][size_t(y) * size], size * sizeof(Pixel));
         tex = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, cols * size, rows * size);
         SDL_UpdateTexture(tex, nullptr, sheet.data(), cols * size * int(sizeof(Pixel)));
         SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
@@ -2308,7 +2320,9 @@ fs::path art_dir() {          // by value: load_all_arts calls it from several t
     return g_paths.assets / "art";
 }
 
-bool load_art(const std::string& id, Art& out) {
+// lazy: a rendered sheet (smooth) keeps no pixels in memory, they are read
+// again from the PNG when its texture is made (all of them decoded take 2.2 GB).
+bool load_art(const std::string& id, Art& out, bool lazy = false) {
     json j = load_json(art_dir() / (id + ".json"));
     if (!j.is_object()) return false;
     out.id = id;
@@ -2326,8 +2340,9 @@ bool load_art(const std::string& id, Art& out) {
     out.variant_of = jstr(j, "variant of");
     out.plate = jstr(j, "plate");
     out.stars = int(jnum(j, "stars", 0));
+    out.lazy = lazy && out.smooth;
     int w = 0, h = 0, n = 0;
-    unsigned char* px = stbi_load((art_dir() / (id + ".png")).string().c_str(), &w, &h, &n, 4);
+    unsigned char* px = out.lazy ? nullptr : stbi_load((art_dir() / (id + ".png")).string().c_str(), &w, &h, &n, 4);
     if (j.contains("animations") && j["animations"].is_array()) {
         int row = 0;
         for (auto& e : j["animations"]) {
@@ -2336,7 +2351,8 @@ bool load_art(const std::string& id, Art& out) {
             a.fps = std::clamp(jnum(e, "fps", 8), 0.5f, 60.0f);
             a.loop = e.value("loop", true);
             int nf = int(jnum(e, "frames", 0));
-            for (int c = 0; c < nf; c++) {
+            if (out.lazy) a.frames.resize(nf);   // the count only
+            else for (int c = 0; c < nf; c++) {
                 std::vector<Pixel> f(size_t(out.size) * out.size, 0);
                 if (px)
                     for (int y = 0; y < out.size; y++)
@@ -2398,7 +2414,7 @@ void load_all_arts() {
             pool.emplace_back([&] {
                 for (size_t i; (i = next.fetch_add(1)) < ids.size();) {
                     arts[i] = std::make_unique<Art>();
-                    ok[i] = load_art(ids[i], *arts[i]);
+                    ok[i] = load_art(ids[i], *arts[i], true);
                 }
             });
     }
@@ -4068,6 +4084,7 @@ struct App {
 
     Scene scene = Scene::Menu;
     double scene_t0 = 0;                  // for the fade-in
+    double last_input = 0;                // the last event (mouse, keys): the frame rate drops at rest
     SDL_Cursor* cursor_arrow = nullptr;
     SDL_Cursor* cursor_hand = nullptr;
     std::string toast;
@@ -9172,6 +9189,13 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
         a->frames_left = std::stoi(arg_value(argc, argv, "--frames", "30"));
     }
+#ifdef __linux__
+    // WSL: Mesa picks llvmpipe (drawing on the processor: 2.5 to 3.5 cores at 60
+    // images/s) although the d3d12 driver goes through the graphics card (0.1 to
+    // 0.2 core). Kept when the user sets GALLIUM_DRIVER.
+    if (a->screenshot.empty() && !std::getenv("GALLIUM_DRIVER") && (std::getenv("WSL_DISTRO_NAME") || std::getenv("WSL_INTEROP")))
+        setenv("GALLIUM_DRIVER", "d3d12", 0);
+#endif
     SDL_SetAppMetadata("Yolah", APP_VERSION, "fr.yolah.app");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init: %s", SDL_GetError());
@@ -9310,6 +9334,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {
     // Mouse coordinates in rendering pixels (they differ from window
     // coordinates on high-density screens).
     SDL_ConvertEventToRenderCoordinates(a->renderer, e);
+    a->last_input = now_seconds();
     switch (e->type) {
     case SDL_EVENT_QUIT: return SDL_APP_SUCCESS;
     case SDL_EVENT_MOUSE_MOTION: a->in.mouse = {e->motion.x, e->motion.y}; break;
@@ -9424,7 +9449,19 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
             return SDL_APP_SUCCESS;
         }
     }
+    // At rest (a scene without a game, no effect, nothing touched for a second):
+    // 30 images/s instead of 60, the figurines' animations run at 8 to 20.
+    const bool calm = (a->scene == Scene::Menu || a->scene == Scene::Setup || a->scene == Scene::Themes || a->scene == Scene::Puzzles)
+                      && a->course.empty() && a->fx.empty() && a->time - a->last_input > 1.0 && a->time - a->scene_t0 > 0.5 && a->frames_left < 0;
+    if (calm) {
+        const double left = 1.0 / 30 - (now_seconds() - a->time) - 0.012;   // the present waits for the next refresh (~1/60 s)
+        if (left > 0) SDL_Delay(Uint32(left * 1000));
+    }
     SDL_RenderPresent(a->renderer);
+    if (static const bool show_fps = std::getenv("YOLAH_FPS") != nullptr; show_fps) {   // YOLAH_FPS=1: images per second on stderr, every 2 s
+        static double t0 = a->time; static int n = 0;
+        if (++n, a->time - t0 >= 2) { std::fprintf(stderr, "%.1f images/s%s\n", n / (a->time - t0), calm ? " (at rest)" : ""); t0 = a->time; n = 0; }
+    }
     a->in.pressed = a->in.released = a->in.rpressed = false;
     a->in.wheel = 0;
     a->in.files.clear();
