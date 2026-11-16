@@ -7104,9 +7104,9 @@ const std::vector<Lesson>& lessons() {
 
         l = {};
         l.title = "Pr\xC3\xAAt pour une vraie partie !";
-        l.text = "Tu connais toutes les r\xC3\xA8gles. Le secret : garde de la place pour tes pions et prends-en \xC3\xA0 l'adversaire. Commence par l'IA la plus douce, Monte Carlo, puis monte en puissance.";
+        l.text = "Tu connais toutes les r\xC3\xA8gles. Le secret : garde de la place pour tes pions et prends-en \xC3\xA0 l'adversaire. Commence par l'IA la plus douce, D\xC3\xA9" "butant, puis monte en puissance.";
         l.task = "Lance ta premi\xC3\xA8re partie !";
-        l.button = "Jouer contre Monte Carlo";
+        l.button = "Jouer contre D\xC3\xA9" "butant";
         v.push_back(l);
         return v;
     }();
@@ -7347,7 +7347,7 @@ void scene_tutorial(App& a) {
             }
     }
     BoardView::Look look;
-    a.set_look(look, a.theme(), "human", "monte_carlo");
+    a.set_look(look, a.theme(), "human", "beginner");
     look.human_turn = human_turn;
     look.coords = true;
     if (t.hint && human_turn && t.hint_move != Move::none()) { look.hint = t.hint_move; look.hint_label = "indice"; }
@@ -7356,9 +7356,16 @@ void scene_tutorial(App& a) {
     float pulse = 0.75f + 0.25f * float(std::sin(a.time * 4));
     for (int sq : t.targets) {
         if (!pos.free_squares() || !((pos.free_squares() >> sq) & 1)) continue;
-        Box b = t.board.square(sq).inset(t.board.sq() * 0.06f);
-        draw::round_box(b, b.w * 0.18f, hex(0xffd36b, uint8_t(70 * pulse)));
-        draw::round_frame(b, b.w * 0.18f, std::max(2.0f, b.w * 0.06f), hex(0xffd36b, uint8_t(255 * pulse)));
+        // Visible on light and dark squares of every theme: a dark rim around a
+        // saturated gold fill and a bright frame, with a halo that breathes.
+        const float q = t.board.sq();
+        Box b = t.board.square(sq).inset(q * 0.05f);
+        const float r = b.w * 0.18f, wf = std::max(2.0f, q * 0.07f);
+        for (int i = 3; i >= 1; i--)   // halo, spilling over the neighbours
+            draw::round_frame(b.inset(-q * 0.05f * i * pulse), r + q * 0.05f * i, q * 0.05f, hex(0xffc23a, uint8_t(60 * pulse / i)));
+        draw::round_box(b, r, hex(0xf2a900, uint8_t(150 + 60 * pulse)));
+        draw::round_frame(b, r, wf + std::max(1.5f, q * 0.025f), hex(0x3a2400, 220));   // dark rim
+        draw::round_frame(b.inset(std::max(1.5f, q * 0.025f)), r, wf, hex(0xffe58a, uint8_t(200 + 55 * pulse)));
     }
     if (finding) {
         for (int sq : t.found) draw::ring(t.board.center(sq), t.board.sq() * 0.48f, t.board.sq() * 0.06f, pal::good);
@@ -7432,7 +7439,7 @@ void scene_tutorial(App& a) {
     if (a.ui.button("t_next", next, label, can_next ? Style::Primary : Style::Normal, can_next, 17) || (can_next && a.in.key(SDLK_RETURN))) {
         if (last) {
             a.settings.black = "human";
-            a.settings.white = "monte_carlo";
+            a.settings.white = "beginner";
             a.start_game();
         } else {
             start_lesson(a, t.index + 1);
