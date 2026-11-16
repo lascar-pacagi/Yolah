@@ -81,6 +81,9 @@
 // gives SDL four functions (see @@MAIN); SDL owns the loop. This is the
 // recommended structure in SDL3 and works the same on every platform.
 #define SDL_MAIN_USE_CALLBACKS 1
+#ifdef __linux__
+#include <malloc.h>
+#endif
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
@@ -2201,9 +2204,11 @@ struct Art {
         if (first.frames.empty()) first.frames.push_back(std::vector<Pixel>(size_t(size) * size, 0));
         // Animations of another kind (the kind changed) are kept but unused.
     }
-    void update_texture() {
-        if (!dirty && tex) return;
-        if (tex) SDL_DestroyTexture(tex);
+    // The sheet and, when smooth, its halved levels, in memory (no SDL call: load_all_arts
+    // runs it on every core at start-up, the textures are made later on the main thread).
+    struct Level { int w, h; std::vector<Pixel> px; };
+    std::vector<Level> pending;
+    void build_levels() {
         cols = 1;
         for (auto& a : anims) cols = std::max(cols, int(a.frames.size()));
         int rows = std::max(1, int(anims.size()));
@@ -2221,16 +2226,12 @@ struct Art {
                 for (int c = 0; c < int(anims[r].frames.size()); c++)
                     for (int y = 0; y < size; y++)
                         std::memcpy(&sheet[(size_t(r) * size + y) * cols * size + size_t(c) * size], &anims[r].frames[c][size_t(y) * size], size * sizeof(Pixel));
-        tex = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, cols * size, rows * size);
-        SDL_UpdateTexture(tex, nullptr, sheet.data(), cols * size * int(sizeof(Pixel)));
-        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-        SDL_SetTextureScaleMode(tex, smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
-        for (SDL_Texture* l : levels) SDL_DestroyTexture(l);
-        levels.clear();
-        if (smooth) {   // halve while the frames stay even and larger than 16 pixels
-            int w = cols * size, h = rows * size, fs = size;
-            std::vector<Pixel> cur = std::move(sheet);
+        pending.clear();
+        int w = cols * size, h = rows * size, fs = size;
+        pending.push_back({w, h, std::move(sheet)});
+        if (smooth)   // halve while the frames stay even and larger than 16 pixels
             while (fs % 2 == 0 && fs / 2 >= 16) {
+                const std::vector<Pixel>& cur = pending.back().px;
                 int w2 = w / 2, h2 = h / 2;
                 std::vector<Pixel> nx(size_t(w2) * h2);
                 for (int y = 0; y < h2; y++)
@@ -2246,15 +2247,27 @@ struct Art {
                         if (al > 0) o = {uint8_t(r / al + 0.5f), uint8_t(g / al + 0.5f), uint8_t(b / al + 0.5f), uint8_t(al / 4 * 255 + 0.5f)};
                         nx[size_t(y) * w2 + x] = pack(o);
                     }
-                SDL_Texture* lt = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w2, h2);
-                SDL_UpdateTexture(lt, nullptr, nx.data(), w2 * int(sizeof(Pixel)));
-                SDL_SetTextureBlendMode(lt, SDL_BLENDMODE_BLEND);
-                SDL_SetTextureScaleMode(lt, SDL_SCALEMODE_LINEAR);
-                levels.push_back(lt);
-                cur = std::move(nx);
+                pending.push_back({w2, h2, std::move(nx)});
                 w = w2; h = h2; fs /= 2;
             }
+    }
+    void update_texture() {
+        if (!dirty && tex) return;
+        if (pending.empty()) build_levels();
+        if (tex) SDL_DestroyTexture(tex);
+        for (SDL_Texture* l : levels) SDL_DestroyTexture(l);
+        levels.clear();
+        for (size_t i = 0; i < pending.size(); i++) {
+            const Level& L = pending[i];
+            SDL_Texture* t = SDL_CreateTexture(draw::R, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, L.w, L.h);
+            SDL_UpdateTexture(t, nullptr, L.px.data(), L.w * int(sizeof(Pixel)));
+            SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureScaleMode(t, smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+            if (i == 0) tex = t;
+            else levels.push_back(t);
         }
+        pending.clear();
+        pending.shrink_to_fit();
         dirty = false;
     }
     // The frame of animation `n` shown `t` seconds after it started (its row
@@ -2320,8 +2333,8 @@ fs::path art_dir() {          // by value: load_all_arts calls it from several t
     return g_paths.assets / "art";
 }
 
-// lazy: a rendered sheet (smooth) keeps no pixels in memory, they are read
-// again from the PNG when its texture is made (all of them decoded take 2.2 GB).
+// lazy: a rendered sheet (smooth) keeps no frames in memory (all of them decoded
+// take 2.2 GB): load_all_arts reads its PNG and makes its textures at once.
 bool load_art(const std::string& id, Art& out, bool lazy = false) {
     json j = load_json(art_dir() / (id + ".json"));
     if (!j.is_object()) return false;
@@ -2397,8 +2410,10 @@ bool save_art(Art& art) {
 }
 
 // All the drawings of assets/art. Decoding the PNG sheets (about 260, 140 MB)
-// is most of the start-up time: it runs on every core (load_art makes no SDL
-// call; the textures are created at the first draw), about 8× faster than in turn.
+// is most of the start-up time: it runs on every core (load_art and build_levels
+// make no SDL call), about 8× faster than in turn. The rendered sheets are then
+// uploaded at once (no delay later) and keep no pixels in memory; the drawings
+// of the workshop keep theirs (it edits them) and make their texture at the first draw.
 void load_all_arts() {
     std::error_code ec;
     std::vector<std::string> ids;
@@ -2415,11 +2430,18 @@ void load_all_arts() {
                 for (size_t i; (i = next.fetch_add(1)) < ids.size();) {
                     arts[i] = std::make_unique<Art>();
                     ok[i] = load_art(ids[i], *arts[i], true);
+                    if (ok[i] && arts[i]->lazy) arts[i]->build_levels();   // decoded and halved here, uploaded below
                 }
             });
     }
     for (size_t i = 0; i < ids.size(); i++)
-        if (ok[i]) g_arts[ids[i]] = std::move(arts[i]);
+        if (ok[i]) {
+            if (arts[i]->lazy) arts[i]->update_texture();   // all on the graphics card now: no delay when a theme first shows; the pixels are dropped
+            g_arts[ids[i]] = std::move(arts[i]);
+        }
+#ifdef __GLIBC__
+    malloc_trim(0);   // the freed pixels go back to the system (glibc keeps them otherwise)
+#endif
 }
 // The drawings of a kind, by name (smooth_too: also the rendered ones, which
 // the workshop does not edit; never the white variants).
@@ -9235,7 +9257,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     a->sprites = load_sprites(g_paths.assets / "sprites" / "sprites.json");
     a->piece_sets = load_piece_sets(g_paths.assets / "sprites" / "sets.json");
     add_set_sprites(a->sprites, a->piece_sets);
-    load_all_arts();
+    {
+        const double t0 = now_seconds();
+        load_all_arts();
+        if (std::getenv("YOLAH_FPS")) std::fprintf(stderr, "drawings loaded in %.2f s\n", now_seconds() - t0);
+    }
     register_art_sprites(a->sprites);
     a->roster = load_roster(g_paths.assets / "ai_roster.json");
     a->set_growth();
