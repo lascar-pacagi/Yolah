@@ -1,0 +1,6 @@
+# The three strongest AIs of the application, with its settings (app/assets/ai_roster.json), to rank them
+# precisely (nnue/top3_tournament.sh): Minimax NNUE dev (dev_u8), MCTS ResNet, AlphaZero (az_00271360,
+# copied to TOURNAMENT_DIR/az256.ts). Every pair plays each balanced opening with both colours.
+dev.cfg
+resnet.cfg
+alphazero.cfg

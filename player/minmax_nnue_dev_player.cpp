@@ -1704,14 +1704,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (i >= n) break;
         }
         const Move m = generated ? pick_move(moves, scores, i, n) : tt_move;   // stage 1: no list yet
-        if (m == s.excluded[ply_now] && m != Move::none()) continue;   // U4 (8): the singular search
+        if (m == s.excluded[ply_now] && m != Move::none()) { TR(SKIP, 7, int(i), m.raw()); continue; }   // U4 (8): the singular search
         // U5 (1): sealed pockets — one move kept per pocket (exact).
         if (options.reserve > 0 && generated && m != Move::none() && std::popcount(yolah.free_squares()) <= options.reserve_max_free) {
             if (!reserve_done) { compute_reserves(); reserve_done = true; }
             bool drop = false;
             for (int k = 0; k < n_reserves; k++)
                 if ((reserve_pieces[k] & square_bb(m.from_sq())) && m != reserve_keep[k]) drop = true;
-            if (drop) { s.nb_region_cuts++; continue; }
+            if (drop) { s.nb_region_cuts++; TR(SKIP, 1, int(i), m.raw()); continue; }
         }
         // U4 (2): one move per private region (only we can reach it) at non-PV nodes.
         if (options.pocket > 0 && prunable && depth >= options.pocket_depth && i > 0 && m != Move::none()) {
@@ -1719,14 +1719,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             const uint64_t priv = u4_ru & ~u4_rt;
             if (priv & square_bb(m.to_sq())) {
                 const uint64_t comp = region_reach(square_bb(m.to_sq()), priv) | square_bb(m.to_sq());
-                if (comp & pocket_done) { s.nb_fly_prunes++; fly_pruned = true; continue; }
+                if (comp & pocket_done) { s.nb_fly_prunes++; fly_pruned = true; TR(SKIP, 2, int(i), m.raw()); continue; }
                 pocket_done |= comp;
             }
         }
         // U7 (A4): history pruning; (B6): futility pruning per move.
         if (generated && prunable && i >= 1 && best > -WIN && scores[i] < SCORE_COUNTER && !killer_sp(m) && m != Move::none() && depth <= 3) {
-            if (options.hist_prune > 0 && i >= 2 && scores[i] < SCORE_ARTICULATION && scores[i] < -options.hist_prune * depth) { node_fragile = true; continue; }
-            if (options.fp_margin > 0 && s.eval_stack[ply_now] != EVAL_NONE && static_eval + 1000 + options.fp_margin * depth <= alpha) { node_fragile = true; continue; }
+            if (options.hist_prune > 0 && i >= 2 && scores[i] < SCORE_ARTICULATION && scores[i] < -options.hist_prune * depth) { node_fragile = true; TR(SKIP, 3, int(i), m.raw()); continue; }
+            if (options.fp_margin > 0 && s.eval_stack[ply_now] != EVAL_NONE && static_eval + 1000 + options.fp_margin * depth <= alpha) { node_fragile = true; TR(SKIP, 4, int(i), m.raw()); continue; }
         }
         // Q. Proxy tail: an ordinary move ordered after the failed witness.
         int tail_r = 0;
@@ -1793,6 +1793,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 s.nb_fly_prunes++;
                 if (options.verify_tests && !s.verifying) verify_decision(yolah, s, hash, m, depth, alpha, true);
                 fly_pruned = true;
+                TR(SKIP, 5, int(i), m.raw());
                 continue;
             }
             if (!fly_ref && vf > alpha && vf < WIN && (options.fly_reply & 2) && thr == alpha) {   // good even against the stronger reply: cut
@@ -1833,6 +1834,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 s.nb_fly_prunes++;
                 if (options.verify_tests && !s.verifying) verify_decision(yolah, s, hash, m, depth, alpha, true);
                 fly_pruned = true;
+                TR(SKIP, 5, int(i), m.raw());
                 continue;
             }
         }
@@ -1895,6 +1897,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
             if (stopped()) return TRET(0);
             if (refuted) {
+                TR(SKIP, 6, int(i), m.raw());
                 s.nb_fly_prunes++;
                 if (options.refute_reduction > 0) fly_pruned = true;   // exact at reduction 0: the node may store its bound
                 if (options.verify_tests && !s.verifying) verify_decision(yolah, s, hash, m, depth, alpha, true);
@@ -1952,6 +1955,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         s.ext_sum[ply_now + 1] = s.ext_sum[ply_now] + ext;
         if (ext > 0) r_fly = 0;
         const int r_used = std::min(r_fly + tail_r, std::max(0, depth - 2));
+        TR(REDUCE, int(i), m.raw(), r, r_used, ext);
         if (i < Yolah::MAX_NB_MOVES) searched[i] = true;
         const int v = search_move(yolah, s, hash, m, i, r_used, alpha, beta, depth + ext);
         // U7 (C5): a reduction that was wrong (the reduced search beat alpha and the full one confirmed it)

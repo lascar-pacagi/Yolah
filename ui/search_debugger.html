@@ -883,6 +883,12 @@ function describe(e) {
       break; }
     case E.CHILD_EVALS: s = `(Débogueur) valeur NNUE de chacun des ${a(0)} enfants, calculée à part : la recherche ne la voit pas. Voir l'onglet « Coups ».`; break;
     case E.STOPPED: s = "<span class=bad>Enregistrement plein : la recherche a été arrêtée ici.</span>"; break;
+    case E.REDUCE: s = `Réduction finale du coup ${mvStr(a(1))} (rang ${a(0)}) : formule LMR ${a(2)}, <b>réduction utilisée ${a(3)}</b>` +
+      (a(3) !== a(2) ? ` (ajustée par les options : interception, historique des réductions ratées, nœud de coupure, poche…)` : "") +
+      (a(4) ? `, <b>extension +${a(4)}</b>` : "") + "."; break;
+    case E.SKIP: s = `Coup ${mvStr(a(2))} (rang ${a(1)}) <b>écarté sans recherche</b> : ` + ["", "poche scellée (réserve de tempos : un seul coup gardé, exact)",
+      "région privée (un coup par région)", "élagage par l'historique", "élagage futile (valeur statique trop basse)", "test « pouvoir » (fly reply / test optimiste)",
+      "réfutation par la réplique la plus probable", "coup exclu de la recherche singulière"][a(0)] + "."; break;
     default: s = name;
   }
   return `<span class="ev">${name}</span> <span class=dim>#${e} · ligne ${T.line[e]}</span><br>${s}`;
@@ -1226,15 +1232,15 @@ function ttStateAt(key, t) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Tabs
 // ═══════════════════════════════════════════════════════════════════════════
-const TABS = [["branche", "Branche"], ["coups", "Coups"], ["tt", "TT"], ["hist", "Historique"], ["iter", "Itérations"], ["stats", "Stats"], ["arrets", "Points d'arrêt"], ["valid", "Validation"], ["aide", "Aide"]];
+const TABS = [["branche", "Branche"], ["coups", "Coups"], ["pb", "Problèmes"], ["tt", "TT"], ["hist", "Historique"], ["iter", "Itérations"], ["stats", "Stats"], ["arrets", "Points d'arrêt"], ["valid", "Validation"], ["aide", "Aide"]];
 function renderTabs() {
   $("tabs").innerHTML = TABS.map(([k, n]) => `<button class="${ui.tab === k ? "on" : ""}" data-k="${k}">${n}</button>`).join("");
   for (const b of $("tabs").children) b.onclick = () => { ui.tab = b.dataset.k; renderTabs(); renderTab(); };  // keeps the preview
 }
 function renderTab() {
-  const f = { branche: tabBranch, coups: tabMoves, tt: tabTT, hist: tabHistory, iter: tabIters, stats: tabStats, arrets: tabBps, aide: tabHelp, valid: tabValidation }[ui.tab];
+  const f = { branche: tabBranch, coups: tabMoves, pb: tabProblems, tt: tabTT, hist: tabHistory, iter: tabIters, stats: tabStats, arrets: tabBps, aide: tabHelp, valid: tabValidation }[ui.tab];
   $("tabbody").innerHTML = f ? f() : "";
-  const after = { branche: afterBranch, coups: afterMoves, tt: afterTT, hist: afterHistory, iter: afterIters, arrets: afterBps, valid: afterValidation }[ui.tab];
+  const after = { branche: afterBranch, coups: afterMoves, pb: afterProblems, tt: afterTT, hist: afterHistory, iter: afterIters, arrets: afterBps, valid: afterValidation }[ui.tab];
   if (after) after();
 }
 
@@ -1558,6 +1564,10 @@ function afterBps() {
 function tabHelp() {
   return `<div class="small" style="line-height:1.6">
   <b>Ce que montre la page.</b> La trace vient du code C++ du joueur lui-même (<code>${esc(T.H["source name"])}</code>, compilé avec ses points d'enregistrement) : chaque événement porte sa ligne de code. Ce n'est pas une réimplémentation : le coup, la valeur et les nœuds sont ceux de la vraie recherche (vérifiable avec <code>--check 1</code>).<br>
+  <b>Problèmes</b> (onglet) : les nœuds où la recherche a perdu le plus de travail, par aspect (ordre des coups, réductions et
+  re-recherches, tests d'élagage ratés, aspiration, table de transposition), en pires cas ou en cas représentatifs (groupés par aspect et
+  profondeur) ; « problème suivant ▶ » avance dans le temps jusqu'au prochain cas au-dessus du seuil. Les événements <code>REDUCE</code>
+  (réduction finale, extensions) et <code>SKIP</code> (coups écartés par les options des campagnes U) montrent ce que font les options de dev_u8.<br>
   <b>Navigation</b> :
   <kbd>→</kbd>/<kbd>F11</kbd> pas (entre dans les appels) · <kbd>←</kbd> pas en arrière ·
   <kbd>↓</kbd>/<kbd>F10</kbd> pas par-dessus (saute le sous-arbre) · <kbd>↑</kbd> idem en arrière ·
@@ -1677,7 +1687,7 @@ const tdiv = (a, b) => Math.trunc(a / b);
 function validateTrace() {
   const E = T.E, nd = T.nd, C = T.C, cfg = T.H.config, W = C.WIN, INF = C.INFINITE;
   const checks = new Map();
-  const ck = (name, ok, e, msg) => {
+  let ck = (name, ok, e, msg) => {
     let c = checks.get(name); if (!c) checks.set(name, c = { n: 0, fail: 0, ex: [] });
     c.n++; if (!ok) { c.fail++; if (c.ex.length < 6) c.ex.push({ e, msg: typeof msg === "function" ? msg() : msg }); }
   };
@@ -1693,6 +1703,27 @@ function validateTrace() {
   const rootFix = !!cfg["root fix"], lmrTerr = cfg["lmr territory"] !== false, cutPV = cfg["tt cut pv"] !== false,
         cutPVExact = cfg["tt cut pv exact"] !== false, depthAsym = !!cfg["tt depth asym"];
   const notAssumed = Object.entries(assumed).filter(([k, v]) => cfg[k] !== undefined && cfg[k] !== v).map(([k]) => k);
+  // The options of campaigns U1-U10 (dev_u8: continuation history, reserves, killers as a bonus, intercept…) change the
+  // ordering, the reductions, the pruning and the history updates in ways the page does not recompute: with any of them on,
+  // only the structural checks are kept (moves, hashes, windows, values, table, network), the others are counted as "not modelled".
+  const UDEF = { "cont hist": 0, reserve: 0, "killer mode": 0, intercept: 0, "intercept lmr": false, lmrh: 0, "corr hist": 0,
+    improving: false, iir: 0, "cutnode lmr": 0, se: 0, multicut: false, "piece lmr": 0, "family lmr": false, "gate lmr": 0, "gate ext": 0,
+    "opp lmr": 0, "split solve": 0, pocket: 0, qs: 0, "sibling ref": false, "fly reply": 0, "fly prune": 0, "proxy fly": false,
+    "proxy restrict": 0, "proxy nohole": false, "pass razor": 0, "nohole razor": 0, refute: 0, "region bounds": 0, "fly lmr": 0,
+    "fly order": 0, "tt fragile": 0, "root audit": 0, sym: 0, "lmr table": "", "cont age": false, "cont fix": 0, "rel weight": 0,
+    "hole weight": 0, "from weight": 0, "geo weight": 0, "hpv weight": 0, killer2ply: 0, "hist prune": 0, "lmp protect": 0,
+    "fp margin": 0, "razor margin": 0, "corr cont": 0, "bonus margin": 0, "malus pct": 100, "malus cap": 0, "root context": false,
+    "killer special": false, "lmr hist full": false, "malus per key": false, "root cont lmr": 0, "prec weight": 0, "fn sample": 0,
+    "tt bonus": 0, "proxy bonus": 0 };
+  const unmod = Object.entries(UDEF).filter(([k, v]) => cfg[k] !== undefined && cfg[k] !== v).map(([k]) => k);
+  const CORE = ["coup légal", "hash Zobrist", "ply du nœud", "fenêtre et profondeur", "résultat d'un appel", "appel : α courant", "appel d'un enfant",
+    "nœuds de la trace", "page :", "partie finie", "partie non finie", "evaluate()", "valeur NNUE de l'enfant", "écriture TT", "sonde TT",
+    "valeur de l'itération", "coup de l'itération", "résultat final", "issue de l'itération", "β-coupure : v ≥ β", "β-coupure : valeur rendue"];
+  let skipped = 0;
+  if (unmod.length) {
+    const ck0 = ck;
+    ck = (name, ok, e, msg) => { if (CORE.some(c => name.startsWith(c))) ck0(name, ok, e, msg); else skipped++; };
+  }
   const lmrBase = cfg["lmr base"], lmrDiv = cfg["lmr divisor"];
   const lmrTable = (d, n) => Math.trunc(1024 * (lmrBase + Math.log(d) * Math.log(n) / lmrDiv));
   const lmrRed = (depth, i, pv, special, hist) => {
@@ -2052,7 +2083,7 @@ function validateTrace() {
     let n = 0; for (let e = nd.enter[q]; e <= x; e++) if (T.type[e] === E.ENTER) n++;
     ck("page : taille des sous-arbres", n === nd.sub[q], nd.enter[q], "différente");
   }
-  return { checks, notAssumed, full };
+  return { checks, notAssumed, full, unmod, skipped };
 }
 function legalOrPass(pos) { const l = legalMoves(pos); return l.length ? l : [0]; }
 function sameSet(a, b) { if (a.length !== b.length) return false; const s = new Set(a); return b.every(x => s.has(x)); }
@@ -2068,6 +2099,8 @@ function tabValidation() {
     const tot = [...r.checks.values()].reduce((s, c) => s + c.n, 0), bad = [...r.checks.values()].reduce((s, c) => s + c.fail, 0);
     h += `<div style="margin:8px 0;font-size:14px">${bad ? `<span class=bad>${bad} échecs</span>` : `<span class=good>Tout est cohérent</span>`} sur ${fmtN(tot)} vérifications${r.label ? " — " + r.label : ""}.</div>`;
     if (r.notAssumed.length) h += `<div class=warn>Options différentes des valeurs par défaut (certaines vérifications ne s'appliquent pas) : ${r.notAssumed.join(", ")}</div>`;
+    if (r.unmod && r.unmod.length) h += `<div class=warn>Options des campagnes U1-U10 actives (${r.unmod.join(", ")}) : la page ne refait pas leurs calculs d'ordre, de réduction,
+      d'élagage et d'historique ; seules les vérifications structurelles (coups, hash, fenêtres, valeurs, table, réseau) sont faites — ${fmtN(r.skipped || 0)} vérifications non modélisées.</div>`;
     if (r.full) h += `<div class=warn>Trace tronquée : la fin n'est pas vérifiée.</div>`;
     h += `<table class="t"><tr><th>vérification</th><th class=r>cas</th><th class=r>échecs</th><th>exemples</th></tr>`;
     for (const [name, c] of r.checks) h += `<tr><td style="white-space:normal">${esc(name)}</td><td class=r>${fmtN(c.n)}</td><td class="r ${c.fail ? "bad" : "good"}">${c.fail}</td>` +
@@ -2081,18 +2114,123 @@ function afterValidation() {
   if ($("b-valall")) $("b-valall").onclick = () => {
     $("valmsg").textContent = "vérification de toute la partie…";
     setTimeout(() => {
-      const t0 = performance.now(), keep = G.k, all = new Map(); let full = false, notAssumed = [];
+      const t0 = performance.now(), keep = G.k, all = new Map(); let full = false, notAssumed = [], unmod = [], skipped = 0;
       for (let k = 0; k < G.H.searches.length; k++) {
         selectSearch(k);
-        const r = validateTrace(); full ||= r.full; notAssumed = r.notAssumed;
+        const r = validateTrace(); full ||= r.full; notAssumed = r.notAssumed; unmod = r.unmod; skipped += r.skipped;
         for (const [n, c] of r.checks) { let A = all.get(n); if (!A) all.set(n, A = { n: 0, fail: 0, ex: [] }); A.n += c.n; A.fail += c.fail; for (const x of c.ex) if (A.ex.length < 6) A.ex.push({ ...x, k }); }
       }
       selectSearch(keep);
-      ui.validation = { checks: all, notAssumed, full, label: `toute la partie, ${((performance.now() - t0) / 1000).toFixed(1)} s` };
+      ui.validation = { checks: all, notAssumed, full, unmod, skipped, label: `toute la partie, ${((performance.now() - t0) / 1000).toFixed(1)} s` };
       ui.tab = "valid"; renderTabs(); renderTab();
     }, 20);
   };
   for (const x of $("tabbody").querySelectorAll("a[data-ev]")) x.onclick = ev => { ev.preventDefault(); if (x.dataset.k !== "" && G) selectSearch(+x.dataset.k); go(+x.dataset.ev); };
+}
+
+// ── Problems: where the search wasted the most work, by aspect ──
+// Each problem is a node where some work turned out useless, measured in nodes:
+//   ordre      a cut node whose cutting move came late: the subtrees of the moves tried before it
+//   lmr        a reduced search that beat alpha and had to be redone (LMR → full depth), or a null
+//              window redone with the full window (PVS): the subtree of the search thrown away
+//   tests      a pruning test that did not cut (proxy witness, MPC): its subtree
+//   aspiration a root attempt that failed (low or high): the whole attempt
+//   tt         a position searched again at the same depth in the same iteration: the transposition
+//              the table did not keep
+const PB_CATS = [["general", "Général (tous les aspects)"], ["ordre", "Ordre des coups"], ["lmr", "Réductions et re-recherches (LMR / PVS)"],
+  ["tests", "Tests d'élagage ratés (proxy, MPC)"], ["aspiration", "Fenêtres d'aspiration"], ["tt", "Table de transposition (positions recherchées deux fois)"]];
+const PB_NAME = Object.fromEntries(PB_CATS);
+function buildProblems() {
+  const nd = T.nd, out = [];
+  const children = q => { const c = []; for (let x = nd.first[q]; x >= 0; x = nd.next[x]) c.push(x); return c; };
+  const seen = new Map();
+  for (let q = 0; q < T.N; q++) {
+    if (nd.exit[q] < 0) continue;
+    const ch = children(q);
+    // ordre: the cutting move came late
+    if (nd.reason[q] === R.CUT && nd.cutI[q] > 0) {
+      let w = 0, n = 0;
+      for (const c of ch) if (nd.idx[c] >= 0 && nd.idx[c] < nd.cutI[q] && nd.kind[c] >= 1 && nd.kind[c] <= 4) { w += nd.sub[c]; n++; }
+      if (w > 0) out.push({ q, cat: "ordre", w, txt: `coupure au coup de rang ${nd.cutI[q]} : ${fmtN(w)} nœuds sur ${n} recherche(s) de coups inutiles avant` });
+    }
+    // lmr / pvs: a search redone for the same move
+    for (let i = 0; i + 1 < ch.length; i++) {
+      const a = ch[i], b = ch[i + 1];
+      if (nd.idx[a] === nd.idx[b] && nd.idx[a] >= 0 && nd.kind[a] >= 1 && nd.kind[a] <= 2 && nd.kind[b] > nd.kind[a] && nd.kind[b] <= 4)
+        out.push({ q, cat: "lmr", w: nd.sub[a], txt: `${nd.kind[a] === 1 ? "recherche réduite (LMR)" : "fenêtre nulle (PVS)"} du coup ${mvStr(nd.move[a])} (rang ${nd.idx[a]}) refaite : ${fmtN(nd.sub[a])} nœuds perdus` });
+    }
+    // tests: a pruning test that did not cut
+    const reasonCut = nd.reason[q] === R.PROXY || nd.reason[q] === R.MPCH || nd.reason[q] === R.MPCL;
+    if (!reasonCut) for (const c of ch) if (nd.kind[c] >= 7 && nd.kind[c] <= 9)
+      out.push({ q, cat: "tests", w: nd.sub[c], txt: `${KIND[nd.kind[c]]} sans coupure (${mvStr(nd.move[c])}) : ${fmtN(nd.sub[c])} nœuds` });
+    // tt: the same position at the same depth again in the same iteration
+    if (nd.sub[q] > 1 && !nd.root[q]) {
+      const key = hkey(nd.hlo[q], nd.hhi[q]) + ":" + nd.depth[q] + ":" + nd.iter[q];
+      if (seen.has(key)) out.push({ q, cat: "tt", w: nd.sub[q], txt: `position déjà cherchée à la profondeur ${nd.depth[q]} dans cette itération (nœud #${seen.get(key)}) : ${fmtN(nd.sub[q])} nœuds de nouveau` });
+      else seen.set(key, q);
+    }
+  }
+  for (const it of T.iters) if (it.node >= 0 && (it.outcome === 1 || it.outcome === 2))
+    out.push({ q: it.node, cat: "aspiration", w: nd.sub[it.node], txt: `itération ${it.d}, fenêtre ${winStr(it.alpha, it.beta)} : ${it.outcome === 1 ? "échec bas" : "échec haut"}, ${fmtN(nd.sub[it.node])} nœuds à refaire` });
+  return { all: out, total: T.N };
+}
+function problemsOf(cat) {
+  if (!T.problems) T.problems = buildProblems();
+  const L = cat === "general" ? T.problems.all : T.problems.all.filter(p => p.cat === cat);
+  return L;
+}
+// Representative cases: problems grouped by aspect and depth; each group shows its total, its count and a
+// typical case (the one at its 75th percentile of waste: frequent and costly, not the single outlier).
+function problemGroups(L) {
+  const G2 = new Map();
+  for (const p of L) { const k = p.cat + "|" + T.nd.depth[p.q]; if (!G2.has(k)) G2.set(k, []); G2.get(k).push(p); }
+  const out = [];
+  for (const [k, ps] of G2) {
+    ps.sort((a, b) => a.w - b.w);
+    const tot = ps.reduce((s, p) => s + p.w, 0);
+    out.push({ cat: ps[0].cat, depth: T.nd.depth[ps[0].q], n: ps.length, tot, typ: ps[Math.min(ps.length - 1, Math.floor(ps.length * 0.75))], worst: ps[ps.length - 1] });
+  }
+  return out.sort((a, b) => b.tot - a.tot);
+}
+function tabProblems() {
+  const cat = ui.pbCat || "general", view = ui.pbView || "pires", thr = ui.pbThr ?? 50;
+  const L = problemsOf(cat), total = T.problems.total;
+  const waste = L.reduce((s, p) => s + p.w, 0);
+  let h = `<div class="legend">Les endroits où la recherche a <b>gaspillé le plus de travail</b>, mesuré en nœuds : coupures venues tard
+  (ordre des coups), recherches réduites ou en fenêtre nulle refaites (LMR, PVS), tests d'élagage qui n'ont pas coupé (proxy, MPC), tentatives
+  d'aspiration ratées, positions cherchées deux fois à la même profondeur. <b>Pires cas</b> : triés par nœuds perdus ;
+  <b>cas représentatifs</b> : regroupés par aspect et profondeur, chaque groupe avec un cas typique (75ᵉ centile) et le pire.
+  <b>Arrêt sur problème</b> : avance dans le temps jusqu'au prochain nœud qui perd au moins le seuil de nœuds.</div>
+  <div style="margin:6px 0"><select id="pb-cat">${PB_CATS.map(([k, n]) => `<option value="${k}" ${k === cat ? "selected" : ""}>${n}</option>`).join("")}</select>
+  <select id="pb-view"><option value="pires" ${view === "pires" ? "selected" : ""}>pires cas</option><option value="repr" ${view === "repr" ? "selected" : ""}>cas représentatifs</option></select>
+  seuil <input id="pb-thr" type="number" value="${thr}" style="width:70px"> nœuds
+  <button id="pb-prev">◀ problème précédent</button> <button id="pb-next">problème suivant ▶</button></div>
+  <div style="margin:4px 0">${fmtN(L.length)} cas, ${fmtN(waste)} nœuds perdus pour ${fmtN(total)} nœuds dans la trace` +
+    (cat === "general" ? ` <span class=dim>(les aspects se chevauchent : une tentative d'aspiration ratée contient d'autres cas, le total peut dépasser la trace)</span>` : ` (${(100 * waste / total).toFixed(1)} %)`) + `.</div>`;
+  if (view === "pires") {
+    const S = [...L].sort((a, b) => b.w - a.w).slice(0, 200);
+    h += `<table class="t"><tr><th>nœud</th><th>aspect</th><th class=r>prof.</th><th class=r>ply</th><th class=r>perdus</th><th>ce qui s'est passé</th></tr>` +
+      S.map(p => `<tr data-q="${p.q}"><td>#${p.q} ${mvStr(T.nd.move[p.q])}</td><td>${PB_NAME[p.cat].split(" (")[0]}</td><td class=r>${T.nd.depth[p.q]}</td><td class=r>${T.nd.ply[p.q] - T.nd.ply[0]}</td><td class=r>${fmtN(p.w)}</td><td style="white-space:normal">${esc(p.txt)}</td></tr>`).join("") + `</table>`;
+  } else {
+    h += `<table class="t"><tr><th>aspect</th><th class=r>prof.</th><th class=r>cas</th><th class=r>nœuds perdus</th><th>cas typique</th><th>pire cas</th></tr>` +
+      problemGroups(L).slice(0, 60).map(g => `<tr><td>${PB_NAME[g.cat].split(" (")[0]}</td><td class=r>${g.depth}</td><td class=r>${g.n}</td><td class=r>${fmtN(g.tot)}</td>` +
+        `<td style="white-space:normal"><a href="#" data-q="${g.typ.q}">#${g.typ.q}</a> ${esc(g.typ.txt)}</td><td><a href="#" data-q="${g.worst.q}">#${g.worst.q}</a> ${fmtN(g.worst.w)}</td></tr>`).join("") + `</table>`;
+  }
+  return h;
+}
+function gotoProblemNode(q) { ui.expanded && pathOf(q).forEach(x => ui.expanded.add(x)); go(T.nd.enter[q]); }
+function afterProblems() {
+  $("pb-cat").onchange = () => { ui.pbCat = $("pb-cat").value; renderTab(); };
+  $("pb-view").onchange = () => { ui.pbView = $("pb-view").value; renderTab(); };
+  $("pb-thr").onchange = () => { ui.pbThr = +$("pb-thr").value; renderTab(); };
+  const step = dir => {   // the next / previous problem in time, at least the threshold
+    const L = problemsOf(ui.pbCat || "general").filter(p => p.w >= (ui.pbThr ?? 50)).map(p => T.nd.enter[p.q]).sort((a, b) => a - b);
+    const t = dir > 0 ? L.find(e => e > cur) : [...L].reverse().find(e => e < cur);
+    if (t !== undefined) go(t); else $("pb-next").textContent = dir > 0 ? "plus de problème ▶" : $("pb-next").textContent;
+  };
+  $("pb-next").onclick = () => step(1);
+  $("pb-prev").onclick = () => step(-1);
+  for (const x of $("tabbody").querySelectorAll("[data-q]")) x.onclick = ev => { ev.preventDefault(); gotoProblemNode(+x.dataset.q); };
 }
 
 // ── the guide: how to record a trace, every option, sizes ──

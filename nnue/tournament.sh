@@ -53,6 +53,7 @@ THREADS="${THREADS:-4}"                        # search threads per player
 OPENING_PLIES="${OPENING_PLIES:-4}"
 BOOK="${BOOK:-}"                               # e.g. /Yolah/config/openings/balanced.txt; empty = random openings
 ROUNDS="${ROUNDS:-0}"                          # 0 = until the time limit
+SEED="${SEED:-}"                               # order of the openings (several jobs pooled: one seed each)
 # AZ_LATEST=1: copy the latest az_*.ts of the AlphaZero run into WORK_DIR/az256.ts
 # (the network of config/az_vs_nnue/az256.cfg). Only once: a resubmitted job keeps
 # playing the same network, even after the run has exported (or pruned) others.
@@ -97,7 +98,7 @@ echo "[$(date '+%F %T')] === Tournament ==="
 start_in_container bash -c "cd /Yolah/config && exec ${BUILD_DIR}/yolah_tournament --players ${PLAYERS} \
     --results /work/games.csv --time ${TIME_US} --threads ${THREADS} \
     --parallel ${PARALLEL} --gpu-parallel ${GPU_PARALLEL} --opening-plies ${OPENING_PLIES} \
-    ${BOOK:+--book ${BOOK}} --rounds ${ROUNDS} --hours ${MAX_HOURS}"
+    ${BOOK:+--book ${BOOK}} ${SEED:+--seed ${SEED}} --rounds ${ROUNDS} --hours ${MAX_HOURS}"
 wait_forwarding_signals
 
 echo "[$(date '+%F %T')] === Stopped (exit code ${RC}) — ratings ==="

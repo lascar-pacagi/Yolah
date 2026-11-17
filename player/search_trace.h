@@ -48,12 +48,16 @@ struct SearchTracer {
         STOPPED,        // the recording is full: the search was stopped
         YT_STORE,       // tt_store, Yolah table                 (depth, alpha, beta, value, move; old: hash lo, hi, depth
                         //                                        (−1: empty), lower, upper, move; new: depth, lower, upper, move)
+        REDUCE,         // the reduction finally used for a move  (i, move, LMR formula, reduction used, extension)
+        SKIP,           // a move skipped by a pruning rule       (reason, i, move): 1 sealed pocket (tempo reserve),
+                        //   2 private region, 3 history pruning, 4 futility, 5 fly / optimistic test, 6 refutation,
+                        //   7 singular search's excluded move
         NB_EVENTS
     };
     static constexpr const char* EVENT_NAMES[NB_EVENTS] = {
         "", "SEARCH", "ITER", "ITER_RESULT", "PV", "ROOT_ORDER", "ENTER", "RETURN", "TT_PROBE", "EVAL", "RFP", "MPC",
         "MPC_RESULT", "PROXY", "PROXY_RESULT", "GEN", "SCORES", "MOVE", "CALL", "CALL_RESULT", "MOVE_DONE", "LMP",
-        "CUTOFF", "KILLER", "HISTORY", "COUNTER", "TT_STORE", "CHILD_EVALS", "STOPPED", "YT_STORE"};
+        "CUTOFF", "KILLER", "HISTORY", "COUNTER", "TT_STORE", "CHILD_EVALS", "STOPPED", "YT_STORE", "REDUCE", "SKIP"};
 
     std::vector<int32_t> words;
     size_t max_words = size_t(1) << 26;    // 256 MB of events, then the search is stopped
