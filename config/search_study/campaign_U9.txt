@@ -1,0 +1,15 @@
+# Campaign U9 (2026-11-17): Gemini's code review — four oversights, each as an option, 2000 games at 0.2 s.
+#   root context: s.played was empty before the root (a fresh Search each move): the continuation, intercept and
+#     countermove were blind at the root, the 2-ply continuation on the first ply
+#   killer special: with killers as a bonus (U7 km1 +17.7) they lost their special-move treatment
+#   lmr hist full: the LMR used the raw history while the ordering uses history + context
+#   reserve max free: sealed pockets looked for at every node (speed only)
+# BOOK=/Yolah/config/openings/balanced.txt; exclude crn04,crn06,crn07,crn14,crn15
+u9_rc dev_u6 200000 1000
+u9_km1sp u7_km1 200000 1000
+u9_lmrfull dev_u6 200000 1000
+u9_km1full u7_km1 200000 1000
+u9_rmf dev_u6 200000 1000
+u9_kilrc u8_kil 200000 1000
+u9_kilcall u8_kilc 200000 1000
+u9_rc dev_u6 1000000 1000

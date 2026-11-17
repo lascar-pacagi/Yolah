@@ -192,6 +192,27 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
         }
         searches.push_back(std::move(s));
     }
+    // U9: the moves that led to the root, by comparison with the previous root
+    // (two plies before: our move, then the opponent's), for the context tables.
+    if (options.root_context) {
+        const int ply = yolah.nb_plies();
+        Move p1 = Move::none(), p2 = Move::none();
+        if (prev_root_ply >= 0 && ply == prev_root_ply + 2) {
+            const uint8_t us = yolah.current_player(), them = Yolah::other_player(us);
+            auto moved = [&](uint64_t before, uint64_t after) {
+                const uint64_t from = before & ~after, to = after & ~before;
+                return std::popcount(from) == 1 && std::popcount(to) == 1 ? Move(Square(std::countr_zero(from)), Square(std::countr_zero(to))) : Move::none();
+            };
+            p2 = moved(prev_root[us], yolah.bitboard(us));
+            p1 = moved(prev_root[them], yolah.bitboard(them));
+        }
+        for (auto& sp : searches) {
+            if (ply >= 1) sp->played[ply - 1] = p1;
+            if (ply >= 2) sp->played[ply - 2] = p2;
+        }
+        prev_root = {yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE), yolah.empty_bitboard()};
+        prev_root_ply = ply;
+    }
     {
         std::vector<std::jthread> helpers;
         for (size_t i = 1; i < nb_threads; i++) {
@@ -804,6 +825,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                            || s.excluded[yolah.nb_plies()] != Move::none();   // U4: the singular search (same hash)
     const uint16_t ply_now = yolah.nb_plies();
     s.eval_stack[ply_now] = EVAL_NONE;
+    // U9: with "killer special", the killers count as special moves even when ordered as a bonus
+    auto killer_sp = [&](Move mv) { return options.killer_special && mv != Move::none() && (mv == s.killer1[ply_now] || mv == s.killer2[ply_now]); };
     if (options.sibling_ref) for (auto& r : s.sib_ref[ply_now + 1]) r = Move::none();
     // 1. Finished game: the exact score (difference of the numbers of moves),
     //    pushed beyond any evaluation (|eval| ≤ WIN) so that a real win always
@@ -1317,7 +1340,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     std::copy(cand + r, cand + nc, cand);
                     nc -= r;
                 } else if (options.proxy_witness == 0) {
-                    for (size_t j = 0; j < n; j++) if (scores[j] < SCORE_COUNTER) cand[nc++] = int(j);
+                    for (size_t j = 0; j < n; j++) if (scores[j] < SCORE_COUNTER && !killer_sp(moves[j])) cand[nc++] = int(j);
                     std::stable_sort(cand, cand + nc, [&](int a, int b) { return scores[a] > scores[b]; });
                     const int r = std::min(nc, options.proxy_rank);
                     std::copy(cand + r, cand + nc, cand);
@@ -1664,7 +1687,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         const Move m = generated ? pick_move(moves, scores, i, n) : tt_move;   // stage 1: no list yet
         if (m == s.excluded[ply_now] && m != Move::none()) continue;   // U4 (8): the singular search
         // U5 (1): sealed pockets — one move kept per pocket (exact).
-        if (options.reserve > 0 && generated && m != Move::none()) {
+        if (options.reserve > 0 && generated && m != Move::none() && std::popcount(yolah.free_squares()) <= options.reserve_max_free) {
             if (!reserve_done) { compute_reserves(); reserve_done = true; }
             bool drop = false;
             for (int k = 0; k < n_reserves; k++)
@@ -1682,13 +1705,13 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             }
         }
         // U7 (A4): history pruning; (B6): futility pruning per move.
-        if (generated && prunable && i >= 1 && best > -WIN && scores[i] < SCORE_COUNTER && m != Move::none() && depth <= 3) {
+        if (generated && prunable && i >= 1 && best > -WIN && scores[i] < SCORE_COUNTER && !killer_sp(m) && m != Move::none() && depth <= 3) {
             if (options.hist_prune > 0 && i >= 2 && scores[i] < SCORE_ARTICULATION && scores[i] < -options.hist_prune * depth) { node_fragile = true; continue; }
             if (options.fp_margin > 0 && s.eval_stack[ply_now] != EVAL_NONE && static_eval + 1000 + options.fp_margin * depth <= alpha) { node_fragile = true; continue; }
         }
         // Q. Proxy tail: an ordinary move ordered after the failed witness.
         int tail_r = 0;
-        if (tail && after_witness >= 0 && scores[i] < SCORE_COUNTER && after_witness++ >= options.proxy_tail_keep) {
+        if (tail && after_witness >= 0 && scores[i] < SCORE_COUNTER && !killer_sp(m) && after_witness++ >= options.proxy_tail_keep) {
             const int k = after_witness - 1 - options.proxy_tail_keep;   // 0 for the first move concerned
             if (options.proxy_tail <= 2) {
                 if (best > -WIN) { node_fragile = true; break; }      // pruned (once a move that does not lose was found)
@@ -1703,9 +1726,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         // scores[i] is now m's score: special move (killer, countermove), articulation or history
         const bool tactical = options.articulation_lmr && is_articulation_move(yolah, m);
         const int r = tactical || !generated ? 0          // (the first move is never reduced anyway)
-                    : late_move_reduction_of(depth, i, beta - alpha > 1 || tt_pv, scores[i] >= SCORE_COUNTER,
+                    : late_move_reduction_of(depth, i, beta - alpha > 1 || tt_pv, scores[i] >= SCORE_COUNTER || killer_sp(m),
                                              scores[i] >= SCORE_ARTICULATION ? 0
                                              : options.lmr_territory || !options.history ? scores[i]
+                                             : options.lmr_hist_full ? scores[i]
                                              : s.w->history[yolah.current_player()][m.from_sq()][m.to_sq()] + cont_term(m));
         // U. Fly reply: m first searched at a reduced depth against a stronger
         //    reply (the opponent may also jump over obstacles). Non-PV nodes
@@ -3188,6 +3212,10 @@ json MinMaxNNUE_DevPlayer::config() {
     j["razor margin"] = options.razor_margin;
     j["lmrh"] = options.lmrh;
     j["corr cont"] = options.corr_cont;
+    j["root context"] = options.root_context;
+    j["killer special"] = options.killer_special;
+    j["lmr hist full"] = options.lmr_hist_full;
+    j["reserve max free"] = options.reserve_max_free;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;

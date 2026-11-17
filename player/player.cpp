@@ -482,6 +482,10 @@ unique_ptr<Player> Player::create(const json& j) {
              options.razor_margin = j.value("razor margin", options.razor_margin);
              options.lmrh = j.value("lmrh", options.lmrh);
              options.corr_cont = j.value("corr cont", options.corr_cont);
+             options.root_context = j.value("root context", options.root_context);
+             options.killer_special = j.value("killer special", options.killer_special);
+             options.lmr_hist_full = j.value("lmr hist full", options.lmr_hist_full);
+             options.reserve_max_free = j.value("reserve max free", options.reserve_max_free);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);

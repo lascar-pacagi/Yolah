@@ -310,6 +310,11 @@ struct MinMaxNNUE_DevOptions {
     int  razor_margin = 0;               // ["razor margin"] U7 (B7): razoring at depth <= 2: static + this·depth <= alpha: the static value returned (0 off)
     int  lmrh = 0;                       // ["lmrh"] U7 (C5): moves whose reduced search was wrong (failed high after reduction) learnt by context; history >= this: one ply less (0 off)
     int  corr_cont = 0;                  // ["corr cont"] U7 (C7): correction of the static value (pruning only) by (our previous destination, the opponent's last destination)
+    // U9 (2026-11-17, Gemini's code review)
+    bool root_context = false;            // ["root context"] the last two moves before the root (found by comparing with the previous root) fill played[], so that the continuation, intercept and countermove also work at the root and the first plies
+    bool killer_special = false;          // ["killer special"] with "killer mode" 1, the killers stay special moves for the LMR, the proxy witnesses, the tail and the per-move pruning
+    bool lmr_hist_full = false;           // ["lmr hist full"] the LMR's history term is the ordering score (history + every context term)
+    int  reserve_max_free = 64;           // ["reserve max free"] the sealed pockets only looked for with at most this many free squares (speed)
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced
@@ -614,6 +619,8 @@ private:
     std::chrono::steady_clock::time_point search_start{};   // U5 (8)
     uint64_t search_us = 0;
     std::vector<int8_t> lmr_adjust;       // U5 (6): learnt adjustment per bucket (lmr_bucket)
+    std::array<uint64_t, 3> prev_root{};  // U9: the previous root's black, white, empty bitboards
+    int prev_root_ply = -1;
     static constexpr int LMR_BUCKETS = 8 * 5 * 4 * 4 * 3;
     Accumulator sym_acc;                  // U5 (9): the mirror's accumulator
     int  sym_eval(const Yolah& yolah);   // U: tests, prunes, cuts, nodes in the tests (search_bench)
