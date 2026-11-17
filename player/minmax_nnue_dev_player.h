@@ -131,6 +131,21 @@ int lmr_bucket(int free, int depth, size_t i, int hist, int tried);   // U5 (6) 
 //      jump over pieces and holes along a queen's line); pruned if even so it
 //      stays <= alpha (mode 1), the node cut if it beats alpha (mode 2).
 //      Campaign U1.
+//      Campaigns U1-U10 (2026-11-17, config/search_study/campaign_U*.txt, about
+//      200 variants, 2000 games each, all behind options, off by default):
+//      the "extra power" family (U1-U3: fly reply, optimistic test, proxy
+//      witness against a stronger reply, region bounds…) brought nothing (best
+//      ≈ 0; storing the bound of a node with pruned moves cost −340). What
+//      paid is ordering by the LOCAL reply to the opponent's last move. Kept in
+//      config/search_study/dev_u8.cfg (+54.1 [+45.0, +63.3] against dev_final
+//      at 1 s): continuation history by the last move ("cont hist" 1, U4
+//      +32.6), sealed pockets as tempo reserves ("reserve", exact, U5 +10 at
+//      1 s), killers as a bonus ("killer mode" 1, U7 +17.7), intercept of the
+//      last move with one ply less of LMR ("intercept", U7 +17.0), history of
+//      reductions that proved wrong ("lmrh", U7 +12.3), correction history
+//      ("corr hist" 2, U6 +10.6). Neutral or worse: IIR, improving, singular
+//      extension / multi-cut, quiescence, razoring, futility per move, root
+//      audit, symmetry, learnt LMR, TT provenance, the reviews' fixes (U9, U10).
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
