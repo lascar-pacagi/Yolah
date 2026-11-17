@@ -199,6 +199,7 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
         asp_stats[0] += s->asp_attempts; asp_stats[1] += s->asp_failed;
         asp_stats[2] += s->asp_rebounds; asp_stats[3] += s->asp_failed_nodes;
         region_cuts += s->nb_region_cuts;
+        validity[0] += s->nb_checked; validity[1] += s->nb_false;
         fly_stats[0] += s->nb_fly_tests; fly_stats[1] += s->nb_fly_prunes; fly_stats[2] += s->nb_fly_cuts; fly_stats[3] += s->nb_fly_nodes;
     }
     r.move = best->move;
@@ -364,6 +365,8 @@ int MinMaxNNUE_DevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Mo
 //   2 only the first free square past the first run of obstacles
 //   3 the same, but only over holes (a run containing a piece cannot be jumped)
 //   4 the same, but only over a single obstacle square
+//   5 "micro-fly": over a single obstacle square, landing in the same region
+//     (8-connected squares that are not holes) as the piece: no new reserve
 // ordinary[k]: moves[k] is an ordinary move. Returns the number of moves.
 int fly_moves(const Yolah& yolah, uint8_t player, int jumps, Move* moves, bool* ordinary) {
     const uint64_t free = yolah.free_squares(), occupied = yolah.occupied_squares();
@@ -371,10 +374,22 @@ int fly_moves(const Yolah& yolah, uint8_t player, int jumps, Move* moves, bool* 
     static constexpr int DF[8] = {1, -1, 0, 0, 1, 1, -1, -1}, DR[8] = {0, 0, 1, -1, 1, -1, 1, -1};
     int n = 0;
     uint64_t bb = yolah.bitboard(player);
+    auto region_of = [&](Square sq) {   // 8-connected squares that are not holes, from sq
+        constexpr uint64_t NOT_A = 0xfefefefefefefefeULL, NOT_H = 0x7f7f7f7f7f7f7f7fULL;
+        const uint64_t open = ~yolah.empty_bitboard();
+        uint64_t r = square_bb(sq), prev = 0;
+        while (r != prev) {
+            prev = r;
+            const uint64_t row = r | ((r << 1) & NOT_A) | ((r >> 1) & NOT_H);
+            r = (row | (row << 8) | (row >> 8)) & open;
+        }
+        return r;
+    };
     while (bb) {
         const Square from = pop_lsb(bb);
         const uint64_t normal = attacks_bb(from, occupied) & free;
         uint64_t targets = normal;
+        const uint64_t region = jumps == 5 ? region_of(from) : ~uint64_t(0);
         if (jumps == 1) targets = attacks_bb(from, 0) & free;
         else
             for (int d = 0; d < 8; d++) {
@@ -387,7 +402,8 @@ int fly_moves(const Yolah& yolah, uint8_t player, int jumps, Move* moves, bool* 
                 while (inside() && !(sq() & free)) { piece |= (sq() & pieces) != 0; run++; f += DF[d]; r += DR[d]; }   // the obstacles
                 if (!inside() || run == 0) continue;
                 if (jumps == 3 && piece) continue;
-                if (jumps == 4 && run > 1) continue;
+                if ((jumps == 4 || jumps == 5) && run > 1) continue;
+                if (jumps == 5 && !(sq() & region)) continue;
                 targets |= sq();
             }
         while (targets) {
@@ -489,6 +505,57 @@ static uint64_t region_reach(uint64_t pieces, uint64_t free) {
     while (r != prev) { prev = r; r = grow(r) & free; }
     return r;
 }
+// G (sound): a legal harvest of the squares `excl` (free squares only `pieces`
+// can ever reach): moves only through and onto those squares, greedy (the
+// destination with the fewest free neighbours first). It can be played
+// whatever the opponent does, so our future moves are at least its length.
+static int greedy_harvest(uint64_t pieces, uint64_t excl) {
+    constexpr uint64_t NOT_A = 0xfefefefefefefefeULL, NOT_H = 0x7f7f7f7f7f7f7f7fULL;
+    auto neighbours = [&](uint64_t b) {
+        const uint64_t row = b | ((b << 1) & NOT_A) | ((b >> 1) & NOT_H);
+        return (row | (row << 8) | (row >> 8)) & ~b;
+    };
+    int count = 0;
+    for (;;) {
+        Square best_from = SQ_NONE, best_to = SQ_NONE;
+        int best_n = 99;
+        uint64_t pb = pieces;
+        while (pb) {
+            const Square from = pop_lsb(pb);
+            uint64_t t = attacks_bb(from, ~excl) & excl;
+            while (t) {
+                const Square to = pop_lsb(t);
+                const int nb = std::popcount(neighbours(square_bb(to)) & excl);
+                if (nb < best_n) { best_n = nb; best_from = from; best_to = to; }
+            }
+        }
+        if (best_from == SQ_NONE) return count;
+        pieces ^= square_bb(best_from) | square_bb(best_to);
+        excl &= ~square_bb(best_to);
+        count++;
+    }
+}
+// G: the bounds as score differences (low, high), side to move's view (search_bench checks them).
+std::pair<int, int> region_score_bounds(const Yolah& yolah) {
+    const uint8_t us = yolah.current_player(), them = Yolah::other_player(us);
+    const uint64_t free = yolah.free_squares();
+    const uint64_t ru = region_reach(yolah.bitboard(us), free), rt = region_reach(yolah.bitboard(them), free);
+    const int lu = (ru & ~rt) ? greedy_harvest(yolah.bitboard(us), ru & ~rt) : 0;
+    const int lt = (rt & ~ru) ? greedy_harvest(yolah.bitboard(them), rt & ~ru) : 0;
+    return {yolah.score(us) + lu - std::popcount(rt), yolah.score(us) + std::popcount(ru) - lt};
+}
+// G: sound bounds of the final value (the engine's scale: WIN + difference).
+std::pair<int, int> region_values(const Yolah& yolah, int win) {
+    const uint8_t us = yolah.current_player(), them = Yolah::other_player(us);
+    const uint64_t free = yolah.free_squares();
+    const uint64_t ru = region_reach(yolah.bitboard(us), free), rt = region_reach(yolah.bitboard(them), free);
+    const int diff = yolah.score(us);
+    const int lu = (ru & ~rt) ? greedy_harvest(yolah.bitboard(us), ru & ~rt) : 0;
+    const int lt = (rt & ~ru) ? greedy_harvest(yolah.bitboard(them), rt & ~ru) : 0;
+    const int low = diff + lu - std::popcount(rt), high = diff + std::popcount(ru) - lt;
+    auto value = [&](int d) { return d > 0 ? win + d : d < 0 ? d - win : 0; };
+    return {value(low), value(high)};
+}
 std::pair<int, int> region_bounds(const Yolah& yolah) {
     const uint8_t us = yolah.current_player(), them = Yolah::other_player(us);
     const uint64_t free = yolah.free_squares();
@@ -497,6 +564,87 @@ std::pair<int, int> region_bounds(const Yolah& yolah) {
     const int low = diff + std::popcount(ru & ~rt) - std::popcount(rt);
     const int high = diff + std::popcount(ru) - std::popcount(rt & ~ru);
     return {low, high};
+}
+
+// ─── U (C, D): moves that leave no hole ──────────────────────────────────────
+// The piece moves and scores, but its square stays free. Not a real position
+// (the scores no longer match the holes): the subtree uses no table (s.no_tt),
+// and its accumulator is computed from scratch (the incremental update assumes
+// a hole). Lazy accumulators only.
+uint64_t MinMaxNNUE_DevPlayer::nohole_play(Yolah& yolah, Search& s, Move m, std::array<uint64_t, 6>& saved) {
+    const auto [bs, ws] = yolah.score();
+    saved = {yolah.bitboard(Yolah::BLACK), yolah.bitboard(Yolah::WHITE), yolah.empty_bitboard(), bs, ws, yolah.nb_plies()};
+    const uint64_t mv = square_bb(m.from_sq()) | square_bb(m.to_sq());
+    const bool black = yolah.current_player() == Yolah::BLACK;
+    yolah.set_state(saved[0] ^ (black ? mv : 0), saved[1] ^ (black ? 0 : mv), saved[2],
+                    uint16_t(bs + (black ? 1 : 0)), uint16_t(ws + (black ? 0 : 1)), uint16_t(saved[5] + 1));
+    s.played[saved[5]] = m;
+    net_init(yolah, s.accs[saved[5] + 1]);
+    s.acc_ok[saved[5] + 1] = true;
+    return zobrist::hash(yolah);
+}
+void MinMaxNNUE_DevPlayer::nohole_undo(Yolah& yolah, Search& s, const std::array<uint64_t, 6>& saved) {
+    yolah.set_state(saved[0], saved[1], saved[2], uint16_t(saved[3]), uint16_t(saved[4]), uint16_t(saved[5]));
+    s.acc_ok[saved[5] + 1] = false;
+}
+// D: the node whose moves leave no hole (the proxy witness's opponent).
+int MinMaxNNUE_DevPlayer::negamax_nohole(Yolah& yolah, Search& s, uint64_t hash, int alpha, int beta, int depth) {
+    ++s.nb_nodes;
+    if (stopped()) return 0;
+    Yolah::MoveList moves;
+    yolah.moves(moves);
+    if (moves[0] == Move::none()) {   // it must pass: an ordinary node
+        const int saved = s.nohole_ply;
+        s.nohole_ply = -1;
+        const int v = negamax(yolah, s, hash, alpha, beta, depth);
+        s.nohole_ply = saved;
+        return v;
+    }
+    const uint8_t player = yolah.current_player();
+    std::stable_sort(moves.begin(), moves.end(), [&](Move a, Move b) {
+        return s.w->history[player][a.from_sq()][a.to_sq()] > s.w->history[player][b.from_sq()][b.to_sq()];
+    });
+    int best = -INFINITE;
+    for (Move m : moves) {
+        std::array<uint64_t, 6> saved;
+        const uint64_t h = nohole_play(yolah, s, m, saved);
+        s.no_tt++;
+        const int v = -negamax(yolah, s, h, -beta, -alpha, depth - 1);
+        s.no_tt--;
+        nohole_undo(yolah, s, saved);
+        if (stopped()) return 0;
+        best = std::max(best, v);
+        alpha = std::max(alpha, v);
+        if (alpha >= beta) break;
+    }
+    return best;
+}
+// H: a test's decision checked by a normal search (no test inside): a pruned
+// move m (prune: wrong if m beats `bound` = alpha), a cut by m (wrong if m stays
+// below `bound` = beta); m = none: the whole node (prune: wrong if it beats
+// alpha). Statistics only: it changes the table and the history.
+bool MinMaxNNUE_DevPlayer::verify_decision(Yolah& yolah, Search& s, uint64_t hash, Move m, int depth, int bound, bool prune) {
+    s.verifying = true;
+    s.fly_nest++;
+    int v;
+    if (m == Move::none()) v = prune ? negamax(yolah, s, hash, bound, bound + 1, depth) : negamax(yolah, s, hash, bound - 1, bound, depth);
+    else {
+        const uint8_t player = yolah.current_player();
+        s.played[yolah.nb_plies()] = m;
+        if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+        else net_play(player, m, s.acc, &s.refresh);
+        yolah.play(m);
+        const uint64_t child = zobrist::update(hash, player, m);
+        v = prune ? -negamax(yolah, s, child, -(bound + 1), -bound, depth - 1) : -negamax(yolah, s, child, -bound, -bound + 1, depth - 1);
+        yolah.undo(m);
+        if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
+    }
+    s.fly_nest--;
+    s.verifying = false;
+    const bool wrong = prune ? v > bound : v < bound;
+    s.nb_checked++;
+    s.nb_false += wrong;
+    return wrong;
 }
 
 // ─── Inner nodes ─────────────────────────────────────────────────────────────
@@ -517,8 +665,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     if (stopped()) return TRET(0);    // the caller ignores this value
     // U, pivot 1: the node whose side has the extra power (the optimistic test)
     if (yolah.nb_plies() == s.fly_ply) return TRET(negamax_fly(yolah, s, hash, alpha, beta, depth));
-    // between a test's root and its node with extra power, the values are not real: no table
-    const bool fly_above = s.fly_ply > int(yolah.nb_plies());
+    if (yolah.nb_plies() == s.nohole_ply) return TRET(negamax_nohole(yolah, s, hash, alpha, beta, depth));
+    // between a test's root and its node with extra power or restricted moves, and
+    // below a no-hole move, the values are not real: no table
+    const bool fly_above = s.fly_ply > int(yolah.nb_plies()) || s.no_tt > 0 || s.restrict_ply >= int(yolah.nb_plies());
     // 1. Finished game: the exact score (difference of the numbers of moves),
     //    pushed beyond any evaluation (|eval| ≤ WIN) so that a real win always
     //    beats a position that only looks good.
@@ -547,6 +697,12 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (tt.upper <= alpha) return TRET(tt.upper);
             if (tt.lower == tt.upper) return TRET(tt.lower);
         }
+    }
+    // U (G): sound bounds of the final value from the regions of free squares.
+    if (options.region_bounds == 2 && std::popcount(yolah.free_squares()) <= options.region_max_free) {
+        const auto [lv, uv] = region_values(yolah, WIN);
+        if (lv >= beta) { s.nb_region_cuts++; return TRET(lv); }
+        if (uv <= alpha) { s.nb_region_cuts++; return TRET(uv); }
     }
     // G. Very few free squares: the exact result from the endgame solver
     //    (win / draw / loss — only the sign matters for the outcome), instead
@@ -582,7 +738,9 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     int static_eval = 0;
     if (prunable && ((options.rfp_depth > 0 && depth <= options.rfp_depth) || (options.null_move && depth >= 3)
                      || (options.proxy_cut == 1 && depth >= options.proxy_depth)
-                     || (options.mpc > 0 && depth >= options.mpc_depth))) {
+                     || (options.mpc > 0 && depth >= options.mpc_depth)
+                     || (options.pass_razor > 0 && depth >= options.pass_razor_depth)
+                     || (options.nohole_razor > 0 && depth >= options.nohole_razor_depth))) {
         static_eval = evaluate(yolah, s, hash);
     }
     // F1. Reverse futility pruning ("static null move"): if the static value
@@ -595,10 +753,59 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         return TRET(static_eval);
     }
     // U, pivot 5: bounds of the final score from the regions of free squares.
-    if (prunable && options.region_bounds > 0 && std::popcount(yolah.free_squares()) <= options.region_max_free) {
+    if (prunable && options.region_bounds == 1 && std::popcount(yolah.free_squares()) <= options.region_max_free) {
         const auto [low, high] = region_bounds(yolah);
         if (low >= options.region_margin) { s.nb_region_cuts++; return TRET(beta); }
         if (high <= -options.region_margin) { s.nb_region_cuts++; return TRET(alpha); }
+    }
+    // U (E): a free pass to fail low — if even passing stays <= alpha − margin.
+    if (prunable && options.pass_razor > 0 && depth >= options.pass_razor_depth && !s.verifying && s.fly_nest == 0
+        && s.no_tt == 0 && static_eval <= alpha - options.pass_razor_guard && alpha - options.pass_razor_margin > -WIN
+        && yolah.nb_plies() > 0 && s.played[yolah.nb_plies() - 1] != Move::none()) {
+        const int thr = alpha - options.pass_razor_margin;
+        const int d = std::max(0, depth - 1 - (options.pass_razor_reduction + depth / 4 - 1));
+        const uint8_t player = yolah.current_player();
+        s.nb_fly_tests++;
+        s.played[yolah.nb_plies()] = Move::none();
+        if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+        else net_play(player, Move::none(), s.acc, &s.refresh);
+        yolah.play(Move::none());
+        s.fly_nest++;
+        const int v = -negamax(yolah, s, zobrist::update(hash, player, Move::none()), -(thr + 1), -thr, d);
+        s.fly_nest--;
+        yolah.undo(Move::none());
+        if (!options.lazy_accumulator) net_undo(player, Move::none(), s.acc, &s.refresh);
+        if (stopped()) return TRET(0);
+        if (v <= thr) {
+            s.nb_fly_prunes++;
+            if (options.verify_tests) verify_decision(yolah, s, hash, Move::none(), depth, alpha, true);
+            return TRET(alpha);
+        }
+    }
+    // U (C): the table's move (else killer 1) played without leaving a hole; if even so <= alpha, fail low.
+    if (prunable && options.nohole_razor > 0 && options.lazy_accumulator && depth >= options.nohole_razor_depth
+        && !s.verifying && s.fly_nest == 0 && s.no_tt == 0 && static_eval <= alpha - options.nohole_razor_guard) {
+        Move m = tt_move != Move::none() && is_legal(yolah, tt_move) ? tt_move : Move::none();
+        if (m == Move::none() && s.killer1[yolah.nb_plies()] != Move::none() && is_legal(yolah, s.killer1[yolah.nb_plies()]))
+            m = s.killer1[yolah.nb_plies()];
+        if (m != Move::none()) {
+            const int d = std::max(0, depth - 1 - (options.nohole_razor_reduction + depth / 4 - 1));
+            s.nb_fly_tests++;
+            std::array<uint64_t, 6> saved;
+            const uint64_t h = nohole_play(yolah, s, m, saved);
+            s.no_tt++;
+            s.fly_nest++;
+            const int v = -negamax(yolah, s, h, -(alpha + 1), -alpha, d);
+            s.fly_nest--;
+            s.no_tt--;
+            nohole_undo(yolah, s, saved);
+            if (stopped()) return TRET(0);
+            if (v <= alpha) {
+                s.nb_fly_prunes++;
+                if (options.verify_tests) verify_decision(yolah, s, hash, Move::none(), depth, alpha, true);
+                return TRET(alpha);
+            }
+        }
     }
     // O. Multi-ProbCut (Buro) without its regression, tuned by hand as
     //    Stockfish tunes its margins: search THIS position at a shallow depth
@@ -788,10 +995,24 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     s.fly_jumps = options.proxy_fly_jumps;
                     v = -negamax_fly(yolah, s, child, -bound, -bound + 1, d);
                     s.fly_nest--;
+                } else if (options.proxy_nohole && options.lazy_accumulator && s.no_tt == 0 && s.fly_nest == 0) {   // U (D)
+                    s.fly_nest++;
+                    s.nohole_ply = yolah.nb_plies();
+                    v = -negamax(yolah, s, child, -bound, -bound + 1, d);
+                    s.nohole_ply = -1;
+                    s.fly_nest--;
+                } else if (options.proxy_restrict > 0 && s.fly_nest == 0) {   // U (B): our next turn limited to k moves
+                    s.fly_nest++;
+                    s.restrict_ply = yolah.nb_plies() + 1;
+                    s.restrict_k = options.proxy_restrict;
+                    v = -negamax(yolah, s, child, -bound, -bound + 1, d + options.proxy_restrict_deeper);
+                    s.restrict_ply = -1;
+                    s.fly_nest--;
                 } else v = -negamax(yolah, s, child, -bound, -bound + 1, d);
                 TR(PROXY_RESULT, m.raw(), v, v >= bound);
                 yolah.undo(m);
                 if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
+                if (options.verify_tests && !s.verifying && v >= bound && !stopped()) verify_decision(yolah, s, hash, m, depth, bound, false);
                 return v;
             };
             const int R = options.proxy_reduction + depth / 4 - 1;
@@ -1049,7 +1270,9 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     int fly_first = -INFINITE;
     bool fly_pruned = false;                 // U: a move of this node was pruned by the fly reply               // U: the first move's value against the stronger reply ("fly reply relative")
     int after_witness = -1;                  // Q: ordinary moves searched after the witness (-1: not yet)
+    const bool restricted = int(yolah.nb_plies()) == s.restrict_ply;   // U (B)
     for (size_t i = 0; i < n || !generated; i++) {
+        if (restricted && i >= size_t(s.restrict_k)) break;
         if (!generated && i == 1) {
             // Stage 2: the table's move did not cut. Generate everything, put
             // the table's move where the selection would have put it (index
@@ -1157,11 +1380,13 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (fly_ref) fly_first = vf;
             else if (vf <= thr && (options.fly_reply & 1) && !(options.fly_reply_relative && fly_first == -INFINITE)) {   // pruned
                 s.nb_fly_prunes++;
+                if (options.verify_tests && !s.verifying) verify_decision(yolah, s, hash, m, depth, alpha, true);
                 fly_pruned = true;
                 continue;
             }
             if (!fly_ref && vf > alpha && vf < WIN && (options.fly_reply & 2) && thr == alpha) {   // good even against the stronger reply: cut
                 s.nb_fly_cuts++;
+                if (options.verify_tests && !s.verifying) verify_decision(yolah, s, hash, m, depth, beta, false);
                 return TRET(vf);
             }
             }
@@ -1195,7 +1420,73 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (stopped()) return TRET(0);
             if (vo <= alpha) {
                 s.nb_fly_prunes++;
+                if (options.verify_tests && !s.verifying) verify_decision(yolah, s, hash, m, depth, alpha, true);
                 fly_pruned = true;
+                continue;
+            }
+        }
+        // U (A): refutation by a restricted reply — the opponent limited to its
+        //    likeliest replies; if one keeps us <= alpha, m is pruned.
+        if (options.refute > 0 && prunable && generated && i >= size_t(options.refute_from) && depth >= options.refute_depth
+            && s.fly_nest == 0 && s.no_tt == 0 && !s.verifying && m != Move::none()) {
+            const uint8_t player = yolah.current_player(), opp = Yolah::other_player(player);
+            const uint64_t child = zobrist::update(hash, player, m);
+            s.played[yolah.nb_plies()] = m;
+            if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+            else net_play(player, m, s.acc, &s.refresh);
+            yolah.play(m);
+            bool refuted = false;
+            if (!yolah.game_over()) {
+                Yolah::MoveList replies;
+                yolah.moves(replies);
+                if (replies[0] != Move::none()) {
+                    Move cand[4];
+                    int nc = 0;
+                    auto add = [&](Move r) {
+                        if (r == Move::none() || nc >= options.refute_replies) return;
+                        for (int k = 0; k < nc; k++) if (cand[k] == r) return;
+                        if (std::find(replies.begin(), replies.end(), r) == replies.end()) return;
+                        cand[nc++] = r;
+                    };
+                    add(tt_probe(child).move);
+                    add(s.w->countermoves[m.from_sq()][m.to_sq()]);
+                    while (nc < options.refute_replies && nc < int(replies.size())) {   // then by history
+                        Move bm = Move::none();
+                        int bh = std::numeric_limits<int>::min();
+                        for (Move r : replies) {
+                            bool used = false;
+                            for (int k = 0; k < nc; k++) used |= cand[k] == r;
+                            if (!used && s.w->history[opp][r.from_sq()][r.to_sq()] > bh) { bh = s.w->history[opp][r.from_sq()][r.to_sq()]; bm = r; }
+                        }
+                        if (bm == Move::none()) break;
+                        cand[nc++] = bm;
+                    }
+                    const int d2 = depth - 2 - options.refute_reduction;
+                    s.nb_fly_tests++;
+                    s.fly_nest++;
+                    const size_t nodes0 = s.nb_nodes;
+                    for (int k = 0; k < nc && !refuted && !stopped(); k++) {
+                        const Move r = cand[k];
+                        s.played[yolah.nb_plies()] = r;
+                        if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+                        else net_play(opp, r, s.acc, &s.refresh);
+                        yolah.play(r);
+                        const int w = negamax(yolah, s, zobrist::update(child, opp, r), alpha, alpha + 1, d2);
+                        yolah.undo(r);
+                        if (!options.lazy_accumulator) net_undo(opp, r, s.acc, &s.refresh);
+                        refuted = w <= alpha;
+                    }
+                    s.nb_fly_nodes += s.nb_nodes - nodes0;
+                    s.fly_nest--;
+                }
+            }
+            yolah.undo(m);
+            if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
+            if (stopped()) return TRET(0);
+            if (refuted) {
+                s.nb_fly_prunes++;
+                if (options.refute_reduction > 0) fly_pruned = true;   // exact at reduction 0: the node may store its bound
+                if (options.verify_tests && !s.verifying) verify_decision(yolah, s, hash, m, depth, alpha, true);
                 continue;
             }
         }
@@ -2291,6 +2582,24 @@ json MinMaxNNUE_DevPlayer::config() {
     j["fly order"] = options.fly_order;
     j["fly order depth"] = options.fly_order_depth;
     j["fly order jumps"] = options.fly_order_jumps;
+    j["refute"] = options.refute;
+    j["refute replies"] = options.refute_replies;
+    j["refute depth"] = options.refute_depth;
+    j["refute from"] = options.refute_from;
+    j["refute reduction"] = options.refute_reduction;
+    j["proxy restrict"] = options.proxy_restrict;
+    j["proxy restrict deeper"] = options.proxy_restrict_deeper;
+    j["pass razor"] = options.pass_razor;
+    j["pass razor depth"] = options.pass_razor_depth;
+    j["pass razor margin"] = options.pass_razor_margin;
+    j["pass razor reduction"] = options.pass_razor_reduction;
+    j["pass razor guard"] = options.pass_razor_guard;
+    j["nohole razor"] = options.nohole_razor;
+    j["nohole razor depth"] = options.nohole_razor_depth;
+    j["nohole razor guard"] = options.nohole_razor_guard;
+    j["nohole razor reduction"] = options.nohole_razor_reduction;
+    j["proxy nohole"] = options.proxy_nohole;
+    j["verify tests"] = options.verify_tests;
     j["fly reply relative"] = options.fly_reply_relative;
     j["lmp depth"] = options.lmp_depth;
     j["lmp moves"] = options.lmp_moves;

@@ -233,7 +233,39 @@ struct MinMaxNNUE_DevOptions {
     //    extra power (instead of the history), at nodes of depth >= "fly order depth"
     int  fly_order = 0;              // ["fly order"]
     int  fly_order_depth = 6;        // ["fly order depth"]
-    int  fly_order_jumps = 2;        // ["fly order jumps"]        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
+    int  fly_order_jumps = 2;        // ["fly order jumps"]
+    // U, third round (campaign U3, ideas from Gemini and Codex):
+    //  G region bounds 2 = SOUND: our future moves >= a legal greedy harvest of the regions only we touch,
+    //    the opponent's <= the free squares of the regions it touches (8-connected, pieces are walls)
+    //  A refutation by a restricted reply: after a late move, the opponent limited to its "refute replies"
+    //    likeliest replies (child's table move, countermove, history); if one of them keeps us <= alpha
+    //    (search at depth − 2 − "refute reduction"), the move is pruned (exact at reduction 0)
+    int  refute = 0;                 // ["refute"]
+    int  refute_replies = 1;         // ["refute replies"]
+    int  refute_depth = 4;           // ["refute depth"]
+    int  refute_from = 4;            // ["refute from"]
+    int  refute_reduction = 0;       // ["refute reduction"]
+    //  B the proxy cut's witness with OUR next turn restricted to our k best-ordered moves (pessimistic),
+    //    searched "proxy restrict deeper" plies deeper
+    int  proxy_restrict = 0;         // ["proxy restrict"] k, 0 off
+    int  proxy_restrict_deeper = 0;  // ["proxy restrict deeper"]
+    //  E free pass to fail low: if even passing (searched at depth − 1 − R) stays <= alpha − margin, the node
+    //    fails low (in a zugzwang the pass is >= the best move; elsewhere the margin covers a move's worth)
+    int  pass_razor = 0;             // ["pass razor"]
+    int  pass_razor_depth = 4;       // ["pass razor depth"]
+    int  pass_razor_margin = 3000;   // ["pass razor margin"]
+    int  pass_razor_reduction = 3;   // ["pass razor reduction"]
+    int  pass_razor_guard = 0;       // ["pass razor guard"] only if static value <= alpha − this
+    //  C no-hole move to fail low: the table's move (else killer 1) played WITHOUT leaving a hole, searched at
+    //    depth − 1 − R; if even so <= alpha, the node fails low (only if static value <= alpha − guard)
+    int  nohole_razor = 0;           // ["nohole razor"]
+    int  nohole_razor_depth = 4;     // ["nohole razor depth"]
+    int  nohole_razor_guard = 2000;  // ["nohole razor guard"]
+    int  nohole_razor_reduction = 3; // ["nohole razor reduction"]
+    //  D the proxy cut's witness against opponent replies that leave no hole (pessimistic-ish)
+    bool proxy_nohole = false;       // ["proxy nohole"]
+    //  H validity statistics (search_bench): each prune / cut decision of a test re-searched normally
+    bool verify_tests = false;       // ["verify tests"]        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
     int  lmp_depth = 3;              // ["lmp depth"] late move pruning up to this depth (0 = never)
     int  lmp_moves = 4;              // ["lmp moves"] moves searched before pruning: this + depth²
     bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
@@ -457,6 +489,11 @@ private:
         int  fly_nest = 0;                         // U: fly replies in progress above this node
         int  fly_ply = -1;                         // U: the ply whose side has the extra power (negamax_fly), −1 none
         int  fly_jumps = 2;                        // U: the kind of extra power (fly_moves)
+        int  no_tt = 0;                            // U: inside a subtree whose positions are not real (no-hole moves): no table
+        int  restrict_ply = -1, restrict_k = 0;    // U (B): the ply whose moves are limited to the k best-ordered
+        int  nohole_ply = -1;                      // U (D): the ply whose moves leave no hole
+        bool verifying = false;                    // U (H): inside a verification search
+        uint64_t nb_checked = 0, nb_false = 0;     // U (H): decisions checked, wrong ones
         uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
     };
 
@@ -476,7 +513,8 @@ private:
     uint64_t nb_evals = 0, nb_eval_hits = 0;
     std::array<uint64_t, 4> asp_stats{};
     std::array<uint64_t, 4> fly_stats{};
-    uint64_t region_cuts = 0;   // U: tests, prunes, cuts, nodes in the tests (search_bench)
+    uint64_t region_cuts = 0;
+    std::array<uint64_t, 2> validity{};   // U (H): decisions checked, wrong ones   // U: tests, prunes, cuts, nodes in the tests (search_bench)
 
     bool stopped() const { return stop.load(std::memory_order_relaxed); }
     int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
@@ -486,6 +524,10 @@ private:
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
     int  negamax_fly(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);   // U: the stronger reply
     int  fly_static(Yolah& yolah, Search&, uint64_t hash, int jumps, bool ordinary_only);
+    int  negamax_nohole(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);   // U (D)
+    uint64_t nohole_play(Yolah& yolah, Search& s, Move m, std::array<uint64_t, 6>& saved);
+    void nohole_undo(Yolah& yolah, Search& s, const std::array<uint64_t, 6>& saved);
+    bool verify_decision(Yolah& yolah, Search& s, uint64_t hash, Move m, int depth, int bound, bool prune);
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const;
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int reduction, int alpha, int beta, int depth);
@@ -568,6 +610,7 @@ public:
     std::array<uint64_t, 4> aspiration_stats() const { return asp_stats; }
     std::array<uint64_t, 4> fly_reply_stats() const { return fly_stats; }
     uint64_t region_bound_cuts() const { return region_cuts; }
+    std::array<uint64_t, 2> validity_stats() const { return validity; }
     void clear_table(bool keep_ordering = false);   // forget everything: table, history, countermoves (reproducible
                                                     // benchmarks); keep_ordering: keep history and countermoves
     // The principal variation of the last search, read from the table (at most

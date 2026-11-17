@@ -77,6 +77,7 @@
 #include <atomic>
 
 using std::cout, std::cerr, std::string, std::vector;
+std::pair<int, int> region_score_bounds(const Yolah& yolah);   // player/minmax_nnue_dev_player.cpp (U, G)
 
 namespace {
     struct Args {
@@ -238,6 +239,7 @@ namespace {
         const bool wld = a.get("wld", "0") == "1";
         const uint64_t us = std::stoull(a.get("time", "0"));
         EndgameSolver solver(o);
+        int region_checked = 0, region_wrong = 0, region_width = 0;
         std::ofstream csv;
         if (a.has("csv")) {
             csv.open(a.get("csv"));
@@ -265,6 +267,12 @@ namespace {
             const double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             if (clock.joinable()) { clock.request_stop(); clock.join(); }
             total_nodes += r.nodes; total_time += sec; solved += r.complete;
+            if (r.complete) {   // U (G): the region bounds must hold the exact value
+                const auto [lo, hi] = region_score_bounds(position);
+                region_checked++;
+                if (r.value < lo || r.value > hi) { region_wrong++; cout << std::format("REGION BOUNDS WRONG: pos {} value {} bounds [{}, {}]\n", i, r.value, lo, hi); }
+                region_width += hi - lo;
+            }
             const int nb_free = std::popcount(position.free_squares());
             const string value = r.complete ? std::to_string(r.value) : "-";
             cout << std::format("{:>4} {:>4} {:>4} {:>6} {:>6} {:>12} {:>9.3f} {:>10.0f}\n", i, position.nb_plies(), nb_free,
@@ -275,6 +283,8 @@ namespace {
                     << move_str(r.move) << ',' << r.nodes << ',' << sec << '\n' << std::flush;
             }
         }
+        cout << std::format("region bounds: {} checked, {} wrong, mean width {:.1f}\n", region_checked, region_wrong,
+                            double(region_width) / std::max(1, region_checked));
         cout << std::format("total: {} positions, {} solved, {} nodes, {:.2f} s, {:.0f} knodes/s\n", positions.size(), solved,
                             total_nodes, total_time, total_nodes / std::max(total_time, 1e-9) / 1000);
         return 0;
@@ -429,6 +439,8 @@ namespace {
             if (a[0]) cout << std::format("aspiration: {} root attempts, {} failed ({:.1f}%), {} fail highs right after a fail low, "
                                           "{:.1f}% of the nodes in failed attempts\n", a[0], a[1], 100.0 * a[1] / a[0], a[2],
                                           100.0 * a[3] / std::max<uint64_t>(1, total_nodes));
+            if (s.dev->validity_stats()[0]) cout << std::format("validity: {} decisions checked, {} wrong ({:.1f}%)\n",
+                s.dev->validity_stats()[0], s.dev->validity_stats()[1], 100.0 * s.dev->validity_stats()[1] / s.dev->validity_stats()[0]);
             if (s.dev->region_bound_cuts()) cout << std::format("region bounds: {} cuts\n", s.dev->region_bound_cuts());
             const auto f = s.dev->fly_reply_stats();
             if (f[0]) cout << std::format("fly reply: {} tests, {} moves pruned ({:.1f}%), {} cuts ({:.1f}%), {:.1f}% of the nodes in the tests\n",
