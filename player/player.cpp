@@ -395,6 +395,16 @@ unique_ptr<Player> Player::create(const json& j) {
              options.rfp_margin = j.value("rfp margin", options.rfp_margin);
              options.null_move = j.value("null move", options.null_move);
              options.null_move_reduction = j.value("null move reduction", options.null_move_reduction);
+             options.fly_reply = j.value("fly reply", options.fly_reply);
+             options.fly_reply_jumps = j.value("fly reply jumps", options.fly_reply_jumps);
+             options.fly_reply_depth = j.value("fly reply depth", options.fly_reply_depth);
+             options.fly_reply_reduction = j.value("fly reply reduction", options.fly_reply_reduction);
+             options.fly_reply_div = j.value("fly reply div", options.fly_reply_div);
+             options.fly_reply_from = j.value("fly reply from", options.fly_reply_from);
+             options.fly_reply_order = j.value("fly reply order", options.fly_reply_order);
+             options.fly_reply_margin = j.value("fly reply margin", options.fly_reply_margin);
+             options.fly_reply_store = j.value("fly reply store", options.fly_reply_store);
+             options.fly_reply_relative = j.value("fly reply relative", options.fly_reply_relative);
              options.lmp_depth = j.value("lmp depth", options.lmp_depth);
              options.lmp_moves = j.value("lmp moves", options.lmp_moves);
              options.pass_rule = j.value("pass rule", options.pass_rule);

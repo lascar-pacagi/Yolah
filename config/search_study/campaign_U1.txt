@@ -1,0 +1,46 @@
+# Campaign U1 (2026-11-17): the "fly reply" (user's idea, player/minmax_nnue_dev_player.h, U). At a
+# non-PV node (null window, beta = alpha + 1), a move after the first is first searched at depth
+# − 1 − R (R = reduction + depth / div) against a STRONGER reply: the opponent's next move may also jump
+# over pieces and holes along a queen's line and land on a free square ("jumps 2": only the first free
+# square past the first obstacles; "jumps 1": every free square of the line past them); then normal play.
+# Never in a branch where a fly reply is already active.
+#   fly reply 1: the move pruned if the result is <= alpha (heuristic);
+#   fly reply 2: the node cut if the result is >= beta (only the cut);   3: both.
+# A node with pruned moves does not store its (guessed) upper bound in the table and returns alpha:
+# storing it lost about −300 Elo locally (u_r1d8store, the control), not storing −65.
+# Reference u_base = dev_final without MPC and proxy cut. Local (0.1 s, 200 games vs u_base):
+# u_r1d8 40.8 %, u_r2d7 44.5 %, u_r2d8 45.0 % (±45 Elo).
+# BOOK=/Yolah/config/openings/balanced.txt
+# 1-6: mode 2 (cut only) against u_base, 0.2 s
+u_r2d5 u_base 200000 1000
+u_r2d7 u_base 200000 1000
+u_r2d8 u_base 200000 1000
+u_r2d10 u_base 200000 1000
+u_r2d7j1 u_base 200000 1000
+u_r2d7f0 u_base 200000 1000
+# 7-16: mode 1 (prune) and 3 (both) against u_base, 0.2 s
+u_r1d8 u_base 200000 1000
+u_r1d8j1 u_base 200000 1000
+u_r1d6 u_base 200000 1000
+u_r1d10 u_base 200000 1000
+u_r1d8r6 u_base 200000 1000
+u_r1d8r2 u_base 200000 1000
+u_r1d8m3k u_base 200000 1000
+u_r1d8rel u_base 200000 1000
+u_r1d8f3 u_base 200000 1000
+u_r3d8 u_base 200000 1000
+# 17: the control (bounds stored)
+u_r1d8store u_base 200000 500
+# 18-20: against dev (MPC + proxy cut)
+u_base dev_final 200000 1000
+u_r2d7 dev_final 200000 1000
+u_r1d8 dev_final 200000 1000
+# 21-22: on top of dev
+u_dev_r2d7 dev_final 200000 1000
+u_dev_r1d8 dev_final 200000 1000
+# 23-24: between them
+u_r2d7 u_r1d8 200000 1000
+u_r2d7 u_r2d5 200000 1000
+# 25-26: at 1 s
+u_r2d7 u_base 1000000 1000
+u_dev_r2d7 dev_final 1000000 1000

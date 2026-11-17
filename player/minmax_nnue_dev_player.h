@@ -123,6 +123,11 @@ struct SearchTracer;   // player/search_trace.h, only used by the search_trace e
 //      −25.0 [−32.8, −17.2] (0.2 s), −16.2 [−23.5, −8.9] (1 s); top 2 −24.0,
 //      −25.2. The history's best moves pushed back (and reduced more by LMR,
 //      which grows with the move's rank). Step T closed: off.
+//   U. "fly reply" (the user's idea, 2026-11-17): a late move searched first
+//      at a reduced depth against a STRONGER reply (the opponent may also
+//      jump over pieces and holes along a queen's line); pruned if even so it
+//      stays <= alpha (mode 1), the node cut if it beats alpha (mode 2).
+//      Campaign U1.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
@@ -178,6 +183,26 @@ struct MinMaxNNUE_DevOptions {
     int  rfp_margin = 3000;          // ["rfp margin"] per ply of depth (values: ±30000 = tanh ±1)
     bool null_move = false;          // ["null move"] null move pruning (−81 Elo in a match: off)
     int  null_move_reduction = 3;    // ["null move reduction"] R at depth 4; R = this + depth / 4 − 1
+    // U. "Fly reply" (the user's idea, 2026-11-17): at a non-PV node, a move m after the first is
+    //    first searched at a reduced depth against a STRONGER reply: the opponent's next move may also
+    //    jump over pieces and holes along a queen's line, landing on a free square. With a stronger
+    //    opponent m can only look worse: value_fly(m) <= value(m). Mode 1: if even that is <= alpha,
+    //    m is pruned (heuristic, like late move pruning); mode 2: if it is > alpha (>= beta at a
+    //    non-PV node), the node cuts (safe direction, a proxy cut with a handicap); 3: both.
+    //    Otherwise m is searched as usual. Never in a branch where a fly reply is already active.
+    int  fly_reply = 0;              // ["fly reply"] 0 off, 1 prune m, 2 cut the node, 3 both
+    int  fly_reply_jumps = 1;        // ["fly reply jumps"] 1: every free square of the line past the
+                                     //   obstacles, 2: only the first free square past the first obstacles
+    int  fly_reply_depth = 3;        // ["fly reply depth"] only at nodes of at least this depth
+    int  fly_reply_reduction = 2;    // ["fly reply reduction"] m searched at depth − 1 − R, R = this + depth / div
+    int  fly_reply_div = 4;          // ["fly reply div"]
+    int  fly_reply_from = 1;         // ["fly reply from"] moves of rank >= this are tested (0 = the first one too)
+    bool fly_reply_store = false;    // ["fly reply store"] a node with moves pruned by the fly reply stores its
+                                     //   upper bound in the table (off: not stored, fail-hard)
+    int  fly_reply_margin = 0;       // ["fly reply margin"] mode 1: pruned if the value is <= threshold − this
+    bool fly_reply_relative = false; // ["fly reply relative"] mode 1: threshold = the FIRST move's value against the
+                                     //   stronger reply (same handicap: moves compared with each other), else alpha
+    int  fly_reply_order = 0;        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
     int  lmp_depth = 3;              // ["lmp depth"] late move pruning up to this depth (0 = never)
     int  lmp_moves = 4;              // ["lmp moves"] moves searched before pruning: this + depth²
     bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
@@ -397,6 +422,8 @@ private:
         // from it (NNUE_Persp::RefreshCache), whichever of acc / accs is used.
         NNUE_Persp::RefreshCache refresh;
         bool proxy_off = false;                    // during a proxy cut verification: no proxy cut inside
+        uint64_t nb_fly_tests = 0, nb_fly_prunes = 0, nb_fly_cuts = 0, nb_fly_nodes = 0;   // U: statistics (search_bench)
+        int  fly_nest = 0;                         // U: fly replies in progress above this node
         uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
     };
 
@@ -415,6 +442,7 @@ private:
     EndgameSolver endgame;
     uint64_t nb_evals = 0, nb_eval_hits = 0;
     std::array<uint64_t, 4> asp_stats{};
+    std::array<uint64_t, 4> fly_stats{};   // U: tests, prunes, cuts, nodes in the tests (search_bench)
 
     bool stopped() const { return stop.load(std::memory_order_relaxed); }
     int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
@@ -422,6 +450,7 @@ private:
     int  raw_network_value(const Yolah& yolah, Search& s);
     void update_accumulator(const int16_t* in, int16_t* out, uint8_t player, Move m, NNUE_Persp::RefreshCache* cache) const;
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
+    int  negamax_fly(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);   // U: the stronger reply
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const;
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int reduction, int alpha, int beta, int depth);
@@ -502,6 +531,7 @@ public:
     std::pair<uint64_t, uint64_t> eval_stats() const { return {nb_evals, nb_eval_hits}; }
     // Summed over the searches since construction: attempts, failed, rebounds, nodes in failed attempts.
     std::array<uint64_t, 4> aspiration_stats() const { return asp_stats; }
+    std::array<uint64_t, 4> fly_reply_stats() const { return fly_stats; }
     void clear_table(bool keep_ordering = false);   // forget everything: table, history, countermoves (reproducible
                                                     // benchmarks); keep_ordering: keep history and countermoves
     // The principal variation of the last search, read from the table (at most
