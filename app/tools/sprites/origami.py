@@ -392,9 +392,9 @@ def elephant(anim, t, side):
 
 
 SCALE = {"random": 1.5, "beginner": 1.58, "monte_carlo": 1.65, "basic_minmax": 1.72, "mcts": 1.78, "minmax": 1.8, "features": 1.82, "mcts_nnue": 1.82,
-         "nnue193": 1.88, "dev": 1.8, "resnet": 1.85, "alphazero": 1.85}   # the folds bigger and bigger (the peacock and the dragon touch the frame above that)
+         "nnue193": 1.88, "resnet": 1.8, "alphazero": 1.85, "dev": 1.85}   # the folds bigger and bigger (the peacock and the dragon touch the frame above that)
 CAST = {"random": ("Bateau en papier", boat), "beginner": ("Grenouille", frog), "monte_carlo": ("Lapin", rabbit),
         "basic_minmax": ("Renard", fox), "mcts": ("Papillon", butterfly), "minmax": ("Cygne", swan), "features": ("\u00c9l\u00e9phant", elephant), "mcts_nnue": ("Grue", crane),
-        "nnue193": ("Cerf", stag), "dev": ("Paon", peacock), "resnet": ("Lion", lion), "alphazero": ("Dragon de papier", dragon)}
+        "nnue193": ("Cerf", stag), "resnet": ("Paon", peacock), "alphazero": ("Lion", lion), "dev": ("Dragon de papier", dragon)}
 ORIGAMI = {"ori_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"ori_" + k: n for k, (n, _) in CAST.items()}

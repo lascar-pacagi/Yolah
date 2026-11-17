@@ -51,10 +51,6 @@
       "config": "mm_nnue193_distill_quantized_player.cfg",
       "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
       "description": "Minimax avec approfondissement itératif, table de transposition et réductions ; évalue les positions avec un réseau NNUE (193 entrées) distillé d'un réseau convolutif et calculé en entiers." },
-    { "id": "dev", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 3590, "sprite": "fig_sentinel",
-      "config": "search_study/dev_final.cfg", "overrides": { "tt size": 128, "nb threads": 1 },
-      "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
-      "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, réductions, élagage, solveur de fin de partie, et un réseau NNUE vu du camp au trait, avec une première couche par phase, 8 têtes de phase et des caractéristiques d'espace." },
     { "id": "resnet", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif", "elo": 3600, "sprite": "fig_android",
       "config": "az_vs_nnue/resnet_supervised.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "batch size", "label": "Positions par lot", "values": [8, 16, 32, 64, 128], "help": "évaluées ensemble par le réseau" } ],
       "description": "Recherche Monte Carlo guidée par un réseau convolutif résiduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Sur GPU avec libtorch ; sur CPU sinon, bien plus lent, donc plus faible à temps égal. Il cherche d'abord la victoire (voir MCTS), mais quand sa recherche voit la fin de la partie, il préfère aussi gagner par plus de points.",
@@ -64,8 +60,12 @@
       "config": "az_vs_nnue/az256.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "batch size", "label": "Positions par lot", "values": [8, 16, 32, 64, 128], "help": "évaluées ensemble par le réseau" } ],
       "description": "Le même MCTS, avec le réseau qu'AlphaZero a entraîné en jouant contre lui-même à partir du réseau supervisé. Il cherche d'abord la victoire (voir MCTS), mais quand sa recherche voit la fin de la partie, il préfère aussi gagner par plus de points.",
       "overrides": { "backend": "cpu", "weights": "models/az_00271360.bin", "score utility": 0.05, "score scale": 10, "nb threads": 8, "batch size": 16 },
-      "torch overrides": { "backend": "torch", "weights": "models/az_00271360.ts", "score utility": 0.05, "score scale": 10, "nb threads": 16, "batch size": 64 } }
+      "torch overrides": { "backend": "torch", "weights": "models/az_00271360.ts", "score utility": 0.05, "score scale": 10, "nb threads": 16, "batch size": 64 } },
+    { "id": "dev", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 3650, "sprite": "fig_sentinel",
+      "config": "search_study/dev_u8.cfg", "overrides": { "tt size": 128, "nb threads": 1 },
+      "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
+      "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, réductions, élagage, solveur de fin de partie, et un réseau NNUE vu du camp au trait (une première couche par phase, 8 têtes de phase, caractéristiques d'espace). Il ordonne ses coups selon la réponse au dernier coup adverse (historique de continuation, interception) et compte les poches qu'il est seul à pouvoir remplir comme des réserves de coups." }
   ],
   // The engine behind the evaluation bar, the hint and the principal variation.
-  "analysis": { "config": "search_study/dev_final.cfg", "overrides": { "tt size": 64 } }
+  "analysis": { "config": "search_study/dev_u8.cfg", "overrides": { "tt size": 64 } }
 }

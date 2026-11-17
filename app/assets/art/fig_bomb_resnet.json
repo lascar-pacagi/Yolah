@@ -1,5 +1,5 @@
 {
-  "name": "Missile",
+  "name": "Bombe d'avion",
   "kind": "piece",
   "size": 192,
   "smooth": true,

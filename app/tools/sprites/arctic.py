@@ -895,11 +895,11 @@ def narwhal(anim, t, side):
 
 
 SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.45, "basic_minmax": 1.4, "mcts": 1.35, "minmax": 1.4, "features": 1.45, "mcts_nnue": 1.4,
-         "nnue193": 1.4, "dev": 1.45, "resnet": 1.5, "alphazero": 1.45}
+         "nnue193": 1.4, "resnet": 1.45, "alphazero": 1.5, "dev": 1.45}
 CAST = {"random": ("Phoque gris", seal), "beginner": ("Manchot empereur", penguin), "monte_carlo": ("Renard polaire", arctic_fox),
         "basic_minmax": ("Harfang des neiges", snowy_owl), "mcts": ("Morse", walrus), "minmax": ("Renne", reindeer), "features": ("Narval", narwhal),
         "mcts_nnue": ("Loup arctique", arctic_wolf),
-        "nnue193": ("Bœuf musqué", muskox), "dev": ("Ours blanc", polar_bear), "resnet": ("Orque", orca),
-        "alphazero": ("Mammouth laineux", mammoth)}
+        "nnue193": ("Bœuf musqué", muskox), "resnet": ("Ours blanc", polar_bear), "alphazero": ("Orque", orca),
+        "dev": ("Mammouth laineux", mammoth)}
 ARCTIC = {"ice_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"ice_" + k: n for k, (n, _) in CAST.items()}

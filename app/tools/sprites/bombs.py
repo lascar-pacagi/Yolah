@@ -325,11 +325,11 @@ def c4(anim, t, side):
 
 
 SCALE = {"random": 1.8, "beginner": 1.45, "monte_carlo": 1.32, "basic_minmax": 1.28, "mcts": 1.25, "minmax": 1.24, "features": 1.6, "mcts_nnue": 1.22,
-         "nnue193": 1.18, "dev": 1.1, "resnet": 1.1, "alphazero": 1.1}     # the weak ones a little bigger: they start small on the board
+         "nnue193": 1.18, "resnet": 1.1, "alphazero": 1.1, "dev": 1.1}     # the weak ones a little bigger: they start small on the board
 CAST = {"random": ("Pétard", firecracker), "beginner": ("Fusée d'artifice", rocket), "monte_carlo": ("Bâton de dynamite", dynamite),
         "basic_minmax": ("Paquet de dynamite", bundle), "mcts": ("Grenade", grenade), "minmax": ("Obus", shell), "features": ("Pain de plastic", c4),
         "mcts_nnue": ("Bombe à mèche", round_bomb),
-        "nnue193": ("Mine marine", sea_mine), "dev": ("Bombe d'avion", aerial_bomb), "resnet": ("Missile", missile),
-        "alphazero": ("Bombe nucléaire", nuke)}
+        "nnue193": ("Mine marine", sea_mine), "resnet": ("Bombe d'avion", aerial_bomb), "alphazero": ("Missile", missile),
+        "dev": ("Bombe nucléaire", nuke)}
 BOMBS = {"bomb_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"bomb_" + k: n for k, (n, _) in CAST.items()}
