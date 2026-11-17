@@ -7,12 +7,16 @@ window, symmetries, evaluation matches, cluster sizing, KataGo's auxiliary
 heads), a code map, a parameter reference, the measurements, and an
 appendix with the complete annotated source of every file involved.
 
-`minmax_nnue_dev_player.html` — the final minimax NNUE dev player
-(`config/search_study/dev_final.cfg`), self-contained HTML with diagrams and
-interactive widgets: the search (iterative deepening, aspiration windows,
-negamax and its pruning, move ordering, the Yolah table, lazy SMP), the
-evaluation cache and lazy accumulators, the NNUE network and its SIMD forward
-pass, and its training (distillation, quantization-aware training, export).
+`minmax_nnue_dev_player.html` — the minimax NNUE dev player, current version
+(`config/search_study/dev_u8.cfg` = `dev_final.cfg` + the six gains of the
+search campaigns U1–U10), self-contained HTML with diagrams and interactive
+widgets: the search (iterative deepening, aspiration windows, negamax and its
+pruning, the sealed pockets as tempo reserves, move ordering with the
+continuation history, the killers as a bonus and the intercept, the Yolah
+table, lazy SMP), the evaluation cache, lazy accumulators and the correction
+history, the NNUE network and its SIMD forward pass, its training
+(distillation, quantization-aware training, export), and what campaigns
+U1–U10 tried (about 200 variants, the tools used).
 Written by hand, not rendered by Quarto.
 
 `alphazero_mcts_player.html` — the MCTS player with the value/policy ResNet,

@@ -6182,7 +6182,7 @@ void scene_setup(App& a) {
     entries.push_back({"human", "Humain", "Vous jouez \xC3\xA0 la souris", "human", true, "", "Cliquez sur un de vos pions puis sur la case d'arriv\xC3\xA9" "e, ou faites-le glisser."});
     for (auto& ai : a.roster) {
         const bool set = a.settings.ai_options.contains(ai.id);
-        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", shown_elo(ai, set ? a.settings.ai_options[ai.id] : json()), tr(ai.family).c_str()) + (set ? tr(" \xE2\x80\xA2 r\xC3\xA9gl\xC3\xA9") : std::string()),
+        entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", shown_elo(ai, set ? a.settings.ai_options[ai.id] : json()), tr(ai.family).c_str()),
                            ai.sprite, ai.available, ai.reason, ai.description});
     }
 
