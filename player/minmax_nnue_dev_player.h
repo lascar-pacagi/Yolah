@@ -265,7 +265,39 @@ struct MinMaxNNUE_DevOptions {
     //  D the proxy cut's witness against opponent replies that leave no hole (pessimistic-ish)
     bool proxy_nohole = false;       // ["proxy nohole"]
     //  H validity statistics (search_bench): each prune / cut decision of a test re-searched normally
-    bool verify_tests = false;       // ["verify tests"]        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
+    bool verify_tests = false;       // ["verify tests"]
+    // U4 (2026-11-17, ideas of Gemini and Codex, campaign U4): classical search techniques adapted to Yolah
+    int  iir = 0;                        // ["iir"] 9 internal iterative reduction: no table move at depth >= "iir depth": one ply less (1 every node, 2 PV and cut nodes)
+    int  iir_depth = 4;                  // ["iir depth"] 
+    int  cutnode_lmr = 0;                // ["cutnode lmr"] 9 late moves of an expected cut node reduced this much more
+    bool improving = false;              // ["improving"] 6 static value better than two plies ago: reverse futility margin (depth − improving); not improving: late moves reduced one ply more
+    int  corr_hist = 0;                  // ["corr hist"] 6 correction history: the static value corrected by a table (pieces, side) learnt from (best − static); 1 for the pruning, 2 at the leaves too
+    int  corr_scale = 8;                 // ["corr scale"]   bonus = (best − static) · depth / this
+    int  se = 0;                         // ["se"] 8 singular extension: the table move extended one ply if every other move fails below (table lower bound − margin · depth) at depth (d−1)/2
+    int  se_depth = 7;                   // ["se depth"] 
+    int  se_margin = 30;                 // ["se margin"]   per ply of depth
+    bool se_double = false;              // ["se double"]   two plies if they fail below by twice the margin
+    bool multicut = false;               // ["multicut"] 8 multi-cut: if that search reaches beta, the node cuts
+    int  ext_max = 0;                    // ["ext max"]   extensions per line at most (0: half the iteration depth)
+    int  cont_hist = 0;                  // ["cont hist"] 7 continuation history in the ordering: 1 by the opponent's last move, 2 also by our previous move
+    int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
+    bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
+    int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced
+    int  gate_min = 4;                   // ["gate min"] 
+    int  gate_depth = 3;                 // ["gate depth"] 
+    int  gate_ext = 0;                   // ["gate ext"] 5b one of the first 4 moves at depth >= 6 whose destroyed square cuts the opponent off >= "gate ext min" free squares: extended one ply
+    int  gate_ext_min = 6;               // ["gate ext min"] 
+    int  opp_lmr = 0;                    // ["opp lmr"] 10 opponent mobility: a late move removing >= "opp lmr k" opponent moves reduced one ply less, a passive one (none removed, not next to its pieces) one more
+    int  opp_lmr_k = 3;                  // ["opp lmr k"] 
+    int  split_solve = 0;                // ["split solve"] 1 once no region of free squares is reached by both sides: the exact value (each side's longest harvest, solved exactly)
+    int  split_max_free = 36;            // ["split max free"] 
+    int  split_budget = 200000;          // ["split budget"]   nodes per harvest problem
+    int  pocket = 0;                     // ["pocket"] 2 one move per private region (only we reach it) at non-PV nodes, the others pruned
+    int  pocket_depth = 3;               // ["pocket depth"] 
+    int  qs = 0;                         // ["qs"] 3 quiescence: 1 tension moves (an opponent piece left with <= 1 free neighbour, or a move of our piece with <= 2) with stand pat; 2 mobility, no stand pat: a side with <= "qs moves" moves plays them all
+    int  qs_depth = 2;                   // ["qs depth"] 
+    int  qs_moves = 2;                   // ["qs moves"] 
+    bool sibling_ref = false;            // ["sibling ref"] 5c the replies that cut after a sibling move are tried early (a killer local to the parent)        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
     int  lmp_depth = 3;              // ["lmp depth"] late move pruning up to this depth (0 = never)
     int  lmp_moves = 4;              // ["lmp moves"] moves searched before pruning: this + depth²
     bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
@@ -438,6 +470,9 @@ private:
         // Countermove: for each opponent move (from, to), the last move that
         // refuted it (caused a cutoff right after it).
         Move countermoves[SQUARE_NB][SQUARE_NB]{};
+        int16_t cont1[2][SQUARE_NB][SQUARE_NB]{}; // U4: by the opponent's last move's destination, our move's destination
+        int16_t cont2[2][SQUARE_NB][SQUARE_NB]{}; // U4: by our previous move's destination
+        int16_t corr[2][16384]{};                 // U4: correction history (pieces, side to move)
         // Adaptive aspiration windows: decaying sums of |v_d − v_{d−1}| and
         // of their count, over the iterations of this game's searches.
         double asp_sum = 0, asp_n = 0;
@@ -493,6 +528,11 @@ private:
         int  restrict_ply = -1, restrict_k = 0;    // U (B): the ply whose moves are limited to the k best-ordered
         int  nohole_ply = -1;                      // U (D): the ply whose moves leave no hole
         bool verifying = false;                    // U (H): inside a verification search
+        bool cutnode[Yolah::MAX_NB_PLIES + 2]{};   // U4: expected cut node (set by the parent in search_move)
+        int  eval_stack[Yolah::MAX_NB_PLIES + 2]{};// U4: static value of the node at each ply (EVAL_NONE: none)
+        Move excluded[Yolah::MAX_NB_PLIES + 2]{};  // U4: the move left out by the singular search
+        int  ext_sum[Yolah::MAX_NB_PLIES + 2]{};   // U4: extensions along the line
+        Move sib_ref[Yolah::MAX_NB_PLIES + 2][4]{};// U4: replies that cut after a sibling
         uint64_t nb_checked = 0, nb_false = 0;     // U (H): decisions checked, wrong ones
         uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
     };

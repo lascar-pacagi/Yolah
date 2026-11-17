@@ -1,0 +1,36 @@
+# Campaign U4 (2026-11-17): classical search techniques adapted to Yolah (ideas of Gemini and Codex),
+# each added to dev_final and played against dev_final, 0.2 s (and 1 s for two), 2000 games.
+# Local bench (60 positions, depth 11; nodes / time vs dev_final; same move as base at depth 14, dev 38/60):
+# IIR −23 % 38/60, IIR PV+cut −14 %, + cut-node LMR −20 % 38, improving −26 % 33, correction history −16 % 36,
+# singular extension +21 % 39 (with multi-cut +13 % 36), continuation history −17 % 41 (two plies −16 % 43),
+# piece LMR −9 %, family LMR +3 %, gate −2 %, gate extension +2 %, opponent mobility −5 %, split +8 % time,
+# pocket −1 %, quiescence +8 % / +0 %, sibling refutations −8 %. Split solve and region bounds checked exact.
+# BOOK=/Yolah/config/openings/balanced.txt
+u4_iir1 dev_final 200000 1000
+u4_iir2 dev_final 200000 1000
+u4_cut1 dev_final 200000 1000
+u4_cutonly dev_final 200000 1000
+u4_imp dev_final 200000 1000
+u4_corr1 dev_final 200000 1000
+u4_corr2 dev_final 200000 1000
+u4_impcorr dev_final 200000 1000
+u4_se dev_final 200000 1000
+u4_semc dev_final 200000 1000
+u4_se90 dev_final 200000 1000
+u4_cont1 dev_final 200000 1000
+u4_cont2 dev_final 200000 1000
+u4_piece2 dev_final 200000 1000
+u4_piece3 dev_final 200000 1000
+u4_fam dev_final 200000 1000
+u4_gate dev_final 200000 1000
+u4_gext dev_final 200000 1000
+u4_opp dev_final 200000 1000
+u4_split dev_final 200000 1000
+u4_pocket dev_final 200000 1000
+u4_qs1 dev_final 200000 1000
+u4_qs2 dev_final 200000 1000
+u4_sib dev_final 200000 1000
+# at 1 s
+u4_iir1 dev_final 1000000 1000
+u4_cont2 dev_final 1000000 1000
+u4_semc dev_final 1000000 1000

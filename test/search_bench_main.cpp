@@ -78,6 +78,7 @@
 
 using std::cout, std::cerr, std::string, std::vector;
 std::pair<int, int> region_score_bounds(const Yolah& yolah);   // player/minmax_nnue_dev_player.cpp (U, G)
+bool split_score(const Yolah& yolah, int budget, int& diff);   // player/minmax_nnue_dev_player.cpp (U4, 1)
 
 namespace {
     struct Args {
@@ -239,7 +240,7 @@ namespace {
         const bool wld = a.get("wld", "0") == "1";
         const uint64_t us = std::stoull(a.get("time", "0"));
         EndgameSolver solver(o);
-        int region_checked = 0, region_wrong = 0, region_width = 0;
+        int region_checked = 0, region_wrong = 0, region_width = 0, split_checked = 0, split_wrong = 0;
         std::ofstream csv;
         if (a.has("csv")) {
             csv.open(a.get("csv"));
@@ -272,6 +273,8 @@ namespace {
                 region_checked++;
                 if (r.value < lo || r.value > hi) { region_wrong++; cout << std::format("REGION BOUNDS WRONG: pos {} value {} bounds [{}, {}]\n", i, r.value, lo, hi); }
                 region_width += hi - lo;
+                int sd;
+                if (split_score(position, 2000000, sd)) { split_checked++; if (sd != r.value) { split_wrong++; cout << std::format("SPLIT WRONG: pos {} value {} split {}\n", i, r.value, sd); } }
             }
             const int nb_free = std::popcount(position.free_squares());
             const string value = r.complete ? std::to_string(r.value) : "-";
@@ -283,6 +286,7 @@ namespace {
                     << move_str(r.move) << ',' << r.nodes << ',' << sec << '\n' << std::flush;
             }
         }
+        cout << std::format("split solve: {} separated positions checked, {} wrong\n", split_checked, split_wrong);
         cout << std::format("region bounds: {} checked, {} wrong, mean width {:.1f}\n", region_checked, region_wrong,
                             double(region_width) / std::max(1, region_checked));
         cout << std::format("total: {} positions, {} solved, {} nodes, {:.2f} s, {:.0f} knodes/s\n", positions.size(), solved,
