@@ -456,6 +456,10 @@ unique_ptr<Player> Player::create(const json& j) {
              options.multicut = j.value("multicut", options.multicut);
              options.ext_max = j.value("ext max", options.ext_max);
              options.cont_hist = j.value("cont hist", options.cont_hist);
+             options.cont_weight = j.value("cont weight", options.cont_weight);
+             options.cont2_weight = j.value("cont2 weight", options.cont2_weight);
+             options.cont_bonus = j.value("cont bonus", options.cont_bonus);
+             options.cont_lmr = j.value("cont lmr", options.cont_lmr);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);

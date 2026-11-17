@@ -1503,6 +1503,16 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     bool node_fragile = false;               // U5 (7): moves of this node pruned (LMP, proxy tail)               // U: the first move's value against the stronger reply ("fly reply relative")
     int after_witness = -1;                  // Q: ordinary moves searched after the witness (-1: not yet)
     const bool restricted = int(yolah.nb_plies()) == s.restrict_ply;   // U (B)
+    // U6: the continuation history's term of a move, for the LMR ("cont lmr")
+    auto cont_term = [&](Move mv) {
+        if (!options.cont_lmr || options.cont_hist == 0 || mv == Move::none()) return 0;
+        const uint8_t pl = yolah.current_player();
+        const Move q1 = ply_now > 0 ? s.played[ply_now - 1] : Move::none(), q2 = ply_now > 1 ? s.played[ply_now - 2] : Move::none();
+        int t = 0;
+        if (q1 != Move::none()) t += s.w->cont1[pl][q1.to_sq()][mv.to_sq()] * options.cont_weight / 100;
+        if (options.cont_hist > 1 && q2 != Move::none()) t += s.w->cont2[pl][q2.to_sq()][mv.to_sq()] * options.cont2_weight / 100;
+        return t;
+    };
     // U5 (1): the sealed pockets of the side to move: pieces that can only move
     // into a region of free squares only they reach. Such a pocket is a reserve
     // of tempos: only its maximal harvest matters, so one move that keeps it is
@@ -1647,7 +1657,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     : late_move_reduction_of(depth, i, beta - alpha > 1 || tt_pv, scores[i] >= SCORE_COUNTER,
                                              scores[i] >= SCORE_ARTICULATION ? 0
                                              : options.lmr_territory || !options.history ? scores[i]
-                                             : s.w->history[yolah.current_player()][m.from_sq()][m.to_sq()]);
+                                             : s.w->history[yolah.current_player()][m.from_sq()][m.to_sq()] + cont_term(m));
         // U. Fly reply: m first searched at a reduced depth against a stronger
         //    reply (the opponent may also jump over obstacles). Non-PV nodes
         //    only (null window: beta = alpha + 1), never in a branch where a
@@ -1901,7 +1911,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                         update_history(s, player, m, bonus);
                         for (size_t k = 0; k < i; k++) update_history(s, player, moves[k], -bonus);
                         if (options.cont_hist > 0) {   // U4 (7)
-                            auto upd = [&](int16_t& h, int b) { h = int16_t(h + b - h * std::abs(b) / HISTORY_MAX); };
+                            auto upd = [&](int16_t& h, int b0) { const int b = b0 * options.cont_bonus / 100; h = int16_t(h + b - h * std::abs(b) / HISTORY_MAX); };
                             const Move p1 = ply > 0 ? s.played[ply - 1] : Move::none(), p2 = ply > 1 ? s.played[ply - 2] : Move::none();
                             if (p1 != Move::none()) {
                                 upd(s.w->cont1[player][p1.to_sq()][m.to_sq()], bonus);
@@ -2417,8 +2427,8 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     const Move p1 = ply > 0 ? s.played[ply - 1] : Move::none(), p2 = ply > 1 ? s.played[ply - 2] : Move::none();
     auto hist = [&](Move m) {
         int h = s.w->history[player][m.from_sq()][m.to_sq()] + (add_prior ? prior_of(ph, player, m) : 0);
-        if (options.cont_hist > 0 && p1 != Move::none() && m != Move::none()) h += s.w->cont1[player][p1.to_sq()][m.to_sq()];      // U4 (7)
-        if (options.cont_hist > 1 && p2 != Move::none() && m != Move::none()) h += s.w->cont2[player][p2.to_sq()][m.to_sq()];
+        if (options.cont_hist > 0 && p1 != Move::none() && m != Move::none()) h += s.w->cont1[player][p1.to_sq()][m.to_sq()] * options.cont_weight / 100;   // U4 (7)
+        if (options.cont_hist > 1 && p2 != Move::none() && m != Move::none()) h += s.w->cont2[player][p2.to_sq()][m.to_sq()] * options.cont2_weight / 100;
         return h;
     };
     for (size_t i = 0; i < moves.size(); i++) {
@@ -3045,6 +3055,10 @@ json MinMaxNNUE_DevPlayer::config() {
     j["multicut"] = options.multicut;
     j["ext max"] = options.ext_max;
     j["cont hist"] = options.cont_hist;
+    j["cont weight"] = options.cont_weight;
+    j["cont2 weight"] = options.cont2_weight;
+    j["cont bonus"] = options.cont_bonus;
+    j["cont lmr"] = options.cont_lmr;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;

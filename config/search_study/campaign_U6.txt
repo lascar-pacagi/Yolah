@@ -1,0 +1,22 @@
+# Campaign U6 (2026-11-17): consolidating the two gains of U1-U5 into a new reference
+#   dev_u6 = dev_final + continuation history by the last move (U4 cont1 +32.6 at 0.2 s; cont2 +21.7 at 1 s)
+#            + sealed pockets as tempo reserves (U5 +10.3 at 1 s)
+# then tuning the continuation history and stacking the near-winners of U4/U5 on it, one at a time.
+# BOOK=/Yolah/config/openings/balanced.txt; exclude crn04,crn06,crn07,crn14,crn15 (Apptainer / exit 127)
+# 1-3: the new reference against dev_final; cont1 alone at 1 s
+dev_u6 dev_final 200000 1000
+dev_u6 dev_final 1000000 1000
+u4_cont1 dev_final 1000000 1000
+# 4-9: tuning the continuation history (against dev_u6)
+u6_w50 dev_u6 200000 1000
+u6_w200 dev_u6 200000 1000
+u6_lmr dev_u6 200000 1000
+u6_c2h dev_u6 200000 1000
+u6_b50 dev_u6 200000 1000
+u6_b200 dev_u6 200000 1000
+# 10-14: the near-winners stacked on dev_u6
+u6_cut dev_u6 200000 1000
+u6_corr2 dev_u6 200000 1000
+u6_semc dev_u6 200000 1000
+u6_fam dev_u6 200000 1000
+u6_lmrm dev_u6 200000 1000

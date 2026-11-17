@@ -283,6 +283,10 @@ struct MinMaxNNUE_DevOptions {
     bool multicut = false;               // ["multicut"] 8 multi-cut: if that search reaches beta, the node cuts
     int  ext_max = 0;                    // ["ext max"]   extensions per line at most (0: half the iteration depth)
     int  cont_hist = 0;                  // ["cont hist"] 7 continuation history in the ordering: 1 by the opponent's last move, 2 also by our previous move
+    int  cont_weight = 100;               // ["cont weight"] U6: % of the continuation history (last move) in the ordering
+    int  cont2_weight = 100;              // ["cont2 weight"] U6: % of the 2-ply one
+    int  cont_bonus = 100;                // ["cont bonus"] U6: % of the history bonus given to the continuation history
+    bool cont_lmr = false;                // ["cont lmr"] U6: the continuation history also in the LMR's history term
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced
