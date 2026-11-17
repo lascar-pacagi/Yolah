@@ -486,6 +486,14 @@ unique_ptr<Player> Player::create(const json& j) {
              options.killer_special = j.value("killer special", options.killer_special);
              options.lmr_hist_full = j.value("lmr hist full", options.lmr_hist_full);
              options.reserve_max_free = j.value("reserve max free", options.reserve_max_free);
+             options.malus_per_key = j.value("malus per key", options.malus_per_key);
+             options.root_cont_lmr = j.value("root cont lmr", options.root_cont_lmr);
+             options.prec_weight = j.value("prec weight", options.prec_weight);
+             options.prec_conf = j.value("prec conf", options.prec_conf);
+             options.fn_sample = j.value("fn sample", options.fn_sample);
+             options.fn_thr = j.value("fn thr", options.fn_thr);
+             options.tt_bonus = j.value("tt bonus", options.tt_bonus);
+             options.proxy_bonus = j.value("proxy bonus", options.proxy_bonus);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);

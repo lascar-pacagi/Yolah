@@ -156,7 +156,7 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
                 for (size_t k = 0; k < sizeof(arr) / sizeof(int16_t); k++) p[k] /= 2;
             };
             halve(w->cont1); halve(w->cont2); halve(w->holec); halve(w->cfrom); halve(w->lmrh); halve(w->ccorr);
-            halve(w->rel); halve(w->cont2s); halve(w->hpv); halve(w->geo);
+            halve(w->rel); halve(w->cont2s); halve(w->hpv); halve(w->geo); halve(w->cprec); halve(w->fnh);
         }
 #ifdef YOLAH_SEARCH_TRACE
     if (tracer) trace_search_start(__LINE__, yolah);
@@ -854,7 +854,18 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         if (tt.depth >= tt_need && !(s.audit && int(ply_now) - s.root_ply < 3) && (options.tt_cut_pv || beta - alpha == 1
                                   || (options.tt_cut_pv_exact && tt.lower == tt.upper)
                                   || tt.lower > WIN || tt.upper < -WIN)) {
-            if (tt.lower >= beta && (!options.tt_depth_asym || tt.depth > depth)) return TRET(tt.lower);
+            if (tt.lower >= beta && (!options.tt_depth_asym || tt.depth > depth)) {
+                if (options.tt_bonus > 0 && tt_move != Move::none() && options.history && is_legal(yolah, tt_move)) {   // U10
+                    const uint8_t player = yolah.current_player();
+                    const int b = std::min(16 * depth * depth + 32 * depth, 2000) * options.tt_bonus / 100;
+                    update_history(s, player, tt_move, b);
+                    if (options.cont_hist > 0 && ply_now > 0 && s.played[ply_now - 1] != Move::none()) {
+                        int16_t& h = s.w->cont1[player][s.played[ply_now - 1].to_sq()][tt_move.to_sq()];
+                        h = int16_t(h + b - h * b / HISTORY_MAX);
+                    }
+                }
+                return TRET(tt.lower);
+            }
             if (tt.upper <= alpha) return TRET(tt.upper);
             if (tt.lower == tt.upper) return TRET(tt.lower);
         }
@@ -1292,6 +1303,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 yolah.undo(m);
                 if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
                 if (options.verify_tests && !s.verifying && v >= bound && !stopped()) verify_decision(yolah, s, hash, m, depth, bound, false);
+                if (options.proxy_bonus > 0 && v >= bound && !stopped() && options.history) {   // U10: the witness that cuts
+                    const int b = std::min(16 * depth * depth + 32 * depth, 2000) * options.proxy_bonus / 100;
+                    update_history(s, player, m, b);
+                    if (options.cont_hist > 0 && ply_now > 0 && s.played[ply_now - 1] != Move::none()) {
+                        int16_t& h = s.w->cont1[player][s.played[ply_now - 1].to_sq()][m.to_sq()];
+                        h = int16_t(h + b - h * b / HISTORY_MAX);
+                    }
+                }
                 return v;
             };
             const int R = options.proxy_reduction + depth / 4 - 1;
@@ -1891,6 +1910,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (options.intercept_lmr && ((attacks_bb(q1.to_sq(), yolah.occupied_squares()) | around(square_bb(q1.to_sq()))) & square_bb(m.to_sq())))
                 r_fly = std::max(0, r_fly - 1);
             if (options.lmrh > 0 && s.w->lmrh[yolah.current_player()][q1.to_sq()][m.to_sq()] >= options.lmrh) r_fly = std::max(0, r_fly - 1);
+            if (options.fn_sample > 0 && r_fly > 0 && s.w->fnh[yolah.current_player()][q1.to_sq()][m.to_sq()] >= options.fn_thr) r_fly = std::max(0, r_fly - 1);   // U10
         }
         if (r_fly > 0 && !lmr_adjust.empty())                                       // U5 (6)
             r_fly = std::max(0, r_fly + lmr_adjust[lmr_bucket(std::popcount(yolah.free_squares()), depth, i,
@@ -1939,6 +1959,25 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             int16_t& h = s.w->lmrh[yolah.current_player()][s.played[ply_now - 1].to_sq()][m.to_sq()];
             const int b = std::min(16 * depth * depth + 32 * depth, 2000);
             h = int16_t(h + b - h * b / HISTORY_MAX);
+        }
+        // U10: the real LMR misses — a sample of the reduced fail-lows re-searched at full depth
+        if (options.fn_sample > 0 && s.id == 0 && !s.verifying && r_used > 0 && v <= alpha && !stopped()
+            && ply_now > 0 && s.played[ply_now - 1] != Move::none() && ++s.fn_counter % uint64_t(options.fn_sample) == 0) {
+            const uint8_t player = yolah.current_player();
+            s.verifying = true;
+            s.played[ply_now] = m;
+            if (options.lazy_accumulator) s.acc_ok[ply_now + 1] = false;
+            else net_play(player, m, s.acc, &s.refresh);
+            yolah.play(m);
+            const int vf = -negamax(yolah, s, zobrist::update(hash, player, m), -(alpha + 1), -alpha, depth - 1);
+            yolah.undo(m);
+            if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
+            s.verifying = false;
+            if (!stopped()) {
+                int16_t& h = s.w->fnh[player][s.played[ply_now - 1].to_sq()][m.to_sq()];
+                const int b = (vf > alpha ? 1 : -1) * std::min(16 * depth * depth + 32 * depth, 2000);
+                h = int16_t(h + b - h * std::abs(b) / HISTORY_MAX);
+            }
         }
         // U5 (6): a sample of the reduced fail-lows re-searched at full depth, logged with their features
         if (options.lmr_log > 0 && lmr_log_file && s.id == 0 && !s.verifying && r_used > 0 && v <= alpha && !stopped()
@@ -2003,19 +2042,50 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                         // U4 (7), U7: the context tables
                         const Move p1 = ply > 0 ? s.played[ply - 1] : Move::none(), p2 = ply > 1 ? s.played[ply - 2] : Move::none();
                         auto upd = [&](int16_t& h, int b0) { const int b = b0 * options.cont_bonus / 100; h = int16_t(h + b - h * std::abs(b) / HISTORY_MAX); };
+                        // U10 "malus per key": each table penalises each key once, never the rewarded key
+                        std::vector<int> seen[8];
+                        int rk[8];
+                        auto keys_of = [&](Move mv, int* k) {
+                            k[0] = mv.to_sq();
+                            k[1] = p1 != Move::none() ? (int(file_of(mv.to_sq())) - int(file_of(p1.to_sq())) + 7) * 15 + int(rank_of(mv.to_sq())) - int(rank_of(p1.to_sq())) + 7 : 0;
+                            k[2] = mv.to_sq();
+                            k[3] = mv.from_sq();
+                            k[4] = (p2 != Move::none() && mv.from_sq() == p2.to_sq()) * 64 + mv.to_sq();
+                            int mk = 0, dr = 0, ds = 0;
+                            if (options.geo_weight) geo_index(yolah, mv, mk, dr, ds);
+                            k[5] = (mk * 8 + dr) * 3 + ds;
+                            k[6] = mv.from_sq() * 64 + mv.to_sq();
+                            k[7] = 0;
+                        };
+                        auto ok = [&](int t, int key, bool penal) {
+                            if (!penal || !options.malus_per_key) return true;
+                            if (key == rk[t]) return false;
+                            if (std::find(seen[t].begin(), seen[t].end(), key) != seen[t].end()) return false;
+                            seen[t].push_back(key);
+                            return true;
+                        };
                         auto ctx_update = [&](Move mv, int b) {
+                            const bool penal = b < 0;
+                            int k[8];
+                            keys_of(mv, k);
                             if (p1 != Move::none()) {
-                                if (options.cont_hist > 0) upd(s.w->cont1[player][p1.to_sq()][mv.to_sq()], b);
-                                if (options.rel_weight) upd(s.w->rel[player][int(file_of(mv.to_sq())) - int(file_of(p1.to_sq())) + 7][int(rank_of(mv.to_sq())) - int(rank_of(p1.to_sq())) + 7], b);
-                                if (options.hole_weight) upd(s.w->holec[player][p1.from_sq()][mv.to_sq()], b);
-                                if (options.from_weight) upd(s.w->cfrom[player][p1.to_sq()][mv.from_sq()], b);
+                                if (options.cont_hist > 0 && ok(0, k[0], penal)) upd(s.w->cont1[player][p1.to_sq()][mv.to_sq()], b);
+                                if (options.rel_weight && ok(1, k[1], penal)) upd(s.w->rel[player][int(file_of(mv.to_sq())) - int(file_of(p1.to_sq())) + 7][int(rank_of(mv.to_sq())) - int(rank_of(p1.to_sq())) + 7], b);
+                                if (options.hole_weight && ok(2, k[2], penal)) upd(s.w->holec[player][p1.from_sq()][mv.to_sq()], b);
+                                if (options.from_weight && ok(3, k[3], penal)) upd(s.w->cfrom[player][p1.to_sq()][mv.from_sq()], b);
+                                if (options.prec_weight && ok(6, k[6], penal)) {
+                                    upd(s.w->cprec[player][p1.to_sq()][mv.from_sq()][mv.to_sq()], b);
+                                    uint8_t& n = s.w->cprec_n[player][p1.to_sq()][mv.from_sq()][mv.to_sq()];
+                                    if (n < 255) n++;
+                                }
                             }
-                            if (options.cont_hist > 1 && p2 != Move::none()) {
+                            if (options.cont_hist > 1 && p2 != Move::none() && ok(4, k[4], penal)) {
                                 if (options.cont2_same) upd(s.w->cont2s[player][mv.from_sq() == p2.to_sq()][p2.to_sq()][mv.to_sq()], b);
                                 else upd(s.w->cont2[player][p2.to_sq()][mv.to_sq()], b);
                             }
-                            if (options.geo_weight) { int mk, dr, ds; geo_index(yolah, mv, mk, dr, ds); upd(s.w->geo[player][mk][dr][ds], b); }
+                            if (options.geo_weight && ok(5, k[5], penal)) { int mk, dr, ds; geo_index(yolah, mv, mk, dr, ds); upd(s.w->geo[player][mk][dr][ds], b); }
                         };
+                        keys_of(m, rk);
                         ctx_update(m, bonus);
                         uint64_t done = 0;
                         for (size_t k = k0; k < i; k++) {
@@ -2445,7 +2515,9 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
         const int r = close[i] ? 0
                     : options.articulation_lmr && is_articulation_move(yolah, rm.move) ? 0
                     : late_move_reduction_of(depth, i, true, false,
-                                             s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()]);
+                                             s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()]
+                                             + (options.root_cont_lmr > 0 && yolah.nb_plies() > 0 && s.played[yolah.nb_plies() - 1] != Move::none()
+                                                ? s.w->cont1[yolah.current_player()][s.played[yolah.nb_plies() - 1].to_sq()][rm.move.to_sq()] * options.root_cont_lmr / 100 : 0));
         TR(MOVE, int(i), rm.move.raw(), s.w->history[yolah.current_player()][rm.move.from_sq()][rm.move.to_sq()], r, 0);
         const int v = search_move(yolah, s, hash, rm.move, i, r, alpha, beta, depth);
         TR(MOVE_DONE, int(i), rm.move.raw(), v, best, alpha);
@@ -2548,6 +2620,10 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
                 h += s.w->rel[player][int(file_of(m.to_sq())) - int(file_of(p1.to_sq())) + 7][int(rank_of(m.to_sq())) - int(rank_of(p1.to_sq())) + 7] * options.rel_weight / 100;
             if (options.hole_weight) h += s.w->holec[player][p1.from_sq()][m.to_sq()] * options.hole_weight / 100;
             if (options.from_weight) h += s.w->cfrom[player][p1.to_sq()][m.from_sq()] * options.from_weight / 100;
+            if (options.prec_weight) {   // U10
+                const int n = s.w->cprec_n[player][p1.to_sq()][m.from_sq()][m.to_sq()];
+                h += s.w->cprec[player][p1.to_sq()][m.from_sq()][m.to_sq()] * options.prec_weight / 100 * (options.prec_conf ? std::min(n, 8) : 8) / 8;
+            }
             if (options.intercept && ((attacks_bb(p1.to_sq(), yolah.occupied_squares()) | around(square_bb(p1.to_sq()))) & square_bb(m.to_sq())))
                 h += options.intercept;
         }
@@ -3216,6 +3292,14 @@ json MinMaxNNUE_DevPlayer::config() {
     j["killer special"] = options.killer_special;
     j["lmr hist full"] = options.lmr_hist_full;
     j["reserve max free"] = options.reserve_max_free;
+    j["malus per key"] = options.malus_per_key;
+    j["root cont lmr"] = options.root_cont_lmr;
+    j["prec weight"] = options.prec_weight;
+    j["prec conf"] = options.prec_conf;
+    j["fn sample"] = options.fn_sample;
+    j["fn thr"] = options.fn_thr;
+    j["tt bonus"] = options.tt_bonus;
+    j["proxy bonus"] = options.proxy_bonus;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;

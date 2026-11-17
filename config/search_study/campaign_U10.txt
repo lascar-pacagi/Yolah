@@ -1,0 +1,15 @@
+# Campaign U10 (2026-11-17): Astra's review, each point added to dev_u8 against dev_u8, 0.2 s, 2000 games.
+# Rule (the user): a point of Astra is kept only if it brings at least +10 Elo.
+# BOOK=/Yolah/config/openings/balanced.txt; exclude crn04,crn06,crn07,crn14,crn15
+u10_mkey dev_u8 200000 1000
+u10_from100 dev_u8 200000 1000
+u10_mkeyfrom dev_u8 200000 1000
+u10_rcl25 dev_u8 200000 1000
+u10_rcl50 dev_u8 200000 1000
+u10_rcl100 dev_u8 200000 1000
+u10_prec dev_u8 200000 1000
+u10_precc dev_u8 200000 1000
+u10_fn50 dev_u8 200000 1000
+u10_fn20 dev_u8 200000 1000
+u10_ttb dev_u8 200000 1000
+u10_pxb dev_u8 200000 1000

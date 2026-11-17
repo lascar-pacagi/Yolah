@@ -315,6 +315,15 @@ struct MinMaxNNUE_DevOptions {
     bool killer_special = false;          // ["killer special"] with "killer mode" 1, the killers stay special moves for the LMR, the proxy witnesses, the tail and the per-move pruning
     bool lmr_hist_full = false;           // ["lmr hist full"] the LMR's history term is the ordering score (history + every context term)
     int  reserve_max_free = 64;           // ["reserve max free"] the sealed pockets only looked for with at most this many free squares (speed)
+    // U10 (2026-11-17, Astra's review; kept only if >= +10 Elo)
+    bool malus_per_key = false;           // ["malus per key"] each context table penalises each of its keys once, never the rewarded key (cfrom got its bonus cancelled by the other moves of the same piece)
+    int  root_cont_lmr = 0;               // ["root cont lmr"] the root's LMR history term + this % of the continuation (needs "root context")
+    int  prec_weight = 0;                 // ["prec weight"] % weight of the precise continuation (opponent's last destination, our origin, our destination)
+    bool prec_conf = false;               // ["prec conf"] that weight grows with the entry's observations (full from 8)
+    int  fn_sample = 0;                   // ["fn sample"] one reduced fail-low in this many re-searched at full depth; the real misses learnt by context (0 off)
+    int  fn_thr = 2000;                   // ["fn thr"] that table >= this: one ply less of LMR
+    int  tt_bonus = 0;                    // ["tt bonus"] % of the bonus given to the table's move when the table cuts
+    int  proxy_bonus = 0;                 // ["proxy bonus"] % of the bonus given to a proxy witness that cuts
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced
@@ -531,6 +540,9 @@ private:
         int16_t hpv[2][4][SQUARE_NB][SQUARE_NB]{};// U7: PV best moves near the root
         int16_t lmrh[2][SQUARE_NB][SQUARE_NB]{};  // U7: reductions that were wrong, by context
         int16_t ccorr[2][SQUARE_NB][SQUARE_NB]{}; // U7: continuation correction of the static value
+        int16_t cprec[2][SQUARE_NB][SQUARE_NB][SQUARE_NB]{};   // U10: precise continuation
+        uint8_t cprec_n[2][SQUARE_NB][SQUARE_NB][SQUARE_NB]{}; // U10: its observations
+        int16_t fnh[2][SQUARE_NB][SQUARE_NB]{};   // U10: real LMR misses by context
         // Adaptive aspiration windows: decaying sums of |v_d − v_{d−1}| and
         // of their count, over the iterations of this game's searches.
         double asp_sum = 0, asp_n = 0;
@@ -592,6 +604,7 @@ private:
         int  ext_sum[Yolah::MAX_NB_PLIES + 2]{};   // U4: extensions along the line
         Move sib_ref[Yolah::MAX_NB_PLIES + 2][4]{};// U4: replies that cut after a sibling
         bool audit = false;                        // U5 (8): inside a root audit search
+        uint64_t fn_counter = 0;                   // U10
         int  root_ply = 0;                         // U5: the root's ply
         uint64_t nb_checked = 0, nb_false = 0;     // U (H): decisions checked, wrong ones
         uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
