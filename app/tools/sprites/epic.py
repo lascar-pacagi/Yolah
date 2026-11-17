@@ -454,12 +454,16 @@ def war_troll(anim, t, side):
     p = base_pose(anim, t)
     p.r = [0.5, 0.35, 0.9]
     p.l = [0.4, 0.4, 0.5]
-    if anim == "win":                 # a dab: the right arm stretched up and out, the face buried in the left elbow (the hammer set down beside)
+    if anim == "win":                 # a dab: the left arm stretched up and out, the face buried in the right elbow (the hammer set down beside)
         k = 0.5 + 0.5 * wave(t, 2)    # a little pulse, twice per loop (periodic)
-        p.r = [0.55, 2.55 + 0.06 * k, 0.05]
-        p.l = [1.25, 1.95, 2.45]
+        # both arms point the same way: the left one stretched out and a little up (on the side turned
+        # away from the camera, so it stays in the frame), the right one folded level in front of the
+        # face, its forearm parallel to the left arm (angles solved numerically for those directions in
+        # the torso's frame; the 4th value twists the upper arm so that the elbow bends across the face)
+        p.l = [0.1, 2.3 + 0.04 * k, 0.05]
+        p.r = [1.97, 0.70, 1.34, -0.50]
         p.pitch = 0.55 + 0.05 * k
-        p.yaw = -0.5
+        p.yaw = 0.5
         p.lean = -0.25
         p.jump = 0.03 * abs(math.sin(TAU * t))
     sk = warty("#424c4e")

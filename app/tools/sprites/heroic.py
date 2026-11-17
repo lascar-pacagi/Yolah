@@ -43,10 +43,14 @@ def adult(sc, p, m, H=1.0, bulk=1.0, head=1.0, hunch=0.0, arm=1.0, leg=1.0, neck
     sc.add(sd_ellipsoid(0.135 * bulk, 0.1 * H, 0.082 * bulk), m["top"], torso * T(0, 0.235 * H, 0.006), blend=0.035)
     sh_y = 0.3 * H
     hands = []
-    for sgn, (pitch, spread, elbow) in ((-1, p.l), (1, p.r)):
+    for sgn, arm_p in ((-1, p.l), (1, p.r)):
+        # shoulder pitch (forward +), spread (out +), elbow bend (+), and an optional twist of the upper
+        # arm about its own axis (turns the plane in which the elbow bends: a dab's forearm across the face)
+        pitch, spread, elbow = arm_p[:3]
+        twist = arm_p[3] if len(arm_p) > 3 else 0.0
         sc.add(sd_sphere(0.052 * bulk), m["top"], torso * T(0.135 * bulk * sgn, sh_y - 0.01, 0), blend=0.02)   # deltoid
         up, fo = 0.17 * H * arm, 0.155 * H * arm
-        sh = torso * T(0.15 * bulk * sgn, sh_y - 0.01, 0) * RZ(spread * sgn) * RX(-pitch)
+        sh = torso * T(0.15 * bulk * sgn, sh_y - 0.01, 0) * RZ(spread * sgn) * RX(-pitch) * RY(twist * sgn)
         sc.add(sd_capsule((0, 0, 0), (0, -up, 0), 0.04 * bulk, 0.031 * bulk), g("arms", "skin"), sh)
         sc.add(sd_ellipsoid(0.036 * bulk, 0.06 * H * arm, 0.036 * bulk), g("arms", "skin"), sh * T(0, -up * 0.45, 0.012), blend=0.015)
         el = sh * T(0, -up, 0) * RX(-elbow)
