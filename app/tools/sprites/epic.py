@@ -454,9 +454,14 @@ def war_troll(anim, t, side):
     p = base_pose(anim, t)
     p.r = [0.5, 0.35, 0.9]
     p.l = [0.4, 0.4, 0.5]
-    if anim == "win":
-        p.r = [2.6, 0.25, 0.25]
-        p.l = [2.0, 0.6, 0.5]
+    if anim == "win":                 # a dab: the right arm stretched up and out, the face buried in the left elbow (the hammer set down beside)
+        k = 0.5 + 0.5 * wave(t, 2)    # a little pulse, twice per loop (periodic)
+        p.r = [0.55, 2.55 + 0.06 * k, 0.05]
+        p.l = [1.25, 1.95, 2.45]
+        p.pitch = 0.55 + 0.05 * k
+        p.yaw = -0.5
+        p.lean = -0.25
+        p.jump = 0.03 * abs(math.sin(TAU * t))
     sk = warty("#424c4e")
     plate = rust("#4a4c50")
     m = {"skin": sk, "top": sk, "legs": cloth("#3a2a20"), "boots": plate, "arms": sk}
@@ -476,6 +481,8 @@ def war_troll(anim, t, side):
     x, r = rig["head"], rig["hr"]
     sc.add(sd_plane_cut(sd_ellipsoid(r * 1.15, r * 0.95, r * 1.1), (0, -1, 0), -r * 0.1), plate, x * T(0, r * 0.2, -r * 0.05))
     mm = held(rig["r"], -math.pi if anim == "win" else -1.0)
+    if anim == "win":                 # the dab: the hammer set down, head on the base, the handle leaning on the troll's side
+        mm = rig["body"] * T(0.27, BASE_TOP + 0.58, 0.12) * RZ(math.pi - 0.12)
     sc.add(sd_capsule((0, -0.12, 0), (0, 0.5, 0), 0.022), wood("#2a1d12"), mm)
     sc.add(sd_box(0.15, 0.09, 0.09, 0.025), Mat("#5a5a5e", rough=0.8), mm * T(0, 0.55, 0))
     sc.add(sd_box(0.152, 0.015, 0.092, 0.005), plate, mm * T(0, 0.5, 0))
