@@ -287,6 +287,29 @@ struct MinMaxNNUE_DevOptions {
     int  cont2_weight = 100;              // ["cont2 weight"] U6: % of the 2-ply one
     int  cont_bonus = 100;                // ["cont bonus"] U6: % of the history bonus given to the continuation history
     bool cont_lmr = false;                // ["cont lmr"] U6: the continuation history also in the LMR's history term
+    // U7 (2026-11-17, third round of Gemini and Codex around the continuation history)
+    bool cont_age = false;               // ["cont age"] U7 fix: the continuation tables halved at each new move, like the history
+    int  cont_fix = 0;                   // ["cont fix"] U7 fix: maluses only for the moves really searched, never on the cutting move's destination (1 continuation tables, 2 the history too)
+    int  malus_pct = 100;                // ["malus pct"] U7: malus = this % of the bonus
+    int  malus_cap = 0;                  // ["malus cap"] U7: at most this many maluses per cutoff (the last ones tried; 0 no cap)
+    int  bonus_margin = 0;               // ["bonus margin"] U7 (10): bonus × (1 + clamp((v − beta) / this, 0, 2)) (0 off)
+    int  rel_weight = 0;                 // ["rel weight"] U7 (A1): % weight of the relative continuation (our destination − the opponent's last destination, 15×15)
+    int  hole_weight = 0;                // ["hole weight"] U7 (A2, C1): % weight of the continuation by the square the opponent just destroyed (its last origin) → our destination
+    int  from_weight = 0;                // ["from weight"] U7 (A3): % weight of the continuation opponent's last destination → our ORIGIN (which piece to move)
+    bool cont2_same = false;             // ["cont2 same"] U7 (C3): the 2-ply continuation split by "the same piece moves again"
+    int  geo_weight = 0;                 // ["geo weight"] U7 (C4): % weight of the history by the holes around the origin, direction and distance
+    int  hpv_weight = 0;                 // ["hpv weight"] U7 (C6): % weight of the history of PV best moves in the first 4 plies
+    int  intercept = 0;                  // ["intercept"] U7 (B8): a move landing on a line of, or next to, the opponent's last destination: ordering bonus (this), and with "intercept lmr" one ply less
+    bool intercept_lmr = false;          // ["intercept lmr"] 
+    int  killer2ply = 0;                 // ["killer2ply"] U7 (B9): the killer of two plies before, tried after the killers
+    int  killer_mode = 0;                // ["killer mode"] U7 (C2): 0 killers first; 1 killers as a bonus of "killer bonus" on the history; 2 killers first only if their continuation is positive
+    int  killer_bonus = 4000;            // ["killer bonus"] 
+    int  hist_prune = 0;                 // ["hist prune"] U7 (A4): at depth <= 3, non-PV, from the 3rd move: an ordinary move whose history (+ continuation) < −this·depth is pruned (0 off)
+    int  lmp_protect = 0;                // ["lmp protect"] U7 (A4): late move pruning keeps the moves whose continuation >= this (0 off)
+    int  fp_margin = 0;                  // ["fp margin"] U7 (B6): futility pruning per move at depth <= 3: static + 1000 + this·depth <= alpha, ordinary move: pruned (0 off)
+    int  razor_margin = 0;               // ["razor margin"] U7 (B7): razoring at depth <= 2: static + this·depth <= alpha: the static value returned (0 off)
+    int  lmrh = 0;                       // ["lmrh"] U7 (C5): moves whose reduced search was wrong (failed high after reduction) learnt by context; history >= this: one ply less (0 off)
+    int  corr_cont = 0;                  // ["corr cont"] U7 (C7): correction of the static value (pruning only) by (our previous destination, the opponent's last destination)
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced
@@ -495,6 +518,14 @@ private:
         int16_t cont1[2][SQUARE_NB][SQUARE_NB]{}; // U4: by the opponent's last move's destination, our move's destination
         int16_t cont2[2][SQUARE_NB][SQUARE_NB]{}; // U4: by our previous move's destination
         int16_t corr[2][16384]{};                 // U4: correction history (pieces, side to move)
+        int16_t rel[2][15][15]{};                 // U7: relative continuation
+        int16_t holec[2][SQUARE_NB][SQUARE_NB]{}; // U7: opponent's last origin (now a hole) → our destination
+        int16_t cfrom[2][SQUARE_NB][SQUARE_NB]{}; // U7: opponent's last destination → our origin
+        int16_t cont2s[2][2][SQUARE_NB][SQUARE_NB]{}; // U7: 2-ply continuation split by "same piece"
+        int16_t geo[2][256][8][3]{};              // U7: holes around the origin, direction, distance class
+        int16_t hpv[2][4][SQUARE_NB][SQUARE_NB]{};// U7: PV best moves near the root
+        int16_t lmrh[2][SQUARE_NB][SQUARE_NB]{};  // U7: reductions that were wrong, by context
+        int16_t ccorr[2][SQUARE_NB][SQUARE_NB]{}; // U7: continuation correction of the static value
         // Adaptive aspiration windows: decaying sums of |v_d − v_{d−1}| and
         // of their count, over the iterations of this game's searches.
         double asp_sum = 0, asp_n = 0;

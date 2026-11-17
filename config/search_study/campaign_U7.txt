@@ -1,0 +1,30 @@
+# Campaign U7 (2026-11-17): third round of Gemini and Codex, around the continuation history (U4 cont1 +32.6).
+# Each variant added to dev_u6 (dev_final + cont1 + tempo reserves) against dev_u6, 0.2 s, 2000 games.
+# Two fixes found by Gemini: the continuation tables never aged between moves (the history is halved), and
+# the maluses could hit the cutting move's own destination (another piece tried the same square first).
+# BOOK=/Yolah/config/openings/balanced.txt; exclude crn04,crn06,crn07,crn14,crn15
+u7_age dev_u6 200000 1000
+u7_fix1 dev_u6 200000 1000
+u7_fix2 dev_u6 200000 1000
+u7_agefix dev_u6 200000 1000
+u7_rel dev_u6 200000 1000
+u7_hole dev_u6 200000 1000
+u7_from dev_u6 200000 1000
+u7_from100 dev_u6 200000 1000
+u7_same dev_u6 200000 1000
+u7_geo dev_u6 200000 1000
+u7_hpv dev_u6 200000 1000
+u7_icp dev_u6 200000 1000
+u7_icpl dev_u6 200000 1000
+u7_k2p dev_u6 200000 1000
+u7_km1 dev_u6 200000 1000
+u7_km2 dev_u6 200000 1000
+u7_hp dev_u6 200000 1000
+u7_lmpp dev_u6 200000 1000
+u7_fp dev_u6 200000 1000
+u7_raz dev_u6 200000 1000
+u7_lmrh dev_u6 200000 1000
+u7_ccor dev_u6 200000 1000
+u7_bm dev_u6 200000 1000
+u7_mal50 dev_u6 200000 1000
+u7_cap8 dev_u6 200000 1000
