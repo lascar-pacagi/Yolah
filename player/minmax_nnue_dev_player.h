@@ -8,13 +8,16 @@
 #include <memory>
 #include <atomic>
 #include <vector>
+#include <fstream>
+#include <chrono>
 #include <bit>
 #include <string>
 #include "nnue_quantized.h"
 #include "nnue_persp.h"
 #include "endgame_solver.h"
 
-struct SearchTracer;   // player/search_trace.h, only used by the search_trace executable
+struct SearchTracer;
+int lmr_bucket(int free, int depth, size_t i, int hist, int tried);   // U5 (6)   // player/search_trace.h, only used by the search_trace executable
 
 // The search being improved, step by step. It started as an exact copy of
 // MinMaxNNUE_BaselinePlayer (the reference, which never changes); every change
@@ -298,6 +301,20 @@ struct MinMaxNNUE_DevOptions {
     int  qs_depth = 2;                   // ["qs depth"] 
     int  qs_moves = 2;                   // ["qs moves"] 
     bool sibling_ref = false;            // ["sibling ref"] 5c the replies that cut after a sibling move are tried early (a killer local to the parent)        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
+    // U5 (2026-11-17, second list of Codex, campaign U5)
+    int  tt_fragile = 0;                 // ["tt fragile"] 7 provenance: bounds of nodes whose moves were pruned (LMP, proxy tail, pockets) marked fragile; 1 they need one more ply to cut within "tt fragile ply" plies of the root, 2 everywhere
+    int  tt_fragile_ply = 4;             // ["tt fragile ply"] 
+    int  root_audit = 0;                 // ["root audit"] 8 after each iteration of depth >= "root audit depth": the second root move searched with another policy (no LMP, LMR one ply less, no table cut near the root) against the best; switched if better under the same policy
+    int  root_audit_depth = 6;           // ["root audit depth"] 
+    int  root_audit_frac = 10;           // ["root audit frac"]   only while less than (100 − this) % of the time is used
+    int  sym = 0;                        // ["sym"] 9 symmetry: near a cut (|static − beta| < "sym window"), the network on the position mirrored; if they disagree by > "sym thr", no static pruning here and LMR one ply less
+    int  sym_depth = 4;                  // ["sym depth"] 
+    int  sym_window = 3000;              // ["sym window"] 
+    int  sym_thr = 2000;                 // ["sym thr"] 
+    int  reserve = 0;                    // ["reserve"] 1 sealed pockets (pieces that can only move into a region only they reach): only one move kept, one that keeps the maximal harvest (exact: the pocket is a reserve of tempos)
+    int  reserve_max = 20;               // ["reserve max"]   pockets of at most this many free squares
+    int  lmr_log = 0;                    // ["lmr log"] 6 (search_bench) one reduced fail-low in this many re-searched at full depth and logged with its features
+    std::string lmr_table;                // ["lmr table"] 6: the learnt LMR adjustments (nnue/lmr_learn.py), empty: none
     int  lmp_depth = 3;              // ["lmp depth"] late move pruning up to this depth (0 = never)
     int  lmp_moves = 4;              // ["lmp moves"] moves searched before pruning: this + depth²
     bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
@@ -419,10 +436,11 @@ private:
         int  depth = 0;
         int  lower = -32767, upper = 32767;   // value ∈ [lower, upper]
         bool pv = false;                      // searched as a PV node ("tt pv", Yolah table only)
+        bool fragile = false;                 // U5 (7): from a node whose moves were pruned (Yolah table only)
     };
     TTView tt_probe(uint64_t hash) const;
     void   tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move,
-                    bool pv = false);
+                    bool pv = false, bool fragile = false);
     Move   tt_move(uint64_t hash) const;
     size_t nb_moves_at_full_depth;
     uint8_t late_move_reduction;
@@ -533,6 +551,8 @@ private:
         Move excluded[Yolah::MAX_NB_PLIES + 2]{};  // U4: the move left out by the singular search
         int  ext_sum[Yolah::MAX_NB_PLIES + 2]{};   // U4: extensions along the line
         Move sib_ref[Yolah::MAX_NB_PLIES + 2][4]{};// U4: replies that cut after a sibling
+        bool audit = false;                        // U5 (8): inside a root audit search
+        int  root_ply = 0;                         // U5: the root's ply
         uint64_t nb_checked = 0, nb_false = 0;     // U (H): decisions checked, wrong ones
         uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
     };
@@ -554,7 +574,14 @@ private:
     std::array<uint64_t, 4> asp_stats{};
     std::array<uint64_t, 4> fly_stats{};
     uint64_t region_cuts = 0;
-    std::array<uint64_t, 2> validity{};   // U (H): decisions checked, wrong ones   // U: tests, prunes, cuts, nodes in the tests (search_bench)
+    std::array<uint64_t, 2> validity{};   // U (H): decisions checked, wrong ones
+    std::array<uint64_t, 2> audits{};     // U5 (8): audits, switches
+    std::chrono::steady_clock::time_point search_start{};   // U5 (8)
+    uint64_t search_us = 0;
+    std::vector<int8_t> lmr_adjust;       // U5 (6): learnt adjustment per bucket (lmr_bucket)
+    static constexpr int LMR_BUCKETS = 8 * 5 * 4 * 4 * 3;
+    Accumulator sym_acc;                  // U5 (9): the mirror's accumulator
+    int  sym_eval(const Yolah& yolah);   // U: tests, prunes, cuts, nodes in the tests (search_bench)
 
     bool stopped() const { return stop.load(std::memory_order_relaxed); }
     int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
@@ -651,6 +678,12 @@ public:
     std::array<uint64_t, 4> fly_reply_stats() const { return fly_stats; }
     uint64_t region_bound_cuts() const { return region_cuts; }
     std::array<uint64_t, 2> validity_stats() const { return validity; }
+    // U5 (9, search_bench): the network's value of a position and of its mirror image (side to move's view)
+    std::pair<int, int> sym_values(const Yolah& yolah);
+    // U5 (6, search_bench): where the LMR log goes
+    std::ofstream* lmr_log_file = nullptr;
+    uint64_t lmr_log_counter = 0;
+    std::array<uint64_t, 2> audit_stats() const { return audits; }
     void clear_table(bool keep_ordering = false);   // forget everything: table, history, countermoves (reproducible
                                                     // benchmarks); keep_ordering: keep history and countermoves
     // The principal variation of the last search, read from the table (at most

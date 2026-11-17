@@ -1,0 +1,26 @@
+# Campaign U5 (2026-11-17): the second list of Codex, each added to dev_final against dev_final, 2000 games.
+#   7 provenance of the table's bounds (fragile ones need one more ply to cut)
+#   8 root audit (the challenger searched with another policy)
+#   9 symmetry disagreement as an uncertainty of the network (180° rotation: correlation 0.54 with its error)
+#   1 sealed pockets as tempo reserves (exact; solving 10x fewer nodes)
+#   6 learnt LMR (nnue/lmr_learn.py on 4.26 M reduced fail-lows re-searched at full depth, 1974 positions)
+#  10 df-pn: offline only (search_bench dfpn: agrees with the alpha-beta solver on 103/103, decides 106 vs 104
+#     of 109 positions <= 28 free in 3 s; each wins on different positions)
+# BOOK=/Yolah/config/openings/balanced.txt
+u5_frag1 dev_final 200000 1000
+u5_frag2 dev_final 200000 1000
+u5_audit dev_final 200000 1000
+u5_audit20 dev_final 200000 1000
+u5_sym3 dev_final 200000 1000
+u5_sym6 dev_final 200000 1000
+u5_sym3w dev_final 200000 1000
+u5_res dev_final 200000 1000
+u5_res_split dev_final 200000 1000
+u5_lmrm dev_final 200000 1000
+u5_lmrm3 dev_final 200000 1000
+u5_lmrb dev_final 200000 1000
+# at 1 s
+u5_audit dev_final 1000000 1000
+u5_sym3 dev_final 1000000 1000
+u5_lmrm3 dev_final 1000000 1000
+u5_res dev_final 1000000 1000

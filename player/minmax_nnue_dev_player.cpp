@@ -70,6 +70,14 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
 MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, uint8_t max_depth, uint64_t microseconds) {
     const auto start = std::chrono::steady_clock::now();
     stop = false;
+    search_start = start;   // U5 (8)
+    search_us = microseconds;
+    if (!options.lmr_table.empty() && lmr_adjust.empty()) {   // U5 (6)
+        lmr_adjust.assign(LMR_BUCKETS, 0);
+        std::ifstream in(options.lmr_table);
+        int b, d;
+        while (in >> b >> d) if (b >= 0 && b < LMR_BUCKETS) lmr_adjust[b] = int8_t(d);
+    }
     // The clock: sets `stop` after `microseconds`, unless the search is over
     // before (then the jthread's destructor wakes it up at once).
     std::mutex m;
@@ -569,6 +577,37 @@ std::pair<int, int> region_bounds(const Yolah& yolah) {
     return {low, high};
 }
 
+// ─── U5 helpers ──────────────────────────────────────────────────────────────
+// 6: the bucket of a late move for the learnt LMR (8 phases × 5 depths × 4 ranks
+// × 4 history levels × 3 counts of the piece's moves already tried).
+int lmr_bucket(int free, int depth, size_t i, int hist, int tried) {
+    const int fb = std::min(free / 8, 7), db = std::min(depth, 14) / 3, rb = i < 4 ? 0 : i < 8 ? 1 : i < 16 ? 2 : 3;
+    const int hb = hist < -2000 ? 0 : hist < 0 ? 1 : hist < 2000 ? 2 : 3, tb = std::min(tried, 2);
+    return (((fb * 5 + db) * 4 + rb) * 4 + hb) * 3 + tb;
+}
+// 9: the network on the position turned by 180° (the rules are symmetric, and
+// this symmetry keeps the starting position: a1 ↔ h8, d5 ↔ e4; a top-bottom
+// mirror swaps the two sides' starting corners and leaves the network's domain).
+static uint64_t rotate180(uint64_t x) {
+    x = ((x >> 1) & 0x5555555555555555ULL) | ((x & 0x5555555555555555ULL) << 1);
+    x = ((x >> 2) & 0x3333333333333333ULL) | ((x & 0x3333333333333333ULL) << 2);
+    x = ((x >> 4) & 0x0F0F0F0F0F0F0F0FULL) | ((x & 0x0F0F0F0F0F0F0F0FULL) << 4);
+    return __builtin_bswap64(x);
+}
+int MinMaxNNUE_DevPlayer::sym_eval(const Yolah& yolah) {
+    Yolah y;
+    const auto [bs, ws] = yolah.score();
+    y.set_state(rotate180(yolah.bitboard(Yolah::BLACK)), rotate180(yolah.bitboard(Yolah::WHITE)),
+                rotate180(yolah.empty_bitboard()), bs, ws, yolah.nb_plies());
+    net_init(y, sym_acc);
+    return int(net_value(sym_acc, y) * WIN);
+}
+std::pair<int, int> MinMaxNNUE_DevPlayer::sym_values(const Yolah& yolah) {
+    net_init(yolah, sym_acc);
+    const int e = int(net_value(sym_acc, yolah) * WIN);
+    return {e, sym_eval(yolah)};
+}
+
 // ─── U4 helpers ──────────────────────────────────────────────────────────────
 // 1: the longest harvest of `pieces` on the free squares `region` (moves only
 // through and onto them), exactly, by a depth-first search with a memo; −1
@@ -758,7 +797,9 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         // exact" is off too — or a proven result cuts; the bounds mostly come
         // from non-PV searches, with their pruning. "tt depth asym": a lower
         // bound must come from a strictly deeper search.)
-        if (tt.depth >= depth && (options.tt_cut_pv || beta - alpha == 1
+        const int tt_need = depth + (options.tt_fragile > 0 && tt.fragile
+                                     && (options.tt_fragile == 2 || int(ply_now) - s.root_ply < options.tt_fragile_ply) ? 1 : 0);
+        if (tt.depth >= tt_need && !(s.audit && int(ply_now) - s.root_ply < 3) && (options.tt_cut_pv || beta - alpha == 1
                                   || (options.tt_cut_pv_exact && tt.lower == tt.upper)
                                   || tt.lower > WIN || tt.upper < -WIN)) {
             if (tt.lower >= beta && (!options.tt_depth_asym || tt.depth > depth)) return TRET(tt.lower);
@@ -894,13 +935,19 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                            || s.eval_stack[ply_now - 2] == EVAL_NONE || s.eval_stack[ply_now] > s.eval_stack[ply_now - 2];
     const int rfp_d = depth - (options.improving && improving ? 1 : 0);
     const bool cut_node = !pv_node && s.cutnode[ply_now];
+    // U5 (9): near a cut, the network on the mirrored position; a disagreement
+    // means an unreliable static value: no static pruning here, LMR one ply less.
+    bool sym_unsure = false;
+    if (options.sym > 0 && prunable && s.id == 0 && depth >= options.sym_depth && s.eval_stack[ply_now] != EVAL_NONE
+        && std::abs(static_eval - beta) < options.sym_window && !fly_above)
+        sym_unsure = std::abs(evaluate(yolah, s, hash) - sym_eval(yolah)) > options.sym_thr;
     // F1. Reverse futility pruning ("static null move"): if the static value
     //     is above beta by a margin that a shallow search will hardly lose,
     //     trust it and cut. The margin grows with the depth: the deeper the
     //     search, the more the value may still change.
     if (prunable && !tt_pv && depth <= options.rfp_depth)
         TR(RFP, static_eval, options.rfp_margin * depth, beta, static_eval - options.rfp_margin * rfp_d >= beta);
-    if (prunable && !tt_pv && depth <= options.rfp_depth && static_eval - options.rfp_margin * rfp_d >= beta) {
+    if (prunable && !tt_pv && !sym_unsure && depth <= options.rfp_depth && static_eval - options.rfp_margin * rfp_d >= beta) {
         return TRET(static_eval);
     }
     // U, pivot 5: bounds of the final score from the regions of free squares.
@@ -967,7 +1014,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    Egaroucid, tried only when the static value is already on that side.
     constexpr int NO_CUT = std::numeric_limits<int>::min();
     auto mpc_cut = [&]() -> int {
-        if (prunable && options.mpc > 0 && depth >= options.mpc_depth) {
+        if (prunable && !sym_unsure && options.mpc > 0 && depth >= options.mpc_depth) {
             const int d2 = std::max(1, depth * options.mpc_ratio / 100);
             const int margin = options.mpc_margin + options.mpc_margin_per_ply * (depth - d2);
             if (static_eval >= beta && beta + margin < WIN) {
@@ -1141,7 +1188,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     // traced). "proxy after tt": with a table move (staged), it waits until
     // that move has been searched without cutting (stage 2 of the loop).
     auto proxy_test = [&]() -> int {
-        if (options.proxy_cut > 0 && prunable && depth >= options.proxy_depth && !s.proxy_off && !proxy_done
+        if (options.proxy_cut > 0 && prunable && !sym_unsure && depth >= options.proxy_depth && !s.proxy_off && !proxy_done
             && (options.proxy_cut == 2 || static_eval >= beta)) {
             if (!generated) {                       // the test needs the move list
                 yolah.moves(moves);
@@ -1452,9 +1499,53 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     };
     bool pruned = false;
     int fly_first = -INFINITE;
-    bool fly_pruned = false;                 // U: a move of this node was pruned by the fly reply               // U: the first move's value against the stronger reply ("fly reply relative")
+    bool fly_pruned = false;                 // U: a move of this node was pruned by the fly reply
+    bool node_fragile = false;               // U5 (7): moves of this node pruned (LMP, proxy tail)               // U: the first move's value against the stronger reply ("fly reply relative")
     int after_witness = -1;                  // Q: ordinary moves searched after the witness (-1: not yet)
     const bool restricted = int(yolah.nb_plies()) == s.restrict_ply;   // U (B)
+    // U5 (1): the sealed pockets of the side to move: pieces that can only move
+    // into a region of free squares only they reach. Such a pocket is a reserve
+    // of tempos: only its maximal harvest matters, so one move that keeps it is
+    // enough (any order of the pocket's moves can be played at any time).
+    uint64_t reserve_pieces[4]{};
+    Move reserve_keep[4]{};
+    int n_reserves = 0;
+    bool reserve_done = false;
+    auto compute_reserves = [&]() {
+        const uint8_t us = yolah.current_player();
+        const uint64_t free = yolah.free_squares(), mine = yolah.bitboard(us), occupied = yolah.occupied_squares();
+        uint64_t priv = region_reach(mine, free) & ~region_reach(yolah.bitboard(Yolah::other_player(us)), free);
+        while (priv && n_reserves < 4) {
+            const uint64_t seed = priv & -priv;
+            const uint64_t comp = region_reach(seed, priv) | seed;
+            priv &= ~comp;
+            if (std::popcount(comp) > options.reserve_max) continue;
+            uint64_t pieces = 0;
+            bool sealed = true;
+            for (uint64_t b = mine; b;) {
+                const uint64_t q = square_bb(pop_lsb(b));
+                const uint64_t nb = around(q) & free;
+                if (nb & comp) { pieces |= q; if (nb & ~comp) sealed = false; }
+            }
+            if (!sealed || !pieces) continue;
+            const int h = harvest_exact(pieces, comp, options.split_budget);
+            if (h <= 0) continue;
+            Move keep = Move::none();
+            for (uint64_t b = pieces; b && keep == Move::none();) {
+                const Square from = pop_lsb(b);
+                for (uint64_t t = attacks_bb(from, occupied) & comp; t;) {
+                    const Square to = pop_lsb(t);
+                    if (harvest_exact(pieces ^ square_bb(from) ^ square_bb(to), comp & ~square_bb(to), options.split_budget) == h - 1) {
+                        keep = Move(from, to);
+                        break;
+                    }
+                }
+            }
+            if (keep == Move::none()) continue;
+            reserve_pieces[n_reserves] = pieces;
+            reserve_keep[n_reserves++] = keep;
+        }
+    };
     // U4: per-node state of the move loop
     uint8_t tried_from[SQUARE_NB]{};          // 4: moves of each piece already searched
     uint64_t pocket_done = 0;                 // 2: private regions already given a move
@@ -1499,9 +1590,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         //     cut anywhere) are not searched at all — once a move that does not
         //     lose has been found. I: except the articulation moves, which are
         //     kept (moved to the front of what is left).
-        if (!pruned && prunable && depth <= options.lmp_depth && i >= size_t(options.lmp_moves + depth * depth)
+        if (!pruned && prunable && !s.audit && depth <= options.lmp_depth && i >= size_t(options.lmp_moves + depth * depth)
             && best > -WIN) {
             TR(LMP, int(i), int(n));
+            node_fragile = true;
             if (!options.articulation_lmr) break;
             size_t k = i;
             for (size_t j = i; j < n; j++) {
@@ -1517,6 +1609,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         }
         const Move m = generated ? pick_move(moves, scores, i, n) : tt_move;   // stage 1: no list yet
         if (m == s.excluded[ply_now] && m != Move::none()) continue;   // U4 (8): the singular search
+        // U5 (1): sealed pockets — one move kept per pocket (exact).
+        if (options.reserve > 0 && generated && m != Move::none()) {
+            if (!reserve_done) { compute_reserves(); reserve_done = true; }
+            bool drop = false;
+            for (int k = 0; k < n_reserves; k++)
+                if ((reserve_pieces[k] & square_bb(m.from_sq())) && m != reserve_keep[k]) drop = true;
+            if (drop) { s.nb_region_cuts++; continue; }
+        }
         // U4 (2): one move per private region (only we can reach it) at non-PV nodes.
         if (options.pocket > 0 && prunable && depth >= options.pocket_depth && i > 0 && m != Move::none()) {
             regions();
@@ -1532,7 +1632,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         if (tail && after_witness >= 0 && scores[i] < SCORE_COUNTER && after_witness++ >= options.proxy_tail_keep) {
             const int k = after_witness - 1 - options.proxy_tail_keep;   // 0 for the first move concerned
             if (options.proxy_tail <= 2) {
-                if (best > -WIN) break;      // pruned (once a move that does not lose was found)
+                if (best > -WIN) { node_fragile = true; break; }      // pruned (once a move that does not lose was found)
             } else if (options.proxy_tail == 3) {
                 tail_r = options.proxy_tail_reduction;
             } else {                         // 4: an LMR anchored on the witness that failed
@@ -1702,6 +1802,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         TR(MOVE, int(i), m.raw(), generated ? scores[i] : SCORE_TT, r, tail_r);
         int r_fly = r > 0 ? std::max(0, r + fly_lmr_delta) : 0;   // U, pivot 4
         // U4: reductions
+        if (r_fly > 0 && (s.audit || sym_unsure)) r_fly = std::max(0, r_fly - 1);   // U5 (8, 9)
+        if (r_fly > 0 && !lmr_adjust.empty())                                       // U5 (6)
+            r_fly = std::max(0, r_fly + lmr_adjust[lmr_bucket(std::popcount(yolah.free_squares()), depth, i,
+                                                              s.w->history[yolah.current_player()][m.from_sq()][m.to_sq()], tried_from[m.from_sq()])]);
         if (r_fly > 0) {
             if (cut_node) r_fly += options.cutnode_lmr;                                   // 9
             if (options.improving && !improving) r_fly += 1;                              // 6
@@ -1738,7 +1842,28 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         if (s.ext_sum[ply_now] + ext > ext_cap) ext = 0;
         s.ext_sum[ply_now + 1] = s.ext_sum[ply_now] + ext;
         if (ext > 0) r_fly = 0;
-        const int v = search_move(yolah, s, hash, m, i, std::min(r_fly + tail_r, std::max(0, depth - 2)), alpha, beta, depth + ext);
+        const int r_used = std::min(r_fly + tail_r, std::max(0, depth - 2));
+        const int v = search_move(yolah, s, hash, m, i, r_used, alpha, beta, depth + ext);
+        // U5 (6): a sample of the reduced fail-lows re-searched at full depth, logged with their features
+        if (options.lmr_log > 0 && lmr_log_file && s.id == 0 && !s.verifying && r_used > 0 && v <= alpha && !stopped()
+            && ++lmr_log_counter % uint64_t(options.lmr_log) == 0) {
+            const uint8_t player = yolah.current_player();
+            const int hist = s.w->history[player][m.from_sq()][m.to_sq()];
+            s.verifying = true;
+            s.played[ply_now] = m;
+            if (options.lazy_accumulator) s.acc_ok[ply_now + 1] = false;
+            else net_play(player, m, s.acc, &s.refresh);
+            yolah.play(m);
+            const int vf = -negamax(yolah, s, zobrist::update(hash, player, m), -(alpha + 1), -alpha, depth - 1);
+            yolah.undo(m);
+            if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
+            s.verifying = false;
+            if (!stopped()) {
+                const int fr = std::popcount(yolah.free_squares());
+                *lmr_log_file << lmr_bucket(fr, depth, i, hist, tried_from[m.from_sq()]) << ' ' << fr << ' ' << depth << ' ' << i << ' '
+                              << hist << ' ' << int(tried_from[m.from_sq()]) << ' ' << r_used << ' ' << (vf > alpha ? 1 : 0) << '\n';
+            }
+        }
         tried_from[m.from_sq()]++;
         TR(MOVE_DONE, int(i), m.raw(), v, best, alpha);
         if (tail && m == witness) after_witness = 0;
@@ -1809,7 +1934,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     // U: with moves pruned by the fly reply, that bound is a guess: not stored
     // ("fly reply store" off), and fail-hard (alpha, not a lower guess).
     if (fly_pruned && !options.fly_reply_store) return TRET(std::max(best, alpha_orig));
-    if (!fly_above) tt_store(hash, yolah, depth, alpha_orig, beta, best, best_move, tt_pv);
+    if (!fly_above) tt_store(hash, yolah, depth, alpha_orig, beta, best, best_move, tt_pv, node_fragile && options.tt_fragile > 0);
     corr_update(best);
     if (recorder && options.record_depth > 0 && s.id == 0 && depth >= options.record_depth
         && alpha_orig < best && best < beta && beta - alpha_orig > 1 && !stopped()) {
@@ -1929,7 +2054,7 @@ MinMaxNNUE_DevPlayer::TTView MinMaxNNUE_DevPlayer::tt_probe(uint64_t hash) const
     TTView view;
     if (yolah_table) {
         if (const SearchTable::Entry* e = yolah_table->probe(hash)) {
-            view = {true, e->move, e->depth, e->lower, e->upper, e->pv != 0};
+            view = {true, e->move, e->depth, e->lower, e->upper, e->pv != 0, (e->padding & 1) != 0};
         }
         return view;
     }
@@ -1949,7 +2074,7 @@ MinMaxNNUE_DevPlayer::TTView MinMaxNNUE_DevPlayer::tt_probe(uint64_t hash) const
 // The result of a search of `depth` with the window (alpha, beta): fail-soft
 // `value` (≤ alpha: upper bound, ≥ beta: lower bound, between: exact).
 void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth, int alpha, int beta, int value, Move move,
-                                    bool pv) {
+                                    bool pv, bool fragile) {
     if (yolah_table) {
 #ifdef YOLAH_SEARCH_TRACE
         if (tracer) {
@@ -1962,7 +2087,7 @@ void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth
                 auto it = tracer->hash_of_ykey.find(ykey(old.key32, old.key16));
                 old_hash = it != tracer->hash_of_ykey.end() ? it->second : ykey(old.key32, old.key16);
             }
-            yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv);
+            yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv, fragile);
             tracer->hash_of_ykey[ykey(e->key32, e->key16)] = hash;
             TR(YT_STORE, depth, alpha, beta, value, move.raw(), int32_t(uint32_t(old_hash)), int32_t(uint32_t(old_hash >> 32)),
                old.key32 ? int(old.depth) : -1, int(old.lower), int(old.upper), old.move.raw(),
@@ -1970,7 +2095,7 @@ void MinMaxNNUE_DevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth
             return;
         }
 #endif
-        yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv);
+        yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv, fragile);
         return;
     }
     const Bound b = value >= beta ? BOUND_LOWER : value > alpha ? BOUND_EXACT : BOUND_UPPER;
@@ -2169,6 +2294,7 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
     if (tracer && tracer->child_evals_depth > 0) trace_child_evals(__LINE__, yolah);
 #endif
     std::fill(std::begin(s.ext_sum), std::end(s.ext_sum), 0);   // U4: extensions counted from the root
+    s.root_ply = yolah.nb_plies();
     s.cutnode[yolah.nb_plies()] = false;
     const int alpha_orig = alpha;
     int best = -INFINITE;
@@ -2728,6 +2854,39 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
             value = v;
             break;
         }
+        // U5 (8): root audit — the strongest challenger searched with another
+        // policy (no LMP, LMR one ply less, no table cut near the root), against
+        // the best move under the same policy; switched if it is better.
+        if (options.root_audit > 0 && s.id == 0 && d >= options.root_audit_depth && s.root_moves.size() >= 2 && !stopped()
+            && std::abs(value) < WIN && (search_us == 0 || std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - search_start).count()
+                                                          < search_us * (100 - options.root_audit_frac) / 100.0)) {
+            const Move best = res;
+            const Move ch = s.root_moves[0].move == best ? s.root_moves[1].move : s.root_moves[0].move;
+            auto audited = [&](Move m, int a, int b) {
+                const uint8_t player = yolah.current_player();
+                s.audit = true;
+                s.played[yolah.nb_plies()] = m;
+                if (options.lazy_accumulator) s.acc_ok[yolah.nb_plies() + 1] = false;
+                else net_play(player, m, s.acc, &s.refresh);
+                yolah.play(m);
+                const int r = -negamax(yolah, s, zobrist::update(hash, player, m), -b, -a, d - 1);
+                yolah.undo(m);
+                if (!options.lazy_accumulator) net_undo(player, m, s.acc, &s.refresh);
+                s.audit = false;
+                return r;
+            };
+            audits[0]++;
+            const int vc = audited(ch, value, value + 1);
+            if (!stopped() && vc > value) {
+                const int vb = audited(best, vc - 1, vc);
+                if (!stopped() && vb < vc) {
+                    audits[1]++;
+                    res = ch;
+                    for (size_t k = 0; k < s.root_moves.size(); k++)
+                        if (s.root_moves[k].move == ch) { std::rotate(s.root_moves.begin(), s.root_moves.begin() + k, s.root_moves.begin() + k + 1); break; }
+                }
+            }
+        }
     }
 done:
     s.depth = depth;
@@ -2904,6 +3063,19 @@ json MinMaxNNUE_DevPlayer::config() {
     j["qs depth"] = options.qs_depth;
     j["qs moves"] = options.qs_moves;
     j["sibling ref"] = options.sibling_ref;
+    j["tt fragile"] = options.tt_fragile;
+    j["tt fragile ply"] = options.tt_fragile_ply;
+    j["root audit"] = options.root_audit;
+    j["root audit depth"] = options.root_audit_depth;
+    j["root audit frac"] = options.root_audit_frac;
+    j["sym"] = options.sym;
+    j["sym depth"] = options.sym_depth;
+    j["sym window"] = options.sym_window;
+    j["sym thr"] = options.sym_thr;
+    j["reserve"] = options.reserve;
+    j["reserve max"] = options.reserve_max;
+    j["lmr log"] = options.lmr_log;
+    j["lmr table"] = options.lmr_table;
     j["fly reply relative"] = options.fly_reply_relative;
     j["lmp depth"] = options.lmp_depth;
     j["lmp moves"] = options.lmp_moves;

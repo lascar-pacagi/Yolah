@@ -52,6 +52,17 @@
 //       `tried` then all the `cut`). nnue/history_prior.py turns them into
 //       the prior.
 //
+//   search_bench run ... --lmr-log FILE   (dev player with "lmr log" N): one reduced fail-low in N
+//       re-searched at full depth, logged with its features (nnue/lmr_learn.py builds the table)
+//
+//   search_bench symcheck --player CFG --positions FILE --depth D
+//       U5 (9): does the network's disagreement with itself on the mirrored position
+//       (u = |E(s) − E(mirror)|) predict its error against a search of depth D?
+//
+//   search_bench dfpn --positions FILE --max-free F [--time US] [--budget NODES]
+//       U5 (10): a df-pn prover of "the side to move ends ahead" (region bounds as
+//       terminal certificates) against the alpha-beta solver (win/draw/loss), same positions.
+//
 // Players: MinMaxNNUE_BaselinePlayer and MinMaxNNUE_DevPlayer (they expose
 // search() and clear_table()).
 #include "magic.h"
@@ -66,6 +77,8 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <cmath>
+#include <unordered_map>
 #include <random>
 #include <sstream>
 #include <string>
@@ -376,6 +389,141 @@ namespace {
         return res;
     }
 
+    // U5 (9): the mirror disagreement as a predictor of the network's error.
+    int symcheck(const Args& a) {
+        Searcher s(a.get("player"));
+        if (!s.dev) { cerr << "dev player expected\n"; return 1; }
+        auto positions = read_positions(a.get("positions", "bench_positions.txt"));
+        const uint8_t depth = uint8_t(std::stoi(a.get("depth", "9")));
+        vector<std::pair<double, double>> uv;   // (disagreement, error)
+        for (auto& p : positions) {
+            if (p.game_over()) continue;
+            const auto [e, es] = s.dev->sym_values(p);
+            s.clear();
+            const auto r = s.search(p, depth, 0);
+            if (std::abs(int(r.value)) >= 29000) continue;
+            uv.push_back({double(std::abs(e - es)), double(std::abs(e - int(r.value)))});
+        }
+        if (uv.size() < 10) { cerr << "too few positions\n"; return 1; }
+        auto mean = [](auto f, auto& v) { double t = 0; for (auto& x : v) t += f(x); return t / v.size(); };
+        const double mu = mean([](auto& x) { return x.first; }, uv), me = mean([](auto& x) { return x.second; }, uv);
+        double cov = 0, vu = 0, ve = 0;
+        for (auto& [u, e] : uv) { cov += (u - mu) * (e - me); vu += (u - mu) * (u - mu); ve += (e - me) * (e - me); }
+        std::sort(uv.begin(), uv.end());
+        const size_t q = uv.size() / 4;
+        double low = 0, high = 0;
+        for (size_t i = 0; i < q; i++) { low += uv[i].second; high += uv[uv.size() - 1 - i].second; }
+        cout << std::format("{} positions: mean disagreement {:.0f}, mean |E − search d{}| {:.0f}, correlation {:.3f}\n",
+                            uv.size(), mu, depth, me, cov / std::sqrt(std::max(vu * ve, 1e-9)));
+        cout << std::format("mean error: quarter with the least disagreement {:.0f}, the most {:.0f} (ratio {:.2f})\n",
+                            low / q, high / q, high / std::max(low, 1.0));
+        return 0;
+    }
+
+    // U5 (10): df-pn (Nagai) on "the root's side ends ahead (final difference > 0)".
+    struct DfPn {
+        static constexpr uint32_t INF = 1u << 30;
+        struct PN { uint32_t pn = 1, dn = 1; };
+        std::unordered_map<uint64_t, PN> tt;
+        uint8_t root_side = 0;
+        uint64_t nodes = 0, budget = 0;
+        const std::atomic_bool* stop = nullptr;
+        bool out() const { return nodes >= budget || (stop && stop->load()); }
+        // proven (pn 0) / disproven (dn 0) without search: finished game, region bounds
+        bool leaf(const Yolah& y, PN& r) const {
+            int lo, hi;
+            if (y.game_over()) { lo = hi = y.score(y.current_player()); }
+            else std::tie(lo, hi) = region_score_bounds(y);
+            if (y.current_player() != root_side) { const int t = lo; lo = -hi; hi = -t; }
+            if (lo > 0) { r = {0, INF}; return true; }
+            if (hi <= 0) { r = {INF, 0}; return true; }
+            return false;
+        }
+        PN get(const Yolah& y, uint64_t h) {
+            if (auto it = tt.find(h); it != tt.end()) return it->second;
+            PN r;
+            if (leaf(y, r)) tt[h] = r;
+            return r;
+        }
+        void mid(Yolah& y, uint64_t h, uint32_t thpn, uint32_t thdn) {
+            nodes++;
+            PN me;
+            if (leaf(y, me)) { tt[h] = me; return; }
+            Yolah::MoveList ml;
+            y.moves(ml);
+            const bool or_node = y.current_player() == root_side;
+            vector<Move> moves(ml.begin(), ml.end());
+            vector<uint64_t> hs(moves.size());
+            for (size_t i = 0; i < moves.size(); i++) hs[i] = zobrist::update(h, y.current_player(), moves[i]);
+            for (;;) {
+                uint32_t pn = or_node ? INF : 0, dn = or_node ? 0 : INF, second = INF;
+                size_t best = 0;
+                vector<PN> c(moves.size());
+                for (size_t i = 0; i < moves.size(); i++) {
+                    y.play(moves[i]); c[i] = get(y, hs[i]); y.undo(moves[i]);
+                }
+                for (size_t i = 0; i < moves.size(); i++) {
+                    const uint32_t key = or_node ? c[i].pn : c[i].dn;
+                    if (key < (or_node ? c[best].pn : c[best].dn) || i == 0) { if (i > 0) second = std::min(second, or_node ? c[best].pn : c[best].dn); best = i; }
+                    else second = std::min(second, key);
+                    if (or_node) { pn = std::min(pn, c[i].pn); dn = std::min<uint64_t>(INF, uint64_t(dn) + c[i].dn); }
+                    else { dn = std::min(dn, c[i].dn); pn = std::min<uint64_t>(INF, uint64_t(pn) + c[i].pn); }
+                }
+                if (pn >= thpn || dn >= thdn || out()) { tt[h] = {pn, dn}; return; }
+                uint32_t cpn, cdn;
+                if (or_node) { cpn = std::min(thpn, second == INF ? INF : second + 1); cdn = uint32_t(std::min<uint64_t>(INF, uint64_t(thdn) - dn + c[best].dn)); }
+                else { cdn = std::min(thdn, second == INF ? INF : second + 1); cpn = uint32_t(std::min<uint64_t>(INF, uint64_t(thpn) - pn + c[best].pn)); }
+                y.play(moves[best]);
+                mid(y, hs[best], cpn, cdn);
+                y.undo(moves[best]);
+            }
+        }
+        int prove(Yolah y, uint64_t node_budget, const std::atomic_bool* st) {   // 1 win, 0 not a win, −1 unknown
+            tt.clear(); nodes = 0; budget = node_budget; stop = st; root_side = y.current_player();
+            const uint64_t h = zobrist::hash(y);
+            mid(y, h, INF, INF);
+            const PN r = tt[h];
+            return r.pn == 0 ? 1 : r.dn == 0 ? 0 : -1;
+        }
+    };
+    int dfpn(const Args& a) {
+        auto positions = select_positions(read_positions(a.get("positions", "bench_positions.txt")), a);
+        const uint64_t us = std::stoull(a.get("time", "10000000")), budget = std::stoull(a.get("budget", "50000000"));
+        EndgameSolver solver;
+        DfPn prover;
+        int both = 0, agree = 0, ab_done = 0, pn_done = 0;
+        double ab_t = 0, pn_t = 0;
+        cout << std::format("{:>4} {:>4} {:>8} {:>10} {:>9} {:>8} {:>10} {:>9}\n", "pos", "free", "ab win?", "ab nodes", "ab s", "dfpn", "dfpn nodes", "dfpn s");
+        for (size_t i = 0; i < positions.size(); i++) {
+            const Yolah& p = positions[i].second;
+            if (p.game_over()) continue;
+            auto timed = [&](auto f) {
+                std::atomic_bool stop = false;
+                std::jthread clock([&](std::stop_token st) {
+                    std::mutex m; std::condition_variable_any cv; std::unique_lock l(m);
+                    if (!cv.wait_for(l, st, std::chrono::microseconds(us), [] { return false; })) stop = true;
+                });
+                const auto t0 = std::chrono::steady_clock::now();
+                f(stop);
+                const double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+                clock.request_stop();
+                return sec;
+            };
+            EndgameSolver::Result ab;
+            const double tab = timed([&](std::atomic_bool& st) { ab = solver.solve(p, true, &st); });
+            int pr = -1;
+            const double tpn = timed([&](std::atomic_bool& st) { pr = prover.prove(p, budget, &st); });
+            const int abw = ab.complete ? (ab.value > 0 ? 1 : 0) : -1;
+            ab_done += ab.complete; pn_done += pr >= 0; ab_t += tab; pn_t += tpn;
+            if (abw >= 0 && pr >= 0) { both++; agree += abw == pr; }
+            cout << std::format("{:>4} {:>4} {:>8} {:>10} {:>9.3f} {:>8} {:>10} {:>9.3f}\n", i, std::popcount(p.free_squares()),
+                                abw < 0 ? "?" : abw ? "win" : "no", ab.nodes, tab, pr < 0 ? "?" : pr ? "win" : "no", prover.nodes, tpn) << std::flush;   // (pos: rank among the selected)
+        }
+        cout << std::format("alpha-beta: {} decided, {:.2f} s; df-pn: {} decided, {:.2f} s; both decided {}, agreeing {}\n",
+                            ab_done, ab_t, pn_done, pn_t, both, agree);
+        return 0;
+    }
+
     int run(const Args& a) {
         Searcher s(a.get("player"));
         auto positions = select_positions(read_positions(a.get("positions", "bench_positions.txt")), a);
@@ -396,6 +544,8 @@ namespace {
         cout << std::format("{:>4} {:>4} {:>5} {:>7} {:>6} {:>12} {:>9} {:>10}{}\n", "pos", "ply", "depth", "value", "move",
                             "nodes", "seconds", "knodes/s", ref.empty() ? "" : "   ref nodes  ref s  same");
         const bool warm = a.get("warm", "0") == "1";
+        std::ofstream lmr_log;
+        if (a.has("lmr-log") && s.dev) { lmr_log.open(a.get("lmr-log")); s.dev->lmr_log_file = &lmr_log; }
         std::ofstream rootlog;
         std::vector<MinMaxNNUE_DevPlayer::RootRecord> roots;
         if (a.has("rootlog")) {
@@ -443,6 +593,7 @@ namespace {
             if (a[0]) cout << std::format("aspiration: {} root attempts, {} failed ({:.1f}%), {} fail highs right after a fail low, "
                                           "{:.1f}% of the nodes in failed attempts\n", a[0], a[1], 100.0 * a[1] / a[0], a[2],
                                           100.0 * a[3] / std::max<uint64_t>(1, total_nodes));
+            if (s.dev->audit_stats()[0]) cout << std::format("root audits: {}, switched: {}\n", s.dev->audit_stats()[0], s.dev->audit_stats()[1]);
             if (s.dev->validity_stats()[0]) cout << std::format("validity: {} decisions checked, {} wrong ({:.1f}%)\n",
                 s.dev->validity_stats()[0], s.dev->validity_stats()[1], 100.0 * s.dev->validity_stats()[1] / s.dev->validity_stats()[0]);
             if (s.dev->region_bound_cuts()) cout << std::format("region bounds: {} cuts\n", s.dev->region_bound_cuts());
@@ -474,6 +625,8 @@ int main(int argc, char* argv[]) {
     Args a = parse(argc, argv, 2);
     if (mode == "positions") return make_positions(a);
     if (mode == "run") return run(a);
+    if (mode == "symcheck") return symcheck(a);
+    if (mode == "dfpn") return dfpn(a);
     if (mode == "solve") return solve(a);
     if (mode == "cutstats") return cutstats(a);
     if (mode == "blunders") return blunders(a);

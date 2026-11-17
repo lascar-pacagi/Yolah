@@ -43,7 +43,7 @@ public:
         uint8_t  free;      // number of free squares of the position
         uint16_t key16;     // bits 31..16 of the hash
         uint8_t  pv;        // 1: searched as a PV node at least once ("tt pv")
-        uint8_t  padding;
+        uint8_t  padding;   // U5 (7): bit 0: fragile (from a node whose moves were pruned)
     };
     static_assert(sizeof(Entry) == 16);
     static constexpr int CLUSTER_SIZE = 4;
@@ -67,7 +67,7 @@ public:
     // fail-soft value v ≤ alpha is an upper bound, v ≥ beta a lower bound,
     // and in between both. `pv`: the search was at a PV node (sticky while
     // the entry holds this position).
-    void store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move, bool pv = false);
+    void store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move, bool pv = false, bool fragile = false);
     // The slot store() writes for this position: its entry, or the one it
     // evicts (for the search debugger: the entry before and after a store).
     const Entry* slot(uint64_t hash) const;

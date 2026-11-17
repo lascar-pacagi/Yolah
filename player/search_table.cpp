@@ -57,7 +57,7 @@ const SearchTable::Entry* SearchTable::slot(uint64_t hash) const {
     return s;
 }
 
-void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move, bool pv) {
+void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta, int value, Move move, bool pv, bool fragile) {
     const uint32_t k = key_of(hash);
     const uint16_t k16 = key16_of(hash);
     Entry* slot = const_cast<Entry*>(this->slot(hash));
@@ -74,6 +74,7 @@ void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta,
         // the best move of this position is kept (an all-node, where no move
         // beat alpha, has none to give, and the old one still orders well).
         if (!same) slot->move = Move::none(), slot->pv = 0;
+        slot->padding = 0;
         slot->key32 = k;
         slot->key16 = k16;
         slot->lower = -NO_BOUND;
@@ -95,6 +96,7 @@ void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta,
     }
     if (move != Move::none()) slot->move = move;
     slot->pv |= pv;
+    slot->padding |= fragile ? 1 : 0;
 }
 
 double SearchTable::load() const {
