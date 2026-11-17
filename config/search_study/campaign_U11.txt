@@ -1,0 +1,6 @@
+# Campaign U11 (2026-11-17): does dev_u8's gain (+54.1 at 1 thread, 1 s) hold with several search threads?
+# The app's top-3 tournament gives dev 4 threads (THREADS=4), where it looked weaker than expected.
+# Run with THREADS=4 (4 threads per player, one game per 4 physical cores):
+#   THREADS=4 BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-2 nnue/search_study.sh campaign_U11.txt
+dev_u8 dev_final 1000000 1000
+dev_u8 dev_final 200000 1000

@@ -23,10 +23,12 @@ def elo(s):
 
 rows = []
 for path in sorted(glob.glob(os.path.join(sys.argv[1] if len(sys.argv) > 1 else ".", "*.csv"))):
-    m = re.match(r"(.+)__vs__(.+)__t(\d+)\.csv$", os.path.basename(path))
+    m = re.match(r"(.+)__vs__(.+)__t(\d+)(?:__th(\d+))?\.csv$", os.path.basename(path))
     if not m:
         continue
     cand, ref, t = m.group(1), m.group(2), int(m.group(3))
+    if m.group(4):                                    # THREADS=k matches: "<cand> (k threads)"
+        cand = f"{cand} ({m.group(4)}th)"
     pairs = defaultdict(list)
     for g in csv.DictReader(open(path)):
         r = float(g["result"])                       # black's points

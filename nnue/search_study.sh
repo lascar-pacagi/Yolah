@@ -18,6 +18,8 @@
 # openings come from that book of balanced openings instead (one per round;
 # test/opening_book_main.cpp); default: random 4-ply openings, as for every
 # campaign before P6. Do not mix both in one results file.
+# THREADS=4: 4 search threads per player (one game per 4 physical cores); the
+# results file name then ends in __th4 (a different match).
 # ────────────────────────────────────────────────────────────────────────────
 #SBATCH --job-name=yolah_search
 #SBATCH --output=yolah_search_%A_%a.out
@@ -40,10 +42,14 @@ PHYS=$(lscpu -p=CPU,Core,Socket | grep -v '^#' | awk -F, -v allowed="$(grep Cpus
   ($1 in ok) { core[$3 "," $2] = 1 }
   END { k = 0; for (x in core) k++; print k }')
 PARALLEL=$(( ${SLURM_CPUS_PER_TASK:-24} < PHYS ? ${SLURM_CPUS_PER_TASK:-24} : PHYS ))
+# THREADS=k: k search threads per player (lazy SMP), so PARALLEL / k games at a time (default 1)
+THREADS="${THREADS:-1}"
+PARALLEL=$(( PARALLEL / THREADS > 0 ? PARALLEL / THREADS : 1 ))
 
 LINE=$(grep -v '^#' "${YOLAH_DIR}/config/search_study/${CAMPAIGN}" | grep . | sed -n "${SLURM_ARRAY_TASK_ID}p")
 read -r CAND REF T ROUNDS SEED <<< "${LINE}"
 NAME="${CAND}__vs__${REF}__t${T}"
+[[ "${THREADS:-1}" != "1" ]] && NAME="${NAME}__th${THREADS}"
 echo "[$(date '+%F %T')] task ${SLURM_ARRAY_TASK_ID} on $(hostname), CPU:$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2), ${PHYS} physical cores, ${PARALLEL} games at a time"
 echo "  openings: ${BOOK:-random, 4 plies}"
 echo "  ${CAND} vs ${REF}, ${T} µs/move, ${ROUNDS} rounds, Yolah $(git -C "${YOLAH_DIR}" rev-parse --short HEAD 2>/dev/null || echo '?')"
@@ -56,7 +62,7 @@ LIST="${WORK_DIR}/search_study/${NAME}.players"
 printf '/Yolah/config/search_study/%s.cfg\n/Yolah/config/search_study/%s.cfg\n' "${CAND}" "${REF}" > "${LIST}"
 start_in_container bash -c "cd /Yolah/config && exec ${BUILD_DIR}/yolah_tournament \
     --players /work/search_study/${NAME}.players --results /work/search_study/${NAME}.csv \
-    --time ${T} --threads 1 --parallel ${PARALLEL} --rounds ${ROUNDS} --opening-plies 4 ${BOOK:+--book ${BOOK}} \
+    --time ${T} --threads ${THREADS} --parallel ${PARALLEL} --rounds ${ROUNDS} --opening-plies 4 ${BOOK:+--book ${BOOK}} \
     --seed ${SEED:-${SLURM_ARRAY_TASK_ID}}"
 wait_forwarding_signals
 echo "[$(date '+%F %T')] done (exit code ${RC})"
