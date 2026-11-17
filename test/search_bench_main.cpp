@@ -429,6 +429,7 @@ namespace {
             if (a[0]) cout << std::format("aspiration: {} root attempts, {} failed ({:.1f}%), {} fail highs right after a fail low, "
                                           "{:.1f}% of the nodes in failed attempts\n", a[0], a[1], 100.0 * a[1] / a[0], a[2],
                                           100.0 * a[3] / std::max<uint64_t>(1, total_nodes));
+            if (s.dev->region_bound_cuts()) cout << std::format("region bounds: {} cuts\n", s.dev->region_bound_cuts());
             const auto f = s.dev->fly_reply_stats();
             if (f[0]) cout << std::format("fly reply: {} tests, {} moves pruned ({:.1f}%), {} cuts ({:.1f}%), {:.1f}% of the nodes in the tests\n",
                                           f[0], f[1], 100.0 * f[1] / f[0], f[2], 100.0 * f[2] / f[0], 100.0 * f[3] / std::max<uint64_t>(1, total_nodes));

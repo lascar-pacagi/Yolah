@@ -202,7 +202,38 @@ struct MinMaxNNUE_DevOptions {
     int  fly_reply_margin = 0;       // ["fly reply margin"] mode 1: pruned if the value is <= threshold − this
     bool fly_reply_relative = false; // ["fly reply relative"] mode 1: threshold = the FIRST move's value against the
                                      //   stronger reply (same handicap: moves compared with each other), else alpha
-    int  fly_reply_order = 0;        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
+    int  fly_reply_order = 0;
+    bool fly_reply_filter = false;   // ["fly reply filter"] 6: mode 2 only if one ply with extra power, statically (the
+    int  fly_reply_filter_margin = 0;//   network), already gives >= beta + "fly reply filter margin"
+    // U, pivots of the second round (campaign U2):
+    //  1 optimistic test (the right direction to prune): m pruned if, with OUR next move given the extra
+    //    power, a reduced search still says <= alpha
+    int  fly_prune = 0;              // ["fly prune"] 0 off, 1 on
+    int  fly_prune_jumps = 2;        // ["fly prune jumps"] see fly_moves (1 all, 2 first, 3 holes only, 4 one obstacle)
+    int  fly_prune_depth = 8;        // ["fly prune depth"]
+    int  fly_prune_reduction = 4;    // ["fly prune reduction"] R = this + depth / div
+    int  fly_prune_div = 3;          // ["fly prune div"]
+    int  fly_prune_from = 1;         // ["fly prune from"]
+    //  3 the proxy cut's witness searched against the stronger reply (allows bigger "proxy reduction")
+    bool proxy_fly = false;          // ["proxy fly"]
+    int  proxy_fly_jumps = 2;        // ["proxy fly jumps"]
+    //  4 openness: gap between the opponent's best static reply with and without the extra power (after a
+    //    pass); closed (gap < closed): late moves reduced one ply more; open (gap > open): one ply less
+    int  fly_lmr = 0;                // ["fly lmr"] 0 off, 1 on
+    int  fly_lmr_depth = 6;          // ["fly lmr depth"]
+    int  fly_lmr_closed = 1000;      // ["fly lmr closed"]
+    int  fly_lmr_open = 8000;        // ["fly lmr open"]
+    int  fly_lmr_jumps = 2;          // ["fly lmr jumps"]
+    //  5 bounds of the final score from the regions of free squares (region_bounds): cut if low >= margin,
+    //    fail low if high <= −margin, at non-PV nodes
+    int  region_bounds = 0;          // ["region bounds"] 0 off, 1 on
+    int  region_margin = 1;          // ["region margin"]
+    int  region_max_free = 40;       // ["region max free"] only with at most this many free squares
+    //  7 ordering: the ordinary moves ordered by our static value after the opponent's best reply with
+    //    extra power (instead of the history), at nodes of depth >= "fly order depth"
+    int  fly_order = 0;              // ["fly order"]
+    int  fly_order_depth = 6;        // ["fly order depth"]
+    int  fly_order_jumps = 2;        // ["fly order jumps"]        // ["fly reply order"] the opponent's moves: 0 ordinary ones first, 1 jumps first, 2 history only
     int  lmp_depth = 3;              // ["lmp depth"] late move pruning up to this depth (0 = never)
     int  lmp_moves = 4;              // ["lmp moves"] moves searched before pruning: this + depth²
     bool pass_rule = false;          // ["pass rule"] a player who must pass has lost (see negamax)
@@ -422,8 +453,10 @@ private:
         // from it (NNUE_Persp::RefreshCache), whichever of acc / accs is used.
         NNUE_Persp::RefreshCache refresh;
         bool proxy_off = false;                    // during a proxy cut verification: no proxy cut inside
-        uint64_t nb_fly_tests = 0, nb_fly_prunes = 0, nb_fly_cuts = 0, nb_fly_nodes = 0;   // U: statistics (search_bench)
+        uint64_t nb_fly_tests = 0, nb_fly_prunes = 0, nb_fly_cuts = 0, nb_fly_nodes = 0, nb_region_cuts = 0;   // U: statistics (search_bench)
         int  fly_nest = 0;                         // U: fly replies in progress above this node
+        int  fly_ply = -1;                         // U: the ply whose side has the extra power (negamax_fly), −1 none
+        int  fly_jumps = 2;                        // U: the kind of extra power (fly_moves)
         uint8_t last_stage = 0;                    // search_move: 1 reduced, 2 null window, 3 full re-search, 4 full
     };
 
@@ -442,7 +475,8 @@ private:
     EndgameSolver endgame;
     uint64_t nb_evals = 0, nb_eval_hits = 0;
     std::array<uint64_t, 4> asp_stats{};
-    std::array<uint64_t, 4> fly_stats{};   // U: tests, prunes, cuts, nodes in the tests (search_bench)
+    std::array<uint64_t, 4> fly_stats{};
+    uint64_t region_cuts = 0;   // U: tests, prunes, cuts, nodes in the tests (search_bench)
 
     bool stopped() const { return stop.load(std::memory_order_relaxed); }
     int  evaluate(const Yolah& yolah, Search& s, uint64_t hash);
@@ -451,6 +485,7 @@ private:
     void update_accumulator(const int16_t* in, int16_t* out, uint8_t player, Move m, NNUE_Persp::RefreshCache* cache) const;
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
     int  negamax_fly(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);   // U: the stronger reply
+    int  fly_static(Yolah& yolah, Search&, uint64_t hash, int jumps, bool ordinary_only);
     int  root_search(Yolah&, Search&, uint64_t hash, int alpha, int beta, int depth, Move&);
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const;
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int reduction, int alpha, int beta, int depth);
@@ -532,6 +567,7 @@ public:
     // Summed over the searches since construction: attempts, failed, rebounds, nodes in failed attempts.
     std::array<uint64_t, 4> aspiration_stats() const { return asp_stats; }
     std::array<uint64_t, 4> fly_reply_stats() const { return fly_stats; }
+    uint64_t region_bound_cuts() const { return region_cuts; }
     void clear_table(bool keep_ordering = false);   // forget everything: table, history, countermoves (reproducible
                                                     // benchmarks); keep_ordering: keep history and countermoves
     // The principal variation of the last search, read from the table (at most

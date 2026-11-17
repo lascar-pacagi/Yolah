@@ -1,0 +1,45 @@
+# Campaign U2 (2026-11-17): second round around the user's "extra power" idea (U1: the fly reply, all
+# negative, best ≈ −14). Seven pivots (player/minmax_nnue_dev_player.h, U), each against u_base (dev_final
+# without MPC and proxy cut) unless noted, 0.2 s, 2000 games.
+#   1 the RIGHT direction to prune: an optimistic bound (OUR next move may jump); m pruned if even so <= alpha
+#   2 weaker power for the cut (mode 2): jumps over holes only / over a single obstacle
+#   3 the proxy cut's witness against the stronger reply (allows bigger reductions), on dev_final
+#   4 openness (gap with / without jumps of the opponent's best static reply) steering the late move reductions
+#   5 bounds of the final score from the regions of free squares (cheap, no search)
+#   6 mode 2 only when a static ply with jumps already reaches beta (the test made cheap)
+#   7 move ordering by the static value after the opponent's best reply with jumps
+# Local bench (60 positions, depth 11, same move as base at depth 14; base 47/60): 1 +5 % nodes 47/60,
+# 1 one obstacle +6 % 48/60, 4 −12 % 42/60, 5 −3 % 41/60, 6 +4 % 48/60, 7 −3 % 43/60 (indicative only).
+# BOOK=/Yolah/config/openings/balanced.txt
+# 1-5: pivot 1
+u2_p1 u_base 200000 1000
+u2_p1j4 u_base 200000 1000
+u2_p1j1 u_base 200000 1000
+u2_p1d6 u_base 200000 1000
+u2_p1d10 u_base 200000 1000
+# 6-8: pivot 2
+u2_p2h u_base 200000 1000
+u2_p2o u_base 200000 1000
+u2_p2hd5 u_base 200000 1000
+# 9-12: pivot 3 (on dev_final)
+u2_p3r3 dev_final 200000 1000
+u2_p3r5 dev_final 200000 1000
+u2_p3h5 dev_final 200000 1000
+u2_p3d3 dev_final 200000 1000
+# 13-15: pivot 4
+u2_p4 u_base 200000 1000
+u2_p4c u_base 200000 1000
+u2_p4d4 u_base 200000 1000
+# 16-18: pivot 5
+u2_p5 u_base 200000 1000
+u2_p5m3 u_base 200000 1000
+u2_p5f28 u_base 200000 1000
+# 19-21: pivot 6
+u2_p6 u_base 200000 1000
+u2_p6d5 u_base 200000 1000
+u2_p6m u_base 200000 1000
+# 22-23: pivot 7
+u2_p7 u_base 200000 1000
+u2_p7d8 u_base 200000 1000
+# 24: pivot 1 on top of dev
+u2_dev_p1 dev_final 200000 1000
