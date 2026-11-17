@@ -1,5 +1,5 @@
 {
-  "name": "Jules César",
+  "name": "Napoléon",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,7 +35,7 @@
       "frames": 16
     }
   ],
-  "plate": "César",
+  "plate": "Napoléon",
   "white": "fig_gen_alphazero_blanc",
-  "stars": 4
+  "stars": 5
 }

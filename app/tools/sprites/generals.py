@@ -625,16 +625,16 @@ def anastole(sc, x, r, c):
 
 
 G = {
-    "dev": dict(name="Napoléon", plate="Napoléon", hair="#3a2a1e", nose=1.0, iris="#6a7a8a", jaw=1.05, cheeks=1.05, pose=pose_still,
+    "alphazero": dict(name="Napoléon", plate="Napoléon", hair="#3a2a1e", nose=1.0, iris="#6a7a8a", jaw=1.05, cheeks=1.05, pose=pose_still,
                       dress=dict(coat="#1e2a5c", lapels="#f2f0ea", collar="#1e2a5c", cuffs="#b8242a", vest="#f2f0ea", legs="#f2f0ea",
                                  skirt="tails", epaulettes="fringe", buttons=(-0.03, 0.03), nbuttons=6),
                       head=lambda sc, x, r, a, t: (hair_cap(sc, x, r, "#3a2a1e", front=0.4, back=-0.15, bulk=1.02), bicorne(sc, x, r, True)),
                       body=napoleon_body),
-    "alphazero": dict(name="Jules César", plate="César", hair="#4a3e34", nose=1.15, cheeks=0.82, long=1.12, jaw=0.9, aquiline=0.6, age=1.0, brow=1.2,
+    "resnet": dict(name="Jules César", plate="César", hair="#4a3e34", nose=1.15, cheeks=0.82, long=1.12, jaw=0.9, aquiline=0.6, age=1.0, brow=1.2,
                 dress=dict(coat="#9a1e24", legs="#e8b49a", boot="sandal", skirt="pteruges", pteruges="#7a4a24", tunic="#e8e0d0", sleeve="bare"),
                 head=lambda sc, x, r, a, t: (hair_cap(sc, x, r, "#4a3e34", front=0.6, back=-0.45, bulk=1.02), laurel(sc, x, r)),
                 body=caesar_body),
-    "resnet": dict(name="Wellington", plate="Wellington", hair="#3a2a20", nose=1.4, aquiline=1.0, cheeks=0.88, long=1.08, jaw=0.95,
+    "dev": dict(name="Wellington", plate="Wellington", hair="#3a2a20", nose=1.4, aquiline=1.0, cheeks=0.88, long=1.08, jaw=0.95,
                    dress=dict(coat="#a81e24", collar="#1c2440", collar_lace=True, cuffs="#1c2440", lapels="#1c2440", lapel_w=0.03, legs="#ece6d6",
                               skirt="tails", epaulettes="fringe", sash="#c8242a", buttons=(0.035,), nbuttons=7),
                    head=lambda sc, x, r, a, t: (hair_cap(sc, x, r, "#3a2a20", front=0.3, back=-0.5, curls=True, bulk=1.04),
@@ -712,5 +712,5 @@ NAMES["gen_human"] = "Vous (maréchal)"
 PLATES = {"gen_" + k: G[k]["plate"] for k in ORDER}
 # the rank, as gold stars over the plaque (drawn by the application, "stars" in the
 # drawing's file): 1 to 5 by the place in the set, five for Napoleon alone
-RANKS = ["random", "beginner", "monte_carlo", "basic_minmax", "mcts", "minmax", "features", "mcts_nnue", "nnue193", "resnet", "alphazero", "dev"]
+RANKS = ["random", "beginner", "monte_carlo", "basic_minmax", "mcts", "minmax", "features", "mcts_nnue", "nnue193", "dev", "resnet", "alphazero"]
 STARS = {"gen_" + k: 1 + i * 4 // (len(RANKS) - 1) for i, k in enumerate(RANKS)}

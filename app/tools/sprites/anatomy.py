@@ -531,7 +531,7 @@ SCALE = {k: 1.3 for k in ("random", "beginner", "monte_carlo", "mcts", "basic_mi
 CAST = {"random": ("Système nerveux", stage(1)), "beginner": ("Circulation", stage(2)), "monte_carlo": ("Squelette", stage(3)),
         "basic_minmax": ("Organes", stage(4)), "mcts": ("Écorché", stage(5)), "minmax": ("Fascias", stage(5.3)), "features": ("Hypoderme", stage(5.6)),
         "mcts_nnue": ("Peau", stage(6)),
-        "nnue193": ("Corps achevé", stage(7)), "resnet": ("Éveil", stage(8)), "alphazero": ("Lévitation", stage(9)),
-        "dev": ("Être de lumière", stage(10))}
+        "nnue193": ("Corps achevé", stage(7)), "dev": ("Éveil", stage(8)), "resnet": ("Lévitation", stage(9)),
+        "alphazero": ("Être de lumière", stage(10))}
 ANATOMY = {"lab_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"lab_" + k: n for k, (n, _) in CAST.items()}

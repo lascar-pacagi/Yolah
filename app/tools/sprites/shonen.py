@@ -662,10 +662,10 @@ def tenryu(anim, t, side):
 
 
 SCALE = {"random": 1.2, "beginner": 1.2, "monte_carlo": 1.2, "basic_minmax": 1.15, "mcts": 1.05, "minmax": 1.15, "features": 1.1, "mcts_nnue": 1.15,
-         "nnue193": 1.05, "resnet": 1.1, "alphazero": 1.15, "dev": 1.0}
+         "nnue193": 1.05, "dev": 1.1, "resnet": 1.15, "alphazero": 1.0}
 CAST = {"random": ("Ōkami", okami), "beginner": ("Shinobi", shinobi), "monte_carlo": ("Kitsune", kitsune),
         "basic_minmax": ("Samouraï", samurai), "mcts": ("Oni", oni), "minmax": ("Tengu", tengu), "features": ("Nue", nue),
         "mcts_nnue": ("Onmyōji", onmyoji),
-        "nnue193": ("Raijū", raiju), "resnet": ("Hōō", hoo), "alphazero": ("Kaigen", kaigen), "dev": ("Tenryū", tenryu)}
+        "nnue193": ("Raijū", raiju), "dev": ("Hōō", hoo), "resnet": ("Kaigen", kaigen), "alphazero": ("Tenryū", tenryu)}
 SHONEN = {"manga_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"manga_" + k: n for k, (n, _) in CAST.items()}

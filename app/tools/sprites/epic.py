@@ -660,12 +660,12 @@ def dragon(anim, t, side):
 
 
 SCALE = {"random": 1.4, "beginner": 1.3, "monte_carlo": 1.25, "basic_minmax": 1.3, "mcts": 1.25, "minmax": 1.3, "features": 1.3, "mcts_nnue": 1.3,
-         "nnue193": 1.3, "alphazero": 1.25, "resnet": 1.25, "dev": 1.15}
+         "nnue193": 1.3, "resnet": 1.25, "dev": 1.25, "alphazero": 1.15}
 CAST = {"random": ("Gobelin chapardeur", goblin), "beginner": ("Orque éclaireur", orc_scout),
         "monte_carlo": ("Rôdeuse elfe", elf_ranger), "basic_minmax": ("Guerrier orque", orc_warrior),
         "mcts": ("Troll des collines", hill_troll), "minmax": ("Guerrier nain", dwarf_warrior), "features": ("Chaman orque", orc_shaman),
         "mcts_nnue": ("Chevalier elfe", elf_knight),
-        "nnue193": ("Seigneur de guerre orque", orc_warlord), "resnet": ("Troll de guerre", war_troll),
-        "alphazero": ("Archimage elfe", archmage), "dev": ("Dragon ancien", dragon)}
+        "nnue193": ("Seigneur de guerre orque", orc_warlord), "dev": ("Troll de guerre", war_troll),
+        "resnet": ("Archimage elfe", archmage), "alphazero": ("Dragon ancien", dragon)}
 EPIC = {"leg_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"leg_" + k: n for k, (n, _) in CAST.items()}

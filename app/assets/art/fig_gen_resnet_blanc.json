@@ -1,5 +1,5 @@
 {
-  "name": "Wellington (blanc)",
+  "name": "Jules César (blanc)",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,7 +35,7 @@
       "frames": 16
     }
   ],
-  "plate": "Wellington",
+  "plate": "César",
   "variant of": "fig_gen_resnet",
   "stars": 4
 }

@@ -531,12 +531,12 @@ def coelophysis(anim, t, side):
 
 
 SCALE = {"random": 1.0, "beginner": 1.0, "monte_carlo": 1.0, "basic_minmax": 1.05, "mcts": 1.08, "minmax": 1.1, "features": 1.12, "mcts_nnue": 1.05,
-         "nnue193": 1.08, "resnet": 1.12, "alphazero": 1.12, "dev": 1.15}
+         "nnue193": 1.08, "dev": 1.12, "resnet": 1.12, "alphazero": 1.15}
 CAST = {"random": ("Brachiosaure", brachiosaurus), "beginner": ("Parasaurolophus", parasaurolophus),
         "monte_carlo": ("Stégosaure", stegosaurus), "basic_minmax": ("Ankylosaure", ankylosaurus),
         "mcts": ("Tricératops", triceratops), "minmax": ("Pachycéphalosaure", pachycephalosaurus), "features": ("Cœlophysis", coelophysis),
         "mcts_nnue": ("Dilophosaure", dilophosaurus),
-        "nnue193": ("Quetzalcoatlus", quetzalcoatlus), "resnet": ("Allosaure", allosaurus), "alphazero": ("Spinosaure", spinosaurus),
-        "dev": ("Tyrannosaure", tyrannosaurus)}
+        "nnue193": ("Quetzalcoatlus", quetzalcoatlus), "dev": ("Allosaure", allosaurus), "resnet": ("Spinosaure", spinosaurus),
+        "alphazero": ("Tyrannosaure", tyrannosaurus)}
 DINOS = {"dino_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"dino_" + k: n for k, (n, _) in CAST.items()}

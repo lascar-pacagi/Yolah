@@ -1,5 +1,5 @@
 {
-  "name": "Napoléon",
+  "name": "Wellington",
   "kind": "piece",
   "size": 192,
   "smooth": true,
@@ -35,7 +35,7 @@
       "frames": 16
     }
   ],
-  "plate": "Napoléon",
+  "plate": "Wellington",
   "white": "fig_gen_dev_blanc",
-  "stars": 5
+  "stars": 4
 }
