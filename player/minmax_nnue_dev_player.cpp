@@ -412,7 +412,10 @@ int MinMaxNNUE_DevPlayer::negamax_fly(Yolah& yolah, Search& s, uint64_t hash, in
     bool ordinary[4 * 64];
     int scores[4 * 64];
     const int n = fly_moves(yolah, player, s.fly_jumps, moves, ordinary);
-    if (n == 0) {   // cannot move even with the extra power: an ordinary node (it passes)
+    // No ordinary move: no extra power either, the side passes as the rules say
+    // (forcing a jump instead of a pass could hurt it in a zugzwang, and the
+    // bound would no longer hold).
+    if (std::none_of(ordinary, ordinary + n, [](bool b) { return b; })) {
         const int saved = s.fly_ply;
         s.fly_ply = -1;
         const int v = negamax(yolah, s, hash, alpha, beta, depth);
