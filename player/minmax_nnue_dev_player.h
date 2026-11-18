@@ -146,6 +146,14 @@ int lmr_bucket(int free, int depth, size_t i, int hist, int tried);   // U5 (6) 
 //      ("corr hist" 2, U6 +10.6). Neutral or worse: IIR, improving, singular
 //      extension / multi-cut, quiescence, razoring, futility per move, root
 //      audit, symmetry, learnt LMR, TT provenance, the reviews' fixes (U9, U10).
+//      Campaigns U12-U17 (2026-11-18, user's idea + Astra's review): ordering
+//      bonus (and LMR reduction) for moves that land on an opponent piece's ray
+//      and cut off a cone of free squares behind the destination ("block weight",
+//      "block mode", "block steps", "block cone", "block multi", "block union",
+//      "block team", "block self", "block inf", "block depth", "block proxy",
+//      "block lmr"). Best variants: w100_d3_m0 (+0.7 at 0.2 s, +8.7 at 1 s) and
+//      w300_d3_inf2 (+6.6 at 0.2 s, +4.1 at 1 s); nothing reaches +10 Elo over
+//      dev_u8 (which already has "intercept" 2000 + "cont hist" 1). Off.
 // Each improvement can be switched off in the config.
 
 // The switches of the improvements (config keys in brackets), so that each
