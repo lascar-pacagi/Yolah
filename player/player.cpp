@@ -494,6 +494,14 @@ unique_ptr<Player> Player::create(const json& j) {
              options.fn_thr = j.value("fn thr", options.fn_thr);
              options.tt_bonus = j.value("tt bonus", options.tt_bonus);
              options.proxy_bonus = j.value("proxy bonus", options.proxy_bonus);
+             options.block_weight = j.value("block weight", options.block_weight);
+             options.block_mode = j.value("block mode", options.block_mode);
+             options.block_min = j.value("block min", options.block_min);
+             options.block_steps = j.value("block steps", options.block_steps);
+             options.block_cone = j.value("block cone", options.block_cone);
+             options.block_multi = j.value("block multi", options.block_multi);
+             options.block_depth = j.value("block depth", options.block_depth);
+             options.block_lmr = j.value("block lmr", options.block_lmr);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);

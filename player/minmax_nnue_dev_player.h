@@ -339,6 +339,15 @@ struct MinMaxNNUE_DevOptions {
     int  fn_thr = 2000;                   // ["fn thr"] that table >= this: one ply less of LMR
     int  tt_bonus = 0;                    // ["tt bonus"] % of the bonus given to the table's move when the table cuts
     int  proxy_bonus = 0;                 // ["proxy bonus"] % of the bonus given to a proxy witness that cuts
+    // U12 (2026-11-18, user's idea): blocking an opponent piece's ray toward a zone of free squares
+    int  block_weight = 0;                // ["block weight"] ordering weight per square of the blocked cone zone (0 off)
+    int  block_mode = 0;                  // ["block mode"] 0 bonus added to the move's score, 1 tactical tier (SCORE_ARTICULATION) if zone >= "block min"
+    int  block_min = 4;                   // ["block min"] minimum blocked zone score for mode 1 or "block lmr"
+    int  block_steps = 2;                 // ["block steps"] king expansion steps in the cone behind our destination (0: ray only)
+    int  block_cone = 1;                  // ["block cone"] 1: 90-degree cone behind the destination, 2: half-plane
+    int  block_multi = 50;                // ["block multi"] extra % per additional opponent piece blocked by the same move
+    int  block_depth = 1;                 // ["block depth"] only at nodes of at least this depth
+    bool block_lmr = false;               // ["block lmr"] one ply less of LMR when the blocked zone score >= "block min"
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced
@@ -674,6 +683,7 @@ private:
     static bool is_legal(const Yolah&, Move);
     static Move pick_move(Yolah::MoveList&, int* scores, size_t i, size_t n);
     bool is_articulation_move(const Yolah&, Move) const;
+    int  block_zone_score(const Yolah&, Move) const;
     void update_history(Search&, uint8_t player, Move m, int bonus);
     void iterative_deepening(Yolah, Search&, uint8_t max_depth);
     void print_pv(Yolah, uint64_t hash, int8_t depth);

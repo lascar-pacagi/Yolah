@@ -1923,6 +1923,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             if (options.improving && !improving) r_fly += 1;                              // 6
             if (options.piece_lmr > 0 && tried_from[m.from_sq()] >= options.piece_lmr) r_fly += 1;   // 4
             if (options.family_lmr && tried_from[m.from_sq()] == 0) r_fly = std::max(0, r_fly - 1); // 4b
+            if (options.block_lmr && r_fly > 0 && depth >= options.block_depth && block_zone_score(yolah, m) >= options.block_min)   // U12
+                r_fly = std::max(0, r_fly - 1);
             if (options.gate_lmr > 0 && depth >= options.gate_depth) {                    // 5
                 regions();
                 const uint64_t free2 = yolah.free_squares() & ~square_bb(m.to_sq());
@@ -2238,6 +2240,108 @@ bool MinMaxNNUE_DevPlayer::is_articulation_move(const Yolah& yolah, Move m) cons
     const int to = m.to_sq();
     const uint64_t pattern = _pext_u64(yolah.free_squares(), articulation_tables.neighbours[to]);
     return articulation_tables.lut[to][pattern];
+}
+
+// ─── U12. Blocking an opponent piece's ray toward a zone ─────────────────────
+namespace {
+    struct BlockTables {
+        int8_t dir_between[64][64];     // 0..7 if aligned on a queen line, -1 otherwise
+        uint64_t ray_from[64][8];       // squares strictly after sq in direction d
+        uint64_t cone[2][64][8];        // 0: 90-degree cone (|cross| <= dot, dot > 0), 1: half-plane (dot > 0)
+        BlockTables() {
+            static constexpr int DF[8] = {1, -1, 0, 0, 1, 1, -1, -1};
+            static constexpr int DR[8] = {0, 0, 1, -1, 1, -1, 1, -1};
+            std::memset(dir_between, -1, sizeof(dir_between));
+            std::memset(ray_from, 0, sizeof(ray_from));
+            std::memset(cone, 0, sizeof(cone));
+            for (int s = 0; s < 64; s++) {
+                const int sf = s & 7, sr = s >> 3;
+                for (int d = 0; d < 8; d++) {
+                    const int df = DF[d], dr = DR[d];
+                    for (int f = sf + df, r = sr + dr; f >= 0 && f < 8 && r >= 0 && r < 8; f += df, r += dr) {
+                        const int t = (r << 3) | f;
+                        dir_between[s][t] = int8_t(d);
+                        ray_from[s][d] |= uint64_t(1) << t;
+                    }
+                    for (int t = 0; t < 64; t++) {
+                        const int tf = (t & 7) - sf, tr = (t >> 3) - sr;
+                        const int dot = tf * df + tr * dr;
+                        const int cross = std::abs(tf * dr - tr * df);
+                        if (dot > 0) {
+                            cone[1][s][d] |= uint64_t(1) << t;
+                            if (cross <= dot) cone[0][s][d] |= uint64_t(1) << t;
+                        }
+                    }
+                }
+            }
+        }
+    };
+    const BlockTables block_tables;
+    inline uint64_t expand_king_bb(uint64_t b) {
+        const uint64_t h = b | ((b << 1) & 0xFEFEFEFEFEFEFEFEULL) | ((b >> 1) & 0x7F7F7F7F7F7F7F7FULL);
+        return h | (h << 8) | (h >> 8);
+    }
+    template <Direction D> inline uint64_t queen_slide_bb(uint64_t gen, uint64_t free) {
+        uint64_t pro = free;
+        gen |= pro & shift<D>(gen);
+        pro &= shift<D>(pro);
+        gen |= pro & shift<D>(shift<D>(gen));
+        pro &= shift<D>(shift<D>(pro));
+        gen |= pro & shift<D>(shift<D>(shift<D>(shift<D>(gen))));
+        return shift<D>(gen) & free;
+    }
+    inline uint64_t queen_reach_bb(uint64_t from, uint64_t free) {
+        return queen_slide_bb<NORTH>(from, free) | queen_slide_bb<SOUTH>(from, free) | queen_slide_bb<EAST>(from, free) |
+               queen_slide_bb<WEST>(from, free) | queen_slide_bb<NORTH_EAST>(from, free) | queen_slide_bb<NORTH_WEST>(from, free) |
+               queen_slide_bb<SOUTH_EAST>(from, free) | queen_slide_bb<SOUTH_WEST>(from, free);
+    }
+}
+
+int MinMaxNNUE_DevPlayer::block_zone_score(const Yolah& yolah, Move m) const {
+    if (m == Move::none()) return 0;
+    const Square to = m.to_sq();
+    const uint64_t to_bb = square_bb(to);
+    const uint64_t free = yolah.free_squares(), occupied = yolah.occupied_squares();
+    const uint64_t free_after = free & ~to_bb;
+    const int cone_idx = options.block_cone == 2 ? 1 : 0;
+    uint64_t opp_bb = yolah.bitboard(Yolah::other_player(yolah.current_player()));
+    int total_zone = 0, nb_blocked = 0;
+    while (opp_bb) {
+        const Square w = pop_lsb(opp_bb);
+        const int dir = block_tables.dir_between[w][to];
+        if (dir < 0) continue;
+        const uint64_t atk_before = attacks_bb(w, occupied) & free;
+        if (!(atk_before & to_bb)) continue;
+        const uint64_t ray_beyond = block_tables.ray_from[to][dir];
+        const uint64_t shadow_ray = atk_before & ray_beyond;
+        const uint64_t atk_after  = atk_before & ~(ray_beyond | to_bb);
+        const uint64_t mask = free_after & block_tables.cone[cone_idx][to][dir];
+        uint64_t zone = 0;
+        if (options.block_steps < 0) {   // -1: 2-move queen reach via (shadow_ray | to) minus 2-move queen reach via atk_after
+            const uint64_t via_ray   = (shadow_ray | queen_reach_bb(shadow_ray | to_bb, free_after)) & mask;
+            const uint64_t via_other = atk_after  | queen_reach_bb(atk_after, free_after);
+            zone = via_ray & ~via_other;
+        } else {
+            zone = shadow_ray;
+            uint64_t front = shadow_ray | to_bb;
+            uint64_t other = atk_after, ofront = atk_after;
+            for (int step = 0; step < options.block_steps; step++) {
+                front  = expand_king_bb(front)  & mask       & ~zone;
+                ofront = expand_king_bb(ofront) & free_after & ~other;
+                zone  |= front;
+                other |= ofront;
+                if (!front) break;
+            }
+            zone &= ~other;
+        }
+        const int sz = std::popcount(zone);
+        if (sz > 0) {
+            total_zone += sz;
+            nb_blocked++;
+        }
+    }
+    if (nb_blocked == 0) return 0;
+    return total_zone * (100 + options.block_multi * (nb_blocked - 1)) / 100;
 }
 
 // ─── Transposition table access (H) ──────────────────────────────────────────
@@ -2599,8 +2703,66 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     // J: territory ordering only where it pays (deep nodes: few, and a good
     // order there saves the most).
     const bool territory = options.territory_ordering > 0 && depth >= options.territory_depth;
+    const bool use_block = options.block_weight > 0 && depth >= options.block_depth;
     const uint16_t ply = yolah.nb_plies();
     const uint8_t player = yolah.current_player();
+    // U12: precompute the opponent pieces' attacks once for the node when block ordering is on
+    Square opp_sq[4];
+    uint64_t opp_atk[4]{}, opp_atk_all = 0;
+    int n_opp = 0;
+    const uint64_t node_free = yolah.free_squares();
+    if (use_block) {
+        const uint64_t occupied = yolah.occupied_squares();
+        for (uint64_t b = yolah.bitboard(Yolah::other_player(player)); b && n_opp < 4;) {
+            const Square w = pop_lsb(b);
+            opp_sq[n_opp] = w;
+            opp_atk[n_opp] = attacks_bb(w, occupied) & node_free;
+            opp_atk_all |= opp_atk[n_opp++];
+        }
+    }
+    auto block_fast = [&](Move m) -> int {
+        if (m == Move::none()) return 0;
+        const Square to = m.to_sq();
+        const uint64_t to_bb = square_bb(to);
+        if (!(opp_atk_all & to_bb)) return 0;
+        const uint64_t free_after = node_free & ~to_bb;
+        const int cone_idx = options.block_cone == 2 ? 1 : 0;
+        int total_zone = 0, nb_blocked = 0;
+        for (int p = 0; p < n_opp; p++) {
+            if (!(opp_atk[p] & to_bb)) continue;
+            const int dir = block_tables.dir_between[opp_sq[p]][to];
+            if (dir < 0) continue;
+            const uint64_t ray_beyond = block_tables.ray_from[to][dir];
+            const uint64_t shadow_ray = opp_atk[p] & ray_beyond;
+            const uint64_t atk_after  = opp_atk[p] & ~(ray_beyond | to_bb);
+            const uint64_t mask = free_after & block_tables.cone[cone_idx][to][dir];
+            uint64_t zone = 0;
+            if (options.block_steps < 0) {
+                const uint64_t via_ray   = (shadow_ray | queen_reach_bb(shadow_ray | to_bb, free_after)) & mask;
+                const uint64_t via_other = atk_after  | queen_reach_bb(atk_after, free_after);
+                zone = via_ray & ~via_other;
+            } else {
+                zone = shadow_ray;
+                uint64_t front = shadow_ray | to_bb;
+                uint64_t other = atk_after, ofront = atk_after;
+                for (int step = 0; step < options.block_steps; step++) {
+                    front  = expand_king_bb(front)  & mask       & ~zone;
+                    ofront = expand_king_bb(ofront) & free_after & ~other;
+                    zone  |= front;
+                    other |= ofront;
+                    if (!front) break;
+                }
+                zone &= ~other;
+            }
+            const int sz = std::popcount(zone);
+            if (sz > 0) {
+                total_zone += sz;
+                nb_blocked++;
+            }
+        }
+        if (nb_blocked == 0) return 0;
+        return total_zone * (100 + options.block_multi * (nb_blocked - 1)) / 100;
+    };
     Move counter = Move::none();
     if (options.countermove && ply > 0) {
         const Move prev = s.played[ply - 1];
@@ -2652,10 +2814,18 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
             scores[i] = SCORE_COUNTER - 1 - int(std::find(std::begin(s.sib_ref[ply]), std::end(s.sib_ref[ply]), m) - std::begin(s.sib_ref[ply]));   // U4 (5c)
         else if (options.articulation_ordering && is_articulation_move(yolah, m))
             scores[i] = SCORE_ARTICULATION + (options.history ? hist(m) : 0);
+        else if (use_block && options.block_mode == 1) {
+            const int bz = block_fast(m);
+            if (bz >= options.block_min) scores[i] = SCORE_ARTICULATION + options.block_weight * bz + (options.history ? hist(m) : 0);
+            else                         scores[i] = options.history ? hist(m) : -int(i);
+        }
         else if (tier_prior && prior_of(ph, player, m) >= options.history_prior_threshold)
             scores[i] = SCORE_ARTICULATION + prior_of(ph, player, m);   // T, mode 3: above the history
         else if (options.history)         scores[i] = hist(m);
         else                              scores[i] = -int(i);
+        if (use_block && options.block_mode == 0 && scores[i] < SCORE_ARTICULATION) {
+            scores[i] += options.block_weight * block_fast(m);
+        }
         if (territory && scores[i] < SCORE_ARTICULATION) {
             scores[i] += options.territory_weight * territory_after(yolah, m);
         }
@@ -3304,6 +3474,14 @@ json MinMaxNNUE_DevPlayer::config() {
     j["fn thr"] = options.fn_thr;
     j["tt bonus"] = options.tt_bonus;
     j["proxy bonus"] = options.proxy_bonus;
+    j["block weight"] = options.block_weight;
+    j["block mode"] = options.block_mode;
+    j["block min"] = options.block_min;
+    j["block steps"] = options.block_steps;
+    j["block cone"] = options.block_cone;
+    j["block multi"] = options.block_multi;
+    j["block depth"] = options.block_depth;
+    j["block lmr"] = options.block_lmr;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;
