@@ -347,6 +347,7 @@ struct MinMaxNNUE_DevOptions {
     int  block_cone = 1;                  // ["block cone"] 1: 90-degree cone behind the destination, 2: half-plane
     int  block_multi = 50;                // ["block multi"] extra % per additional opponent piece blocked by the same move
     int  block_self = 0;                  // ["block self"] > 0: subtract this % of our own other pieces' blocked zone (clamped >= 0); < 0: signed (penalises self-blocking too)
+    int  block_inf = 0;                   // ["block inf"] U14: when delta_inf = inf_after − inf_before < 0: 1 cancel bz, 2 max(0, bz + delta_inf), 3 bz + delta_inf, 4 max(0, bz + 2·delta_inf), 5 bz + 2·delta_inf
     int  block_depth = 1;                 // ["block depth"] only at nodes of at least this depth
     bool block_lmr = false;               // ["block lmr"] one ply less of LMR when the blocked zone score >= "block min"
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)

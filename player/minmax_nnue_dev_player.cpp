@@ -2295,6 +2295,32 @@ namespace {
                queen_slide_bb<WEST>(from, free) | queen_slide_bb<NORTH_EAST>(from, free) | queen_slide_bb<NORTH_WEST>(from, free) |
                queen_slide_bb<SOUTH_EAST>(from, free) | queen_slide_bb<SOUTH_WEST>(from, free);
     }
+    inline int influence_fast_bb(uint64_t me, uint64_t opp, uint64_t free) {
+        uint64_t mi = me, oi = opp, mf = me, of = opp, neutral = 0;
+        while (mf | of) {
+            uint64_t nm = expand_king_bb(mf) & free & ~oi & ~mi;
+            uint64_t no = expand_king_bb(of) & free & ~mi & ~oi;
+            const uint64_t collision = nm & no;
+            if (neutral | collision) {
+                neutral |= collision | (expand_king_bb(neutral) & free);
+                nm &= ~neutral;
+                no &= ~neutral;
+            }
+            mi |= nm;
+            oi |= no;
+            mf = nm;
+            of = no;
+        }
+        return std::popcount(mi & free) - std::popcount(oi & free);
+    }
+    inline int apply_block_inf(int bz, int delta_inf, int mode) {
+        if (mode <= 0 || delta_inf >= 0) return bz;
+        if (mode == 1) return 0;
+        if (mode == 2) return std::max(0, bz + delta_inf);
+        if (mode == 3) return bz + delta_inf;
+        if (mode == 4) return std::max(0, bz + 2 * delta_inf);
+        return bz + 2 * delta_inf;
+    }
 }
 
 int MinMaxNNUE_DevPlayer::block_zone_score(const Yolah& yolah, Move m) const {
@@ -2346,11 +2372,20 @@ int MinMaxNNUE_DevPlayer::block_zone_score(const Yolah& yolah, Move m) const {
     };
     const uint8_t us = yolah.current_player(), them = Yolah::other_player(us);
     const int opp_bz = side_block(yolah.bitboard(them), SQ_NONE);
-    if (options.block_self == 0) return opp_bz;
-    if (options.block_self > 0 && opp_bz == 0) return 0;
-    const int self_bz = side_block(yolah.bitboard(us), from);
-    const int net = opp_bz - self_bz * std::abs(options.block_self) / 100;
-    return options.block_self > 0 ? std::max(0, net) : net;
+    int res = opp_bz;
+    if (options.block_self != 0) {
+        if (options.block_self > 0 && opp_bz == 0) return 0;
+        const int self_bz = side_block(yolah.bitboard(us), from);
+        const int net = opp_bz - self_bz * std::abs(options.block_self) / 100;
+        res = options.block_self > 0 ? std::max(0, net) : net;
+    }
+    if (options.block_inf > 0 && res > 0) {
+        const uint64_t me = yolah.bitboard(us), opp = yolah.bitboard(them);
+        const int inf_before = influence_fast_bb(me, opp, free);
+        const int inf_after  = influence_fast_bb((me & ~square_bb(from)) | to_bb, opp, free_after);
+        res = apply_block_inf(res, inf_after - inf_before, options.block_inf);
+    }
+    return res;
 }
 
 // ─── Transposition table access (H) ──────────────────────────────────────────
@@ -2777,16 +2812,26 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         if (nb_blocked == 0) return 0;
         return total_zone * (100 + options.block_multi * (nb_blocked - 1)) / 100;
     };
+    int inf_before = EVAL_NONE;
     auto block_fast = [&](Move m) -> int {
         if (m == Move::none()) return 0;
         const Square from = m.from_sq(), to = m.to_sq();
         const uint64_t to_bb = square_bb(to);
         const int opp_bz = side_fast(opp_sq, opp_atk, n_opp, opp_atk_all, to, to_bb, SQ_NONE);
-        if (options.block_self == 0) return opp_bz;
-        if (options.block_self > 0 && opp_bz == 0) return 0;
-        const int self_bz = side_fast(my_sq, my_atk, n_my, my_atk_all, to, to_bb, from);
-        const int net = opp_bz - self_bz * std::abs(options.block_self) / 100;
-        return options.block_self > 0 ? std::max(0, net) : net;
+        int res = opp_bz;
+        if (options.block_self != 0) {
+            if (options.block_self > 0 && opp_bz == 0) return 0;
+            const int self_bz = side_fast(my_sq, my_atk, n_my, my_atk_all, to, to_bb, from);
+            const int net = opp_bz - self_bz * std::abs(options.block_self) / 100;
+            res = options.block_self > 0 ? std::max(0, net) : net;
+        }
+        if (options.block_inf > 0 && res > 0) {
+            const uint64_t me = yolah.bitboard(player), opp = yolah.bitboard(Yolah::other_player(player));
+            if (inf_before == EVAL_NONE) inf_before = influence_fast_bb(me, opp, node_free);
+            const int inf_after = influence_fast_bb((me & ~square_bb(from)) | to_bb, opp, node_free & ~to_bb);
+            res = apply_block_inf(res, inf_after - inf_before, options.block_inf);
+        }
+        return res;
     };
     Move counter = Move::none();
     if (options.countermove && ply > 0) {
@@ -3506,6 +3551,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["block cone"] = options.block_cone;
     j["block multi"] = options.block_multi;
     j["block self"] = options.block_self;
+    j["block inf"] = options.block_inf;
     j["block depth"] = options.block_depth;
     j["block lmr"] = options.block_lmr;
     j["piece lmr"] = options.piece_lmr;

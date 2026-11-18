@@ -501,6 +501,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.block_cone = j.value("block cone", options.block_cone);
              options.block_multi = j.value("block multi", options.block_multi);
              options.block_self = j.value("block self", options.block_self);
+             options.block_inf = j.value("block inf", options.block_inf);
              options.block_depth = j.value("block depth", options.block_depth);
              options.block_lmr = j.value("block lmr", options.block_lmr);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);

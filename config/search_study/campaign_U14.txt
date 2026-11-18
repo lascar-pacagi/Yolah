@@ -1,0 +1,20 @@
+# Campaign U14 (2026-11-18): penalising/cancelling a ray-zone block when the move loses net king-step
+# influence (delta_inf = inf_after - inf_before < 0):
+#   block inf 1: cancel bz (bz = 0) when delta_inf < 0
+#   block inf 2: subtract influence loss, clamped >= 0 (bz = max(0, bz + delta_inf))
+#   block inf 3: signed (bz = bz + delta_inf, so a block that loses more influence than it blocks is penalised)
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-12 nnue/search_study.sh campaign_U14.txt
+# 1-8: at 0.2 s
+u14_w150_inf1 dev_u8 200000 1000
+u14_w150_inf2 dev_u8 200000 1000
+u14_w150_inf3 dev_u8 200000 1000
+u14_w150_d3_inf1 dev_u8 200000 1000
+u14_w150_d3_inf2 dev_u8 200000 1000
+u14_w150_d3_inf3 dev_u8 200000 1000
+u14_w300_d3_inf2 dev_u8 200000 1000
+u14_w300_d3_inf3 dev_u8 200000 1000
+# 9-12: at 1 s
+u14_w150_inf1 dev_u8 1000000 1000
+u14_w150_inf2 dev_u8 1000000 1000
+u14_w150_inf3 dev_u8 1000000 1000
+u14_w150_d3_inf2 dev_u8 1000000 1000
