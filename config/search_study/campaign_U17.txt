@@ -1,0 +1,15 @@
+# Campaign U17 (2026-11-18): isolating the proxy-cut interaction on the best U16 candidates:
+#   - "block proxy": false (`_noproxy`): excludes `block` from `proxy_cut` witness selection (and skips computing
+#     `block_fast` on nodes that `proxy_cut` cuts immediately).
+#   - "block max depth": 3 (`_onlyd3`): applies `block` exclusively at `depth == 3` (never on `depth >= 4` proxy_cut nodes).
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-8 nnue/search_study.sh campaign_U17.txt
+# 1-4: at 0.2 s, common seed 101
+u17_w100_d3_m0_noproxy dev_u8 200000 1000 101
+u17_w100_onlyd3_m0 dev_u8 200000 1000 101
+u16_w150_noproxy dev_u8 200000 1000 101
+u16_w300_d3_inf2_noproxy dev_u8 200000 1000 101
+# 5-8: at 1 s, common seed 201
+u17_w100_d3_m0_noproxy dev_u8 1000000 1000 201
+u17_w100_onlyd3_m0 dev_u8 1000000 1000 201
+u16_w150_noproxy dev_u8 1000000 1000 201
+u16_w300_d3_inf2_noproxy dev_u8 1000000 1000 201
