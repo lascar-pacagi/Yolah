@@ -1,10 +1,11 @@
 # Campaign U12 (2026-11-18): blocking an opponent piece's ray toward a zone of free squares
 # (the user's idea, player/minmax_nnue_dev_player.h, U12). For each opponent piece whose queen
 # ray passes through our destination `to`, we expand K king steps inside the cone behind `to`
-# (90-degree cone or half-plane), subtract squares the piece still attacks directly, and scale
-# up when several opponent pieces are blocked at once.
+# (90-degree cone or half-plane), subtract squares the piece still attacks via its other rays,
+# scale up when several opponent pieces are blocked at once, and optionally subtract our own
+# other pieces' obstructed zone ("block self").
 # Tested on top of dev_u8 against dev_u8, 0.2 s, 2000 games (1000 rounds of balanced.txt).
-#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-12 nnue/search_study.sh campaign_U12.txt
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-14 nnue/search_study.sh campaign_U12.txt
 u12_w150 dev_u8 200000 1000
 u12_w300 dev_u8 200000 1000
 u12_w600 dev_u8 200000 1000
@@ -17,3 +18,5 @@ u12_w300_m100 dev_u8 200000 1000
 u12_tier6 dev_u8 200000 1000
 u12_tier10 dev_u8 200000 1000
 u12_tier8_lmr dev_u8 200000 1000
+u12_self100 dev_u8 200000 1000
+u12_self_neg dev_u8 200000 1000

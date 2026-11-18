@@ -1,0 +1,21 @@
+# Campaign U13 (2026-11-18): follow-up on U12 (where u12_w150 was +5.4, u12_w300_d3 +2.4, u12_w300_lmr +2.2
+# vs u12_w300 -4.8, and the tier mode lost -17 to -33). Adds "block self" (subtracting our own other pieces'
+# obstructed zone when we land on `to`, clamped >= 0 for > 0, signed for < 0) and combines the U12 winners
+# (weight 100-150, depth >= 3, LMR -1), at 0.2 s and at 1 s/move.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-14 nnue/search_study.sh campaign_U13.txt
+# 1-8: at 0.2 s
+u13_w150_self100 dev_u8 200000 1000
+u13_w150_self_neg dev_u8 200000 1000
+u13_w150_d3 dev_u8 200000 1000
+u13_w150_d3_self100 dev_u8 200000 1000
+u13_w150_d3_self_neg dev_u8 200000 1000
+u13_w150_d3_lmr_self dev_u8 200000 1000
+u13_w100_d3_self100 dev_u8 200000 1000
+u13_w300_d3_self100 dev_u8 200000 1000
+# 9-14: at 1 s
+u12_w150 dev_u8 1000000 1000
+u13_w150_self100 dev_u8 1000000 1000
+u13_w150_d3 dev_u8 1000000 1000
+u13_w150_d3_self100 dev_u8 1000000 1000
+u13_w150_d3_self_neg dev_u8 1000000 1000
+u13_w150_d3_lmr_self dev_u8 1000000 1000
