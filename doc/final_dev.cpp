@@ -966,25 +966,50 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 
 
 // =============================================================================
-//  7. ORDONNANCEMENT DES COUPS (`score_moves`) & TERRITOIRE (`territory_after`)
+//  7. ORDONNANCEMENT DES COUPS (`score_moves`) & HISTORIQUE DE CONTINUATION
 // =============================================================================
 //
 //  À Yolah, il n'y a ni prises ni promotions : tous les coups sont « calmes ».
-//  La qualité de l'ordonnancement repose donc sur la combinaison de :
-//    1. La mémoire exacte du nœud : `tt_move` (`SCORE_TT`).
-//    2. La réfutation directe du dernier coup adverse : `countermove` (`SCORE_COUNTER`).
-//    3. Le score composite des coups ordinaires :
-//         • `history[player][m.from][m.to]` : succès global du coup dans la partie
-//         • `cont1[player][p1.to][m.to]`    : succès de la case d'arrivée `m.to`
-//                                             en réponse à la dernière case d'arrivée
-//                                             adverse `p1.to` (+32.6 Elo en U4)
-//         • `INTERCEPT_BONUS` (+2000)       : si `m.to` coupe une ligne de tir ou
-//                                             touche (3×3) `p1.to` (+17.0 Elo en U7)
-//         • `KILLER_BONUS` (+4000)          : si `m` est `killer1` ou `killer2` du pli
-//                                             (`killer_mode = 1`, +17.7 Elo en U7)
-//         • `512 × territory_after(m)`      : aux nœuds profonds (`depth >= 4`),
-//                                             avantage territorial Voronoï à pas de roi
-//                                             laissé par le coup (+36 Elo en J).
+//  Dans le moteur de base (`dev_final`), le tri reposait uniquement sur
+//  `history[player][m.from][m.to]`, qui mesure si un coup `(from → to)` est bon
+//  EN MOYENNE dans tout l'arbre, indépendamment de ce que l'adversaire vient
+//  de jouer.
+//
+//  Or, à Yolah, la valeur d'un coup est essentiellement RÉACTIVE : si
+//  l'adversaire vient d'amener une pièce en `p1.to`, la bonne réponse consiste
+//  à lui fermer l'accès à une zone ou à contester son voisinage autour de `p1.to`.
+//  C'est le rôle des trois mécanismes contextuels indexés par `p1.to` :
+//
+//    1. L'historique de continuation à 1 pli (`cont1[player][p1.to][m.to]`, +32.6 Elo) :
+//       • Indexé par (dernière destination adverse `p1.to`, notre destination `m.to`).
+//       • Lorsqu'un coup `m` coupe bêta après le coup adverse `p1`, `cont1[us][p1.to][m.to]`
+//         reçoit le même bonus de gravité (`+bonus`) que `history`, et tous les coups
+//         essayés avant `m` sans couper reçoivent `-bonus`.
+//       • Ignorer les cases de départ (`p1.from` et `m.from`) réduit la table à
+//         64 × 64 entrées par joueur : si la case `c5` est la bonne case de blocage
+//         quand l'adversaire joue en `d5`, cet apprentissage profite immédiatement
+//         à TOUTES nos pièces capables d'aller en `c5`, quelle que soit la case
+//         d'où venait la pièce adverse !
+//       • Contrairement à `history`, `cont1` n'est PAS divisé par 2 entre deux coups
+//         de la partie (`cont_age = false`), et il intervient uniquement dans le tri
+//         des coups (`score_moves`), pas dans le terme `-hist / 8192` de LMR
+//         (`cont_lmr = false`).
+//
+//    2. Le bonus d'interception (`INTERCEPT_BONUS = +2000`, +17.0 Elo) :
+//       • Priorité géométrique a priori (dès le début de la recherche, avant même que
+//         `cont1` ait appris) pour tout coup dont la destination `m.to` se trouve
+//         sur l'un des 8 rayons partant de `p1.to` ou sur l'une des 8 cases adjacentes
+//         à `p1.to`.
+//
+//    3. Les coups tueurs en bonus (`KILLER_BONUS = +4000`, `killer_mode = 1`, +17.7 Elo) :
+//       • Au lieu de trier `killer1` et `killer2` avec un score fixe géant devant tous
+//         les coups ordinaires, on leur donne `hist(m) + 4000` (où `hist(m)` inclut
+//         `history + cont1 + intercept`). Ainsi, un coup ordinaire doté d'une forte
+//         continuation (`cont1`) et d'une interception peut dépasser un killer issu
+//         d'une autre branche où l'adversaire avait joué ailleurs.
+//
+//    4. Le territoire Voronoï aux nœuds profonds (`512 × territory_after(m)` à `depth >= 4`,
+//       +36 Elo).
 // =============================================================================
 
 void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,

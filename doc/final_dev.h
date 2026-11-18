@@ -261,12 +261,27 @@ private:
         // Contre-coup : countermoves[ origine_adverse ][ dest_adverse ] = meilleur coup de réfutation
         Move countermoves[SQUARE_NB][SQUARE_NB]{};
 
-        // U4 (7) : Historique de continuation à 1 pli :
-        // cont1[joueur][ destination_adverse_précédente ][ notre_destination ]
+        // U4 (7) : Historique de continuation à 1 pli (+32.6 Elo, le gain majeur de U1–U10) :
+        //   cont1[joueur][ destination_adverse_précédente ][ notre_destination ] ∈ [-16384, 16384]
+        //
+        // Pourquoi indexer par (prev.to, m.to) et non par (prev.from, prev.to, m.from, m.to) ?
+        //   • Une table complète 4D (2 × 64^4 = 32 Mo) serait beaucoup trop creuse : au cours
+        //     d'une recherche d'une seconde, la plupart des quadruplets ne seraient vus qu'une
+        //     seule fois.
+        //   • À Yolah, l'urgence tactique créée par le dernier coup adverse dépend avant tout de
+        //     la case où sa pièce VIENT D'ATTERRIR (`prev.to`), et la réfutation dépend de la
+        //     case clé que nous allons OCCUPER (`m.to`), quelle que soit celle de nos 4 pièces
+        //     qui s'y rend.
+        //   • Avec une table 64 × 64 par camp (8 Ko par camp, qui tient entièrement dans le
+        //     cache L1), l'apprentissage converge très vite dès les premières profondeurs et se
+        //     généralise immédiatement à toutes nos pièces pouvant atteindre `m.to`.
         int16_t cont1[2][SQUARE_NB][SQUARE_NB]{};
 
-        // U7 (C5) : Historique des réductions LMR erronées (coups réduits qui ont
-        // finalement battu alpha) : lmrh[joueur][ dest_adverse_précédente ][ notre_destination ]
+        // U7 (C5) : Historique contextuel des réductions LMR erronées (+12.3 Elo) :
+        //   lmrh[joueur][ dest_adverse_précédente ][ notre_destination ]
+        // Même indexation (prev.to, m.to) que `cont1` : mémorise les réponses `m.to` à `prev.to`
+        // qui ont été réduites par LMR (`r_used > 0`) mais qui ont finalement battu `alpha`.
+        // Dès que `lmrh >= 4000`, ce couple reçoit 1 pli de réduction LMR en moins.
         int16_t lmrh[2][SQUARE_NB][SQUARE_NB]{};
 
         // U4/U6 (6) : Historique de correction de l'évaluation statique :
