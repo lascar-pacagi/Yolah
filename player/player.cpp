@@ -506,6 +506,8 @@ unique_ptr<Player> Player::create(const json& j) {
              options.block_self = j.value("block self", options.block_self);
              options.block_inf = j.value("block inf", options.block_inf);
              options.block_depth = j.value("block depth", options.block_depth);
+             options.block_max_depth = j.value("block max depth", options.block_max_depth);
+             options.block_proxy = j.value("block proxy", options.block_proxy);
              options.block_lmr = j.value("block lmr", options.block_lmr);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);

@@ -1253,6 +1253,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     bool tail = false, tail_clear = false;
     Move witness = Move::none();
     bool scores_pending = false;             // witness 3: the moves are scored only if the loop needs them
+    bool block_pending = false;              // block_proxy == false: block scores added only if proxy_test does not cut
     // The proxy test as a function: NO_CUT, or what the node returns (already
     // traced). "proxy after tt": with a table move (staged), it waits until
     // that move has been searched without cutting (stage 2 of the loop).
@@ -1266,7 +1267,9 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 if (options.proxy_cut == 1 && options.proxy_witness == 3) {
                     scores_pending = true;
                 } else {
-                    score_moves(yolah, s, tt_move, moves, scores, depth);
+                    score_moves(yolah, s, tt_move, moves, scores, depth, options.block_proxy);
+                    if (!options.block_proxy && options.block_weight > 0 && depth >= options.block_depth && depth <= options.block_max_depth)
+                        block_pending = true;
                 }
                 n = moves.size();
             }
@@ -1522,8 +1525,10 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         const int v = proxy_test();
         if (v != NO_CUT) return v;
     }
-    if (scores_pending) {
-        score_moves(yolah, s, tt_move, moves, scores, depth);
+    if (scores_pending || block_pending) {
+        score_moves(yolah, s, tt_move, moves, scores, depth, true);
+        scores_pending = false;
+        block_pending = false;
     }
     // U, pivot 7: the ordinary moves ordered by our static value after the
     // opponent's best reply with extra power.
@@ -1665,13 +1670,17 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     break;
                 }
             }
-            score_moves(yolah, s, tt_move, moves, scores, depth);
+            score_moves(yolah, s, tt_move, moves, scores, depth, !proxy_deferred || options.block_proxy);
             n = moves.size();
             fly_reorder();
             if (proxy_deferred) {             // "proxy after tt": the table's move did not cut
                 proxy_deferred = false;
                 const int v = proxy_test();
                 if (v != NO_CUT) return v;
+                if (block_pending || (!options.block_proxy && options.block_weight > 0 && depth >= options.block_depth && depth <= options.block_max_depth)) {
+                    score_moves(yolah, s, tt_move, moves, scores, depth, true);
+                    block_pending = false;
+                }
             }
             if (i >= n) break;
         }
@@ -2763,11 +2772,11 @@ int MinMaxNNUE_DevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash, in
 // All Yolah moves are "quiet" (no captures), so there is no static way to
 // recognise a good move: the ordering only learns from the search itself.
 void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
-                                       const Yolah::MoveList& moves, int* scores, int depth) const {
+                                       const Yolah::MoveList& moves, int* scores, int depth, bool allow_block) const {
     // J: territory ordering only where it pays (deep nodes: few, and a good
     // order there saves the most).
     const bool territory = options.territory_ordering > 0 && depth >= options.territory_depth;
-    const bool use_block = options.block_weight > 0 && depth >= options.block_depth;
+    const bool use_block = allow_block && options.block_weight > 0 && depth >= options.block_depth && depth <= options.block_max_depth;
     const uint16_t ply = yolah.nb_plies();
     const uint8_t player = yolah.current_player();
     // U12: precompute the pieces' attacks once for the node when block ordering is on
@@ -3599,6 +3608,8 @@ json MinMaxNNUE_DevPlayer::config() {
     j["block self"] = options.block_self;
     j["block inf"] = options.block_inf;
     j["block depth"] = options.block_depth;
+    j["block max depth"] = options.block_max_depth;
+    j["block proxy"] = options.block_proxy;
     j["block lmr"] = options.block_lmr;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;

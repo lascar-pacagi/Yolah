@@ -1,19 +1,26 @@
-# Campaign U16 (2026-11-18): addressing Astra's review points on the ray-zone blocking heuristic:
+# Campaign U16 (2026-11-18): addressing Astra's review points + U15 findings on the ray-zone blocking heuristic:
 #   1. Early-stop fix: loop continues while `(front | ofront) != 0` so alternative paths `ofront` still expand
 #      even if `front` stops first.
-#   2. Proxy-cut witness & multi-piece overlap: test best weights (`w100_d3`, `w150`, `w300_d3_inf2`, `w400`)
-#      with `block multi = 0` (`_m0`) vs `block union = true` + `block per piece = 3` (`_union`).
+#   2. Proxy-cut interaction ("block proxy": false & "block max depth": 3) and multi-piece overlap ("block multi": 0
+#      vs "block union": true + "block per piece": 3):
+#      - `_noproxy`: excludes `block` from `proxy_cut` witness selection (and skips computing `block_fast` on nodes
+#        that `proxy_cut` cuts immediately!).
+#      - `_onlyd3`: applies `block` exclusively at `depth == 3` (`block depth = 3, block max depth = 3`).
+#      - `_m0` / `_union`: removes multi-piece overlap amplification.
 #   3. Collective opponent access ("block team"): 1 subtract squares directly attacked by other opponent pieces,
 #      2 subtract squares reached within K steps by other opponent pieces, 3 half weight on squares directly
 #      attacked by another opponent piece.
 #   4. Common opening seed (5th column = 101 at 0.2 s, 201 at 1 s) so all candidates play the exact same openings.
-#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-26 nnue/search_study.sh campaign_U16.txt
-# 1-18: at 0.2 s, common seed 101
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-32 nnue/search_study.sh campaign_U16.txt
+# 1-22: at 0.2 s, common seed 101
 u16_w100_d3_fix dev_u8 200000 1000 101
 u16_w100_d3_m0 dev_u8 200000 1000 101
+u16_w100_d3_noproxy dev_u8 200000 1000 101
+u16_w100_onlyd3 dev_u8 200000 1000 101
 u16_w100_d3_ut1 dev_u8 200000 1000 101
 u16_w150_fix dev_u8 200000 1000 101
 u16_w150_m0 dev_u8 200000 1000 101
+u16_w150_noproxy dev_u8 200000 1000 101
 u16_w150_union dev_u8 200000 1000 101
 u16_w150_team1 dev_u8 200000 1000 101
 u16_w150_team2 dev_u8 200000 1000 101
@@ -22,17 +29,20 @@ u16_w150_ut1 dev_u8 200000 1000 101
 u16_w150_ut3 dev_u8 200000 1000 101
 u16_w300_d3_inf2_fix dev_u8 200000 1000 101
 u16_w300_d3_inf2_m0 dev_u8 200000 1000 101
+u16_w300_d3_inf2_noproxy dev_u8 200000 1000 101
 u16_w300_d3_inf2_ut1 dev_u8 200000 1000 101
 u16_w300_d3_inf2_ut3 dev_u8 200000 1000 101
 u16_w300_d3_inf2_self50 dev_u8 200000 1000 101
 u16_w400_fix dev_u8 200000 1000 101
 u16_w400_m0 dev_u8 200000 1000 101
-# 19-26: at 1 s, common seed 201
+# 23-32: at 1 s, common seed 201
 u16_w100_d3_fix dev_u8 1000000 1000 201
 u16_w100_d3_m0 dev_u8 1000000 1000 201
+u16_w100_d3_noproxy dev_u8 1000000 1000 201
+u16_w100_onlyd3 dev_u8 1000000 1000 201
 u16_w150_fix dev_u8 1000000 1000 201
 u16_w150_m0 dev_u8 1000000 1000 201
-u16_w150_ut1 dev_u8 1000000 1000 201
+u16_w150_noproxy dev_u8 1000000 1000 201
 u16_w300_d3_inf2_fix dev_u8 1000000 1000 201
 u16_w300_d3_inf2_m0 dev_u8 1000000 1000 201
-u16_w300_d3_inf2_ut1 dev_u8 1000000 1000 201
+u16_w300_d3_inf2_noproxy dev_u8 1000000 1000 201

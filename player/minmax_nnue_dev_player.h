@@ -352,6 +352,8 @@ struct MinMaxNNUE_DevOptions {
     int  block_self = 0;                  // ["block self"] > 0: subtract this % of our own other pieces' blocked zone (clamped >= 0); < 0: signed (penalises self-blocking too)
     int  block_inf = 0;                   // ["block inf"] U14: when delta_inf = inf_after − inf_before < 0: 1 cancel bz, 2 max(0, bz + delta_inf), 3 bz + delta_inf, 4 max(0, bz + 2·delta_inf), 5 bz + 2·delta_inf
     int  block_depth = 1;                 // ["block depth"] only at nodes of at least this depth
+    int  block_max_depth = 100;           // ["block max depth"] U16: only at nodes of at most this depth
+    bool block_proxy = true;              // ["block proxy"] U16: false = exclude block bonus from proxy_cut witness selection (and skip computing it if proxy_cut cuts)
     bool block_lmr = false;               // ["block lmr"] one ply less of LMR when the blocked zone score >= "block min"
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
@@ -683,7 +685,7 @@ private:
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const;
     int  search_move(Yolah&, Search&, uint64_t hash, Move m, size_t i, int reduction, int alpha, int beta, int depth);
     void score_moves(const Yolah&, const Search& s, Move tt_move, const Yolah::MoveList&, int* scores,
-                     int depth = 0) const;
+                     int depth = 0, bool allow_block = true) const;
     int  territory_after(const Yolah&, Move) const;
     static bool is_legal(const Yolah&, Move);
     static Move pick_move(Yolah::MoveList&, int* scores, size_t i, size_t n);
