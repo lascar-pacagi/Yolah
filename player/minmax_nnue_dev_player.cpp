@@ -2331,44 +2331,64 @@ int MinMaxNNUE_DevPlayer::block_zone_score(const Yolah& yolah, Move m) const {
     const uint64_t free_after = free & ~to_bb;
     const int cone_idx = options.block_cone == 2 ? 1 : 0;
     auto side_block = [&](uint64_t pieces_bb, Square skip_sq) {
-        int total_zone = 0, nb_blocked = 0;
-        while (pieces_bb) {
+        Square sqs[4];
+        uint64_t atks[4]{}, rem_atk[4]{};
+        int np = 0;
+        while (pieces_bb && np < 4) {
             const Square w = pop_lsb(pieces_bb);
             if (w == skip_sq) continue;
-            const int dir = block_tables.dir_between[w][to];
+            sqs[np] = w;
+            atks[np] = attacks_bb(w, occupied) & free;
+            const int d = block_tables.dir_between[w][to];
+            rem_atk[np] = (d >= 0 && (atks[np] & to_bb)) ? (atks[np] & ~(block_tables.ray_from[to][d] | to_bb)) : atks[np];
+            np++;
+        }
+        int total_zone = 0, nb_blocked = 0;
+        uint64_t union_zone = 0;
+        for (int p = 0; p < np; p++) {
+            if (!(atks[p] & to_bb)) continue;
+            const int dir = block_tables.dir_between[sqs[p]][to];
             if (dir < 0) continue;
-            const uint64_t atk_before = attacks_bb(w, occupied) & free;
-            if (!(atk_before & to_bb)) continue;
+            uint64_t team_other = 0;
+            if (options.block_team > 0) {
+                for (int q = 0; q < np; q++) if (q != p) team_other |= rem_atk[q];
+            }
             const uint64_t ray_beyond = block_tables.ray_from[to][dir];
-            const uint64_t shadow_ray = atk_before & ray_beyond;
-            const uint64_t atk_after  = atk_before & ~(ray_beyond | to_bb);
+            const uint64_t shadow_ray = atks[p] & ray_beyond;
+            const uint64_t atk_after  = rem_atk[p];
+            const uint64_t start_other = options.block_team == 2 ? (atk_after | team_other) : atk_after;
             const uint64_t mask = free_after & block_tables.cone[cone_idx][to][dir];
             uint64_t zone = 0;
             if (options.block_steps < 0) {
                 const uint64_t via_ray   = (shadow_ray | queen_reach_bb(shadow_ray | to_bb, free_after)) & mask;
-                const uint64_t via_other = atk_after  | queen_reach_bb(atk_after, free_after);
+                const uint64_t via_other = start_other | queen_reach_bb(start_other, free_after);
                 zone = via_ray & ~via_other;
             } else {
                 zone = shadow_ray;
                 uint64_t front = shadow_ray | to_bb;
-                uint64_t other = atk_after, ofront = atk_after;
+                uint64_t other = start_other, ofront = start_other;
                 for (int step = 0; step < options.block_steps; step++) {
                     front  = expand_king_bb(front)  & mask       & ~zone;
                     ofront = expand_king_bb(ofront) & free_after & ~other;
                     zone  |= front;
                     other |= ofront;
-                    if (!front) break;
+                    if (!(front | ofront)) break;
                 }
                 zone &= ~other;
             }
-            const int sz = std::popcount(zone);
+            if (options.block_team == 1) zone &= ~team_other;
+            const int sz = options.block_team == 3
+                         ? (2 * std::popcount(zone & ~team_other) + std::popcount(zone & team_other)) / 2
+                         : std::popcount(zone);
             if (sz > 0) {
                 total_zone += sz;
+                union_zone |= zone;
                 nb_blocked++;
             }
         }
         if (nb_blocked == 0) return 0;
-        return total_zone * (100 + options.block_multi * (nb_blocked - 1)) / 100;
+        const int base = options.block_union ? std::popcount(union_zone) : total_zone;
+        return base * (100 + options.block_multi * (nb_blocked - 1)) / 100 + options.block_per_piece * (nb_blocked - 1);
     };
     const uint8_t us = yolah.current_player(), them = Yolah::other_player(us);
     const int opp_bz = side_block(yolah.bitboard(them), SQ_NONE);
@@ -2776,7 +2796,16 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         if (!(all_atk & to_bb)) return 0;
         const uint64_t free_after = node_free & ~to_bb;
         const int cone_idx = options.block_cone == 2 ? 1 : 0;
+        uint64_t rem_atk[4]{};
+        if (options.block_team > 0) {
+            for (int q = 0; q < np; q++) {
+                if (sqs[q] == skip_sq) continue;
+                const int dq = block_tables.dir_between[sqs[q]][to];
+                rem_atk[q] = (dq >= 0 && (atks[q] & to_bb)) ? (atks[q] & ~(block_tables.ray_from[to][dq] | to_bb)) : atks[q];
+            }
+        }
         int total_zone = 0, nb_blocked = 0;
+        uint64_t union_zone = 0;
         for (int p = 0; p < np; p++) {
             if (sqs[p] == skip_sq || !(atks[p] & to_bb)) continue;
             const int dir = block_tables.dir_between[sqs[p]][to];
@@ -2784,33 +2813,43 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
             const uint64_t ray_beyond = block_tables.ray_from[to][dir];
             const uint64_t shadow_ray = atks[p] & ray_beyond;
             const uint64_t atk_after  = atks[p] & ~(ray_beyond | to_bb);
+            uint64_t team_other = 0;
+            if (options.block_team > 0) {
+                for (int q = 0; q < np; q++) if (q != p && sqs[q] != skip_sq) team_other |= rem_atk[q];
+            }
+            const uint64_t start_other = options.block_team == 2 ? (atk_after | team_other) : atk_after;
             const uint64_t mask = free_after & block_tables.cone[cone_idx][to][dir];
             uint64_t zone = 0;
             if (options.block_steps < 0) {
                 const uint64_t via_ray   = (shadow_ray | queen_reach_bb(shadow_ray | to_bb, free_after)) & mask;
-                const uint64_t via_other = atk_after  | queen_reach_bb(atk_after, free_after);
+                const uint64_t via_other = start_other | queen_reach_bb(start_other, free_after);
                 zone = via_ray & ~via_other;
             } else {
                 zone = shadow_ray;
                 uint64_t front = shadow_ray | to_bb;
-                uint64_t other = atk_after, ofront = atk_after;
+                uint64_t other = start_other, ofront = start_other;
                 for (int step = 0; step < options.block_steps; step++) {
                     front  = expand_king_bb(front)  & mask       & ~zone;
                     ofront = expand_king_bb(ofront) & free_after & ~other;
                     zone  |= front;
                     other |= ofront;
-                    if (!front) break;
+                    if (!(front | ofront)) break;
                 }
                 zone &= ~other;
             }
-            const int sz = std::popcount(zone);
+            if (options.block_team == 1) zone &= ~team_other;
+            const int sz = options.block_team == 3
+                         ? (2 * std::popcount(zone & ~team_other) + std::popcount(zone & team_other)) / 2
+                         : std::popcount(zone);
             if (sz > 0) {
                 total_zone += sz;
+                union_zone |= zone;
                 nb_blocked++;
             }
         }
         if (nb_blocked == 0) return 0;
-        return total_zone * (100 + options.block_multi * (nb_blocked - 1)) / 100;
+        const int base = options.block_union ? std::popcount(union_zone) : total_zone;
+        return base * (100 + options.block_multi * (nb_blocked - 1)) / 100 + options.block_per_piece * (nb_blocked - 1);
     };
     int inf_before = EVAL_NONE;
     auto block_fast = [&](Move m, int known_inf_after = EVAL_NONE) -> int {
@@ -3554,6 +3593,9 @@ json MinMaxNNUE_DevPlayer::config() {
     j["block steps"] = options.block_steps;
     j["block cone"] = options.block_cone;
     j["block multi"] = options.block_multi;
+    j["block union"] = options.block_union;
+    j["block per piece"] = options.block_per_piece;
+    j["block team"] = options.block_team;
     j["block self"] = options.block_self;
     j["block inf"] = options.block_inf;
     j["block depth"] = options.block_depth;

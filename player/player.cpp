@@ -500,6 +500,9 @@ unique_ptr<Player> Player::create(const json& j) {
              options.block_steps = j.value("block steps", options.block_steps);
              options.block_cone = j.value("block cone", options.block_cone);
              options.block_multi = j.value("block multi", options.block_multi);
+             options.block_union = j.value("block union", options.block_union);
+             options.block_per_piece = j.value("block per piece", options.block_per_piece);
+             options.block_team = j.value("block team", options.block_team);
              options.block_self = j.value("block self", options.block_self);
              options.block_inf = j.value("block inf", options.block_inf);
              options.block_depth = j.value("block depth", options.block_depth);

@@ -346,6 +346,9 @@ struct MinMaxNNUE_DevOptions {
     int  block_steps = 2;                 // ["block steps"] king expansion steps in the cone behind our destination (0: ray only)
     int  block_cone = 1;                  // ["block cone"] 1: 90-degree cone behind the destination, 2: half-plane
     int  block_multi = 50;                // ["block multi"] extra % per additional opponent piece blocked by the same move
+    bool block_union = false;             // ["block union"] U16: union of the blocked zones across pieces (no double counting of overlapping squares)
+    int  block_per_piece = 0;             // ["block per piece"] U16: flat bonus (in zone squares) per additional opponent piece blocked
+    int  block_team = 0;                  // ["block team"] U16: other opponent pieces' access to the zone: 0 ignored, 1 subtract their direct attacks, 2 subtract their K-step reach, 3 half weight on squares directly attacked by another opponent piece
     int  block_self = 0;                  // ["block self"] > 0: subtract this % of our own other pieces' blocked zone (clamped >= 0); < 0: signed (penalises self-blocking too)
     int  block_inf = 0;                   // ["block inf"] U14: when delta_inf = inf_after − inf_before < 0: 1 cancel bz, 2 max(0, bz + delta_inf), 3 bz + delta_inf, 4 max(0, bz + 2·delta_inf), 5 bz + 2·delta_inf
     int  block_depth = 1;                 // ["block depth"] only at nodes of at least this depth

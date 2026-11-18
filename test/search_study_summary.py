@@ -27,8 +27,7 @@ for path in sorted(glob.glob(os.path.join(sys.argv[1] if len(sys.argv) > 1 else 
     if not m:
         continue
     cand, ref, t = m.group(1), m.group(2), int(m.group(3))
-    if m.group(4):                                    # THREADS=k matches: "<cand> (k threads)"
-        cand = f"{cand} ({m.group(4)}th)"
+    label = f"{cand} ({m.group(4)}th)" if m.group(4) else cand
     pairs = defaultdict(list)
     for g in csv.DictReader(open(path)):
         r = float(g["result"])                       # black's points
@@ -44,7 +43,7 @@ for path in sorted(glob.glob(os.path.join(sys.argv[1] if len(sys.argv) > 1 else 
     s = sum(k * c for k, c in enumerate(counts)) / (4.0 * n)
     var = sum(c * (k / 4.0 - s) ** 2 for k, c in enumerate(counts)) / n
     se = math.sqrt(var / n) if n > 1 else float("inf")
-    rows.append((t, ref, cand, 2 * n, s, elo(s), elo(s - 1.96 * se), elo(s + 1.96 * se), counts))
+    rows.append((t, ref, label, 2 * n, s, elo(s), elo(s - 1.96 * se), elo(s + 1.96 * se), counts))
 
 print(f"{'candidate':24s} {'reference':10s} {'µs':>8} {'games':>6} {'score':>6} {'Elo':>7}  95% interval     pentanomial")
 for t, ref, cand, g, s, e, lo, hi, counts in sorted(rows):
