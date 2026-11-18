@@ -1,0 +1,35 @@
+# Campaign U15 (2026-11-18): wide sweep of "block weight" (25, 50, 75, 100, 125, 200, 250, 400, 800, 1200)
+# raw, with "block inf" 2, and with "block depth" 3, at 0.2 s and 1 s/move against dev_u8.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn06,crn07,crn14,crn15 --array=1-28 nnue/search_study.sh campaign_U15.txt
+# 1-10: pure weight sweep at 0.2 s (25..1200)
+u15_w25 dev_u8 200000 1000
+u15_w50 dev_u8 200000 1000
+u15_w75 dev_u8 200000 1000
+u15_w100 dev_u8 200000 1000
+u15_w125 dev_u8 200000 1000
+u15_w200 dev_u8 200000 1000
+u15_w250 dev_u8 200000 1000
+u15_w400 dev_u8 200000 1000
+u15_w800 dev_u8 200000 1000
+u15_w1200 dev_u8 200000 1000
+# 11-15: weight sweep with block inf 2 at 0.2 s
+u15_w50_inf2 dev_u8 200000 1000
+u15_w100_inf2 dev_u8 200000 1000
+u15_w200_inf2 dev_u8 200000 1000
+u15_w400_inf2 dev_u8 200000 1000
+u15_w600_inf2 dev_u8 200000 1000
+# 16-20: weight sweep at depth >= 3 at 0.2 s
+u15_w75_d3 dev_u8 200000 1000
+u15_w100_d3 dev_u8 200000 1000
+u15_w200_d3 dev_u8 200000 1000
+u15_w400_d3 dev_u8 200000 1000
+u15_w600_d3 dev_u8 200000 1000
+# 21-28: weight sweep at 1 s
+u15_w50 dev_u8 1000000 1000
+u15_w100 dev_u8 1000000 1000
+u15_w200 dev_u8 1000000 1000
+u15_w400 dev_u8 1000000 1000
+u15_w800 dev_u8 1000000 1000
+u15_w100_inf2 dev_u8 1000000 1000
+u15_w200_inf2 dev_u8 1000000 1000
+u15_w400_inf2 dev_u8 1000000 1000

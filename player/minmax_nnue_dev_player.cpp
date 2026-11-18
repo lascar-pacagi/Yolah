@@ -2813,7 +2813,7 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         return total_zone * (100 + options.block_multi * (nb_blocked - 1)) / 100;
     };
     int inf_before = EVAL_NONE;
-    auto block_fast = [&](Move m) -> int {
+    auto block_fast = [&](Move m, int known_inf_after = EVAL_NONE) -> int {
         if (m == Move::none()) return 0;
         const Square from = m.from_sq(), to = m.to_sq();
         const uint64_t to_bb = square_bb(to);
@@ -2828,7 +2828,8 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         if (options.block_inf > 0 && res > 0) {
             const uint64_t me = yolah.bitboard(player), opp = yolah.bitboard(Yolah::other_player(player));
             if (inf_before == EVAL_NONE) inf_before = influence_fast_bb(me, opp, node_free);
-            const int inf_after = influence_fast_bb((me & ~square_bb(from)) | to_bb, opp, node_free & ~to_bb);
+            const int inf_after = known_inf_after != EVAL_NONE ? known_inf_after
+                                : influence_fast_bb((me & ~square_bb(from)) | to_bb, opp, node_free & ~to_bb);
             res = apply_block_inf(res, inf_after - inf_before, options.block_inf);
         }
         return res;
@@ -2893,11 +2894,14 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
             scores[i] = SCORE_ARTICULATION + prior_of(ph, player, m);   // T, mode 3: above the history
         else if (options.history)         scores[i] = hist(m);
         else                              scores[i] = -int(i);
-        if (use_block && options.block_mode == 0 && scores[i] < SCORE_ARTICULATION) {
-            scores[i] += options.block_weight * block_fast(m);
-        }
-        if (territory && scores[i] < SCORE_ARTICULATION) {
-            scores[i] += options.territory_weight * territory_after(yolah, m);
+        if (scores[i] < SCORE_ARTICULATION) {
+            const int terr = territory ? territory_after(yolah, m) : EVAL_NONE;
+            if (use_block && options.block_mode == 0) {
+                scores[i] += options.block_weight * block_fast(m, options.territory_ordering == 1 ? terr : EVAL_NONE);
+            }
+            if (territory) {
+                scores[i] += options.territory_weight * terr;
+            }
         }
     }
     // T, mode 4: the "history prior top" moves of the node with the highest
