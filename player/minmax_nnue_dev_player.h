@@ -381,6 +381,14 @@ struct MinMaxNNUE_DevOptions {
     int  policy_weight = 1000;            // ["policy weight"] per logit unit (a logit difference of 1 ≈ ×2.7 in probability)
     int  policy_depth = 2;                // ["policy depth"] only at nodes of at least this depth
     bool policy_no_influence = false;     // ["policy no influence"] the head replaces the influence term where it applies
+    // Constants of the code made options for the SPSA tuning (2026-11-20; defaults = the values of before):
+    int  lmr_hist_div = 8192;             // ["lmr hist div"] LMR: − history / this plies
+    int  lmr_pv = 1024;                   // ["lmr pv"] LMR: − this / 1024 plies at PV nodes
+    int  lmr_special = 1024;              // ["lmr special"] LMR: − this / 1024 plies for the countermove
+    int  hist_bonus_a = 16;               // ["hist bonus a"] history bonus of a cutoff: min(a·d² + b·d, cap)
+    int  hist_bonus_b = 32;               // ["hist bonus b"]
+    int  hist_bonus_cap = 2000;           // ["hist bonus cap"]
+    int  corr_max = 8000;                 // ["corr max"] correction history: bound of an entry
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced

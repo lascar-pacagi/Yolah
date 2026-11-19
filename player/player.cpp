@@ -519,6 +519,13 @@ unique_ptr<Player> Player::create(const json& j) {
              options.policy_weight = j.value("policy weight", options.policy_weight);
              options.policy_depth = j.value("policy depth", options.policy_depth);
              options.policy_no_influence = j.value("policy no influence", options.policy_no_influence);
+             options.lmr_hist_div = j.value("lmr hist div", options.lmr_hist_div);
+             options.lmr_pv = j.value("lmr pv", options.lmr_pv);
+             options.lmr_special = j.value("lmr special", options.lmr_special);
+             options.hist_bonus_a = j.value("hist bonus a", options.hist_bonus_a);
+             options.hist_bonus_b = j.value("hist bonus b", options.hist_bonus_b);
+             options.hist_bonus_cap = j.value("hist bonus cap", options.hist_bonus_cap);
+             options.corr_max = j.value("corr max", options.corr_max);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);

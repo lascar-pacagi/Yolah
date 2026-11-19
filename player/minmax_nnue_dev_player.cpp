@@ -330,9 +330,9 @@ int MinMaxNNUE_DevPlayer::late_move_reduction_of(int depth, size_t i, bool pv_no
     }
     if (depth < 3 || i == 0) return 0;
     int r = lmr_table[std::min(depth, 63)][std::min<size_t>(i + 1, Yolah::MAX_NB_MOVES - 1)];
-    if (pv_node) r -= 1024;
-    if (special) r -= 1024;
-    if (options.history) r -= hist * 1024 / 8192;
+    if (pv_node) r -= options.lmr_pv;
+    if (special) r -= options.lmr_special;
+    if (options.history) r -= hist * 1024 / options.lmr_hist_div;
     return std::clamp(r / 1024, 0, depth - 2);
 }
 
@@ -1599,7 +1599,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         if (bestv <= alpha_orig && bestv >= static_eval) return;    // an upper bound above it: says nothing
         const int b = std::clamp((bestv - static_eval) * depth / std::max(1, options.corr_scale), -2000, 2000);
         auto learn = [&](int16_t& e, int cap) { e = int16_t(std::clamp(e + b - e * std::abs(b) / cap, -cap, cap)); };
-        if (options.corr_hist > 0) learn(s.w->corr[yolah.current_player()][corr_key(yolah)], 8000);
+        if (options.corr_hist > 0) learn(s.w->corr[yolah.current_player()][corr_key(yolah)], options.corr_max);
         if (options.corr_cont > 0 && ply_now >= 2 && s.played[ply_now - 1] != Move::none() && s.played[ply_now - 2] != Move::none())
             learn(s.w->ccorr[yolah.current_player()][s.played[ply_now - 2].to_sq()][s.played[ply_now - 1].to_sq()], options.corr_cont);
     };
@@ -2071,7 +2071,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     // move, hence a bonus growing with the depth.
                     if (options.history) {
                         const uint8_t player = yolah.current_player();
-                        int bonus = std::min(16 * depth * depth + 32 * depth, 2000);
+                        int bonus = std::min(options.hist_bonus_a * depth * depth + options.hist_bonus_b * depth, options.hist_bonus_cap);
                         if (options.bonus_margin > 0) bonus *= 1 + std::clamp((v - beta) / options.bonus_margin, 0, 2);   // U7 (10)
                         const int malus = bonus * options.malus_pct / 100;                                              // U7 (8)
                         const size_t k0 = options.malus_cap > 0 && i > size_t(options.malus_cap) ? i - size_t(options.malus_cap) : 0;
@@ -3681,6 +3681,13 @@ json MinMaxNNUE_DevPlayer::config() {
     j["policy weight"] = options.policy_weight;
     j["policy depth"] = options.policy_depth;
     j["policy no influence"] = options.policy_no_influence;
+    j["lmr hist div"] = options.lmr_hist_div;
+    j["lmr pv"] = options.lmr_pv;
+    j["lmr special"] = options.lmr_special;
+    j["hist bonus a"] = options.hist_bonus_a;
+    j["hist bonus b"] = options.hist_bonus_b;
+    j["hist bonus cap"] = options.hist_bonus_cap;
+    j["corr max"] = options.corr_max;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;
