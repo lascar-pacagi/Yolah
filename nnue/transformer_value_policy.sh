@@ -19,7 +19,8 @@
 #
 # Resumable: submit it again with the same WORK_DIR, it restarts at the last
 # checkpoint (every 4 chunks ≈ 16 M positions per GPU).
-# Compare all of them, and the app's ResNet, on the same validation set (first 8 chunks):
+# Compare all of them, and the app's ResNet, on the same validation set (first 8 chunks), also
+# DURING the training (transformer_last.pt = the last checkpoint, every ~16 M positions):
 #     STAGE=eval sbatch -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
 # ────────────────────────────────────────────────────────────────────────────
 #SBATCH --job-name=tf_vp
@@ -66,7 +67,7 @@ case "${STAGE}" in
         ;;
     eval)
         for a in transformer resnet_ft resnet; do
-            for f in "${BASE_DIR}/${a}"/transformer.e*.pt "${BASE_DIR}/${a}"/transformer.pt; do
+            for f in "${BASE_DIR}/${a}"/transformer.e*.pt "${BASE_DIR}/${a}"/transformer.pt "${BASE_DIR}/${a}"/transformer_last.pt; do
                 [[ -f "${f}" ]] && { echo "── ${a}"; run_py eval --cache /cache --model "/base/${a}/$(basename "${f}")" --chunks "${CHUNKS:-8}"; }
             done
         done
