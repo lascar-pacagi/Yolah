@@ -201,9 +201,44 @@ def load_net(path):
     return net
 
 
-# ── Loader that can start an epoch at a given chunk (exact resume) ──────────
+# ── Loaders: either cache, and an exact resume ──────────────────────────────
 
-class ResumableLoader(R.ChunkedShuffleLoader):
+class _PlanesOfNNUE:
+    """Rows of an NNUE cache (N, 193: black, white, holes, turn; cell c = square
+    63 - c) seen as the ResNet's (N, 4, 8, 8) planes: the same cells, so
+    positions[a:b] gives what preprocess.py would have written."""
+    def __init__(self, inputs):
+        self.inputs = inputs
+        self.shape = (inputs.shape[0], 4, 8, 8)
+
+    def __getitem__(self, sl):
+        a = np.asarray(self.inputs[sl])
+        out = np.empty((len(a), 4, 8, 8), dtype=np.uint8)
+        out[:, :3] = a[:, :192].reshape(-1, 3, 8, 8)
+        out[:, 3] = a[:, 192, None, None]
+        return out
+
+
+class CacheLoader(R.ChunkedShuffleLoader):
+    """The ResNet loader, which also reads an NNUE cache (preprocess_nnue.py)
+    once policies.i16 has been added to it by policies_from_nnue_cache.py."""
+    def _open(self):
+        with open(os.path.join(self.cache_dir, "meta.json")) as f:
+            meta = json.load(f)
+        if "positions" in meta:
+            return super()._open()
+        n = int(meta["n_positions"])
+        pol = os.path.join(self.cache_dir, "policies.i16")
+        if not os.path.isfile(pol):
+            raise FileNotFoundError(f"{pol}: run policies_from_nnue_cache.py {self.cache_dir} first")
+        inputs = np.memmap(os.path.join(self.cache_dir, meta["inputs"]["path"]), dtype=np.uint8, mode='r',
+                           shape=tuple(meta["inputs"]["shape"]))
+        self.positions = _PlanesOfNNUE(inputs)
+        self.values = np.memmap(os.path.join(self.cache_dir, meta["values"]["path"]), dtype=np.int8, mode='r', shape=(n,))
+        self.policies = np.memmap(pol, dtype=np.int16, mode='r', shape=(n,))
+
+
+class ResumableLoader(CacheLoader):
     skip_chunks = 0
 
     def __iter__(self):
@@ -282,7 +317,7 @@ def train_worker(rank, world, args):
         n_total = int(json.load(f)["n_positions"])
     n_train = int(0.95 * n_total)
     train_loader = ResumableLoader(args.cache, 0, n_train, BATCH, rank, world, chunk_size=CHUNK, shuffle=True)
-    val_loader   = R.ChunkedShuffleLoader(args.cache, n_train, n_total, BATCH, rank, world, chunk_size=CHUNK, shuffle=False)
+    val_loader   = CacheLoader(args.cache, n_train, n_total, BATCH, rank, world, chunk_size=CHUNK, shuffle=False)
     per_epoch = len(train_loader)
     total = NB_EPOCHS * per_epoch
 
@@ -390,7 +425,7 @@ def cmd_eval(args):
     with open(os.path.join(args.cache, "meta.json")) as f:
         n_total = int(json.load(f)["n_positions"])
     n_train = int(0.95 * n_total)
-    loader = R.ChunkedShuffleLoader(args.cache, n_train, n_total, BATCH, 0, 1, chunk_size=CHUNK, shuffle=False)
+    loader = CacheLoader(args.cache, n_train, n_total, BATCH, 0, 1, chunk_size=CHUNK, shuffle=False)
     max_b = None if args.chunks <= 0 else args.chunks * loader.batches_per_chunk
     m = evaluate(net, loader, device, torch.bfloat16, max_b)
     print(f"{os.path.basename(args.model)}: {int(m.n):,} validation positions: {m.text()}")

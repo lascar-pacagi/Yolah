@@ -14,6 +14,9 @@
 #     done
 #     GPUS: --gres=gpu:2 works as is (DDP on the node's GPUs)
 #
+# First, once (CPU, ~1 h: writes CACHE_DIR/policies.i16, 2 GB):
+#     STAGE=policies sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 nnue/transformer_value_policy.sh
+#
 # Resumable: submit it again with the same WORK_DIR, it restarts at the last
 # checkpoint (every 4 chunks ≈ 16 M positions per GPU).
 # Compare all of them, and the app's ResNet, on the same validation set (first 8 chunks):
@@ -29,15 +32,19 @@ YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"
 ARCH="${ARCH:-transformer}"
 BASE_DIR="${BASE_DIR:-${HOME}/TransformerVP}"
 WORK_DIR="${WORK_DIR:-${BASE_DIR}/${ARCH}}"
-CACHE_DIR="${CACHE_DIR:?CACHE_DIR=the ResNet cache of preprocess.py (positions.u8, values.i8, policies.i16)}"
+# The NNUE cache (preprocess_nnue.py, the ~988 M positions of data/games): its
+# rows are the ResNet's planes; the move played (policies.i16, 2 GB) is added
+# once by STAGE=policies (read from consecutive rows, checked identical to
+# preprocess.py). A preprocess.py cache (positions.u8) works too.
+CACHE_DIR="${CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache}"
 RESNET_PT="${RESNET_PT:-/Yolah/nnue/cnn_resnet_256x30_value_policy.pt}"
 STAGE="${STAGE:-train}"
 source "${YOLAH_DIR}/nnue/alphazero_common.sh"    # SIF, WSL_BIND
 mkdir -p "${WORK_DIR}"
 [[ -f "${CACHE_DIR}/meta.json" ]] || { echo "no ${CACHE_DIR}/meta.json (CACHE_DIR=...)" >&2; exit 1; }
-grep -q '"policies"' "${CACHE_DIR}/meta.json" && grep -q '"positions"' "${CACHE_DIR}/meta.json" || {
-    echo "${CACHE_DIR} is not a preprocess.py cache (positions.u8 + values.i8 + policies.i16: the ResNet's);" >&2
-    echo "find it with: find ~ -maxdepth 5 -name policies.i16" >&2; exit 1; }
+if [[ "${STAGE}" != policies ]] && ! grep -q '"positions"' "${CACHE_DIR}/meta.json" && [[ ! -f "${CACHE_DIR}/policies.i16" ]]; then
+    echo "${CACHE_DIR}: no policies.i16 yet; first: STAGE=policies sbatch -p insa-cpu ... nnue/transformer_value_policy.sh" >&2; exit 1
+fi
 
 run_py() {
     singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" --bind "${BASE_DIR}:/base" \
@@ -47,6 +54,10 @@ run_py() {
 }
 
 case "${STAGE}" in
+    policies)
+        singularity exec "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${CACHE_DIR}:/cache" "${SIF}" \
+            bash -c "cd /Yolah/nnue && python3 policies_from_nnue_cache.py /cache"
+        ;;
     train)
         echo "[$(date '+%F %T')] training on $(hostname), GPUs: ${CUDA_VISIBLE_DEVICES:-?}"
         run_py train --cache /cache --out /work
@@ -62,5 +73,5 @@ case "${STAGE}" in
         echo "── the app's ResNet (supervised, original recipe)"
         run_py eval --cache /cache --model "${RESNET_PT}" --resnet --chunks "${CHUNKS:-8}"
         ;;
-    *) echo "STAGE=train|eval" >&2; exit 1 ;;
+    *) echo "STAGE=policies|train|eval" >&2; exit 1 ;;
 esac
