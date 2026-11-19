@@ -865,12 +865,14 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 
         // ── Calcul de la réduction LMR du coup `m` (E + U7) ──────────────────
         const uint8_t player = yolah.current_player();
+        // (« PV » se lit sur la fenêtre COURANTE : alpha a pu monter dans la boucle ;
+        //  le contre-coup, noté au-dessus de SCORE_ARTICULATION, compte pour 0 d'historique)
         int r = !generated ? 0
               : late_move_reduction_of(
                     depth, i,
-                    /*pv_node=*/pv_node,
+                    /*pv_node=*/beta - alpha > 1,
                     /*special=*/scores[i] >= SCORE_COUNTER,
-                    s.w->history[player][m.from_sq()][m.to_sq()]
+                    scores[i] >= SCORE_ARTICULATION ? 0 : s.w->history[player][m.from_sq()][m.to_sq()]
                 );
 
         // Réductions LMR contextuelles (U7 : `intercept_lmr` et `lmrh`) :
@@ -945,10 +947,10 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
                         for (size_t k = 0; k < i; k++) {
                             upd_cont1(moves[k], -bonus);
                         }
-
-                        // 4. Enregistrement du contre-coup (`countermoves`)
-                        s.w->countermoves[p1.from_sq()][p1.to_sq()] = m;
                     }
+                    // 4. Enregistrement du contre-coup (`countermoves`), y compris après
+                    //    une passe adverse (comme le joueur : la passe a sa propre case)
+                    if (ply_now > 0) s.w->countermoves[p1.from_sq()][p1.to_sq()] = m;
 
                     return v;
                 }
@@ -1018,7 +1020,8 @@ void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_mo
     const uint16_t ply       = yolah.nb_plies();
     const uint8_t  player    = yolah.current_player();
     const Move     p1        = ply > 0 ? s.played[ply - 1] : Move::none();
-    const Move     counter   = p1 != Move::none() ? s.w->countermoves[p1.from_sq()][p1.to_sq()] : Move::none();
+    // (après une passe adverse aussi : la passe a sa propre case dans la table, comme dans le joueur)
+    const Move     counter   = ply > 0 ? s.w->countermoves[p1.from_sq()][p1.to_sq()] : Move::none();
 
     // Score d'historique composite (historique principal + continuation 1 pli + interception)
     auto hist = [&](Move m) {
@@ -1040,12 +1043,14 @@ void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_mo
 
         if (m == tt_move) {
             scores[i] = SCORE_TT;
-        } else if (m == counter && counter != Move::none()) {
-            scores[i] = SCORE_COUNTER;
         } else if (kil) {
             // `killer_mode = 1` : les killers restent dans la catégorie des coups
-            // ordinaires (< SCORE_ARTICULATION) avec un bonus de +4000 sur `hist(m)`.
+            // ordinaires (< SCORE_ARTICULATION) avec un bonus de +4000 sur `hist(m)`
+            // (testé AVANT le contre-coup : un coup à la fois tueur et contre-coup
+            // est traité en tueur, comme dans le joueur).
             scores[i] = std::min(hist(m) + KILLER_BONUS, SCORE_ARTICULATION - 1);
+        } else if (m == counter && counter != Move::none()) {
+            scores[i] = SCORE_COUNTER;
         } else {
             scores[i] = hist(m);
         }
