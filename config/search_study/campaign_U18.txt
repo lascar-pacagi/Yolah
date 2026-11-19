@@ -1,0 +1,12 @@
+# Campaign U18 (2026-11-19, user's idea): undoing our previous move (A -> B, A now a hole) is usually bad,
+#   or we would not have moved: 'back' = the same piece goes back toward A on its line, 'near' = any piece lands
+#   next to A. Ordering malus (undo malus, default 3000) and optionally one more ply of LMR (undo lmr).
+#   Nodes at depth 11 on 60 bench positions: dev_u8 1102308, back 1068302 (-3.1 %), near 1291680, both 1196199, both+lmr 1075696, near m8k 1137331.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-6 nnue/search_study.sh campaign_U18.txt
+# 1-6: at 0.2 s, common seed 111
+u18_back dev_u8 200000 1000 111
+u18_near dev_u8 200000 1000 111
+u18_both dev_u8 200000 1000 111
+u18_both_lmr dev_u8 200000 1000 111
+u18_back_lmr dev_u8 200000 1000 111
+u18_near_m8k dev_u8 200000 1000 111

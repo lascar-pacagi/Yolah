@@ -363,6 +363,12 @@ struct MinMaxNNUE_DevOptions {
     int  block_max_depth = 100;           // ["block max depth"] U16: only at nodes of at most this depth
     bool block_proxy = true;              // ["block proxy"] U16: false = exclude block bonus from proxy_cut witness selection (and skip computing it if proxy_cut cuts)
     bool block_lmr = false;               // ["block lmr"] one ply less of LMR when the blocked zone score >= "block min"
+    // U18 (2026-11-19, user's idea): our previous move took a piece from A to B (A is now a hole); undoing it is
+    // usually bad, or we would not have moved: the same piece going back toward A on the same line ("back"),
+    // or any piece landing next to A ("near"). An ordering malus, and optionally one ply more of LMR.
+    int  undo_mode = 0;                   // ["undo mode"] 0 off, 1 back only, 2 near only, 3 both
+    int  undo_malus = 3000;               // ["undo malus"] subtracted from the move's ordering score
+    bool undo_lmr = false;                // ["undo lmr"] one ply more of LMR for such a move
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced

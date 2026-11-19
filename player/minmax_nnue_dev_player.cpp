@@ -627,6 +627,22 @@ static inline void geo_index(const Yolah& y, Move m, int& mask, int& dir, int& d
     dist = len <= 1 ? 0 : len <= 3 ? 1 : 2;
 }
 
+// ─── U18 helper ──────────────────────────────────────────────────────────────
+// Does m undo our previous move prev (A → B, A now a hole)? mode bit 1: the same
+// piece goes back toward A along the line it came by; bit 2: m lands next to A.
+static inline bool undoes(Move m, Move prev, int mode) {
+    if (prev == Move::none() || m == Move::none()) return false;
+    const int A = int(prev.from_sq()), B = int(prev.to_sq()), T = int(m.to_sq());
+    if ((mode & 1) && int(m.from_sq()) == B) {
+        const int dfa = (A & 7) - (B & 7), dra = (A >> 3) - (B >> 3);
+        const int dft = (T & 7) - (B & 7), drt = (T >> 3) - (B >> 3);
+        auto sgn = [](int x) { return (x > 0) - (x < 0); };
+        if (dfa * drt == dra * dft && sgn(dfa) == sgn(dft) && sgn(dra) == sgn(drt)) return true;
+    }
+    if ((mode & 2) && (around(square_bb(prev.from_sq())) & square_bb(m.to_sq()))) return true;
+    return false;
+}
+
 // ─── U5 helpers ──────────────────────────────────────────────────────────────
 // 6: the bucket of a late move for the learnt LMR (8 phases × 5 depths × 4 ranks
 // × 4 history levels × 3 counts of the piece's moves already tried).
@@ -1917,6 +1933,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         int r_fly = r > 0 ? std::max(0, r + fly_lmr_delta) : 0;   // U, pivot 4
         // U4: reductions
         if (r_fly > 0 && (s.audit || sym_unsure)) r_fly = std::max(0, r_fly - 1);   // U5 (8, 9)
+        if (r_fly > 0 && options.undo_lmr && options.undo_mode > 0 && ply_now > 1 && undoes(m, s.played[ply_now - 2], options.undo_mode))
+            r_fly += 1;   // U18
         if (r_fly > 0 && ply_now > 0 && s.played[ply_now - 1] != Move::none()) {   // U7 (B8, C5)
             const Move q1 = s.played[ply_now - 1];
             if (options.intercept_lmr && ((attacks_bb(q1.to_sq(), yolah.occupied_squares()) | around(square_bb(q1.to_sq()))) & square_bb(m.to_sq())))
@@ -2942,6 +2960,8 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
             scores[i] = SCORE_ARTICULATION + prior_of(ph, player, m);   // T, mode 3: above the history
         else if (options.history)         scores[i] = hist(m);
         else                              scores[i] = -int(i);
+        if (options.undo_mode > 0 && scores[i] < SCORE_ARTICULATION && ply > 1 && undoes(m, s.played[ply - 2], options.undo_mode))
+            scores[i] -= options.undo_malus;   // U18
         if (scores[i] < SCORE_ARTICULATION) {
             const int terr = territory ? territory_after(yolah, m) : EVAL_NONE;
             if (use_block && options.block_mode == 0) {
@@ -3611,6 +3631,9 @@ json MinMaxNNUE_DevPlayer::config() {
     j["block max depth"] = options.block_max_depth;
     j["block proxy"] = options.block_proxy;
     j["block lmr"] = options.block_lmr;
+    j["undo mode"] = options.undo_mode;
+    j["undo malus"] = options.undo_malus;
+    j["undo lmr"] = options.undo_lmr;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;

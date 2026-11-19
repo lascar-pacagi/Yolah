@@ -509,6 +509,9 @@ unique_ptr<Player> Player::create(const json& j) {
              options.block_max_depth = j.value("block max depth", options.block_max_depth);
              options.block_proxy = j.value("block proxy", options.block_proxy);
              options.block_lmr = j.value("block lmr", options.block_lmr);
+             options.undo_mode = j.value("undo mode", options.undo_mode);
+             options.undo_malus = j.value("undo malus", options.undo_malus);
+             options.undo_lmr = j.value("undo lmr", options.undo_lmr);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);
