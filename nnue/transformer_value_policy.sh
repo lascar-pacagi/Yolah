@@ -1,15 +1,22 @@
 #!/bin/bash
 # ────────────────────────────────────────────────────────────────────────────
-# transformer_value_policy.sh — train the transformer of the same size as the
-# supervised ResNet 256x30 on the same cache (outcome z + move played), in
-# the AlphaZero image, then export it for the MCTS (.ts + .test.bin).
+# transformer_value_policy.sh — train, with ONE recipe (AdamW, warmup + cosine,
+# same cache, same split), three networks of the same size, then export each
+# for the MCTS (.ts + .test.bin):
+#     ARCH=transformer  d 512, 8 heads, 12 layers               (38.7 M params)
+#     ARCH=resnet_ft    ResNet 256x30 + from-to policy head     (35.5 M)
+#     ARCH=resnet       ResNet 256x30 unchanged (baseline)      (36.0 M)
+# resnet_ft vs resnet = the effect of the policy head; transformer vs
+# resnet_ft = the effect of attention.
 #
-#     sbatch -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
+#     for a in transformer resnet_ft resnet; do
+#         ARCH=$a sbatch --job-name=vp_$a -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
+#     done
 #     GPUS: --gres=gpu:2 works as is (DDP on the node's GPUs)
 #
 # Resumable: submit it again with the same WORK_DIR, it restarts at the last
 # checkpoint (every 4 chunks ≈ 16 M positions per GPU).
-# Compare with the ResNet on the same validation set (first 8 chunks):
+# Compare all of them, and the app's ResNet, on the same validation set (first 8 chunks):
 #     STAGE=eval sbatch -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
 # ────────────────────────────────────────────────────────────────────────────
 #SBATCH --job-name=tf_vp
@@ -19,7 +26,9 @@
 #SBATCH --output=tf_vp_%j.out
 set -euo pipefail
 YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"
-WORK_DIR="${WORK_DIR:-${HOME}/TransformerVP}"
+ARCH="${ARCH:-transformer}"
+BASE_DIR="${BASE_DIR:-${HOME}/TransformerVP}"
+WORK_DIR="${WORK_DIR:-${BASE_DIR}/${ARCH}}"
 CACHE_DIR="${CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"
 RESNET_PT="${RESNET_PT:-/Yolah/nnue/cnn_resnet_256x30_value_policy.pt}"
 STAGE="${STAGE:-train}"
@@ -28,9 +37,9 @@ mkdir -p "${WORK_DIR}"
 [[ -f "${CACHE_DIR}/meta.json" ]] || { echo "no ${CACHE_DIR}/meta.json (CACHE_DIR=...)" >&2; exit 1; }
 
 run_py() {
-    singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" \
+    singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" --bind "${BASE_DIR}:/base" \
         --bind "${CACHE_DIR}:/cache" \
-        --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS:-2},YOLAH_TF_LR=${YOLAH_TF_LR:-5e-4},YOLAH_TF_BATCH=${YOLAH_TF_BATCH:-1024}" \
+        --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS:-2},YOLAH_TF_LR=${YOLAH_TF_LR:-5e-4},YOLAH_TF_BATCH=${YOLAH_TF_BATCH:-1024},YOLAH_TF_ARCH=${ARCH}" \
         "${SIF}" bash -c "cd /Yolah/nnue && python3 transformer_value_policy.py $*"
 }
 
@@ -42,9 +51,12 @@ case "${STAGE}" in
         echo "[$(date '+%F %T')] done: ${WORK_DIR}/transformer.ts"
         ;;
     eval)
-        for f in "${WORK_DIR}"/transformer.e*.pt "${WORK_DIR}"/transformer.pt; do
-            [[ -f "${f}" ]] && run_py eval --cache /cache --model "/work/$(basename "${f}")" --chunks "${CHUNKS:-8}"
+        for a in transformer resnet_ft resnet; do
+            for f in "${BASE_DIR}/${a}"/transformer.e*.pt "${BASE_DIR}/${a}"/transformer.pt; do
+                [[ -f "${f}" ]] && { echo "── ${a}"; run_py eval --cache /cache --model "/base/${a}/$(basename "${f}")" --chunks "${CHUNKS:-8}"; }
+            done
         done
+        echo "── the app's ResNet (supervised, original recipe)"
         run_py eval --cache /cache --model "${RESNET_PT}" --resnet --chunks "${CHUNKS:-8}"
         ;;
     *) echo "STAGE=train|eval" >&2; exit 1 ;;

@@ -35,6 +35,10 @@ Training (differences with the ResNet script, both necessary for transformers)
     Checkpoint every SAVE_CHUNKS chunks (model + optimizer + step): a stopped
     job resumes where it was, chunk-exact (time limit, scancel).
 
+YOLAH_TF_ARCH = transformer (default) | resnet_ft (the ResNet 256x30 with this
+from-to policy head, to separate the head from attention) | resnet (the
+ResNet unchanged, trained with this recipe: the fair baseline).
+
 Usage (inside the AlphaZero image; see transformer_value_policy.sh):
     python3 transformer_value_policy.py train  --cache /cache --out /work
     python3 transformer_value_policy.py eval   --cache /cache --model X.pt [--resnet] [--chunks 8]
@@ -105,7 +109,7 @@ class Block(nn.Module):
 class TransformerNet(nn.Module):
     def __init__(self, dim=DIM, heads=HEADS, layers=LAYERS):
         super().__init__()
-        self.config = {"dim": dim, "heads": heads, "layers": layers}
+        self.config = {"arch": "transformer", "dim": dim, "heads": heads, "layers": layers}
         self.embed  = nn.Linear(4, dim)
         self.pos    = nn.Parameter(torch.randn(64, dim) * 0.02)
         self.blocks = nn.ModuleList([Block(dim, heads) for _ in range(layers)])
@@ -142,12 +146,57 @@ class TransformerNet(nn.Module):
         pass
 
 
+class ResNetFromTo(R.Net):
+    """
+    The ResNet 256x30 (same trunk, same value head) with the transformer's
+    from-to policy head instead of its 2-channel one: two 1x1 convolutions
+    give every square a 128-number "from" vector q and "to" vector k, and
+    logit(from, to) = q_from · k_to / √128. It separates the effect of the
+    policy head from the effect of attention. GPU (.ts) only: the C++ CPU
+    backend knows only the original head.
+    """
+    def __init__(self, channels=256, nb_blocks=30):
+        super().__init__(channels=channels, nb_blocks=nb_blocks)
+        self.config = {"arch": "resnet_ft", "channels": channels, "nb_blocks": nb_blocks}
+        del self.policy_conv, self.policy_bn, self.policy_fc
+        self.pol_from = nn.Conv2d(channels, POLICY_DIM, kernel_size=1)
+        self.pol_to   = nn.Conv2d(channels, POLICY_DIM, kernel_size=1)
+
+    def heads(self, x):                                    # x: (B, C, 8, 8), relu'd trunk
+        v = torch.relu(self.value_bn(self.value_conv(x))).flatten(1)
+        v = torch.tanh(self.value_fc2(torch.relu(self.value_fc1(v)))).squeeze(-1)
+        q = self.pol_from(x).reshape(-1, POLICY_DIM, 64)   # cell i = square 63 - i (as the planes)
+        k = self.pol_to(x).reshape(-1, POLICY_DIM, 64)
+        s = q.transpose(1, 2) @ k * (1.0 / math.sqrt(POLICY_DIM))
+        return v, s.flip(1).flip(2).reshape(-1, 64 * 64)
+
+
+class ResNetPlain(R.Net):
+    """The ResNet 256x30 unchanged, trained with THIS script's recipe (fair baseline)."""
+    def __init__(self, channels=256, nb_blocks=30):
+        super().__init__(channels=channels, nb_blocks=nb_blocks)
+        self.config = {"arch": "resnet", "channels": channels, "nb_blocks": nb_blocks}
+
+
+ARCH = os.environ.get("YOLAH_TF_ARCH", "transformer")   # transformer | resnet_ft | resnet
+
+
+def make_net(cfg=None):
+    cfg = dict(cfg or {"arch": ARCH})
+    arch = cfg.pop("arch", "transformer")
+    if arch == "transformer":
+        return TransformerNet(**{"dim": DIM, "heads": HEADS, "layers": LAYERS, **cfg})
+    if arch == "resnet_ft":
+        return ResNetFromTo(**cfg)
+    if arch == "resnet":
+        return ResNetPlain(**cfg)
+    raise ValueError(f"unknown arch {arch}")
+
+
 def load_net(path):
     ck = torch.load(path, map_location="cpu")
     sd = ck["model"] if "model" in ck else ck
-    cfg = ck.get("config", {"dim": DIM, "heads": HEADS, "layers": LAYERS}) if "model" in ck else \
-          {"dim": DIM, "heads": HEADS, "layers": LAYERS}
-    net = TransformerNet(**cfg)
+    net = make_net(ck.get("config") if "model" in ck else None)
     net.load_state_dict({(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()})
     return net
 
@@ -237,7 +286,7 @@ def train_worker(rank, world, args):
     per_epoch = len(train_loader)
     total = NB_EPOCHS * per_epoch
 
-    net = TransformerNet().to(device)
+    net = make_net().to(device).to(memory_format=torch.channels_last)
     decay    = [p for n, p in net.named_parameters() if p.dim() >= 2 and n != "pos" and not n.endswith(".bias")]
     no_decay = [p for n, p in net.named_parameters() if not (p.dim() >= 2 and n != "pos" and not n.endswith(".bias"))]
     opt = torch.optim.AdamW([{"params": decay, "weight_decay": WEIGHT_DECAY},
@@ -284,6 +333,7 @@ def train_worker(rank, world, args):
         meter, t0 = Meter(), time.time()
         for X, v_t, p_t in train_loader:
             X, v_t, p_t = X.to(device, non_blocking=True), v_t.to(device, non_blocking=True), p_t.to(device, non_blocking=True)
+            X = X.contiguous(memory_format=torch.channels_last)
             for g in opt.param_groups:
                 g["lr"] = lr_at(step)
             with torch.autocast('cuda', dtype=amp_dtype):
@@ -382,6 +432,17 @@ def cmd_selftest(args):
     # channels_last input gives the same result
     v2, p2 = net(x.contiguous(memory_format=torch.channels_last))
     assert torch.allclose(p, p2, atol=1e-6)
+    rf = ResNetFromTo().eval()
+    print(f"ResNet 256x30 + from-to head {sum(p.numel() for p in rf.parameters()):,} params")
+    with torch.no_grad():
+        vr, pr = rf(x)
+        tr = torch.relu(rf.output_bn(rf.res_blocks(rf.input_conv(x))))
+        qf, kt = rf.pol_from(tr).flatten(2), rf.pol_to(tr).flatten(2)
+        for (fr, to) in [(0, 63), (12, 5), (63, 0)]:
+            direct = (qf[:, :, 63 - fr] * kt[:, :, 63 - to]).sum(-1) / math.sqrt(POLICY_DIM)
+            assert torch.allclose(direct, pr[:, fr * 64 + to], atol=1e-4), ("resnet_ft", fr, to)
+        trf = torch.jit.trace(rf, torch.zeros(1, 4, 8, 8))
+        assert torch.allclose(trf(x)[1], pr, atol=1e-4)
     traced = torch.jit.trace(net, torch.zeros(1, 4, 8, 8))
     vt, pt = traced(x)
     assert torch.allclose(vt, v, atol=1e-5) and torch.allclose(pt, p, atol=1e-4), "trace"
