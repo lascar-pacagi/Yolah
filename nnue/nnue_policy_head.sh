@@ -19,3 +19,7 @@ mkdir -p "${WORK_DIR}"
 [[ -f "${CACHE_DIR}/policies.i16" ]] || { echo "no ${CACHE_DIR}/policies.i16: STAGE=policies of transformer_value_policy.sh first" >&2; exit 1; }
 singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" --bind "${CACHE_DIR}:/cache" "${SIF}" \
     bash -c "cd /Yolah/nnue && python3 nnue_policy_head.py train --cache /cache --net ${NET} --out /work --samples ${SAMPLES} ${EXTRA:-}"
+# the C++ head (dev option "policy head"), checked against PyTorch on the bench positions:
+singularity exec "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" "${SIF}" \
+    bash -c "cd /Yolah/nnue && python3 nnue_policy_head.py export --heads /work/policy_heads.pt --variant ${VARIANT:-ut64r0} --out /work/nnue_policy_head_${VARIANT:-ut64r0}.txt --check /Yolah/test/bench_positions.txt"
+echo "head: ${WORK_DIR}/nnue_policy_head_${VARIANT:-ut64r0}.txt (copy to ~/Yolah/models/, check: build/nets_check check_policy test/bench_positions.txt <weights> <head> <head>.check.txt)"
