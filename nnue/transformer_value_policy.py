@@ -307,7 +307,8 @@ def train_worker(rank, world, args):
     import torch.distributed as dist
     from torch.nn.parallel import DistributedDataParallel as DDP
     os.environ.setdefault("MASTER_ADDR", "localhost")
-    os.environ.setdefault("MASTER_PORT", "65439")
+    # one port per job: two jobs on one node (crn25 has several GPUs) must not share the rendezvous
+    os.environ.setdefault("MASTER_PORT", str(20000 + int(os.environ.get("SLURM_JOB_ID", "45439")) % 40000))
     dist.init_process_group("nccl", rank=rank, world_size=world)
     torch.cuda.set_device(rank)
     device = torch.device("cuda", rank)
