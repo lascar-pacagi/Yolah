@@ -1,0 +1,230 @@
+{
+    "description": "SPSA of dev_u9's search parameters (2026-11-20). start = the current value; c_end = the perturbation at the end (\u03b8 \u00b1 c: big enough to change the play, ~5-15 % of the value); integers are rounded stochastically. Fishtest's r_end 0.002 for all.",
+    "base": "search_study/dev_u9.cfg",
+    "params": [
+        {
+            "name": "aspiration window",
+            "start": 300,
+            "min": 50,
+            "max": 1500,
+            "c_end": 60,
+            "int": true
+        },
+        {
+            "name": "aspiration k",
+            "start": 1.25,
+            "min": 0.3,
+            "max": 4.0,
+            "c_end": 0.2,
+            "int": false
+        },
+        {
+            "name": "aspiration grow",
+            "start": 1.5,
+            "min": 1.1,
+            "max": 4.0,
+            "c_end": 0.15,
+            "int": false
+        },
+        {
+            "name": "lmr base",
+            "start": 1.25,
+            "min": 0.0,
+            "max": 3.0,
+            "c_end": 0.15,
+            "int": false
+        },
+        {
+            "name": "lmr divisor",
+            "start": 1.5,
+            "min": 0.7,
+            "max": 4.0,
+            "c_end": 0.15,
+            "int": false
+        },
+        {
+            "name": "lmr hist div",
+            "start": 8192,
+            "min": 2048,
+            "max": 32768,
+            "c_end": 1000,
+            "int": true
+        },
+        {
+            "name": "lmr pv",
+            "start": 1024,
+            "min": 0,
+            "max": 3072,
+            "c_end": 150,
+            "int": true
+        },
+        {
+            "name": "lmr special",
+            "start": 1024,
+            "min": 0,
+            "max": 3072,
+            "c_end": 150,
+            "int": true
+        },
+        {
+            "name": "lmrh",
+            "start": 4000,
+            "min": 500,
+            "max": 16000,
+            "c_end": 600,
+            "int": true
+        },
+        {
+            "name": "rfp depth",
+            "start": 4,
+            "min": 1,
+            "max": 8,
+            "c_end": 0.6,
+            "int": true
+        },
+        {
+            "name": "rfp margin",
+            "start": 3000,
+            "min": 800,
+            "max": 9000,
+            "c_end": 300,
+            "int": true
+        },
+        {
+            "name": "mpc depth",
+            "start": 5,
+            "min": 3,
+            "max": 9,
+            "c_end": 0.6,
+            "int": true
+        },
+        {
+            "name": "mpc ratio",
+            "start": 40,
+            "min": 15,
+            "max": 75,
+            "c_end": 4,
+            "int": true
+        },
+        {
+            "name": "mpc margin",
+            "start": 4000,
+            "min": 1000,
+            "max": 12000,
+            "c_end": 400,
+            "int": true
+        },
+        {
+            "name": "mpc margin per ply",
+            "start": 500,
+            "min": 0,
+            "max": 2000,
+            "c_end": 80,
+            "int": true
+        },
+        {
+            "name": "proxy depth",
+            "start": 4,
+            "min": 2,
+            "max": 8,
+            "c_end": 0.6,
+            "int": true
+        },
+        {
+            "name": "proxy reduction",
+            "start": 3,
+            "min": 1,
+            "max": 6,
+            "c_end": 0.6,
+            "int": true
+        },
+        {
+            "name": "lmp depth",
+            "start": 3,
+            "min": 0,
+            "max": 6,
+            "c_end": 0.6,
+            "int": true
+        },
+        {
+            "name": "lmp moves",
+            "start": 4,
+            "min": 1,
+            "max": 12,
+            "c_end": 0.8,
+            "int": true
+        },
+        {
+            "name": "killer bonus",
+            "start": 4000,
+            "min": 0,
+            "max": 12000,
+            "c_end": 500,
+            "int": true
+        },
+        {
+            "name": "intercept",
+            "start": 2000,
+            "min": 0,
+            "max": 8000,
+            "c_end": 300,
+            "int": true
+        },
+        {
+            "name": "cover weight",
+            "start": 1024,
+            "min": 128,
+            "max": 4096,
+            "c_end": 100,
+            "int": true
+        },
+        {
+            "name": "cover depth",
+            "start": 1,
+            "min": 1,
+            "max": 6,
+            "c_end": 0.6,
+            "int": true
+        },
+        {
+            "name": "hist bonus a",
+            "start": 16,
+            "min": 2,
+            "max": 64,
+            "c_end": 2,
+            "int": true
+        },
+        {
+            "name": "hist bonus b",
+            "start": 32,
+            "min": 0,
+            "max": 128,
+            "c_end": 6,
+            "int": true
+        },
+        {
+            "name": "hist bonus cap",
+            "start": 2000,
+            "min": 400,
+            "max": 8000,
+            "c_end": 250,
+            "int": true
+        },
+        {
+            "name": "corr scale",
+            "start": 8,
+            "min": 2,
+            "max": 32,
+            "c_end": 1,
+            "int": true
+        },
+        {
+            "name": "corr max",
+            "start": 8000,
+            "min": 1500,
+            "max": 16000,
+            "c_end": 800,
+            "int": true
+        }
+    ]
+}
