@@ -512,6 +512,9 @@ unique_ptr<Player> Player::create(const json& j) {
              options.undo_mode = j.value("undo mode", options.undo_mode);
              options.undo_malus = j.value("undo malus", options.undo_malus);
              options.undo_lmr = j.value("undo lmr", options.undo_lmr);
+             options.cover_weight = j.value("cover weight", options.cover_weight);
+             options.cover_nolose = j.value("cover nolose", options.cover_nolose);
+             options.cover_depth = j.value("cover depth", options.cover_depth);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);

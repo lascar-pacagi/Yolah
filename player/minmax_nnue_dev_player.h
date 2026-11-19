@@ -369,6 +369,12 @@ struct MinMaxNNUE_DevOptions {
     int  undo_mode = 0;                   // ["undo mode"] 0 off, 1 back only, 2 near only, 3 both
     int  undo_malus = 3000;               // ["undo malus"] subtracted from the move's ordering score
     bool undo_lmr = false;                // ["undo lmr"] one ply more of LMR for such a move
+    // U19 (2026-11-19, user's idea): the COVERAGE of our group = the union of the free squares our pieces
+    // reach in one queen move (each counted once, the opponent ignored). A move that enlarges it is
+    // usually good, above all if it loses none of the squares covered before (the landing square aside).
+    int  cover_weight = 0;                // ["cover weight"] ordering += weight × (coverage after − coverage before); 0 off
+    int  cover_nolose = 0;                // ["cover nolose"] ordering += this if no covered square is lost (landing square aside)
+    int  cover_depth = 4;                 // ["cover depth"] only at nodes of at least this depth
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced

@@ -1,0 +1,15 @@
+# Campaign U19 (2026-11-19, user's idea): the coverage of our group (union of the free squares our pieces reach in
+#   one queen move, each once, the opponent ignored); a move that enlarges it, above all without losing any covered
+#   square (the landing square aside), is ordered earlier. Tested before only: mobility with multiplicity minus the
+#   opponent's, INSTEAD of the influence (+12 vs +36). Nodes at depth 11, 60 bench positions: dev_u8 1102308;
+#   w256 1168176, w512 1230035, w256_d1 1088451, w256_nl1k 1158186, nl2k 1060046, noinf_w512 1116827, noinf_w512_d1 1130919.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-8 nnue/search_study.sh campaign_U19.txt
+# 1-8: at 0.2 s, common seed 121
+u19_w256 dev_u8 200000 1000 121
+u19_w512 dev_u8 200000 1000 121
+u19_w256_d1 dev_u8 200000 1000 121
+u19_w256_nl1k dev_u8 200000 1000 121
+u19_nl2k dev_u8 200000 1000 121
+u19_nl2k_d1 dev_u8 200000 1000 121
+u19_noinf_w512 dev_u8 200000 1000 121
+u19_noinf_w512_d1 dev_u8 200000 1000 121

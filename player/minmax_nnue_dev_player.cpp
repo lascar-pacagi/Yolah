@@ -2797,6 +2797,13 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     const bool use_block = allow_block && options.block_weight > 0 && depth >= options.block_depth && depth <= options.block_max_depth;
     const uint16_t ply = yolah.nb_plies();
     const uint8_t player = yolah.current_player();
+    const bool cover = (options.cover_weight != 0 || options.cover_nolose != 0) && depth >= options.cover_depth;   // U19
+    const uint64_t mine0 = yolah.bitboard(player), free0 = yolah.free_squares(), occ0 = ~free0;
+    uint64_t c0 = 0;
+    if (cover) {
+        for (uint64_t b = mine0; b;) c0 |= attacks_bb(pop_lsb(b), occ0);
+        c0 &= free0;
+    }
     // U12: precompute the pieces' attacks once for the node when block ordering is on
     Square opp_sq[4], my_sq[4];
     uint64_t opp_atk[4]{}, opp_atk_all = 0, my_atk[4]{}, my_atk_all = 0;
@@ -2969,6 +2976,15 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
             }
             if (territory) {
                 scores[i] += options.territory_weight * terr;
+            }
+            if (cover) {                                    // U19
+                const uint64_t from = square_bb(m.from_sq()), to = square_bb(m.to_sq());
+                const uint64_t occ1 = occ0 | to, free1 = free0 & ~to;
+                uint64_t c1 = 0;
+                for (uint64_t b = (mine0 & ~from) | to; b;) c1 |= attacks_bb(pop_lsb(b), occ1);
+                c1 &= free1;
+                scores[i] += options.cover_weight * (std::popcount(c1) - std::popcount(c0));
+                if (options.cover_nolose && !(c0 & ~to & ~c1)) scores[i] += options.cover_nolose;
             }
         }
     }
@@ -3634,6 +3650,9 @@ json MinMaxNNUE_DevPlayer::config() {
     j["undo mode"] = options.undo_mode;
     j["undo malus"] = options.undo_malus;
     j["undo lmr"] = options.undo_lmr;
+    j["cover weight"] = options.cover_weight;
+    j["cover nolose"] = options.cover_nolose;
+    j["cover depth"] = options.cover_depth;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;
