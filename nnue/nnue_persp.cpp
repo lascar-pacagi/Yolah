@@ -400,3 +400,57 @@ float NNUE_Persp::value_n(const int16_t* acc, const Yolah& yolah) const {
 float NNUE_Persp::value(const int16_t* acc, const Yolah& yolah) const {
     return h1_size == H1_SMALL ? value_n<H1_SMALL>(acc, yolah) : value_n<H1_SIZE>(acc, yolah);
 }
+
+
+// ── NNUE_PolicyHead ─────────────────────────────────────────────────────────
+
+NNUE_PolicyHead::~NNUE_PolicyHead() { free(w1); free(b1); free(w2); }
+
+void NNUE_PolicyHead::load(const std::string& filename) {
+    std::ifstream ifs(filename);
+    std::string tag;
+    if (!(ifs >> tag >> them >> l1 >> hidden) || tag != "POLICYHEAD")
+        throw std::runtime_error("NNUE_PolicyHead: " + filename + " is not a POLICYHEAD file");
+    if ((l1 != NNUE_Persp::H1_SIZE && l1 != NNUE_Persp::H1_SMALL) || (hidden != 32 && hidden != 64 && hidden != 128))
+        throw std::runtime_error("NNUE_PolicyHead: unsupported sizes in " + filename);
+    inputs = l1 * (them ? 2 : 1);
+    free(w1); free(b1); free(w2);
+    w1 = aligned_array<int8_t>(size_t(hidden) * inputs);
+    b1 = aligned_array<int16_t>(hidden);
+    w2 = aligned_array<float>(size_t(128) * hidden);
+    auto rd = [&](auto& v) { if (!(ifs >> v)) throw std::runtime_error("NNUE_PolicyHead: truncated " + filename); };
+    for (size_t i = 0; i < size_t(hidden) * inputs; i++) { int v; rd(v); w1[i] = int8_t(v); }
+    for (int i = 0; i < hidden; i++) { int v; rd(v); b1[i] = int16_t(v); }
+    for (int i = 0; i < 128 * hidden; i++) rd(w2[i]);
+    for (float& v : b2) rd(v);
+    for (float& v : table) rd(v);
+}
+
+void NNUE_PolicyHead::eval(const int16_t* acc, int stm, float* from, float* to) const {
+    alignas(64) int8_t h1[2 * NNUE_Persp::H1_SIZE];
+    alignas(64) int8_t z[128];
+    const int16_t* us = acc + stm * l1;
+    for (int i = 0; i < l1; i++) { const int16_t v = us[i]; h1[i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
+    if (them) {
+        const int16_t* other = acc + (1 - stm) * l1;
+        for (int i = 0; i < l1; i++) { const int16_t v = other[i]; h1[l1 + i] = v <= 0 ? 0 : (v >= FACTOR ? FACTOR : v); }
+    }
+    auto run = [&]<int M>() {
+        switch (inputs) {
+            case 512:  matvec<M, 512>(w1, h1, z, b1); break;
+            case 1024: matvec<M, 1024>(w1, h1, z, b1); break;
+            default:   matvec<M, 2048>(w1, h1, z, b1); break;
+        }
+    };
+    if (hidden == 32) run.template operator()<32>();
+    else if (hidden == 64) run.template operator()<64>();
+    else run.template operator()<128>();
+    float zf[128];
+    for (int k = 0; k < hidden; k++) zf[k] = float(z[k]);
+    for (int j = 0; j < 128; j++) {
+        const float* w = w2 + j * hidden;
+        float sum = b2[j];
+        for (int k = 0; k < hidden; k++) sum += w[k] * zf[k];
+        (j < 64 ? from[j] : to[j - 64]) = sum;
+    }
+}

@@ -43,6 +43,7 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -517,6 +518,47 @@ int bench(const string& int8_file, const string& int16_file, const string& float
 
 } // namespace
 
+// check_policy positions.txt weights.quantized.txt head.txt reference.txt: the C++ move head
+// (NNUE_PolicyHead) against nnue_policy_head.py export --check (logits of the legal moves).
+static int check_policy(const string& positions, const string& weights, const string& head_file, const string& ref) {
+    NNUE_Persp net(weights);
+    NNUE_PolicyHead head;
+    head.load(head_file);
+    std::ifstream pf(positions), rf(ref);
+    string line, rline;
+    double max_diff = 0, sum_diff = 0;
+    size_t n = 0, n_pos = 0, argmax_same = 0;
+    NNUE_Persp::Accumulator acc;
+    while (std::getline(pf, line) && std::getline(rf, rline)) {
+        if (line.empty()) continue;
+        const Yolah y = Yolah::from_json(line);
+        net.init(y, acc);
+        float from[64], to[64];
+        head.eval(acc.acc, y.current_player(), from, to);
+        std::istringstream is(rline);
+        string item;
+        int best_ref = -1, best_cpp = -1;
+        double vref = -1e30, vcpp = -1e30;
+        while (is >> item) {
+            const size_t c = item.find(':');
+            const int idx = std::stoi(item.substr(0, c));
+            const double r = std::stod(item.substr(c + 1));
+            const double v = head.table[idx] + from[idx / 64] + to[idx % 64];
+            const double d = std::abs(v - r);
+            max_diff = std::max(max_diff, d);
+            sum_diff += d;
+            n++;
+            if (r > vref) { vref = r; best_ref = idx; }
+            if (v > vcpp) { vcpp = v; best_cpp = idx; }
+        }
+        argmax_same += best_ref == best_cpp;
+        n_pos++;
+    }
+    std::printf("%zu positions, %zu moves: |C++ - PyTorch| mean %.6f max %.6f; best move the same in %zu/%zu\n",
+                n_pos, n, n ? sum_diff / n : 0.0, max_diff, argmax_same, n_pos);
+    return max_diff < 0.01 ? 0 : 1;
+}
+
 int main(int argc, char* argv[]) {
     magic::init();
     zobrist::init();
@@ -524,6 +566,7 @@ int main(int argc, char* argv[]) {
     if (cmd == "dump" && argc >= 3) return dump(argv[2], argc > 3 ? std::stoul(argv[3]) : 2000);
     if (cmd == "check" && argc >= 5) return check(argv[2], argv[3], argv[4]);
     if (cmd == "check_persp" && argc >= 5) return check_persp(argv[2], argv[3], argv[4], argc > 5 ? argv[5] : "");
+    if (cmd == "check_policy" && argc >= 6) return check_policy(argv[2], argv[3], argv[4], argv[5]);
     if (cmd == "check_sparse" && argc >= 4) return check_sparse(argv[2], argv[3]);
     if (cmd == "space" && argc >= 4) return space_of(argv[2], argv[3], false);
     if (cmd == "space-all" && argc >= 4) return space_of(argv[2], argv[3], true);   // 92 columns (ablation)

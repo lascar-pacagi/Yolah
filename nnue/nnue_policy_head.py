@@ -142,7 +142,10 @@ class MoveHead(nn.Module):
         logits = self.table.unsqueeze(0).expand(B, -1, -1)
         if self.table_only:
             return logits
-        z = torch.clamp(self.fc(torch.cat([h1, h1t], 1) if self.them else h1), 0, 1)
+        h = torch.cat([h1, h1t], 1) if self.them else h1
+        # quantization-aware, as the C++ (NNUE_PolicyHead): int8 weights at scale 64, int16 bias at
+        # scale 64², the >> 6 of the int32 sums (floor), clamp to [0, 1] (0..64 in C++)
+        z = torch.clamp(NP.q_floor(F.linear(h, NP.q_weight(self.fc.weight), NP.q_bias(self.fc.bias, NP.Q * NP.Q))), 0, 1)
         o = self.out(z)
         logits = logits + o[:, 0:64].unsqueeze(2) + o[:, 64:128].unsqueeze(1)      # from[f] + to[t]
         if self.rank:
@@ -230,6 +233,10 @@ def cmd_train(args):
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
+            with torch.no_grad():
+                for h in heads.values():
+                    if not h.table_only:
+                        h.fc.weight.clamp_(-NP.WEIGHT_MAX, NP.WEIGHT_MAX)
             step += 1
             if step % 2000 == 0:
                 print(f"step {step:,}/{steps:,} loss/head {float(loss) / len(heads):.4f} lr {lr:.2e} "
@@ -253,6 +260,64 @@ def cmd_train(args):
     print(report, flush=True)
     with open(os.path.join(args.out, "report.txt"), "w") as f:
         f.write(report + "\n")
+
+
+def export_head(head, path):
+    """Text file for the C++ NNUE_PolicyHead (nnue/nnue_policy_head.h):
+        POLICYHEAD <them 0/1> <l1> <hidden>
+        hidden × inputs int8 (W1 · 64), hidden int16 (b1 · 4096),
+        128 × hidden floats (W2 / 64: from 0-63, to 64-127, on the 0..64 integer z), 128 floats (b2),
+        4096 floats (the table, index from_cell · 64 + to_cell, cells of the us view)."""
+    assert not head.table_only and head.rank == 0 and head.hidden % 8 == 0
+    w1 = torch.clamp(torch.round(head.fc.weight.detach().float() * NP.Q), -127, 127).long()
+    b1 = torch.clamp(torch.round(head.fc.bias.detach().float() * NP.Q * NP.Q), -32768, 32767).long()
+    w2 = head.out.weight.detach().float()[:128] / NP.Q
+    b2 = head.out.bias.detach().float()[:128]
+    with open(path, "w") as f:
+        f.write(f"POLICYHEAD {int(head.them)} {head.config['l1']} {head.hidden}\n")
+        for row in w1.tolist():
+            f.write(" ".join(map(str, row)) + "\n")
+        f.write(" ".join(map(str, b1.tolist())) + "\n")
+        for row in w2.tolist():
+            f.write(" ".join(f"{v:.9g}" for v in row) + "\n")
+        f.write(" ".join(f"{v:.9g}" for v in b2.tolist()) + "\n")
+        f.write(" ".join(f"{v:.9g}" for v in head.table.detach().float().view(-1).tolist()) + "\n")
+    print(f"wrote {path}")
+
+
+def cmd_export(args):
+    ck = torch.load(args.heads, map_location="cpu")
+    cfg = ck["configs"][args.variant]
+    head = MoveHead(cfg["l1"], cfg["them"], cfg["hidden"], cfg["rank"], cfg["table_only"])
+    head.load_state_dict({k[len(args.variant) + 1:]: v for k, v in ck["heads"].items() if k.startswith(args.variant + ".")})
+    export_head(head, args.out)
+    if args.check:      # reference logits of the bench positions, for test/policy_head_check
+        net = NP.load_persp(args.net or ck["net"]).eval()
+        from yolah import Yolah
+        rows = []
+        for line in open(args.check):
+            line = line.strip()
+            if not line:
+                continue
+            y = Yolah()
+            y.from_json(line)
+            r = np.zeros(193, dtype=np.float32)
+            for i in range(64):
+                r[i] = (y.black >> (63 - i)) & 1
+                r[64 + i] = (y.white >> (63 - i)) & 1
+                r[128 + i] = (y.empty >> (63 - i)) & 1
+            r[192] = y.nb_plies() & 1
+            rows.append(r)
+        x = torch.tensor(np.array(rows))
+        h1, h1t, view, white = nnue_features(net, x)
+        with torch.no_grad():
+            lg = head(h1, h1t)
+        legal = legal_mask(view, ray_table())
+        with open(args.out + ".check.txt", "w") as f:
+            for i in range(len(rows)):
+                idx = legal[i].view(-1).nonzero().view(-1).tolist()
+                f.write(" ".join(f"{j}:{float(lg[i].view(-1)[j]):.5f}" for j in idx) + "\n")
+        print(f"wrote {args.out}.check.txt ({len(rows)} positions, logits of the legal moves, us-view cells)")
 
 
 def cmd_selftest(args):
@@ -306,7 +371,10 @@ def cmd_selftest(args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["train", "selftest"])
+    ap.add_argument("cmd", choices=["train", "selftest", "export"])
+    ap.add_argument("--heads", help="export: policy_heads.pt")
+    ap.add_argument("--variant", default="ut64r0", help="export: which head")
+    ap.add_argument("--check", help="export: positions (JSON lines) → <out>.check.txt reference logits")
     ap.add_argument("--cache", default="/cache")
     ap.add_argument("--net", default=None)
     ap.add_argument("--out", default="/work")
@@ -317,7 +385,7 @@ def main():
     ap.add_argument("--val-chunks", type=int, default=4)
     ap.add_argument("--chunk", type=int, default=1 << 22, help="positions per chunk of the loader")
     args = ap.parse_args()
-    cmd_train(args) if args.cmd == "train" else cmd_selftest(args)
+    {"train": cmd_train, "selftest": cmd_selftest, "export": cmd_export}[args.cmd](args)
 
 
 if __name__ == "__main__":

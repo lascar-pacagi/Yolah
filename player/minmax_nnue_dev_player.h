@@ -375,6 +375,12 @@ struct MinMaxNNUE_DevOptions {
     int  cover_weight = 0;                // ["cover weight"] ordering += weight × (coverage after − coverage before); 0 off
     int  cover_nolose = 0;                // ["cover nolose"] ordering += this if no covered square is lost (landing square aside)
     int  cover_depth = 4;                 // ["cover depth"] only at nodes of at least this depth
+    // U21 (2026-11-19, experiment 1): the NNUE move head (nnue/nnue_policy_head.py, NNUE_PolicyHead) on the
+    // node's accumulator, once per node: ordering += weight × logit(move) for the ordinary moves.
+    std::string policy_head;              // ["policy head"] the head's file (POLICYHEAD), empty: off
+    int  policy_weight = 1000;            // ["policy weight"] per logit unit (a logit difference of 1 ≈ ×2.7 in probability)
+    int  policy_depth = 2;                // ["policy depth"] only at nodes of at least this depth
+    bool policy_no_influence = false;     // ["policy no influence"] the head replaces the influence term where it applies
     int  piece_lmr = 0;                  // ["piece lmr"] 4 a late move of a piece already tried this many times in the node: one ply more (0 off)
     bool family_lmr = false;             // ["family lmr"] 4b the first move of each piece (family of the destroyed square): one ply less
     int  gate_lmr = 0;                   // ["gate lmr"] 5 a move that shrinks the contested region (reached by both) by >= "gate min" squares: not reduced
@@ -543,6 +549,7 @@ private:
     // accumulators below are sized for the larger of the two (2 views).
     NNUE_Quantized nnue;
     std::unique_ptr<NNUE_Persp> persp;
+    std::unique_ptr<NNUE_PolicyHead> policy_head;   // U21
     using Accumulator = NNUE_Persp::Accumulator;
     void net_init(const Yolah& yolah, Accumulator& a);
     void net_play(uint8_t player, Move m, Accumulator& a, NNUE_Persp::RefreshCache* cache);

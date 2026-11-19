@@ -515,6 +515,10 @@ unique_ptr<Player> Player::create(const json& j) {
              options.cover_weight = j.value("cover weight", options.cover_weight);
              options.cover_nolose = j.value("cover nolose", options.cover_nolose);
              options.cover_depth = j.value("cover depth", options.cover_depth);
+             options.policy_head = j.value("policy head", options.policy_head);
+             options.policy_weight = j.value("policy weight", options.policy_weight);
+             options.policy_depth = j.value("policy depth", options.policy_depth);
+             options.policy_no_influence = j.value("policy no influence", options.policy_no_influence);
              options.piece_lmr = j.value("piece lmr", options.piece_lmr);
              options.family_lmr = j.value("family lmr", options.family_lmr);
              options.gate_lmr = j.value("gate lmr", options.gate_lmr);

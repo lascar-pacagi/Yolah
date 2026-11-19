@@ -43,6 +43,12 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
     else
         nnue.load(nnue_q_parameters_filename);
     if (persp) persp->sparse = options.sparse_h1;
+    if (!options.policy_head.empty()) {   // U21
+        if (!persp) { std::cerr << "policy head: needs a PERSP network\n"; std::exit(1); }
+        policy_head = std::make_unique<NNUE_PolicyHead>();
+        policy_head->load(options.policy_head);
+        if (policy_head->l1 != persp->h1_size) { std::cerr << "policy head: l1 differs from the network's\n"; std::exit(1); }
+    }
     else nnue.sparse = options.sparse_h1;
     if (!options.history_prior.empty()) {
         // T. int16 scores, phase-major (see prior_of), scaled by the weight.
@@ -2798,6 +2804,23 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     const uint16_t ply = yolah.nb_plies();
     const uint8_t player = yolah.current_player();
     const bool cover = (options.cover_weight != 0 || options.cover_nolose != 0) && depth >= options.cover_depth;   // U19
+    const bool use_policy = policy_head && depth >= options.policy_depth;   // U21: the head on the node's accumulator
+    float pol_from[64], pol_to[64];
+    if (use_policy) {
+        Search& ms = const_cast<Search&>(s);     // the lazy accumulators are a cache: bringing them up to date is not a change
+        const int16_t* acc;
+        if (!options.lazy_accumulator) acc = ms.acc.acc;
+        else {
+            int k = ply;
+            while (!ms.acc_ok[k]) k--;
+            for (; k < ply; k++) {
+                update_accumulator(ms.accs[k].acc, ms.accs[k + 1].acc, uint8_t(k & 1), ms.played[k], &ms.refresh);
+                ms.acc_ok[k + 1] = true;
+            }
+            acc = ms.accs[ply].acc;
+        }
+        policy_head->eval(acc, player, pol_from, pol_to);
+    }
     const uint64_t mine0 = yolah.bitboard(player), free0 = yolah.free_squares(), occ0 = ~free0;
     uint64_t c0 = 0;
     if (cover) {
@@ -2970,13 +2993,14 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         if (options.undo_mode > 0 && scores[i] < SCORE_ARTICULATION && ply > 1 && undoes(m, s.played[ply - 2], options.undo_mode))
             scores[i] -= options.undo_malus;   // U18
         if (scores[i] < SCORE_ARTICULATION) {
-            const int terr = territory ? territory_after(yolah, m) : EVAL_NONE;
+            const int terr = territory && !(use_policy && options.policy_no_influence) ? territory_after(yolah, m) : EVAL_NONE;
             if (use_block && options.block_mode == 0) {
                 scores[i] += options.block_weight * block_fast(m, options.territory_ordering == 1 ? terr : EVAL_NONE);
             }
-            if (territory) {
+            if (territory && !(use_policy && options.policy_no_influence)) {
                 scores[i] += options.territory_weight * terr;
             }
+            if (use_policy) scores[i] += int(options.policy_weight * policy_head->logit(pol_from, pol_to, player, m));   // U21
             if (cover) {                                    // U19
                 const uint64_t from = square_bb(m.from_sq()), to = square_bb(m.to_sq());
                 const uint64_t occ1 = occ0 | to, free1 = free0 & ~to;
@@ -3653,6 +3677,10 @@ json MinMaxNNUE_DevPlayer::config() {
     j["cover weight"] = options.cover_weight;
     j["cover nolose"] = options.cover_nolose;
     j["cover depth"] = options.cover_depth;
+    j["policy head"] = options.policy_head;
+    j["policy weight"] = options.policy_weight;
+    j["policy depth"] = options.policy_depth;
+    j["policy no influence"] = options.policy_no_influence;
     j["piece lmr"] = options.piece_lmr;
     j["family lmr"] = options.family_lmr;
     j["gate lmr"] = options.gate_lmr;

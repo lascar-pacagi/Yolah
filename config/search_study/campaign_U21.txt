@@ -1,0 +1,16 @@
+# Campaign U21 (2026-11-19, experiment 1): the NNUE move head (nnue/nnue_policy_head.py, us+them accumulator ->
+#   64 -> from + to + table, QAT; C++ = PyTorch to 7e-6) added to the ordering of the ordinary moves.
+#   Head: models/nnue_policy_head_ut64r0_local.txt, trained locally (30 M samples of 10.5 M positions; top-1 39.6 %
+#   of the dev's moves among the legal ones, middle game 27.7 %); the cluster training (500 M) should do better.
+#   Cost: ~15 % fewer nodes/s at depth >= 2, ~5 % at depth >= 4. Nodes at depth 11, 60 bench positions: dev_u8 1102308;
+#   w1000 d2 1054596, w4000 d2 1003803, w1000 d4 1031887, w4000 d2 noinf 1086089.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-8 nnue/search_study.sh campaign_U21.txt
+# 1-8: at 0.2 s, common seed 141
+u21_w2000_d2 dev_u8 200000 1000 141
+u21_w4000_d2 dev_u8 200000 1000 141
+u21_w8000_d2 dev_u8 200000 1000 141
+u21_w4000_d3 dev_u8 200000 1000 141
+u21_w4000_d4 dev_u8 200000 1000 141
+u21_w8000_d4 dev_u8 200000 1000 141
+u21_w4000_d2_noinf dev_u8 200000 1000 141
+u21_w8000_d2_noinf dev_u8 200000 1000 141

@@ -157,4 +157,30 @@ private:
     template<int H> float value_n(const int16_t* acc, const Yolah& yolah) const;
 };
 
+// Move head on the accumulator (experiment 1, 2026-11-19; trained by nnue/nnue_policy_head.py on
+// the frozen value network, file written by its "export"): for the side to move,
+//     z = clamp((W1 · h1 + b1) >> 6, 0, 64)              h1 = [us] or [us, them], int8 like value()
+//     from[c] = W2 · z + b2  (c < 64),  to[c] = W2 · z + b2  (64 + c)          float
+//     logit(move) = table[cf · 64 + ct] + from[cf] + to[ct]      cells of the us view: NNUE_Persp::row
+// ≈ 130 k int8 multiply-adds (hidden 64, us + them) + 8 k float ones, once per node.
+struct NNUE_PolicyHead {
+    int them = 1, l1 = 1024, hidden = 64, inputs = 2048;
+    int8_t* w1 = nullptr;      // hidden × inputs
+    int16_t* b1 = nullptr;     // hidden, scale 64²
+    float* w2 = nullptr;       // 128 × hidden (already / 64)
+    float b2[128]{};
+    float table[64 * 64]{};
+    NNUE_PolicyHead() = default;
+    NNUE_PolicyHead(const NNUE_PolicyHead&) = delete;
+    NNUE_PolicyHead& operator=(const NNUE_PolicyHead&) = delete;
+    ~NNUE_PolicyHead();
+    void load(const std::string& filename);
+    // acc: an NNUE_Persp accumulator (its h1_size must be l1); from / to: 64 floats each
+    void eval(const int16_t* acc, int stm, float* from, float* to) const;
+    float logit(const float* from, const float* to, int stm, Move m) const {
+        const int cf = NNUE_Persp::row(stm, m.from_sq()), ct = NNUE_Persp::row(stm, m.to_sq());
+        return table[cf * 64 + ct] + from[cf] + to[ct];
+    }
+};
+
 #endif
