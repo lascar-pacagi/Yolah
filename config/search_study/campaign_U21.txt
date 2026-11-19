@@ -14,3 +14,8 @@ u21_w4000_d4 dev_u8 200000 1000 141
 u21_w8000_d4 dev_u8 200000 1000 141
 u21_w4000_d2_noinf dev_u8 200000 1000 141
 u21_w8000_d2_noinf dev_u8 200000 1000 141
+# RESULTS (2026-11-20, 2000 games each, vs dev_u8): w2000_d2 -11.5, w4000_d2 -23.7, w8000_d2 -22.3, w4000_d3 -0.3,
+#   w4000_d4 -10.6, w8000_d4 -5.0, w4000_d2_noinf -15.3, w8000_d2_noinf -8.7. The cluster head (500 M samples) is no
+#   better (top-1 39.3 % vs 39.6 %; middle game 29.8 % vs 27.7 %; ut128r0 41.1 %): capacity-limited. Experiment 1 CLOSED
+#   (user, 2026-11-20): the head predicts, but costs more than it brings over history / cont1 / killers / influence.
+
