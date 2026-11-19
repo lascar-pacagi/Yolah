@@ -29,12 +29,15 @@ YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"
 ARCH="${ARCH:-transformer}"
 BASE_DIR="${BASE_DIR:-${HOME}/TransformerVP}"
 WORK_DIR="${WORK_DIR:-${BASE_DIR}/${ARCH}}"
-CACHE_DIR="${CACHE_DIR:-/home/pgarcia/NNUE/DistillationNNUE/cache_az256}"
+CACHE_DIR="${CACHE_DIR:?CACHE_DIR=the ResNet cache of preprocess.py (positions.u8, values.i8, policies.i16)}"
 RESNET_PT="${RESNET_PT:-/Yolah/nnue/cnn_resnet_256x30_value_policy.pt}"
 STAGE="${STAGE:-train}"
 source "${YOLAH_DIR}/nnue/alphazero_common.sh"    # SIF, WSL_BIND
 mkdir -p "${WORK_DIR}"
 [[ -f "${CACHE_DIR}/meta.json" ]] || { echo "no ${CACHE_DIR}/meta.json (CACHE_DIR=...)" >&2; exit 1; }
+grep -q '"policies"' "${CACHE_DIR}/meta.json" && grep -q '"positions"' "${CACHE_DIR}/meta.json" || {
+    echo "${CACHE_DIR} is not a preprocess.py cache (positions.u8 + values.i8 + policies.i16: the ResNet's);" >&2
+    echo "find it with: find ~ -maxdepth 5 -name policies.i16" >&2; exit 1; }
 
 run_py() {
     singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" --bind "${BASE_DIR}:/base" \
