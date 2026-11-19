@@ -1,0 +1,14 @@
+# Campaign U20 (2026-11-19), after U19: the only lead is the coverage INSTEAD of the influence at every depth
+#   (u19_noinf_w512_d1 +7.6 [-1.9, +17.2], 0.2 s); on top of the influence it gives nothing (-4..+1).
+#   Weight 256..2048 and depth threshold 1..3 at 0.2 s, u19_noinf_w512_d1 again with another seed, then 1 s.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-8 nnue/search_study.sh campaign_U20.txt
+# 1-6: at 0.2 s, common seed 131
+u19_noinf_w512_d1 dev_u8 200000 1000 131
+u20_noinf_w256_d1 dev_u8 200000 1000 131
+u20_noinf_w1024_d1 dev_u8 200000 1000 131
+u20_noinf_w2048_d1 dev_u8 200000 1000 131
+u20_noinf_w512_d2 dev_u8 200000 1000 131
+u20_noinf_w512_d3 dev_u8 200000 1000 131
+# 7-8: at 1 s, common seed 231
+u19_noinf_w512_d1 dev_u8 1000000 1000 231
+u20_noinf_w1024_d1 dev_u8 1000000 1000 231
