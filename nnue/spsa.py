@@ -113,7 +113,14 @@ def results_of(csv_path):
 
 def report(args):
     spec = load_json(args.params) if args.params else None
-    rows = list(csv.DictReader(open(os.path.join(args.work, "log.csv"))))
+    log = os.path.join(args.work, "log.csv")
+    if not os.path.exists(log):
+        parent = os.path.dirname(os.path.normpath(args.work))
+        runs = sorted(d for d in os.listdir(parent) if os.path.exists(os.path.join(parent, d, "log.csv"))) if os.path.isdir(parent) else []
+        print(f"no {log} (run not started, or another NAME/PARAMS: PARAMS=<name>_params.json bash nnue/spsa.sh report)"
+              + (f"; runs with a log: {', '.join(runs)}" if runs else ""))
+        return
+    rows = list(csv.DictReader(open(log)))
     if not rows:
         print("no batch yet")
         return

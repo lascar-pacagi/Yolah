@@ -4,7 +4,7 @@
 # CPU node: θ+ against θ−, one game per physical core, 2 waves per batch.
 #
 #     PARAMS=dev_u8_params.json sbatch -p insa-cpu -w crn25 --cpus-per-task=128 nnue/spsa.sh
-#     bash nnue/spsa.sh report            # where the parameters went (login node)
+#     PARAMS=dev_u8_params.json bash nnue/spsa.sh report   # where the parameters went (login node; same PARAMS as the run)
 #
 # Resumable: submit again (same NAME), it goes on from state.json. The
 # recommended configuration is always WORK_DIR/spsa/NAME/current.cfg.
