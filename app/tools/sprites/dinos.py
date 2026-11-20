@@ -392,6 +392,7 @@ def dilophosaurus(anim, t, side):
 PTERA_GLTF = os.path.join(os.path.dirname(__file__), "models", "pteranodon", "scene.gltf")
 PTERA_SCALE = 2.4          # glTF metres → figure units (× SCALE["nnue193"]); the flight must fit the frame
 PTERA_YAW = YAW + 0.8      # nearly in profile: the crest and the long beak read best
+PTERA_KEY = (-0.25, 1.0, 0.12)   # its key light from higher up: in flight its shadow falls under it, not beside
 PTERA_CELL = 0.004         # the SDF grid's cell; membranes get 0.9 cell of thickness
 _ptera = None
 
@@ -417,7 +418,8 @@ def pteranodon(anim, t, side):
     elif anim == "blocked":
         v = m.pose("standing", 2.4, turn={m.node("neck_02"): ((0, 1, 0), 0.45 * math.sin(TAU * 2 * t))})
     else:                                  # win: in flight, the body ~0.25 above the base
-        v = m.pose("flying", 4.4 + 0.6 * (1 - math.cos(TAU * 2 * t)) / 2)    # two wing beats, down → up → down
+        v = m.pose("flying", 4.55 + 0.45 * (1 - math.cos(TAU * 2 * t)) / 2)  # two wing beats, down → up → down (from 4.4 s
+        # the far wing went through the base: hidden, it still cast a shadow that matched no visible wing)
         lift = -0.30
     v = v.copy()
     v[:, 1] += lift
@@ -429,6 +431,7 @@ def pteranodon(anim, t, side):
     def tone(pl, pw, n):                   # the texture under the figurines' strong key light; its darkest
         return {"albedo": colour(pl).clamp(min=0) ** 0.8 * 0.32}    # parts (head, beak) lifted: they fall in the folded wing's shadow
     sc.add(sdf, Mat("#806040", rough=0.6, sss=0.2, pattern=tone))
+    sc.key = PTERA_KEY
     return sc
 
 

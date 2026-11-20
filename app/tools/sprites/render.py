@@ -485,6 +485,8 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
     final pixels wide) on the silhouette, on jumps in depth, on sharp creases
     and where the flat colour changes (use flat materials)."""
     n = size * ss
+    key = getattr(scene, "key", None)
+    key = KEY if key is None else norm(vec(*key))    # a scene may move its key light (the flying pteranodon: from above)
     el = math.radians(ELEVATION)
     fwd = vec(0, -math.sin(el), -math.cos(el))      # looking down, towards −z
     right = vec(1, 0, 0)
@@ -565,7 +567,7 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
         sh = torch.ones_like(met)
         ts = torch.full_like(met, 0.02)
         for _ in range(48):
-            dd = scene.casters().dist(p + nrm * 0.004 + KEY * ts[:, None])
+            dd = scene.casters().dist(p + nrm * 0.004 + key * ts[:, None])
             sh = torch.minimum(sh, 10.0 * dd / ts)
             ts = ts + dd.clamp(0.01, 0.15)
         sh = sh.clamp(0, 1)
@@ -584,10 +586,10 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
             gbuf[hi] = gid[ids]
         if toon:
             ndv_ = (nrm * V).sum(-1).clamp(0, 1)
-            lit = (nrm @ KEY).clamp_min(0) * sh
+            lit = (nrm @ key).clamp_min(0) * sh
             band = torch.where(lit > 0.45, torch.full_like(lit, 1.0), torch.where(lit > 0.1, torch.full_like(lit, 0.66), torch.full_like(lit, 0.42)))
             rimb = ((1 - ndv_) > 0.7).float() * ((nrm @ RIM) > -0.3).float() * 0.3
-            Hk = norm(KEY + V)
+            Hk = norm(key + V)
             hl = (((nrm * Hk).sum(-1).clamp_min(0)) > (0.9 + 0.09 * (1 - rou))).float() * (1 - rou) * 1.2
             Rt = norm(-V - 2 * ((-V * nrm).sum(-1, keepdim=True)) * nrm)
             metal_band = torch.where(Rt[:, 1] > 0.25, torch.full_like(lit, 1.25), torch.full_like(lit, 0.45))
@@ -596,7 +598,7 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
             color[hi] = torch.nan_to_num(col, nan=0.0)
             emis[hi] = emi
         else:
-            for L, LC, s_ in ((KEY, KEY_COL, sh), (FILL, FILL_COL, None), (RIM, RIM_COL, None)):
+            for L, LC, s_ in ((key, KEY_COL, sh), (FILL, FILL_COL, None), (RIM, RIM_COL, None)):
                 ndl = (nrm @ L)
                 wrap = (ndl + sss) / (1 + sss)
                 dif = wrap.clamp_min(0)
@@ -662,7 +664,7 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
                 m = gid == i
                 if m.any() and part.mat.glass:
                     tint[m] = part.mat.albedo
-            Hk = norm(KEY + Vg)
+            Hk = norm(key + Vg)
             spec = ((ng * Hk).sum(-1).clamp_min(0) ** 300) * 6.0
             refl = env(Rg) * fr[:, None] * 1.1 + KEY_COL * spec[:, None]
             behind = color[gi] * tint * (1 - fr[:, None])
@@ -719,7 +721,7 @@ def render(scene, size=192, ss=2, view=2.0, center=(0.0, 0.62, 0.0), ground=True
                 sh = torch.ones(sel.shape[0], device=DEV)
                 ts = torch.full_like(sh, 0.02)
                 for _ in range(40):
-                    q = scene.casters().dist(pg + KEY * ts[:, None])
+                    q = scene.casters().dist(pg + key * ts[:, None])
                     sh = torch.minimum(sh, 6.0 * q / ts)
                     ts = ts + q.clamp(0.01, 0.2)
                 sh = sh.clamp(0, 1)
