@@ -32,7 +32,8 @@ set -euo pipefail
 YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"
 ARCH="${ARCH:-transformer}"
 BASE_DIR="${BASE_DIR:-${HOME}/TransformerVP}"
-WORK_DIR="${WORK_DIR:-${BASE_DIR}/${ARCH}}"
+TAG="${TAG:-}"                                    # a run of the same ARCH in its own directory (e.g. TAG=_reg)
+WORK_DIR="${WORK_DIR:-${BASE_DIR}/${ARCH}${TAG}}"
 # The NNUE cache (preprocess_nnue.py, the ~988 M positions of data/games): its
 # rows are the ResNet's planes; the move played (policies.i16, 2 GB) is added
 # once by STAGE=policies (read from consecutive rows, checked identical to
@@ -66,7 +67,8 @@ case "${STAGE}" in
         echo "[$(date '+%F %T')] done: ${WORK_DIR}/transformer.ts"
         ;;
     eval)
-        for a in transformer resnet_ft resnet; do
+        for d in "${BASE_DIR}"/*/; do                  # every run (ARCH + TAG) of BASE_DIR
+            a=$(basename "${d}")
             for f in "${BASE_DIR}/${a}"/transformer.e*.pt "${BASE_DIR}/${a}"/transformer.pt "${BASE_DIR}/${a}"/transformer_last.pt; do
                 [[ -f "${f}" ]] && { echo "── ${a} $(basename "${f}")"; run_py eval --cache /cache --model "/base/${a}/$(basename "${f}")" --chunks "${CHUNKS:-8}" || echo "   (eval failed: $?)"; }
             done

@@ -28,7 +28,12 @@ position (the ResNet: 36.2 M, ≈ 4.6 GFLOP).
 
 Training (differences with the ResNet script, both necessary for transformers)
 ───────────────────────────────────────────────────────────────────────────────
-    AdamW (weight decay 0.05 on the matrices only), lr warmup 2000 steps then
+    Against memorising the games (the hole pattern identifies a game; the
+    first transformer run: val value mse 0.31 vs 0.11 in training): a random
+    symmetry of the board (8) per training position, dropout 0.1 in the
+    attention and on the residual branches, stochastic depth up to 0.1
+    (YOLAH_TF_AUGMENT / _DROPOUT / _DROP_PATH; "auto" = on for the
+    transformer, off for the ResNets). AdamW (weight decay 0.05 on the matrices only), lr warmup 2000 steps then
     cosine to 1 % per STEP; gradient clipping 1.0; bf16 autocast.
     Same loader (ChunkedShuffleLoader), same 95 % / 5 % split, same logged
     metrics (value_mse, value_sign_acc, policy_ce, policy_acc).
@@ -82,14 +87,20 @@ CHUNK        = int(os.environ.get("YOLAH_TF_CHUNK", str(R.CHUNK_SIZE)))   # posi
 SAVE_CHUNKS  = int(os.environ.get("YOLAH_TF_SAVE_CHUNKS", "4"))   # checkpoint every 4 chunks per rank
 POLICY_DIM = 128
 VALUE_FC   = 256
+# Against memorising the games (2026-11-20: transformer val value mse 0.31 vs 0.11 in training, the
+# ResNets 0.23 / 0.22): "auto" = on for the transformer, off for the ResNets (their runs unchanged).
+def _auto(name, on, off):
+    v = os.environ.get(name, "auto")
+    return (on if ARCH == "transformer" else off) if v == "auto" else type(on)(v)
 
 
 # ── Network ─────────────────────────────────────────────────────────────────
 
 class Block(nn.Module):
-    def __init__(self, d, h):
+    def __init__(self, d, h, dropout=0.0, drop_path=0.0):
         super().__init__()
         self.h = h
+        self.dropout, self.drop_path = dropout, drop_path
         self.ln1  = nn.LayerNorm(d)
         self.qkv  = nn.Linear(d, 3 * d)
         self.proj = nn.Linear(d, d)
@@ -101,18 +112,33 @@ class Block(nn.Module):
     def forward(self, x):                                  # x: (B, 64, d)
         d = x.shape[-1]
         q, k, v = self.qkv(self.ln1(x)).reshape(-1, 64, 3, self.h, d // self.h).permute(2, 0, 3, 1, 4)
-        a = F.scaled_dot_product_attention(q, k, v, attn_mask=self.bias.type_as(q))   # type_as: traced dynamically (fp16 in C++)
-        x = x + self.proj(a.transpose(1, 2).reshape(-1, 64, d))
-        return x + self.fc2(F.gelu(self.fc1(self.ln2(x))))
+        a = F.scaled_dot_product_attention(q, k, v, attn_mask=self.bias.type_as(q),   # type_as: traced dynamically (fp16 in C++)
+                                           dropout_p=self.dropout if self.training else 0.0)
+        x = x + self._branch(self.proj(a.transpose(1, 2).reshape(-1, 64, d)))
+        return x + self._branch(self.fc2(F.gelu(self.fc1(self.ln2(x)))))
+
+    def _branch(self, y):
+        """Dropout on a residual branch, and stochastic depth: the branch dropped for a whole
+        position with probability drop_path (the survivors scaled up). Nothing at inference."""
+        if not self.training:
+            return y
+        if self.dropout > 0:
+            y = F.dropout(y, self.dropout, True)
+        if self.drop_path > 0:
+            keep = (torch.rand(y.shape[0], 1, 1, device=y.device) >= self.drop_path).to(y.dtype)
+            y = y * keep / (1 - self.drop_path)
+        return y
 
 
 class TransformerNet(nn.Module):
-    def __init__(self, dim=DIM, heads=HEADS, layers=LAYERS):
+    def __init__(self, dim=DIM, heads=HEADS, layers=LAYERS, dropout=None, drop_path=None):
         super().__init__()
         self.config = {"arch": "transformer", "dim": dim, "heads": heads, "layers": layers}
+        dropout = DROPOUT if dropout is None else dropout
+        drop_path = DROP_PATH if drop_path is None else drop_path
         self.embed  = nn.Linear(4, dim)
         self.pos    = nn.Parameter(torch.randn(64, dim) * 0.02)
-        self.blocks = nn.ModuleList([Block(dim, heads) for _ in range(layers)])
+        self.blocks = nn.ModuleList([Block(dim, heads, dropout, drop_path * i / max(1, layers - 1)) for i in range(layers)])
         self.ln_f   = nn.LayerNorm(dim)
         self.value_fc1 = nn.Linear(2 * dim, VALUE_FC)
         self.value_fc2 = nn.Linear(VALUE_FC, 1)
@@ -179,6 +205,54 @@ class ResNetPlain(R.Net):
 
 
 ARCH = os.environ.get("YOLAH_TF_ARCH", "transformer")   # transformer | resnet_ft | resnet
+AUGMENT   = _auto("YOLAH_TF_AUGMENT", 1, 0)        # a random symmetry of the board (8) per training position
+DROPOUT   = _auto("YOLAH_TF_DROPOUT", 0.1, 0.0)    # in the attention weights and on the residual branches
+DROP_PATH = _auto("YOLAH_TF_DROP_PATH", 0.1, 0.0)  # stochastic depth: a block skipped, up to this rate (last block)
+if os.environ.get("YOLAH_TF_WD"):
+    WEIGHT_DECAY = float(os.environ["YOLAH_TF_WD"])
+
+
+# ── The 8 symmetries of the board ───────────────────────────────────────────
+# The rules are the same under rotations and mirrors: a transformed position
+# keeps its result for the side to move, and its move played is the
+# transformed move. Planes (B, 4, 8, 8) in cell order (cell c = square 63 - c,
+# row-major): g = k + 4·f is rot90 k times, then a left-right flip if f.
+def _sym(x, g):
+    x = torch.rot90(x, g % 4, (-2, -1))
+    return x.flip(-1) if g >= 4 else x
+
+
+def _policy_tables():
+    """(8, 4096): the policy index from·64 + to after symmetry g; 0 (the pass) stays 0."""
+    cells = (63 - torch.arange(64)).reshape(8, 8)            # the square in each cell
+    tabs = []
+    for g in range(8):
+        img = _sym(cells, g).reshape(-1)                      # cell c' now holds square img[c']
+        perm = torch.empty(64, dtype=torch.long)
+        perm[img] = 63 - torch.arange(64)                     # square s moves to the square of c'
+        t = (perm[:, None] * 64 + perm[None, :]).reshape(-1)
+        t[0] = 0
+        tabs.append(t)
+    return torch.stack(tabs)
+
+
+_POL_TABLES = {}
+
+
+def augment(X, p_t):
+    """A random symmetry per position (X on the device, any dtype); policy targets moved with it."""
+    dev = X.device
+    if dev not in _POL_TABLES:
+        _POL_TABLES[dev] = _policy_tables().to(dev)
+    tab = _POL_TABLES[dev]
+    g = torch.randint(0, 8, (X.shape[0],), device=dev)
+    out = torch.empty_like(X)
+    for k in range(8):
+        m = (g == k).nonzero().squeeze(1)
+        if m.numel():
+            out[m] = _sym(X[m], k)
+    p = torch.where(p_t >= 0, tab[g, p_t.clamp(min=0)], p_t)
+    return out, p
 
 
 def make_net(cfg=None):
@@ -321,6 +395,9 @@ def train_worker(rank, world, args):
     val_loader   = CacheLoader(args.cache, n_train, n_total, BATCH, rank, world, chunk_size=CHUNK, shuffle=False)
     per_epoch = len(train_loader)
     total = NB_EPOCHS * per_epoch
+    if rank == 0:
+        print(f"regularisation: augment {AUGMENT} (8 symmetries), dropout {DROPOUT}, drop path {DROP_PATH}, "
+              f"weight decay {WEIGHT_DECAY}", flush=True)
 
     net = make_net().to(device).to(memory_format=torch.channels_last)
     decay    = [p for n, p in net.named_parameters() if p.dim() >= 2 and n != "pos" and not n.endswith(".bias")]
@@ -369,6 +446,8 @@ def train_worker(rank, world, args):
         meter, t0 = Meter(), time.time()
         for X, v_t, p_t in train_loader:
             X, v_t, p_t = X.to(device, non_blocking=True), v_t.to(device, non_blocking=True), p_t.to(device, non_blocking=True)
+            if AUGMENT:
+                X, p_t = augment(X, p_t)
             X = X.contiguous(memory_format=torch.channels_last)
             for g in opt.param_groups:
                 g["lr"] = lr_at(step)
@@ -449,7 +528,65 @@ def cmd_export(args):
     E.export_test_vectors(net, base + ".test.bin", 32)
 
 
+def _check_augment(n=4000, seed=1):
+    """The symmetries keep the move played legal: random boards (4 + 4 pieces, holes), a random
+    queen move of the side to move, both transformed; legality checked by rays, on squares."""
+    rng = np.random.default_rng(seed)
+    dirs = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+
+    def legal(board, f, t):                     # board[sq]: 0 free, 1 black, 2 white, 3 hole
+        fr, fc, tr, tc = f // 8, f % 8, t // 8, t % 8
+        dr, dc = np.sign(tr - fr), np.sign(tc - fc)
+        if (dr, dc) == (0, 0) or not (fr == tr or fc == tc or abs(tr - fr) == abs(tc - fc)):
+            return False
+        r, c = fr + dr, fc + dc
+        while True:
+            if board[r * 8 + c] != 0:
+                return False
+            if (r, c) == (tr, tc):
+                return True
+            r, c = r + dr, c + dc
+    X = np.zeros((n, 4, 8, 8), np.uint8)
+    P = np.zeros(n, np.int64)
+    boards = []
+    for i in range(n):
+        while True:
+            sq = rng.permutation(64)
+            board = np.zeros(64, np.int64)
+            board[sq[:4]], board[sq[4:8]] = 1, 2
+            board[sq[8:8 + rng.integers(0, 40)]] = 3
+            stm = int(rng.integers(0, 2))
+            moves = [(f, t) for f in np.nonzero(board == 1 + stm)[0] for t in range(64) if legal(board, f, t)]
+            if moves:
+                break
+        f, t = moves[rng.integers(len(moves))]
+        for s_ in range(64):
+            if board[s_]:
+                X[i, board[s_] - 1].reshape(-1)[63 - s_] = 1          # cell 63 - s
+        X[i, 3] = stm
+        P[i] = f * 64 + t
+        boards.append(board)
+    P[:5] = 0                                    # passes stay passes
+    P[5:10] = -1                                 # ignored rows stay ignored
+    Xa, Pa = augment(torch.tensor(X), torch.tensor(P))
+    Xa, Pa = Xa.numpy(), Pa.numpy()
+    bad = 0
+    for i in range(n):
+        board = np.zeros(64, np.int64)
+        for k in range(3):
+            board[63 - np.nonzero(Xa[i, k].reshape(-1))[0]] = k + 1
+        assert (Xa[i, 3] == X[i, 3, 0, 0]).all() and np.bincount(board, minlength=4)[1:].tolist() == np.bincount(boards[i], minlength=4)[1:].tolist()
+        if P[i] <= 0:
+            assert Pa[i] == P[i]
+            continue
+        f, t = divmod(int(Pa[i]), 64)
+        bad += not (board[f] == 1 + int(X[i, 3, 0, 0]) and legal(board, f, t))
+    assert bad == 0, f"{bad} moves not legal after the symmetry"
+    return n
+
+
 def cmd_selftest(args):
+    print(f"augmentation: {_check_augment()} random positions, the transformed move legal in each")
     torch.manual_seed(0)
     net = TransformerNet().eval()
     res = R.Net()
