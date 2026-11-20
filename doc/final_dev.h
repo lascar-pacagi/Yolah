@@ -2,11 +2,11 @@
 #define FINAL_DEV_H
 
 // =============================================================================
-//  FINAL_DEV (dev_u8) — Version épurée et commentée de MinMaxNNUE_DevPlayer
+//  FINAL_DEV (dev_u9) — Version épurée et commentée de MinMaxNNUE_DevPlayer
 // =============================================================================
 //
 //  Ce fichier (et son compagnon doc/final_dev.cpp) présente le code exact du
-//  moteur « Minimax NNUE dev » (configuration `dev_u8`) utilisé dans
+//  moteur « Minimax NNUE dev » (configuration `dev_u9`) utilisé dans
 //  l'application Yolah, débarrassé de la centaine d'options expérimentales
 //  testées et écartées au fil des campagnes A à U (plus de 250 variantes et
 //  des centaines de milliers de parties sur cluster).
@@ -17,7 +17,7 @@
 //    détaillant le « pourquoi » et le « comment » de chaque mécanisme.
 //
 //  ---------------------------------------------------------------------------
-//  Vue d'ensemble des briques actives dans `dev_u8` (et gains Elo mesurés) :
+//  Vue d'ensemble des briques actives dans `dev_u9` (et gains Elo mesurés) :
 //  ---------------------------------------------------------------------------
 //
 //  1. APPROFONDISSEMENT ITÉRATIF, PVS & FENÊTRES D'ASPIRATION ADAPTATIVES (B, A2)
@@ -94,8 +94,20 @@
 //                       + cont1[us][prev.to][m.to]         (U4 : +32.6 Elo)
 //                       + (intercepte(prev.to, m.to) ? 2000 : 0) (U7 : +17.0 Elo)
 //                       + (est_killer(m) ? 4000 : 0)       (U7 : +17.7 Elo)
-//                       + (depth ≥ 4 ? 512 × influence_fast(m) : 0) (J : +36 Elo)
-//            Noter que dans `dev_u8`, les coups tueurs (`killer1`, `killer2`) ne
+//                       + 1024 × (couverture(après m) − couverture(avant))
+//                                                      (U19-U22, voir ci-dessous)
+//            La COUVERTURE de notre groupe est le nombre de cases libres que
+//            nos pièces atteignent collectivement en un coup (union de leurs
+//            rayons de dame, sans tenir compte de l'adversaire). Un coup qui
+//            l'agrandit ouvre de l'espace à notre groupe ; un coup qui la
+//            réduit l'enferme. Ce terme REMPLACE l'influence Voronoï de dev_u8
+//            (`512 × influence_fast(m)` à depth ≥ 4, J : +36 Elo) : contre
+//            dev_u8, +17.9 Elo [+7.6, +28.2] à 0.2 s/coup (2000 parties) et
+//            +6.9 Elo [+0.9, +13.0] à 1 s/coup (4000 parties). Il est appliqué
+//            à TOUTES les profondeurs : bien moins cher que l'inondation
+//            Voronoï (8 calculs de rayons par coup), il paie même près des
+//            feuilles (seuil 2 ou 3 : ≈ 0 Elo ; ajouté EN PLUS de l'influence : ≈ 0).
+//            Noter que dans `dev_u9` (comme dans `dev_u8`), les coups tueurs (`killer1`, `killer2`) ne
 //            sont PAS placés brutalement avant tous les coups ordinaires : ils
 //            reçoivent un bonus de +4000 sur leur score d'historique, ce qui
 //            permet à un coup ayant un fort historique de continuation (`cont1`)
@@ -174,7 +186,7 @@ private:
     static constexpr int WIN      = heuristic::MAX_VALUE;   // 30 000
     static constexpr int EVAL_NONE = -32768;
 
-    // ── Constantes des heuristiques de `dev_u8` ──────────────────────────────
+    // ── Constantes des heuristiques de `dev_u9` ──────────────────────────────
     // 1. Fenêtres d'aspiration adaptatives (B, A2)
     static constexpr int    ASPIRATION_MIN_DELTA   = 300;
     static constexpr double ASPIRATION_K           = 1.25;
@@ -212,8 +224,8 @@ private:
     static constexpr int HISTORY_MAX      = 16384;
     static constexpr int KILLER_BONUS     = 4000;    // killer_mode = 1 : bonus sur hist(m)
     static constexpr int INTERCEPT_BONUS  = 2000;    // coup sur rayon ou voisin 3×3 de prev.to
-    static constexpr int TERRITORY_DEPTH  = 4;
-    static constexpr int TERRITORY_WEIGHT = 512;     // poids de `influence_fast` à depth ≥ 4
+    static constexpr int COVER_DEPTH      = 1;       // couverture à toutes les profondeurs (U20)
+    static constexpr int COVER_WEIGHT     = 1024;    // poids de (couverture après − avant) (U20-U22)
 
     // Scores spéciaux de tri (au-dessus de tout score d'historique)
     static constexpr int SCORE_TT           = 1 << 30;
@@ -358,7 +370,7 @@ private:
 
     void score_moves(const Yolah& yolah, const Search& s, Move tt_move,
                      const Yolah::MoveList& moves, int* scores, int depth) const;
-    int  territory_after(const Yolah& yolah, Move m) const;
+    static uint64_t coverage(uint64_t mine, uint64_t occupied);
     static bool is_legal(const Yolah& yolah, Move m);
     static Move pick_move(Yolah::MoveList& moves, int* scores, size_t i, size_t n);
     void update_history(Search& s, uint8_t player, Move m, int bonus);

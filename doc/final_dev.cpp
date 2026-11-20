@@ -1,9 +1,9 @@
 // =============================================================================
-//  FINAL_DEV (dev_u8) — Implémentation épurée et commentée du joueur Minimax NNUE
+//  FINAL_DEV (dev_u9) — Implémentation épurée et commentée du joueur Minimax NNUE
 // =============================================================================
 //
 //  Ce fichier rassemble uniquement le code effectivement exécuté par la
-//  configuration `dev_u8` (utilisée dans l'application Yolah pour « Minimax
+//  configuration `dev_u9` (utilisée dans l'application Yolah pour « Minimax
 //  NNUE dev » et pour la barre d'analyse).
 //
 //  Plan de lecture du fichier :
@@ -11,7 +11,7 @@
 //    2. Approfondissement itératif & fenêtres d'aspiration adaptatives
 //    3. Recherche à la racine (`root_search`) & tri par taille de sous-arbre
 //    4. Recherche d'un coup (`search_move` : LMR + PVS) & formule LMR
-//    5. Fonctions géométriques auxiliaires (influence rapide, poches scellées,
+//    5. Fonctions géométriques auxiliaires (poches scellées,
 //       récolte exacte `harvest_exact`, clé de correction `corr_key`)
 //    6. Nœuds internes (`negamax`) :
 //         a) Fin de partie & Table de transposition (`SearchTable`)
@@ -25,7 +25,7 @@
 //         h) Coupure bêta : mise à jour de la table, de la correction,
 //            des killers, de l'historique, de la continuation (`cont1`)
 //            et du contre-coup
-//    7. Ordonnancement des coups (`score_moves`) & Territoire (`territory_after`)
+//    7. Ordonnancement des coups (`score_moves`) & Couverture (`coverage`)
 //    8. Évaluation NNUE paresseuse (`lazy_accumulator`) & Cache d'évaluations
 //    9. Accès à la table de transposition Yolah (`tt_probe`, `tt_store`)
 // =============================================================================
@@ -116,7 +116,7 @@ FinalDevPlayer::Result FinalDevPlayer::search(const Yolah& yolah, uint8_t max_de
     // Ce qui a été appris aux coups précédents reste pertinent (les positions
     // sont proches), mais on divise par 2 l'historique principal pour que les
     // nouvelles coupures pèsent davantage que les anciennes.
-    // (Note : dans `dev_u8`, `cont_age = false` : les tables contextuelles
+    // (Note : dans `dev_u9`, `cont_age = false` : les tables contextuelles
     // `cont1` et `lmrh` ne sont pas divisées par 2 à chaque coup.)
     for (auto& w : workers) {
         for (auto& by_from : w->history)
@@ -220,7 +220,7 @@ void FinalDevPlayer::clear_table(bool keep_ordering) {
 //
 //    Or, avec une demi-largeur fixe δ = 300, la moitié des itérations échouaient
 //    (la variation médiane d'une profondeur à la suivante vaut ~630). Dans
-//    `dev_u8`, δ s'adapte à la volatilité réelle de la partie :
+//    `dev_u9`, δ s'adapte à la volatilité réelle de la partie :
 //
 //        δ = max(300, 1.25 × moyenne_glissante(|v_d − v_{d−1}|))
 //
@@ -239,7 +239,7 @@ void FinalDevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t max_dep
     int     value = 0;
 
     // Initialisation de la liste des coups à la racine, triée une première fois
-    // comme un nœud interne (coup de la table, contre-coup, historique, territoire).
+    // comme un nœud interne (coup de la table, contre-coup, historique, couverture).
     {
         Yolah::MoveList moves;
         yolah.moves(moves);
@@ -1010,18 +1010,33 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 //         continuation (`cont1`) et d'une interception peut dépasser un killer issu
 //         d'une autre branche où l'adversaire avait joué ailleurs.
 //
-//    4. Le territoire Voronoï aux nœuds profonds (`512 × territory_after(m)` à `depth >= 4`,
-//       +36 Elo).
+//    4. La couverture de notre groupe (`COVER_WEIGHT = 1024`, à toutes les profondeurs,
+//       U19-U22 : +17.9 Elo à 0.2 s, +6.9 Elo à 1 s contre dev_u8) :
+//       • `coverage(mine, occupied)` = les cases LIBRES atteintes en un coup par
+//         au moins une de nos pièces (union des rayons de dame `attacks_bb`).
+//       • Chaque coup ordinaire reçoit `1024 × (|C_après| − |C_avant|)` : après m,
+//         la pièce part de `from` (qui devient un trou, donc reste occupée) et
+//         arrive en `to` (qui n'est plus libre). Les pièces adverses ne comptent
+//         que comme obstacles : ce n'est pas un territoire disputé, c'est
+//         l'espace que notre groupe garde ouvert.
+//       • Ce terme remplace l'influence Voronoï de dev_u8 (`512 × influence_fast`
+//         à depth ≥ 4, J : +36 Elo contre l'ordre par l'historique seul) : la
+//         couverture se calcule avec 8 rayons par coup au lieu d'une inondation
+//         du plateau, et s'applique donc à toutes les profondeurs.
 // =============================================================================
 
 void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
                                  const Yolah::MoveList& moves, int* scores, int depth) const {
-    const bool     territory = depth >= TERRITORY_DEPTH;
+    const bool     cover     = depth >= COVER_DEPTH;
     const uint16_t ply       = yolah.nb_plies();
     const uint8_t  player    = yolah.current_player();
     const Move     p1        = ply > 0 ? s.played[ply - 1] : Move::none();
     // (après une passe adverse aussi : la passe a sa propre case dans la table, comme dans le joueur)
     const Move     counter   = ply > 0 ? s.w->countermoves[p1.from_sq()][p1.to_sq()] : Move::none();
+    // Couverture de notre groupe AVANT le coup (une fois par nœud)
+    const uint64_t mine0     = yolah.bitboard(player);
+    const uint64_t occ0      = ~yolah.free_squares();
+    const int      c0        = cover ? std::popcount(coverage(mine0, occ0)) : 0;
 
     // Score d'historique composite (historique principal + continuation 1 pli + interception)
     auto hist = [&](Move m) {
@@ -1055,54 +1070,23 @@ void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_mo
             scores[i] = hist(m);
         }
 
-        // Aux nœuds de profondeur ≥ 4, ajout du terme territorial Voronoï (`512 × influence_fast`)
-        if (scores[i] < SCORE_ARTICULATION && territory) {
-            scores[i] += TERRITORY_WEIGHT * territory_after(yolah, m);
+        // Terme de couverture (coups ordinaires seulement) : variation du nombre
+        // de cases libres que notre groupe atteint, si l'on joue m.
+        if (scores[i] < SCORE_ARTICULATION && cover) {
+            const uint64_t from = square_bb(m.from_sq()), to = square_bb(m.to_sq());
+            const uint64_t c1   = coverage((mine0 & ~from) | to, occ0 | to);
+            scores[i] += COVER_WEIGHT * (std::popcount(c1) - c0);
         }
     }
 }
 
-// ── Calcul rapide de l'influence Voronoï à pas de roi (`influence_fast`) ─────
-// Les deux camps inondent simultanément les cases libres d'un pas de roi à
-// chaque étape :
-//   • `mf`, `of` : fronts d'onde (uniquement les NOUVELLES cases atteintes à
-//     l'étape courante, pour que chaque case ne soit visitée qu'une fois).
-//   • Les cases atteintes au même pas par les deux camps (`collision = nm & no`)
-//     deviennent neutres et propagent cette neutralité autour d'elles.
-//   • Renvoie `(nos_cases_libres_contrôlées − leurs_cases_libres_contrôlées)`.
-static inline uint64_t expand_king(uint64_t b) {
-    const uint64_t h = b | ((b << 1) & 0xFEFEFEFEFEFEFEFEULL) | ((b >> 1) & 0x7F7F7F7F7F7F7F7FULL);
-    return h | (h << 8) | (h >> 8);
-}
-
-static int influence_fast(uint64_t me, uint64_t opp, uint64_t free) {
-    uint64_t mi = me, oi = opp, mf = me, of = opp, neutral = 0;
-    while (mf | of) {
-        uint64_t nm = expand_king(mf) & free & ~oi & ~mi;
-        uint64_t no = expand_king(of) & free & ~mi & ~oi;
-        const uint64_t collision = nm & no;
-        if (neutral | collision) {
-            neutral |= collision | (expand_king(neutral) & free);
-            nm &= ~neutral;
-            no &= ~neutral;
-        }
-        mi |= nm;
-        oi |= no;
-        mf = nm;
-        of = no;
-    }
-    return std::popcount(mi & free) - std::popcount(oi & free);
-}
-
-int FinalDevPlayer::territory_after(const Yolah& yolah, Move m) const {
-    if (m == Move::none()) return 0;
-    const uint8_t  player = yolah.current_player();
-    const uint64_t from   = uint64_t(1) << m.from_sq();
-    const uint64_t to     = uint64_t(1) << m.to_sq();
-    const uint64_t me     = (yolah.bitboard(player) & ~from) | to;
-    const uint64_t opp    = yolah.bitboard(Yolah::other_player(player));
-    const uint64_t free   = yolah.free_squares() & ~to;   // la case de départ était déjà occupée, elle devient un trou
-    return influence_fast(me, opp, free);
+// ── Couverture d'un groupe de pièces (`coverage`) ───────────────────────────
+// Les cases libres qu'au moins une des pièces `mine` atteint en un coup
+// (déplacement de dame, arrêté par toute case occupée : pièce ou trou).
+uint64_t FinalDevPlayer::coverage(uint64_t mine, uint64_t occupied) {
+    uint64_t c = 0;
+    for (uint64_t b = mine; b;) c |= attacks_bb(pop_lsb(b), occupied);
+    return c & ~occupied;
 }
 
 bool FinalDevPlayer::is_legal(const Yolah& yolah, Move m) {
@@ -1232,12 +1216,12 @@ std::vector<Move> FinalDevPlayer::principal_variation(Yolah yolah, int max_len) 
 }
 
 std::string FinalDevPlayer::info() {
-    return "final dev player (dev_u8, " + std::to_string(nb_threads) + " threads)";
+    return "final dev player (dev_u9, " + std::to_string(nb_threads) + " threads)";
 }
 
 json FinalDevPlayer::config() {
     json j;
-    j["name"]         = "FinalDevPlayer (dev_u8)";
+    j["name"]         = "FinalDevPlayer (dev_u9)";
     j["microseconds"] = thinking_time;
     j["tt size"]      = tt_size_mb;
     j["nb threads"]   = nb_threads;
