@@ -147,9 +147,10 @@
 //       constante se déplace vers le côté qui a gagné. 50 004 paires de
 //       parties (100 008 parties) à 0.2 s/coup.
 //     • Gain contre dev_u9 (mêmes heuristiques, constantes réglées à la main) :
-//       +14.4 Elo [+4.2, +24.7] à 0.2 s (2000 parties) et +15.1 Elo
-//       [+2.3, +27.9] à 1 s (1016 parties) : le réglage tient à une cadence
-//       5 fois plus longue que celle où il a été fait.
+//       +14.4 Elo [+4.2, +24.7] à 0.2 s et +18.3 Elo [+9.2, +27.3] à 1 s
+//       (2000 parties chacun) : le réglage tient à une cadence 5 fois plus
+//       longue que celle où il a été fait. Contre dev_u8 (avant la couverture),
+//       à 1 s : +19.3 Elo [+10.5, +28.1] (2000 parties).
 //     • Les changements les plus nets : LMP plus agressif (2 + d² coups au lieu
 //       de 4 + d², jusqu'à depth 4), Proxy Cut plus réduit (R = 3 + d/4 au lieu
 //       de 2 + d/4), MPC dès depth 4 avec une marge plus large, RFP jusqu'à
@@ -208,7 +209,7 @@ private:
 
     // ── Constantes des heuristiques de `dev_u9_spsa` ─────────────────────────
     // Les valeurs viennent du SPSA de dev_u9 (U23 : 29 paramètres, 100 008 parties
-    // à 0,2 s ; +14,4 Elo à 0,2 s, +15,1 à 1 s contre dev_u9). Entre crochets :
+    // à 0,2 s ; +14,4 Elo à 0,2 s, +18,3 à 1 s contre dev_u9). Entre crochets :
     // la valeur avant le SPSA.
     // 1. Fenêtres d'aspiration adaptatives (B, A2)
     static constexpr int    ASPIRATION_MIN_DELTA   = 345;     // [300]
