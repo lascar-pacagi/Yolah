@@ -176,6 +176,7 @@ struct MinMaxNNUE_DevOptions {
     bool root_nodes_last = false;    // ["root nodes last"] with "root fix": the nodes of a move are those of the last
                                      //   attempt only (summed, the moves before a fail-high cut count twice)
     bool aspiration_keep_beta = false; // ["aspiration keep beta"] adaptive windows: a fail low does not lower beta
+    bool smp_skip = true;              // ["smp skip"] lazy SMP: helper threads skip depths (L); false = every thread searches every depth (U24)
     int  aspiration_stats_depth = 4; // ["aspiration stats depth"] adaptive windows: |v_d − v_{d−1}| counted from this depth
     bool aspiration_center2 = false; // ["aspiration center 2"] window centred on (v_{d−1} + v_{d−2}) / 2 (odd/even effect)
     double aspiration_last = 0;      // ["aspiration last"] > 0, adaptive windows: half width at least this × |v_{d−1} − v_{d−2}|

@@ -1,0 +1,11 @@
+# Campaign U24 (2026-11-20): are the staggered depths of the lazy SMP useful? (L: each helper thread skips
+#   depths by its own (size, phase) pattern, Stockfish before 2018; the main thread never skips.) u24_noskip =
+#   dev_u9_spsa with "smp skip" false: every thread searches every depth, the threads differ only by timing.
+#   With one thread both are the same player, so this campaign is only meaningful with THREADS > 1. Launch it
+#   twice, 4 threads (the app's default) and 8; the results files end in __th4 / __th8. Multi-thread matches
+#   need fast, homogeneous cores (U11: the old Xeons gave meaningless numbers): EPYC crn25 only.
+#   THREADS=4 BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu -w crn25 --cpus-per-task=32 --array=1-2 nnue/search_study.sh campaign_U24.txt
+#   THREADS=8 BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu -w crn25 --cpus-per-task=32 --array=1-2 nnue/search_study.sh campaign_U24.txt
+# 1: at 0.2 s, 2: at 1 s
+u24_noskip dev_u9_spsa 200000 1000 241
+u24_noskip dev_u9_spsa 1000000 1000 242

@@ -3344,7 +3344,7 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
     static constexpr int SKIP_PHASE[] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
     const int k = s.id % 20;
     for (int d = 1; d <= max_depth && d < 64; d++) {
-        if (s.id > 0 && ((d + SKIP_PHASE[k]) / SKIP_SIZE[k]) % 2 == 1 && d < max_depth) continue;
+        if (options.smp_skip && s.id > 0 && ((d + SKIP_PHASE[k]) / SKIP_SIZE[k]) % 2 == 1 && d < max_depth) continue;
         int delta = options.aspiration_window;
         const bool adaptive = options.aspiration_k > 0;
         if (adaptive && s.w->asp_n > 0) delta = std::max(delta, int(options.aspiration_k * s.w->asp_sum / s.w->asp_n));
@@ -3532,6 +3532,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["root order gap"] = options.root_order_gap;
     j["root close full"] = options.root_close_full;
     j["aspiration keep beta"] = options.aspiration_keep_beta;
+    j["smp skip"] = options.smp_skip;
     j["aspiration stats depth"] = options.aspiration_stats_depth;
     j["aspiration center 2"] = options.aspiration_center2;
     j["aspiration last"] = options.aspiration_last;
