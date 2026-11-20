@@ -68,11 +68,11 @@ case "${STAGE}" in
     eval)
         for a in transformer resnet_ft resnet; do
             for f in "${BASE_DIR}/${a}"/transformer.e*.pt "${BASE_DIR}/${a}"/transformer.pt "${BASE_DIR}/${a}"/transformer_last.pt; do
-                [[ -f "${f}" ]] && { echo "── ${a}"; run_py eval --cache /cache --model "/base/${a}/$(basename "${f}")" --chunks "${CHUNKS:-8}"; }
+                [[ -f "${f}" ]] && { echo "── ${a} $(basename "${f}")"; run_py eval --cache /cache --model "/base/${a}/$(basename "${f}")" --chunks "${CHUNKS:-8}" || echo "   (eval failed: $?)"; }
             done
         done
         echo "── the app's ResNet (supervised, original recipe)"
-        run_py eval --cache /cache --model "${RESNET_PT}" --resnet --chunks "${CHUNKS:-8}"
+        run_py eval --cache /cache --model "${RESNET_PT}" --resnet --chunks "${CHUNKS:-8}" || echo "   (eval failed: $?)"
         ;;
     *) echo "STAGE=policies|train|eval" >&2; exit 1 ;;
 esac

@@ -430,6 +430,10 @@ def cmd_eval(args):
     max_b = None if args.chunks <= 0 else args.chunks * loader.batches_per_chunk
     m = evaluate(net, loader, device, torch.bfloat16, max_b)
     print(f"{os.path.basename(args.model)}: {int(m.n):,} validation positions: {m.text()}")
+    # the loader's producer thread may still be filling its queue (--chunks stops early):
+    # leave without tearing it down (otherwise "terminate called without an active exception")
+    sys.stdout.flush()
+    os._exit(0)
 
 
 # ── Export for the C++ MCTS (libtorch backend) ──────────────────────────────
