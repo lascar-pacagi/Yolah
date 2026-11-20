@@ -227,8 +227,18 @@ void FinalDevPlayer::clear_table(bool keep_ordering) {
 //    Lorsqu'une recherche échoue bas (v' ≤ α) ou haut (v' ≥ β) :
 //      • On recentre le bord dépassé directement autour de la valeur fail-soft `v'`
 //        renvoyée par `root_search` (α = v' − δ en fail-low, β = v' + δ en fail-high).
-//      • En cas de fail-low, on abaisse aussi β à (α + β) / 2 pour éviter un
-//        rebond trop large.
+//      • En cas de fail-low, on abaisse aussi β au milieu de l'ancienne fenêtre,
+//        (α + β) / 2, calculé avec l'ancien α avant de le déplacer. L'échec
+//        bas dit que la valeur est ≤ α : garder l'ancien β laisserait au-dessus
+//        de α une zone presque sûrement vide, et une fenêtre plus large coupe
+//        moins. On ne descend pas β jusqu'à α, car la recherche est instable :
+//        relancée avec une autre fenêtre et une table qui a appris entre-temps,
+//        elle peut revenir au-dessus de l'ancien α. Avec β = α, cela ferait un
+//        échec haut et une troisième recherche (un « rebond »). Le milieu laisse
+//        une marge. Mesuré (campagne A2) : garder β (`aspiration keep beta`)
+//        divise les rebonds par 4 sur le bench (201 → 51), mais perd 2 à 7 Elo :
+//        la fenêtre plus étroite fait gagner plus de temps que les rebonds n'en
+//        coûtent.
 //      • On multiplie δ par ASPIRATION_GROW = 1.3372 avant de relancer.
 // =============================================================================
 
