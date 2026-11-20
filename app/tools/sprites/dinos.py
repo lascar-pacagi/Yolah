@@ -385,8 +385,8 @@ _ptera = None
 
 def pteranodon(anim, t, side):
     """Standing on its folded wings and short legs (idle: the model's 'standing'
-    clip, a seamless 4 s cut), walking on all fours (move), shaking its head
-    (blocked), flapping above its base (win: one beat of 'flying', there and back)."""
+    clip, a seamless 4 s cut, the wings beating a little twice), walking on all fours (move), shaking its head
+    (blocked), flapping above its base (win: a beat of 'flying' there and back, twice)."""
     global _ptera
     from gltf_mesh import GltfMesh, grid_part
     if _ptera is None:
@@ -396,13 +396,15 @@ def pteranodon(anim, t, side):
     base(sc, side)
     lift = 0.0
     if anim == "idle":
-        v = m.loop_pose("standing", 2.4, 4.0, t, fade=0.15)
+        flap = 0.5 * max(0.0, math.sin(TAU * 2 * t)) ** 3            # twice per loop, the folded wings lift and fall
+        turn = {m.node("LupperArm"): ((0, 0, 1), flap), m.node("RupperArm"): ((0, 0, 1), -flap)}
+        v = m.loop_pose("standing", 2.4, 4.0, t, fade=0.15, turn=turn)
     elif anim == "move":
         v = m.pose("walking", 0.6 + 1.0 * t)
     elif anim == "blocked":
         v = m.pose("standing", 2.4, turn={m.node("neck_02"): ((0, 1, 0), 0.45 * math.sin(TAU * 2 * t))})
     else:                                  # win: in flight, the body ~0.25 above the base
-        v = m.pose("flying", 4.4 + 0.6 * (1 - math.cos(TAU * t)) / 2)    # one wing beat, down → up → down
+        v = m.pose("flying", 4.4 + 0.6 * (1 - math.cos(TAU * 2 * t)) / 2)    # two wing beats, down → up → down
         lift = -0.30
     v = v.copy()
     v[:, 1] += lift
