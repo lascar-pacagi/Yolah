@@ -8,11 +8,11 @@ heads), a code map, a parameter reference, the measurements, and an
 appendix with the complete annotated source of every file involved.
 
 `minmax_nnue_dev_player.html` — the minimax NNUE dev player, current version
-(`config/search_study/dev_u8.cfg` = `dev_final.cfg` + the six gains of the
-search campaigns U1–U10), self-contained HTML with diagrams and interactive
+(`config/search_study/dev_u9_spsa.cfg` = `dev_final.cfg` + the six gains of the
+search campaigns U1–U10 + the coverage of U19–U22, constants tuned by SPSA in U23), self-contained HTML with diagrams and interactive
 widgets: the search (iterative deepening, aspiration windows, negamax and its
 pruning, the sealed pockets as tempo reserves, move ordering with the
-continuation history, the killers as a bonus and the intercept, the Yolah
+coverage of our group, the continuation history, the killers as a bonus and the intercept, the Yolah
 table, lazy SMP), the evaluation cache, lazy accumulators and the correction
 history, the NNUE network and its SIMD forward pass, its training
 (distillation, quantization-aware training, export), and what campaigns

@@ -147,7 +147,7 @@ details.mobile-toc ol { columns: 1; }
 </nav>
 <main>
 <header class="hero">
-  <div class="eyebrow">Yolah · minimax NNUE · dev player, current version (config/search_study/dev_u8.cfg = dev_final + the six gains of campaigns U1–U10)</div>
+  <div class="eyebrow">Yolah · minimax NNUE · dev player, current version (config/search_study/dev_u9_spsa.cfg = dev_final + the six gains of campaigns U1–U10 + the coverage of campaigns U19–U22, constants tuned by SPSA in campaign U23)</div>
   <h1>Yolah Dev Player Internals</h1>
   <p class="lede">How the strongest Yolah minimax player chooses a move: the search, the transposition table, the move ordering, the NNUE network that evaluates the leaves, the SIMD code that runs it, and the training that produced its weights. Only what is switched on in the final player is described, with its code.</p>
   <div class="stat-row">
@@ -269,15 +269,15 @@ int negamax(pos, α, β, depth):                                              //
     if depth <= 0: return evaluate(pos)                                     // 3.2, 7, 8  the NNUE
     if null window (non-PV node):
         e = evaluate(pos)                                                   // 3.3  static value
-        if depth <= 4 and e - 3000·depth >= β: return e                     // 3.3  reverse futility pruning
-        d' = 0.4·depth,  m = 4000 + 500·(depth − d')                        // 3.4  MPC
-        if depth >= 5 and e >= β and negamax(pos, d') >= β + m: return β    // 3.4
+        if depth <= 5 and e - 2609·depth >= β: return e                     // 3.3  reverse futility pruning
+        d' = 0.46·depth,  m = 4054 + 644·(depth − d')                       // 3.4  MPC
+        if depth >= 4 and e >= β and negamax(pos, d') >= β + m: return β    // 3.4
                    or e <= α and negamax(pos, d') <= α − m: return α        // 3.4
         if depth >= 4 and e >= β and best ordinary move,                    // 3.6  proxy cut
                searched at reduced depth, gives v >= β: return v            // 3.6
     search the table's move first, generate the others if it does not cut   // 3.5
-    for each move, best score first:                                        // 4    table move, killers, countermove, history + territory
-        if non-PV, depth <= 3 and enough moves tried: stop                  // 3.7  late move pruning
+    for each move, best score first:                                        // 4    table move, countermove, history + coverage
+        if non-PV, depth <= 4 and enough moves tried: stop                  // 3.7  late move pruning
         r = reduction(depth, move number, history)                          // 3.7  LMR
         v = search_move(move, r)                                            // 2.4  reduced → null window → full window
         if v >= β: store, update killers / history / countermove, return v  // 3.8
@@ -286,13 +286,13 @@ int negamax(pos, α, β, depth):                                              //
 
 <h3 id="s1-options"><span class="num">1.5</span>What is switched on</h3>
 <div class="col">
-<p>The configuration file of the current player, <code>config/search_study/dev_u8.cfg</code>, is <code>dev_final.cfg</code> (the network, four MPC and proxy settings) plus six options found by campaigns U1–U10 (section 11): the continuation history, the tempo reserves, the killers as a bonus, the intercept, the history of wrong reductions and the correction history. Everything else is a default of <code>MinMaxNNUE_DevOptions</code>. The table lists every option that is active, grouped by role, with the section that explains it; the six of dev_u8 are marked <b>U</b>. Options that are off (null move pruning, ProbCut, the endgame solver, articulation moves, history priors, the hundred-odd variants of campaigns U1–U10, …) are described only in section 11.</p>
+<p>The configuration file of the current player, <code>config/search_study/dev_u9_spsa.cfg</code>, is built in three layers. <code>dev_u8.cfg</code> is <code>dev_final.cfg</code> (the network, four MPC and proxy settings) plus six options found by campaigns U1–U10 (section 11): the continuation history, the tempo reserves, the killers as a bonus, the intercept, the history of wrong reductions and the correction history. <code>dev_u9.cfg</code> replaces the influence in the move order by the coverage of our group (campaigns U19–U22, section 4.2). <code>dev_u9_spsa.cfg</code> gives 29 numeric constants the values found by an SPSA tuning (campaign U23, section 12). Everything else is a default of <code>MinMaxNNUE_DevOptions</code>. The table lists every option that is active, grouped by role, with the section that explains it; the six of dev_u8 and the coverage are marked <b>U</b>, the values changed by the SPSA <b>S</b>, with the hand-set value in brackets. Options that are off (null move pruning, ProbCut, the endgame solver, articulation moves, history priors, the hundred-odd variants of campaigns U1–U10, …) are described only in section 11.</p>
 </div>
 <div class="tbl wide"><table>
 <thead><tr><th>Role</th><th>Option (config key)</th><th>Value</th><th>Section</th></tr></thead>
 <tbody>
-<tr><td rowspan="4">Iterative deepening</td><td><code>aspiration window</code></td><td>300 (minimum half width)</td><td>2.2</td></tr>
-<tr><td><code>aspiration k</code>, <code>aspiration grow</code></td><td>1.25, 1.5</td><td>2.2</td></tr>
+<tr><td rowspan="4">Iterative deepening</td><td><code>aspiration window</code></td><td><b>S</b> 345 [300] (minimum half width)</td><td>2.2</td></tr>
+<tr><td><code>aspiration k</code>, <code>aspiration grow</code></td><td><b>S</b> 0.92 [1.25], 1.34 [1.5]</td><td>2.2</td></tr>
 <tr><td><code>aspiration stats depth</code></td><td>4</td><td>2.2</td></tr>
 <tr><td><code>root ordering</code>, <code>root fix</code></td><td>on, on</td><td>2.3</td></tr>
 <tr><td rowspan="2">Tree search</td><td><code>pvs</code></td><td>on</td><td>2.4</td></tr>
@@ -300,24 +300,26 @@ int negamax(pos, α, β, depth):                                              //
 <tr><td rowspan="3">Table</td><td><code>yolah table</code>, <code>tt size</code></td><td>on, 200 MB</td><td>5</td></tr>
 <tr><td><code>tt cut pv</code></td><td>off: at PV nodes only exact values and proven results cut</td><td>3.1</td></tr>
 <tr><td><code>tt cut pv exact</code></td><td>on</td><td>3.1</td></tr>
-<tr><td rowspan="5">Pruning</td><td><code>rfp depth</code>, <code>rfp margin</code></td><td>4, 3000 per ply</td><td>3.3</td></tr>
-<tr><td><code>mpc</code>, <code>mpc depth</code>, <code>mpc ratio</code></td><td>2 (both directions), 5, 40 %</td><td>3.4</td></tr>
-<tr><td><code>mpc margin</code>, <code>mpc margin per ply</code></td><td>4000, 500</td><td>3.4</td></tr>
-<tr><td><code>proxy cut</code>, <code>proxy depth</code>, <code>proxy reduction</code></td><td>1 (ordinary move), 4, 3</td><td>3.6</td></tr>
-<tr><td><code>lmp depth</code>, <code>lmp moves</code></td><td>3, 4 (+ depth²)</td><td>3.7</td></tr>
-<tr><td rowspan="3">Reductions</td><td><code>lmr</code>, <code>lmr base</code>, <code>lmr divisor</code></td><td>on, 1.25, 1.5</td><td>3.7</td></tr>
-<tr><td><b>U</b> <code>lmrh</code></td><td>4000: one ply less where reductions proved wrong</td><td>3.7</td></tr>
+<tr><td rowspan="5">Pruning</td><td><code>rfp depth</code>, <code>rfp margin</code></td><td><b>S</b> 5 [4], 2609 [3000] per ply</td><td>3.3</td></tr>
+<tr><td><code>mpc</code>, <code>mpc depth</code>, <code>mpc ratio</code></td><td>2 (both directions), <b>S</b> 4 [5], 46 % [40 %]</td><td>3.4</td></tr>
+<tr><td><code>mpc margin</code>, <code>mpc margin per ply</code></td><td><b>S</b> 4054 [4000], 644 [500]</td><td>3.4</td></tr>
+<tr><td><code>proxy cut</code>, <code>proxy depth</code>, <code>proxy reduction</code></td><td>1 (ordinary move), 4, <b>S</b> 4 [3]</td><td>3.6</td></tr>
+<tr><td><code>lmp depth</code>, <code>lmp moves</code></td><td><b>S</b> 4 [3], 2 [4] (+ depth²)</td><td>3.7</td></tr>
+<tr><td rowspan="4">Reductions</td><td><code>lmr</code>, <code>lmr base</code>, <code>lmr divisor</code></td><td>on, <b>S</b> 1.116 [1.25], 1.415 [1.5]</td><td>3.7</td></tr>
+<tr><td><code>lmr pv</code>, <code>lmr special</code>, <code>lmr hist div</code></td><td><b>S</b> 1058 [1024], 829 [1024] (in 1/1024 ply), 6945 [8192]</td><td>3.7</td></tr>
+<tr><td><b>U</b> <code>lmrh</code></td><td><b>S</b> 4453 [4000]: one ply less where reductions proved wrong</td><td>3.7</td></tr>
 <tr><td><code>lmr territory</code></td><td>off: the reduction reads the history only</td><td>3.7</td></tr>
 <tr><td rowspan="6">Move ordering</td><td><code>history</code>, <code>countermove</code></td><td>on, on (killers are always on)</td><td>3.8, 4.1</td></tr>
+<tr><td><code>hist bonus a</code>, <code>b</code>, <code>cap</code></td><td><b>S</b> 16, 34 [32], 2166 [2000]: bonus min(a·d² + b·d, cap)</td><td>3.8</td></tr>
 <tr><td><b>U</b> <code>cont hist</code></td><td>1: continuation history by the opponent's last move</td><td>4.3</td></tr>
-<tr><td><b>U</b> <code>killer mode</code>, <code>killer bonus</code></td><td>1: killers as a bonus of 4000 on the history, not first</td><td>4.4</td></tr>
+<tr><td><b>U</b> <code>killer mode</code>, <code>killer bonus</code></td><td>1: killers as a bonus of <b>S</b> 4667 [4000] on the history, not first</td><td>4.4</td></tr>
 <tr><td><b>U</b> <code>intercept</code>, <code>intercept lmr</code></td><td>2000, on: the moves that answer the last move where it landed</td><td>4.5, 3.7</td></tr>
-<tr><td><code>territory ordering</code>, <code>territory depth</code>, <code>territory weight</code></td><td>1 (influence), 4, 512</td><td>4.2</td></tr>
-<tr><td><code>fast influence</code></td><td>on</td><td>4.2</td></tr>
+<tr><td><b>U</b> <code>cover weight</code>, <code>cover depth</code></td><td><b>S</b> 1038 [1024], 1: coverage of our group at every depth; <code>territory ordering</code> 0 (the influence is off)</td><td>4.2</td></tr>
 <tr><td>Threads</td><td><code>nb threads</code></td><td>1 in the campaigns, 16 against the MCTS players</td><td>6</td></tr>
 <tr><td><b>U</b> Exact pruning</td><td><code>reserve</code>, <code>reserve max</code></td><td>1, pockets of at most 20 free squares</td><td>3.9</td></tr>
-<tr><td rowspan="4">Evaluation</td><td><code>lazy accumulator</code></td><td>on</td><td>7.2</td></tr>
+<tr><td rowspan="5">Evaluation</td><td><code>lazy accumulator</code></td><td>on</td><td>7.2</td></tr>
 <tr><td><b>U</b> <code>corr hist</code></td><td>2: correction history, for the pruning and at the leaves</td><td>7.3</td></tr>
+<tr><td><code>corr scale</code>, <code>corr max</code></td><td>8, <b>S</b> 7917 [8000]</td><td>7.3</td></tr>
 <tr><td><code>eval cache</code></td><td>20 (2<sup>20</sup> entries, 8 MB)</td><td>7.1</td></tr>
 <tr><td><code>sparse h1</code></td><td>on</td><td>8.7</td></tr>
 <tr><td>Network</td><td><code>weights</code></td><td><code>nnue_persp_k8_them_g046_qat_ib4f_ref2u_az20_distill.quantized.txt</code></td><td>8, 9</td></tr>
@@ -357,7 +359,7 @@ int negamax(pos, α, β, depth):                                              //
 <div class="col">
 <p><strong>Iterative deepening.</strong> The engine does not search to a fixed depth. It searches depth 1, then 2, then 3, until the clock stops it. The shallow searches cost little and fill the transposition table with best moves, which order the next, deeper search so well that the total costs less than one deep search from scratch. When the clock stops an iteration, its best move is kept if it was completely searched: the first move tried is always the previous best, so a different move that finished first had beaten it.</p>
 <p><strong>Aspiration windows.</strong> The value at depth d is usually close to the value at depth d − 1. From depth 4 on, the root is searched with a narrow window <code>(v − δ, v + δ)</code> around the previous value instead of <code>(−∞, +∞)</code>. A narrow window cuts much more. If the result falls outside (a <strong>fail low</strong> or a <strong>fail high</strong>) the root is searched again with the window widened on that side.</p>
-<p><strong>Adaptive δ.</strong> With a fixed δ = 300 half the iterations failed: the value of Yolah positions moves a lot from one depth to the next (median change about 630, 90th percentile about 4600, on a scale where ±30000 is a sure result). So δ is <code>k = 1.25</code> times the mean change of value between consecutive depths that this thread has seen, a decaying mean (factor 0.9 per iteration) kept from one move of the game to the next, never below 300. After a fail low, β comes down to the middle of the old window and α goes to <code>v − δ</code>; after a fail high, β goes to <code>v + δ</code>; δ then grows by half.</p>
+<p><strong>Adaptive δ.</strong> With a fixed δ = 300 half the iterations failed: the value of Yolah positions moves a lot from one depth to the next (median change about 630, 90th percentile about 4600, on a scale where ±30000 is a sure result). So δ is <code>k = 0.92</code> times the mean change of value between consecutive depths that this thread has seen, a decaying mean (factor 0.9 per iteration) kept from one move of the game to the next, never below 345. After a fail low, β comes down to the middle of the old window and α goes to <code>v − δ</code>; after a fail high, β goes to <code>v + δ</code>; δ then grows by a factor 1.34. (k = 1.25, 300 and 1.5 were the hand-set values, with which the gains of this section were measured; the SPSA of section 12 tightened the window.)</p>
 </div>
 <script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · iterative_deepening (excerpt: the final options, statistics counters removed)">
 void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t max_depth) {
@@ -377,7 +379,7 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
         for (size_t i = 0; i < moves.size(); i++) s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
     }
     for (int d = 1; d <= max_depth && d < 64; d++) {
-        int delta = options.aspiration_window;                                    // 300
+        int delta = options.aspiration_window;                                    // 345
         if (s.w->asp_n > 0) delta = std::max(delta, int(options.aspiration_k * s.w->asp_sum / s.w->asp_n));
         int alpha = -INFINITE, beta = INFINITE;
         for (RootMove& rm : s.root_moves) rm.nodes = 0;                           // root fix (2.3)
@@ -395,7 +397,7 @@ void MinMaxNNUE_DevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t m
             if (v <= alpha && alpha > -INFINITE) {          // fail low: widen downwards
                 beta = (alpha + beta) / 2;
                 alpha = std::max(v - delta, -INFINITE);
-                delta = int(delta * options.aspiration_grow);  // × 1.5
+                delta = int(delta * options.aspiration_grow);  // × 1.34
                 continue;
             }
             if (v >= beta && beta < INFINITE) {             // fail high: widen upwards
@@ -576,15 +578,15 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
 <h3 id="s3-rfp"><span class="num">3.3</span>Static value and reverse futility pruning</h3>
 <div class="col">
 <p>From here on, the pruning steps only apply at <strong>non-PV nodes</strong> (null window: the question is only "is this node ≥ β?") and never near a proven result. They all rely on the <strong>static value</strong>: the network's value of the node itself, before any search below it. With lazy accumulators and the evaluation cache it is cheap, and with the final settings it is computed at every prunable node (the RFP, proxy and MPC depth ranges cover every depth).</p>
-<p><strong>Reverse futility pruning</strong> (also called "static null move"). If at depth ≤ 4 the static value exceeds β by a margin of 3000 per ply of depth, a shallow search would hardly bring it back below β: the node returns its static value. On the value scale, 3000 is a tenth of a sure win. Measured when it was introduced: +76 Elo.</p>
+<p><strong>Reverse futility pruning</strong> (also called "static null move"). If at depth ≤ 5 the static value exceeds β by a margin of 2609 per ply of depth, a shallow search would hardly bring it back below β: the node returns its static value. On the value scale, 2609 is about a tenth of a sure win. Measured when it was introduced (depth ≤ 4, margin 3000): +76 Elo.</p>
 </div>
 <script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax, static value and RFP (excerpt)">
     const bool pv_node = beta - alpha > 1;
     const bool prunable = !pv_node && std::abs(beta) < WIN;
     int static_eval = 0;
-    if (prunable && (depth <= options.rfp_depth             // 4
+    if (prunable && (depth <= options.rfp_depth             // 5
                      || depth >= options.proxy_depth        // 4
-                     || depth >= options.mpc_depth)) {      // 5
+                     || depth >= options.mpc_depth)) {      // 4
         static_eval = evaluate(yolah, s, hash);
     }
     // F1. Reverse futility pruning ("static null move"): if the static value
@@ -597,15 +599,15 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
 
 <h3 id="s3-mpc"><span class="num">3.4</span>Multi-ProbCut</h3>
 <div class="col">
-<p>Multi-ProbCut (Buro, from Othello) predicts the result of a deep search from a shallow one. At a non-PV node of depth d ≥ 5, the same position is searched at depth <code>d' = 40 % of d</code> with a null window placed at <code>β + margin</code>. If even that shallow search clears β by the margin, the deep search would almost surely reach β too: the node cuts and returns β. The same is done downwards against <code>α − margin</code> (fail low, returns α). Buro fits the margin per pair of depths with a regression; here it is <code>4000 + 500 per ply of depth − d'</code>, set by matches as Stockfish sets its margins. The test is only tried when the static value is already on the right side of the window, as in Egaroucid. Measured: +57 Elo over no MPC at 1 s.</p>
+<p>Multi-ProbCut (Buro, from Othello) predicts the result of a deep search from a shallow one. At a non-PV node of depth d ≥ 4, the same position is searched at depth <code>d' = 46 % of d</code> with a null window placed at <code>β + margin</code>. If even that shallow search clears β by the margin, the deep search would almost surely reach β too: the node cuts and returns β. The same is done downwards against <code>α − margin</code> (fail low, returns α). Buro fits the margin per pair of depths with a regression; here it is <code>4054 + 644 per ply of depth − d'</code>, set by matches as Stockfish sets its margins (by hand at 4000 + 500, from depth 5 and at 40 %, then by the SPSA of section 12). The test is only tried when the static value is already on the right side of the window, as in Egaroucid. Measured: +57 Elo over no MPC at 1 s.</p>
 </div>
 <div class="diagram wide" id="d-mpc"></div>
 <script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax, Multi-ProbCut (excerpt)">
     constexpr int NO_CUT = std::numeric_limits<int>::min();
     auto mpc_cut = [&]() -> int {
-        if (prunable && depth >= options.mpc_depth) {                                  // 5
-            const int d2 = std::max(1, depth * options.mpc_ratio / 100);               // 40 %
-            const int margin = options.mpc_margin + options.mpc_margin_per_ply * (depth - d2);   // 4000 + 500/ply
+        if (prunable && depth >= options.mpc_depth) {                                  // 4
+            const int d2 = std::max(1, depth * options.mpc_ratio / 100);               // 46 %
+            const int margin = options.mpc_margin + options.mpc_margin_per_ply * (depth - d2);   // 4054 + 644/ply
             if (static_eval >= beta && beta + margin < WIN) {
                 const int bound = beta + margin;
                 const int v = negamax(yolah, s, hash, bound - 1, bound, d2);
@@ -659,7 +661,7 @@ bool MinMaxNNUE_DevPlayer::is_legal(const Yolah& yolah, Move m) {
 <p>The null move of chess engines asks "even if I pass, am I still ≥ β?". It assumes that passing is worse than the best move, which is false in a zugzwang, and Yolah is full of them: every move spoils some of one's own space. Measured: −81 Elo, so it is off.</p>
 <p>The <strong>proxy cut</strong> keeps the idea without the flaw. Instead of a pass it plays a <strong>real</strong> move m, an ordinary one (the best-scored move that is neither the table's move, a killer nor the countermove), and searches it at a reduced depth with a null window at β. The best move is at least as good as any move:</p>
 <div class="formula">value(best) ≥ value(m)   so   value(m) ≥ β  ⇒  value(best) ≥ β</div>
-<p>In a zugzwang every move is bad, the test fails, and nothing is cut wrongly. The only approximation is the reduced depth, <code>depth − 1 − (3 + depth/4 − 1)</code>. It is tried at non-PV nodes of depth ≥ 4 whose static value is already ≥ β. Measured: +47 Elo at 0.2 s, +59 at 1 s when introduced; after MPC was tuned it still adds about +8.</p>
+<p>In a zugzwang every move is bad, the test fails, and nothing is cut wrongly. The only approximation is the reduced depth, <code>depth − 1 − (4 + depth/4 − 1)</code> (3 instead of 4 before the SPSA). It is tried at non-PV nodes of depth ≥ 4 whose static value is already ≥ β. Measured: +47 Elo at 0.2 s, +59 at 1 s when introduced; after MPC was tuned it still adds about +8.</p>
 </div>
 <script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax, proxy cut (condensed: with the final options the candidate list and witness loop of the real code reduce to this)">
     if (prunable && depth >= options.proxy_depth && static_eval >= beta && beta < WIN) {      // depth ≥ 4
@@ -694,14 +696,14 @@ bool MinMaxNNUE_DevPlayer::is_legal(const Yolah& yolah, Move m) {
 <h3 id="s3-loop"><span class="num">3.7</span>The move loop: late move pruning and late move reductions</h3>
 <div class="col">
 <p>The moves are taken one at a time, the best-scored remaining one first (a selection step, <code>pick_move</code>: most nodes cut after one or two moves, so sorting the whole list would be wasted work).</p>
-<p><strong>Late move pruning.</strong> At non-PV nodes of depth ≤ 3, once <code>4 + depth²</code> moves have been searched (5, 8 and 13 at depths 1, 2, 3) and one of them does not lose, the remaining moves, the worst ordered, are not searched at all. Measured: +35 Elo.</p>
+<p><strong>Late move pruning.</strong> At non-PV nodes of depth ≤ 4, once <code>2 + depth²</code> moves have been searched (3, 6, 11 and 18 at depths 1 to 4) and one of them does not lose, the remaining moves, the worst ordered, are not searched at all. Measured when introduced (depth ≤ 3, 4 + depth²): +35 Elo; the SPSA made it the most aggressive change of section 12.</p>
 <p><strong>Late move reductions.</strong> With a good order the best move is almost always among the first. The later a move comes, the less likely it is to matter, and the deeper the node, the more a full search of it costs. So move number i (from 0) at a node of depth d is first searched at a reduced depth, in plies:</p>
-<div class="formula">r = 1.25 + ln(d) · ln(i + 1) / 1.5            (table lmr_table, in 1/1024 of a ply)
-    − 1   at a PV node
-    − 1   for a killer or the countermove
-    − history / 8192                          (between −2 and +2)
+<div class="formula">r = 1.116 + ln(d) · ln(i + 1) / 1.415         (table lmr_table, in 1/1024 of a ply)
+    − 1058/1024   at a PV node
+    − 829/1024    for the countermove
+    − history / 6945                          (between −2.4 and +2.4)
 r is truncated to whole plies, kept in [0, depth − 2]; never for the first move or at depth &lt; 3.</div>
-<p>A move with a good history (it often cut elsewhere) is reduced less, one with a bad history more. Since campaign A2 the reduction reads the <strong>history alone</strong>: the move score of section 4 also contains a territory term at deep nodes, which used to leak into the reduction (option <code>lmr territory</code> off, +6.5 Elo alone and +12.5 with the root fix). Try the formula:</p>
+<p>A move with a good history (it often cut elsewhere) is reduced less, one with a bad history more. Since campaign A2 the reduction reads the <strong>history alone</strong>: the move score of section 4 also contains a territory term at deep nodes, which used to leak into the reduction (option <code>lmr territory</code> off, +6.5 Elo alone and +12.5 with the root fix). The constants are the SPSA's (section 12; by hand 1.25, 1.5, one ply, one ply and 8192). Try the formula:</p>
 </div>
 <div class="widget" id="w-lmr">
   <div class="widget-head">
@@ -711,7 +713,7 @@ r is truncated to whole plies, kept in [0, depth − 2]; never for the first mov
       <label for="lmr-i">move number i <input id="lmr-i" type="range" min="0" max="40" value="8"><b id="lmr-iv">8</b></label>
       <label for="lmr-h">history <input id="lmr-h" type="range" min="-16384" max="16384" step="256" value="0"><b id="lmr-hv">0</b></label>
       <label for="lmr-pv"><input id="lmr-pv" type="checkbox"> PV node</label>
-      <label for="lmr-sp"><input id="lmr-sp" type="checkbox"> killer / countermove</label>
+      <label for="lmr-sp"><input id="lmr-sp" type="checkbox"> countermove</label>
     </div>
   </div>
   <div class="twocol">
@@ -731,9 +733,9 @@ for (int d = 1; d < 64; d++) {
 int MinMaxNNUE_DevPlayer::late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const {
     if (depth < 3 || i == 0) return 0;
     int r = lmr_table[std::min(depth, 63)][std::min<size_t>(i + 1, Yolah::MAX_NB_MOVES - 1)];
-    if (pv_node) r -= 1024;
-    if (special) r -= 1024;
-    r -= hist * 1024 / 8192;
+    if (pv_node) r -= options.lmr_pv;                  // 1058
+    if (special) r -= options.lmr_special;             // 829
+    r -= hist * 1024 / options.lmr_hist_div;           // 6945
     return std::clamp(r / 1024, 0, depth - 2);
 }
 </script>
@@ -795,11 +797,11 @@ int MinMaxNNUE_DevPlayer::late_move_reduction_of(int depth, size_t i, bool pv_no
 <p><b>Two adjustments of dev_u8 (campaign U7).</b> Once the formula has given a reduction <i>r</i> &gt; 0, two context tests can lower it by one ply each, never below zero:</p>
 <ul>
 <li><b>Intercept</b> (<code>intercept lmr</code>): the move lands on a line the opponent's last moved piece now attacks, or right next to it. In Yolah this is the answer to a threat: the piece that just moved has opened a corridor or is about to seal one, and the reply that goes there is the one that decides. Such moves are also ordered earlier (section 4.5). Alone: <b>+17.0</b> [+6.9, +27.2] Elo at 0.2 s on dev_u6.</li>
-<li><b>History of wrong reductions</b> (<code>lmrh</code>): a table <code>lmrh[side][last destination][destination]</code> learns, for each context (where the opponent just landed, where we go), how often a <i>reduced</i> search of a late move turned out above alpha and had to be redone at full depth (3.8: the bonus is given right after <code>search_move</code>). Where it is high (≥ 4000), the move is reduced one ply less: the reduced search would only be redone. Alone: <b>+12.3</b> [+2.5, +22.2].</li>
+<li><b>History of wrong reductions</b> (<code>lmrh</code>): a table <code>lmrh[side][last destination][destination]</code> learns, for each context (where the opponent just landed, where we go), how often a <i>reduced</i> search of a late move turned out above alpha and had to be redone at full depth (3.8: the bonus is given right after <code>search_move</code>). Where it is high (≥ 4453, 4000 before the SPSA), the move is reduced one ply less: the reduced search would only be redone. Alone: <b>+12.3</b> [+2.5, +22.2].</li>
 </ul>
 <p>Strictly, <code>lmrh</code> learns where reductions <i>cost a re-search</i>, not where they made the search miss a good move: a move whose reduced search fails low is never re-searched, so the search cannot see that miss. Learning the real misses needs a sample of reduced fail-lows re-searched at full depth (<code>fn sample</code>, campaign U10): it cost more than it gained (−2 and −10 Elo).</p>
 </div>
-<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax: the reductions of dev_u8 (excerpt)">
+<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax: the reductions of dev_u8, kept since (excerpt)">
 int r_fly = r > 0 ? std::max(0, r + fly_lmr_delta) : 0;         // r: the formula above
 if (r_fly > 0 && ply_now > 0 && s.played[ply_now - 1] != Move::none()) {
     const Move q1 = s.played[ply_now - 1];                      // the opponent's last move
@@ -827,8 +829,8 @@ if (options.lmrh > 0 && r_used > 0 && v > alpha && ply_now > 0 && s.played[ply_n
 <ul>
 <li>the <strong>table</strong> gets a lower bound and the cutting move (section 5);</li>
 <li>the move becomes the first <strong>killer</strong> of this ply (the previous first killer becomes the second): a move that refuted one position often refutes its siblings too;</li>
-<li>the <strong>history</strong> of the cutting move goes up by a bonus that grows with the depth, <code>min(16 d² + 32 d, 2000)</code>, and the history of every move tried before it goes down by the same amount;</li>
-<li>in dev_u8, the <strong>continuation history</strong> learns the same bonus and maluses in the context of the opponent's last move (section 4.3);</li>
+<li>the <strong>history</strong> of the cutting move goes up by a bonus that grows with the depth, <code>min(16 d² + 34 d, 2166)</code> (by hand <code>min(16 d² + 32 d, 2000)</code>, then the SPSA), and the history of every move tried before it goes down by the same amount;</li>
+<li>since dev_u8, the <strong>continuation history</strong> learns the same bonus and maluses in the context of the opponent's last move (section 4.3);</li>
 <li>the move becomes the <strong>countermove</strong> of the opponent's last move: the reply that refuted it.</li>
 </ul>
 <p>The history uses a "gravity" update, <code>h += bonus − h · |bonus| / 16384</code>: the closer h is to ±16384, the smaller its moves in that direction, so h stays bounded and recent cutoffs weigh more than old ones. At each new move of the game the whole table is halved: what was learnt during the previous moves still helps, but less and less.</p>
@@ -848,7 +850,8 @@ if (options.lmrh > 0 && r_used > 0 && v > alpha && ply_now > 0 && s.played[ply_n
                     // before it (moves[0..i-1], they did not cut) a malus of the
                     // same size. Deeper cutoffs say more about a move.
                     const uint8_t player = yolah.current_player();
-                    const int bonus = std::min(16 * depth * depth + 32 * depth, 2000);
+                    const int bonus = std::min(options.hist_bonus_a * depth * depth + options.hist_bonus_b * depth,
+                                               options.hist_bonus_cap);                 // min(16 d² + 34 d, 2166)
                     update_history(s, player, m, bonus);
                     for (size_t k = 0; k < i; k++) update_history(s, player, moves[k], -bonus);
                     // Countermove: m refuted the opponent's last move.
@@ -944,7 +947,7 @@ if (options.reserve > 0 && generated && m != Move::none()) {
 <section id="s4">
 <h2><span class="num">4</span>Move ordering</h2>
 <div class="col">
-<p>Alpha-beta is only as good as its move order: a cutoff on the first move skips all the others. Yolah has no captures, so nothing recognises a good move statically; the order learns from the search itself, and, at deep nodes, from a cheap territory estimate.</p>
+<p>Alpha-beta is only as good as its move order: a cutoff on the first move skips all the others. Yolah has no captures, so nothing recognises a good move statically; the order learns from the search itself, and from a cheap measure of the space a move opens to our pieces.</p>
 </div>
 
 <h3 id="s4-scores"><span class="num">4.1</span>Scores and selection</h3>
@@ -957,18 +960,21 @@ if (options.reserve > 0 && generated && m != Move::none()) {
 <tr><td>2</td><td>first killer of the ply</td><td><code>SCORE_KILLER1 = 2<sup>29</sup></code></td></tr>
 <tr><td>3</td><td>second killer</td><td><code>2<sup>29</sup> − 1</code></td></tr>
 <tr><td>4</td><td>countermove of the opponent's last move</td><td><code>SCORE_COUNTER = 2<sup>29</sup> − 2</code></td></tr>
-<tr><td>5</td><td>every other move</td><td>its history (±16384) + 512 × territory after the move, at depth ≥ 4</td></tr>
+<tr><td>5</td><td>every other move</td><td>its history (±16384) + 1038 × the change of coverage of our group (4.2)</td></tr>
 </tbody></table></div>
-<p><b>In dev_u8</b> the table changes in three ways (sections 4.3–4.5): the history of an ordinary move is the sum <i>history + continuation + intercept bonus</i>; the killers lose their reserved rank 2–3 and only get a bonus of 4000 on that sum (they stay, in practice, near the top when their context agrees); the countermove keeps rank 4. Ranks become: table's move, countermove, then everything else by <i>history + continuation + intercept + killer bonus + territory</i>.</p>
-<p>The special scores are far above anything the history and the territory term can reach, so the order between the tiers never changes; within the last tier, a gain of one square of territory is worth 512 points of history. The territory term costs about a hundred nanoseconds per move, so it is only computed at nodes of depth ≥ 4: they are few, and a good order there saves the most. Measured: +36 Elo at 0.2 s.</p>
+<p><b>Since dev_u8</b> the table changes in three ways (sections 4.3–4.5): the history of an ordinary move is the sum <i>history + continuation + intercept bonus</i>; the killers lose their reserved rank 2–3 and only get a bonus of 4667 on that sum (they stay, in practice, near the top when their context agrees); the countermove keeps rank 4. Ranks become: table's move, countermove, then everything else by <i>history + continuation + intercept + killer bonus + coverage</i>.</p>
+<p>The special scores are far above anything the history and the coverage term can reach, so the order between the tiers never changes; within the last tier, one more free square reached by our pieces is worth 1038 points of history. Until dev_u8 this term was the influence (4.2), weighted 512: it costs about a hundred nanoseconds per move, so it was only computed at nodes of depth ≥ 4 (measured when introduced: +36 Elo at 0.2 s). The coverage costs four attack lookups per move and is computed at every depth.</p>
 </div>
-<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · score_moves and pick_move (excerpt)">
+<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · score_moves and pick_move (excerpt: the classical ranks of the table above, with the coverage of dev_u9; the killers as a bonus are in 4.4)">
 void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
                                        const Yolah::MoveList& moves, int* scores, int depth) const {
-    // territory ordering only where it pays (deep nodes: few, and a good order there saves the most)
-    const bool territory = depth >= options.territory_depth;                       // 4
     const uint16_t ply = yolah.nb_plies();
     const uint8_t player = yolah.current_player();
+    // coverage of our group before the move (4.2): the free squares our pieces reach in one queen move
+    const uint64_t mine0 = yolah.bitboard(player), free0 = yolah.free_squares(), occ0 = ~free0;
+    uint64_t c0 = 0;
+    for (uint64_t b = mine0; b;) c0 |= attacks_bb(pop_lsb(b), occ0);
+    c0 &= free0;
     Move counter = Move::none();
     if (ply > 0) {
         const Move prev = s.played[ply - 1];
@@ -981,8 +987,13 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         else if (m == s.killer2[ply])     scores[i] = SCORE_KILLER2;
         else if (m == counter && counter != Move::none()) scores[i] = SCORE_COUNTER;
         else                              scores[i] = s.w->history[player][m.from_sq()][m.to_sq()];
-        if (territory && scores[i] < SCORE_ARTICULATION) {
-            scores[i] += options.territory_weight * territory_after(yolah, m);     // 512 × influence
+        if (scores[i] < SCORE_ARTICULATION) {                                       // ordinary moves
+            // the same after m: m's origin becomes a hole, its destination is occupied
+            const uint64_t from = square_bb(m.from_sq()), to = square_bb(m.to_sq());
+            uint64_t c1 = 0;
+            for (uint64_t b = (mine0 & ~from) | to; b;) c1 |= attacks_bb(pop_lsb(b), occ0 | to);
+            c1 &= free0 & ~to;
+            scores[i] += options.cover_weight * (std::popcount(c1) - std::popcount(c0));   // 1038 × change
         }
     }
 }
@@ -999,9 +1010,20 @@ Move MinMaxNNUE_DevPlayer::pick_move(Yolah::MoveList& moves, int* scores, size_t
 }
 </script>
 
-<h3 id="s4-influence"><span class="num">4.2</span>The territory term: influence</h3>
+<h3 id="s4-influence"><span class="num">4.2</span>The coverage term, and the influence before it</h3>
 <div class="col">
-<p><code>territory_after(m)</code> plays the move on bitboards (the piece leaves its square, which becomes a hole, and lands on the destination) and measures who controls the free squares. The measure is the <strong>influence</strong>: both sides flood the free squares one king step at a time, simultaneously. A square reached by both at the same step is neutral, and neutrality spreads too, blocking both floods. The result is (my squares) − (his squares). It is the "t2" territory of Amazons programs.</p>
+<p><strong>Coverage.</strong> The coverage of our group is the set of free squares that our pieces reach in one queen move, each square counted once however many pieces reach it, the opponent ignored (his pieces only block lines, like holes). A move changes it in three ways: the origin becomes a hole, which can open nothing and may close lines; the piece reaches new squares from its destination; the destination is no longer free and may cut lines of our other pieces. The ordering adds</p>
+<div class="formula">1038 × ( |coverage after m| − |coverage before m| )</div>
+<p>to the history of every ordinary move, at every depth. A move that enlarges the coverage opens space to our group; one that shrinks it walls our pieces in, which in Yolah is how games are lost. It is the user's idea (campaign U19): the territory a move gains is better measured by the squares our pieces will be able to use than by a race against the opponent's.</p>
+<p>It was measured against dev_u8, 2000 games each at 0.2 s unless said otherwise:</p>
+<ul>
+<li><b>added</b> to the influence, at various weights and depths: −4 to +1. It only paid <b>instead</b> of the influence (U19: +7.6 at weight 512);</li>
+<li>the weight, at every depth (U20, U22): 512 +7.6 and +4.5 (two seeds), 768 +19.1, <b>1024 +17.9</b> [+7.6, +28.2], 1536 and 2048 ≈ 0; the neighbours of the peak say that part of it is luck, but the region 768–1024 is clearly positive;</li>
+<li>only from depth 2 or 3, as the influence was: ≈ 0. It costs so little that it pays near the leaves too, where most nodes are;</li>
+<li>weight 1024 at 1 s: <b>+6.9</b> [+0.9, +13.0] over 4000 games. This became <code>dev_u9</code>; the SPSA of section 12 left the weight where it was (1038).</li>
+</ul>
+<p>An earlier test (before dev_final) had ordered by mobility counted with multiplicity minus the opponent's, instead of the influence: +12 against +36 for the influence. Counting each square once and ignoring the opponent is what makes the difference: the coverage says where our group can still go, not how many moves it has.</p>
+<p><strong>The influence (until dev_u8).</strong> <code>territory_after(m)</code> plays the move on bitboards (the piece leaves its square, which becomes a hole, and lands on the destination) and measures who controls the free squares. The measure is the <strong>influence</strong>: both sides flood the free squares one king step at a time, simultaneously. A square reached by both at the same step is neutral, and neutrality spreads too, blocking both floods. The result is (my squares) − (his squares). It is the "t2" territory of Amazons programs. It is no longer in the move order, but the network still reads it as an input (section 8.3), so its computation is shown here.</p>
 <p>The code works on whole bitboards at once. <code>expand_king(b)</code> adds the 8 neighbours of every square of b in five operations: the row first (b and its shifts one file east and west, masked so that nothing wraps from the h-file to the a-file), then that row one rank up and one rank down. The fronts only hold the squares reached at this step, so every square is visited once, and the loop stops when no front can advance. Step through it on a position from the middle of a game:</p>
 </div>
 <div class="widget" id="w-infl">
@@ -1092,7 +1114,7 @@ for (size_t k = 0; k < i; k++)                                             // th
 
 <h3 id="s4-killers"><span class="num">4.4</span>Killers as a bonus</h3>
 <div class="col">
-<p>Killers are the moves that cut at the same ply in a sibling node. Ranked second and third unconditionally, they come before every ordinary move, even when the position has changed in a way that made them irrelevant (the hole the opponent just made may have killed the killer's idea). With <code>killer mode 1</code> they are ranked like ordinary moves, by <i>history + continuation + 4000</i>: a killer still comes early when its context agrees, and gives way to a strong contextual reply when it does not. Measured on dev_u6 (dev_final + continuation history + reserves): <b>+17.7</b> [+7.3, +28.3]. Keeping their special treatment elsewhere (less LMR, not chosen as proxy witnesses, <code>killer special</code>) changed nothing (−0.5): the gain comes from the order. Killers first only when their continuation is positive (<code>killer mode 2</code>): +3.</p>
+<p>Killers are the moves that cut at the same ply in a sibling node. Ranked second and third unconditionally, they come before every ordinary move, even when the position has changed in a way that made them irrelevant (the hole the opponent just made may have killed the killer's idea). With <code>killer mode 1</code> they are ranked like ordinary moves, by <i>history + continuation + 4667</i> (4000 by hand, then the SPSA): a killer still comes early when its context agrees, and gives way to a strong contextual reply when it does not. Measured on dev_u6 (dev_final + continuation history + reserves): <b>+17.7</b> [+7.3, +28.3]. Keeping their special treatment elsewhere (less LMR, not chosen as proxy witnesses, <code>killer special</code>) changed nothing (−0.5): the gain comes from the order. Killers first only when their continuation is positive (<code>killer mode 2</code>): +3.</p>
 </div>
 <script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · score_moves: killers (excerpt)">
 const bool kil = m == s.killer1[ply] || m == s.killer2[ply];
@@ -1468,7 +1490,7 @@ void NNUE_Persp::update(const int16_t* __restrict in, int16_t* __restrict out, u
 <div class="col">
 <p>The network makes systematic errors: in some configurations of pieces it is too optimistic or too pessimistic, and the search keeps paying for them (reverse futility, the proxy cut and MPC all start from the static value). The correction history learns them during the game. A table <code>corr[side][key]</code> of 16,384 int16 entries, the key a hash of the positions of both sides' pieces only (not the holes), holds a correction added to the network's value:</p>
 <pre>static = clamp(network + corr[side][key(pieces)], −WIN + 1, WIN − 1)</pre>
-<p>It learns at the end of a node, from <i>best − static</i>, when that difference says something: an exact value always; a lower bound (fail high) only if it is above the static value; an upper bound (fail low) only if it is below. The step is <code>(best − static) · depth / 8</code>, at most ±2000, with the same gravity as the history and a cap of ±8000. <code>corr hist 1</code> corrects the value used by the pruning only; <code>corr hist 2</code> (dev_u8) also the leaves. Measured: on dev_final +1.2 / +7.8 (1 / 2, campaign U4), on dev_u6 <b>+10.6</b> [+0.4, +20.8] (U6): a better ordering goes deeper, and the corrected leaves pay more. A correction by the last two moves instead of the pieces (<code>corr cont</code>) was neutral.</p>
+<p>It learns at the end of a node, from <i>best − static</i>, when that difference says something: an exact value always; a lower bound (fail high) only if it is above the static value; an upper bound (fail low) only if it is below. The step is <code>(best − static) · depth / 8</code>, at most ±2000, with the same gravity as the history and a cap of ±7917 (±8000 by hand). <code>corr hist 1</code> corrects the value used by the pruning only; <code>corr hist 2</code> (dev_u8) also the leaves. Measured: on dev_final +1.2 / +7.8 (1 / 2, campaign U4), on dev_u6 <b>+10.6</b> [+0.4, +20.8] (U6): a better ordering goes deeper, and the corrected leaves pay more. A correction by the last two moves instead of the pieces (<code>corr cont</code>) was neutral.</p>
 </div>
 <script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax: the correction history (excerpt)">
 static_eval = evaluate(yolah, s, hash);
@@ -1481,7 +1503,7 @@ auto corr_update = [&](int bestv) {     // at the two stores of the node (cutoff
     if (bestv <= alpha_orig && bestv >= static_eval) return;    // an upper bound above it: says nothing
     const int b = std::clamp((bestv - static_eval) * depth / std::max(1, options.corr_scale), -2000, 2000);
     int16_t& e = s.w->corr[yolah.current_player()][corr_key(yolah)];
-    e = int16_t(std::clamp(e + b - e * std::abs(b) / 8000, -8000, 8000));
+    e = int16_t(std::clamp(e + b - e * std::abs(b) / options.corr_max, -options.corr_max, options.corr_max));   // 7917
 };
 </script>
 </section>
@@ -2084,8 +2106,8 @@ def export_persp(path, out_dir):
 <tbody>
 <tr><td>Reverse futility pruning + late move pruning</td><td class="num-r">+95</td><td>the same search without them</td></tr>
 <tr><td>Proxy cut</td><td class="num-r">+59 (1 s)</td><td>no proxy cut; about +8 once MPC was tuned</td></tr>
-<tr><td>Multi-ProbCut, margin 4000 + 500/ply</td><td class="num-r">+57 (1 s)</td><td>no MPC</td></tr>
-<tr><td>Territory term in the move order (influence × 512)</td><td class="num-r">+36 (0.2 s)</td><td>history only</td></tr>
+<tr><td>Multi-ProbCut, margin 4000 + 500/ply (hand-set)</td><td class="num-r">+57 (1 s)</td><td>no MPC</td></tr>
+<tr><td>Territory term in the move order (influence × 512, until dev_u8)</td><td class="num-r">+36 (0.2 s)</td><td>history only</td></tr>
 <tr><td>Sparse product of fc2</td><td class="num-r">+35 (1 s)</td><td>dense product (same values, faster)</td></tr>
 <tr><td>Perspective network with both views, 8 heads</td><td class="num-r">+53 (1 s)</td><td>the 193-input network</td></tr>
 <tr><td>Space features, new teacher, 20 epochs, QAT (g046_qat_az20)</td><td class="num-r">+66 (1 s)</td><td>the previous best network (spacelite)</td></tr>
@@ -2097,17 +2119,20 @@ def export_persp(path, out_dir):
 <tr><td>Continuation history by the opponent's last move (4.3)</td><td class="num-r">+32.6 (0.2 s), +24.1 (1 s)</td><td>dev_final (campaign U4)</td></tr>
 <tr><td>Sealed pockets as tempo reserves (3.9)</td><td class="num-r">+10.3 (1 s)</td><td>dev_final (campaign U5)</td></tr>
 <tr><td>Killers as a bonus, intercept, wrong-reduction history, correction history (3.7, 4.4, 4.5, 7.3)</td><td class="num-r">+29.1 (0.2 s), +18.3 (1 s)</td><td>dev_u6 = dev_final + continuation history + reserves (campaign U8)</td></tr>
-<tr><td><strong>dev_u8, the current player</strong></td><td class="num-r"><strong>+54.1</strong> [+45.0, +63.3] (1 s)</td><td>dev_final (campaign U8, 2000 games)</td></tr>
+<tr><td>dev_u8</td><td class="num-r"><strong>+54.1</strong> [+45.0, +63.3] (1 s)</td><td>dev_final (campaign U8, 2000 games)</td></tr>
 <tr><td>First layer per phase, 4 factorised sets, everything retrained (ib4f_ref2u)</td><td class="num-r"><strong>+32.6</strong> [+23.1, +42.1] (1 s), +37.8 [+27.0, +48.7] (0.2 s)</td><td>the final player with the previous network (about 2000 games each); the control trained as long without sets: +4.3 and +8.7. This network is now the one of the final player</td></tr>
+<tr><td>Coverage of our group instead of the influence in the move order (4.2)</td><td class="num-r">+17.9 (0.2 s), +6.9 [+0.9, +13.0] (1 s, 4000 games)</td><td>dev_u8 (campaigns U20, U22): dev_u9</td></tr>
+<tr><td>SPSA of 29 constants (12)</td><td class="num-r">+14.4 [+4.2, +24.7] (0.2 s), +18.3 [+9.2, +27.3] (1 s)</td><td>dev_u9 (campaign U23, 2000 games each)</td></tr>
+<tr><td><strong>dev_u9_spsa, the current player</strong></td><td class="num-r"><strong>+19.3</strong> [+10.5, +28.1] (1 s)</td><td>dev_u8 (campaign U23, 2000 games)</td></tr>
 </tbody></table></div>
 <div class="col">
 <p>Against the MCTS players at one second per move (before campaigns A1–A5), the g046 network in this search was level with the AlphaZero 256 network (+1 [−15, +17] for AlphaZero over 1273 games) when the MCTS players kept 1024 descents in flight, and about 35 Elo behind both MCTS players with 256 descents in flight, a setting that suits them better.</p>
 </div>
 </section>
 <section id="s10">
-<h2><span class="num">11</span>Campaigns U1–U10: what was tried</h2>
+<h2><span class="num">11</span>Campaigns U1–U23: what was tried</h2>
 <div class="col">
-<p>On 2026-11-17, about two hundred variants of the search were implemented behind options (all off by default: with them off the search visits exactly the same nodes as before, checked on the bench) and measured on the cluster, 2000 games each, against the reference of the time, with balanced openings (<code>config/search_study/campaign_U*.txt</code>, <code>nnue/search_study.sh</code>). Ideas came from the user, from Gemini and Codex (asked with the same prompt) and from reviews of the code by Gemini and Astra. The rule for the reviews' points (U10): kept only if they bring at least +10 Elo. Six were kept (dev_u8, table of 1.5); the table below lists the families, the best variant of each and why the others failed.</p>
+<p>On 2026-11-17, about two hundred variants of the search were implemented behind options (all off by default: with them off the search visits exactly the same nodes as before, checked on the bench) and measured on the cluster, 2000 games each, against the reference of the time, with balanced openings (<code>config/search_study/campaign_U*.txt</code>, <code>nnue/search_study.sh</code>). Ideas came from the user, from Gemini and Codex (asked with the same prompt) and from reviews of the code by Gemini and Astra. The rule for the reviews' points (U10): kept only if they bring at least +10 Elo. Six were kept (dev_u8, table of 1.5). Campaigns U11–U23 (2026-11-17 to 11-20) followed, one idea at a time; one more was kept, the coverage (dev_u9), and the constants were then tuned (dev_u9_spsa). The table below lists the families, the best variant of each and why the others failed.</p>
 </div>
 <div class="tbl wide"><table>
 <thead><tr><th>Campaign</th><th>Idea</th><th>Best result (Elo, 95 %)</th><th>What we learnt</th></tr></thead>
@@ -2122,6 +2147,12 @@ def export_persp(path, out_dir):
 <tr><td>U8</td><td>Combinations on dev_u6</td><td>+29.1 (kilc); dev_u8 vs dev_final <b>+54.1</b> at 1 s</td><td>The three ordering gains overlap; together +23, +29 with the correction history.</td></tr>
 <tr><td>U9</td><td>Gemini's review: root context (the moves before the root), killers kept special, LMR on the full ordering score, reserve guard</td><td>+1.6 on top of dev_u8's candidate</td><td>The oversights were real but already absorbed by the killers-as-a-bonus and the intercept.</td></tr>
 <tr><td>U10</td><td>Astra's review: malus per key, root LMR with the continuation, a 3-index continuation, real LMR misses, small bonuses for table and proxy cuts</td><td>+4.7 (none reaches +10)</td><td>None kept.</td></tr>
+<tr><td>U11</td><td>Does dev_u8's gain hold with 4 search threads per player?</td><td>inconclusive</td><td>The first numbers were wrong (the summary scored white instead of the candidate for multi-thread files, fixed since), and the old Xeon nodes are too slow for fine multi-thread comparisons: such matches must run on the EPYC nodes.</td></tr>
+<tr><td>U12–U17</td><td>Ordering by the zone a move blocks behind it on an opponent's line (the user's idea, implemented by Gemini): cone or half-plane, several pieces at once, minus our own blocked zone, minus the influence lost, a weight sweep from 25 to 1200, Astra's fixes, kept out of the proxy witness</td><td>+5.4 (weight 150)</td><td>Nothing reached +10; a tier above the history lost 17 to 33. The coverage (U19) captures the same idea from our side, more cheaply.</td></tr>
+<tr><td>U18</td><td>Undoing our previous move (the user's idea): a malus for the piece going back toward the square it left, or any piece landing next to it, and one more ply of reduction</td><td>+2.8 ("back")</td><td>Landing next to the square we just left is often good (−8 to −17): the hole it made is a wall to build on.</td></tr>
+<tr><td>U19–U22</td><td>Coverage of our group (the user's idea, 4.2): with or instead of the influence, weight 256–2048, depth threshold 1–3, a bonus when no covered square is lost</td><td><b>+17.9</b> (0.2 s), <b>+6.9</b> (1 s, 4000 games): weight 1024 at every depth, instead of the influence</td><td>Kept: dev_u9. On top of the influence it brings nothing; it pays as a replacement, at every depth.</td></tr>
+<tr><td>U21</td><td>A policy head on the NNUE (its accumulators → 64 → from + to scores, trained on the dev player's moves, 39.6 % top-1 among the legal moves) added to the ordering</td><td>−0.3 (depth ≥ 3)</td><td>−24 to 0: the head costs 15 % of the speed at depth ≥ 2 and says less than the history, which knows the current search. A head trained on 500 M samples was no better (39.3 %).</td></tr>
+<tr><td>U23</td><td>SPSA of 29 constants (section 12)</td><td><b>+18.3</b> (1 s) against dev_u9</td><td>Kept: dev_u9_spsa, the current player.</td></tr>
 </tbody></table></div>
 <h3 id="s10-tools"><span class="num">11.1</span>The tools used</h3>
 <div class="col">
@@ -2132,9 +2163,43 @@ def export_persp(path, out_dir):
 </ul>
 </div>
 </section>
+<section id="s11">
+<h2><span class="num">12</span>Tuning the constants: SPSA</h2>
+<div class="col">
+<p>Every constant of the search (margins, depths, reduction formula, bonuses) was first set by hand, one at a time, by matches of 2000 games against the player of the time. That finds each constant's best value <i>given the others</i>, and the others moved afterwards: the margins of MPC were set before the proxy cut was tuned, the late move pruning before the continuation history made the order much better. Stockfish solves this with <strong>SPSA</strong> (simultaneous perturbation stochastic approximation, Spall 1992), which its testing framework, Fishtest, runs on all the constants at once. Campaign U23 did the same on dev_u9 (<code>nnue/spsa.py</code>, <code>nnue/spsa.sh</code>, parameters in <code>config/spsa/dev_u9_params.json</code>).</p>
+<p><strong>One step.</strong> All 29 constants θ are moved at once by a random ±c<sub>k</sub>, one random sign Δ<sub>i</sub> per constant. The player θ<sup>+</sup> = θ + c<sub>k</sub>Δ plays θ<sup>−</sup> = θ − c<sub>k</sub>Δ, both colours, on balanced openings; then every constant moves toward the side that won:</p>
+<div class="formula">θ<sub>i</sub> ← θ<sub>i</sub> + R<sub>k</sub> · c<sub>k,i</sub> · (W − L) · Δ<sub>i</sub>          W, L: the wins of θ<sup>+</sup> and of θ<sup>−</sup> in the batch
+c<sub>k,i</sub> = c<sub>i</sub> / (k + 1)<sup>0.101</sup>        R<sub>k,i</sub> = a<sub>k,i</sub> / c<sub>k,i</sub>²        a<sub>k,i</sub> = a<sub>i</sub> / (A + k + 1)<sup>0.602</sup>,  A = 0.1 N</div>
+<p>with k the number of game pairs played so far and N the pairs of the whole run, Fishtest's schedules: the perturbation c<sub>end</sub> at the end is about 5–15 % of each value (large enough to change the play), and the step at the end is 0.002 · c<sub>end</sub> per unit of W − L. Integer constants (depths, numbers of moves) are rounded at random, without bias: a depth at 3.6 is played as 4 six times out of ten. A single match moves every constant a little in a direction that is mostly noise; the noise cancels over thousands of batches and the true gradient remains.</p>
+<p><strong>The run.</strong> 50,004 pairs (100,008 games) at 0.2 s per move, one thread per player, 4,167 batches of 24 games, about 15 hours on a 24-core node. θ<sup>+</sup> won 22,245 games, θ<sup>−</sup> 22,666, with 55,097 draws: equal within noise, as they should be, since they sit symmetrically around θ. The last quarter of the run moved almost nothing.</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>Constant</th><th>By hand</th><th>SPSA</th><th>Change</th></tr></thead>
+<tbody>
+<tr><td><code>lmp moves</code> (LMP keeps n + depth² moves)</td><td class="num-r">4</td><td class="num-r">2 (2.48)</td><td>much more pruning</td></tr>
+<tr><td><code>lmp depth</code></td><td class="num-r">3</td><td class="num-r">4 (3.61)</td><td>LMP one ply deeper</td></tr>
+<tr><td><code>proxy reduction</code></td><td class="num-r">3</td><td class="num-r">4 (4.05)</td><td>proxy witness searched one ply shallower</td></tr>
+<tr><td><code>mpc depth</code>, <code>mpc ratio</code></td><td class="num-r">5, 40 %</td><td class="num-r">4 (4.14), 46 %</td><td>MPC one ply earlier, a deeper shallow search</td></tr>
+<tr><td><code>mpc margin</code>, <code>per ply</code></td><td class="num-r">4000, 500</td><td class="num-r">4054, 644</td><td>larger margin at depth</td></tr>
+<tr><td><code>rfp depth</code>, <code>rfp margin</code></td><td class="num-r">4, 3000</td><td class="num-r">5 (4.59), 2609</td><td>RFP one ply deeper with a smaller margin</td></tr>
+<tr><td><code>aspiration window</code>, <code>k</code>, <code>grow</code></td><td class="num-r">300, 1.25, 1.5</td><td class="num-r">345, 0.92, 1.34</td><td>narrower windows, widened more slowly</td></tr>
+<tr><td><code>lmr base</code>, <code>divisor</code></td><td class="num-r">1.25, 1.5</td><td class="num-r">1.116, 1.415</td><td>slightly less at the start, more for late moves</td></tr>
+<tr><td><code>lmr pv</code>, <code>lmr special</code>, <code>lmr hist div</code></td><td class="num-r">1024, 1024, 8192</td><td class="num-r">1058, 829, 6945</td><td>the history weighs more in the reduction</td></tr>
+<tr><td><code>lmrh</code></td><td class="num-r">4000</td><td class="num-r">4453</td><td></td></tr>
+<tr><td><code>killer bonus</code></td><td class="num-r">4000</td><td class="num-r">4667</td><td></td></tr>
+<tr><td><code>hist bonus b</code>, <code>cap</code></td><td class="num-r">32, 2000</td><td class="num-r">34, 2166</td><td></td></tr>
+<tr><td><code>cover weight</code>, <code>cover depth</code></td><td class="num-r">1024, 1</td><td class="num-r">1038, 1 (1.20)</td><td>unchanged: U20–U22 had found it</td></tr>
+<tr><td><code>intercept</code>, <code>hist bonus a</code>, <code>corr scale</code>, <code>corr max</code></td><td class="num-r">2000, 16, 8, 8000</td><td class="num-r">2000, 16, 8, 7917</td><td>unchanged</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>In brackets, the real value before rounding: <code>dev_u9_spsa.cfg</code> rounds to the nearest integer, so two constants that sat near the middle during the run (lmp depth 3.61, cover depth 1.20) are now played at one value only; the validation matches below were played with the rounded file.</p>
+<p><strong>Validation</strong> (campaign U23, 2000 games each, balanced openings): against dev_u9 <b>+14.4</b> [+4.2, +24.7] at 0.2 s, the time control of the tuning, and <b>+18.3</b> [+9.2, +27.3] at 1 s: the gain holds at a five times longer time control, although the tuning made the pruning more aggressive. Against dev_u8 at 1 s: <b>+19.3</b> [+10.5, +28.1]. At depth 11 on the 209 bench positions the search visits 4.04 M nodes instead of 5.33 M for dev_u9 (−24 %).</p>
+<p><code>doc/final_dev.h</code> and <code>doc/final_dev.cpp</code>, the cleaned and commented copy of this player, use the same values (the hand-set ones in brackets) and play exactly like it: same value, move and node count on the 209 bench positions at depth 11.</p>
+</div>
+</section>
 
 <footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
-Repository state: dev_u8 (config/search_study/dev_u8.cfg, campaigns U1–U10 of 2026-11-17, on top of dev_final with the network of the first layer per phase). Speeds measured on an i7-12700K, one thread; Elo figures from the cluster matches of the search and NNUE campaigns, 95 % intervals.
+Repository state: dev_u9_spsa (config/search_study/dev_u9_spsa.cfg: dev_u8 of campaigns U1–U10, the coverage of U19–U22 and the SPSA of U23, 2026-11-17 to 11-20, on top of dev_final with the network of the first layer per phase). Speeds measured on an i7-12700K, one thread; Elo figures from the cluster matches of the search and NNUE campaigns, 95 % intervals.
 </footer>
 </main>
 </div>
@@ -2314,8 +2379,8 @@ function svg(id, w, h, body, label) {
     ["table probe", "3.1 · 5", "deep enough & bound decides: return it"],
     ["depth ≤ 0", "3.2 · 6 · 7", "return evaluate()"],
     ["static value", "3.3 · non-PV only", ""],
-    ["reverse futility", "3.3 · depth ≤ 4", "e − 3000·d ≥ β: return e"],
-    ["Multi-ProbCut", "3.4 · depth ≥ 5", "shallow search clears β+m: return β"],
+    ["reverse futility", "3.3 · depth ≤ 5", "e − 2609·d ≥ β: return e"],
+    ["Multi-ProbCut", "3.4 · depth ≥ 4", "shallow search clears β+m: return β"],
     ["stage 1 setup", "3.5", "table move legal? no generation"],
     ["proxy cut", "3.6 · depth ≥ 4, e ≥ β", "witness ≥ β at reduced depth: return v"],
     ["move loop", "3.7 · LMP, LMR, search_move", "v ≥ β: 3.8 store, killers, history, return"],
@@ -2340,13 +2405,13 @@ function svg(id, w, h, body, label) {
   const X = v => x0 + (v - lo) / (hi - lo) * (x1 - x0);
   s += `<line x1="${x0}" y1="120" x2="${x1}" y2="120" style="stroke:var(--ink-3)"/>`;
   [0, 2000, 4000, 6000, 8000, 10000, 12000].forEach(v => { s += `<line x1="${X(v)}" y1="116" x2="${X(v)}" y2="124" style="stroke:var(--ink-3)"/>` + T(X(v), 140, v, "dg-m", "middle"); });
-  const beta = 1000, margin = 4000 + 500 * (10 - 4);
+  const beta = 1000, margin = 4054 + 644 * (10 - 4);
   s += `<line x1="${X(beta)}" y1="40" x2="${X(beta)}" y2="120" style="stroke:var(--accent);stroke-width:2"/>` + T(X(beta), 34, "β = 1000", "dg-t", "middle");
-  s += `<line x1="${X(beta + margin)}" y1="40" x2="${X(beta + margin)}" y2="120" style="stroke:var(--good);stroke-width:2"/>` + T(X(beta + margin), 34, "β + margin = 8000", "dg-t", "middle");
+  s += `<line x1="${X(beta + margin)}" y1="40" x2="${X(beta + margin)}" y2="120" style="stroke:var(--good);stroke-width:2"/>` + T(X(beta + margin), 34, "β + margin = 8918", "dg-t", "middle");
   s += P(`M${X(beta)},70 L${X(beta + margin)},70`, "acc");
-  s += T((X(beta) + X(beta + margin)) / 2, 64, "margin = 4000 + 500 · (10 − 4) = 7000", "dg-s", "middle");
-  s += `<circle cx="${X(9300)}" cy="100" r="6" style="fill:var(--good)"/>` + T(X(9300) + 10, 104, "search at depth 4 (40 % of 10): 9300 ≥ 8000 → cut, return β", "dg-ret");
-  s += T(x0, 176, "At a non-PV node of depth 10 whose static value is already ≥ β: the same position is searched at depth 4 with a null window at 8000.", "dg-s");
+  s += T((X(beta) + X(beta + margin)) / 2, 64, "margin = 4054 + 644 · (10 − 4) = 7918", "dg-s", "middle");
+  s += `<circle cx="${X(9300)}" cy="100" r="6" style="fill:var(--good)"/>` + T(X(9300) + 10, 104, "search at depth 4 (46 % of 10): 9300 ≥ 8918 → cut, return β", "dg-ret");
+  s += T(x0, 176, "At a non-PV node of depth 10 whose static value is already ≥ β: the same position is searched at depth 4 with a null window at 8918.", "dg-s");
   s += T(x0, 194, "If the shallow search does not clear the bound, the node goes on with its normal search; the shallow search is cheap next to the deep one.", "dg-s");
   svg("d-mpc", 920, 210, s, "multi-probcut margin");
 })();
@@ -2610,9 +2675,9 @@ function drawBoard(svgEl, pos, opts) {
   const el = $("asp-svg"); if (!el) return;
   const prev = 1500;
   const att = [
-    { a: 600, b: 2400, d: 900, v: 600, out: "fail low", next: "β = (600 + 2400) / 2 = 1500, α = v − δ = 600 − 900 = −300, δ = 900 × 1.5 = 1350" },
-    { a: -300, b: 1500, d: 1350, v: -300, out: "fail low", next: "β = (−300 + 1500) / 2 = 600, α = −300 − 1350 = −1650, δ = 2025" },
-    { a: -1650, b: 600, d: 2025, v: -820, out: "inside", next: "accepted: depth d is done with v = −820; the statistics get |−820 − 1500| = 2320" }];
+    { a: 600, b: 2400, d: 900, v: 600, out: "fail low", next: "β = (600 + 2400) / 2 = 1500, α = v − δ = 600 − 900 = −300, δ = 900 × 1.34 = 1203" },
+    { a: -300, b: 1500, d: 1203, v: -300, out: "fail low", next: "β = (−300 + 1500) / 2 = 600, α = −300 − 1203 = −1503, δ = 1608" },
+    { a: -1503, b: 600, d: 1608, v: -820, out: "inside", next: "accepted: depth d is done with v = −820; the statistics get |−820 − 1500| = 2320" }];
   let k = 0;
   const x0 = 70, x1 = 870, lo = -3000, hi = 3000, X = v => x0 + (v - lo) / (hi - lo) * (x1 - x0);
   function render() {
@@ -2641,13 +2706,13 @@ function drawBoard(svgEl, pos, opts) {
 /* 3.7 LMR */
 (function () {
   if (!$("lmr-d")) return;
-  const table = (d, n) => Math.trunc(1024 * (1.25 + Math.log(d) * Math.log(n) / 1.5));
+  const table = (d, n) => Math.trunc(1024 * (1.1158 + Math.log(d) * Math.log(n) / 1.4152));
   function red(depth, i, pv, sp, hist) {
     if (depth < 3 || i === 0) return { r: 0, why: depth < 3 ? "depth < 3: never reduced" : "first move: never reduced" };
     let r = table(Math.min(depth, 63), Math.min(i + 1, 74)); const parts = [`table[${depth}][${Math.min(i + 1, 74)}] = ${r}`];
-    if (pv) { r -= 1024; parts.push("− 1024 (PV)"); }
-    if (sp) { r -= 1024; parts.push("− 1024 (killer / countermove)"); }
-    const h = Math.trunc(hist * 1024 / 8192); r -= h; parts.push(`− ${hist} · 1024 / 8192 = − ${h} (history)`);
+    if (pv) { r -= 1058; parts.push("− 1058 (PV)"); }
+    if (sp) { r -= 829; parts.push("− 829 (countermove)"); }
+    const h = Math.trunc(hist * 1024 / 6945); r -= h; parts.push(`− ${hist} · 1024 / 6945 = − ${h} (history)`);
     const plies = Math.max(0, Math.min(Math.trunc(r / 1024), depth - 2));
     return { r: plies, raw: r, why: parts.join("\n  ") };
   }
@@ -2684,7 +2749,7 @@ function drawBoard(svgEl, pos, opts) {
   if (!$("hist-cv")) return;
   let seq = [0];
   const upd = (h, bonus) => Math.trunc(h + bonus - Math.trunc(h * Math.abs(bonus) / 16384));
-  const bonusOf = d => Math.min(16 * d * d + 32 * d, 2000);
+  const bonusOf = d => Math.min(16 * d * d + 34 * d, 2166);
   function render() {
     const d = +$("hist-d").value; $("hist-dv").textContent = d;
     const cv = $("hist-cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
@@ -2697,7 +2762,7 @@ function drawBoard(svgEl, pos, opts) {
     ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.beginPath();
     seq.forEach((v, i) => { const x = 55 + i * dx; i ? ctx.lineTo(x, Y(v)) : ctx.moveTo(x, Y(v)); }); ctx.stroke();
     ctx.fillStyle = css("--accent"); const lx = 55 + (seq.length - 1) * dx; ctx.beginPath(); ctx.arc(lx, Y(seq[seq.length - 1]), 4, 0, 7); ctx.fill();
-    $("hist-out").textContent = `bonus at depth ${d} = min(16·${d}² + 32·${d}, 2000) = ${bonusOf(d)}     h = ${seq[seq.length - 1]}     (${seq.length - 1} updates)\nEach cutoff moves h by bonus − h·|bonus| / 16384: big steps near 0, small ones near the bounds ±16384.`;
+    $("hist-out").textContent = `bonus at depth ${d} = min(16·${d}² + 34·${d}, 2166) = ${bonusOf(d)}     h = ${seq[seq.length - 1]}     (${seq.length - 1} updates)\nEach cutoff moves h by bonus − h·|bonus| / 16384: big steps near 0, small ones near the bounds ±16384.`;
   }
   const push = f => { seq.push(f(seq[seq.length - 1])); if (seq.length > 200) seq.shift(); render(); };
   $("hist-cut").onclick = () => push(h => upd(h, bonusOf(+$("hist-d").value)));
