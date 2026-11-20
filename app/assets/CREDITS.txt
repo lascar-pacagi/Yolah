@@ -1,0 +1,12 @@
+Yolah — third-party assets
+==========================
+
+3D model (figurine « Ptéranodon », Dinosaures set, app/assets/art/fig_dino_nnue193*.png):
+  This work is based on "Pteranodon (Animated)"
+  (https://sketchfab.com/3d-models/pteranodon-animated-7d7683df41d1405283f160e81a5dff1b)
+  by DogexorRexUwU (https://sketchfab.com/oscar.lopez.riviello),
+  licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+  Changes: posed from its clips, re-rendered as a figurine on a base
+  (app/tools/sprites/gltf_mesh.py, dinos.py).
+
+Fonts: see app/assets/fonts/OFL.txt and app/assets/fonts/DejaVu-LICENSE.txt.

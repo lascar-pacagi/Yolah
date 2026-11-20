@@ -8,7 +8,7 @@ the most ferocious, bigger and bigger:
   basic_minmax  Ankylosaure       a tank of armour, a club at the end of the tail
   mcts          Tricératops       a frill and three horns, charging
   mcts_nnue     Dilophosaure      the first hunter: slender, two thin crests
-  nnue193       Quetzalcoatlus    the giant flying reptile, wings raised in threat
+  nnue193       Ptéranodon        the flying reptile, from a downloaded 3D model (CC-BY, see below)
   dev           Allosaure         a big hunter, horns above the eyes, stripes
   resnet        Spinosaure        a sail on the back, a long crocodile snout
   alphazero     Tyrannosaure      the king: a huge head, roaring
@@ -17,6 +17,8 @@ Shapes after the fossils (no film's look: no frill on the dilophosaur). Counters
 unit size; SCALE makes the stronger ones bigger. The human is never part of a set.
 """
 import math
+import os
+import numpy as np
 import torch
 from render import Scene, Mat, T, RX, RY, RZ, srgb, sd_sphere, sd_ellipsoid, sd_box, sd_capsule, sd_cylinder, \
     sd_torus, sd_cone, fbm
@@ -369,75 +371,49 @@ def dilophosaurus(anim, t, side):
     return sc
 
 
-# ─── 7 · Quetzalcoatlus ─────────────────────────────────────────────────────
-def quetzalcoatlus(anim, t, side):
-    """Standing on its hind legs, wings raised to look bigger, the long neck up,
-    the huge beak; the membranes translucent, the body furred (pycnofibres)."""
+# ─── 7 · Ptéranodon (a downloaded 3D model) ─────────────────────────────────
+# "Pteranodon (Animated)" by DogexorRexUwU, CC-BY-4.0:
+# https://sketchfab.com/3d-models/pteranodon-animated-7d7683df41d1405283f160e81a5dff1b
+# (models/pteranodon/license.txt). The skinned mesh is posed from its own clips
+# (gltf_mesh.py) and becomes one SDF part, lit and shadowed like the others.
+PTERA_GLTF = os.path.join(os.path.dirname(__file__), "models", "pteranodon", "scene.gltf")
+PTERA_SCALE = 2.4          # glTF metres → figure units (× SCALE["nnue193"]); the flight must fit the frame
+PTERA_YAW = YAW + 0.8      # nearly in profile: the crest and the long beak read best
+PTERA_CELL = 0.004         # the SDF grid's cell; membranes get 0.9 cell of thickness
+_ptera = None
+
+
+def pteranodon(anim, t, side):
+    """Standing on its folded wings and short legs (idle: the model's 'standing'
+    clip, a seamless 4 s cut), walking on all fours (move), shaking its head
+    (blocked), flapping above its base (win: one beat of 'flying', there and back)."""
+    global _ptera
+    from gltf_mesh import GltfMesh, grid_part
+    if _ptera is None:
+        _ptera = GltfMesh(PTERA_GLTF)
+    m = _ptera
     sc = Scene()
     base(sc, side)
-    walk, win = anim == "move", anim == "win"
-    B = BASE_TOP
-    m = fur("#4e423a", 170, 0.5)
-    pale = skin("#d8d0c0", "#efe8da", 60, rough=0.6)
-    bone = Mat("#d8c8a0", rough=0.4, clearcoat=0.3)
+    lift = 0.0
+    if anim == "idle":
+        v = m.loop_pose("standing", 2.4, 4.0, t, fade=0.15)
+    elif anim == "move":
+        v = m.pose("walking", 0.6 + 1.0 * t)
+    elif anim == "blocked":
+        v = m.pose("standing", 2.4, turn={m.node("neck_02"): ((0, 1, 0), 0.45 * math.sin(TAU * 2 * t))})
+    else:                                  # win: in flight, the body ~0.25 above the base
+        v = m.pose("flying", 4.4 + 0.6 * (1 - math.cos(TAU * t)) / 2)    # one wing beat, down → up → down
+        lift = -0.30
+    v = v.copy()
+    v[:, 1] += lift
+    c, s_ = math.cos(PTERA_YAW), math.sin(PTERA_YAW)
+    v = (v * PTERA_SCALE) @ np.array([[c, 0, s_], [0, 1, 0], [-s_, 0, c]]).T + np.array([0.0, BASE_TOP + 0.002, 0.0])
+    pts, col = m.surface_samples(v, PTERA_CELL * 0.5)
+    sdf, colour = grid_part(pts, col, PTERA_CELL, 0.9 * PTERA_CELL)
 
-    def memb_pat(pl, pw, n):
-        v = (torch.sin(pl[:, 0] * 70 + 4 * fbm(pl * 6, 2)) > 0.93).float()[:, None]
-        return {"albedo": srgb("#5e3a2c") * (0.85 + 0.3 * fbm(pl * 30, 2))[:, None] * (1 - 0.3 * v)}
-    memb = Mat("#7a4632", rough=0.6, sss=0.7, pattern=memb_pat)
-    crest = Mat("#b8402a", rough=0.5, sss=0.5)
-    hop = 0.05 * math.sin(math.pi * t) if walk else 0.0
-    flap = 0.45 + 0.45 * math.sin(TAU * 2 * t) if win else 0.1 * math.sin(TAU * t)
-    Y = RY(YAW) * T(0, hop, 0)
-    # the body, its front raised
-    sc.add(sd_ellipsoid(0.075, 0.085, 0.13), m, Y * T(0, B + 0.3, 0.0) * RX(-0.7))
-    # the hind legs, short, three toes
-    for sgn in (-1, 1):
-        foot = (0.065 * sgn, B + 0.014 - hop, 0.0)
-        chain(sc, [(0.055 * sgn, B + 0.25, -0.05), (0.07 * sgn, B + 0.15, 0.02), (0.066 * sgn, B + 0.06, -0.04), foot],
-              [0.034, 0.024, 0.015, 0.012], m, Y, blend=0.02)
-        for k in (-1, 0, 1):
-            toe = Y * T(*foot) * RY(0.35 * k)
-            sc.add(sd_capsule((0, 0, 0), (0, -0.004, 0.05), 0.011, 0.007), m, toe, blend=0.008)
-            sc.add(sd_cone(0.016, 0.006, 0.001, 0.001), CLAW, toe * T(0, -0.006, 0.055) * RX(math.pi / 2 + 0.3))
-    # the wings: arm, wrist with three small clawed fingers, the long fourth finger; membranes to the leg
-    for sgn in (-1, 1):
-        sh = (0.065 * sgn, B + 0.37, 0.07)
-        el = (0.15 * sgn, B + 0.46 + 0.04 * flap, 0.03)
-        wr = (0.24 * sgn, B + 0.56 + 0.08 * flap, 0.07)
-        tip = ((0.36 + 0.06 * flap) * sgn, B + 0.8 + 0.12 * flap, -0.16)
-        knee = (0.07 * sgn, B + 0.16, 0.0)
-        chain(sc, [sh, el, wr], [0.03, 0.022, 0.017], m, Y, blend=0.015)
-        sc.add(sd_capsule(wr, tip, 0.012, 0.004), pale, Y, blend=0.006)
-        for f in (-1, 0, 1):
-            fx = (wr[0] + 0.012 * f * sgn, wr[1] + 0.01, wr[2] + 0.035)
-            sc.add(sd_capsule(wr, fx, 0.006, 0.004), m, Y, blend=0.004)
-            sc.add(sd_cone(0.012, 0.005, 0.001, 0.001), CLAW, Y * T(*fx) * RX(math.pi / 2 + 0.6))
-        # the membrane: a fan from the shoulder to a trailing edge bowed inward (tip → knee), slightly cupped
-        sc.add(sheet([sh, wr, tip], 0.0025), memb, Y)
-        prev = tip
-        for i in range(1, 6):
-            u = i / 5
-            q = [tip[k] + (knee[k] - tip[k]) * u for k in range(3)]
-            bow = 0.09 * math.sin(math.pi * u)
-            q = (q[0] - sgn * bow * 0.9, q[1] + bow * 0.5, q[2] - 0.05 * math.sin(math.pi * u))
-            sc.add(sheet([sh, prev, q], 0.0025), memb, Y)
-            prev = q
-        sc.add(sheet([sh, (0.05 * sgn, B + 0.44, 0.12), wr], 0.0025), memb, Y)
-    # the neck, long and stiff, and the head
-    sway = 0.015 * math.sin(TAU * t)
-    up = 0.06 if win else 0.0
-    npts = bezier((0, B + 0.38, 0.06), (0, B + 0.5, 0.1), (sway, B + 0.62 + up, 0.12), (sway, B + 0.7 + up, 0.19), 7)
-    chain(sc, npts, [0.042 - 0.003 * i for i in range(7)], pale, Y, blend=0.02)
-    shake = 0.35 * math.sin(TAU * 3 * t) if anim == "blocked" else 0.0
-    hd = Y * T(*npts[-1]) * RY(shake) * RX(0.45 - (0.5 if win else 0.0))
-    sc.add(sd_ellipsoid(0.03, 0.04, 0.06), pale, hd * T(0, 0.0, 0.02), blend=0.02)
-    gape = 0.25 if win else 0.0
-    sc.add(sd_cone(0.14, 0.03, 0.003), bone, hd * T(0, 0.004, 0.2) * RX(math.pi / 2), blend=0.01)
-    sc.add(sd_cone(0.13, 0.022, 0.003), bone, hd * T(0, -0.016, 0.06) * RX(gape) * T(0, 0, 0.13) * RX(math.pi / 2 + 0.03), blend=0.006)
-    sc.add(sheet([(0, 0.02, 0.06), (0, 0.035, -0.02), (0, 0.13, -0.09)], 0.004), crest, hd, blend=0.01)    # a blade crest
-    for sgn in (-1, 1):
-        reptile_eye(sc, hd, 0.026 * sgn, 0.014, 0.035, 0.009, sgn, iris("#b0702a"), lid=pale)
+    def tone(pl, pw, n):                   # the texture under the figurines' strong key light
+        return {"albedo": colour(pl) * 0.36}
+    sc.add(sdf, Mat("#806040", rough=0.6, sss=0.2, pattern=tone))
     return sc
 
 
@@ -536,7 +512,7 @@ CAST = {"random": ("Brachiosaure", brachiosaurus), "beginner": ("Parasaurolophus
         "monte_carlo": ("Stégosaure", stegosaurus), "basic_minmax": ("Ankylosaure", ankylosaurus),
         "mcts": ("Tricératops", triceratops), "minmax": ("Pachycéphalosaure", pachycephalosaurus), "features": ("Cœlophysis", coelophysis),
         "mcts_nnue": ("Dilophosaure", dilophosaurus),
-        "nnue193": ("Quetzalcoatlus", quetzalcoatlus), "dev": ("Allosaure", allosaurus), "resnet": ("Spinosaure", spinosaurus),
+        "nnue193": ("Ptéranodon", pteranodon), "dev": ("Allosaure", allosaurus), "resnet": ("Spinosaure", spinosaurus),
         "alphazero": ("Tyrannosaure", tyrannosaurus)}
 DINOS = {"dino_" + k: f for k, (_, f) in CAST.items()}
 NAMES = {"dino_" + k: n for k, (n, _) in CAST.items()}

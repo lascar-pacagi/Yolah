@@ -86,7 +86,7 @@
     {"id": "fig_dino_basic_minmax", "name": "Ankylosaure", "category": "Dinosaures", "art": "fig_dino_basic_minmax"},
     {"id": "fig_dino_minmax", "name": "Pachycéphalosaure", "category": "Dinosaures", "art": "fig_dino_minmax"},
     {"id": "fig_dino_mcts_nnue", "name": "Dilophosaure", "category": "Dinosaures", "art": "fig_dino_mcts_nnue"},
-    {"id": "fig_dino_nnue193", "name": "Quetzalcoatlus", "category": "Dinosaures", "art": "fig_dino_nnue193"},
+    {"id": "fig_dino_nnue193", "name": "Ptéranodon", "category": "Dinosaures", "art": "fig_dino_nnue193"},
     {"id": "fig_dino_features", "name": "Cœlophysis", "category": "Dinosaures", "art": "fig_dino_features"},
     {"id": "fig_dino_resnet", "name": "Spinosaure", "category": "Dinosaures", "art": "fig_dino_resnet"},
     {"id": "fig_dino_dev", "name": "Allosaure", "category": "Dinosaures", "art": "fig_dino_dev"},
