@@ -149,17 +149,30 @@ def theropod(sc, anim, t, m, belly=None, leg=1.0, bulk=1.0, tail=1.0, neck=1.0, 
     sc.add(sd_ellipsoid(0.04 * hs * width, 0.022 * hs, 0.115 * hs * snout), bm, jaw * T(0, -0.012 * hs, 0.1 * hs * snout), blend=0.02)
     if roar > 0.15:
         sc.add(sd_ellipsoid(0.03 * hs * width, 0.03 * hs * roar, 0.1 * hs * snout), MOUTH, hd * T(0, -0.04 * hs, 0.1 * hs * snout) * RX(0.3 * roar))
+    # the snout and the lower jaw are ellipsoids: teeth and nostrils sit ON them (a point at
+    # lateral fraction f of the cross-section at depth z), not at a fixed offset (they floated)
+    sa, sb, sz, sl = 0.044 * hs * width, 0.048 * hs, 0.1 * hs * snout, 0.12 * hs * snout     # snout
+    ja, jb, jy, jl = 0.04 * hs * width, 0.022 * hs, -0.012 * hs, 0.115 * hs * snout          # jaw (its frame)
+
+    def on_ell(a_, b_, zc, l_, z, f, below):
+        k = math.sqrt(max(0.0, 1 - ((z - zc) / l_) ** 2))
+        return f * a_ * k, (-1 if below else 1) * b_ * k * math.sqrt(1 - f * f)
     if teeth:
         n = int(6 * snout)
         for i in range(n):
             z = (0.035 + i * 0.03) * hs
             for sgn in (-1, 1):
-                sc.add(sd_cone(0.02 * hs, 0.006 * hs, 0.001, 0.001), IVORY, hd * T(0.036 * hs * width * sgn, -0.044 * hs, z) * RX(math.pi))
+                x, y = on_ell(sa, sb, sz, sl, z, 0.7, True)
+                sc.add(sd_cone(0.021 * hs, 0.006 * hs, 0.001, 0.001), IVORY, hd * T(x * sgn, y + 0.003 * hs, z) * RX(math.pi))
                 if roar > 0.15:
-                    sc.add(sd_cone(0.016 * hs, 0.005 * hs, 0.001, 0.001), IVORY, jaw * T(0.033 * hs * width * sgn, 0.004 * hs, z + 0.015 * hs))
+                    zj = z + 0.015 * hs
+                    x, y = on_ell(ja, jb, sz, jl, zj, 0.55, False)
+                    sc.add(sd_cone(0.021 * hs, 0.005 * hs, 0.001, 0.001), IVORY, jaw * T(x * sgn, jy + y - 0.002 * hs, zj))
     for sgn in (-1, 1):
         reptile_eye(sc, hd, 0.045 * hs * width * sgn, 0.042 * hs, 0.03 * hs, 0.0105 * hs, sgn, eye or iris("#a8742a"), lid=m)
-        sc.add(sd_ellipsoid(0.004 * hs, 0.0035 * hs, 0.008 * hs), Mat("#1a1414", rough=0.8), hd * T(0.02 * hs * width * sgn, 0.03 * hs, 0.205 * hs * snout))
+        zn = sz + 0.8 * sl
+        x, y = on_ell(sa, sb, sz, sl, zn, 0.45, False)
+        sc.add(sd_ellipsoid(0.004 * hs, 0.0035 * hs, 0.008 * hs), Mat("#1a1414", rough=0.8), hd * T(x * sgn, y, zn))
     return root, hd, nk
 
 
@@ -413,8 +426,8 @@ def pteranodon(anim, t, side):
     pts, col = m.surface_samples(v, PTERA_CELL * 0.5)
     sdf, colour = grid_part(pts, col, PTERA_CELL, 0.9 * PTERA_CELL)
 
-    def tone(pl, pw, n):                   # the texture under the figurines' strong key light
-        return {"albedo": colour(pl) * 0.36}
+    def tone(pl, pw, n):                   # the texture under the figurines' strong key light; its darkest
+        return {"albedo": colour(pl).clamp(min=0) ** 0.8 * 0.32}    # parts (head, beak) lifted: they fall in the folded wing's shadow
     sc.add(sdf, Mat("#806040", rough=0.6, sss=0.2, pattern=tone))
     return sc
 
