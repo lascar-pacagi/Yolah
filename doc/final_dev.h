@@ -2,11 +2,11 @@
 #define FINAL_DEV_H
 
 // =============================================================================
-//  FINAL_DEV (dev_u9) — Version épurée et commentée de MinMaxNNUE_DevPlayer
+//  FINAL_DEV (dev_u9_spsa) — Version épurée et commentée de MinMaxNNUE_DevPlayer
 // =============================================================================
 //
 //  Ce fichier (et son compagnon doc/final_dev.cpp) présente le code exact du
-//  moteur « Minimax NNUE dev » (configuration `dev_u9`) utilisé dans
+//  moteur « Minimax NNUE dev » (configuration `dev_u9_spsa`) utilisé dans
 //  l'application Yolah, débarrassé de la centaine d'options expérimentales
 //  testées et écartées au fil des campagnes A à U (plus de 250 variantes et
 //  des centaines de milliers de parties sur cluster).
@@ -17,7 +17,7 @@
 //    détaillant le « pourquoi » et le « comment » de chaque mécanisme.
 //
 //  ---------------------------------------------------------------------------
-//  Vue d'ensemble des briques actives dans `dev_u9` (et gains Elo mesurés) :
+//  Vue d'ensemble des briques actives dans `dev_u9_spsa` (et gains Elo mesurés) :
 //  ---------------------------------------------------------------------------
 //
 //  1. APPROFONDISSEMENT ITÉRATIF, PVS & FENÊTRES D'ASPIRATION ADAPTATIVES (B, A2)
@@ -26,9 +26,10 @@
 //       (alpha, alpha + 1), re-cherchés à fenêtre pleine uniquement s'ils
 //       battent alpha.
 //     • Fenêtres d'aspiration adaptatives à la racine (à partir de depth = 4) :
-//       demi-largeur δ = max(300, 1.25 × moyenne_glissante(|v_d − v_{d−1}|)).
+//       demi-largeur δ = max(345, 0.92 × moyenne_glissante(|v_d − v_{d−1}|)).
 //       En cas d'échec bas/haut, la fenêtre est recentrée sur la valeur fail-soft
-//       et élargie d'un facteur 1.5 (−22 % de nœuds à profondeur 12).
+//       et élargie d'un facteur 1.34 (−22 % de nœuds à profondeur 12, mesuré
+//       avec 300, 1.25 et 1.5 ; valeurs actuelles : SPSA, voir plus bas).
 //     • Tri des coups à la racine (« root_fix ») : meilleur coup en tête, les
 //       suivants triés par la taille (en nœuds) du sous-arbre qu'il a fallu
 //       explorer pour les réfuter, cumulée sur les tentatives de la profondeur.
@@ -66,18 +67,18 @@
 //       réseau aussi bien pour l'élagage interne qu'aux feuilles (depth == 0).
 //
 //  4. ÉLAGAGE AVANT LA BOUCLE DE COUPS (aux nœuds non-PV uniquement)
-//     • Reverse Futility Pruning (RFP, F1, +76 Elo) à depth ≤ 4 :
-//       si `static_eval − 3000 × depth ≥ beta`, on coupe immédiatement.
-//     • Multi-ProbCut bidirectionnel (MPC, O, +57 Elo à 1 s) à depth ≥ 5 :
-//       recherche la position courante à profondeur réduite `d' = max(1, 0.4 × d)` ;
-//       si elle dépasse `beta + 4000 + 500 × (d − d')` (quand `static_eval ≥ beta`)
+//     • Reverse Futility Pruning (RFP, F1, +76 Elo) à depth ≤ 5 :
+//       si `static_eval − 2609 × depth ≥ beta`, on coupe immédiatement.
+//     • Multi-ProbCut bidirectionnel (MPC, O, +57 Elo à 1 s) à depth ≥ 4 :
+//       recherche la position courante à profondeur réduite `d' = max(1, 0.46 × d)` ;
+//       si elle dépasse `beta + 4054 + 644 × (d − d')` (quand `static_eval ≥ beta`)
 //       ou tombe sous `alpha − margin` (quand `static_eval ≤ alpha`), on coupe.
 //     • Proxy Cut (N, +47 Elo à 0.2 s, +59 Elo à 1 s) à depth ≥ 4 :
 //       à Yolah, le *null move pruning* classique (passer son tour) échoue (−81 Elo)
 //       car le jeu est dominé par le zugzwang (jouer détruit une case de son propre
 //       espace). Le Proxy Cut le remplace par un VRAI coup ordinaire « témoin »
 //       (le meilleur coup ordinaire au tri), cherché à profondeur réduite
-//       `d − 1 − (2 + d / 4)` contre `beta`. Si même ce coup ordinaire tient
+//       `d − 1 − (3 + d / 4)` contre `beta`. Si même ce coup ordinaire tient
 //       `beta`, alors le meilleur coup du nœud tiendra `beta` a fortiori (même en
 //       zugzwang : `valeur(meilleur) ≥ valeur(témoin)` est toujours vrai).
 //
@@ -93,8 +94,8 @@
 //              score(m) = history[us][from][to]
 //                       + cont1[us][prev.to][m.to]         (U4 : +32.6 Elo)
 //                       + (intercepte(prev.to, m.to) ? 2000 : 0) (U7 : +17.0 Elo)
-//                       + (est_killer(m) ? 4000 : 0)       (U7 : +17.7 Elo)
-//                       + 1024 × (couverture(après m) − couverture(avant))
+//                       + (est_killer(m) ? 4667 : 0)       (U7 : +17.7 Elo)
+//                       + 1038 × (couverture(après m) − couverture(avant))
 //                                                      (U19-U22, voir ci-dessous)
 //            La COUVERTURE de notre groupe est le nombre de cases libres que
 //            nos pièces atteignent collectivement en un coup (union de leurs
@@ -107,15 +108,15 @@
 //            à TOUTES les profondeurs : bien moins cher que l'inondation
 //            Voronoï (8 calculs de rayons par coup), il paie même près des
 //            feuilles (seuil 2 ou 3 : ≈ 0 Elo ; ajouté EN PLUS de l'influence : ≈ 0).
-//            Noter que dans `dev_u9` (comme dans `dev_u8`), les coups tueurs (`killer1`, `killer2`) ne
+//            Noter que dans `dev_u9_spsa` (comme dans `dev_u8`), les coups tueurs (`killer1`, `killer2`) ne
 //            sont PAS placés brutalement avant tous les coups ordinaires : ils
-//            reçoivent un bonus de +4000 sur leur score d'historique, ce qui
+//            reçoivent un bonus de +4667 sur leur score d'historique, ce qui
 //            permet à un coup ayant un fort historique de continuation (`cont1`)
 //            et d'interception de passer devant un killer hors contexte.
 //
 //  6. ÉLAGAGE PAR COUP, POCHES SCELLÉES & RÉDUCTIONS LMR (E, F3, U5, U7)
-//     • Late Move Pruning (LMP, F3, +35 Elo) à depth ≤ 3 (non-PV) :
-//       au-delà de `4 + depth²` coups essayés (et si un coup non perdant a déjà
+//     • Late Move Pruning (LMP, F3, +35 Elo) à depth ≤ 4 (non-PV) :
+//       au-delà de `2 + depth²` coups essayés (et si un coup non perdant a déjà
 //       été trouvé), on coupe la fin de la liste.
 //     • Poches scellées comme réserves de tempos (`reserve`, U5, +10.3 Elo, EXACT) :
 //       si un groupe de nos pièces est enfermé dans une composante connexe privée
@@ -124,18 +125,37 @@
 //       exactement la récolte maximale `h` de la poche (`harvest_exact`), et on
 //       ne garde dans la boucle qu'UN SEUL coup qui préserve `h − 1` coups futurs.
 //     • Late Move Reductions (LMR, E + U7) pour `depth ≥ 3` et `i ≥ 1` :
-//       réduction de base `r = 1.25 + ln(depth) × ln(i + 1) / 1.5`, modulée par :
-//         − 1 pli aux nœuds PV
-//         − 1 pli pour le contre-coup (`SCORE_COUNTER`)
-//         − history[us][from][to] / 8192 plis (historique principal seul)
+//       réduction de base `r = 1.1158 + ln(depth) × ln(i + 1) / 1.4152`, modulée par :
+//         − 1058/1024 pli aux nœuds PV
+//         − 829/1024 pli pour le contre-coup (`SCORE_COUNTER`)
+//         − history[us][from][to] / 6945 plis (historique principal seul)
 //         − 1 pli si le coup intercepte le dernier coup adverse (`intercept_lmr`)
 //         − 1 pli si ce couple (prev.to → m.to) a souvent contredit sa réduction
-//           par le passé (`lmrh[us][prev.to][m.to] ≥ 4000`, U7 +12.3 Elo).
+//           par le passé (`lmrh[us][prev.to][m.to] ≥ 4453`, U7 +12.3 Elo).
 //
 //  7. PARALLÉLISME LAZY SMP (L)
 //     • `nb_threads` travailleurs lancent l'approfondissement itératif sur la
 //       même racine en partageant sans verrou `SearchTable` et `eval_cache`, mais
 //       avec chacun son `Worker` privé (historiques, killers, fenêtres).
+//
+//  8. RÉGLAGE DES CONSTANTES PAR SPSA (U23)
+//     • Les 29 constantes numériques de la recherche (fenêtres d'aspiration,
+//       LMR, RFP, MPC, Proxy Cut, LMP, bonus d'ordonnancement, historiques,
+//       correction) ont été réglées ENSEMBLE par SPSA, comme le fait Fishtest
+//       pour Stockfish (nnue/spsa.py) : à chaque lot, toutes sont décalées d'un
+//       ±c aléatoire, θ+ joue θ− sur des ouvertures équilibrées, et chaque
+//       constante se déplace vers le côté qui a gagné. 50 004 paires de
+//       parties (100 008 parties) à 0.2 s/coup.
+//     • Gain contre dev_u9 (mêmes heuristiques, constantes réglées à la main) :
+//       +14.4 Elo [+4.2, +24.7] à 0.2 s (2000 parties) et +15.1 Elo
+//       [+2.3, +27.9] à 1 s (1016 parties) : le réglage tient à une cadence
+//       5 fois plus longue que celle où il a été fait.
+//     • Les changements les plus nets : LMP plus agressif (2 + d² coups au lieu
+//       de 4 + d², jusqu'à depth 4), Proxy Cut plus réduit (R = 3 + d/4 au lieu
+//       de 2 + d/4), MPC dès depth 4 avec une marge plus large, RFP jusqu'à
+//       depth 5 avec une marge plus faible, fenêtres d'aspiration plus serrées.
+//       Le poids de la couverture (1038) reste au réglage trouvé à la main.
+//       Les anciennes valeurs sont rappelées entre crochets dans les constantes.
 // =============================================================================
 
 #include "player.h"
@@ -186,35 +206,41 @@ private:
     static constexpr int WIN      = heuristic::MAX_VALUE;   // 30 000
     static constexpr int EVAL_NONE = -32768;
 
-    // ── Constantes des heuristiques de `dev_u9` ──────────────────────────────
+    // ── Constantes des heuristiques de `dev_u9_spsa` ─────────────────────────
+    // Les valeurs viennent du SPSA de dev_u9 (U23 : 29 paramètres, 100 008 parties
+    // à 0,2 s ; +14,4 Elo à 0,2 s, +15,1 à 1 s contre dev_u9). Entre crochets :
+    // la valeur avant le SPSA.
     // 1. Fenêtres d'aspiration adaptatives (B, A2)
-    static constexpr int    ASPIRATION_MIN_DELTA   = 300;
-    static constexpr double ASPIRATION_K           = 1.25;
-    static constexpr double ASPIRATION_GROW        = 1.5;
+    static constexpr int    ASPIRATION_MIN_DELTA   = 345;     // [300]
+    static constexpr double ASPIRATION_K           = 0.9187;  // [1.25]
+    static constexpr double ASPIRATION_GROW        = 1.3372;  // [1.5]
     static constexpr int    ASPIRATION_STATS_DEPTH = 4;
 
     // 2. Late Move Reductions logarithmiques (E, U7)
-    static constexpr double LMR_BASE      = 1.25;
-    static constexpr double LMR_DIVISOR   = 1.5;
-    static constexpr int    LMRH_THRESHOLD = 4000;   // seuil d'historique d'erreurs LMR
+    static constexpr double LMR_BASE      = 1.1158;  // [1.25]
+    static constexpr double LMR_DIVISOR   = 1.4152;  // [1.5]
+    static constexpr int    LMRH_THRESHOLD = 4453;  // seuil d'historique d'erreurs LMR [4000]
+    static constexpr int    LMR_PV         = 1058;  // −1058/1024 pli en nœud PV [1024]
+    static constexpr int    LMR_SPECIAL    = 829;   // −829/1024 pli pour le contre-coup [1024]
+    static constexpr int    LMR_HIST_DIV   = 6945;  // − hist / 6945 plis [8192]
 
     // 3. Reverse Futility Pruning (F1)
-    static constexpr int RFP_DEPTH  = 4;
-    static constexpr int RFP_MARGIN = 3000;          // par pli de profondeur
+    static constexpr int RFP_DEPTH  = 5;              // [4]
+    static constexpr int RFP_MARGIN = 2609;           // par pli de profondeur [3000]
 
     // 4. Multi-ProbCut bidirectionnel (O)
-    static constexpr int MPC_DEPTH          = 5;
-    static constexpr int MPC_RATIO          = 40;    // d' = max(1, depth * 40 / 100)
-    static constexpr int MPC_MARGIN         = 4000;
-    static constexpr int MPC_MARGIN_PER_PLY = 500;
+    static constexpr int MPC_DEPTH          = 4;     // [5]
+    static constexpr int MPC_RATIO          = 46;    // d' = max(1, depth * 46 / 100) [40]
+    static constexpr int MPC_MARGIN         = 4054;  // [4000]
+    static constexpr int MPC_MARGIN_PER_PLY = 644;   // [500]
 
     // 5. Proxy Cut (N)
     static constexpr int PROXY_DEPTH     = 4;
-    static constexpr int PROXY_REDUCTION = 3;        // R = 3 + depth / 4 - 1
+    static constexpr int PROXY_REDUCTION = 4;        // R = 4 + depth / 4 - 1 [3]
 
     // 6. Late Move Pruning (F3)
-    static constexpr int LMP_DEPTH = 3;
-    static constexpr int LMP_MOVES = 4;              // garde 4 + depth² coups
+    static constexpr int LMP_DEPTH = 4;                // [3]
+    static constexpr int LMP_MOVES = 2;              // garde 2 + depth² coups [4]
 
     // 7. Poches scellées comme réserves de tempos (U5)
     static constexpr int RESERVE_MAX_SQUARES = 20;   // taille max d'une poche privée
@@ -222,10 +248,13 @@ private:
 
     // 8. Ordonnancement des coups et tables d'historique (C, J, U4, U7)
     static constexpr int HISTORY_MAX      = 16384;
-    static constexpr int KILLER_BONUS     = 4000;    // killer_mode = 1 : bonus sur hist(m)
+    static constexpr int KILLER_BONUS     = 4667;    // killer_mode = 1 : bonus sur hist(m) [4000]
+    static constexpr int HIST_BONUS_A     = 16;      // bonus d'historique à la coupure :
+    static constexpr int HIST_BONUS_B     = 34;      //   min(A·d² + B·d, CAP) [16, 32, 2000]
+    static constexpr int HIST_BONUS_CAP   = 2166;
     static constexpr int INTERCEPT_BONUS  = 2000;    // coup sur rayon ou voisin 3×3 de prev.to
     static constexpr int COVER_DEPTH      = 1;       // couverture à toutes les profondeurs (U20)
-    static constexpr int COVER_WEIGHT     = 1024;    // poids de (couverture après − avant) (U20-U22)
+    static constexpr int COVER_WEIGHT     = 1038;    // poids de (couverture après − avant) (U20-U22) [1024]
 
     // Scores spéciaux de tri (au-dessus de tout score d'historique)
     static constexpr int SCORE_TT           = 1 << 30;
@@ -236,7 +265,7 @@ private:
     // 9. Historique de correction de l'évaluation statique (U4/U6)
     static constexpr int CORR_TABLE_SIZE = 16384;
     static constexpr int CORR_SCALE      = 8;        // bonus = (best - static_eval) * depth / 8
-    static constexpr int CORR_MAX        = 8000;
+    static constexpr int CORR_MAX        = 7917;     // [8000]
 
     // 10. Cache d'évaluations des feuilles (D)
     static constexpr int EVAL_CACHE_BITS = 20;       // 2^20 = 1 048 576 entrées (8 Mo)

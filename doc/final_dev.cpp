@@ -1,9 +1,9 @@
 // =============================================================================
-//  FINAL_DEV (dev_u9) — Implémentation épurée et commentée du joueur Minimax NNUE
+//  FINAL_DEV (dev_u9_spsa) — Implémentation épurée et commentée du joueur Minimax NNUE
 // =============================================================================
 //
 //  Ce fichier rassemble uniquement le code effectivement exécuté par la
-//  configuration `dev_u9` (utilisée dans l'application Yolah pour « Minimax
+//  configuration `dev_u9_spsa` (utilisée dans l'application Yolah pour « Minimax
 //  NNUE dev » et pour la barre d'analyse).
 //
 //  Plan de lecture du fichier :
@@ -76,9 +76,9 @@ FinalDevPlayer::FinalDevPlayer(uint64_t microseconds,
     eval_cache  = std::vector<std::atomic<uint64_t>>(size_t(1) << EVAL_CACHE_BITS);
 
     // 4. Précalcul de la table logarithmique des Late Move Reductions (en 1/1024 de pli) :
-    //        r(d, n) = 1.25 + ln(d) × ln(n) / 1.5
+    //        r(d, n) = 1.1158 + ln(d) × ln(n) / 1.4152
     //    Stocker r en millièmes de pli (× 1024) permet d'appliquer des ajustements
-    //    continus (comme −hist / 8192) avant d'arrondir au nombre entier de plis.
+    //    continus (comme −hist / 6945) avant d'arrondir au nombre entier de plis.
     for (int d = 1; d < 64; d++) {
         for (int n = 1; n < Yolah::MAX_NB_MOVES; n++) {
             lmr_table[d][n] = int(1024 * (LMR_BASE + std::log(d) * std::log(n) / LMR_DIVISOR));
@@ -116,7 +116,7 @@ FinalDevPlayer::Result FinalDevPlayer::search(const Yolah& yolah, uint8_t max_de
     // Ce qui a été appris aux coups précédents reste pertinent (les positions
     // sont proches), mais on divise par 2 l'historique principal pour que les
     // nouvelles coupures pèsent davantage que les anciennes.
-    // (Note : dans `dev_u9`, `cont_age = false` : les tables contextuelles
+    // (Note : dans `dev_u9_spsa`, `cont_age = false` : les tables contextuelles
     // `cont1` et `lmrh` ne sont pas divisées par 2 à chaque coup.)
     for (auto& w : workers) {
         for (auto& by_from : w->history)
@@ -220,16 +220,16 @@ void FinalDevPlayer::clear_table(bool keep_ordering) {
 //
 //    Or, avec une demi-largeur fixe δ = 300, la moitié des itérations échouaient
 //    (la variation médiane d'une profondeur à la suivante vaut ~630). Dans
-//    `dev_u9`, δ s'adapte à la volatilité réelle de la partie :
+//    `dev_u9_spsa`, δ s'adapte à la volatilité réelle de la partie :
 //
-//        δ = max(300, 1.25 × moyenne_glissante(|v_d − v_{d−1}|))
+//        δ = max(345, 0.9187 × moyenne_glissante(|v_d − v_{d−1}|))
 //
 //    Lorsqu'une recherche échoue bas (v' ≤ α) ou haut (v' ≥ β) :
 //      • On recentre le bord dépassé directement autour de la valeur fail-soft `v'`
 //        renvoyée par `root_search` (α = v' − δ en fail-low, β = v' + δ en fail-high).
 //      • En cas de fail-low, on abaisse aussi β à (α + β) / 2 pour éviter un
 //        rebond trop large.
-//      • On multiplie δ par ASPIRATION_GROW = 1.5 avant de relancer.
+//      • On multiplie δ par ASPIRATION_GROW = 1.3372 avant de relancer.
 // =============================================================================
 
 void FinalDevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t max_depth) {
@@ -412,18 +412,18 @@ int FinalDevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash,
 // Calcule la réduction de profondeur de base (en plis) du i-ème coup (i ≥ 0) :
 //   • Pas de réduction à depth < 3 ni sur le tout premier coup (i == 0).
 //   • Formule de base (en 1/1024 de pli) :
-//         r = 1.25 + ln(depth) × ln(i + 1) / 1.5
+//         r = LMR_BASE + ln(depth) × ln(i + 1) / LMR_DIVISOR   (1.1158, 1.4152)
 //   • Ajustements :
-//         − 1 pli  si c'est un nœud PV (on cherche la valeur exacte)
-//         − 1 pli  si c'est le contre-coup (`special == true`)
-//         − hist / 8192 plis (entre −2 et +2 plis selon l'historique principal)
+//         − 1058/1024 pli  si c'est un nœud PV (on cherche la valeur exacte)
+//         − 829/1024 pli   si c'est le contre-coup (`special == true`)
+//         − hist / 6945 plis (entre −2,4 et +2,4 plis selon l'historique principal)
 //   • Borné dans [0, depth − 2] pour que la recherche réduite garde au moins 1 pli.
 int FinalDevPlayer::late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const {
     if (depth < 3 || i == 0) return 0;
     int r = lmr_table[std::min(depth, 63)][std::min<size_t>(i + 1, Yolah::MAX_NB_MOVES - 1)];
-    if (pv_node) r -= 1024;
-    if (special) r -= 1024;
-    r -= hist * 1024 / 8192;
+    if (pv_node) r -= LMR_PV;
+    if (special) r -= LMR_SPECIAL;
+    r -= hist * 1024 / LMR_HIST_DIV;
     return std::clamp(r / 1024, 0, depth - 2);
 }
 
@@ -638,20 +638,20 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     }
 
     // ── F1. Reverse Futility Pruning (RFP, +76 Elo) ──────────────────────────
-    // Aux faibles profondeurs (depth ≤ 4), si l'évaluation statique dépasse
-    // déjà `beta` d'une marge de sécurité de `3000 × depth`, on coupe sans
+    // Aux faibles profondeurs (depth ≤ 5), si l'évaluation statique dépasse
+    // déjà `beta` d'une marge de sécurité de `2609 × depth`, on coupe sans
     // générer les coups.
     if (prunable && depth <= RFP_DEPTH && static_eval - RFP_MARGIN * depth >= beta) {
         return static_eval;
     }
 
     // ── O. Multi-ProbCut bidirectionnel (MPC, +57 Elo à 1 s) ─────────────────
-    // À `depth >= 5`, on effectue une recherche préliminaire de la position
-    // courante à une profondeur réduite `d2 = max(1, 0.40 × depth)` :
+    // À `depth >= 4`, on effectue une recherche préliminaire de la position
+    // courante à une profondeur réduite `d2 = max(1, 0.46 × depth)` :
     //   • Coupe haute : si `static_eval >= beta` et que la recherche à profondeur `d2`
-    //     dépasse `beta + 4000 + 500 × (depth − d2)`, on coupe à `beta`.
+    //     dépasse `beta + 4054 + 644 × (depth − d2)`, on coupe à `beta`.
     //   • Coupe basse : si `static_eval <= alpha` et que la recherche à profondeur `d2`
-    //     reste sous `alpha − (4000 + 500 × (depth − d2))`, on échoue bas à `alpha`.
+    //     reste sous `alpha − (4054 + 644 × (depth − d2))`, on échoue bas à `alpha`.
     if (prunable && depth >= MPC_DEPTH) {
         const int d2     = std::max(1, depth * MPC_RATIO / 100);
         const int margin = MPC_MARGIN + MPC_MARGIN_PER_PLY * (depth - d2);
@@ -698,7 +698,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     //   du zugzwang :
     //       valeur(meilleur_coup) ≥ valeur(m)
     //   Donc si même un coup ordinaire `m` (ni le coup de table, ni le contre-coup),
-    //   cherché à profondeur réduite `d = depth − 1 − (2 + depth / 4)`, atteint
+    //   cherché à profondeur réduite `d = depth − 1 − (3 + depth / 4)`, atteint
     //   `beta`, le meilleur coup du nœud atteindra `beta` a fortiori !
     if (prunable && depth >= PROXY_DEPTH && static_eval >= beta) {
         if (!generated) {
@@ -835,9 +835,9 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
         }
 
         // F3. Late Move Pruning (LMP, +35 Elo) :
-        // Aux nœuds non-PV peu profonds (depth ≤ 3), dès qu'au moins un coup
+        // Aux nœuds non-PV peu profonds (depth ≤ 4), dès qu'au moins un coup
         // non perdant (`best > -WIN`) a été trouvé et qu'on a déjà testé
-        // `4 + depth²` coups (soit 5, 8 ou 13 coups aux profondeurs 1, 2, 3),
+        // `2 + depth²` coups (soit 3, 6, 11 ou 18 coups aux profondeurs 1 à 4),
         // on élague le reste de la liste.
         if (prunable && depth <= LMP_DEPTH && i >= size_t(LMP_MOVES + depth * depth) && best > -WIN) {
             break;
@@ -881,7 +881,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
         //      case adjacente (3×3) à la pièce adverse qui vient de jouer (`q1.to_sq()`),
         //      on réduit d'un pli de moins (c'est un coup tactique d'obstruction directe).
         //   2. `lmrh` : si la paire `(q1.to_sq(), m.to_sq())` a souvent mis en défaut
-        //      la réduction LMR par le passé (`lmrh >= 4000`), on réduit aussi d'un pli de moins.
+        //      la réduction LMR par le passé (`lmrh >= 4453`), on réduit aussi d'un pli de moins.
         if (r > 0 && ply_now > 0 && s.played[ply_now - 1] != Move::none()) {
             const Move q1 = s.played[ply_now - 1];
             const uint64_t intercept_zone = attacks_bb(q1.to_sq(), yolah.occupied_squares())
@@ -930,7 +930,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
                     //    • Le coup `m` qui a provoqué la coupure bêta reçoit `+bonus`.
                     //    • Tous les coups `moves[0..i-1]` essayés avant lui sans couper
                     //      reçoivent un malus `-bonus`.
-                    const int bonus = std::min(16 * depth * depth + 32 * depth, 2000);
+                    const int bonus = std::min(HIST_BONUS_A * depth * depth + HIST_BONUS_B * depth, HIST_BONUS_CAP);
                     update_history(s, player, m, bonus);
                     for (size_t k = 0; k < i; k++) {
                         update_history(s, player, moves[k], -bonus);
@@ -994,7 +994,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 //         d'où venait la pièce adverse !
 //       • Contrairement à `history`, `cont1` n'est PAS divisé par 2 entre deux coups
 //         de la partie (`cont_age = false`), et il intervient uniquement dans le tri
-//         des coups (`score_moves`), pas dans le terme `-hist / 8192` de LMR
+//         des coups (`score_moves`), pas dans le terme `-hist / 6945` de LMR
 //         (`cont_lmr = false`).
 //
 //    2. Le bonus d'interception (`INTERCEPT_BONUS = +2000`, +17.0 Elo) :
@@ -1003,18 +1003,18 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 //         sur l'un des 8 rayons partant de `p1.to` ou sur l'une des 8 cases adjacentes
 //         à `p1.to`.
 //
-//    3. Les coups tueurs en bonus (`KILLER_BONUS = +4000`, `killer_mode = 1`, +17.7 Elo) :
+//    3. Les coups tueurs en bonus (`KILLER_BONUS = +4667` après SPSA, `killer_mode = 1`, +17.7 Elo) :
 //       • Au lieu de trier `killer1` et `killer2` avec un score fixe géant devant tous
-//         les coups ordinaires, on leur donne `hist(m) + 4000` (où `hist(m)` inclut
+//         les coups ordinaires, on leur donne `hist(m) + 4667` (où `hist(m)` inclut
 //         `history + cont1 + intercept`). Ainsi, un coup ordinaire doté d'une forte
 //         continuation (`cont1`) et d'une interception peut dépasser un killer issu
 //         d'une autre branche où l'adversaire avait joué ailleurs.
 //
-//    4. La couverture de notre groupe (`COVER_WEIGHT = 1024`, à toutes les profondeurs,
+//    4. La couverture de notre groupe (`COVER_WEIGHT = 1038` après SPSA, à toutes les profondeurs,
 //       U19-U22 : +17.9 Elo à 0.2 s, +6.9 Elo à 1 s contre dev_u8) :
 //       • `coverage(mine, occupied)` = les cases LIBRES atteintes en un coup par
 //         au moins une de nos pièces (union des rayons de dame `attacks_bb`).
-//       • Chaque coup ordinaire reçoit `1024 × (|C_après| − |C_avant|)` : après m,
+//       • Chaque coup ordinaire reçoit `1038 × (|C_après| − |C_avant|)` : après m,
 //         la pièce part de `from` (qui devient un trou, donc reste occupée) et
 //         arrive en `to` (qui n'est plus libre). Les pièces adverses ne comptent
 //         que comme obstacles : ce n'est pas un territoire disputé, c'est
@@ -1060,7 +1060,7 @@ void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_mo
             scores[i] = SCORE_TT;
         } else if (kil) {
             // `killer_mode = 1` : les killers restent dans la catégorie des coups
-            // ordinaires (< SCORE_ARTICULATION) avec un bonus de +4000 sur `hist(m)`
+            // ordinaires (< SCORE_ARTICULATION) avec un bonus de +4667 (KILLER_BONUS) sur `hist(m)`
             // (testé AVANT le contre-coup : un coup à la fois tueur et contre-coup
             // est traité en tueur, comme dans le joueur).
             scores[i] = std::min(hist(m) + KILLER_BONUS, SCORE_ARTICULATION - 1);
@@ -1216,12 +1216,12 @@ std::vector<Move> FinalDevPlayer::principal_variation(Yolah yolah, int max_len) 
 }
 
 std::string FinalDevPlayer::info() {
-    return "final dev player (dev_u9, " + std::to_string(nb_threads) + " threads)";
+    return "final dev player (dev_u9_spsa, " + std::to_string(nb_threads) + " threads)";
 }
 
 json FinalDevPlayer::config() {
     json j;
-    j["name"]         = "FinalDevPlayer (dev_u9)";
+    j["name"]         = "FinalDevPlayer (dev_u9_spsa)";
     j["microseconds"] = thinking_time;
     j["tt size"]      = tt_size_mb;
     j["nb threads"]   = nb_threads;
