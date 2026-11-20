@@ -1,0 +1,10 @@
+# Placement of the app's two pre-ResNet networks (2026-11-20: the roster now uses them):
+# the new players against their rated neighbours of the app tournament, same settings
+# (TIME_US, THREADS); their app Elo = the neighbours' ratings + the offsets found here.
+#   sbatch --export=ALL,TOURNAMENT_DIR=$HOME/TournamentOldNets,PLAYERS=/Yolah/config/app_tournament/players_old_nets.txt,THREADS=4,TIME_US=1000000 nnue/tournament.sh
+minmax.cfg
+mcts_nnue.cfg
+features.cfg
+nnue193.cfg
+nnue193_orig.cfg
+features_plain.cfg

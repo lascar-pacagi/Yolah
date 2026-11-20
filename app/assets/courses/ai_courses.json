@@ -256,7 +256,7 @@
         { "h": "Les entrées" },
         { "p": "La position est donnée par 193 entrées valant 0 ou 1 : 64 pour les cases des pions noirs, 64 pour les pions blancs, 64 pour les trous, et 1 pour le camp au trait. Sur 193, une vingtaine seulement valent 1." },
         { "h": "L'astuce : la première couche est mise à jour, pas recalculée" },
-        { "p": "La première couche (193 entrées vers 1024 neurones) est de loin la plus grosse. Son résultat, avant activation, est la somme des colonnes de poids des entrées allumées : on l'appelle l'accumulateur. Un coup n'allume ou n'éteint que trois entrées (le pion part, le pion arrive, un trou apparaît) : on met à jour l'accumulateur avec trois colonnes au lieu de tout recalculer. Les couches suivantes sont minuscules (1024 → 64 → 32 → 1)." },
+        { "p": "La première couche (193 entrées vers 1024 neurones) est de loin la plus grosse. Son résultat, avant activation, est la somme des colonnes de poids des entrées allumées : on l'appelle l'accumulateur. Un coup n'allume ou n'éteint que trois entrées (le pion part, le pion arrive, un trou apparaît) : on met à jour l'accumulateur avec trois colonnes au lieu de tout recalculer. Les couches suivantes sont minuscules (1024 → 64 → 32 → 3)." },
         { "anim": "nnue193", "height": 380, "caption": "Les trois grilles sont les entrées. Quand un coup est joué, seules les cases qui changent (en vert et en rouge) modifient l'accumulateur. Ensuite, quelques petites couches donnent la valeur." },
         { "code": [
           "// au début de la recherche, une seule fois",
@@ -269,10 +269,11 @@
           "h₁ ← clamp(acc, 0, 1)",
           "h₂ ← clamp(W₂ · h₁ + b₂, 0, 1)",
           "h₃ ← clamp(W₃ · h₂ + b₃, 0, 1)",
-          "v  ← W₄ · h₃ + b₄"
+          "(p_noirs, p_nul, p_blancs) ← softmax(W₄ · h₃ + b₄)",
+          "v  ← p_trait − p_adversaire          // une valeur entre −1 et 1"
         ] },
         { "h": "Son histoire" },
-        { "p": "Le premier NNUE du projet (octobre 2024) apprenait le résultat des parties du bon minimax et prédisait victoire, nul ou défaite. Celui de l'application garde ses 193 entrées, mais il a été réappris en juillet 2026 par distillation du ResNet : « ancien » désigne le format du réseau, remplacé depuis par le NNUE du dev, pas l'âge de ses poids." },
+        { "p": "C'est le premier NNUE du projet, appris en octobre 2024 sur les parties du bon minimax contre lui-même : pour chaque position, il apprend qui a gagné la partie d'où elle vient. Il ne donne donc pas une valeur, mais trois probabilités : les Noirs gagnent, nul, les Blancs gagnent. C'est le même réseau que celui du MCTS NNUE. Il n'a jamais vu le ResNet, qui n'existait pas encore : les réseaux distillés ne sont venus qu'en 2026, avec le NNUE du dev." },
         { "tip": "Dans la recherche, chaque nœud fait une mise à jour en descendant et l'annule en remontant : l'accumulateur suit la position comme une pile, en quelques dizaines de nanosecondes par coup avec les instructions vectorielles (AVX2)." }
       ]
     },
@@ -314,7 +315,7 @@
       "id": "features",
       "title": "Un réseau qui lit des caractéristiques",
       "blocks": [
-        { "p": "Au lieu des cases brutes, ce réseau reçoit 119 nombres calculés sur la position, comme l'heuristique du minimax basique, mais en bien plus grand nombre : territoire de chaque camp, mobilité, cases atteintes en premier, zones isolées, pions enfermés, etc. Le réseau (119 → 256 → 64 → 1, en entiers 16 bits) apprend lui-même comment les combiner, par distillation." },
+        { "p": "Au lieu des cases brutes, ce réseau reçoit 119 nombres calculés sur la position, comme l'heuristique du minimax basique, mais en bien plus grand nombre : territoire de chaque camp, mobilité, cases atteintes en premier, zones isolées, pions enfermés, etc. Le réseau (119 → 256 → 64 → 1, en entiers 16 bits) apprend lui-même comment les combiner, à partir des résultats des parties." },
         { "anim": "features", "height": 340, "caption": "Exemple de caractéristique : les deux camps s'étendent en même temps, pas à pas, sur les cases libres. Une case revient à celui qui l'atteint le premier. Le nombre de cases de chaque camp entre dans le vecteur de caractéristiques." },
         { "code": [
           "fonction évaluation(position)",
@@ -328,7 +329,7 @@
           "Résultat : à peu près la même force que le NNUE ancien. Le minimax NNUE dev combine les deux idées : les cases brutes, plus quelques caractéristiques d'espace."
         ] },
         { "h": "Son histoire" },
-        { "p": "Le réseau de features est né en mars 2026 : les caractéristiques de toutes les positions des parties du minimax NNUE ont été calculées sur le cluster (jusqu'à 500 millions d'exemples). D'avril à mai 2026, de nouvelles caractéristiques ont été cherchées, certaines proposées par un modèle de langage (Qwen) dans une boucle qui gardait celles qui aidaient le réseau. Le réseau de l'application a ensuite été distillé du ResNet, comme le NNUE ancien, en juillet 2026." }
+        { "p": "Le réseau de features est né en mars 2026 : les caractéristiques de toutes les positions des parties du minimax NNUE ont été calculées sur le cluster (jusqu'à 500 millions d'exemples). D'avril à mai 2026, de nouvelles caractéristiques ont été cherchées, certaines proposées par un modèle de langage (Qwen) dans une boucle qui gardait celles qui aidaient le réseau. Celui de l'application a appris sur les résultats des parties : il n'a jamais vu le ResNet." }
       ]
     },
     {
@@ -583,7 +584,7 @@
           "list": [
             "Mars-avril 2026 : le réseau de features, qui lit des caractéristiques calculées au lieu des cases. Certaines caractéristiques ont été proposées par un modèle de langage (Qwen) dans une boucle automatique ; une entrée « victoire sûre » a été ajoutée.",
             "Mai 2026 : le ResNet, un réseau convolutif résiduel à la AlphaZero (30 blocs de 256 filtres, une tête valeur et une tête coups), appris de façon supervisée sur les parties du minimax NNUE, sur plusieurs GPU.",
-            "Juillet 2026 : la distillation. Le ResNet, trop lent pour un minimax, devient le maître : il étiquette des centaines de millions de positions, et deux petits réseaux rapides apprennent à l'imiter. Ce sont eux qui jouent dans l'application : Minimax NNUE (ancien), avec 193 entrées, et Minimax Features, avec 119 caractéristiques.",
+            "Juillet 2026 : la distillation. Le ResNet, trop lent pour un minimax, devient le maître : il étiquette des centaines de millions de positions, et deux petits réseaux rapides apprennent à l'imiter. Ces élèves ont servi d'essais : dans l'application, Minimax NNUE (ancien) et Minimax Features gardent leurs réseaux d'avant le ResNet, appris sur les résultats des parties.",
             "Septembre 2026 : AlphaZero part du ResNet et s'améliore en jouant contre lui-même, avec une recherche à la manière de KataGo, sur les GPU du cluster.",
             "Octobre 2026 : le réseau d'AlphaZero devient le maître à son tour. Il étiquette environ un milliard de positions, et le NNUE vu du camp au trait du Minimax NNUE dev en est distillé. La recherche du dev est retravaillée étape par étape, chaque idée mesurée sur des milliers de parties.",
             "Novembre 2026 : la boucle de distillation. Les parties du dev sont étiquetées, elles améliorent le ResNet, qui enseigne le NNUE suivant. En fin de partie (22 cases libres ou moins), la cible devient le résultat exact, plus fiable que le maître.",
@@ -627,8 +628,8 @@
     "basic_minmax": ["minimax", "alphabeta", "heuristic", "cem", "depth", "lineage"],
     "minmax": ["minimax", "alphabeta", "heuristic", "minmax_search", "lineage"],
     "mcts_nnue": ["mcts", "uct", "mcts_nnue", "lineage"],
-    "nnue193": ["minimax", "alphabeta", "modern_search", "nnue193", "quantization", "distill", "lineage"],
-    "features": ["minimax", "alphabeta", "modern_search", "features", "distill", "lineage"],
+    "nnue193": ["minimax", "alphabeta", "modern_search", "nnue193", "quantization", "lineage"],
+    "features": ["minimax", "alphabeta", "modern_search", "features", "lineage"],
     "dev": ["minimax", "alphabeta", "modern_search", "dev_search", "dev_endgame", "nnue_persp", "quantization", "distill", "lineage"],
     "resnet": ["mcts", "uct", "resnet", "puct", "supervised", "lineage"],
     "alphazero": ["mcts", "uct", "resnet", "puct", "selfplay", "lineage"]
