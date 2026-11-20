@@ -52,9 +52,9 @@
       "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
       "description": "Minimax avec approfondissement itératif, table de transposition et réductions ; évalue les positions avec le premier réseau NNUE du projet (193 entrées, appris en octobre 2024 sur les résultats des parties du minimax : les Noirs gagnent, nul, les Blancs gagnent), calculé en entiers 8 bits." },
     { "id": "dev", "name": "Minimax NNUE dev", "family": "minimax optimisé + NNUE perspective", "elo": 3570, "sprite": "fig_sentinel",
-      "config": "search_study/dev_u8.cfg", "overrides": { "tt size": 128, "nb threads": 4 },
+      "config": "search_study/dev_u9_spsa.cfg", "overrides": { "tt size": 128, "nb threads": 4 },
       "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
-      "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, réductions, élagage, solveur de fin de partie, et un réseau NNUE vu du camp au trait (une première couche par phase, 8 têtes de phase, caractéristiques d'espace). Il ordonne ses coups selon la réponse au dernier coup adverse (historique de continuation, interception) et compte les poches qu'il est seul à pouvoir remplir comme des réserves de coups." },
+      "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, réductions, élagage, solveur de fin de partie, et un réseau NNUE vu du camp au trait (une première couche par phase, 8 têtes de phase, caractéristiques d'espace). Il ordonne ses coups selon la réponse au dernier coup adverse (historique de continuation, interception) et selon l'espace que ses pièces atteignent ensemble, et compte les poches qu'il est seul à pouvoir remplir comme des réserves de coups. Ses constantes de recherche ont été réglées par SPSA, sur 100 000 parties contre lui-même." },
     { "id": "resnet", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif", "elo": 3600, "sprite": "fig_android",
       "config": "az_vs_nnue/resnet_supervised.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "batch size", "label": "Positions par lot", "values": [8, 16, 32, 64, 128], "help": "évaluées ensemble par le réseau" } ],
       "description": "Recherche Monte Carlo guidée par un réseau convolutif résiduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Sur GPU avec libtorch ; sur CPU sinon, bien plus lent, donc plus faible à temps égal. Il cherche d'abord la victoire (voir MCTS), mais quand sa recherche voit la fin de la partie, il préfère aussi gagner par plus de points.",
@@ -67,5 +67,5 @@
       "torch overrides": { "backend": "torch", "weights": "models/az_00271360.ts", "score utility": 0.05, "score scale": 10, "nb threads": 16, "batch size": 64 } }
   ],
   // The engine behind the evaluation bar, the hint and the principal variation.
-  "analysis": { "config": "search_study/dev_u8.cfg", "overrides": { "tt size": 64 } }
+  "analysis": { "config": "search_study/dev_u9_spsa.cfg", "overrides": { "tt size": 64 } }
 }
