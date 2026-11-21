@@ -524,7 +524,22 @@ private:
         // qui ont été réduites par LMR (`r_used > 0`) mais qui ont finalement battu `alpha`
         // (la réduction a donc coûté une re-recherche). Dès que `lmrh >= 4453`
         // (LMRH_THRESHOLD), ce couple reçoit 1 pli de réduction LMR en moins.
-        // Ne fait que monter (aucun malus) ; borné par la gravité à 16384.
+        // Elle ne fait que MONTER :
+        //   • le seul endroit qui l'écrit (cpp, section 6.g) ajoute un bonus b > 0,
+        //     b = min(16 d² + 32 d, 2000), quand un coup réduit a battu alpha ;
+        //   • aucun malus quand la réduction était juste (un coup réduit qui échoue
+        //     bas n'est jamais re-cherché : on ne sait pas s'il était bon) ;
+        //   • elle n'est pas divisée par 2 entre deux coups de la partie (seul
+        //     `history` l'est) ; seul `clear_table()` la remet à zéro.
+        // Elle reste bornée par la « gravité » : h ← h + b − h·b/16384, soit un
+        // pas b × (1 − h/16384), qui rétrécit à mesure que h approche 16384 et
+        // vaut 0 en h = 16384 (l'écart à 16384 est multiplié par (1 − b/16384) à
+        // chaque mise à jour). Exemple avec b = 2000 (d ≥ 11) : 0 → 2000 → 3756 →
+        // 5298 : le seuil 4453 est franchi à la 3e réduction ratée ; avec
+        // b = 48 (d = 1), il en faut une centaine.
+        // Conséquence : un couple (prev.to, m.to) qui a franchi le seuil y reste
+        // jusqu'à la fin de la partie, et ses coups sont réduits d'un pli de moins
+        // pour de bon. C'est voulu : ce couple a montré qu'il fallait le chercher.
         int16_t lmrh[2][SQUARE_NB][SQUARE_NB]{};
 
         // U4/U6 (6) : Historique de correction de l'évaluation statique :
