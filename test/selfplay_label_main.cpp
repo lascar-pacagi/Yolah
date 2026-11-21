@@ -3,13 +3,20 @@
 //
 //   selfplay_label --player CFG --out FILE --first-game G --games N
 //                  [--threads 8] [--seed 1] [--book ../config/openings/balanced.txt]
-//                  [--random-plies 2] [--max-nodes 650000] [--record-depth 10]
+//                  [--random-plies 2 | A-B] [--max-nodes 650000] [--node-jitter 0] [--record-depth 10]
 //                  [--tree-per-search 8] [--exact-free 22] [--exact-ms 300] [--tt 64]
 //
 // Plays games G .. G + N − 1 (an opening of the book, then --random-plies
 // random plies; the game number seeds both), every move a search of the dev
 // player limited to --max-nodes nodes (the same depth on any machine; about
 // 0.5 s on an i7-12700K), one thread per game. Each game writes, in one block:
+//
+// --random-plies A-B: game g gets A + g mod (B − A + 1) random plies (A-B = 0-9:
+// as many games with 0, 1, …, 9 random plies, the user's 2025 data).
+// --node-jitter J: each search's node limit drawn in [N(1 − J), N(1 + J)] from
+// the game's seed, so that games from the same opening do not all repeat each
+// other move for move (a node limit makes the dev player deterministic).
+// --tree-per-search 0: no tree positions, and no recording of the trees.
 //
 //   • every position where the player searched (kind 0): the search's value
 //     and depth, the move played;
@@ -176,7 +183,13 @@ int main(int argc, char* argv[]) {
     const uint32_t nb_games = uint32_t(std::stoul(a["games"]));
     const int threads = std::stoi(get("threads", "8"));
     const uint64_t seed = std::stoull(get("seed", "1"));
-    const int random_plies = std::stoi(get("random-plies", "2"));
+    // "N", or "A-B": game g gets A + g mod (B - A + 1) random plies.
+    const string rp = get("random-plies", "2");
+    const auto dash = rp.find('-');
+    const int random_lo = std::stoi(rp.substr(0, dash));
+    const int random_hi = dash == string::npos ? random_lo : std::stoi(rp.substr(dash + 1));
+    if (random_hi < random_lo || random_lo < 0) { cerr << "bad --random-plies " << rp << '\n'; return 1; }
+    const double node_jitter = std::stod(get("node-jitter", "0"));
     const uint64_t max_nodes = std::stoull(get("max-nodes", "650000"));
     const int record_depth = std::stoi(get("record-depth", "10"));
     const size_t tree_per_search = std::stoul(get("tree-per-search", "8"));
@@ -208,7 +221,7 @@ int main(int argc, char* argv[]) {
         auto* dev = dynamic_cast<MinMaxNNUE_DevPlayer*>(player.get());
         if (!dev) { cerr << "the player must be a MinMaxNNUE_DevPlayer\n"; std::exit(1); }
         std::vector<MinMaxNNUE_DevPlayer::NodeRecord> nodes;
-        dev->recorder = &nodes;
+        dev->recorder = tree_per_search > 0 ? &nodes : nullptr;   // no tree positions: nothing to record
         EndgameSolver solver;
         std::vector<Record> recs;
         for (uint32_t g; (g = next++) < end;) {
@@ -218,6 +231,7 @@ int main(int argc, char* argv[]) {
             for (;;) {
                 y = Yolah();
                 if (!book.empty()) for (Move m : book[rng() % book.size()]) y.play(m);
+                const int random_plies = random_lo + int(g % uint32_t(random_hi - random_lo + 1));
                 for (int i = 0; i < random_plies && !y.game_over(); i++) {
                     Yolah::MoveList moves;
                     y.moves(moves);
@@ -231,6 +245,10 @@ int main(int argc, char* argv[]) {
             std::unordered_set<uint64_t> seen;     // the tree positions already taken in this game
             while (!y.game_over()) {
                 nodes.clear();
+                if (node_jitter > 0) {
+                    const double u = std::uniform_real_distribution<double>(1 - node_jitter, 1 + node_jitter)(rng);
+                    dev->set_max_nodes(uint64_t(double(max_nodes) * u));
+                }
                 const auto r = dev->search(y, 63, 0);
                 Record root = record_of(y);
                 root.value = r.value;

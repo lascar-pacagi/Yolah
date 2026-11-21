@@ -767,6 +767,8 @@ public:
         uint16_t move;                         // the best move found (Move::raw)
     };
     std::vector<NodeRecord>* recorder = nullptr;
+    // The node limit of the next searches (["max nodes"]; selfplay_label varies it per search).
+    void set_max_nodes(uint64_t n) { options.max_nodes = n; }
     // Root log (search_bench run --rootlog): after each completed depth of the
     // main thread, one record per root move, in the order of the last attempt.
     // value ≤ alpha: upper bound (fail soft), value ≥ beta: lower bound,
