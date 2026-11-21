@@ -359,8 +359,13 @@ void FinalDevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t max_dep
     //   • le test de parité ci-dessus ;
     //   • `d < max_depth` : on ne saute jamais la dernière profondeur demandée
     //     (dans une recherche à profondeur fixe, chacun finit à `max_depth`).
-    // (Le vrai joueur a une option "smp skip" pour désactiver ces sauts ; la
-    //  campagne U24 mesure leur utilité. Avec un seul thread, ils n'existent pas.)
+    // (Le vrai joueur a une option "smp skip" pour désactiver ces sauts. Avec un
+    //  seul thread, ils n'existent pas.) Campagne U24 (2026-11-21, 2000 parties
+    //  par match, sauts désactivés contre sauts actifs) : 4 threads −1.2 à 0.2 s
+    //  et −2.4 à 1 s ; 8 threads +6.3 à 0.2 s et −3.5 à 1 s, tous les intervalles
+    //  à 95 % contenant 0. Les sauts ne rapportent donc rien de mesurable à 4 ou
+    //  8 threads ; ils sont gardés car le joueur est réglé et mesuré avec eux, et
+    //  le léger avantage à 1 s va plutôt dans leur sens.
     static constexpr int SKIP_SIZE[]  = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
     static constexpr int SKIP_PHASE[] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
     const int k = s.id % 20;

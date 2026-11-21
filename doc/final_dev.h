@@ -250,8 +250,9 @@
 //       avec chacun son `Worker` privé (historiques, killers, fenêtres). Ce que
 //       l'un trouve aide les autres par la table. Les threads secondaires
 //       sautent certaines profondeurs pour ne pas tous chercher la même chose
-//       au même moment (cpp, section 2 ; l'utilité de ces sauts est mesurée par
-//       la campagne U24).
+//       au même moment (cpp, section 2). Campagne U24 : sans ces sauts, −1 à
+//       −4 Elo à 4 et 8 threads (+6 à 8 threads à 0.2 s), rien de significatif :
+//       ils sont gardés, sans gain démontré.
 //
 //  8. RÉGLAGE DES CONSTANTES PAR SPSA (U23)
 //     • Les 29 constantes numériques de la recherche (fenêtres d'aspiration,
