@@ -10,7 +10,9 @@
 #     bash nnue/gen_dev_data.sh resubmit   # the tasks not finished and not queued (time limit, node failure)
 #
 # Each task plays GAMES_PER_TASK games (test/selfplay_label_main.cpp), one per
-# physical core, and writes DATA_DIR/games/task_<i>.bin (40-byte records,
+# logical CPU (hyperthreading: measured 2026-11-21 on 4 cores of an i7-12700K,
+# 8 games at a time instead of 4 → +68 % games per hour; at fixed nodes the
+# quality is the same, each game is only slower), and writes DATA_DIR/games/task_<i>.bin (40-byte records,
 # resumable: a task started again goes on where it stopped):
 #   • game g: RANDOM_PLIES = 0-9 → g mod 10 random plies from the initial
 #     position (no book: as in 2025), then the dev player to the end;
@@ -25,9 +27,10 @@
 #     the exact result by the endgame solver (EXACT_MS per position).
 # The random plies' positions are not recorded (no search value, no move of the player).
 #
-# Sizes: ~53 positions per game (4 test games: 211) → GAMES = 4.8 M games ≈ 250 M
-# positions × 40 bytes = 10 GB. Time: ~110 s per game and EPYC core → ~150 k
-# core-hours: about 2 weeks with ~500 cores, longer when the cluster is busy.
+# Sizes: ~51 positions per game (first 1574 games on the cluster: 50.6) → GAMES =
+# 4.8 M games ≈ 243 M positions × 40 bytes = 10 GB. Time: ~110 s per game and EPYC
+# core (one game per core). First 26 min on the cluster (28 tasks, one game per
+# physical core): ~5 700 games/h → 35 days; one game per logical CPU: ~3 weeks.
 # The 4 symmetries that keep the initial position (identity, 180° rotation,
 # both diagonal reflections) are applied later, when the training cache is made.
 # ────────────────────────────────────────────────────────────────────────────
@@ -43,7 +46,7 @@ PLAYER="${PLAYER:-/Yolah/config/search_study/dev_u9_spsa.cfg}"   # path inside t
 GAMES="${GAMES:-4800000}"
 GAMES_PER_TASK="${GAMES_PER_TASK:-6000}"          # 800 tasks (SLURM arrays: < 1000)
 THROTTLE="${THROTTLE:-32}"                        # tasks at a time (scontrol update JobId=… ArrayTaskThrottle=N)
-GEN_CPUS="${GEN_CPUS:-16}"                        # logical CPUs per task (one game per physical core)
+GEN_CPUS="${GEN_CPUS:-16}"                        # logical CPUs per task = games at a time
 GEN_MEM="${GEN_MEM:-8G}"
 GEN_TIME="${GEN_TIME:-3-00:00:00}"                # ~12 h on an EPYC, ~40 h on an old Xeon (16 games at a time)
 EXCLUDE="${EXCLUDE:-crn04,crn05,crn06,crn07,crn13,crn14,crn15}"   # broken for containers / no AVX2
@@ -126,12 +129,12 @@ gen)
       BEGIN { n = split(allowed, r, ","); for (i = 1; i <= n; i++) { m = split(r[i], ab, "-"); for (c = ab[1]; c <= (m > 1 ? ab[2] : ab[1]); c++) ok[c] = 1 } }
       ($1 in ok) { core[$3 "," $2] = 1 }
       END { k = 0; for (x in core) k++; print k }')
-    THREADS=$(( ${SLURM_CPUS_PER_TASK:-16} < PHYS ? ${SLURM_CPUS_PER_TASK:-16} : PHYS ))
+    THREADS=$(grep -c . <(taskset -cp $$ | sed 's/.*: //' | tr ',' '\n' | awk -F- '{ if (NF == 2) for (i = $1; i <= $2; i++) print i; else print $1 }'))
     TASK="${SLURM_ARRAY_TASK_ID:?array task}"
     FIRST=$(( TASK * GAMES_PER_TASK ))
     COUNT=$(task_count "${TASK}")
     echo "[$(date '+%F %T')] devdata task ${TASK} on $(hostname) (job ${SLURM_JOB_ID:-local}), Yolah $(git -C "${YOLAH_DIR}" rev-parse --short HEAD 2>/dev/null || echo '?')"
-    echo "  CPU:$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2), ${PHYS} physical cores: ${THREADS} games at a time; games ${FIRST} .. $(( FIRST + COUNT - 1 ))"
+    echo "  CPU:$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2), ${PHYS} physical cores, ${THREADS} logical CPUs: ${THREADS} games at a time; games ${FIRST} .. $(( FIRST + COUNT - 1 ))"
     build_alphazero_learn selfplay_label
     start_in_container bash -c "cd /Yolah/config && exec ${BUILD_DIR}/selfplay_label \
         --player ${PLAYER} --out /work/games/task_$(printf '%04d' "${TASK}").bin \
