@@ -257,13 +257,50 @@
 //  8. RÉGLAGE DES CONSTANTES PAR SPSA (U23)
 //     • Les 29 constantes numériques de la recherche (fenêtres d'aspiration,
 //       LMR, RFP, MPC, Proxy Cut, LMP, bonus d'ordonnancement, historiques,
-//       correction) ont été réglées ENSEMBLE par SPSA, comme le fait Fishtest
-//       pour Stockfish (nnue/spsa.py) : à chaque lot de parties, toutes sont
-//       décalées d'un ±c aléatoire (un signe tiré au hasard par constante) ;
-//       la version θ+ joue la version θ− (décalée en sens inverse) sur des
-//       ouvertures équilibrées, et chaque constante avance d'un petit pas vers
-//       le côté qui a gagné. Un lot seul ne dit presque rien ; sur 50 004 paires
-//       de parties (100 008 parties) à 0.2 s/coup, le bruit s'annule.
+//       correction) ont été réglées ENSEMBLE par SPSA (« simultaneous
+//       perturbation stochastic approximation », Spall 1992), comme le fait
+//       Fishtest pour Stockfish (nnue/spsa.py, nnue/spsa.sh,
+//       config/spsa/dev_u9_params.json).
+//     • Le problème : régler une constante à la fois coûte un match de 2000
+//       parties par valeur essayée, et la meilleure valeur de l'une dépend des
+//       autres (les marges du MPC ont été réglées avant que le meilleur ordre
+//       des coups ne change ce qui est sûr d'élaguer). Régler les 29 ensemble
+//       demande une méthode qui les fait toutes bouger à chaque match.
+//     • Un lot (24 parties) se déroule ainsi. Soit θ les valeurs actuelles.
+//         1. Pour chaque constante i, on tire à pile ou face Δ_i = +1 ou −1.
+//         2. On fabrique deux joueurs : θ+ = θ + c·Δ et θ− = θ − c·Δ, où c_i est
+//            un écart choisi par constante (« c_end » du fichier de paramètres,
+//            ~5 à 15 % de la valeur : assez pour changer le jeu).
+//            Exemple sur 3 constantes : rfp margin 3000 (c 300), lmp moves 4
+//            (c 0.8), killer bonus 4000 (c 500), tirage Δ = (+1, −1, +1) :
+//              θ+ = (3300, 3.2, 4500)    θ− = (2700, 4.8, 3500).
+//            Les constantes entières sont arrondies au hasard sans biais
+//            (3.2 → 3 quatre fois sur cinq, 4 une fois sur cinq).
+//         3. θ+ joue θ− : 12 ouvertures équilibrées, chacune avec les deux
+//            couleurs. W = victoires de θ+, L = victoires de θ−.
+//         4. TOUTES les constantes bougent d'un petit pas vers le gagnant :
+//              θ_i ← θ_i + pas_i × (W − L) × Δ_i
+//            Si θ+ a gagné (W > L) dans l'exemple : rfp margin monte, lmp moves
+//            descend, killer bonus monte (chacune va vers sa valeur dans θ+).
+//            Si θ− a gagné, c'est l'inverse ; à égalité, rien ne bouge.
+//     • Pourquoi ça marche alors qu'un lot ne dit pas QUELLE constante a fait
+//       gagner : les signes Δ sont tirés indépendamment à chaque lot. Une
+//       constante sans effet sur la force est poussée vers le haut ou vers le
+//       bas au hasard, et ses pas s'annulent en moyenne. Une constante dont la
+//       hausse rend le joueur plus fort est, plus souvent qu'à son tour, du
+//       côté gagnant quand son Δ vaut +1 : elle dérive vers le haut. En
+//       moyenne, le pas de chaque constante est proportionnel à la pente du
+//       taux de victoire selon cette constante (un gradient estimé), et ce
+//       pour les 29 à la fois, au prix d'un seul petit match par lot.
+//     • L'écart c et le pas diminuent au fil du run (calendriers de Fishtest :
+//       c_k = c / (k+1)^0.101, pas_k ∝ 1 / (A+k+1)^0.602, k = nombre de paires
+//       jouées) : on explore large au début, on affine à la fin.
+//     • Le run : 4 167 lots, 50 004 paires de parties (100 008 parties) à
+//       0.2 s/coup, un thread par joueur, ~15 h sur un nœud de 24 cœurs.
+//       θ+ et θ− ont fait jeu égal sur l'ensemble (22 245 victoires contre
+//       22 666), ce qui est normal : ils sont symétriques autour de θ ; c'est
+//       θ qui a progressé. Le dernier quart du run n'a presque plus rien
+//       changé. Les valeurs finales de θ, arrondies, sont celles de ce fichier.
 //     • Gain contre dev_u9 (mêmes heuristiques, constantes réglées à la main) :
 //       +14.4 Elo [+4.2, +24.7] à 0.2 s et +18.3 Elo [+9.2, +27.3] à 1 s
 //       (2000 parties chacun) : le réglage tient à une cadence 5 fois plus
