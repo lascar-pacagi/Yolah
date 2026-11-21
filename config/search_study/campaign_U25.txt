@@ -1,0 +1,7 @@
+# Campaign U25 (2026-11-21): before generating 250 M positions with nnue/gen_dev_data.sh, is dev_u9_spsa at 4 M nodes
+#   per move (~2 s) a better teacher than the player of the user's 2025 data (old2025: minimax + first NNUE, 10 s per
+#   move, one thread)? Local check at 1 s both: dev 8/8 (2 more at 300 k nodes vs 1.5 s: 2/2).
+#   The old player is time-limited, so the node's speed matters: crn25 only (EPYC 9534, like the fast nodes of 2025).
+#   400 games (200 rounds), ~330 s per game (old 10 s × ~27 moves, dev ~2 s × ~28), 64 at a time: about 40 min.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu -w crn25 --cpus-per-task=64 --array=1 nnue/search_study.sh campaign_U25.txt
+u25_dev_4mn old2025 10000000 200 251
