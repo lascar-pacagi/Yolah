@@ -592,10 +592,48 @@ private:
         // sauvegardé d'une partie à l'autre.
         int16_t corr[2][CORR_TABLE_SIZE]{};
 
-        // Fenêtres d'aspiration adaptatives : moyenne glissante (décroissance 0.9
-        // par profondeur terminée) des écarts |v_d − v_{d−1}| observés par ce
-        // thread, gardée d'un coup de la partie au suivant.
-        // Moyenne = asp_sum / asp_n.
+        // Fenêtres d'aspiration adaptatives (cpp, section 2) : de combien la
+        // valeur de la racine bouge-t-elle, d'habitude, d'une profondeur à la
+        // suivante ? La réponse fixe la demi-largeur de la fenêtre :
+        //     δ = max(345, 0.9187 × asp_sum / asp_n)
+        // À Yolah la valeur bouge beaucoup (écart médian ~630, 90e centile ~4600
+        // sur une échelle où ±30 000 est une fin prouvée) et selon la phase de
+        // la partie : une largeur fixe échouait une fois sur deux.
+        //
+        // CE QUI EST MESURÉ. Chaque fois qu'une profondeur d ≥ 4 se termine avec
+        // une valeur exacte v (dans la fenêtre, après les éventuelles relances),
+        // on prend l'écart |v − v_préc| avec la valeur de la profondeur terminée
+        // juste avant DANS LA MÊME RECHERCHE (pour le thread principal, d − 1 ;
+        // pour un thread qui saute des profondeurs, ce peut être d − 2 ou plus).
+        // Rien n'est mesuré si l'une des deux valeurs est une fin de partie
+        // prouvée (un saut vers ±30 000 n'est pas une « volatilité »), ni pour la
+        // première profondeur terminée d'une recherche (rien à comparer : la
+        // valeur du coup précédent de la partie n'est pas utilisée).
+        //
+        // LA MOYENNE GLISSANTE. À chaque mesure x :
+        //     asp_sum ← 0.9 × asp_sum + x
+        //     asp_n   ← 0.9 × asp_n   + 1
+        //     moyenne  = asp_sum / asp_n
+        // C'est une moyenne pondérée de toutes les mesures passées : la dernière
+        // pèse 1, l'avant-dernière 0.9, la précédente 0.81, etc. « Décroissance
+        // 0.9 par profondeur terminée » : chaque nouvelle mesure réduit de 10 %
+        // le poids de toutes les anciennes (c'est compté en mesures, pas en temps).
+        // asp_n est la somme des poids ; diviser par lui (au lieu de multiplier
+        // asp_sum par 0.1) donne une vraie moyenne dès la première mesure. Il
+        // tend vers 10 : la moyenne retient en gros les 10 dernières mesures.
+        // Exemple : mesures 600, puis 1000, puis 200 :
+        //     asp_sum : 600 → 0.9×600 + 1000 = 1540 → 0.9×1540 + 200 = 1586
+        //     asp_n   : 1   → 1.9               → 2.71
+        //     moyenne = 1586 / 2.71 = 585   (= (200×1 + 1000×0.9 + 600×0.81) / 2.71)
+        //     δ = max(345, 0.9187 × 585) = 537 à la profondeur suivante.
+        //
+        // GARDÉE D'UN COUP AU SUIVANT. Ces deux nombres sont dans le Worker, qui
+        // survit entre les coups : au coup suivant, dès la profondeur 4, la
+        // fenêtre est réglée sur la volatilité constatée juste avant (elle
+        // change peu d'un coup à l'autre, c'est une propriété de la phase de jeu).
+        // Ils ne sont pas divisés entre les coups : la décroissance 0.9 suffit à
+        // faire oublier les vieilles mesures. Chaque thread a sa propre moyenne.
+        // Remise à zéro par `clear_table()` ; tant que asp_n = 0, δ = 345.
         double asp_sum = 0;
         double asp_n   = 0;
     };
