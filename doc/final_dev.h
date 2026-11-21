@@ -572,10 +572,26 @@ private:
         // non-PV (seuls ceux-là calculent l'évaluation statique), avec la valeur
         // `best` trouvée par la recherche :
         //   • rien si `best` est un résultat prouvé (|best| ≥ 30 000) ;
-        //   • rien si `best` n'est qu'une borne qui ne contredit pas l'évaluation :
-        //     une coupure (best ≥ beta, donc vraie valeur ≥ best) avec best ≤ éval,
-        //     ou un échec bas (vraie valeur ≤ best) avec best ≥ éval ; ces bornes
-        //     ne disent pas dans quel sens le réseau s'est trompé ;
+        //   • rien si `best` n'est qu'une borne qui ne contredit pas l'évaluation.
+        //     En fail-soft, `best` n'est la vraie valeur V du nœud que si
+        //     alpha < best < beta. Sinon ce n'est qu'une borne :
+        //       – coupure (best ≥ beta) : la recherche s'est arrêtée dès qu'un coup
+        //         a suffi, d'autres auraient pu faire mieux → V ≥ best ;
+        //       – échec bas (best ≤ alpha) : chaque coup a seulement été prouvé
+        //         ≤ alpha (fenêtre nulle, recherches réduites…) → V ≤ best.
+        //     On n'apprend que si l'on sait de quel côté de l'évaluation se
+        //     trouve V. Exemples avec une évaluation éval = 1000 :
+        //       – coupure, best = 1500 : V ≥ 1500 > 1000, le réseau a SOUS-estimé :
+        //         on apprend (correction vers le haut) ;
+        //       – coupure, best = 600  : V ≥ 600, donc V peut valoir 600 (le réseau
+        //         a sur-estimé) ou 5000 (il a sous-estimé) : on ne sait pas, RIEN ;
+        //       – échec bas, best = 600  : V ≤ 600 < 1000, le réseau a SUR-estimé :
+        //         on apprend (correction vers le bas) ;
+        //       – échec bas, best = 1500 : V ≤ 1500, donc V peut être au-dessus ou
+        //         au-dessous de 1000 : RIEN.
+        //     D'où les deux tests : coupure avec best ≤ éval, ou échec bas avec
+        //     best ≥ éval → on ne fait rien. (Quand on apprend d'une borne, le pas
+        //     best − éval est une sous-estimation de l'erreur, jamais un contresens.)
         //   • sinon, pas b = (best − éval) × depth / 8, borné à ±2000 (une
         //     recherche plus profonde est plus fiable, elle pèse plus), puis
         //     mise à jour par gravité : e ← e + b − e·|b|/7917, ce qui garde e
