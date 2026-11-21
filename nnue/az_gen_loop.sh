@@ -33,7 +33,8 @@
 #              the balanced book shuffled by each task's seed
 #              (alphazero_match.sh) → ROOT/matches.csv, one line per task;
 #              status sums them per pair (with ~85 % draws, 400 games could
-#              not tell two neighbouring generations apart)
+#              not tell two neighbouring generations apart). EVAL_REF=K: against
+#              az_K instead (e.g. the previous generation, with `eval`)
 #   next       (after train, with eval running) submits generation G + 1, until MAX_GEN
 #
 # Generation 0 is START_PT / START_TS (ResNet_1 of the distillation loop),
@@ -69,6 +70,7 @@ EXACT_MS="${EXACT_MS:-300}"
 EVAL_GAMES="${EVAL_GAMES:-2000}"                # in all, against az_0
 EVAL_TASKS="${EVAL_TASKS:-5}"                   # GPUs sharing them
 EVAL_SECONDS="${EVAL_SECONDS:-1}"
+EVAL_REF="${EVAL_REF:-0}"                       # the opponent generation (EVAL_REF=2: az_<G> against az_2)
 MAX_GEN="${MAX_GEN:-20}"
 AUTO="${AUTO:-1}"                               # 0: no next stage
 
@@ -188,7 +190,7 @@ submit)
     j_ev=$(sbatch "${common[@]}" ${dep[@]+"${dep[@]}"} --export="${env_base},STAGE=eval" --array=0-$(( EVAL_TASKS - 1 )) \
         --cpus-per-task=8 --mem=16G --time=16:00:00 \
         --job-name="ag${G}_eval" --output="${L}/${G}_eval_%A_%a.out" "${SCRIPT}")
-    echo "eval ${j_ev} (${EVAL_GAMES} games against az_0 on ${EVAL_TASKS} GPUs)"
+    echo "eval ${j_ev} (${EVAL_GAMES} games against az_${EVAL_REF} on ${EVAL_TASKS} GPUs)"
     if [[ "${AUTO}" == "1" && "${FROM}" != "eval" ]] && (( GEN < MAX_GEN )); then
         j_nx=$(sbatch --parsable -p insa-cpu --exclude=crn04,crn05,crn07,crn13,crn14,crn15 ${dep[@]+"${dep[@]}"} \
             --export="${env_base},STAGE=next" --cpus-per-task=1 --mem=1G --time=00:10:00 \
@@ -248,7 +250,7 @@ train)
 # ── az_<GEN> against az_0: this task's share of the games ───────────────────
 eval)
     header
-    A="${GEN}" B=0 GAMES=$(( EVAL_GAMES / EVAL_TASKS )) MOVE_SECONDS="${EVAL_SECONDS}" bash "${YOLAH_DIR}/nnue/alphazero_match.sh"
+    A="${GEN}" B="${EVAL_REF}" GAMES=$(( EVAL_GAMES / EVAL_TASKS )) MOVE_SECONDS="${EVAL_SECONDS}" bash "${YOLAH_DIR}/nnue/alphazero_match.sh"
     ;;
 
 next)
