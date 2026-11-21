@@ -542,9 +542,54 @@ private:
         // pour de bon. C'est voulu : ce couple a montré qu'il fallait le chercher.
         int16_t lmrh[2][SQUARE_NB][SQUARE_NB]{};
 
-        // U4/U6 (6) : Historique de correction de l'évaluation statique :
-        // corr[joueur][ hachage_14_bits_des_8_pièces ] ∈ [-7917, 7917], ajouté
-        // à la valeur du réseau (cpp, sections 5 et 6).
+        // U4/U6 (6) : Historique de correction de l'évaluation statique
+        // (+10.6 Elo [+0.4, +20.8] sur dev_u6, campagne U6) :
+        //   corr[joueur][ clé ] ∈ [-7917, 7917]
+        //
+        // LE PROBLÈME. Le réseau se trompe de façon systématique dans certaines
+        // configurations de pièces : trop optimiste ici, trop pessimiste là. La
+        // recherche paie ces erreurs à chaque nœud, car RFP, MPC et Proxy Cut
+        // comparent tous l'évaluation statique à beta : une évaluation trop haute
+        // fait couper à tort, une trop basse empêche des coupures justes.
+        //
+        // L'IDÉE. Pendant la partie, chaque recherche sous un nœud dit ce que le
+        // nœud valait vraiment (à la profondeur cherchée). L'écart avec ce que le
+        // réseau avait annoncé mesure son erreur. Ces erreurs sont mémorisées
+        // par configuration de pièces, et ajoutées au réseau la prochaine fois :
+        //     évaluation statique = clamp(réseau + corr[camp au trait][clé], −29999, 29999)
+        //   (aux nœuds non-PV pour l'élagage, et aux feuilles : `corr_hist = 2`).
+        //
+        // LA CLÉ (`corr_key`, cpp, section 5). Un hachage sur 14 bits (0..16383)
+        // des positions des 4 pièces noires et des 4 pièces blanches. Les trous
+        // sont IGNORÉS : deux positions avec les mêmes pièces aux mêmes endroits
+        // partagent la même correction, ce qui la fait revenir assez souvent pour
+        // apprendre vite. 16384 cases pour bien plus de configurations possibles :
+        // des positions sans rapport peuvent tomber sur la même case et brouiller
+        // un peu la correction (accepté, c'est mesuré gagnant). Une table par camp
+        // au trait : l'erreur n'est pas la même selon qui doit jouer.
+        //
+        // L'APPRENTISSAGE (`corr_update`, cpp, section 6), à la fin de chaque nœud
+        // non-PV (seuls ceux-là calculent l'évaluation statique), avec la valeur
+        // `best` trouvée par la recherche :
+        //   • rien si `best` est un résultat prouvé (|best| ≥ 30 000) ;
+        //   • rien si `best` n'est qu'une borne qui ne contredit pas l'évaluation :
+        //     une coupure (best ≥ beta, donc vraie valeur ≥ best) avec best ≤ éval,
+        //     ou un échec bas (vraie valeur ≤ best) avec best ≥ éval ; ces bornes
+        //     ne disent pas dans quel sens le réseau s'est trompé ;
+        //   • sinon, pas b = (best − éval) × depth / 8, borné à ±2000 (une
+        //     recherche plus profonde est plus fiable, elle pèse plus), puis
+        //     mise à jour par gravité : e ← e + b − e·|b|/7917, ce qui garde e
+        //     dans [−7917, 7917] (même principe que `history`, section 7).
+        //   Exemple : nœud de profondeur 6, le réseau (déjà corrigé) dit 2000, la
+        //   recherche trouve exactement 5000. b = 3000 × 6 / 8 = 2250 → borné à
+        //   2000 ; e passe de 0 à 2000. Si la même erreur se répète : e = 2000 +
+        //   2000 − 2000 × 2000 / 7917 = 3495, et ainsi de suite vers 7917. Si
+        //   l'erreur disparaît (la correction suffit), b ≈ 0 et e ne bouge plus.
+        //
+        // DURÉE DE VIE. Propre à chaque thread (dans le Worker), gardée d'un coup
+        // de la partie au suivant (pas divisée par 2), remise à zéro par
+        // `clear_table()`. Elle n'apprend que pendant la partie : rien n'est
+        // sauvegardé d'une partie à l'autre.
         int16_t corr[2][CORR_TABLE_SIZE]{};
 
         // Fenêtres d'aspiration adaptatives : moyenne glissante (décroissance 0.9
