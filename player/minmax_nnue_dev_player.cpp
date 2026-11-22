@@ -151,9 +151,9 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
                     }
     } else {
         for (auto& w : workers)
-            for (auto& by_from : w->history)
-                for (auto& by_to : by_from)
-                    for (int16_t& h : by_to) h /= 2;
+            for (auto& of_player : w->history)          // [player][from][to]
+                for (auto& of_from : of_player)
+                    for (int16_t& h : of_from) h /= 2;
     }
     if (options.cont_age)   // U7 fix: the context tables age like the history
         for (auto& w : workers) {

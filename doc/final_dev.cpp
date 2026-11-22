@@ -190,9 +190,10 @@ FinalDevPlayer::Result FinalDevPlayer::search(const Yolah& yolah, uint8_t max_de
     // Les tables contextuelles `cont1` et `lmrh`, la correction `corr` et les
     // contre-coups ne sont PAS vieillis (vieillir `cont1` a été mesuré neutre).
     for (auto& w : workers) {
-        for (auto& by_from : w->history)
-            for (auto& by_to : by_from)
-                for (int16_t& h : by_to) h /= 2;
+        // history[joueur][origine][destination] : 3 boucles imbriquées.
+        for (auto& of_player : w->history)          // of_player = history[joueur]             : [64][64]
+            for (auto& of_from : of_player)         // of_from   = history[joueur][origine]    : [64]
+                for (int16_t& h : of_from) h /= 2;  // h         = history[joueur][origine][destination]
     }
 
     // ── Parallélisme Lazy SMP (L) ────────────────────────────────────────────
