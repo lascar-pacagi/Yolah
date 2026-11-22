@@ -570,6 +570,39 @@ done:
 //          un coup secondaire qui a demandé beaucoup de nœuds pour être réfuté
 //          est le principal challenger à tester tôt à la profondeur d + 1.
 //          (Correction « root fix » de la campagne A2 : +9 Elo à 0.2 s.)
+//
+//          Pourquoi les nœuds et pas la valeur : après le premier coup, les
+//          autres sont cherchés en fenêtre nulle (alpha, alpha + 1) (PVS,
+//          section 4). Un coup qui ne bat pas le meilleur renvoie seulement
+//          « ≤ alpha », une borne : un coup perdant et un coup à 1 point du
+//          meilleur ont la même valeur renvoyée. Leurs valeurs ne permettent
+//          donc pas de les classer. Le nombre de nœuds, lui, les distingue :
+//            • un coup nettement mauvais est réfuté vite : la première réponse
+//              de l'adversaire essayée (coup de table, killer) suffit à couper
+//              dans presque chaque nœud, et la recherche réduite (LMR, étape 1)
+//              échoue déjà sous alpha, sans relance ;
+//            • un coup presque aussi bon que le meilleur est réfuté difficilement :
+//              la coupure n'arrive qu'après plusieurs réponses essayées, la
+//              recherche réduite peut dépasser alpha et forcer une relance à
+//              pleine profondeur (étape 2), et ses sous-arbres sont plus larges.
+//          Beaucoup de nœuds = valeur proche de alpha = le coup qui a le plus de
+//          chances de devenir meilleur une fois cherché un pli plus loin.
+//
+//          Pourquoi le tester tôt : (1) s'il devient le meilleur, alpha monte
+//          tout de suite et tous les coups suivants sont coupés plus vite ;
+//          (2) la réduction LMR croît avec le rang (ln(i + 1), section 4) : à
+//          la profondeur 10 en nœud PV, rangé 15e (i = 14) il serait réduit de
+//          1.1158 + ln 10 × ln 15 / 1.4152 − 1.03 = 4.49 → 4 plis ; rangé 2e
+//          (i = 1) de 2.24 − 1.03 = 1.21 → 1 pli. Réduit de 4 plis, il pourrait
+//          échouer sous alpha à tort ; réduit d'1, sa vraie valeur a une chance
+//          d'apparaître.
+//          Ce tri par nœuds existait avant A2 ; le « root fix » d'A2 (+9 Elo) y a
+//          ajouté les trois règles ci-dessus : nœuds cumulés sur toutes les
+//          tentatives de la profondeur (une relance après échec d'aspiration ne
+//          remet pas les compteurs à zéro), ordre inchangé après un fail-low
+//          (avant, un coup réfuté vite pouvait passer en tête), simple rotation
+//          après un fail-high (les coups non cherchés ont des compteurs
+//          incomplets).
 // =============================================================================
 
 int FinalDevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash,
