@@ -483,7 +483,10 @@ def polar_bear(anim, t, side):
     sc = Scene()
     base(sc, side)
     (fl, fr, hl, hr), bob = gait(anim, t)
-    X = frame_of(anim, t, bob)
+    # idle (1.6 s loop): breathing (the body rises a little), the head swaying
+    # slowly from side to side and sniffing (two small nods per loop)
+    breath = 0.004 * (0.5 - 0.5 * math.cos(TAU * t)) if anim == "idle" else 0.0
+    X = frame_of(anim, t, bob + breath)
     m = pelt("#f0e8d6", "#e0d2b8", k=80, spread=0.22)
     amp, k = 0.007, 55.0
     trunk = [(-0.2, 0.31, 0.11, 0.12, 0.11), (-0.06, 0.29, 0.13, 0.13, 0.14), (0.08, 0.29, 0.125, 0.135, 0.12), (0.16, 0.32, 0.1, 0.1, 0.08)]
@@ -500,14 +503,19 @@ def polar_bear(anim, t, side):
         limb(sc, m, X, pts, [0.06, 0.045, 0.036, 0.036], amp, k, 0.025)
         paw(sc, m, X, (pts[-1][0], 0.02, pts[-1][2] + 0.03), 0.042, 5, claw)
     sc.add(furry(sd_sphere(0.03), amp, k), m, X * T(0, 0.32, -0.32), blend=0.03)                                     # the tail
-    roar = anim == "win"
+    # win (1.33 s loop): the roar opens and closes once, r from 0 to 1 and back
+    # (the head rises, the jaw drops, the teeth show); blocked: the head low
+    r = 0.5 - 0.5 * math.cos(TAU * t) if anim == "win" else 0.0
+    roar = r > 0.25
     low = 0.2 if anim == "blocked" else 0.0
-    nk = X * T(0, 0.31, 0.17) * RX(0.15 - (0.5 if roar else 0.0) + low)
+    sway = 0.35 * math.sin(TAU * t) if anim == "idle" else 0.0
+    sniff = 0.1 * math.sin(2 * TAU * t) if anim == "idle" else 0.0
+    nk = X * T(0, 0.31, 0.17) * RY(sway) * RX(0.15 - 0.9 * r + low + sniff)
     sc.add(furry(sd_capsule((0, 0, 0), (0, -0.02, 0.15), 0.085, 0.06), amp, k), m, nk, blend=0.05)
-    hd = nk * T(0, -0.02, 0.17) * RX(0.15 + (0.35 if roar else 0.0))
+    hd = nk * T(0, -0.02, 0.17) * RX(0.15 + 0.45 * r - sniff)
     sc.add(furry(sd_ellipsoid(0.055, 0.055, 0.065), amp * 0.7, k), m, hd, blend=0.03)
     sc.add(furry(sd_capsule((0, -0.005, 0.03), (0, -0.018, 0.11), 0.038, 0.024), amp * 0.4, k), m, hd, blend=0.02)       # the long muzzle
-    gape = 0.3 if roar else 0.0
+    gape = 0.5 * r
     jaw = hd * T(0, -0.03, 0.03) * RX(gape)
     sc.add(sd_capsule((0, 0, 0), (0, -0.008, 0.075), 0.025, 0.017), m, jaw, blend=0.012)
     if roar:
