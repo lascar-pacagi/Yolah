@@ -822,6 +822,25 @@ int FinalDevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Move m, 
     if (v > alpha && !stopped()) {
         if (i > 0) {
             // Recherche à pleine profondeur en fenêtre nulle (PVS)
+            //
+            // Même à un nœud PV, seul le PREMIER coup (i == 0, branche else
+            // plus bas) est cherché en fenêtre pleine. C'est le principe de la
+            // PVS (Principal Variation Search) : le tri des coups met en tête le
+            // coup de la table, qui est presque toujours le meilleur. Les autres
+            // coups n'ont alors besoin que d'une réponse oui/non : « bat-il alpha ? ».
+            // La fenêtre nulle (alpha, alpha + 1) répond à cette question beaucoup
+            // moins cher : chaque coupure y arrive plus tôt, et les nœuds en
+            // dessous sont tous non-PV, donc réduits et élagués plus fort.
+            // Dans la grande majorité des cas la réponse est non (v <= alpha) et le
+            // coup est écarté sans qu'on connaisse sa valeur exacte : inutile.
+            // Rarement la réponse est oui : le tri s'est trompé. Il faut alors la
+            // valeur exacte de ce nouveau meilleur coup, d'où la relance en
+            // fenêtre pleine juste après (seulement si v < beta : si v >= beta,
+            // le nœud coupe de toute façon).
+            // Le nœud reste un nœud PV, dont la fenêtre (alpha, beta) est pleine.
+            // Ce qui est nul, c'est la fenêtre donnée à l'enfant pour ce test.
+            // Le surcoût d'un oui (deux recherches au lieu d'une) est largement
+            // compensé par l'économie faite sur tous les non.
             v = -negamax(yolah, s, child, -(alpha + 1), -alpha, depth - 1);
             // Aux nœuds PV (beta - alpha > 1), si le coup bat alpha sans dépasser beta,
             // on relance en fenêtre pleine pour connaître sa valeur exacte.
