@@ -583,7 +583,10 @@ def human(anim, t, side, outfit="plain", shades=True):       # shades: glasses w
             # the arms: from the frame's outer corner along the side of the head to the ear
             sc.add(sd_capsule((0.166 * sgn, 0.05, 0.245), (0.212 * sgn, 0.045, 0.1), 0.009, 0.008), frame, head)
             sc.add(sd_capsule((0.212 * sgn, 0.045, 0.1), (0.212 * sgn, 0.03, -0.02), 0.008, 0.007), frame, head)
-        sc.add(sd_capsule((-0.034, 0.045, 0.268), (0.034, 0.045, 0.268), 0.008), frame, head)               # the bridge
+        # the bridge: an arch over the nose from one rim to the other (straight at z 0.268
+        # it ran inside the nose, whose skin is at z 0.278 between the eyes: invisible)
+        for sgn in (-1, 1):
+            sc.add(sd_capsule((0.036 * sgn, 0.045, 0.268), (0.0, 0.05, 0.29), 0.008), frame, head)
     # a real beard and moustache: a layer over the face's surface, the lips left bare
     beard_dark = srgb("#141210") if side == 0 else srgb("#2a2622")
     beard_light = srgb("#2c2824") if side == 0 else srgb("#dcd8d2")
