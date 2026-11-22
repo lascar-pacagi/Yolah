@@ -99,10 +99,32 @@ FinalDevPlayer::FinalDevPlayer(uint64_t microseconds,
 
     // 4. Précalcul de la table logarithmique des Late Move Reductions (en 1/1024 de pli) :
     //        r(d, n) = 1.1158 + ln(d) × ln(n) / 1.4152      (d = profondeur, n = rang + 1)
-    //    Stocker r en 1/1024 de pli permet d'appliquer des ajustements continus
-    //    (comme −hist / 6945 plis) avant d'arrondir au nombre entier de plis.
-    //    Exemples (sans ajustement) : d = 10, n = 9 (9e coup) → 1.1158 + 2.303 ×
-    //    2.197 / 1.4152 = 4.69 → 4 plis ; d = 3, n = 2 → 1.65 → 1 pli.
+    //    Cette table ne donne que la réduction DE BASE. Au moment de chercher le
+    //    coup, `late_move_reduction_of` (section 4) lui retire trois ajustements
+    //    qui ne sont pas des nombres entiers de plis :
+    //        − 1058/1024 ≈ 1,03 pli  en nœud PV,
+    //        −  829/1024 ≈ 0,81 pli  pour le contre-coup,
+    //        − hist / 6945 plis       (hist = −2500 → +0,36 pli ; hist = 5000 → −0,72 pli),
+    //    puis seulement tronque le total en plis entiers.
+    //
+    //    Pourquoi « en 1/1024 de pli » : il faut garder les fractions jusqu'à la
+    //    fin, car ce sont elles qui, en s'additionnant, font passer ou non un
+    //    pli entier. On les garde en virgule fixe : r est stocké comme un entier
+    //    valant r × 1024 (4,69 pli → 4803). Tous les calculs se font alors en
+    //    entiers (pas de flottant dans la boucle des coups), avec une précision
+    //    de 1/1024 ≈ 0,001 pli, et la conversion finale en plis est une simple
+    //    division entière par 1024 (une puissance de 2 : un décalage de 10 bits).
+    //    Exemple où cela compte : d = 10, 9e coup, hist = −2500 :
+    //        en 1/1024 : 4803 + 368 = 5171 → 5171 / 1024 = 5 plis ;
+    //        si la table était déjà arrondie en plis : 4 + round(0,36) = 4 + 0 = 4 plis
+    //        (les 0,69 de la base et les 0,36 de l'historique seraient perdus séparément).
+    //
+    //    Exemples SANS AJUSTEMENT (c.-à-d. la valeur brute de la table, celle d'un
+    //    nœud non-PV, coup qui n'est pas le contre-coup, hist = 0) :
+    //        d = 10, n = 9 (9e coup) → 1.1158 + 2.303 × 2.197 / 1.4152 = 4.69
+    //                                 → stocké 4803 → 4 plis ;
+    //        d = 3,  n = 2 (2e coup) → 1.1158 + 1.099 × 0.693 / 1.4152 = 1.65
+    //                                 → stocké 1693 → 1 pli.
     //    Le logarithme fait croître la réduction avec la profondeur ET le rang,
     //    mais de moins en moins vite.
     for (int d = 1; d < 64; d++) {
