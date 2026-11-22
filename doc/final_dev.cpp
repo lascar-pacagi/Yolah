@@ -921,6 +921,22 @@ namespace {
     //   Le +10,3 Elo mesuré pour les poches (U5) est NET : ce coût y est déjà
     //   inclus. Le rendre moins cher (cache des poches déjà calculées, pas
     //   d'allocation) rendrait au mieux ~5-8 % de vitesse.
+    //
+    // Version rapide ESSAYÉE puis abandonnée (2026-11-22) :
+    //   • aucune allocation : une table par thread de 2^15 entrées, clé complète
+    //     (pièces, région), gardée d'un appel à l'autre ;
+    //   • décomposition : les pièces et les régions qui n'interagissent pas
+    //     sont résolues à part, et les récoltes s'additionnent (une pièce qui
+    //     choisit entre deux zones disjointes reste dans un seul groupe ; deux
+    //     groupes indépendants ne multiplient plus leurs combinaisons) ;
+    //   • les pièces qui ne touchent pas la région sont retirées de la clé.
+    //   Résultat sur le banc à profondeur fixe (13 et 15) : arbres identiques
+    //   (mêmes nœuds, 209/209 mêmes valeurs et coups), mais seulement 1 à 4 %
+    //   plus rapide. Les combinaisons ne sont pas le problème : 4,5 états par
+    //   appel en moyenne. Le coût restant vient du nombre d'appels et du
+    //   repérage des poches. Une version itérative n'aurait rien changé : la
+    //   récursion fait au plus 20 niveaux (une case remplie par niveau).
+    //   Gain trop faible pour un code moins lisible : la version simple est gardée.
     int harvest_exact_rec(uint64_t pieces, uint64_t region,
                           std::unordered_map<uint64_t, int>& memo, int64_t& budget) {
         if (--budget < 0) return -1;
