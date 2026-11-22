@@ -390,18 +390,45 @@ void FinalDevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t max_dep
     // dupliqué). Solution reprise de Stockfish (avant 2018) : chaque thread
     // secondaire SAUTE certaines profondeurs, selon son propre motif.
     //
-    // Le thread d'identifiant `s.id` reçoit un couple (taille S, phase P) lu à
-    // l'indice k = s.id % 20 des deux tables ci-dessous, et saute la profondeur d
-    // quand ⌊(d + P) / S⌋ est impair : il cherche S profondeurs consécutives,
-    // saute les S suivantes, etc., le motif étant décalé de P d'un thread à
-    // l'autre. Exemples :
-    //     k = 1  (S 1, P 1) : cherche 1, 3, 5, 7, 9…          (impaires)
-    //     k = 2  (S 2, P 0) : cherche 1, 4, 5, 8, 9, 12, 13…  (⌊d/2⌋ pair)
-    //     k = 3  (S 2, P 1) : cherche 3, 4, 7, 8, 11, 12…
-    //     k = 4  (S 2, P 2) : cherche 2, 3, 6, 7, 10, 11…
-    //     k = 5  (S 2, P 3) : cherche 1, 2, 5, 6, 9, 10…
-    //     k = 6..11  : blocs de 3, six décalages ; k = 12..19 : blocs de 4, huit décalages
-    //     k = 0  (thread 20, 40…) : (S 1, P 0) cherche 2, 4, 6…  (paires)
+    // Comment chaque thread choisit les profondeurs qu'il saute :
+    //   1. Son numéro `s.id` (0 = principal, 1, 2, …) donne un indice k = s.id % 20
+    //      (au-delà de 20 threads, les motifs recommencent).
+    //   2. k donne deux nombres, lus dans les tables SKIP_SIZE et SKIP_PHASE
+    //      ci-dessous : une taille de bloc S et un décalage P.
+    //   3. Il découpe les profondeurs en blocs de S profondeurs consécutives et
+    //      cherche un bloc sur deux : il cherche le premier, saute le suivant,
+    //      cherche le suivant, etc. Le décalage P fait commencer ce découpage
+    //      plus tôt, pour que deux threads de même taille S n'aient pas les
+    //      mêmes blocs.
+    //   En formule : la profondeur d est sautée quand q = (d + P) / S (division
+    //   entière) est impair. q est le numéro du bloc de d ; blocs pairs cherchés,
+    //   blocs impairs sautés.
+    //
+    // Exemple de calcul, thread 3 (k = 3 : S = 2, P = 1) :
+    //   d = 1 : q = (1 + 1) / 2 = 1, impair → sautée
+    //   d = 2 : q = (2 + 1) / 2 = 1, impair → sautée
+    //   d = 3 : q = (3 + 1) / 2 = 2, pair   → cherchée
+    //   d = 4 : q = (4 + 1) / 2 = 2, pair   → cherchée
+    //   d = 5 : q = (5 + 1) / 2 = 3, impair → sautée     … d'où 3, 4, 7, 8, 11, 12…
+    //
+    // Le tableau complet des 10 premiers threads (X = cherchée, . = sautée ;
+    // sans la règle « jamais la dernière profondeur », voir plus bas) :
+    //     d =                     1  2  3  4  5  6  7  8  9 10 11 12 13 14
+    //     thread 0 (principal)    X  X  X  X  X  X  X  X  X  X  X  X  X  X
+    //     thread 1 (S 1, P 1)     X  .  X  .  X  .  X  .  X  .  X  .  X  .
+    //     thread 2 (S 2, P 0)     X  .  .  X  X  .  .  X  X  .  .  X  X  .
+    //     thread 3 (S 2, P 1)     .  .  X  X  .  .  X  X  .  .  X  X  .  .
+    //     thread 4 (S 2, P 2)     .  X  X  .  .  X  X  .  .  X  X  .  .  X
+    //     thread 5 (S 2, P 3)     X  X  .  .  X  X  .  .  X  X  .  .  X  X
+    //     thread 6 (S 3, P 0)     X  X  .  .  .  X  X  X  .  .  .  X  X  X
+    //     thread 7 (S 3, P 1)     X  .  .  .  X  X  X  .  .  .  X  X  X  .
+    //     thread 8 (S 3, P 2)     .  .  .  X  X  X  .  .  .  X  X  X  .  .
+    //     thread 9 (S 3, P 3)     .  .  X  X  X  .  .  .  X  X  X  .  .  .
+    //   Threads 10 et 11 : S 3, P 4 et 5 ; threads 12 à 19 : S 4, P 0 à 7 ;
+    //   thread 20 (k = 0 : S 1, P 0) : les profondeurs paires 2, 4, 6… ; puis
+    //   thread 21 = thread 1, etc. Chaque colonne a des X et des . : à chaque
+    //   profondeur, une partie des threads y travaille et les autres sont déjà
+    //   plus loin.
     // Un thread qui saute la moitié des profondeurs arrive plus tôt aux
     // suivantes : pendant que le thread principal cherche d, certains sont déjà
     // à d + 1 ou d + 2 et remplissent la table de résultats plus profonds, que
@@ -465,6 +492,17 @@ void FinalDevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t max_dep
                 goto done;
             }
 
+            // Pourquoi `alpha > -INFINITE` : un échec bas n'a de sens que si la
+            // fenêtre a un bord bas à élargir. Si alpha vaut déjà −∞ (fenêtre
+            // pleine : profondeur < 4, fin de partie prouvée, ou alpha déjà
+            // descendu jusqu'à −∞ par les élargissements), « v ≤ alpha » ne peut
+            // arriver qu'avec v = −32000, et relancer donnerait la MÊME fenêtre
+            // (max(v − δ, −∞) = −∞) : la même recherche, le même résultat, une
+            // boucle sans fin. Avec alpha = −∞, la valeur v est exacte (rien
+            // n'est plus bas que −∞) : on la garde. Les vraies valeurs restent
+            // dans [−30000, 30000] et `root_search` part de best = −32000 : v =
+            // −32000 n'arriverait que si aucun coup n'avait été évalué. C'est
+            // une garde de sécurité ; même rôle pour `beta < INFINITE` plus bas.
             if (v <= alpha && alpha > -INFINITE) {
                 // Échec bas (fail-low) : tous les coups ont échoué sous alpha ;
                 // la vraie valeur est ≤ v. Voir l'explication en tête de section.
