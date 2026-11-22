@@ -695,8 +695,7 @@ int FinalDevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash,
 //   • Pas de réduction à depth < 3 ni sur le tout premier coup (i == 0).
 //   • Formule de base (en 1/1024 de pli, lue dans `lmr_table`) :
 //         r = LMR_BASE + ln(depth) × ln(i + 1) / LMR_DIVISOR
-//         avec LMR_BASE = 1.1158 et LMR_DIVISOR = 1.4152 (les deux constantes,
-//         pas un intervalle ; valeurs SPSA, voir final_dev.h)
+//         avec LMR_BASE = 1.1158 et LMR_DIVISOR = 1.4152
 //   • Ajustements :
 //         − 1058/1024 pli  si c'est un nœud PV (on y veut la valeur exacte :
 //                          moins de risque de rater le bon coup)
@@ -737,6 +736,27 @@ int FinalDevPlayer::late_move_reduction_of(int depth, size_t i, bool pv_node, bo
 //     pour obtenir la valeur exacte. À un nœud non-PV (beta = alpha + 1), la
 //     condition `alpha < v < beta` est impossible pour un entier : il n'y a
 //     jamais d'étape 3 pour i > 0, la fenêtre nulle suffit.
+//
+//     Pourquoi l'étape 2 peut-elle donner `alpha < v < beta` alors qu'elle
+//     cherche en fenêtre nulle (alpha, alpha + 1) ? La fenêtre nulle ne dit
+//     pas « v vaut alpha ou alpha + 1 ». Elle dit seulement de quel côté
+//     d'alpha se trouve la vraie valeur :
+//       • v <= alpha : le coup ne bat pas alpha (v est un majorant) ;
+//       • v >= alpha + 1 : le coup bat alpha, et v n'est qu'un MINORANT.
+//     La recherche est en fail-soft : dans le second cas, v n'est pas
+//     forcément alpha + 1. C'est la meilleure valeur trouvée avant la coupure,
+//     qui peut être plus haute.
+//     À un nœud PV, beta peut être bien au-dessus d'alpha + 1, donc un
+//     minorant tel que alpha < v < beta est possible, et c'est même le cas
+//     courant. On sait alors seulement que le coup vaut au moins v. On ne sait
+//     pas s'il atteint beta, ni de combien il dépasse alpha. Il faut donc
+//     relancer en fenêtre pleine pour avoir sa valeur exacte (et sa PV).
+//     Exemple : nœud PV de fenêtre (10, 50). L'étape 2 cherche en (10, 11),
+//     l'enfant coupe et renvoie v = 23. La vraie valeur vaut 23 ou plus :
+//     peut-être 23, 40 ou 60. L'étape 3 cherche en (10, 50) et tranche.
+//     Si au contraire v >= beta (ici v >= 50), le minorant suffit : le coup
+//     vaut au moins beta, le nœud coupe, et la valeur exacte est inutile.
+//     D'où la condition `v > alpha && v < beta`.
 //
 // Les signes : la valeur de l'enfant est vue par l'adversaire, d'où
 // `v = -negamax(enfant, -beta, -alpha)` ; la fenêtre (alpha, alpha+1) du nœud
