@@ -66,7 +66,9 @@ BASE_ON_SQUARE = 0.8            # the base's diameter in squares
 ANIMS = [("idle", 16, 10, True), ("move", 8, 24, False), ("blocked", 12, 12, True), ("win", 16, 12, True)]
 # figures whose idle is slower than 1.6 s: a longer loop (the owl turning its head)
 ANIMS_FOR = {"ice_basic_minmax": [("idle", 32, 8, True)] + ANIMS[1:],
-             "dino_nnue193": [("idle", 32, 8, True)] + ANIMS[1:]}    # the pteranodon's standing clip, 4 s
+             "dino_nnue193": [("idle", 32, 8, True)] + ANIMS[1:],    # the pteranodon's standing clip, 4 s
+             # the polar bear's head (sway, sniff, roar) a little slower: 2 s and 1.67 s instead of 1.6 s and 1.33 s
+             "ice_dev": [("idle", 20, 10, True), ANIMS[1], ANIMS[2], ("win", 20, 12, True)]}
 NAMES = {"sentinel": "Sentinelle", "human": "Humain", "tin_toy": "Jouet m\u00e9canique", "roller": "Roulix",
          "dicer": "T\u00eate de d\u00e9", "tree_bot": "Arborescent", "retro": "R\u00e9tro 1955", "crt": "Cathodique",
          "geometer": "G\u00e9om\u00e8tre", "android": "Androïde", "core": "Noyau",
