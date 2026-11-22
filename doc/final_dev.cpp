@@ -114,10 +114,24 @@ FinalDevPlayer::FinalDevPlayer(uint64_t microseconds,
     //    entiers (pas de flottant dans la boucle des coups), avec une précision
     //    de 1/1024 ≈ 0,001 pli, et la conversion finale en plis est une simple
     //    division entière par 1024 (une puissance de 2 : un décalage de 10 bits).
-    //    Exemple où cela compte : d = 10, 9e coup, hist = −2500 :
-    //        en 1/1024 : 4803 + 368 = 5171 → 5171 / 1024 = 5 plis ;
-    //        si la table était déjà arrondie en plis : 4 + round(0,36) = 4 + 0 = 4 plis
-    //        (les 0,69 de la base et les 0,36 de l'historique seraient perdus séparément).
+    //    Exemple où cela compte : d = 10, 9e coup (n = 9), nœud non-PV, pas le
+    //    contre-coup, hist = −2500 (un coup qui a plutôt échoué ailleurs : on le
+    //    réduit un peu PLUS) :
+    //      1. La table : 1.1158 + ln(10) × ln(9) / 1.4152 = 4.6905 plis,
+    //         stocké int(1024 × 4.6905) = int(4803.1) = 4803.
+    //      2. L'historique, ligne `r -= hist * 1024 / LMR_HIST_DIV` :
+    //         hist × 1024 = −2500 × 1024 = −2 560 000 ;
+    //         −2 560 000 / 6945 = −368.6, tronqué vers zéro (division entière) = −368 ;
+    //         r −= −368, donc r = 4803 + 368 = 5171.
+    //         Ces 368 valent 368 / 1024 = 0.36 pli (= 2500 / 6945).
+    //      3. En plis entiers : 5171 / 1024 = 5.05, division entière = 5 plis
+    //         (borné dans [0, d − 2 = 8] : inchangé). Le coup est cherché à
+    //         10 − 1 − 5 = 4 plis au lieu de 9.
+    //    Si la table était déjà en plis entiers : la base 4.69 deviendrait 4 (même
+    //    troncature), l'historique 0.36 deviendrait 0, total 4 plis. Or la vraie
+    //    somme est 4.69 + 0.36 = 5.05 > 5 : les deux fractions 0.69 et 0.36, chacune
+    //    trop petite pour faire un pli, en font un ensemble. Arrondir chaque
+    //    terme séparément les perdrait ; la virgule fixe les additionne d'abord.
     //
     //    Exemples SANS AJUSTEMENT (c.-à-d. la valeur brute de la table, celle d'un
     //    nœud non-PV, coup qui n'est pas le contre-coup, hist = 0) :
