@@ -571,12 +571,18 @@ done:
 //          est le principal challenger à tester tôt à la profondeur d + 1.
 //          (Correction « root fix » de la campagne A2 : +9 Elo à 0.2 s.)
 //
-//          Pourquoi les nœuds et pas la valeur : après le premier coup, les
+//          Pourquoi les nœuds plutôt que la valeur : après le premier coup, les
 //          autres sont cherchés en fenêtre nulle (alpha, alpha + 1) (PVS,
-//          section 4). Un coup qui ne bat pas le meilleur renvoie seulement
-//          « ≤ alpha », une borne : un coup perdant et un coup à 1 point du
-//          meilleur ont la même valeur renvoyée. Leurs valeurs ne permettent
-//          donc pas de les classer. Le nombre de nœuds, lui, les distingue :
+//          section 4). La recherche est fail-soft : un coup qui ne bat pas le
+//          meilleur renvoie une valeur v ≤ alpha qui n'est pas forcément alpha,
+//          et c'est un MAJORANT (la vraie valeur est ≤ v). Il y a donc bien une
+//          information : un coup renvoyant alpha − 2000 est sûrement mauvais.
+//          Mais ce majorant est flou près de alpha : il vient des coupures chez
+//          l'adversaire, qui s'arrêtent dès qu'une réponse suffit, pas à la
+//          meilleure ; et le coup a souvent été cherché réduit (LMR), donc
+//          moins profond. Deux coups renvoyant alpha − 3 et alpha − 40 ne
+//          sont pas classés de façon fiable.
+//          Le nombre de nœuds mesure autre chose : la difficulté de la réfutation.
 //            • un coup nettement mauvais est réfuté vite : la première réponse
 //              de l'adversaire essayée (coup de table, killer) suffit à couper
 //              dans presque chaque nœud, et la recherche réduite (LMR, étape 1)
@@ -585,6 +591,17 @@ done:
 //              la coupure n'arrive qu'après plusieurs réponses essayées, la
 //              recherche réduite peut dépasser alpha et forcer une relance à
 //              pleine profondeur (étape 2), et ses sous-arbres sont plus larges.
+//          Mesuré (campagne R1, 2026-11-05, journal de la racine à profondeur 12,
+//          où se place le coup qui deviendra le meilleur à la profondeur
+//          suivante parmi les autres) :
+//            • classé par nœuds : dans les 3 premiers 56 à 61 % des fois, rang moyen 8.5 à 10.1 ;
+//            • classé par valeur fail-soft : 48 à 51 %, rang moyen 6.1 à 6.2
+//              (moins souvent en tête, mais moins de ratés lointains) ;
+//            • classé par la somme des deux rangs : 60 à 61 %, rang moyen 5.0 à 5.6.
+//          La somme était donc le meilleur classement sur le papier (option
+//          "root order gap" du vrai joueur) ; en parties elle a perdu :
+//          −8.7 Elo [−19.1, +1.7] à 0.2 s (1000 parties), campagne abandonnée.
+//          Le tri par nœuds seul est resté.
 //          Beaucoup de nœuds = valeur proche de alpha = le coup qui a le plus de
 //          chances de devenir meilleur une fois cherché un pli plus loin.
 //
