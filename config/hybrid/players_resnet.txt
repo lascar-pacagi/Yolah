@@ -1,0 +1,3 @@
+# campaign H1: the MCTS ResNet alone against dev_u9_spsa (the hybrid that never switches)
+resnet.cfg
+dev.cfg

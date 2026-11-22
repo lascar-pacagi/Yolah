@@ -1,0 +1,3 @@
+# campaign H1: hybrid switching at ply 18 against dev_u9_spsa (nnue/hybrid_campaign.sh)
+hybrid_18.cfg
+dev.cfg

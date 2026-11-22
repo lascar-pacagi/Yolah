@@ -134,6 +134,8 @@ namespace test {
         }
 
         bool uses_gpu(const json& cfg) {
+            if (cfg.value("name", std::string()) == "HybridPlayer")   // two players, one after the other
+                return uses_gpu(cfg.at("early")) || uses_gpu(cfg.at("late"));
             return cfg.value("name", std::string()) == "AlphaZeroMCTSPlayer" &&
                    cfg.value("backend", std::string("cpu")) == "torch" &&
                    cfg.value("device", std::string("cuda")) != "cpu";
@@ -246,6 +248,9 @@ namespace test {
                 j["microseconds"] = uint64_t(std::max(1.0, j["microseconds"].get<double>() * factor));
             }
             if (opt.threads && j.contains("nb threads") && !uses_gpu(j)) j["nb threads"] = opt.threads;   // a GPU MCTS keeps its threads (its batches)
+            // HybridPlayer: its own top-level keys pass the time to both players and the
+            // threads to its late (CPU) player; the GPU MCTS keeps its threads.
+            if (opt.threads && j.value("name", string()) == "HybridPlayer") j["nb threads"] = opt.threads;
             if (j.contains("verbose")) j["verbose"] = false;
             Player::create(j);                  // fail now, not in the middle of the night
             cfgs.push_back(j);

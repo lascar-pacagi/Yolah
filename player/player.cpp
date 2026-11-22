@@ -15,6 +15,7 @@
 #include "MCTS_mem_nn_player.h"
 #include "features_net_player.h"
 #include "alphazero_mcts_player.h"
+#include "hybrid_player.h"
 #ifdef ENABLE_CUDA
 #include "alphazero_player.h"
 #endif
@@ -676,6 +677,13 @@ unique_ptr<Player> Player::create(const json& j) {
             [](const json& j) {
                 // Keys are validated by the constructor (see alphazero_mcts_player.h).
                 return make_unique<AlphaZeroMCTSPlayer>(j);
+            }
+        },
+        {
+            "HybridPlayer",
+            [](const json& j) {
+                // "early" player before "switch ply", "late" player after (see hybrid_player.h).
+                return make_unique<HybridPlayer>(j);
             }
         },
 #ifdef ENABLE_CUDA
