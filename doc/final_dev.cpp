@@ -918,6 +918,29 @@ namespace {
             const Square from = pop_lsb(pb);
             // Destinations : les cases de la région atteintes en ligne droite,
             // tout ce qui n'est pas dans la région bloquant les rayons.
+            //
+            // `attacks_bb(s, occupied)` (game/magic.h) : les cases qu'une dame
+            // posée en `s` « voit » : les 8 rayons (tour + fou, par magic
+            // bitboards), chacun s'arrêtant SUR la première case de `occupied`
+            // qu'il rencontre (cette case bloquante est incluse dans le résultat,
+            // comme une prise aux échecs).
+            // • On passe `~region` comme `occupied` : tout ce qui n'est pas une
+            //   case libre de la poche bloque. Ça couvre les trous, les pièces
+            //   adverses, les autres pièces de `pieces` (occupées, donc hors de
+            //   `region`), et aussi les cases libres hors de la poche (on calcule
+            //   la récolte de la poche seule).
+            // • `& region` retire les cases bloquantes incluses par
+            //   `attacks_bb` : il ne reste que les cases libres de la poche
+            //   atteignables d'un coup depuis `from`, c'est-à-dire les coups légaux
+            //   de cette pièce dans la poche.
+            // Exemple (une rangée) : from en a1, region = {b1, c1, e1},
+            // d1 hors région. Le rayon vers l'est voit b1, c1, puis s'arrête sur
+            // d1 (incluse). Après `& region` : {b1, c1}. e1 est derrière d1 :
+            // inaccessible en ligne droite.
+            //
+            // La boucle `for (t = …; t;)` sans incrément parcourt les bits à 1
+            // de `t` : `pop_lsb(t)` (ligne suivante) renvoie la case du bit le plus
+            // bas et l'efface de `t`. La boucle s'arrête quand `t` vaut 0.
             for (uint64_t t = attacks_bb(from, ~region) & region; t;) {
                 const Square to = pop_lsb(t);
                 if (best >= max_possible) break;   // impossible de faire mieux que de tout remplir
