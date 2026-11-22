@@ -694,7 +694,9 @@ int FinalDevPlayer::root_search(Yolah& yolah, Search& s, uint64_t hash,
 // Calcule la réduction de profondeur de base (en plis) du i-ème coup (i ≥ 0) :
 //   • Pas de réduction à depth < 3 ni sur le tout premier coup (i == 0).
 //   • Formule de base (en 1/1024 de pli, lue dans `lmr_table`) :
-//         r = LMR_BASE + ln(depth) × ln(i + 1) / LMR_DIVISOR   (1.1158, 1.4152)
+//         r = LMR_BASE + ln(depth) × ln(i + 1) / LMR_DIVISOR
+//         avec LMR_BASE = 1.1158 et LMR_DIVISOR = 1.4152 (les deux constantes,
+//         pas un intervalle ; valeurs SPSA, voir final_dev.h)
 //   • Ajustements :
 //         − 1058/1024 pli  si c'est un nœud PV (on y veut la valeur exacte :
 //                          moins de risque de rater le bon coup)
