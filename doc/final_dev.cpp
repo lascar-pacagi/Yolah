@@ -902,6 +902,25 @@ namespace {
     // occupée ; le départ devient un trou, il n'était déjà pas dans la région).
     // Renvoie −1 si le budget de nœuds `budget` est dépassé (poche trop compliquée :
     // l'appelant l'ignore alors simplement, ce qui est toujours sûr).
+    //
+    // Coût mesuré (2026-11-22, dev_u9_spsa, 1 thread, 209 positions de
+    // test/bench_positions.txt à 0,2 s, compteurs temporaires) :
+    //   • `compute_reserves` (section 6) est appelé à ~25 % des nœuds :
+    //     9,9 M appels pour 40 M nœuds. Il coûte en tout ~10 % du temps de
+    //     recherche (3,3 s sur 28,4 s), dont ~6 % pour `harvest_exact`
+    //     (1,9 s, 15 M appels) et le reste pour le repérage des poches
+    //     (deux `region_reach` et le découpage en régions).
+    //   • `harvest_exact` visite au total 69 M états, plus que la recherche
+    //     elle-même (40 M nœuds), mais ~4,5 états par appel en moyenne : les
+    //     poches sont presque toujours minuscules. Le budget n'a été dépassé
+    //     que 3 fois.
+    //   • Une bonne part de ce temps est l'allocation de la table `memo` (un
+    //     `unordered_map` neuf à chaque appel), et les mêmes poches reviennent
+    //     de nœud en nœud. Les chronomètres eux-mêmes gonflent un peu ces
+    //     chiffres (deux lectures d'horloge par appel).
+    //   Le +10,3 Elo mesuré pour les poches (U5) est NET : ce coût y est déjà
+    //   inclus. Le rendre moins cher (cache des poches déjà calculées, pas
+    //   d'allocation) rendrait au mieux ~5-8 % de vitesse.
     int harvest_exact_rec(uint64_t pieces, uint64_t region,
                           std::unordered_map<uint64_t, int>& memo, int64_t& budget) {
         if (--budget < 0) return -1;
