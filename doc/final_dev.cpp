@@ -283,6 +283,23 @@ Move FinalDevPlayer::play(Yolah yolah) {
 // le cache d'évaluations et (sauf `keep_ordering`) la mémoire des threads
 // (historiques, contre-coups, continuation, lmrh, correction, statistiques
 // d'aspiration). Après `clear_table()`, une recherche est reproductible.
+//
+// Qui l'appelle, et avec quoi :
+//   • `clear_table()` (keep_ordering = false, le défaut) : tous les appels réels —
+//     entre deux parties (test/selfplay_label_main.cpp avant chaque partie,
+//     test/opening_book_main.cpp), et avant chaque position du banc d'essai
+//     (test/search_bench_main.cpp `bench`, `cutstats`) pour que deux joueurs
+//     soient comparés à partir du même état vide.
+//   • `clear_table(true)` : UN seul usage, de mesure, `search_bench bench --warm 1`
+//     (via le joueur d'origine MinMaxNNUE_DevPlayer, dont cette classe est la
+//     copie commentée) : on vide la table et le cache mais on garde les
+//     historiques appris sur les positions PRÉCÉDENTES du banc, pour estimer
+//     la recherche « en cours de partie », où ces tables sont déjà chaudes.
+//   • Pendant une partie, personne ne l'appelle : d'un coup à l'autre la
+//     table de transposition est gardée (seule son ancienneté change, voir
+//     `new_search`) et l'historique principal est divisé par 2 (vieillissement
+//     au début de `search`). Ni le jeu de l'application ni les matchs de
+//     tournoi n'utilisent `keep_ordering`.
 void FinalDevPlayer::clear_table(bool keep_ordering) {
     yolah_table->clear();
     if (!keep_ordering) {

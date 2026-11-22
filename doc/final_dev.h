@@ -371,7 +371,8 @@ public:
     // Vide la table de transposition et le cache d'évaluations ; si
     // `keep_ordering` est faux, efface aussi tout ce que les threads ont appris
     // (historiques, contre-coups, correction…). Sert entre deux parties et
-    // pour les comparaisons reproductibles.
+    // pour les comparaisons reproductibles. `keep_ordering = true` ne sert
+    // qu'au banc d'essai `search_bench bench --warm 1` (voir le .cpp).
     void clear_table(bool keep_ordering = false);
     std::string info() override;
     json config() override;
