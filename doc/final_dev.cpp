@@ -772,8 +772,40 @@ int FinalDevPlayer::search_move(Yolah& yolah, Search& s, uint64_t hash, Move m, 
     // l'enfant le consultera dès son entrée dans `negamax`.
     yolah_table->prefetch(child);
 
-    // Enregistrement du coup joué à ce pli et invalidation de l'accumulateur enfant
-    // (il ne sera calculé que si une feuille sous cet enfant est évaluée, section 8).
+    // Deux piles indexées par le pli, une case par niveau de la branche courante
+    // (racine → nœud courant). `ply` est le pli du nœud courant, avant de jouer `m`.
+    // L'enfant est donc au pli `ply + 1`.
+    //
+    // • `s.played[ply] = m` : le coup qui mène du pli `ply` au pli `ply + 1`.
+    //   L'enfant et ses descendants le lisent en `played[ply_enfant − 1]` pour
+    //   le contre-coup, cont1, l'interception et lmrh. L'accumulateur paresseux
+    //   le lit aussi (point suivant).
+    //
+    // • `s.acc_ok[ply + 1] = false` : la case `accs[ply + 1]` contient encore
+    //   l'accumulateur d'un FRÈRE déjà exploré. Avant `m`, le nœud a peut-être
+    //   joué m1, et l'évaluation d'une feuille sous m1 a rempli accs[ply + 1]
+    //   avec la position « nœud + m1 » et l'a marquée valide. Pour l'enfant
+    //   « nœud + m », ce contenu est faux. On le marque donc invalide.
+    //   On ne le recalcule PAS maintenant (« paresseux ») : un calcul NNUE coûte
+    //   cher, et souvent aucune feuille ne sera évaluée sous cet enfant (coupure
+    //   par la table de transposition, fin de partie, valeur trouvée dans le
+    //   cache d'évaluation).
+    //   Si une évaluation a lieu plus bas, au pli P, `raw_network_value` remonte
+    //   jusqu'au dernier pli k <= P dont `acc_ok[k]` est vrai. Au pire c'est la
+    //   racine, calculée de zéro dans `search`. Puis elle redescend de k à P :
+    //   accs[k + 1] = accs[k] + l'effet du coup played[k], et ainsi de suite.
+    //   Chaque case recalculée redevient valide et sert aux autres feuilles du
+    //   même sous-arbre (section 8).
+    //   Pourquoi une case marquée vraie au-dessus de P est forcément correcte :
+    //   chaque descente invalide la case de l'enfant AVANT d'y entrer, et une
+    //   case n'est remise à vrai que par un calcul fait pour la branche courante.
+    //
+    //   Exemple : racine au pli 20 (accs[20] valide). Le nœud du pli 22 joue m :
+    //   played[22] = m, acc_ok[23] = false. Sous l'enfant, une feuille au pli 25
+    //   est évaluée. Si acc_ok[21] et acc_ok[22] sont vrais, la remontée
+    //   s'arrête à 22, et il y a 3 mises à jour : 23 (coup played[22]),
+    //   24 (played[23]) et 25 (played[24]). Le frère suivant m' remettra
+    //   acc_ok[23] à faux, mais accs[22] restera valide et resservira.
     s.played[ply]     = m;
     s.acc_ok[ply + 1] = false;
 
