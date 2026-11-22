@@ -252,10 +252,15 @@ def grid_part(points, colors, h, thickness, band=3, pad=0.03):
     dist[near] = (key[near] >> 24).to(F) / 1e4 * h
     col = torch.zeros(nvox, 3, device=DEV)
     col[near] = colors[key[near] & ((1 << 24) - 1)]
-    # chamfer outward: each pass lets the distance grow by at most one cell step
+    # chamfer outward: each pass lets the distance grow by one cell step h, whatever the
+    # neighbour (axial, face or corner diagonal): h × the number of steps is the Chebyshev
+    # distance, never more than the true one, so a ray marched on it cannot jump over a
+    # thin part. (h√3 per step, as before, overestimated by up to √3 along the axes: the
+    # rays went through the pteranodon's thin upper beak in some frames, a dark gap
+    # on the head that looked like a misplaced shadow.)
     g = dist.reshape(1, 1, D, Hh, W)
     for _ in range(int(max(D, Hh, W))):
-        m = -torch.nn.functional.max_pool3d(-g, 3, 1, 1) + h * math.sqrt(3)
+        m = -torch.nn.functional.max_pool3d(-g, 3, 1, 1) + h
         g2 = torch.minimum(g, m)
         if torch.equal(g2, g):
             break
