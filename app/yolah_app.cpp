@@ -4261,7 +4261,10 @@ enum class Scene { Menu, Setup, Game, Themes, Tutorial, Puzzles, Editor, Studio 
 // Saved in the preferences folder (settings.json).
 struct Settings {
     std::string theme = "espace";
-    bool show_eval = true, show_hint = false, show_coords = true, show_pv = false;
+    // (No "show pv": the variation on the board is not a setting, only a display of the
+    // Analyse tab for the current game; a "show pv" left in an old settings.json is ignored
+    // — it kept switching the variation on at every new game.)
+    bool show_eval = true, show_hint = false, show_coords = true;
     int time_index = 1;                       // index in TIMES
     std::string black = "human", white = "dev";
     std::vector<int> tutorial_done;           // lessons completed in this session (not saved: the tutorial starts over at each launch)
@@ -4271,7 +4274,7 @@ struct Settings {
     std::string lang = "fr";                  // language of the interface (@@I18N): "fr", "en"
     json to_json() const {
         return {{"theme", theme}, {"show eval", show_eval}, {"show hint", show_hint}, {"show coordinates", show_coords},
-                {"show pv", show_pv}, {"time index", time_index}, {"black", black}, {"white", white},
+                {"time index", time_index}, {"black", black}, {"white", white},
                 {"puzzles done", puzzles_done}, {"ai options", ai_options},
                 {"piece set", piece_set}, {"language", lang}};
     }
@@ -4281,7 +4284,6 @@ struct Settings {
         show_eval = j.value("show eval", show_eval);
         show_hint = j.value("show hint", show_hint);
         show_coords = j.value("show coordinates", show_coords);
-        show_pv = j.value("show pv", show_pv);
         time_index = j.value("time index", time_index);
         black = j.value("black", black);
         white = j.value("white", white);
@@ -4324,7 +4326,7 @@ struct App {
     std::vector<AiSpec> roster;
     Settings settings;
     // The analysis displays of the current game (evaluation bar, hint, variation on the board).
-    // A game starts with the settings' ones (setup screen); changed in the game (Analyse tab, H, E,
+    // A game starts with the setup screen's ones (the variation: off); changed in the game (Analyse tab, H, E,
     // the Indice button), they only last for this game and its "Rejouer", not for the next games
     // nor the next launches (user, 2026-11-23).
     struct View { bool eval = true, hint = false, pv = false; } view;
@@ -4772,9 +4774,10 @@ struct App {
         g.pass_at = -1;
         g.move_scroll = 0;
         g.eval_shown = 0.5f;
-        // The analysis displays come from the settings (the setup screen), unless the game is
-        // played again ("Rejouer"): then they stay as they were changed during the game.
-        if (!keep_view) view = {settings.show_eval, settings.show_hint, settings.show_pv};
+        // The analysis displays come from the setup screen ("Barre d'évaluation", "Indices"),
+        // the variation on the board starts off; unless the game is played again ("Rejouer"):
+        // then they stay as they were changed during the game.
+        if (!keep_view) view = {settings.show_eval, settings.show_hint, false};
         const std::string who[2] = {black, white};
         for (int side : {BLACK, WHITE}) {
             Slot& sl = g.slot[side];
