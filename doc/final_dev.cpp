@@ -1113,6 +1113,32 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     // Tous les élagages avant-coup (RFP, MPC, Proxy Cut) ne s'appliquent qu'aux
     // nœuds non-PV (`beta == alpha + 1`) et hors scores de fin de partie (`|beta| < WIN` :
     // quand la question porte sur un résultat prouvé, une estimation ne suffit pas).
+    //
+    // Pourquoi. La fenêtre dit quelle question on pose au nœud. Avec |beta| ≥ WIN,
+    // la question porte sur un résultat PROUVÉ : beta = WIN + 3 demande « ce nœud
+    // est-il une victoire prouvée d'au moins 3 points ? », beta = −WIN − 3 demande
+    // « évitons-nous à coup sûr une défaite de plus de 3 points ? ». De telles
+    // fenêtres apparaissent dès qu'une fin de partie a été prouvée quelque part
+    // dans l'arbre : alpha monte au-dessus de WIN (on cherche si on peut gagner
+    // PLUS largement), ou beta descend sous −WIN (on cherche à perdre MOINS
+    // largement).
+    // Or ces élagages répondent avec l'évaluation statique (toujours dans
+    // ]−WIN, WIN[) ou une recherche réduite et une marge en unités d'évaluation :
+    //   • le RFP renverrait `static_eval` comme borne inférieure dès que
+    //     static_eval − marge ≥ beta. Avec beta = −WIN − 3, c'est presque toujours
+    //     vrai (une évaluation de −0,2 victoire est très au-dessus de −WIN − 3) :
+    //     le nœud affirmerait « on ne perd pas de plus de 3 points » sur la foi
+    //     d'une estimation, alors que la position peut être une défaite forcée
+    //     de 10 points. Cette borne fausse irait dans la table, remonterait
+    //     comme un résultat prouvé (|v| > WIN signifie « prouvé », section des
+    //     valeurs de final_dev.h) et fausserait le choix entre deux fins de
+    //     partie (la plus large victoire, la plus petite défaite) ;
+    //   • le MPC et le Proxy Cut comparent une recherche réduite à beta ± une
+    //     marge de quelques milliers : à l'échelle des résultats prouvés, où un
+    //     seul point d'écart (WIN + 3 contre WIN + 4) compte, ces marges n'ont
+    //     aucun sens, et une recherche réduite ne prouve rien.
+    // Au-delà de ±WIN, seule une vraie recherche (ou le solveur exact) a le
+    // droit de répondre ; ces nœuds sont rares, les chercher sans élagage coûte peu.
     const bool pv_node  = beta - alpha > 1;
     const bool prunable = !pv_node && std::abs(beta) < WIN;
 
