@@ -77,7 +77,7 @@
 //   --verbose             let the AI players print to the terminal
 //   --export-puzzle ID --out FILE   write the puzzle's export file (puzzle_export) and quit
 //   --import-puzzle FILE  import a puzzle file (puzzle_import) and quit
-//   --browse export|import  (--scene editor) the file browser open
+//   --browse export|import|image  the file browser open (over any --scene)
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── @@INCLUDES ─────────────────────────────────────────────────────────────
@@ -4524,19 +4524,16 @@ struct App {
         std::lock_guard lock(files_mutex);
         return std::exchange(pending_files, {});
     }
-    // Opens the system's dialog to choose an image; the answer comes back as
-    // a file of Input::files with this purpose (nothing if cancelled).
-    std::string dialog_purpose;
+    // Opens the app's file browser to choose an image; the answer comes back
+    // as a file of Input::files with this purpose (nothing if cancelled).
     void choose_image(const std::string& purpose) {
-        static const SDL_DialogFileFilter filters[] = {{"Images", "png;jpg;jpeg;bmp;gif;tga"}};
-        dialog_purpose = purpose;
-        SDL_ShowOpenFileDialog(
-            [](void* user, const char* const* list, int) {
-                App* a = static_cast<App*>(user);
-                if (!list) { a->push_file("dialog-error", SDL_GetError()); return; }
-                if (list[0]) a->push_file(a->dialog_purpose, list[0]);
-            },
-            this, window, filters, 1, nullptr, false);
+        // The app's file browser (see FileBrowser), in open mode, on images.
+        browser = {};
+        browser.open = true;
+        browser.purpose = purpose;
+        browser.title = "Choisir une image";
+        browser.exts = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga"};
+        open_browser_dir();
     }
     // The file browser of the app (file_browser): to export a puzzle (save
     // mode: a folder and a name) or import one (open mode: a .json file).
@@ -4549,6 +4546,7 @@ struct App {
         std::string purpose, title, name;   // name: the file name typed (save mode)
         fs::path dir;                       // the folder shown
         std::string selected;               // the file clicked (open mode)
+        std::vector<std::string> exts{".json"};   // the files shown (lower-case extensions)
         float scroll = 0;
         bool confirm_replace = false;
     } browser;
@@ -4560,6 +4558,9 @@ struct App {
         browser.purpose = save ? "puzzle-export" : "puzzle-import";
         browser.title = save ? "Exporter le puzzle" : "Importer un puzzle";
         browser.name = default_file;
+        open_browser_dir();
+    }
+    void open_browser_dir() {
         std::error_code ec;
         if (!browser_last_dir.empty() && fs::is_directory(browser_last_dir, ec)) browser.dir = browser_last_dir;
         else if (const char* d = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS); d && fs::is_directory(d, ec)) browser.dir = d;
@@ -8051,7 +8052,8 @@ void editor_new_dialog(App& a) {
     }
 }
 
-// The app's file browser (App::FileBrowser): a modal window over the scene.
+// The app's file browser (App::FileBrowser): a modal window over any scene
+// (drawn by SDL_AppIterate after the scene, which gets no input meanwhile).
 // Left: shortcuts (home, Documents, Desktop, Downloads, and under WSL the
 // Windows user folders); right: the folder's sub-folders, then its .json
 // files. A click on a folder enters it; on a file selects it (open mode) or
@@ -8096,7 +8098,7 @@ void file_browser(App& a) {
             for (auto [n, sub] : {std::pair<const char*, const char*>{"Documents", "Documents"}, {"Bureau", "Desktop"}, {"T\xC3\xA9l\xC3\xA9" "chargements", "Downloads"}})
                 place(std::string("Windows : ") + n + " (" + u + ")", e.path() / sub);
         }
-    place("Puzzles de l'app", g_paths.assets / "puzzles");
+    if (b.exts.size() == 1 && b.exts[0] == ".json") place("Puzzles de l'app", g_paths.assets / "puzzles");
     Box side{p.x + 20 * s, p.y + 116 * s, 250 * s, p.h - 136 * s - (b.save ? 70 * s : 60 * s)};
     float y = side.y;
     for (size_t i = 0; i < places.size(); i++) {
@@ -8114,7 +8116,11 @@ void file_browser(App& a) {
         if (n.empty() || n[0] == '.') continue;
         std::error_code e2;
         if (e.is_directory(e2)) dirs.push_back(e.path());
-        else if (e.path().extension() == ".json") files.push_back(e.path());
+        else {
+            std::string x = e.path().extension().string();
+            for (auto& c : x) c = char(std::tolower(uint8_t(c)));
+            if (std::find(b.exts.begin(), b.exts.end(), x) != b.exts.end()) files.push_back(e.path());
+        }
     }
     auto by_name = [](const fs::path& x, const fs::path& y) {
         std::string u = x.filename().string(), v = y.filename().string();
@@ -8157,7 +8163,7 @@ void file_browser(App& a) {
     draw::clip(nullptr);
     if (!b.open) return;
     if (dirs.empty() && files.empty())
-        a.text.draw(Font::Regular, 15 * s, b.save ? "Dossier vide" : "Aucun fichier .json ici", {list.x + 16 * s, list.y + 14 * s}, pal::faint);
+        a.text.draw(Font::Regular, 15 * s, b.save ? "Dossier vide" : "Rien \xC3\xA0 ouvrir ici", {list.x + 16 * s, list.y + 14 * s}, pal::faint);
     if (!enter.empty()) { b.dir = enter; b.scroll = 0; b.selected.clear(); }
 
     // The bottom row.
@@ -8176,9 +8182,9 @@ void file_browser(App& a) {
             else choose(target);
         }
     } else {
-        a.text.draw(Font::Regular, 14 * s, b.selected.empty() ? "Choisissez un fichier .json (un puzzle export\xC3\xA9)" : b.selected,
+        a.text.draw(Font::Regular, 14 * s, b.selected.empty() ? (b.purpose == "puzzle-import" ? "Choisissez un fichier .json (un puzzle export\xC3\xA9)" : "Choisissez une image") : b.selected,
                     {bot.x, bot.y + 12 * s}, b.selected.empty() ? pal::faint : pal::text);
-        if (a.ui.button("fb_open", {bot.right() - 210 * s, bot.y, 210 * s, 44 * s}, "Importer", Style::Primary, !b.selected.empty(), 16) ||
+        if (a.ui.button("fb_open", {bot.right() - 210 * s, bot.y, 210 * s, 44 * s}, b.purpose == "puzzle-import" ? "Importer" : "Ouvrir", Style::Primary, !b.selected.empty(), 16) ||
             (!b.selected.empty() && a.in.key(SDLK_RETURN)))
             choose(b.dir / b.selected);
     }
@@ -8601,7 +8607,6 @@ void scene_editor(App& a) {
     a.ui.blocked = false;
     if (a.picker.open) sprite_picker(a);
     if (ed.choose_new) { editor_new_dialog(a); return; }
-    if (a.browser.open) { a.ui.blocked = false; file_browser(a); return; }
 
     // ── actions on the lists ──
     if (action == "open") {
@@ -9746,8 +9751,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     }
     // Start scene (command line).
     std::string scene = arg_value(argc, argv, "--scene", "menu");
-    if (!arg_value(argc, argv, "--browse").empty())   // the editor's file browser open (tests)
-        a->choose_puzzle_file(arg_value(argc, argv, "--browse") == "export", "deux_d_avance.json");
+    if (const std::string br = arg_value(argc, argv, "--browse"); br == "image") a->choose_image("studio-import");   // the file browser open (tests)
+    else if (!br.empty()) a->choose_puzzle_file(br == "export", "deux_d_avance.json");
     a->debug_fx = arg_value(argc, argv, "--fx");
     a->fixed_dt = arg_flag(argc, argv, "--fixed-dt");
     if (!arg_value(argc, argv, "--pieces").empty()) a->settings.piece_set = arg_value(argc, argv, "--pieces");   // a set for this run
@@ -9874,6 +9879,18 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
         a->in.keys.clear();
         a->in.text.clear();
     }
+    // The file browser (file_browser) is above the scene in the same way.
+    Input saved_browser;
+    const bool browser_open = a->browser.open && !course_open;
+    if (browser_open) {
+        saved_browser = a->in;
+        a->in.mouse = {-1e6f, -1e6f};
+        a->in.pressed = a->in.released = a->in.down = a->in.rpressed = a->in.rdown = false;
+        a->in.wheel = 0;
+        a->in.keys.clear();
+        a->in.text.clear();
+        a->in.backspaces = 0;
+    }
     switch (a->scene) {
     case Scene::Menu: scene_menu(*a); break;
     case Scene::Setup: scene_setup(*a); break;
@@ -9883,6 +9900,12 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     case Scene::Puzzles: scene_puzzles(*a); break;
     case Scene::Editor: scene_editor(*a); break;
     case Scene::Studio: scene_studio(*a); break;
+    }
+    if (browser_open) {
+        a->in = saved_browser;
+        a->ui.hovering = false;
+        a->ui.blocked = false;
+        file_browser(*a);
     }
     if (a->scene != Scene::Game) {
         a->fx.update(float(a->dt));
