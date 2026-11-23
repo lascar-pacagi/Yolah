@@ -567,6 +567,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.staged = j.value("staged", options.staged);
              options.eval_grain = j.value("eval grain", options.eval_grain);
              options.proxy_cut = j.value("proxy cut", options.proxy_cut);
+             options.proxy_static = j.value("proxy static", options.proxy_static);
              options.proxy_rank = j.value("proxy rank", options.proxy_rank);
              options.probcut_margin = j.value("probcut margin", options.probcut_margin);
              options.proxy_depth = j.value("proxy depth", options.proxy_depth);

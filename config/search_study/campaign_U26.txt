@@ -1,0 +1,9 @@
+# Campaign U26 (2026-11-23, user's question): the proxy cut's "static_eval >= beta" condition measured alone.
+#   u26_proxy_nostatic = dev_u9_spsa with "proxy static" false: the proxy test (an ordinary move at reduced
+#   depth reaching beta) tried at every non-PV node of depth >= 4, not only where the static value is >= beta.
+#   Only measured before in Othello (Egaroucid stage A: +236.8 with, +230.2 without, no difference).
+#   2000 games per line (1000 rounds, balanced book), one thread per player.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-2 nnue/search_study.sh campaign_U26.txt
+# 1: at 0.2 s, 2: at 1 s
+u26_proxy_nostatic dev_u9_spsa 200000 1000 261
+u26_proxy_nostatic dev_u9_spsa 1000000 1000 262

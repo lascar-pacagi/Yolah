@@ -436,6 +436,8 @@ struct MinMaxNNUE_DevOptions {
     int  territory_weight = 512;     // ["territory weight"] score = history + weight · territory
     bool fast_influence = true;      // ["fast influence"] influence_fast (same values, less work)
     int  proxy_cut = 1;              // ["proxy cut"] 0 = off, 1 = ordinary move vs beta, 2 = ProbCut
+    bool proxy_static = true;        // ["proxy static"] variant 1 only where the static value is already >= beta
+                                     //   (false: at every non-PV node of depth >= proxy depth; campaign U26)
     int  proxy_rank = 0;             // ["proxy rank"] 1: which ordinary move (0 = the best-ordered one)
     int  probcut_margin = 3000;      // ["probcut margin"] 2: searched against beta + this
     int  proxy_depth = 4;            // ["proxy depth"] only at nodes of at least this depth

@@ -1281,7 +1281,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     // that move has been searched without cutting (stage 2 of the loop).
     auto proxy_test = [&]() -> int {
         if (options.proxy_cut > 0 && prunable && !sym_unsure && depth >= options.proxy_depth && !s.proxy_off && !proxy_done
-            && (options.proxy_cut == 2 || static_eval >= beta)) {
+            && (options.proxy_cut == 2 || !options.proxy_static || static_eval >= beta)) {
             if (!generated) {                       // the test needs the move list
                 yolah.moves(moves);
                 generated = true;
@@ -3482,6 +3482,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["history prior threshold"] = options.history_prior_threshold;
     j["history prior top"] = options.history_prior_top;
     j["proxy cut"] = options.proxy_cut;
+    j["proxy static"] = options.proxy_static;
     j["proxy rank"] = options.proxy_rank;
     j["probcut margin"] = options.probcut_margin;
     j["proxy depth"] = options.proxy_depth;
