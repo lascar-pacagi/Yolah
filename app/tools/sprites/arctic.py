@@ -75,6 +75,9 @@ def root_of(anim, t, lift=0.0):
 def quadruped(sc, anim, t, fm, bm, s=1.0, leg=1.0, bulk=1.0, snout=1.0, ears=1.0, ear_round=False, neck=1.0):
     gait = TAU * t * (2 if anim == "move" else 0.5)
     lift = 0.03 * s * abs(math.sin(gait)) if anim == "move" else 0.0
+    if anim == "idle":     # breathing: the body rises and sinks a little
+        lift = 0.004 * s * math.sin(TAU * t)
+    r = 0.5 - 0.5 * math.cos(TAU * t)   # 0 → 1 → 0 over the loop (win: the howl rises and falls back)
     L = 0.23 * s * leg
     root = RY(HEAD + (0.25 * math.sin(TAU * 3 * t) if anim == "blocked" else 0)) * T(0, BASE_TOP + L + 0.02 * s + lift, 0)
     sc.add(sd_ellipsoid(0.09 * s * bulk, 0.09 * s * bulk, 0.21 * s), fm, root * T(0, 0, -0.03 * s))
@@ -94,7 +97,8 @@ def quadruped(sc, anim, t, fm, bm, s=1.0, leg=1.0, bulk=1.0, snout=1.0, ears=1.0
         sc.add(sd_ellipsoid(0.026 * s * bulk, 0.013 * s, 0.034 * s), fm, hip * T(0, -L - 0.005 * s, 0.015 * s))
     howl = anim == "win"
     nk = root * T(0, 0.06 * s, 0.17 * s)
-    head = nk * T(0, 0.1 * s * neck, 0.07 * s) * RX(-0.6 if howl else (0.15 if anim == "blocked" else 0.0))
+    pitch = {"win": -0.25 - 0.5 * r, "blocked": 0.15, "idle": 0.1 * math.sin(TAU * t)}.get(anim, 0.0)   # idle: a slow nod
+    head = nk * T(0, 0.1 * s * neck, 0.07 * s) * RX(pitch)
     sc.add(sd_capsule((0, 0, 0), (0, 0.09 * s * neck, 0.06 * s), 0.062 * s * bulk, 0.05 * s), fm, nk, blend=0.03 * s)
     sc.add(sd_ellipsoid(0.06 * s, 0.056 * s, 0.066 * s), fm, head)
     sc.add(sd_capsule((0, -0.01 * s, 0.03 * s), (0, -0.025 * s, 0.13 * s * snout), 0.036 * s, 0.02 * s), fm, head, blend=0.02 * s)
@@ -403,7 +407,8 @@ def walrus(anim, t, side):
     def wrinkled(f):
         return lambda q: f(q) - 0.0025 * torch.sin(q[:, 1] * 180 + 14 * fbm(q * 9, 3)) - 0.004 * fbm(q * 25, 2)
     breathe = 0.01 * math.sin(TAU * t)
-    up = 0.45 if anim == "win" else 0.2 + 0.03 * math.sin(TAU * t)
+    # win: the head rises and falls back, bellowing (r: 0 → 1 → 0 over the loop)
+    up = 0.25 + 0.3 * (0.5 - 0.5 * math.cos(TAU * t)) if anim == "win" else 0.2 + 0.03 * math.sin(TAU * t)
     sc.add(wrinkled(sd_ellipsoid(0.17, 0.13 + breathe, 0.24)), wr, X * T(0, 0.15, -0.07))
     sc.add(wrinkled(sd_ellipsoid(0.15, 0.15, 0.13)), wr, X * T(0, 0.21, 0.1), blend=0.08)
     sc.add(wrinkled(sd_ellipsoid(0.08, 0.06, 0.14)), wr, X * T(0, 0.08, -0.3), blend=0.06)
@@ -458,7 +463,8 @@ def muskox(anim, t, side):
         pts = swing_pts([(0.075 * sgn, 0.2, z), (0.075 * sgn, 0.1, z + (0.0 if front else -0.02)), (0.075 * sgn, 0.02, z + 0.01)], sw)
         limb(sc, legs_m, X, pts, [0.04, 0.028, 0.026], 0.003, 90, 0.015)
         sc.add(sd_ellipsoid(0.03, 0.014, 0.035), Mat("#1a1612", rough=0.4, clearcoat=0.5), X * T(pts[-1][0], 0.013, pts[-1][2] + 0.01))   # the hoof
-    low = 0.2 if anim == "win" else (0.05 if anim == "blocked" else 0.0)
+    # idle: the head nods slowly; win: it butts, the horns swept down then back up (r: 0 → 1 → 0)
+    low = (0.02 + 0.3 * (0.5 - 0.5 * math.cos(TAU * t))) if anim == "win" else (0.05 if anim == "blocked" else 0.06 * math.sin(TAU * t))
     hd = X * T(0, 0.3 - low * 0.3, 0.29) * RX(0.5 + low) * T(0, 0, 0) 
     S_ = 1.35
     sc.add(furry(sd_ellipsoid(0.07 * S_, 0.08 * S_, 0.1 * S_), 0.01, 40, hang=0.7), hair, hd, blend=0.05)
@@ -725,6 +731,11 @@ def mammoth(anim, t, side):
     sc = Scene()
     base(sc, side)
     (fl, fr, hl, hr), bob = gait(anim, t)
+    # win (1.33 s loop): it trumpets once, r from 0 to 1 and back: the trunk
+    # swings up, the head rises, a forefoot lifts and stamps
+    r = 0.5 - 0.5 * math.cos(TAU * t) if anim == "win" else 0.0
+    if anim == "win":
+        fr = -0.5 * r
     X = frame_of(anim, t, bob)
     hair = pelt("#4a2e1c", "#36200f", k=60, spread=0.35, strands=0.7)
     amp, k = 0.014, 32.0
@@ -738,8 +749,8 @@ def mammoth(anim, t, side):
         limb(sc, legs_m, X, pts, [0.058, 0.046, 0.046], 0.008, 40, 0.02, hang=0.4)
         sc.add(sd_cylinder(0.014, 0.05, 0.008), Mat("#2a2420", rough=0.6), X * T(pts[-1][0], 0.014, pts[-1][2]))           # the foot
     sc.add(furry(sd_capsule((0, 0, 0), (0, -0.1, -0.04), 0.015, 0.008), 0.01, 40, hang=0.8), hair, X * T(0, 0.38, -0.3))  # the short tail
-    raise_ = 0.6 if anim == "win" else 0.08 * math.sin(TAU * t)
-    hd = X * T(0, 0.55, 0.21) * RX(0.25 - (0.2 if anim == "win" else 0.0))
+    raise_ = 0.1 + 0.7 * r if anim == "win" else 0.08 * math.sin(TAU * t)
+    hd = X * T(0, 0.55, 0.21) * RX(0.25 - 0.3 * r)
     sc.add(furry(sd_ellipsoid(0.1, 0.12, 0.1), 0.01, 36, hang=0.5), hair, hd, blend=0.06)
     sc.add(furry(sd_ellipsoid(0.07, 0.07, 0.07), 0.01, 36), hair, hd * T(0, 0.1, -0.02), blend=0.05)                 # the dome
     skin_m = Mat("#3a2a20", rough=0.7, pattern=lambda pl, pw, n: {"albedo": srgb("#3e2c22") * (0.8 + 0.3 * fbm(pl * 50, 2))[:, None]})
@@ -794,7 +805,8 @@ def reindeer(anim, t, side):
             sc.add(sd_ellipsoid(0.012, 0.012, 0.022), hoof, X * T(pts[-1][0] + d * 0.009, 0.012, pts[-1][2] + 0.012) * RY(0.12 * d))
     # the neck, carried forward and up, the mane hanging under it
     low = 0.25 if anim == "blocked" else 0.0
-    up = 0.25 if anim == "win" else 0.04 * math.sin(TAU * t)
+    # win: it tosses its antlers, the head thrown up then back (r: 0 → 1 → 0)
+    up = 0.05 + 0.35 * (0.5 - 0.5 * math.cos(TAU * t)) if anim == "win" else 0.04 * math.sin(TAU * t)
     nk = X * T(0, 0.33, 0.15) * RX(-0.75 - up + low)
     sc.add(furry(sd_capsule((0, 0, 0), (0, 0, 0.13), 0.055, 0.04), amp, k), pale, nk, blend=0.04)
     sc.add(furry(sd_ellipsoid(0.04, 0.06, 0.08), 0.012, 40, hang=1.0), pale, nk * T(0, -0.04, 0.06), blend=0.03)   # the throat mane

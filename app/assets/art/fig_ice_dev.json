@@ -14,7 +14,7 @@
       "name": "idle",
       "fps": 10,
       "loop": true,
-      "frames": 16
+      "frames": 20
     },
     {
       "name": "move",
@@ -32,7 +32,7 @@
       "name": "win",
       "fps": 12,
       "loop": true,
-      "frames": 16
+      "frames": 20
     }
   ],
   "white": "fig_ice_dev_blanc"
