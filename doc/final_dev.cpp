@@ -1238,9 +1238,17 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     // Pourquoi le Proxy Cut au lieu du Null Move Pruning ?
     //   Le null move des moteurs d'échecs demande « même si je passe mon tour,
     //   suis-je encore ≥ beta ? » ; il suppose que passer est pire que le
-    //   meilleur coup. À Yolah c'est faux très souvent (zugzwang : bouger détruit
-    //   une case de son propre territoire, passer serait un cadeau). Le null move
-    //   croit donc à tort que la position est bonne et coupe à tort (−81 Elo).
+    //   meilleur coup. À Yolah c'est faux très souvent : c'est un jeu de
+    //   zugzwang, où être obligé de jouer est souvent un désavantage. Tout coup
+    //   ENGAGE : la pièce part dans une direction, vers une zone, et ne pourra
+    //   pas revenir en arrière (sa case de départ devient un trou, le chemin
+    //   du retour est coupé). Jouer, c'est choisir sa zone et le montrer à
+    //   l'adversaire ; tant qu'on ne bouge pas, on garde toutes ses options
+    //   (rester entre deux zones, attendre de voir où l'adversaire s'engage).
+    //   Passer serait donc souvent MEILLEUR que tous les coups légaux : un
+    //   cadeau qu'on se ferait (et que les règles interdisent, on ne passe que
+    //   bloqué). Le null move, qui fait jouer ce cadeau, surestime la position
+    //   et coupe à tort (−81 Elo mesurés).
     //   À l'inverse, tester un VRAI coup légal `m` est toujours sain vis-à-vis
     //   du zugzwang :
     //       valeur(meilleur_coup) ≥ valeur(m)
