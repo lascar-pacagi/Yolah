@@ -1,0 +1,3 @@
+# campaign H2: mm_32_1000 against dev_u9_spsa (nnue/leafmm_campaign.sh)
+mm_32_1000.cfg
+../hybrid/dev.cfg

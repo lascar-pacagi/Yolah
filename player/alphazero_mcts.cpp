@@ -78,6 +78,7 @@ struct Search::Worker {
         uint32_t path_len;
     };
     PRNG prng;
+    size_t id = 0;                       // the thread's index (LeafValue)
     std::vector<Leaf> leaves;            // distinct leaves to evaluate
     std::vector<Descent> descents;       // one per gathered visit
     std::vector<PathStep> paths;         // (batch_size + 1) × MAX_PATH steps
@@ -609,7 +610,14 @@ void Search::run_worker(Worker& w, const Yolah& root_position) {
             // ── 3. expand ... ──
             for (size_t i = 0; i < nb; i++) {
                 Worker::Leaf& leaf = w.leaves[i];
-                const nn::Result& r = w.results[i];
+                nn::Result& r = w.results[i];
+                // Another value for the leaf (LeafValue: a minimax late in the
+                // game): it replaces the network's here, so the cache, the
+                // expansion and the back-ups below all use it.
+                if (leaf_value) {
+                    float v;
+                    if (leaf_value->value(w.id, leaf.state, r.value, v)) r.value = v;
+                }
                 priors_from_logits(r, leaf.moves.size(), priors);
                 cache->store(leaf.hash, leaf.moves.size(), r.value, priors);
                 expand(*leaf.node, leaf.moves, priors, r.value);
@@ -657,6 +665,7 @@ SearchResult Search::search(const Yolah& state) {
         // Distinct, non-zero seeds per thread and per search.
         const uint64_t seed = (base_seed + 0x9E3779B97F4A7C15ull * (search_counter * prm.nb_threads + t + 1)) | 1;
         workers.push_back(std::make_unique<Worker>(seed, prm.batch_size));
+        workers.back()->id = t;
     }
     ++search_counter;
 

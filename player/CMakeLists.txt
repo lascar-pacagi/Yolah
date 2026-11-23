@@ -7,7 +7,7 @@ set(PLAYER_SOURCES
     minmax_nnue_baseline_player.cpp minmax_nnue_dev_player.cpp endgame_solver.cpp search_table.cpp
     features_net_player.cpp
     alphazero_mcts.cpp alphazero_mcts_player.cpp alphazero_selfplay.cpp
-    hybrid_player.cpp
+    hybrid_player.cpp leaf_minimax.cpp
 )
 
 # Add AlphaZero player if CUDA is enabled

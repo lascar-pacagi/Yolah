@@ -35,7 +35,9 @@
 //   "reuse tree": true,
 //   "nn cache": 64,                   // MB of transposition cache for network outputs (0 = off)
 //   "seed": 0,
-//   "verbose": false                  // print the root statistics after every move
+//   "verbose": false,                 // print the root statistics after every move
+//   "leaf minimax": { ... }           // optional: late leaves valued by a minimax NNUE search
+//                                     //   (player/leaf_minimax.h, campaign H2)
 // }
 // Only "microseconds" (or "nb simulations") and "weights" are mandatory.
 //
@@ -57,6 +59,7 @@
 #include "nn_evaluator.h"
 #include <memory>
 #include <memory_resource>
+class LeafMinimax;
 #include <string>
 
 class AlphaZeroMCTSPlayer : public Player {
@@ -85,6 +88,10 @@ private:
     bool verbose;
     std::pmr::synchronized_pool_resource memory;
     std::unique_ptr<nn::Evaluator> net;
+    std::unique_ptr<LeafMinimax> leaf_mm;   // before searcher: destroyed after it
+    // per game, with a leaf minimax: new leaves (network evaluations) and seconds of the moves before / from its "min ply"
+    uint64_t sims_early = 0, sims_late = 0;
+    double   secs_early = 0, secs_late = 0;
     std::unique_ptr<az::Search> searcher;
     az::SearchResult last;
 };

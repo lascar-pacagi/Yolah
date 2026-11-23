@@ -1,5 +1,6 @@
 #include "alphazero_mcts_player.h"
 #include "batched_evaluator.h"
+#include "leaf_minimax.h"
 #include <iostream>
 #include <stdexcept>
 #include <thread>
@@ -78,6 +79,10 @@ AlphaZeroMCTSPlayer::AlphaZeroMCTSPlayer(const json& j) : cfg(j) {
         net = std::move(backend);
     }
     searcher = std::make_unique<az::Search>(*net, p, &memory);
+    if (j.contains("leaf minimax")) {
+        leaf_mm = std::make_unique<LeafMinimax>(j["leaf minimax"], p.nb_threads, p.score_utility, p.score_scale);
+        searcher->set_leaf_value(leaf_mm.get());
+    }
 }
 
 AlphaZeroMCTSPlayer::~AlphaZeroMCTSPlayer() {
@@ -87,12 +92,28 @@ AlphaZeroMCTSPlayer::~AlphaZeroMCTSPlayer() {
 
 Move AlphaZeroMCTSPlayer::play(Yolah yolah) {
     last = searcher->search(yolah);
-    if (verbose) std::cout << last.to_string() << std::flush;
+    if (leaf_mm) {
+        // the root's subtree reaches the leaf minimax's plies from a few plies before them: "late" = the
+        // moves whose root is at most 4 plies before "min ply"
+        const bool late = yolah.nb_plies() + 4 >= cfg["leaf minimax"].value("min ply", 30);
+        (late ? sims_late : sims_early) += last.nb_evaluations;   // new leaves (network calls), not the simulations: late in the game most of these back up finished games
+        (late ? secs_late : secs_early) += last.seconds;
+    }
+    if (verbose) std::cout << last.to_string() << (leaf_mm ? leaf_mm->stats() : std::string()) << std::flush;
     return last.best_move;
 }
 
 void AlphaZeroMCTSPlayer::game_over(Yolah) {
     searcher->reset();
+    if (leaf_mm) {
+        // one line per game on stderr (the tournament's log): what the leaf searches cost
+        std::cerr << "[leaf minimax] new leaves/s " << uint64_t(sims_early / std::max(secs_early, 1e-9))
+                  << " before, " << uint64_t(sims_late / std::max(secs_late, 1e-9)) << " from min ply - 4; "
+                  << leaf_mm->stats() << std::flush;
+        sims_early = sims_late = 0;
+        secs_early = secs_late = 0;
+        leaf_mm->new_game();
+    }
 }
 
 void AlphaZeroMCTSPlayer::reload_weights(const std::string& filename) {
@@ -104,7 +125,8 @@ void AlphaZeroMCTSPlayer::reload_weights(const std::string& filename) {
 }
 
 std::string AlphaZeroMCTSPlayer::info() {
-    return "alphazero mcts player (PUCT + value/policy resnet, " + net->info() + ")";
+    return "alphazero mcts player (PUCT + value/policy resnet, " + net->info() + ")"
+         + (leaf_mm ? " + leaf minimax from ply " + std::to_string(cfg["leaf minimax"].value("min ply", 30)) : "");
 }
 
 json AlphaZeroMCTSPlayer::config() {

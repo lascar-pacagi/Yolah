@@ -239,6 +239,18 @@ struct SearchResult {
     std::string to_string(size_t max_children = 8) const;
 };
 
+// Another value for the leaves (player/leaf_minimax.h: a short minimax NNUE
+// search late in the game). Called by the search thread that gathered the
+// leaf, right after the network evaluated it: returns true and sets `value`
+// (for the side to move at `state`, in [−1, 1]) to replace the network's
+// value; false keeps it. The priors stay the network's. `thread` is the
+// search thread's index (0 .. nb_threads − 1), so that each thread can own
+// its engine. The value replaced is also the one stored in the network cache.
+struct LeafValue {
+    virtual ~LeafValue() = default;
+    virtual bool value(size_t thread, const Yolah& state, float net_value, float& value) = 0;
+};
+
 class Search {
 public:
     Search(nn::Evaluator& evaluator, const SearchParams& params, std::pmr::memory_resource* memory);
@@ -257,6 +269,8 @@ public:
     SearchParams&       params()       { return prm; }
     const SearchParams& params() const { return prm; }
     size_t nb_nodes() const { return node_count.load(std::memory_order_relaxed); }
+    // The leaves' other value (null = the network's only). Not owned.
+    void set_leaf_value(LeafValue* lv) { leaf_value = lv; }
 
 private:
     struct Node;
@@ -300,6 +314,7 @@ private:
     void root_play_values(std::vector<ChildStat>& children) const;
 
     nn::Evaluator& evaluator;
+    LeafValue* leaf_value = nullptr;
     SearchParams prm;
     std::pmr::polymorphic_allocator<> alloc;
     Shard shards[NB_SHARDS];

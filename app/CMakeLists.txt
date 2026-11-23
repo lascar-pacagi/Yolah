@@ -92,7 +92,7 @@ set(ENGINE_SOURCES
     ${R}/player/minmax_nnue_baseline_player.cpp ${R}/player/minmax_nnue_dev_player.cpp
     ${R}/player/endgame_solver.cpp ${R}/player/search_table.cpp
     ${R}/player/features_net_player.cpp
-    ${R}/player/alphazero_mcts.cpp ${R}/player/alphazero_mcts_player.cpp ${R}/player/hybrid_player.cpp
+    ${R}/player/alphazero_mcts.cpp ${R}/player/alphazero_mcts_player.cpp ${R}/player/hybrid_player.cpp ${R}/player/leaf_minimax.cpp
     ${R}/nnue/nnue.cpp ${R}/nnue/nnue_quantized.cpp ${R}/nnue/nnue_persp.cpp ${R}/nnue/ffnn.cpp ${R}/nnue/ffnn_float.cpp
     ${R}/nnue/nn_evaluator.cpp ${R}/nnue/resnet.cpp ${R}/nnue/batched_evaluator.cpp
     ${R}/optimization/cem.cpp ${R}/optimization/nelder_mead.cpp
