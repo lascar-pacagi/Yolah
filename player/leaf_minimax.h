@@ -62,6 +62,7 @@ private:
     std::unique_ptr<std::counting_semaphore<1024>> slots;   // null: no limit
     std::atomic<uint64_t> nb_searches{0}, nb_nodes{0}, nb_proven{0}, nb_us{0};
     std::atomic<double>   sum_diff{0.0};             // Σ |minimax − network|
+    std::atomic<double>   sum_net{0.0}, sum_mm{0.0}; // Σ |network|, Σ |minimax| (the two scales)
 };
 
 #endif

@@ -62,6 +62,10 @@ bool LeafMinimax::value(size_t thread, const Yolah& state, float net_value, floa
     nb_us.fetch_add(uint64_t(us), std::memory_order_relaxed);
     double d = sum_diff.load(std::memory_order_relaxed);
     while (!sum_diff.compare_exchange_weak(d, d + std::abs(mm - net_value), std::memory_order_relaxed)) {}
+    double a = sum_net.load(std::memory_order_relaxed);
+    while (!sum_net.compare_exchange_weak(a, a + std::abs(net_value), std::memory_order_relaxed)) {}
+    double b = sum_mm.load(std::memory_order_relaxed);
+    while (!sum_mm.compare_exchange_weak(b, b + std::abs(mm), std::memory_order_relaxed)) {}
     return true;
 }
 
@@ -71,10 +75,10 @@ void LeafMinimax::new_game() {
 
 std::string LeafMinimax::stats() {
     const uint64_t n = nb_searches.exchange(0), nd = nb_nodes.exchange(0), pr = nb_proven.exchange(0), us = nb_us.exchange(0);
-    const double diff = sum_diff.exchange(0.0);
+    const double diff = sum_diff.exchange(0.0), net = sum_net.exchange(0.0), mmv = sum_mm.exchange(0.0);
     if (n == 0) return "leaf minimax: no leaf searched\n";
     char buf[256];
-    std::snprintf(buf, sizeof buf, "leaf minimax: %llu leaves, %.0f nodes and %.2f ms per leaf, %.1f %% proven, mean |minimax - net| %.3f\n",
-                  (unsigned long long)n, double(nd) / n, us / 1000.0 / n, 100.0 * pr / n, diff / n);
+    std::snprintf(buf, sizeof buf, "leaf minimax: %llu leaves, %.0f nodes and %.2f ms per leaf, %.1f %% proven, mean |minimax - net| %.3f, mean |net| %.3f, mean |minimax| %.3f\n",
+                  (unsigned long long)n, double(nd) / n, us / 1000.0 / n, 100.0 * pr / n, diff / n, net / n, mmv / n);
     return buf;
 }
