@@ -1258,6 +1258,15 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     //   La seule approximation est la profondeur réduite (comme pour le null move).
     // Conditions : nœud non-PV, depth ≥ 4, et évaluation statique déjà ≥ beta
     // (sinon le test échouerait presque toujours).
+    // Cette condition n'a JAMAIS été mesurée seule dans Yolah : la variante 1
+    // du vrai joueur (« proxy cut » 1) l'impose toujours, il n'existe pas
+    // d'option pour l'enlever. Elle n'a été mesurée qu'à Othello, dans
+    // Egaroucid (étude du Proxy Cut, 2026-10, stage A, 800 parties, même
+    // adversaire) : avec la condition +236.8 Elo [+211.7, +264.2], sans
+    // +230.2 [+206.1, +256.4] — aucune différence mesurable. Elle sert surtout
+    // à ne pas payer le test là où il échouerait (sa recherche réduite coûte
+    // des nœuds) ; elle ne change pas sa justesse (un coup qui atteint beta
+    // reste une preuve, que l'évaluation statique soit haute ou non).
     if (prunable && depth >= PROXY_DEPTH && static_eval >= beta) {
         if (!generated) {
             yolah.moves(moves);
