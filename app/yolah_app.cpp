@@ -77,6 +77,7 @@
 //   --verbose             let the AI players print to the terminal
 //   --export-puzzle ID --out FILE   write the puzzle's export file (puzzle_export) and quit
 //   --import-puzzle FILE  import a puzzle file (puzzle_import) and quit
+//   --browse export|import  (--scene editor) the file browser open
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── @@INCLUDES ─────────────────────────────────────────────────────────────
@@ -4537,23 +4538,33 @@ struct App {
             },
             this, window, filters, 1, nullptr, false);
     }
-    // The system's dialogs for a puzzle file (export: "Enregistrer sous",
-    // import: "Ouvrir"); the answer comes back like choose_image's, purpose
-    // "puzzle-export" / "puzzle-import". `default_file`: the proposed name, in
-    // the user's Documents folder.
+    // The file browser of the app (file_browser): to export a puzzle (save
+    // mode: a folder and a name) or import one (open mode: a .json file).
+    // Drawn by the app itself, not the system's dialog: SDL's dialogs need
+    // a desktop portal or zenity on Linux, absent under WSL, and the export
+    // then failed silently. The chosen path comes back like a dialog's, as a
+    // file of Input::files with the purpose "puzzle-export" / "puzzle-import".
+    struct FileBrowser {
+        bool open = false, save = false;
+        std::string purpose, title, name;   // name: the file name typed (save mode)
+        fs::path dir;                       // the folder shown
+        std::string selected;               // the file clicked (open mode)
+        float scroll = 0;
+        bool confirm_replace = false;
+    } browser;
+    fs::path browser_last_dir;              // where the browser opens next time (this session)
     void choose_puzzle_file(bool save, const std::string& default_file = "") {
-        static const SDL_DialogFileFilter filters[] = {{"Puzzle Yolah (JSON)", "json"}};
-        dialog_purpose = save ? "puzzle-export" : "puzzle-import";
-        static std::string location;   // must outlive the call (the dialog may read it later)
-        const char* docs = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
-        location = docs ? (fs::path(docs) / default_file).string() : default_file;
-        auto cb = [](void* user, const char* const* list, int) {
-            App* a = static_cast<App*>(user);
-            if (!list) { a->push_file("dialog-error", SDL_GetError()); return; }
-            if (list[0]) a->push_file(a->dialog_purpose, list[0]);
-        };
-        if (save) SDL_ShowSaveFileDialog(cb, this, window, filters, 1, location.empty() ? nullptr : location.c_str());
-        else      SDL_ShowOpenFileDialog(cb, this, window, filters, 1, docs, false);
+        browser = {};
+        browser.open = true;
+        browser.save = save;
+        browser.purpose = save ? "puzzle-export" : "puzzle-import";
+        browser.title = save ? "Exporter le puzzle" : "Importer un puzzle";
+        browser.name = default_file;
+        std::error_code ec;
+        if (!browser_last_dir.empty() && fs::is_directory(browser_last_dir, ec)) browser.dir = browser_last_dir;
+        else if (const char* d = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS); d && fs::is_directory(d, ec)) browser.dir = d;
+        else if (const char* h = SDL_GetUserFolder(SDL_FOLDER_HOME)) browser.dir = h;
+        else browser.dir = fs::current_path(ec);
     }
     // Copies an image into assets/<folder>/ (a free name from its own);
     // returns the new file name, "" on failure.
@@ -8040,6 +8051,139 @@ void editor_new_dialog(App& a) {
     }
 }
 
+// The app's file browser (App::FileBrowser): a modal window over the scene.
+// Left: shortcuts (home, Documents, Desktop, Downloads, and under WSL the
+// Windows user folders); right: the folder's sub-folders, then its .json
+// files. A click on a folder enters it; on a file selects it (open mode) or
+// takes its name (save mode); a second click on the selected file opens it.
+// Save mode: the name field, "Enregistrer" (asks before replacing a file).
+void file_browser(App& a) {
+    const float s = a.s;
+    auto& b = a.browser;
+    draw::rect({0, 0, float(a.w), float(a.h)}, hex(0x000000, 170));
+    Box p{a.w * 0.5f - 470 * s, 60 * s, 940 * s, a.h - 120 * s};
+    a.ui.panel(p, 22, hex(0x1a202b));
+    a.text.draw(Font::Black, 24 * s, b.title, {p.x + 28 * s, p.y + 20 * s}, pal::text);
+    auto close = [&] { a.browser_last_dir = b.dir; b.open = false; };
+    auto choose = [&](const fs::path& f) { a.push_file(b.purpose, f.string()); close(); };
+    if (a.ui.button("fb_cancel", {p.right() - 150 * s, p.y + 16 * s, 122 * s, 42 * s}, "Annuler", Style::Ghost) ||
+        (a.ui.focus.empty() && a.in.key(SDLK_ESCAPE))) {
+        a.in.eat(SDLK_ESCAPE);
+        close();
+        return;
+    }
+    // The current folder, and "up".
+    std::error_code ec;
+    if (a.ui.button("fb_up", {p.x + 28 * s, p.y + 66 * s, 130 * s, 36 * s}, "\xE2\x86\x91 Parent", Style::Normal, b.dir.has_parent_path() && b.dir != b.dir.root_path(), 14)) {
+        b.dir = b.dir.parent_path();
+        b.scroll = 0;
+    }
+    std::string shown = b.dir.string();
+    while (shown.size() > 4 && a.text.width(Font::Regular, 15 * s, shown) > p.w - 220 * s) shown = "\xE2\x80\xA6" + shown.substr(std::min<size_t>(shown.size(), 5));
+    a.text.draw(Font::Regular, 15 * s, shown, {p.x + 172 * s, p.y + 74 * s}, pal::dim);
+
+    // Shortcuts.
+    std::vector<std::pair<std::string, fs::path>> places;
+    auto place = [&](const std::string& n, const fs::path& d) { if (!d.empty() && fs::is_directory(d, ec)) places.push_back({n, d}); };
+    if (const char* h = SDL_GetUserFolder(SDL_FOLDER_HOME)) place("Dossier personnel", h);
+    if (const char* d = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS)) place("Documents", d);
+    if (const char* d = SDL_GetUserFolder(SDL_FOLDER_DESKTOP)) place("Bureau", d);
+    if (const char* d = SDL_GetUserFolder(SDL_FOLDER_DOWNLOADS)) place("T\xC3\xA9l\xC3\xA9" "chargements", d);
+    if (fs::is_directory("/mnt/c/Users", ec))   // WSL: the Windows side
+        for (auto& e : fs::directory_iterator("/mnt/c/Users", ec)) {
+            const std::string u = e.path().filename().string();
+            if (u == "Public" || u == "Default" || u == "All Users" || u == "Default User" || !e.is_directory(ec)) continue;
+            for (auto [n, sub] : {std::pair<const char*, const char*>{"Documents", "Documents"}, {"Bureau", "Desktop"}, {"T\xC3\xA9l\xC3\xA9" "chargements", "Downloads"}})
+                place(std::string("Windows : ") + n + " (" + u + ")", e.path() / sub);
+        }
+    place("Puzzles de l'app", g_paths.assets / "puzzles");
+    Box side{p.x + 20 * s, p.y + 116 * s, 250 * s, p.h - 136 * s - (b.save ? 70 * s : 60 * s)};
+    float y = side.y;
+    for (size_t i = 0; i < places.size(); i++) {
+        Box r{side.x, y, side.w, 36 * s};
+        const bool cur = places[i].second == b.dir;
+        if (a.ui.button("fb_pl" + std::to_string(i), r, places[i].first, cur ? Style::Primary : Style::Ghost, true, 13)) { b.dir = places[i].second; b.scroll = 0; b.selected.clear(); }
+        y += 40 * s;
+        if (y > side.bottom() - 36 * s) break;
+    }
+
+    // The folder's content: sub-folders, then .json files (hidden ones left out), sorted.
+    std::vector<fs::path> dirs, files;
+    for (auto& e : fs::directory_iterator(b.dir, fs::directory_options::skip_permission_denied, ec)) {
+        const std::string n = e.path().filename().string();
+        if (n.empty() || n[0] == '.') continue;
+        std::error_code e2;
+        if (e.is_directory(e2)) dirs.push_back(e.path());
+        else if (e.path().extension() == ".json") files.push_back(e.path());
+    }
+    auto by_name = [](const fs::path& x, const fs::path& y) {
+        std::string u = x.filename().string(), v = y.filename().string();
+        for (auto& c : u) c = char(std::tolower(uint8_t(c)));
+        for (auto& c : v) c = char(std::tolower(uint8_t(c)));
+        return u < v;
+    };
+    std::sort(dirs.begin(), dirs.end(), by_name);
+    std::sort(files.begin(), files.end(), by_name);
+    Box list{side.right() + 16 * s, side.y, p.right() - 20 * s - side.right() - 16 * s, side.h};
+    draw::round_box(list, 10 * s, hex(0x0f141c, 200));
+    if (a.ui.hover(list)) b.scroll = std::max(0.0f, b.scroll - a.in.wheel * 40 * s);
+    const float rh = 34 * s;
+    y = list.y + 6 * s - b.scroll;
+    draw::clip(&list);
+    fs::path enter;
+    auto row = [&](const fs::path& f, bool is_dir) {
+        Box r{list.x + 6 * s, y, list.w - 12 * s, rh - 4 * s};
+        y += rh;
+        if (r.bottom() < list.y || r.y > list.bottom()) return;
+        const bool h = a.ui.hover(r) && list.contains(a.in.mouse);
+        if (h) a.ui.hovering = true;
+        const std::string n = f.filename().string();
+        const bool sel = !is_dir && (b.save ? n == b.name : n == b.selected);
+        draw::round_box(r, 8 * s, sel ? with_alpha(pal::accent, 0.35f) : with_alpha(hex(0xffffff), h ? 0.1f : 0.0f));
+        // A folder: a small drawn folder; a file: a sheet.
+        Box ic{r.x + 10 * s, r.y + 6 * s, 20 * s, 16 * s};
+        if (is_dir) { draw::round_box({ic.x, ic.y - 3 * s, 9 * s, 5 * s}, 2 * s, hex(0xe0b050)); draw::round_box(ic, 3 * s, hex(0xe0b050)); }
+        else draw::round_box({ic.x + 3 * s, ic.y - 3 * s, 14 * s, 20 * s}, 2 * s, hex(0xdfe4ee));
+        a.text.draw(is_dir ? Font::Bold : Font::Regular, 15 * s, n, {r.x + 40 * s, r.y + 5 * s}, pal::text);
+        if (h && a.in.released) {
+            if (is_dir) enter = f;
+            else if (b.save) { b.name = n; b.confirm_replace = false; }
+            else if (b.selected == n) choose(f);
+            else b.selected = n;
+        }
+    };
+    for (auto& d : dirs) row(d, true);
+    for (auto& f : files) { if (!b.open) break; row(f, false); }
+    draw::clip(nullptr);
+    if (!b.open) return;
+    if (dirs.empty() && files.empty())
+        a.text.draw(Font::Regular, 15 * s, b.save ? "Dossier vide" : "Aucun fichier .json ici", {list.x + 16 * s, list.y + 14 * s}, pal::faint);
+    if (!enter.empty()) { b.dir = enter; b.scroll = 0; b.selected.clear(); }
+
+    // The bottom row.
+    Box bot{p.x + 20 * s, p.bottom() - (b.save ? 64 * s : 56 * s), p.w - 40 * s, 44 * s};
+    if (b.save) {
+        a.text.draw(Font::Bold, 15 * s, "Nom du fichier", {bot.x, bot.y + 12 * s}, pal::dim);
+        if (a.ui.text_field("fb_name", {bot.x + 150 * s, bot.y, bot.w - 150 * s - 230 * s, 44 * s}, b.name, "puzzle.json", 16)) b.confirm_replace = false;
+        std::string n = b.name;
+        if (!n.empty() && fs::path(n).extension() != ".json") n += ".json";
+        const bool ok = !n.empty() && n.find('/') == std::string::npos && n.find('\\') == std::string::npos;
+        const fs::path target = b.dir / n;
+        const bool exists = ok && fs::exists(target, ec);
+        if (a.ui.button("fb_save", {bot.right() - 210 * s, bot.y, 210 * s, 44 * s}, b.confirm_replace ? "Remplacer ?" : "Enregistrer", Style::Primary, ok, 16) ||
+            (ok && a.ui.focus.empty() && a.in.key(SDLK_RETURN))) {
+            if (exists && !b.confirm_replace) b.confirm_replace = true;
+            else choose(target);
+        }
+    } else {
+        a.text.draw(Font::Regular, 14 * s, b.selected.empty() ? "Choisissez un fichier .json (un puzzle export\xC3\xA9)" : b.selected,
+                    {bot.x, bot.y + 12 * s}, b.selected.empty() ? pal::faint : pal::text);
+        if (a.ui.button("fb_open", {bot.right() - 210 * s, bot.y, 210 * s, 44 * s}, "Importer", Style::Primary, !b.selected.empty(), 16) ||
+            (!b.selected.empty() && a.in.key(SDLK_RETURN)))
+            choose(b.dir / b.selected);
+    }
+}
+
 void scene_editor(App& a) {
     const float s = a.s;
     auto& ed = a.editor;
@@ -8054,8 +8198,11 @@ void scene_editor(App& a) {
             }
         if (ed.saved.empty() && !a.puzzles.empty()) editor_open(a, a.puzzles.front(), "");
     }
-    const bool modal = a.picker.open || ed.choose_new;
+    const bool modal = a.picker.open || ed.choose_new || a.browser.open;
     draw_image_background(a, p.background, 120, true, &a.theme_or(p.theme));
+    // Import, at the top (next to "Retour"): a puzzle file received from someone.
+    if (!modal && a.ui.button("ed_import", {a.w - 440 * s, 40 * s, 220 * s, 50 * s}, "Importer un puzzle\xE2\x80\xA6", Style::Normal, true, 15))
+        a.choose_puzzle_file(false);
     a.text.draw_shadowed(Font::Title, 34 * s, "\xC3\x89" "diteur de puzzles", {40 * s, 24 * s}, pal::text, Align::Left, hex(0x000000, 120), 3 * s);
     a.ui.blocked = modal;
     if (!modal && a.ui.focus.empty() && back_button(a)) {
@@ -8454,6 +8601,7 @@ void scene_editor(App& a) {
     a.ui.blocked = false;
     if (a.picker.open) sprite_picker(a);
     if (ed.choose_new) { editor_new_dialog(a); return; }
+    if (a.browser.open) { a.ui.blocked = false; file_browser(a); return; }
 
     // ── actions on the lists ──
     if (action == "open") {
@@ -9598,6 +9746,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     }
     // Start scene (command line).
     std::string scene = arg_value(argc, argv, "--scene", "menu");
+    if (!arg_value(argc, argv, "--browse").empty())   // the editor's file browser open (tests)
+        a->choose_puzzle_file(arg_value(argc, argv, "--browse") == "export", "deux_d_avance.json");
     a->debug_fx = arg_value(argc, argv, "--fx");
     a->fixed_dt = arg_flag(argc, argv, "--fixed-dt");
     if (!arg_value(argc, argv, "--pieces").empty()) a->settings.piece_set = arg_value(argc, argv, "--pieces");   // a set for this run
