@@ -75,6 +75,8 @@
 //   --theme ID            board theme
 //   --lang fr|en          language of the interface
 //   --verbose             let the AI players print to the terminal
+//   --export-puzzle ID --out FILE   write the puzzle's export file (puzzle_export) and quit
+//   --import-puzzle FILE  import a puzzle file (puzzle_import) and quit
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── @@INCLUDES ─────────────────────────────────────────────────────────────
@@ -113,6 +115,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <variant>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -299,8 +302,23 @@ std::string strf(const char* format0, ...) {
 
 // A file name from a title: lower case letters, digits and '_'.
 std::string slug(const std::string& name) {
+    // The accented letters of French (UTF-8, 2 bytes) → their plain letter
+    // ("Le grand écart" → le_grand_ecart, not le_grand_cart).
+    static const std::vector<std::pair<std::string, std::string>> accents = {
+        {"\xC3\xA0", "a"}, {"\xC3\xA2", "a"}, {"\xC3\xA4", "a"}, {"\xC3\xA7", "c"}, {"\xC3\xA8", "e"}, {"\xC3\xA9", "e"},
+        {"\xC3\xAA", "e"}, {"\xC3\xAB", "e"}, {"\xC3\xAE", "i"}, {"\xC3\xAF", "i"}, {"\xC3\xB4", "o"}, {"\xC3\xB6", "o"},
+        {"\xC3\xB9", "u"}, {"\xC3\xBB", "u"}, {"\xC3\xBC", "u"}, {"\xC3\x80", "a"}, {"\xC3\x82", "a"}, {"\xC3\x87", "c"},
+        {"\xC3\x88", "e"}, {"\xC3\x89", "e"}, {"\xC3\x8A", "e"}, {"\xC3\x8E", "i"}, {"\xC3\x94", "o"}, {"\xC3\x99", "u"},
+        {"\xC3\x9B", "u"}, {"\xC5\x93", "oe"}, {"\xC5\x92", "oe"}, {"\xC3\xA6", "ae"}, {"\xC3\x86", "ae"}};
+    std::string plain;
+    for (size_t i = 0; i < name.size();) {
+        bool done = false;
+        for (auto& [u, r] : accents)
+            if (name.compare(i, u.size(), u) == 0) { plain += r; i += u.size(); done = true; break; }
+        if (!done) plain += name[i++];
+    }
     std::string out;
-    for (unsigned char c : name) {
+    for (unsigned char c : plain) {
         if (std::isalnum(c)) out += char(std::tolower(c));
         else if ((c == ' ' || c == '-' || c == '_') && !out.empty() && out.back() != '_') out += '_';
     }
@@ -3914,6 +3932,207 @@ bool save_puzzle(Puzzle& p) {
     return write_file(dir / (p.id + ".json"), puzzle_to_json(p).dump(2));
 }
 
+// ── Exporting and importing a puzzle (one file to send) ──
+// A player of the app invents a puzzle and sends it as ONE file:
+//   {"format": "yolah-puzzle", "version": 1, "puzzle": {...the puzzle's JSON...},
+//    "files": {"art/<id>.json": {...}, "art/<id>.png": "<base64>",
+//              "themes/<id>.json": {...}, "backgrounds/<name>": "<base64>"}}
+// "files" holds what the puzzle uses besides the app's own content: the
+// workshop's drawings (tiles, decorations, hole style, pieces "art:<id>", and
+// the drawings THEY name: the white side, the variant), the board theme and its
+// drawings, the background image. Found by walking the strings of the JSONs:
+// a string that names a drawing (with or without "art:"), a theme (key
+// "theme") or a background (key "background") is embedded, then its own JSON
+// walked in turn. The rendered figurines (drawings with "smooth": true, the
+// sheets of assets/art/fig_*) are never embedded: every app has them, and
+// they weigh megabytes. The import writes each file unless an identical one
+// is there; a different file with the same name is imported under a new name
+// (and the puzzle's references follow). A bare puzzle JSON (assets/puzzles/
+// <id>.json) is accepted too.
+namespace base64 {
+    const char* A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string encode(const std::string& in) {
+        std::string out;
+        out.reserve((in.size() + 2) / 3 * 4);
+        for (size_t i = 0; i < in.size(); i += 3) {
+            uint32_t v = uint32_t(uint8_t(in[i])) << 16;
+            if (i + 1 < in.size()) v |= uint32_t(uint8_t(in[i + 1])) << 8;
+            if (i + 2 < in.size()) v |= uint32_t(uint8_t(in[i + 2]));
+            out += A[v >> 18 & 63];
+            out += A[v >> 12 & 63];
+            out += i + 1 < in.size() ? A[v >> 6 & 63] : '=';
+            out += i + 2 < in.size() ? A[v & 63] : '=';
+        }
+        return out;
+    }
+    std::optional<std::string> decode(const std::string& in) {
+        int rev[256];
+        std::fill(rev, rev + 256, -1);
+        for (int k = 0; k < 64; k++) rev[uint8_t(A[k])] = k;
+        std::string out;
+        uint32_t v = 0;
+        int bits = 0;
+        for (char c : in) {
+            if (c == '=' || c == '\n' || c == '\r') continue;
+            int d = rev[uint8_t(c)];
+            if (d < 0) return std::nullopt;
+            v = v << 6 | uint32_t(d);
+            bits += 6;
+            if (bits >= 8) { bits -= 8; out += char(v >> bits & 0xff); }
+        }
+        return out;
+    }
+}
+
+// The files a puzzle uses (see above), keyed "folder/name".
+json puzzle_files(const Puzzle& p) {
+    json files = json::object();
+    std::function<void(const json&, const std::string&)> walk = [&](const json& j, const std::string& key) {
+        if (j.is_object()) { for (auto& [k, v] : j.items()) walk(v, k); return; }
+        if (j.is_array()) { for (auto& v : j) walk(v, key); return; }
+        if (!j.is_string()) return;
+        const std::string s = j.get<std::string>();
+        if (s.empty() || s.find('/') != std::string::npos || s.find("..") != std::string::npos) return;
+        if (key == "background") {
+            const std::string k = "backgrounds/" + s;
+            if (files.contains(k)) return;
+            if (auto data = read_file(g_paths.assets / "backgrounds" / s)) files[k] = base64::encode(*data);
+            return;
+        }
+        if (key == "theme") {
+            // A theme's file is named "<n>_<name>.json"; its id is inside ("id").
+            std::error_code ec;
+            for (auto& e : fs::directory_iterator(g_paths.assets / "themes", ec)) {
+                if (e.path().extension() != ".json") continue;
+                const std::string k = "themes/" + e.path().filename().string();
+                if (files.contains(k)) continue;
+                json t = load_json(e.path());
+                if (!t.is_object() || jstr(t, "id") != s) continue;
+                files[k] = t;
+                walk(t, "");
+                break;
+            }
+            return;
+        }
+        const std::string id = s.rfind("art:", 0) == 0 ? s.substr(4) : s;
+        const Art* art = find_art(id);
+        if (!art || art->smooth || files.contains("art/" + id + ".json")) return;
+        json aj = load_json(art_dir() / (id + ".json"));
+        if (!aj.is_object()) return;
+        files["art/" + id + ".json"] = aj;
+        if (auto png = read_file(art_dir() / (id + ".png"))) files["art/" + id + ".png"] = base64::encode(*png);
+        walk(aj, "");
+    };
+    walk(puzzle_to_json(p), "");
+    return files;
+}
+
+json puzzle_export(const Puzzle& p) {
+    return {{"format", "yolah-puzzle"}, {"version", 1}, {"puzzle", puzzle_to_json(p)}, {"files", puzzle_files(p)}};
+}
+
+// Imports an exported puzzle (or a bare puzzle JSON): writes its files, then
+// the puzzle under a new id. Returns the puzzle (its id set) or an error message.
+std::variant<Puzzle, std::string> puzzle_import(const fs::path& path) {
+    json j = load_json(path);
+    if (!j.is_object()) return std::string("Ce fichier n'est pas un puzzle Yolah (JSON illisible).");
+    json pj = j.contains("puzzle") ? j["puzzle"] : j;
+    if (!pj.is_object() || !pj.contains("board")) return std::string("Ce fichier n'est pas un puzzle Yolah (pas de plateau).");
+    json files = j.contains("files") && j["files"].is_object() ? j["files"] : json::object();
+    // 1. Where each file goes: its own name, or a new one if a different
+    //    file already has it. Renamed: name → new name, per kind.
+    std::map<std::string, std::string> art_ren, theme_ren, bg_ren;
+    auto content_of = [](const json& v) -> std::optional<std::string> {
+        if (v.is_string()) return base64::decode(v.get<std::string>());
+        return v.dump(2);
+    };
+    auto same = [](const fs::path& f, const std::string& data, bool is_json) {
+        if (is_json) { json a = load_json(f); return a.is_object() && a == json::parse(data); }
+        auto cur = read_file(f);
+        return cur && *cur == data;
+    };
+    std::vector<std::tuple<fs::path, std::string, bool>> writes;   // file, content, is JSON (references to rewrite)
+    for (auto& [k, v] : files.items()) {
+        const auto slash = k.find('/');
+        if (slash == std::string::npos) continue;
+        const std::string folder = k.substr(0, slash), name = k.substr(slash + 1);
+        if (name.empty() || name.find('/') != std::string::npos || name.find("..") != std::string::npos || name[0] == '.') continue;
+        if (folder != "art" && folder != "themes" && folder != "backgrounds") continue;
+        auto data = content_of(v);
+        if (!data) continue;
+        fs::path dir = g_paths.assets / folder;
+        if (folder == "art") {
+            // A drawing is two files (.json, .png) under one id: decided once, from its .json.
+            if (fs::path(name).extension() != ".json") continue;
+            const std::string id = fs::path(name).stem().string();
+            std::string png;
+            const std::string pk = "art/" + id + ".png";
+            if (files.contains(pk)) if (auto d = content_of(files[pk])) png = *d;
+            std::string nid = id;
+            for (int n = 2; fs::exists(dir / (nid + ".json")) &&
+                            !(same(dir / (nid + ".json"), *data, true) && (png.empty() || same(dir / (nid + ".png"), png, false))); n++)
+                nid = id + "_" + std::to_string(n);
+            if (nid != id) art_ren[id] = nid;
+            if (!png.empty()) writes.push_back({dir / (nid + ".png"), png, false});   // the image first: loading the .json reads it
+            writes.push_back({dir / (nid + ".json"), *data, true});
+        } else if (folder == "themes") {
+            // Matched by its id (inside the file), not by its file name.
+            json t = json::parse(*data);
+            const std::string id = jstr(t, "id");
+            if (id.empty()) continue;
+            std::map<std::string, fs::path> by_id;   // the themes there, by id
+            std::error_code ec;
+            for (auto& e : fs::directory_iterator(dir, ec))
+                if (e.path().extension() == ".json") { json x = load_json(e.path()); if (x.is_object()) by_id[jstr(x, "id")] = e.path(); }
+            if (by_id.count(id) && same(by_id[id], *data, true)) continue;   // already there, identical
+            std::string nid = id;
+            for (int n = 2; by_id.count(nid); n++) nid = id + "_" + std::to_string(n);
+            if (nid != id) { theme_ren[id] = nid; t["id"] = nid; }
+            std::string file = name;
+            for (int n = 2; fs::exists(dir / file); n++) file = fs::path(name).stem().string() + "_" + std::to_string(n) + ".json";
+            writes.push_back({dir / file, t.dump(2), true});
+        } else {
+            const fs::path f(name);
+            std::string nn = name;
+            for (int n = 2; fs::exists(dir / nn) && !same(dir / nn, *data, false); n++)
+                nn = f.stem().string() + "_" + std::to_string(n) + f.extension().string();
+            if (nn != name) bg_ren[name] = nn;
+            writes.push_back({dir / nn, *data, false});
+        }
+    }
+    // 2. The references follow the renamed files (in the puzzle and in the embedded JSONs).
+    std::function<void(json&, const std::string&)> fix = [&](json& x, const std::string& key) {
+        if (x.is_object()) { for (auto& [k, v] : x.items()) fix(v, k); return; }
+        if (x.is_array()) { for (auto& v : x) fix(v, key); return; }
+        if (!x.is_string()) return;
+        std::string s = x.get<std::string>();
+        if (key == "background") { if (bg_ren.count(s)) x = bg_ren[s]; return; }
+        if (key == "theme") { if (theme_ren.count(s)) x = theme_ren[s]; return; }
+        const bool prefixed = s.rfind("art:", 0) == 0;
+        const std::string id = prefixed ? s.substr(4) : s;
+        if (art_ren.count(id)) x = (prefixed ? "art:" : "") + art_ren[id];
+    };
+    for (auto& [f, data, is_json] : writes) {
+        if (is_json && !(art_ren.empty() && theme_ren.empty() && bg_ren.empty())) {
+            json d = json::parse(data);
+            fix(d, "");
+            data = d.dump(2);
+        }
+        if (fs::exists(f) && same(f, data, is_json)) continue;
+        if (!write_file(f, data)) return "Impossible d'\xC3\xA9" "crire " + f.string();
+        // A drawing written: known to the app at once.
+        if (f.parent_path() == art_dir() && f.extension() == ".json") {
+            auto art = std::make_unique<Art>();
+            if (load_art(f.stem().string(), *art)) g_arts[f.stem().string()] = std::move(art);
+        }
+    }
+    fix(pj, "");
+    // 3. The puzzle itself, under a new id (never over an existing puzzle).
+    Puzzle p = puzzle_from_json(pj, "");
+    if (!save_puzzle(p)) return std::string("Impossible d'enregistrer le puzzle.");
+    return p;
+}
+
 struct Level {
     std::string id, name = "Nouveau niveau", text;
     std::vector<std::string> puzzles;   // ids, in order
@@ -4317,6 +4536,24 @@ struct App {
                 if (list[0]) a->push_file(a->dialog_purpose, list[0]);
             },
             this, window, filters, 1, nullptr, false);
+    }
+    // The system's dialogs for a puzzle file (export: "Enregistrer sous",
+    // import: "Ouvrir"); the answer comes back like choose_image's, purpose
+    // "puzzle-export" / "puzzle-import". `default_file`: the proposed name, in
+    // the user's Documents folder.
+    void choose_puzzle_file(bool save, const std::string& default_file = "") {
+        static const SDL_DialogFileFilter filters[] = {{"Puzzle Yolah (JSON)", "json"}};
+        dialog_purpose = save ? "puzzle-export" : "puzzle-import";
+        static std::string location;   // must outlive the call (the dialog may read it later)
+        const char* docs = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
+        location = docs ? (fs::path(docs) / default_file).string() : default_file;
+        auto cb = [](void* user, const char* const* list, int) {
+            App* a = static_cast<App*>(user);
+            if (!list) { a->push_file("dialog-error", SDL_GetError()); return; }
+            if (list[0]) a->push_file(a->dialog_purpose, list[0]);
+        };
+        if (save) SDL_ShowSaveFileDialog(cb, this, window, filters, 1, location.empty() ? nullptr : location.c_str());
+        else      SDL_ShowOpenFileDialog(cb, this, window, filters, 1, docs, false);
     }
     // Copies an image into assets/<folder>/ (a free name from its own);
     // returns the new file name, "" on failure.
@@ -7735,6 +7972,12 @@ void editor_new_dialog(App& a) {
     a.text.draw(Font::Black, 24 * s, "Nouveau puzzle", {p.x + 28 * s, p.y + 22 * s}, pal::text);
     a.text.draw(Font::Regular, 15 * s, "Partir de la position de d\xC3\xA9part, ou d'une copie de n'importe quel puzzle (plateau, r\xC3\xA9glages, apparence).",
                 {p.x + 28 * s, p.y + 60 * s}, pal::dim);
+    // A puzzle received from someone (a file made by "Exporter"): the answer is handled by the editor (scene_editor).
+    if (a.ui.button("nw_import", {p.right() - 380 * s, p.y + 18 * s, 220 * s, 42 * s}, "Importer un fichier\xE2\x80\xA6", Style::Normal)) {
+        ed.choose_new = false;
+        a.choose_puzzle_file(false);
+        return;
+    }
     if (a.ui.button("nw_close", {p.right() - 150 * s, p.y + 18 * s, 122 * s, 42 * s}, "Annuler", Style::Ghost) || a.in.key(SDLK_ESCAPE)) {
         ed.choose_new = false;
         a.in.eat(SDLK_ESCAPE);
@@ -8167,17 +8410,44 @@ void scene_editor(App& a) {
     }
     // File actions.
     Box fb{x, panel.bottom() - 62 * s, w, 46 * s};
-    float fw = (w - 2 * 8 * s) / 3;
-    if (a.ui.button("ed_save", {fb.x, fb.y, fw, fb.h}, "Enregistrer", Style::Normal, true, 15)) { editor_save(a); a.notify(tr("Enregistr\xC3\xA9 : assets/puzzles/") + p.id + ".json"); }
-    if (a.ui.button("ed_dup", {fb.x + fw + 8 * s, fb.y, fw, fb.h}, "Dupliquer", Style::Normal, true, 15)) action = "dup";
+    float fw = (w - 3 * 8 * s) / 4;
+    if (a.ui.button("ed_save", {fb.x, fb.y, fw, fb.h}, "Enregistrer", Style::Normal, true, 13)) { editor_save(a); a.notify(tr("Enregistr\xC3\xA9 : assets/puzzles/") + p.id + ".json"); }
+    if (a.ui.button("ed_dup", {fb.x + fw + 8 * s, fb.y, fw, fb.h}, "Dupliquer", Style::Normal, true, 13)) action = "dup";
+    // Export: one file with the puzzle and the drawings, theme and image it uses (puzzle_export), to send.
+    if (a.ui.button("ed_export", {fb.x + 2 * (fw + 8 * s), fb.y, fw, fb.h}, "Exporter", Style::Normal, problem.empty(), 13)) {
+        editor_save(a);
+        a.choose_puzzle_file(true, slug(p.name) + ".json");
+    }
+    for (auto& [purpose, path] : a.in.files) {
+        // A puzzle file: chosen in the import dialog (editor_new_dialog), or dropped on the window.
+        const bool json_file = fs::path(path).extension() == ".json";
+        if (purpose == "puzzle-import" || (purpose == "drop" && json_file)) {
+            auto r = puzzle_import(fs::path(path));
+            if (auto* err = std::get_if<std::string>(&r)) { a.notify(*err); continue; }
+            Puzzle imported = std::get<Puzzle>(r);
+            a.reload_puzzles();
+            a.themes = load_themes(g_paths.assets / "themes");   // a theme it brought
+            editor_open(a, imported, "");
+            a.notify(tr("Puzzle import\xC3\xA9 : ") + imported.name + " (assets/puzzles/" + imported.id + ".json)");
+            continue;
+        }
+        if (purpose == "puzzle-export") {
+            fs::path f = fs::path(path);
+            if (f.extension() != ".json") f += ".json";
+            if (write_file(f, puzzle_export(p).dump(1))) a.notify(tr("Puzzle export\xC3\xA9 : ") + f.string());
+            else a.notify(tr("Impossible d'\xC3\xA9" "crire ") + f.string());
+            continue;
+        }
+    }
     // An image given to the editor (dialog or dropped on the window): the puzzle's background.
     for (auto& [purpose, path] : a.in.files) {
-        if (purpose == "dialog-error") { a.notify("Pas de s\xC3\xA9lecteur de fichiers ici : glissez l'image sur la fen\xC3\xAAtre."); continue; }
+        if (purpose == "dialog-error") { a.notify("Pas de s\xC3\xA9lecteur de fichiers ici : glissez le fichier sur la fen\xC3\xAAtre."); continue; }
+        if (purpose == "drop" && fs::path(path).extension() == ".json") continue;   // a puzzle, above
         if (purpose != "puzzle-background" && purpose != "drop") continue;
         std::string name = a.import_image(path, "backgrounds");
         if (!name.empty()) { p.background = name; a.notify(tr("Image de fond : ") + name + tr(" (copi\xC3\xA9" "e dans assets/backgrounds)")); }
     }
-    if (a.ui.button("ed_del", {fb.x + 2 * (fw + 8 * s), fb.y, fw, fb.h}, ed.confirm_delete ? "Confirmer ?" : "Supprimer", Style::Danger, !p.id.empty(), 15)) {
+    if (a.ui.button("ed_del", {fb.x + 3 * (fw + 8 * s), fb.y, fw, fb.h}, ed.confirm_delete ? "Confirmer ?" : "Supprimer", Style::Danger, !p.id.empty(), 13)) {
         if (ed.confirm_delete) action = "delete";
         else ed.confirm_delete = true;
     }
@@ -9311,6 +9581,21 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     a->cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
     a->cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
 
+    // Export / import of a puzzle without the interface (tests, scripts).
+    if (!arg_value(argc, argv, "--export-puzzle").empty()) {
+        const std::string id = arg_value(argc, argv, "--export-puzzle"), out = arg_value(argc, argv, "--out", "puzzle.json");
+        json j = load_json(g_paths.assets / "puzzles" / (id + ".json"));
+        if (!j.is_object()) { std::fprintf(stderr, "no puzzle %s\n", id.c_str()); return SDL_APP_FAILURE; }
+        const bool ok = write_file(out, puzzle_export(puzzle_from_json(j, id)).dump(1));
+        std::fprintf(stderr, ok ? "exported %s to %s\n" : "cannot write %s to %s\n", id.c_str(), out.c_str());
+        return ok ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+    }
+    if (!arg_value(argc, argv, "--import-puzzle").empty()) {
+        auto r = puzzle_import(fs::path(arg_value(argc, argv, "--import-puzzle")));
+        if (auto* err = std::get_if<std::string>(&r)) { std::fprintf(stderr, "%s\n", err->c_str()); return SDL_APP_FAILURE; }
+        std::fprintf(stderr, "imported as assets/puzzles/%s.json\n", std::get<Puzzle>(r).id.c_str());
+        return SDL_APP_SUCCESS;
+    }
     // Start scene (command line).
     std::string scene = arg_value(argc, argv, "--scene", "menu");
     a->debug_fx = arg_value(argc, argv, "--fx");
