@@ -1139,6 +1139,23 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     //     aucun sens, et une recherche réduite ne prouve rien.
     // Au-delà de ±WIN, seule une vraie recherche (ou le solveur exact) a le
     // droit de répondre ; ces nœuds sont rares, les chercher sans élagage coûte peu.
+    // `pv_node` est un nom trompeur : il veut dire « cherché avec une fenêtre
+    // LARGE », pas « sur la variation principale ». Un nœud qui finira sur la
+    // variation principale est très souvent d'abord cherché avec une fenêtre
+    // NULLE : en PVS (section 4), tout coup après le premier est d'abord testé
+    // à fenêtre nulle ; s'il s'avère meilleur (alpha < v < beta), il est
+    // re-cherché à fenêtre large, et c'est seulement alors qu'il devient
+    // pv_node. Pendant le test à fenêtre nulle, ce futur nœud PV est traité
+    // comme un nœud non-PV : RFP, MPC, Proxy Cut, LMR forte s'y appliquent. Ce
+    // n'est pas une erreur de justesse : le test ne fait que répondre à « ≥
+    // alpha + 1 ? » ; s'il répond oui à tort ou à raison, la re-recherche à
+    // fenêtre large (sans ces élagages) établit la vraie valeur, et s'il répond
+    // non à tort, le coup est perdu pour cette profondeur (le risque de tout
+    // élagage). Stockfish ajoute un drapeau « ttPv » : une position déjà
+    // cherchée une fois comme nœud PV le garde dans la table, et reste traitée
+    // en PV même sous une fenêtre nulle. Testé ici (option "tt pv", campagne
+    // A5, 2026-11) : −3,8 Elo à 0,2 s, +3,0 à 1 s, et +7 % de nœuds au banc :
+    // pas de gain, laissé de côté.
     const bool pv_node  = beta - alpha > 1;
     const bool prunable = !pv_node && std::abs(beta) < WIN;
 

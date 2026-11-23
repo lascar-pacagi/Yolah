@@ -67,10 +67,14 @@
 //    • Fenêtre nulle : beta = alpha + 1. Elle ne peut rien trouver « entre »
 //      les deux : elle répond seulement à « est-ce ≥ beta ? ». C'est beaucoup
 //      moins cher qu'une recherche à fenêtre large.
-//    • Nœud PV (variation principale) : nœud cherché avec une fenêtre large
-//      (beta − alpha > 1), sur le chemin des meilleurs coups ; on y veut la
-//      valeur exacte, donc on n'y élague presque rien. Nœud non-PV : fenêtre
-//      nulle ; c'est l'immense majorité des nœuds, et c'est là qu'on élague.
+//    • Nœud PV (variation principale) : dans le code, nœud cherché avec une
+//      fenêtre LARGE (beta − alpha > 1) ; on y veut la valeur exacte, donc on
+//      n'y élague presque rien. Nœud non-PV : fenêtre nulle ; c'est l'immense
+//      majorité des nœuds, et c'est là qu'on élague. Attention, c'est la
+//      fenêtre qui décide, pas la position : un nœud qui finira sur la vraie
+//      variation principale est souvent d'abord cherché à fenêtre nulle (test
+//      PVS), donc élagué comme un non-PV, avant d'être re-cherché à fenêtre
+//      large (cpp, section 6.d).
 //    • Profondeur `depth` : nombre de plis qu'il reste à chercher sous un nœud
 //      (0 = feuille, on évalue avec le réseau). Une RÉDUCTION cherche un coup
 //      moins profond ; un ÉLAGAGE ne le cherche pas du tout.
