@@ -143,6 +143,7 @@ int EndgameSolver::search(Yolah& yolah, uint64_t hash, int alpha, int beta) {
 EndgameSolver::Result EndgameSolver::solve(const Yolah& position, bool wld_only, const std::atomic_bool* stop_flag) {
     stop = stop_flag;
     const uint64_t nodes_before = nb_nodes;
+    solve_start = nb_nodes;
     Yolah yolah = position;
     Result res;
     const int current = yolah.score(yolah.current_player());

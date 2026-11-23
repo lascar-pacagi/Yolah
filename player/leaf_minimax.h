@@ -26,8 +26,22 @@
 //     "concurrency": 4,         // at most this many leaf searches at the same time (the CPU
 //                               //   budget: the opponent minimax gets 4 threads); 0 = every thread
 //     "tt size": 16,            // MB of table per search thread
-//     "player": { ...a MinMaxNNUE_DevPlayer config... }   // the dev's options and weights
+//     "player": { ...a MinMaxNNUE_DevPlayer config... },  // the dev's options and weights
+//     // "Proven only" mode (campaign H2b): no minimax at all; at the leaves with at
+//     // most "solver free" free squares, the exact endgame solver with a budget of
+//     // "solver nodes" nodes. Proven: its value replaces the network's (a finished
+//     // game's utility); not proven within the budget: the network's value stays.
+//     // The value is never less exact than the network's. ("min ply", "weight",
+//     // "concurrency" still apply; "player" is not needed.)
+//     "proven only": false,
+//     "solver free": 20,        // at most this many free squares at the leaf
+//     "solver nodes": 20000,    // node budget of a solve
+//     "solver exact": false     // false: win / draw / loss only (cheaper; a win counts as the
+//                               //   smallest win, 1 − u); true: the exact final margin
 //   }
+// H2 (the minimax value at every leaf from ply 24 on) lost 150-180 Elo: 3.5 times
+// fewer leaves per second, and a 1000-node NNUE search judges worse than the
+// ResNet (doc: endgame truth study). The proven results were the only gain.
 // The minimax's value v (side to move, ±30000 = tanh ±1, see heuristic.h) is
 // mapped to the MCTS scale [−1, 1] as v / 30000; a proven result (|v| >
 // 30000: ±(WIN + margin)) gets the MCTS's terminal utility with that margin
@@ -40,6 +54,7 @@
 #include <vector>
 
 class MinMaxNNUE_DevPlayer;
+class EndgameSolver;
 
 class LeafMinimax : public az::LeafValue {
 public:
@@ -58,7 +73,12 @@ private:
     uint64_t nodes, microseconds;
     uint8_t  max_depth;
     float    weight, score_utility, score_scale;
-    std::vector<std::unique_ptr<Player>> engines;   // one per search thread
+    bool     proven_only, solver_exact;
+    int      solver_free;
+    uint64_t solver_nodes;
+    std::vector<std::unique_ptr<Player>> engines;   // one per search thread (minimax mode)
+    std::vector<std::unique_ptr<EndgameSolver>> solvers;   // one per search thread (proven only)
+    std::atomic<uint64_t> nb_tried{0};              // proven only: leaves where the solver ran
     std::unique_ptr<std::counting_semaphore<1024>> slots;   // null: no limit
     std::atomic<uint64_t> nb_searches{0}, nb_nodes{0}, nb_proven{0}, nb_us{0};
     std::atomic<double>   sum_diff{0.0};             // Σ |minimax − network|

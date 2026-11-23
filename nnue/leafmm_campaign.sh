@@ -23,6 +23,17 @@
 # promising ones can be extended: ROUNDS=500 ONLY=32_4000 bash ... .
 # Every game prints one line "[leaf minimax] ..." in the job's log: new
 # leaves per second before / after, nodes and ms per leaf searched, % proven.
+#
+# H2 result (2026-11-23): 24_1000 −154 [−218, −98] (65 games), 24_4000 −183
+# (58 games): 3.5 times fewer leaves per second (1.5 ms per leaf on the
+# cluster) and a 1000-node NNUE search judges worse than the ResNet; more
+# nodes did worse. The 4000/16000 jobs were cancelled.
+# Campaign H2b, "proven only" (player/leaf_minimax.h): the exact endgame solver
+# at the leaves with at most F free squares (20 000 nodes, win/draw/loss), the
+# ResNet's value wherever it does not prove: never less exact than the
+# network. Locally 80-88 % of the tried leaves proven, 0.3 ms per try.
+#     KS="pv_16_20000 pv_20_20000 pv_24_20000" bash ~/Yolah/nnue/leafmm_campaign.sh
+#     KS="pv_16_20000 pv_20_20000 pv_24_20000" bash ~/Yolah/nnue/leafmm_campaign.sh status
 # ────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 YOLAH_DIR="${YOLAH_DIR:-${HOME}/Yolah}"

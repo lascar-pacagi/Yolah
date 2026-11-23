@@ -33,3 +33,18 @@ for p in PLIES:
         with open(os.path.join(HERE, f"players_{p}_{n}.txt"), "w") as f:
             f.write(f"# campaign H2: {name} against dev_u9_spsa (nnue/leafmm_campaign.sh)\n{name}.cfg\n../hybrid/dev.cfg\n")
         print(name)
+
+# Campaign H2b: "proven only" — the exact endgame solver at the leaves with at most
+# F free squares, N nodes per solve; the ResNet's value wherever it does not prove.
+for f in [int(x) for x in os.environ.get("SOLVER_FREE", "16 20 24").split()]:
+    for n in [int(x) for x in os.environ.get("SOLVER_NODES", "20000").split()]:
+        name = f"pv_{f}_{n}"
+        c = dict(resnet)
+        c["description"] = (f"MCTS ResNet (app) whose leaves with at most {f} free squares are solved exactly "
+                            f"({n} nodes per solve, win/draw/loss; the ResNet's value if not proven)")
+        c["leaf minimax"] = {"proven only": True, "solver free": f, "solver nodes": n, "solver exact": False,
+                             "min ply": 0, "weight": 1.0, "concurrency": 4}
+        json.dump(c, open(os.path.join(HERE, name + ".cfg"), "w"), indent=4)
+        with open(os.path.join(HERE, f"players_pv_{f}_{n}.txt"), "w") as fl:
+            fl.write(f"# campaign H2b: {name} against dev_u9_spsa (nnue/leafmm_campaign.sh)\n{name}.cfg\n../hybrid/dev.cfg\n")
+        print(name)

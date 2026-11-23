@@ -1,0 +1,3 @@
+# campaign H2b: pv_16_20000 against dev_u9_spsa (nnue/leafmm_campaign.sh)
+pv_16_20000.cfg
+../hybrid/dev.cfg

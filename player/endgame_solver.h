@@ -59,6 +59,10 @@ public:
     // wld_only: only win / draw / loss — the value's sign is exact, its
     // magnitude is not (much cheaper: the search only asks "≥ 1?" and "≤ −1?").
     Result solve(const Yolah& yolah, bool wld_only, const std::atomic_bool* stop = nullptr);
+    // A node budget for the next solves (0 = none): a solve that reaches it stops
+    // like with the stop flag (complete = false). Used by the MCTS leaves
+    // (player/leaf_minimax.h, "proven only"), where a clock per solve costs too much.
+    void set_node_limit(uint64_t n) { node_limit = n; }
     void clear();
     uint64_t nodes() const { return nb_nodes; }
 
@@ -73,8 +77,11 @@ private:
     std::vector<Entry> table;
     uint64_t nb_nodes = 0;
     const std::atomic_bool* stop = nullptr;
+    uint64_t node_limit = 0, solve_start = 0;   // the budget, and nb_nodes when the current solve began
 
-    bool stopped() const { return stop && stop->load(std::memory_order_relaxed); }
+    bool stopped() const {
+        return (stop && stop->load(std::memory_order_relaxed)) || (node_limit && nb_nodes - solve_start >= node_limit);
+    }
     int  search(Yolah& yolah, uint64_t hash, int alpha, int beta);
     int  order_moves(Yolah& yolah, Move tt_move, Yolah::MoveList& moves) const;
     void store(uint64_t hash, int alpha, int beta, int value, Move move);
