@@ -4103,6 +4103,11 @@ struct App {
     std::string debug_fx;                 // --fx style,power (screenshots): a square breaks at the board's centre
     std::vector<AiSpec> roster;
     Settings settings;
+    // The analysis displays of the current game (evaluation bar, hint, variation on the board).
+    // A game starts with the settings' ones (setup screen); changed in the game (Analyse tab, H, E,
+    // the Indice button), they only last for this game and its "Rejouer", not for the next games
+    // nor the next launches (user, 2026-11-23).
+    struct View { bool eval = true, hint = false, pv = false; } view;
     std::string setup_params;             // the AI whose settings box is open (new-game screen)
 
     Scene scene = Scene::Menu;
@@ -4500,12 +4505,12 @@ struct App {
     }
 
     // ── game management (@@SCENE_GAME uses these) ──
-    void start_game(const Yolah& start = Yolah()) {
+    void start_game(const Yolah& start = Yolah(), bool keep_view = false) {
         game.puzzle_mode = false;
-        launch(start, settings.black, settings.white, TIMES[settings.time_index]);
+        launch(start, settings.black, settings.white, TIMES[settings.time_index], keep_view);
     }
     // A game from `start` between two players ("human" or AI ids).
-    void launch(const Yolah& start, const std::string& black, const std::string& white, double seconds) {
+    void launch(const Yolah& start, const std::string& black, const std::string& white, double seconds, bool keep_view = false) {
         leave_game();
         auto& g = game;
         g.match.reset(start);
@@ -4518,7 +4523,9 @@ struct App {
         g.pass_at = -1;
         g.move_scroll = 0;
         g.eval_shown = 0.5f;
-        settings.show_hint = false;     // a new game starts without the hint (it is a help asked for, not a mode)
+        // The analysis displays come from the settings (the setup screen), unless the game is
+        // played again ("Rejouer"): then they stay as they were changed during the game.
+        if (!keep_view) view = {settings.show_eval, settings.show_hint, settings.show_pv};
         const std::string who[2] = {black, white};
         for (int side : {BLACK, WHITE}) {
             Slot& sl = g.slot[side];
@@ -6566,9 +6573,9 @@ void tab_analysis(App& a, Box b, const Analyzer::Snapshot& snap) {
         side = 1 - side;
     }
     y = std::max(y + 44 * s, b.bottom() - 112 * s);
-    a.ui.toggle("g_hint", {b.x, y, b.w, 30 * s}, "Indice sur le plateau (H)", a.settings.show_hint);
-    a.ui.toggle("g_pv", {b.x, y + 36 * s, b.w, 30 * s}, "Variation sur le plateau", a.settings.show_pv);
-    a.ui.toggle("g_eval", {b.x, y + 72 * s, b.w, 30 * s}, "Barre d'\xC3\xA9valuation (E)", a.settings.show_eval);
+    a.ui.toggle("g_hint", {b.x, y, b.w, 30 * s}, "Indice sur le plateau (H)", a.view.hint);
+    a.ui.toggle("g_pv", {b.x, y + 36 * s, b.w, 30 * s}, "Variation sur le plateau", a.view.pv);
+    a.ui.toggle("g_eval", {b.x, y + 72 * s, b.w, 30 * s}, "Barre d'\xC3\xA9valuation (E)", a.view.eval);
 }
 
 void tab_ai(App& a, Box b) {
@@ -6667,7 +6674,7 @@ void draw_game_over(App& a, Box area) {
     a.text.draw(Font::Black, 54 * s, strf("%d \xE2\x80\x93 %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 88 * s}, with_alpha(a.theme().accent, k), Align::Center);
     a.text.draw(Font::Regular, 16 * s, strf("Noirs \xE2\x80\x94 Blancs \xE2\x80\xA2 %zu coups", g.match.history.size()), {card.center().x, card.y + 158 * s}, with_alpha(pal::dim, k), Align::Center);
     float bw = 130 * s, by = card.bottom() - 74 * s;
-    if (a.ui.button("go_again", {card.x + 24 * s, by, bw, 50 * s}, "Rejouer", Style::Primary)) a.start_game(g.match.start);
+    if (a.ui.button("go_again", {card.x + 24 * s, by, bw, 50 * s}, "Rejouer", Style::Primary)) a.start_game(g.match.start, true);   // the analysis displays of this game are kept
     if (a.ui.button("go_setup", {card.center().x - bw / 2, by, bw, 50 * s}, "Joueurs")) a.go(Scene::Setup);
     if (a.ui.button("go_menu", {card.right() - 24 * s - bw, by, bw, 50 * s}, "Menu", Style::Ghost)) a.go(Scene::Menu);
 }
@@ -6700,8 +6707,8 @@ void scene_game(App& a) {
     // The analysis is a help: none in a puzzle played from a level (it would
     // give the solution), but there when the editor tests a puzzle.
     const bool help = !g.puzzle_mode || g.from_editor;
-    if (a.in.key(SDLK_H) && help) a.settings.show_hint = !a.settings.show_hint;
-    if (a.in.key(SDLK_E) && help) a.settings.show_eval = !a.settings.show_eval;
+    if (a.in.key(SDLK_H) && help) a.view.hint = !a.view.hint;
+    if (a.in.key(SDLK_E) && help) a.view.eval = !a.view.eval;
     if (a.in.key(SDLK_F)) g.board.flipped = !g.board.flipped;
     if (a.in.key(SDLK_U) || a.in.key(SDLK_BACKSPACE)) a.undo_move();
     if (a.in.key(SDLK_SPACE) && !g.slot[0].human() && !g.slot[1].human()) g.paused = !g.paused;
@@ -6710,8 +6717,8 @@ void scene_game(App& a) {
 
     // Analysis: restarted whenever the position changes and something shows it.
     if (!help && g.tab == 1) g.tab = 0;
-    const bool show_eval = a.settings.show_eval && help;
-    bool need = help && (a.settings.show_eval || a.settings.show_hint || a.settings.show_pv || g.tab == 1);
+    const bool show_eval = a.view.eval && help;
+    bool need = help && (a.view.eval || a.view.hint || a.view.pv || g.tab == 1);
     if (need && g.analysed != g.token && !g.board.animating(a.time) && !g.match.over()) {
         g.analyzer.analyse(g.match.pos, g.token, 20.0);
         g.analysed = g.token;
@@ -6767,12 +6774,12 @@ void scene_game(App& a) {
     look.coords = a.settings.show_coords;
     look.human_turn = human_turn;
     if (fresh && !g.board.animating(a.time) && !g.match.over()) {
-        if (a.settings.show_hint && snap.best != Move::none()) {
+        if (a.view.hint && snap.best != Move::none()) {
             look.hint = snap.best;
             int v = side == BLACK ? snap.value : -snap.value;
             look.hint_label = std::abs(v) > EVAL_WIN ? (v > 0 ? strf("gagne +%d", v - EVAL_WIN) : "perd") : strf("%d %%", int(std::round(100 * eval_share(v))));
         }
-        if (a.settings.show_pv) look.pv = snap.pv;
+        if (a.view.pv) look.pv = snap.pv;
     }
     if (human_turn && g.board.hover_sq >= 0 && (g.match.pos.bitboard(side) >> g.board.hover_sq & 1)) a.ui.hovering = true;
     g.board.draw(a.text, a.board_textures, a.game_theme(), g.match.pos, look, a.time, s);
@@ -6805,8 +6812,8 @@ void scene_game(App& a) {
     auto bbox = [&](int i) { return Box{buttons.x + i * (bw + 6 * s), buttons.y, bw, buttons.h}; };
     if (ai_vs_ai) {
         if (a.ui.button("g_pause", bbox(0), g.paused ? "Reprendre" : "Pause", g.paused ? Style::Primary : Style::Normal, true, 16)) g.paused = !g.paused;
-    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.settings.show_hint && help ? Style::Primary : Style::Normal, help, 16)) {
-        a.settings.show_hint = !a.settings.show_hint;
+    } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.view.hint && help ? Style::Primary : Style::Normal, help, 16)) {
+        a.view.hint = !a.view.hint;
     }
     if (a.ui.button("g_undo", bbox(1), "Annuler", Style::Normal, !g.match.history.empty(), 16)) a.undo_move();
     if (a.ui.button("g_flip", bbox(2), "Retourner", Style::Normal, true, 16)) g.board.flipped = !g.board.flipped;
@@ -9331,7 +9338,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
             y.play(mv[rng() % mv.size()]);
         }
         a->start_game(y);
-        if (arg_flag(argc, argv, "--hint")) a->settings.show_hint = true;   // a new game clears it
+        if (arg_flag(argc, argv, "--hint")) a->view.hint = true;   // after start_game, which takes the settings' displays
         // The holes of the random moves are not animated.
         a->game.board.hole_since.fill(-100);
         a->game.tab = std::stoi(arg_value(argc, argv, "--tab", "0"));
