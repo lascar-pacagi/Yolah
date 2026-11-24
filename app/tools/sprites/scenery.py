@@ -26,7 +26,13 @@ from render import DEV, F, vec, norm, length, srgb, aces, to_srgb, gauss_blur, f
 
 
 class Camera:
-    def __init__(self, pos, look, fov=50.0, up=(0, 1, 0)):
+    def __init__(self, pos, look, fov=50.0, up=(0, 1, 0), shift=(0.0, 0.0)):
+        # shift: an off-axis lens (a shift lens): the point the camera looks at moves to
+        # (shift x, shift y) on the screen, in fractions of the half width / half height
+        # (0.3, 0: a third of the way to the right edge), verticals staying vertical —
+        # the same picture as a wider render cropped (cpu_scene.py: the hall's end in the
+        # app's free strip between the board and the side panel)
+        self.shift = shift
         self.pos = vec(*pos)
         f = norm(vec(*look) - self.pos)
         r = norm(torch.linalg.cross(f, vec(*up)))
@@ -36,8 +42,8 @@ class Camera:
 
     def rays(self, W, H, js, is_):
         a = W / H
-        x = ((is_ + 0.5) / W * 2 - 1) * self.tan * a
-        y = (1 - (js + 0.5) / H * 2) * self.tan
+        x = ((is_ + 0.5) / W * 2 - 1 - self.shift[0]) * self.tan * a
+        y = (1 - (js + 0.5) / H * 2 - self.shift[1]) * self.tan
         d = norm(self.f + x[:, None] * self.r + y[:, None] * self.u)
         return self.pos.expand_as(d), d
 

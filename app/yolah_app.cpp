@@ -2672,6 +2672,14 @@ struct Debris : Effect {
 //           ring; star rays for the strongest
 //   ink     manga impact: ink speed lines, a white starburst, ink drops, a ring
 //   cannon  a muzzle flash, smoke puffs, grapeshot, earth thrown up
+//   glass   a stained-glass pane shatters (the Vitraux set): a flash of light,
+//           shards of coloured glass (blue, ruby, gold, green, cream) tumbling
+//           down, glints; the strong add a ring of light
+//   pixel   an 8-bit arcade explosion (the Vaisseaux set): everything on a grid
+//           of big pixels, drawn at 12 frames a second like the old games — a
+//           blocky jagged fireball white → yellow → red → brown that hollows
+//           out into a dithered ring, square debris flying in 8 directions and
+//           blinking before they vanish; the strong add a cyan shock ring
 struct Shatter : Effect {
     struct P { V2 p, v; float life, max, size, spin, ang; Rgba c; int kind; };   // kind: 0 dot, 1 chunk, 2 puff, 3 spark, 4 scrap of paper
     std::vector<P> ps;
@@ -2681,6 +2689,7 @@ struct Shatter : Effect {
     std::vector<float> rays;      // angles of the speed lines / star rays
     std::vector<std::vector<V2>> cracks;   // ice: jagged cracks from the centre (offsets in squares)
     int tier = 0;                 // blast: 0 firecracker ... 9 nuclear bomb
+    uint32_t seed = 0;            // pixel: the fireball's jagged outline
     Shatter(V2 c, float sq, const Theme& th, float power, std::mt19937& rng)
         : style(th.break_fx), c(c), sq(sq), power(std::clamp(power, 0.0f, 1.0f)) {
         std::uniform_real_distribution<float> U(0, 1);
@@ -2798,6 +2807,26 @@ struct Shatter : Effect {
                 add(c + V2{(U(rng) - 0.5f) * sq * 0.5f, (U(rng) - 0.5f) * sq * 0.5f}, V2{std::cos(a) * sp, std::sin(a) * sp},
                     1.2f + 0.8f * U(rng), sq * (0.06f + 0.08f * U(rng)) * (0.8f + 0.4f * P), col, 4);
             }
+        } else if (style == "glass") {
+            const Rgba cols[] = {hex(0x2448b0), hex(0x1a3a9a), hex(0xb81a28), hex(0xe0a830), hex(0x2a8a4a), hex(0xf2e4c0)};
+            for (int i = 0; i < 14 + int(26 * P); i++) {
+                float a = -float(M_PI) * (0.05f + 0.9f * U(rng)), sp = sq * (0.8f + 2.2f * U(rng)) * (0.7f + 0.6f * P);
+                add(c + V2{(U(rng) - 0.5f) * sq * 0.6f, (U(rng) - 0.5f) * sq * 0.6f}, V2{std::cos(a) * sp, std::sin(a) * sp},
+                    0.6f + 0.5f * U(rng), sq * (0.05f + 0.08f * U(rng)) * (0.8f + 0.4f * P), cols[int(U(rng) * 6) % 6], 1);
+            }
+            for (int i = 0; i < 10 + int(20 * P); i++) {
+                float a = U(rng) * 6.283f, sp = sq * (1.0f + 2.5f * U(rng));
+                add(c, V2{std::cos(a) * sp, std::sin(a) * sp - sq * 0.4f}, 0.3f + 0.3f * U(rng), sq * 0.018f, hex(0xfff4d8), 3);
+            }
+        } else if (style == "pixel") {
+            // Debris: square blocks thrown along the 8 directions of a joystick, a little spread.
+            seed = uint32_t(rng());
+            dur = 0.6f + 0.4f * P;
+            int n = 8 + int(16 * P);
+            for (int i = 0; i < n; i++) {
+                float a = (i % 8) * 0.785398f + (U(rng) - 0.5f) * 0.35f, sp = sq * (1.2f + 1.8f * U(rng)) * (0.7f + 0.6f * P);
+                add(c, V2{std::cos(a) * sp, std::sin(a) * sp}, 0.45f + 0.35f * U(rng), sq / 10, hex(0xffffff), 6);
+            }
         } else if (style == "blast") {
             // The square left is blown up; the stronger the piece, the bigger the blast, and each
             // strength its own shape (the Bombes set, from the firecracker to the nuclear bomb).
@@ -2888,6 +2917,7 @@ struct Shatter : Effect {
         for (auto& p : ps) {
             p.life += dt;
             if (style == "space") continue;              // computed from the time in draw
+            if (p.kind == 6) { p.v = p.v * (1 - 2.0f * dt); p.p = p.p + p.v * dt; continue; }   // pixel debris: no gravity, as in space
             float g = p.kind == 2 ? -sq * 0.3f : p.kind == 3 ? sq * 1.5f : p.kind == 4 ? sq * 1.2f : p.kind == 5 ? -sq * 0.4f : sq * 5.0f;   // puffs rise slowly, paper floats, cubes drift up
             p.v.y += g * dt;
             if (p.kind == 2) p.v = p.v * (1 - 1.5f * dt);
@@ -2899,6 +2929,55 @@ struct Shatter : Effect {
             p.ang += p.spin * dt;
         }
         return t < dur + 0.6f;
+    }
+    // The 8-bit explosion of the Vaisseaux set (see the constructor): one block = an eighth of
+    // a square, the time stepped at 12 frames a second, the C64 palette (the brighter
+    // "Colodore" values: with Pepto's, used for the tiles, the fire looked muddy brown).
+    void draw_pixel() {
+        using namespace draw;
+        const float px = sq / 8;
+        const float ts = std::floor(t * 12) / 12;                   // the stepped time
+        const int frame = int(t * 12);
+        auto block = [&](V2 p, Rgba col) {                          // a block snapped to the grid around the square's centre
+            V2 q{c.x + std::floor((p.x - c.x) / px + 0.5f) * px, c.y + std::floor((p.y - c.y) / px + 0.5f) * px};
+            rect({q.x - px / 2, q.y - px / 2, px, px}, col);
+        };
+        static const Rgba pal[] = {hex(0xffffff), hex(0xedf171), hex(0xc46c71), hex(0x8e5029), hex(0x813338), hex(0x553800)};
+        // the fireball: blocks within a jagged radius that grows fast, then hollows out from the centre
+        const float life = 0.55f + 0.25f * power;
+        if (ts < life) {
+            float u = ts / life;
+            float R = (2.5f + 2.5f * power) * std::min(1.0f, u * 3.5f + 0.25f);   // in blocks
+            float hollow = u < 0.4f ? 0 : R * (u - 0.4f) / 0.6f * 1.05f;
+            int N = int(R) + 2;
+            for (int j = -N; j <= N; j++)
+                for (int i = -N; i <= N; i++) {
+                    uint32_t h = (uint32_t(i + 64) * 73856093u) ^ (uint32_t(j + 64) * 19349663u) ^ seed;
+                    h ^= h >> 13; h *= 0x5bd1e995u; h ^= h >> 15;
+                    float jag = 0.75f + 0.5f * float(h & 1023) / 1023;      // each block its own reach: a ragged outline
+                    float d = std::sqrt(float(i * i + j * j)) / jag;
+                    if (d > R || d < hollow) continue;
+                    if (u > 0.6f && ((i + j + frame) & 1)) continue;         // the end: a checkerboard dither, flickering
+                    int idx = std::clamp(int((d / std::max(R, 1.0f)) * 1.6f + u * 4.5f), 0, 5);
+                    block(c + V2{i * px, j * px}, pal[idx]);
+                }
+        }
+        // the strong: a cyan shock ring of single blocks, two blocks thick
+        if (power > 0.7f && ts > 0.08f && ts < 0.6f) {
+            float r = (1.5f + 8.0f * (ts - 0.08f)) * px;
+            int n = int(r / px * 6.3f);
+            for (int k = 0; k < n; k++) {
+                float a = k * 6.283f / n;
+                block(c + V2{std::cos(a), std::sin(a)} * r, k % 3 ? hex(0x70a4b2) : hex(0xffffff));
+            }
+        }
+        // the debris: white, then yellow, then light red; the last third blinks, as sprites did
+        for (auto& p : ps) {
+            if (p.kind != 6 || p.life >= p.max) continue;
+            float u = p.life / p.max;
+            if (u > 0.66f && (frame & 1)) continue;
+            block(p.p, pal[std::min(2, int(u * 3))]);
+        }
     }
     // The blast of the Bombes set, by tier (see the constructor).
     void draw_blast() {
@@ -3120,6 +3199,12 @@ struct Shatter : Effect {
                 }
         }
         if (style == "blast") draw_blast();
+        if (style == "pixel") { draw_pixel(); return; }
+        if (style == "glass") {   // a warm flash through the pane, a ring of light for the strong
+            float fl = std::exp(-t * 7);
+            circle(c, sq * (0.55 + 0.4 * P), hex(0xfff2d0, uint8_t(230 * fl)), hex(0xe0b048, 0), 0);
+            if (P > 0.5f) ring(c, sq * (0.3f + 1.4f * ease_out_cubic(k)), sq * 0.04f * (1 - k), hex(0xffe8b0, uint8_t(200 * (1 - k))));
+        }
         if (style == "paper") {   // a white tear flash
             float fl = std::exp(-t * 8);
             circle(c, sq * (0.45f + 0.3f * P), hex(0xfffaf0, uint8_t(200 * fl)), hex(0xfffaf0, 0), 0);

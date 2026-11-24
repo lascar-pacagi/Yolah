@@ -1,0 +1,39 @@
+{
+  "name": "Soucoupe (blanc)",
+  "kind": "piece",
+  "size": 192,
+  "smooth": true,
+  "on stone": false,
+  "box": 1.4,
+  "anchor": [
+    0.5,
+    0.7
+  ],
+  "animations": [
+    {
+      "name": "idle",
+      "fps": 8,
+      "loop": true,
+      "frames": 8
+    },
+    {
+      "name": "move",
+      "fps": 16,
+      "loop": false,
+      "frames": 8
+    },
+    {
+      "name": "blocked",
+      "fps": 10,
+      "loop": true,
+      "frames": 8
+    },
+    {
+      "name": "win",
+      "fps": 10,
+      "loop": true,
+      "frames": 8
+    }
+  ],
+  "variant of": "fig_pix_mcts_nnue"
+}

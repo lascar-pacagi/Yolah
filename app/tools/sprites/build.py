@@ -37,6 +37,14 @@ import origami
 import dinos
 import anatomy
 import bombs
+import computers
+import vitraux
+for _k, _f in vitraux.VITRAUX.items():       # the Vitraux set (vitraux.py)
+    SCALE[_k] = vitraux.SCALE[_k[4:]]
+    MODELS[_k] = scaled(_k, _f)
+for _k, _f in computers.COMPUTERS.items():   # the Informatique set (computers.py)
+    SCALE[_k] = computers.SCALE[_k[4:]]
+    MODELS[_k] = scaled(_k, _f)
 for _k, _f in bombs.BOMBS.items():           # the Bombes set (bombs.py)
     SCALE[_k] = bombs.SCALE[_k[5:]]
     MODELS[_k] = scaled(_k, _f)
@@ -84,6 +92,8 @@ NAMES.update(origami.NAMES)
 NAMES.update(dinos.NAMES)
 NAMES.update(anatomy.NAMES)
 NAMES.update(bombs.NAMES)
+NAMES.update(computers.NAMES)
+NAMES.update(vitraux.NAMES)
 NAMES["human_legendes"] = "Humain (L\u00e9gendes)"
 
 
