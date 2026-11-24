@@ -1363,9 +1363,28 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     //   • `comp` est une région 8-connexe entière de cases libres que
     //     l'adversaire ne peut pas atteindre (`region_reach`, section 5) :
     //     aucune pièce adverse n'y entrera jamais.
-    //   • Pour entrer dans `comp`, une pièce doit passer par une case voisine de
-    //     `comp` ; une case voisine libre ferait partie de `comp`. Donc seules nos
-    //     pièces VOISINES de `comp` peuvent y aller, et ce sont exactement `pieces`.
+    //   • `comp` est même une région ENTIÈRE des cases libres, pas seulement de
+    //     `priv` : une case libre voisine de `comp` serait atteinte par les
+    //     mêmes pièces que `comp` (`region_reach` est une inondation 8-connexe :
+    //     elle passe d'une case libre à toutes ses voisines libres). Nous
+    //     l'atteindrions donc, et l'adversaire non plus (sinon il atteindrait
+    //     aussi `comp`) : elle serait dans `priv`, et collée à `comp`, donc
+    //     dans `comp`. Conclusion : toutes les cases voisines de `comp` sont
+    //     des trous, des pièces, ou des cases de `comp`.
+    //   • D'où « toucher la poche = pouvoir y entrer, et seulement ainsi ». Un
+    //     coup glisse sur des cases libres ; s'il finit dans `comp`, la case
+    //     d'où il entre (la case de départ, ou la dernière case libre
+    //     traversée) est voisine de `comp`. Ce ne peut pas être une case libre
+    //     hors de `comp` (point précédent) : c'est donc la case de départ, et la
+    //     pièce était voisine de `comp`. Une pièce qui ne touche pas `comp` ne
+    //     pourra jamais y aller, même plus tard : chaque case où elle peut se
+    //     rendre est dans une région libre qui la touche, et cette région n'est
+    //     pas `comp`. Donc seules nos pièces VOISINES de `comp` peuvent y
+    //     entrer, et ce sont exactement `pieces`.
+    //   • Une pièce qui touche `comp` ET une autre case libre a le choix entre
+    //     deux régions : la poche n'est plus un jeu à part (`sealed == false`)
+    //     et on ne l'utilise pas. C'est prudent, pas faux : on renonce seulement
+    //     au raccourci pour cette poche.
     //   • `sealed` exige que ces pièces n'aient aucune autre case libre voisine :
     //     elles ne peuvent aller que dans `comp`.
     //   La poche et ses pièces forment donc un petit jeu à part, sans effet sur
@@ -1395,7 +1414,12 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
         // Découpage de `priv` en régions 8-connexes, une par une.
         while (priv && n_reserves < 4) {
             const uint64_t seed = priv & -priv;                    // la plus petite case restante
-            const uint64_t comp = region_reach(seed, priv) | seed; // sa région entière dans `priv`
+            // Sa région entière dans `priv`. Elle contient `seed` : `grow` garde
+            // les cases de départ, et `seed` est dans `priv`, donc le `& free`
+            // de `region_reach` le laisse passer (il n'exclut les cases de départ
+            // que si elles ne sont pas libres, comme les pièces dans son usage
+            // habituel).
+            const uint64_t comp = region_reach(seed, priv);
             priv &= ~comp;
             if (std::popcount(comp) > RESERVE_MAX_SQUARES) continue;  // trop grande pour un calcul exact
 
@@ -1405,10 +1429,13 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
             bool sealed = true;
             for (uint64_t b = mine; b;) {
                 const uint64_t q  = square_bb(pop_lsb(b));
-                const uint64_t nb = around(q) & free;
+                const uint64_t nb = around(q) & free;   // ses voisines LIBRES (ni trous ni pièces)
                 if (nb & comp) {
                     pieces |= q;
-                    if (nb & ~comp) sealed = false;   // la pièce touche aussi une autre région
+                    // `~comp` contient aussi les trous et les pièces, mais `nb` n'a que
+                    // des cases libres : `nb & ~comp` = ses voisines libres hors de la
+                    // poche, donc une autre région où elle pourrait aller.
+                    if (nb & ~comp) sealed = false;
                 }
             }
             if (!sealed || !pieces) continue;
@@ -1436,9 +1463,14 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     };
 
     // ── 6.g) Boucle principale sur les coups du nœud ─────────────────────────
-    // Tant que la liste n'est pas générée (étape 1), la condition `!generated`
-    // fait entrer dans la boucle pour i = 0 (le coup de table) puis pour i = 1,
-    // où l'étape 2 génère la liste.
+    // Pourquoi `|| !generated` : à l'étape 1 (liste pas encore générée), `n`
+    // vaut 1 (seul le coup de table est connu). Avec `i < n` seul, la boucle
+    // s'arrêterait après i = 0, sans jamais essayer les autres coups. Le
+    // `!generated` la fait entrer aussi pour i = 1, où l'étape 2 génère la
+    // liste et donne à `n` sa vraie valeur ; ensuite `generated` est vrai et
+    // la condition redevient simplement `i < n`. (Si la table n'a pas de coup
+    // utilisable, la liste est générée avant la boucle et `!generated` est
+    // faux dès le départ.)
     for (size_t i = 0; i < n || !generated; i++) {
         // Étape 2 de la génération par étapes : le coup de la table (`i == 0`)
         // n'a pas suffi à couper. On génère maintenant tous les coups, on place

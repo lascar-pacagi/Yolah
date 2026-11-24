@@ -1633,7 +1633,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         uint64_t priv = region_reach(mine, free) & ~region_reach(yolah.bitboard(Yolah::other_player(us)), free);
         while (priv && n_reserves < 4) {
             const uint64_t seed = priv & -priv;
-            const uint64_t comp = region_reach(seed, priv) | seed;
+            const uint64_t comp = region_reach(seed, priv);
             priv &= ~comp;
             if (std::popcount(comp) > options.reserve_max) continue;
             uint64_t pieces = 0;

@@ -3896,12 +3896,17 @@ const std::vector<std::string> TIME_LABELS = {"0,5 s", "1 s", "2 s", "5 s"};
 const std::vector<std::pair<std::string, std::string>> HOLE_STYLES = {
     {"pit", "Selon le th\xC3\xA8me"}, {"lava", "Lave"}, {"water", "Eau"}, {"void", "Vide \xC3\xA9toil\xC3\xA9"}, {"ice", "Glace"}, {"bush", "Buisson"}};
 
+constexpr int MAX_BONUS = 20;   // a puzzle's starting points per side: 0..MAX_BONUS
 struct Puzzle {
     std::string id, name = "Nouveau puzzle", text;
     std::array<char, 64> cells{};   // by square (a1 = 0): '.' free, '#' hole, 'B' black, 'W' white
     int to_move = BLACK, human = BLACK;
     std::string opponent = "dev";
     int margin = 1;                 // win by at least this many points
+    // Points each side starts with (BLACK, WHITE): written into the position's
+    // score, so every AI sees them at the end of the game and in its exact
+    // endgame search (not in its mid-game evaluation, which reads the board only).
+    std::array<int, 2> bonus{0, 0};
     int time_index = 1;             // index in TIMES
     std::string theme, hole_style = "pit", sprite_black, sprite_white, background;
     // Drawings of the workshop placed on this puzzle's board.
@@ -3926,6 +3931,7 @@ json puzzle_to_json(const Puzzle& p) {
     }
     return {{"name", p.name}, {"text", p.text}, {"board", rows}, {"to move", p.to_move == BLACK ? "black" : "white"},
             {"player", p.human == BLACK ? "black" : "white"}, {"opponent", p.opponent}, {"margin", p.margin},
+            {"bonus black", p.bonus[BLACK]}, {"bonus white", p.bonus[WHITE]},
             {"time index", p.time_index}, {"theme", p.theme}, {"hole style", p.hole_style},
             {"sprite black", p.sprite_black}, {"sprite white", p.sprite_white}, {"background", p.background},
             {"tiles", [&] {
@@ -3956,6 +3962,8 @@ Puzzle puzzle_from_json(const json& j, const std::string& id) {
     p.human = jstr(j, "player", "black") == "white" ? WHITE : BLACK;
     p.opponent = jstr(j, "opponent", p.opponent);
     p.margin = std::max(1, int(jnum(j, "margin", 1)));
+    p.bonus[BLACK] = std::clamp(int(jnum(j, "bonus black", 0)), 0, MAX_BONUS);
+    p.bonus[WHITE] = std::clamp(int(jnum(j, "bonus white", 0)), 0, MAX_BONUS);
     p.time_index = std::clamp(int(jnum(j, "time index", 1)), 0, int(TIMES.size()) - 1);
     p.theme = jstr(j, "theme");
     p.hole_style = jstr(j, "hole style", "pit");
@@ -3980,7 +3988,7 @@ Yolah puzzle_position(const Puzzle& p) {
         else if (p.cells[sq] == '#') e |= bit;
     }
     Yolah y;
-    y.set_state(b, w, e, 0, 0, p.to_move == BLACK ? 0 : 1);
+    y.set_state(b, w, e, uint16_t(p.bonus[BLACK]), uint16_t(p.bonus[WHITE]), p.to_move == BLACK ? 0 : 1);
     return y;
 }
 // Why the puzzle cannot be played ("" when it can).
@@ -7891,8 +7899,12 @@ void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bo
 std::string goal_text(const App& a, const Puzzle& p) {
     const AiSpec* ai = a.ai(p.opponent);
     std::string vs = ai ? tr(ai->name) : p.opponent;
-    if (p.margin <= 1) return strf("Gagne avec les %s contre %s.", side_name(p.human), vs.c_str());
-    return strf("Gagne avec les %s contre %s, avec au moins %d points d'avance.", side_name(p.human), vs.c_str(), p.margin);
+    std::string t = p.margin <= 1 ? strf("Gagne avec les %s contre %s.", side_name(p.human), vs.c_str())
+                                  : strf("Gagne avec les %s contre %s, avec au moins %d points d'avance.", side_name(p.human), vs.c_str(), p.margin);
+    const int mine = p.bonus[p.human], theirs = p.bonus[1 - p.human];
+    if (mine > 0) t += " " + (mine == 1 ? std::string(tr("Tu pars avec 1 point.")) : strf("Tu pars avec %d points.", mine));
+    if (theirs > 0) t += " " + (theirs == 1 ? std::string(tr("L'adversaire part avec 1 point.")) : strf("L'adversaire part avec %d points.", theirs));
+    return t;
 }
 
 // The window covered by a background image (cropped to keep its proportions),
@@ -8570,6 +8582,14 @@ void scene_editor(App& a) {
     std::vector<std::string> goals;
     for (int m = 1; m <= 12; m++) goals.push_back(m == 1 ? "Gagner" : strf("Gagner de %d+", m));
     p.margin = 1 + a.ui.cycler("ed_goal", {x, y, w, 34 * s}, "Objectif", goals, p.margin - 1);
+    y += 40 * s;
+    {   // the starting points of each side (a handicap, or "win by N" that the AI really defends)
+        std::vector<std::string> pts;
+        for (int k = 0; k <= MAX_BONUS; k++) pts.push_back(k == 0 ? "0" : strf("+%d", k));
+        p.bonus[BLACK] = a.ui.cycler("ed_bonus_b", {x, y, w, 34 * s}, "Bonus des Noirs", pts, p.bonus[BLACK]);
+        y += 40 * s;
+        p.bonus[WHITE] = a.ui.cycler("ed_bonus_w", {x, y, w, 34 * s}, "Bonus des Blancs", pts, p.bonus[WHITE]);
+    }
     y += 40 * s;
     a.text.draw(Font::Regular, 16 * s, "Temps de l'IA", {x, y + 8 * s}, pal::dim);
     p.time_index = a.ui.segmented("ed_time", {x + w * 0.38f, y, w * 0.62f, 34 * s}, TIME_LABELS, p.time_index, 14);
