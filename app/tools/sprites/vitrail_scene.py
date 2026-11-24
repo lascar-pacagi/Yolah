@@ -338,19 +338,63 @@ def reredos(sc, Z):
         return torch.minimum(d, pin)
     sc.add(screen, stone("#8e846f", 0.6, 0.15))
 
+    def smin(a, b, k):
+        h = (0.5 + 0.5 * (b - a) / k).clamp(0, 1)
+        return b + (a - b) * h - k * h * (1 - h)
+
+    def ellipsoid(x, y, z, rx, ry, rz):
+        return (torch.sqrt((x / rx) ** 2 + (y / ry) ** 2 + (z / rz) ** 2) - 1) * min(rx, ry, rz)
+
+    def figure(u, y, z, crowned):
+        """A gothic saint 1.75 high, base at y = 0, facing +z (one unit = 1 m): a long
+        robe falling in vertical folds and flaring at the hem, a mantle over the
+        shoulders, the hands joined in prayer before the chest, a veil over the
+        head and shoulders; `crowned` (a tensor of 0/1) adds a crown of points."""
+        plinth = torch.maximum(_box2(u, z, 0.19, 0.13), (y - 0.05).abs() - 0.05)
+        th = torch.atan2(u, z)
+        t = ((y - 0.1) / 1.2).clamp(0, 1)                                           # 0 at the hem, 1 at the chest
+        rr = 0.205 - 0.06 * t + 0.02 * torch.exp(-((y - 1.15) / 0.12) ** 2)
+        folds = 0.014 * torch.sin(11 * th + 3 * y) * (1 - 0.8 * t)
+        robe = torch.sqrt(u ** 2 + (z / 0.75) ** 2) * 0.8 - (rr + folds) * 0.8
+        robe = torch.maximum(robe, torch.maximum(0.1 - y, y - 1.32))
+        chest = ellipsoid(u, y - 1.22, z + 0.01, 0.19, 0.13, 0.11)
+        d = smin(robe, chest, 0.06)
+        d = torch.minimum(d, plinth)
+        # the arms: upper arms down the sides, forearms meeting at the joined hands
+        au = u.abs()
+        def seg(px, py, pz, ax, ay, az, bx, by, bz, r):
+            bax, bay, baz = bx - ax, by - ay, bz - az
+            h = (((px - ax) * bax + (py - ay) * bay + (pz - az) * baz) / (bax * bax + bay * bay + baz * baz)).clamp(0, 1)
+            return torch.sqrt((px - ax - bax * h) ** 2 + (py - ay - bay * h) ** 2 + (pz - az - baz * h) ** 2) - r
+        upper = seg(au, y, z, 0.16, 1.27, 0.0, 0.15, 1.02, 0.05, 0.05)
+        fore = seg(au, y, z, 0.15, 1.02, 0.05, 0.025, 1.14, 0.13, 0.042)
+        hands = ellipsoid(u, y - 1.2, z - 0.14, 0.03, 0.08, 0.035)
+        d = smin(d, smin(torch.minimum(upper, fore), hands, 0.02), 0.03)
+        # the head, the neck, the veil falling behind onto the shoulders
+        neck = seg(u, y, z, 0.0, 1.3, 0.0, 0.0, 1.42, 0.01, 0.045)
+        head = ellipsoid(u, y - 1.51, z - 0.015, 0.078, 0.1, 0.088)
+        nose = ellipsoid(u, y - 1.5, z - 0.095, 0.014, 0.03, 0.016)
+        d = smin(d, smin(neck, torch.minimum(head, nose), 0.02), 0.02)
+        veil = torch.abs(ellipsoid(u, y - 1.53, z + 0.005, 0.105, 0.125, 0.11)) - 0.012
+        veil = torch.maximum(veil, torch.maximum(z - 0.03, 1.47 - y + 0.0 * u))
+        drape = torch.maximum(ellipsoid(u, y - 1.33, z + 0.05, 0.2, 0.2, 0.09), torch.maximum(z - 0.0, y - 1.5))
+        d = torch.minimum(d, torch.minimum(veil, smin(drape, chest, 0.03)))
+        # the crown (the central statue): a band with eight points
+        cu, cv = _sector(u, z + 0.01, 8)
+        band = torch.maximum(torch.abs(torch.sqrt(u ** 2 + (z + 0.01) ** 2) - 0.095) - 0.012, (y - 1.66).abs() - 0.025)
+        point = torch.maximum(torch.sqrt((cu - 0.095) ** 2 + cv ** 2) - 0.018 * (1 - (y - 1.68) / 0.07).clamp(0, 1), (y - 1.715).abs() - 0.035)
+        crown = torch.minimum(band, point)
+        crown = torch.where(crowned > 0.5, crown, torch.full_like(crown, 10.0))
+        return torch.minimum(d, crown)
+
     def statues(p):
         x, y, z = p[:, 0], p[:, 1], p[:, 2]
-        zl = z - (Z + 0.12)
         k, xl = _cell(x, -4, 4, 1.05)
         sm = x.abs() > 1.4
         u = torch.where(sm, xl, x)
-        y0 = 2.4
         sc_ = torch.where(sm, torch.ones_like(x), torch.full_like(x, 1.45))      # the central statue is larger
-        yy = (y - y0) / sc_
-        body = torch.sqrt((u / sc_) ** 2 + (zl / sc_) ** 2) - (0.2 - 0.07 * (yy / 1.45).clamp(0, 1))
-        body = torch.maximum(body, (yy - 0.72).abs() - 0.72) * sc_
-        head = (torch.sqrt((u / sc_) ** 2 + (yy - 1.62) ** 2 + (zl / sc_) ** 2) - 0.13) * sc_
-        return torch.minimum(body, head)
+        zl = z - (Z + 0.1)
+        return figure(u / sc_, (y - 2.4) / sc_, zl / sc_, (~sm).float()) * sc_
     sc.add(statues, stone("#b0a690", 0.55, 0.0))
     # the gloria: gilt rays round a glowing heart, hung in front of the central lancet
     G = (0.0, 16.6, Z - 3.0)
@@ -639,6 +683,8 @@ def render(W_=2560, H_=1440, ss=1, shift=0.36):
     cam = Camera((0.0, 1.8, 6.0), (0.0, 7.0, ZW), fov=56, shift=(shift, 0.0))
     if os.environ.get("VIT_CAM") == "far":                                                   # a close look at the west end (checks)
         cam = Camera((0.0, 6.0, ZW + 30.0), (0.0, 13.0, ZW), fov=50)
+    if os.environ.get("VIT_CAM") == "statues":                                               # a close look at the reredos' statues (checks)
+        cam = Camera((1.5, 4.0, ZW + 11.0 + 4.5), (1.5, 3.6, ZW + 11.0), fov=50)
     sky = lambda d: srgb("#020306").expand(d.shape[0], 3) * 1.0
     lights = []
     cols = ["#5a7aff", "#ff5a6a", "#ffc870"]

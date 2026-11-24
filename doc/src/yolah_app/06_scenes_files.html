@@ -40,11 +40,55 @@ Box panel{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin};
 <pre data-extract="int solve(Yolah& y, int depth = 0) {" data-file="app/yolah_app.cpp"></pre>
 
 <h3><span class="n">24.3</span>Puzzles and levels</h3>
-<p><code>start_puzzle</code> launches an ordinary game from the puzzle's position (<code>App::launch</code>) with <code>game.puzzle_mode</code> set: the background image replaces the theme's gradient, the puzzle's theme, holes, sprites, tiles and decorations replace the player's, the analysis is off (it would give the solution, except when the editor tests a puzzle), and the game starts with the introduction card. At the end, the player's lead is compared with the goal; a success is saved in the settings and opens the next puzzle of the level.</p>
+<p><code>start_puzzle</code> launches an ordinary game from the puzzle's position (<code>App::launch</code>) with <code>game.puzzle_mode</code> set: the background image replaces the theme's gradient, the puzzle's theme, holes, sprites, tiles and decorations replace the player's, the analysis is off (it would give the solution, except when the editor tests a puzzle), and the game starts with the introduction card. The puzzle's starting bonuses are written into the position's scores (<code>puzzle_position</code>), so the score boxes start from them. At the end, the player's lead is compared with the goal; a success is saved in the settings and opens the next puzzle of the level.</p>
 <pre data-extract="void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai) {" data-file="app/yolah_app.cpp"></pre>
 
 <h3><span class="n">24.4</span>The editor</h3>
-<p>One screen in three columns. Left: the levels (unfold one to see its puzzles, rename, reorder, delete with a confirmation), each with “+ nouveau puzzle dans ce niveau…” (a dialog: the starting position or a copy of any puzzle). Middle: the brushes (free, hole, black, white, special square, decoration; keys 1–6) and the board, painted by pressing and dragging. Right: the title and introduction (text fields), the opposing AI, sides, goal, time, look (theme, holes, sprites, background with “Charger…” or a dropped image), and the tests (“Moi contre l'IA”, “IA contre IA”). The puzzle is saved when it is tested, when another one is opened, or with “Enregistrer”.</p>
+<p>One screen in three columns. Left: the levels (unfold one to see its puzzles, rename, reorder, delete with a confirmation), each with “+ nouveau puzzle dans ce niveau…” (a dialog: the starting position or a copy of any puzzle). Middle: the brushes (free, hole, black, white, special square, decoration; keys 1–6) and the board, painted by pressing and dragging. Right: the title and introduction (text fields), the opposing AI, sides, goal, the two starting bonuses (“Bonus des Noirs”, “Bonus des Blancs”, 0 to +20), time, look (theme, holes, sprites, background with “Charger…” or a dropped image), and the tests (“Moi contre l'IA”, “IA contre IA”). The puzzle is saved when it is tested, when another one is opened, or with “Enregistrer”.</p>
+<p>Above the board, with the piece brushes (free, hole, black, white), a row of actions: “Tout noircir”, “Tout vider”, “Départ” and “Vérifier”, which proves the puzzle feasible or not (next section). Its verdict replaces the status line under the board (green: feasible, red: impossible, grey: unknown) for as long as the puzzle is the one that was checked; any change of the board, the side to move, the player's side, the goal or a bonus brings the status line back.</p>
+
+<h3><span class="n">24.5</span>Starting bonus and puzzle verification</h3>
+<p><b>The bonus.</b> A puzzle can give each side points before the first move (<code>Puzzle::bonus</code>). They are not a separate counter: <code>puzzle_position</code> writes them into the scores of the <code>Yolah</code> position (<code>set_state</code>), exactly as if the side had already made that many moves. So every part of the program that reads the score sees them, the AIs included, without any change to the AIs. What an AI does with them depends on where it reads the score:</p>
+<table>
+<tr><th>Where</th><th>Sees the bonus?</th><th>Consequence</th></tr>
+<tr><td>end of the game (all AIs)</td><td>yes</td><td>a finished game is won by the higher score, bonus included</td></tr>
+<tr><td>the dev's exact endgame search (regions, pockets, split scores)</td><td>yes</td><td>exact play once the position is small or split into regions</td></tr>
+<tr><td>the MCTS's terminal nodes</td><td>yes</td><td>same at the leaves that end the game</td></tr>
+<tr><td>the NNUE and ResNet evaluations</td><td>no</td><td>they read the board only (in normal play the score difference is always 0 or 1, they never needed it): with a large bonus on an open board, the AI misjudges the middle game</td></tr>
+</table>
+<p>So a bonus is safe in endgame puzzles (few free squares, or separate regions), and should stay small on an open board. Two uses: a handicap (give points to the weaker side), and goals that the AI really defends. With the goal “Gagner de 3+”, an AI that is already lost has no reason to limit the margin (a loss is a loss for it); with the goal “Gagner” and +2 for the AI, the same puzzle becomes a game the AI fights for, point by point. The same trick makes “survive N moves” puzzles: give the lone piece enough points that surviving long enough is winning, and the AI must shut it in to win.</p>
+
+<p><b>The verdict.</b> “Vérifier” runs the exact endgame solver (<code>player/endgame_solver.{h,cpp}</code>): a search to the very end of the game, with no evaluation, so its answer is a proof. It answers:</p>
+<ul>
+<li><b>Faisable</b>: the player reaches the goal against any defence. When the player moves first, the <b>key moves</b> are counted and listed (up to four): the moves after which the goal is still reached. A good puzzle often has a single one; “7 coups clés sur 9” means the puzzle is easy.</li>
+<li><b>Impossible</b>: the best defence stops every attempt (the line says whether it gets a draw or wins).</li>
+<li><b>Inconnu</b>: more than 36 free squares (no attempt: a proof would take hours), no proof within 10 seconds, or “Arrêter” clicked (“Vérification arrêtée”). The puzzle then depends on the strength of the AI chosen to play it.</li>
+</ul>
+<p>Measured examples (one core of an i7-12700K):</p>
+<table>
+<tr><th>Puzzle</th><th>Free squares</th><th>Verdict</th><th>Time</th></tr>
+<tr><td>shut the white piece in (example “encerclement”)</td><td>12</td><td>Faisable, 7 key moves out of 9</td><td>0.02 s</td></tr>
+<tr><td>the lone black piece against four white ones, bonus 0 / 5 / 6 / 8</td><td>21</td><td>Impossible</td><td>0.04 / 0.13 / 0.27 / 3.8 s</td></tr>
+<tr><td>same, bonus 10</td><td>21</td><td>Inconnu</td><td>10 s</td></tr>
+<tr><td>same, bonus 12 or more</td><td>21</td><td>Faisable (key moves not counted in time)</td><td>10 s</td></tr>
+<tr><td>an open middle game</td><td>44</td><td>Inconnu (too many free squares)</td><td>0 s</td></tr>
+</table>
+<p>Scanning the bonus like this answers the designer's question “how many points must the lone piece get for the puzzle to be playable?”: here between 9 and 12.</p>
+
+<p><b>Three choices that make it exact and fast.</b></p>
+<ol>
+<li><b>“Win by N” is checked as “win” with N − 1 more points for the opponent.</b> The lead is ≥ N exactly when the lead minus (N − 1) is ≥ 1. The solver then only has to tell win / draw / loss (a narrow window around 0), which is far cheaper than the exact final score: on the lone-piece puzzle with the goal “Gagner de 3+”, the exact score had no answer in 10 s, the shifted win/loss check answers in 0.07 s.</li>
+<li><b>No “pass rule”.</b> The solver has an option saying that a player who must pass while the game is not over has lost. It holds in normal play (if White must pass, Black already has one move more and White will make no other; if Black must pass, the scores are equal and White can still move), and it saves the AlphaZero self-play and the hybrid player a lot of search. But it assumes the scores of a normal game: with a bonus, a blocked player can win, and a puzzle where White moves first at 0–0 does not have those scores either. The editor turns it off. (The dev player has its own copy of the rule, off by default and off in the app's configuration.)</li>
+<li><b>Bounds for a lone player.</b> Without the pass rule, a blocked side made the solver slow: the other side then plays alone to the end, and the solver tried every order of its moves to find how many it can make. Two facts give exact bounds instead, whatever the scores: a blocked side stays blocked (a free square never comes back), and every move fills one free square. So when the side to move must pass, the opponent will make at least one more move and at most one per free square it can reach (an 8-connected flood fill from its pieces through free squares); when the opponent is blocked, we will make at least one move and at most one per free square we can reach. When a bound is enough to leave the search window, it is returned at once. On the lone piece with a bonus of 6: 4.6 s → 0.27 s. These bounds are only used when the pass rule is off, so the other users of the solver are unchanged.</li>
+</ol>
+
+<p><b>The thread.</b> The check must not freeze the interface, so it runs in a thread of its own (<code>PuzzleCheck</code>, made by <code>puzzle_check_start</code>). A second thread, the watchdog, waits on a condition variable for the result or 10 s, then sets the solver's <code>stop</code> flag; the solver sees it at its next node and returns an incomplete result, which becomes “Inconnu”. “Arrêter” sets the same flag. <code>stop</code> and <code>done</code> are always set under the mutex (<code>PuzzleCheck::signal</code>): set without it, a notification could fall between the waiter's test and its sleep and be lost, and the waiter would sleep until its timeout. The job is held by a <code>shared_ptr</code> in the editor's state; its destructor stops and joins both threads, so starting a new check or quitting never leaves a thread behind. The verdict is shown only while the puzzle's key (<code>puzzle_check_key</code>: board, side to move, player's side, goal, bonuses) is the one that was checked.</p>
+<pre data-extract="struct PuzzleCheck {" data-file="app/yolah_app.cpp"></pre>
+<pre data-extract="puzzle_check_start(const Puzzle& p, double now) {" data-file="app/yolah_app.cpp" data-max="95"></pre>
+<p>The bounds for a lone player, in the solver:</p>
+<pre data-extract="    if (!options.pass_rule) {" data-file="player/endgame_solver.cpp"></pre>
+
+<p><b>The commented copy.</b> <code>doc/final_solver.{h,cpp}</code> holds the editor's solver alone, in French, commented line by line like <code>doc/final_dev</code> and <code>doc/final_mcts</code>: the “remaining score” values (why the table can share them between positions whose scores differ, which is what makes the bonus free for the table), the fail-soft window, the move ordering, the lone-player bounds with a worked example, and <code>verify</code>, the verdict without the thread. <code>test/final_solver_check.sh</code> proves it is the same code: on random positions (6 to 13 free squares, scores 0 to 6, either side to move) it gives the same values, the same moves and the same node counts as <code>EndgameSolver</code> configured like the editor, the same values as a plain negamax to the end of the game, and the same verdicts and key moves for goals “win by 1 to 3” (2000 positions, 0 mismatches).</p>
 </section>
 
 <section id="files">
@@ -93,7 +137,7 @@ Box panel{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin};
 <pre data-lang="json" data-title="assets/puzzles/deux_d_avance.json (rank 8 first: B black, W white, # hole, . free)">
 { "name": "Deux d'avance", "text": "Gagner ne suffit pas : il faut deux points d'avance.",
   "board": ["B.#W###.", ".#######", "########", "###.####", ".#..##.#", "#W#.##W#", "##B##.##", "B##.#WB."],
-  "to move": "black", "player": "black", "opponent": "dev", "margin": 2, "time index": 1,
+  "to move": "black", "player": "black", "opponent": "dev", "margin": 2, "bonus black": 0, "bonus white": 0, "time index": 1,
   "theme": "jade", "hole style": "bush", "sprite black": "", "sprite white": "", "background": "crepuscule.jpg",
   "tiles": { "e4": "herbe" }, "decor": [ { "art": "flamme", "x": 8.4, "y": 1.2, "scale": 1 } ] }
 </pre>
@@ -102,7 +146,7 @@ Box panel{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin};
   "puzzles": ["deux_d_avance", "le_chemin_le_plus_long", "neuf_choix", "le_grand_ecart"] }
 { "levels": ["premiers_defis", "nouveau_niveau"] }
 </pre>
-<p>Hole styles: <code>pit</code> (the theme's), <code>lava</code>, <code>water</code>, <code>void</code>, <code>ice</code>, <code>bush</code>, or a drawing <code>art:&lt;id&gt;</code>. Decorations are placed in squares from the top-left corner of the board, so they may sit on the frame or outside it.</p>
+<p><code>"bonus black"</code> and <code>"bonus white"</code> are the points each side starts with (0 to 20; absent in older files: 0), see 24.5. Hole styles: <code>pit</code> (the theme's), <code>lava</code>, <code>water</code>, <code>void</code>, <code>ice</code>, <code>bush</code>, or a drawing <code>art:&lt;id&gt;</code>. Decorations are placed in squares from the top-left corner of the board, so they may sit on the frame or outside it.</p>
 
 <h3><span class="n">25.5</span>Drawing: <code>assets/art/&lt;id&gt;.json</code> + <code>.png</code></h3>
 <pre data-lang="json">
@@ -127,6 +171,13 @@ Box panel{a.w - margin - panel_w, margin, panel_w, a.h - 2 * margin};
 ./app/build/yolah_app --screenshot picker.bmp --scene themes --pick human
 ./app/build/yolah_app --screenshot studio.bmp --scene studio --tab 0 --art visage
 python3 -c "from PIL import Image; Image.open('menu.bmp').save('menu.png')"
+</pre>
+<p>The editor's “Vérifier” also runs without a window, on a puzzle id or any puzzle file, and prints the verdict; the commented copy of the solver has its own check:</p>
+<pre data-lang="bash">
+./app/build/yolah_app --verify-puzzle mon_puzzle          # assets/puzzles/mon_puzzle.json
+./app/build/yolah_app --verify-puzzle /tmp/my_puzzle.json
+#   Faisable : le joueur gagne contre toute défense • 7 coups clés sur 9 : e3→d3, e3→d4, e3→e4, e3→c5, ….  (0.02 s)
+test/final_solver_check.sh 2000      # doc/final_solver.cpp = the editor's solver (values, moves, nodes)
 </pre>
 <p>The full list of options is at the top of <code>yolah_app.cpp</code>. To rebuild the images of this page and the page itself:</p>
 <pre data-lang="bash">

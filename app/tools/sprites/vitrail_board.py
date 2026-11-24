@@ -83,9 +83,9 @@ def dark_tile(S=128):
     return to_rgba(c, torch.ones_like(x))
 
 
-def broken(S=128, frames=10, opening=False):
+def broken(S=128, frames=1, opening=False):
     """The broken pane: dark, jagged shards of glass left in the lead round the edge,
-    a glint running over them (idle); the pane bursting into coloured shards (open)."""
+    still (idle, one frame); the pane bursting into coloured shards (open)."""
     out = []
     x, y = grid(S, S)
     u, v = (x - 0.5) * 2, (y - 0.5) * 2
@@ -98,15 +98,13 @@ def broken(S=128, frames=10, opening=False):
     shards = [(rnd.uniform(0, TAU), rnd.uniform(0.6, 1.2), rnd.choice(["#2448b0", "#b81a28", "#e0a830", "#2a8a4a", "#f2e4c0"])) for _ in range(18)]
     n_frames = 9 if opening else frames
     for f in range(n_frames):
-        ph = f / frames
         k = 1.0 if not opening else (f + 1) / n_frames
         R = jag * k + (1 - k) * 0.0
         hole = (r < R).float()
         c = C("#0a0a12") * (0.6 + 0.4 * (r / R.clamp_min(1e-3)).clamp(0, 1) ** 2)[None]
         rim = ((r >= R) & (r < 0.97)).float()                                          # the shards left in place
         sh_col = C("#2448b0") * 0.65 * (0.8 + 0.4 * noise2(torch.cos(th) * 5, torch.sin(th) * 5, 6.0, 1))[None]
-        glint = torch.exp(-((th - (TAU * ph - math.pi)) / 0.25) ** 2) * rim
-        c = c * hole[None] + (sh_col * (0.7 + 0.5 * noise2(u * 6, v * 6, 4.0, 2))[None] + C("#ffffff") * glint[None] * 1.2) * rim[None]
+        c = c * hole[None] + (sh_col * (0.7 + 0.5 * noise2(u * 6, v * 6, 4.0, 2))[None]) * rim[None]
         crack = (torch.abs(torch.remainder(th * 9 / TAU + 0.3 * torch.sin(th * 2), 1.0) - 0.5) > 0.47).float() * rim   # the cracks between the shards
         lead = ((r - R).abs() < 0.02).float() + (r > 0.97).float() + crack
         c = c * (1 - lead.clamp(0, 1))[None] + C(LEAD) * lead.clamp(0, 1)[None]

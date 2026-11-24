@@ -1148,5 +1148,21 @@
  "            + 1038 × (cases couvertes par nos pièces après le coup − avant)": "            + 1038 × (squares covered by our pieces after the move − before)",
  "Régler toutes les constantes à la fois": "Tuning all the constants at once",
  "La recherche dépend d'une trentaine de constantes : marges d'élagage, profondeurs, formule des réductions, bonus du tri. Chacune avait été réglée à la main, seule, contre le joueur du moment, et les autres avaient bougé depuis. La méthode SPSA, celle de Stockfish, les règle toutes ensemble : à chaque petit match, toutes les constantes sont décalées au hasard, un peu vers le haut ou vers le bas, et cette version affronte la version décalée en sens inverse ; chaque constante avance alors d'un pas vers le côté qui a gagné. Un match seul ne dit presque rien, mais sur 100 000 parties le bruit s'annule et la bonne direction reste. Le dev élague maintenant plus fort (il essaie moins de coups tardifs, coupe plus tôt) et cherche 24 % de nœuds en moins à profondeur égale. Mesuré : +18 Elo à 1 s par coup.": "The search depends on about thirty constants: pruning margins, depths, the reduction formula, ordering bonuses. Each had been tuned by hand, alone, against the player of the time, and the others had moved since. The SPSA method, Stockfish's, tunes them all together: at each small match, every constant is shifted at random, a little up or down, and this version plays the version shifted the opposite way; each constant then takes a step toward the side that won. One match alone says almost nothing, but over 100,000 games the noise cancels and the right direction remains. The dev now prunes harder (it tries fewer late moves, cuts earlier) and searches 24 % fewer nodes at the same depth. Measured: +18 Elo at 1 s per move.",
- "Novembre 2026, suite : la couverture de notre groupe remplace l'influence dans le tri des coups (une idée de l'utilisateur), puis un réglage SPSA de 29 constantes sur 100 000 parties. Ensemble : +19 Elo à 1 s par coup.": "November 2026, continued: the coverage of our group replaces the influence in the move ordering (the user's idea), then an SPSA tuning of 29 constants over 100,000 games. Together: +19 Elo at 1 s per move."
+ "Novembre 2026, suite : la couverture de notre groupe remplace l'influence dans le tri des coups (une idée de l'utilisateur), puis un réglage SPSA de 29 constantes sur 100 000 parties. Ensemble : +19 Elo à 1 s par coup.": "November 2026, continued: the coverage of our group replaces the influence in the move ordering (the user's idea), then an SPSA tuning of 29 constants over 100,000 games. Together: +19 Elo at 1 s per move.",
+ "Inconnu : %d cases libres, trop pour une preuve (au plus %d).": "Unknown: %d free squares, too many for a proof (at most %d).",
+ "Inconnu : pas de preuve en %.0f s (%d cases libres).": "Unknown: no proof within %.0f s (%d free squares).",
+ "le joueur gagne contre toute défense": "the player wins against any defence",
+ "la meilleure défense obtient le nul": "the best defence gets a draw",
+ "la meilleure défense gagne": "the best defence wins",
+ "Faisable : ": "Feasible: ",
+ "Impossible : ": "Impossible: ",
+ " (coups clés non comptés : temps écoulé).": " (key moves not counted: out of time).",
+ " • un seul coup clé : %s": " • a single key move: %s",
+ " • %zu coups clés sur %zu : %s": " • %zu key moves out of %zu: %s",
+ "Arrêter": "Stop",
+ "Vérifier": "Verify",
+ "Vérification… %.0f s": "Verifying… %.0f s",
+ "Vérification arrêtée.": "Verification stopped.",
+ "le joueur gagne de %d ou plus contre toute défense": "the player wins by %d or more against any defence",
+ "la meilleure défense empêche de gagner de %d": "the best defence prevents winning by %d"
 }

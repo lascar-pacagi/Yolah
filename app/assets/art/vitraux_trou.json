@@ -9,7 +9,7 @@
       "name": "idle",
       "fps": 6,
       "loop": true,
-      "frames": 10
+      "frames": 1
     },
     {
       "name": "open",

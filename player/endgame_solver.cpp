@@ -70,6 +70,22 @@ int EndgameSolver::order_moves(Yolah& yolah, Move tt_move, Yolah::MoveList& move
     return n;
 }
 
+// The free squares that `pieces` can still reach, through free squares
+// (8-connected flood fill: a slide is a chain of steps over free squares).
+static uint64_t reach(uint64_t pieces, uint64_t free) {
+    auto grow = [](uint64_t b) {
+        constexpr uint64_t NOT_A = 0xfefefefefefefefeULL, NOT_H = 0x7f7f7f7f7f7f7f7fULL;
+        const uint64_t row = b | ((b << 1) & NOT_A) | ((b >> 1) & NOT_H);
+        return row | (row << 8) | (row >> 8);
+    };
+    uint64_t r = grow(pieces) & free, prev = 0;
+    while (r != prev) {
+        prev = r;
+        r = grow(r) & free;
+    }
+    return r;
+}
+
 // Fail-soft alpha-beta on the remaining value (see the header).
 int EndgameSolver::search(Yolah& yolah, uint64_t hash, int alpha, int beta) {
     ++nb_nodes;
@@ -110,6 +126,30 @@ int EndgameSolver::search(Yolah& yolah, uint64_t hash, int alpha, int beta) {
     if (options.pass_rule && moves[0] == Move::none()) {
         const int upper = -1 - yolah.score(yolah.current_player());
         if (upper <= alpha) return upper;
+    }
+    // Without the pass rule (any scores, e.g. a puzzle's starting bonus), the
+    // same facts give exact bounds when one side is blocked for good (a blocked
+    // player stays blocked) and the other plays alone to the end:
+    //   • the side to move must pass: the opponent will make at least one more
+    //     move (the game is not over) and at most one per free square it can
+    //     reach (each move fills one): remaining ∈ [−reach(opponent), −1];
+    //   • the opponent is blocked (no free square next to its pieces): we will
+    //     make at least one move and at most one per free square we can reach:
+    //     remaining ∈ [1, reach(us)].
+    // Without them, the solver would search every order of the lone player's
+    // moves to find their exact number.
+    if (!options.pass_rule) {
+        const uint64_t free = yolah.free_squares();
+        const uint8_t us = yolah.current_player();
+        if (moves[0] == Move::none()) {
+            if (-1 <= alpha) return -1;
+            const int lower = -std::popcount(reach(yolah.bitboard(Yolah::other_player(us)), free));
+            if (lower >= beta) return lower;
+        } else if (reach(yolah.bitboard(Yolah::other_player(us)), free) == 0) {
+            if (1 >= beta) return 1;
+            const int upper = std::popcount(reach(yolah.bitboard(us), free));
+            if (upper <= alpha) return upper;
+        }
     }
     if (!brute) order_moves(yolah, tt_move, moves);
     const uint8_t player = yolah.current_player();

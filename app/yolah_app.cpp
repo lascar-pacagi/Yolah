@@ -43,11 +43,14 @@
 //   @@SCENE_TUTORIAL learn to play: lessons on the board, each with a goal
 //                   checked by code (reach a square, shut a piece in, win an
 //                   endgame...), a small perfect solver for the endgames
-//   @@PUZZLE        puzzles and levels: data, JSON files, validity, hole styles
+//   @@PUZZLE        puzzles and levels: data, JSON files, validity, hole styles,
+//                   the starting bonus, the verification ("Vérifier": the exact
+//                   endgame solver in a thread, PuzzleCheck; doc/final_solver)
 //   @@SCENE_PUZZLES levels and puzzles to play (each solved puzzle unlocks the
 //                   next), the level editor, the introduction card, the goal
 //   @@SCENE_EDITOR  puzzle editor: paint the board, who starts, the player's
-//                   side, the AI, the goal, theme, holes, sprites, background
+//                   side, the AI, the goal, the bonuses, theme, holes, sprites,
+//                   background, "Vérifier" (its verdict under the board)
 //   @@SCENE_STUDIO  the workshop: pixel editor (tools, colours, frames, undo,
 //                   import) and board editor (theme colours and drawings)
 //   @@MAIN          the SDL callbacks: SDL_AppInit, SDL_AppEvent,
@@ -77,6 +80,7 @@
 //   --verbose             let the AI players print to the terminal
 //   --export-puzzle ID --out FILE   write the puzzle's export file (puzzle_export) and quit
 //   --import-puzzle FILE  import a puzzle file (puzzle_import) and quit
+//   --verify-puzzle ID|FILE.json   the editor's "Vérifier" without a window: print the verdict and quit
 //   --browse export|import|image  the file browser open (over any --scene)
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -103,12 +107,15 @@
 #include "zobrist.h"
 #include "player.h"
 #include "minmax_nnue_dev_player.h"
+#include "endgame_solver.h"
 #include "heuristic.h"
 
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <chrono>
+#include <condition_variable>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -3998,6 +4005,136 @@ std::string puzzle_problem(const Puzzle& p) {
     if (puzzle_position(p).game_over()) return "Personne ne peut bouger : la partie serait d\xC3\xA9j\xC3\xA0 finie.";
     return "";
 }
+// ─── Puzzle verification (the editor's "Vérifier") ───────────────────────────
+// The exact endgame solver (player/endgame_solver.h) searches the puzzle to the
+// end of the game, in a thread of its own, within a time budget. Verdicts:
+// "Faisable" (proved: the player reaches the goal against any defence),
+// "Impossible" (proved: the best defence stops every attempt), or "Inconnu"
+// (too many free squares, or no proof within the budget). When the player
+// moves first, the key moves (those that keep the goal reachable) are counted:
+// a good puzzle often has a single one.
+// "Win by at least N" is checked as "win" with N − 1 more points for the
+// opponent: the solver then only has to tell win / draw / loss, which is far
+// cheaper than computing the exact final score.
+// The solver's "pass rule" is switched off: it says that a player who must
+// pass has lost, which is only true when the scores come from normal play; a
+// puzzle's starting bonus can let a blocked player win.
+struct PuzzleCheck {
+    static constexpr int MAX_FREE = 36;          // more free squares: no attempt, "Inconnu"
+    static constexpr double BUDGET = 10.0;       // seconds
+    enum class Verdict { Running, Feasible, Impossible, Unknown };
+    std::string key;                             // the puzzle as checked (puzzle_check_key)
+    std::atomic_bool stop{false}, done{false};
+    Verdict verdict = Verdict::Running;          // written by the thread before `done`
+    std::string text;                            // the verdict, explained
+    double start = 0;                            // SDL ticks (s) at the start
+    std::thread worker, watchdog;
+    std::mutex m;
+    std::condition_variable cv;
+    // Sets stop (and done), under the lock: a waiter cannot miss the wake-up.
+    void signal(bool finished) {
+        {
+            std::lock_guard lk(m);
+            stop = true;
+            if (finished) done = true;
+        }
+        cv.notify_all();
+    }
+    ~PuzzleCheck() {
+        signal(false);
+        if (worker.joinable()) worker.join();
+        if (watchdog.joinable()) watchdog.join();
+    }
+};
+
+// What the verdict depends on: the board, who moves, who plays, the goal and the bonuses.
+std::string puzzle_check_key(const Puzzle& p) {
+    return std::string(p.cells.begin(), p.cells.end()) + strf("|%d|%d|%d|%d|%d", p.to_move, p.human, p.margin, p.bonus[BLACK], p.bonus[WHITE]);
+}
+
+std::shared_ptr<PuzzleCheck> puzzle_check_start(const Puzzle& p, double now) {
+    auto job = std::make_shared<PuzzleCheck>();
+    job->key = puzzle_check_key(p);
+    job->start = now;
+    const Yolah pos = puzzle_position(p);
+    const int free_sq = std::popcount(pos.free_squares());
+    if (free_sq > PuzzleCheck::MAX_FREE) {
+        job->verdict = PuzzleCheck::Verdict::Unknown;
+        job->text = strf("Inconnu : %d cases libres, trop pour une preuve (au plus %d).", free_sq, PuzzleCheck::MAX_FREE);
+        job->done = true;
+        return job;
+    }
+    const int human = p.human, margin = p.margin;
+    PuzzleCheck* j = job.get();   // the threads end before the job is destroyed (its destructor joins them)
+    j->worker = std::thread([j, pos, human, margin, free_sq] {
+        EndgameSolver::Options opt;
+        opt.pass_rule = false;
+        opt.tt_bits = 22;
+        EndgameSolver solver(opt);
+        auto finish = [&](PuzzleCheck::Verdict v, std::string t) {
+            j->text = std::move(t);
+            j->verdict = v;
+            j->signal(true);
+        };
+        const auto t0 = std::chrono::steady_clock::now();
+        auto unknown = [&] {   // stopped: by the budget, or by the "Arrêter" button before it
+            const double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            finish(PuzzleCheck::Verdict::Unknown, el < PuzzleCheck::BUDGET - 0.2 ? std::string(tr("V\xC3\xA9rification arr\xC3\xAAt\xC3\xA9" "e."))
+                                                                             : strf("Inconnu : pas de preuve en %.0f s (%d cases libres).", PuzzleCheck::BUDGET, free_sq));
+        };
+        // Whether the player reaches the goal with perfect play on both sides: the
+        // sign of the final lead (player − opponent) once the opponent has been
+        // given margin − 1 more points (> 0: reached, 0: draw, < 0: lost).
+        auto lead = [&](const Yolah& y0, bool& ok) {
+            Yolah y = y0;
+            auto [b, w] = y.score();
+            (human == BLACK ? w : b) += uint16_t(margin - 1);
+            y.set_state(y.bitboard(BLACK), y.bitboard(WHITE), y.empty_bitboard(), b, w, y.nb_plies());
+            auto r = solver.solve(y, true, &j->stop);
+            ok = r.complete;
+            return y.current_player() == human ? r.value : -r.value;
+        };
+        bool ok = false;
+        const int d = lead(pos, ok);
+        if (!ok) return unknown();
+        const bool feasible = d > 0;
+        std::string t;
+        if (margin <= 1) t = feasible ? tr("le joueur gagne contre toute d\xC3\xA9" "fense") : (d == 0 ? tr("la meilleure d\xC3\xA9" "fense obtient le nul") : tr("la meilleure d\xC3\xA9" "fense gagne"));
+        else t = feasible ? strf("le joueur gagne de %d ou plus contre toute d\xC3\xA9" "fense", margin) : strf("la meilleure d\xC3\xA9" "fense emp\xC3\xAA" "che de gagner de %d", margin);
+        if (pos.current_player() == human) {
+            // The key moves: those after which the goal is still reached.
+            Yolah::MoveList moves;
+            Yolah y = pos;
+            y.moves(moves);
+            std::vector<Move> keys;
+            for (Move m : moves) {
+                Yolah c = y;
+                c.play(m);
+                bool ok2 = false;
+                const int dc = lead(c, ok2);
+                if (!ok2) return finish(feasible ? PuzzleCheck::Verdict::Feasible : PuzzleCheck::Verdict::Impossible,
+                                        std::string(tr(feasible ? "Faisable : " : "Impossible : ")) + t + tr(" (coups cl\xC3\xA9s non compt\xC3\xA9s : temps \xC3\xA9" "coul\xC3\xA9)."));
+                if (dc > 0) keys.push_back(m);
+            }
+            if (feasible) {
+                std::string list;
+                for (size_t i = 0; i < keys.size() && i < 4; i++) list += (i ? ", " : "") + move_name(keys[i]);
+                if (keys.size() > 4) list += ", \xE2\x80\xA6";
+                t += keys.size() == 1 ? strf(" \xE2\x80\xA2 un seul coup cl\xC3\xA9 : %s", list.c_str())
+                                      : strf(" \xE2\x80\xA2 %zu coups cl\xC3\xA9s sur %zu : %s", keys.size(), moves.size(), list.c_str());
+            }
+        }
+        finish(feasible ? PuzzleCheck::Verdict::Feasible : PuzzleCheck::Verdict::Impossible,
+               std::string(tr(feasible ? "Faisable : " : "Impossible : ")) + t + ".");
+    });
+    j->watchdog = std::thread([j] {
+        std::unique_lock lk(j->m);
+        j->cv.wait_for(lk, std::chrono::duration<double>(PuzzleCheck::BUDGET), [j] { return j->done.load() || j->stop.load(); });
+        j->stop = true;   // the solver sees it and returns incomplete
+    });
+    return job;
+}
+
 std::vector<std::string> json_files(const fs::path& dir) {   // file names without ".json"
     std::vector<std::string> ids;
     std::error_code ec;
@@ -4533,6 +4670,7 @@ struct App {
         bool choose_new = false;
         std::string new_level;            // the level the new puzzle goes into
         float new_scroll = 0;
+        std::shared_ptr<PuzzleCheck> check;   // the last "Vérifier" (running or done)
     } editor;
 
     // The workshop (@@SCENE_STUDIO): pixel drawings and board themes.
@@ -8458,10 +8596,17 @@ void scene_editor(App& a) {
         cur = list[a.ui.cycler(id, b, label, nm, idx, 14)]->id;
     };
     if (ed.tool <= 3) {
-        float bw2 = (row2.w - 12 * s) / 3;
+        float bw2 = (row2.w - 18 * s) / 4;
         if (a.ui.button("ed_fill", {row2.x, row2.y, bw2, row2.h}, "Tout noircir", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '.') c = '#';
         if (a.ui.button("ed_clear", {row2.x + bw2 + 6 * s, row2.y, bw2, row2.h}, "Tout vider", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '#') c = '.';
         if (a.ui.button("ed_start", {row2.x + 2 * (bw2 + 6 * s), row2.y, bw2, row2.h}, "D\xC3\xA9part", Style::Ghost, true, 14)) p.cells = Puzzle().cells;
+        // Verify: prove the puzzle feasible or not (PuzzleCheck); a second click while it runs stops it.
+        const bool running = ed.check && !ed.check->done;
+        if (a.ui.button("ed_verify", {row2.x + 3 * (bw2 + 6 * s), row2.y, bw2, row2.h}, running ? "Arr\xC3\xAAter" : "V\xC3\xA9rifier", Style::Normal,
+                        running || puzzle_problem(p).empty(), 14)) {
+            if (running) ed.check->signal(false);
+            else ed.check = puzzle_check_start(p, a.time);
+        }
     } else if (ed.tool == 4) {
         art_choice("ed_tile", "tile", ed.tile_art, {row2.x, row2.y, row2.w * 0.5f, row2.h}, "Case");
         a.text.draw(Font::Regular, 13 * s, "clic : peindre \xE2\x80\xA2 clic droit : effacer", {row2.x + row2.w * 0.52f, row2.y + 11 * s}, pal::faint);
@@ -8555,7 +8700,19 @@ void scene_editor(App& a) {
     std::string problem = puzzle_problem(p);
     std::string status = strf("Noirs %d/4 \xE2\x80\xA2 Blancs %d/4 \xE2\x80\xA2 %d cases libres  \xE2\x80\x94  ", p.count('B'), p.count('W'), p.count('.')) +
                          (problem.empty() ? std::string("pr\xC3\xAAt \xC3\xA0 jouer") : problem);
-    a.text.draw(Font::Bold, 15 * s, status, {mid.center().x, ed.board.area.bottom() + frame + 4 * s}, problem.empty() ? pal::good : pal::bad, Align::Center);
+    Rgba status_col = problem.empty() ? pal::good : pal::bad;
+    // The verification's verdict replaces the status while it is about this very puzzle.
+    if (ed.check && problem.empty() && ed.check->key == puzzle_check_key(p)) {
+        using V = PuzzleCheck::Verdict;
+        if (!ed.check->done) {
+            status = strf("V\xC3\xA9rification\xE2\x80\xA6 %.0f s", a.time - ed.check->start);
+            status_col = pal::dim;
+        } else {
+            status = ed.check->text;
+            status_col = ed.check->verdict == V::Feasible ? pal::good : ed.check->verdict == V::Impossible ? pal::bad : pal::dim;
+        }
+    }
+    a.text.draw(Font::Bold, 15 * s, status, {mid.center().x, ed.board.area.bottom() + frame + 4 * s}, status_col, Align::Center);
 
     // ── right: settings and tests ──
     a.ui.panel(panel);
@@ -9850,6 +10007,23 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         const bool ok = write_file(out, puzzle_export(puzzle_from_json(j, id)).dump(1));
         std::fprintf(stderr, ok ? "exported %s to %s\n" : "cannot write %s to %s\n", id.c_str(), out.c_str());
         return ok ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+    }
+    // The editor's "Vérifier" without the interface: a puzzle id, or a .json file.
+    if (!arg_value(argc, argv, "--verify-puzzle").empty()) {
+        const std::string arg = arg_value(argc, argv, "--verify-puzzle");
+        const bool file = fs::path(arg).extension() == ".json";
+        json j = load_json(file ? fs::path(arg) : g_paths.assets / "puzzles" / (arg + ".json"));
+        if (!j.is_object()) { std::fprintf(stderr, "no puzzle %s\n", arg.c_str()); return SDL_APP_FAILURE; }
+        const Puzzle pz = puzzle_from_json(j, file ? fs::path(arg).stem().string() : arg);
+        if (auto problem = puzzle_problem(pz); !problem.empty()) { std::fprintf(stderr, "%s\n", problem.c_str()); return SDL_APP_FAILURE; }
+        const double t0 = now_seconds();
+        auto job = puzzle_check_start(pz, t0);
+        {
+            std::unique_lock lk(job->m);
+            job->cv.wait(lk, [&] { return job->done.load(); });
+        }
+        std::printf("%s  (%.2f s)\n", job->text.c_str(), now_seconds() - t0);
+        return SDL_APP_SUCCESS;
     }
     if (!arg_value(argc, argv, "--import-puzzle").empty()) {
         auto r = puzzle_import(fs::path(arg_value(argc, argv, "--import-puzzle")));
