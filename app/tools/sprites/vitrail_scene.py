@@ -637,7 +637,7 @@ def scene():
     # the great rose: its glass in the opening (no shadow: the light comes through), its stone tracery:
     # an outer moulded ring, 12 spokes, a ring of 12 small oculi between them, the hub
     Wr = T(0, RY_, ZW - 0.6) * RX(math.pi / 2)
-    rose = rose_glass("idle", 0.0, 0.0, emit=3.0, R=RR)
+    rose = rose_glass("idle", 0.0, 0.0, emit=3.0, R=RR, shade=False)
     rose.shadow = False
     sc.add(sd_cylinder(0.04, RR), rose, Wr)
     tr = stone("#74695a", 0.7, 0.0)

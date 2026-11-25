@@ -526,7 +526,7 @@ private:
         // U7 (C5) : Historique contextuel des réductions LMR erronées (+12.3 Elo) :
         //   lmrh[joueur][ dest_adverse_précédente ][ notre_destination ]
         // Même indexation (prev.to, m.to) que `cont1` : mémorise les réponses `m.to` à `prev.to`
-        // qui ont été réduites par LMR (`r_used > 0`) mais qui ont finalement battu `alpha`
+        // qui ont été réduites par LMR (`r > 0`) mais qui ont finalement battu `alpha`
         // (la réduction a donc coûté une re-recherche). Dès que `lmrh >= 4453`
         // (LMRH_THRESHOLD), ce couple reçoit 1 pli de réduction LMR en moins.
         // Elle ne fait que MONTER :

@@ -1749,7 +1749,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             regions();
             const uint64_t priv = u4_ru & ~u4_rt;
             if (priv & square_bb(m.to_sq())) {
-                const uint64_t comp = region_reach(square_bb(m.to_sq()), priv) | square_bb(m.to_sq());
+                const uint64_t comp = region_reach(square_bb(m.to_sq()), priv);
                 if (comp & pocket_done) { s.nb_fly_prunes++; fly_pruned = true; TR(SKIP, 2, int(i), m.raw()); continue; }
                 pocket_done |= comp;
             }

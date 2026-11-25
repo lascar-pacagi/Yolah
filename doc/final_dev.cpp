@@ -1570,25 +1570,71 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
             }
         }
 
-        // Toujours au moins 1 pli de recherche réduite (déjà assuré par la
-        // formule ; répété ici par sécurité, comme dans le joueur).
-        const int r_used = std::min(r, std::max(0, depth - 2));
-        const int v = search_move(yolah, s, hash, m, i, r_used, alpha, beta, depth);
+        // Pas de nouvelle borne ici : `late_move_reduction_of` rend déjà `r`
+        // dans [0, depth − 2] (la recherche réduite garde au moins 1 pli :
+        // depth − 1 − r ≥ 1), et les deux ajustements ci-dessus (interception,
+        // lmrh) ne font que le baisser.
+        // (Le joueur, lui, reborne à [0, depth − 2] juste avant `search_move`
+        // (`r_used`), car certaines de ses options ajoutent des plis après la
+        // formule : +1 si le nœud ne s'améliore pas (`improving`), sur un nœud
+        // cut (`cutnode lmr`), pour la n-ième pièce essayée (`piece lmr`), pour
+        // un coup qui défait le précédent (`undo lmr`) ou qui ne gêne pas
+        // l'adversaire (`opp lmr`), la table apprise d'ajustements
+        // (`lmr table`), le décalage de la réponse forte (`fly lmr`) et la
+        // réduction de la queue après le proxy (`proxy tail`). Aucune n'est
+        // active dans dev_u9_spsa.)
+        const int v = search_move(yolah, s, hash, m, i, r, alpha, beta, depth);
 
         if (stopped()) return 0;
 
-        // U7 (C5) : Apprentissage des réductions erronées (`lmrh`) :
-        // Si le coup a été réduit (`r_used > 0`) mais qu'il a finalement battu
-        // `alpha` après re-recherche à pleine profondeur, la réduction était
-        // trop optimiste (elle a coûté une recherche de plus) : on augmente
-        // `lmrh[player][prev.to][m.to]` d'un bonus croissant avec la profondeur,
-        // par gravité (h + b − h·b/16384 : reste sous 16384). Ce bonus garde les
-        // valeurs d'origine 16 d² + 32 d plafonnées à 2000 : le SPSA n'a réglé
-        // que celui de l'historique principal (HIST_BONUS_*).
-        // (Strictement, lmrh apprend où une réduction a COÛTÉ une re-recherche,
-        // pas où elle a fait rater un bon coup : un coup réduit qui échoue bas
-        // n'est jamais re-cherché, la recherche ne peut pas voir cette erreur.)
-        if (r_used > 0 && v > alpha && ply_now > 0 && s.played[ply_now - 1] != Move::none()) {
+        // U7 (C5) : Apprentissage des réductions erronées (`lmrh`).
+        //
+        // Quand est-ce compté ? Le coup a été réduit (`r > 0`) et sa valeur
+        // finale bat `alpha` (`v > alpha`). Dans `search_move`, cela veut dire
+        // que les DEUX recherches ont dit « bat alpha » :
+        //   • l'étape 1 (profondeur réduite, fenêtre nulle) a dépassé alpha,
+        //     sinon `search_move` se serait arrêté là avec v <= alpha ;
+        //   • l'étape 2 (pleine profondeur) l'a confirmé, sinon v <= alpha.
+        // Le coup était donc bon, et la réduction n'a rien économisé : il a
+        // fallu le chercher deux fois (réduit puis complet). Sans réduction,
+        // une seule recherche aurait suffi.
+        // Ne sont PAS comptés :
+        //   • le coup réduit qui échoue bas à l'étape 1 : la réduction a joué
+        //     son rôle (ou s'est trompée, mais la recherche ne peut pas le voir :
+        //     un coup réduit qui échoue bas n'est jamais re-cherché) ;
+        //   • le coup réduit qui passe l'étape 1 mais échoue à pleine
+        //     profondeur : la re-recherche a coûté aussi, mais le coup était
+        //     mauvais, le réduire était juste ;
+        //   • le premier pli de la partie et une passe (pas de coup adverse
+        //     précédent connu pour indexer la table).
+        //
+        // La table : `lmrh[joueur][prev.to][m.to]`, où `prev` est le dernier coup
+        // de l'adversaire (`s.played[ply_now − 1]`) et `m` notre réponse. Elle
+        // retient donc des PAIRES de cases : « quand l'adversaire vient
+        // d'arriver en prev.to, aller en m.to est souvent meilleur que la
+        // réduction ne le croit » (une réponse locale à son coup).
+        //
+        // Le bonus : b = min(16 d² + 32 d, 2000) avec d = `depth`, la profondeur
+        // restante du nœud : une erreur près de la racine (grand d) coûte une
+        // grosse re-recherche et compte davantage. d = 3 → 240, 5 → 560,
+        // 8 → 1280, 10 → 1920, 11 et plus → 2000 (plafond). Ces valeurs sont
+        // celles d'origine : le SPSA n'a réglé que le bonus de l'historique
+        // principal (HIST_BONUS_*).
+        //
+        // La gravité : h ← h + b − h·b/16384. Le terme −h·b/16384 freine la
+        // croissance quand h approche HISTORY_MAX = 16384 : à h = 16384 le bonus
+        // net est nul, h ne dépasse jamais 16384 et tient dans un int16_t. La
+        // table n'a pas de malus : elle ne fait que monter, jusqu'à la remise à
+        // zéro entre deux parties (`clear_table`) ; elle n'est pas non plus
+        // divisée par 2 entre deux coups comme l'historique principal (section
+        // `search`). Chaque thread du Lazy SMP a la sienne (`s.w`).
+        //
+        // L'effet : dès que `lmrh >= LMRH_THRESHOLD` (4453), la paire reçoit 1 pli
+        // de réduction en moins (plus haut dans cette boucle, « Réductions LMR
+        // contextuelles »). Il faut pour cela environ 22 erreurs à d = 3, 10 à
+        // d = 5, 4 à d = 8, 3 à d ≥ 10 (calcul avec la gravité, en partant de 0).
+        // Mesuré en U7 : +12.3 Elo.
+        if (r > 0 && v > alpha && ply_now > 0 && s.played[ply_now - 1] != Move::none()) {
             int16_t& h = s.w->lmrh[player][s.played[ply_now - 1].to_sq()][m.to_sq()];
             const int b = std::min(16 * depth * depth + 32 * depth, 2000);
             h = int16_t(h + b - h * b / HISTORY_MAX);

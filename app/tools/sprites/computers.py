@@ -18,7 +18,7 @@ of historical machines, drawn here, no maker's name or logo):
 
 Animations: idle — the machine works (beads slide, gears and wheels turn, cards
 advance, lamps blink, reels spin, LEDs flicker); move — a hop; blocked — it
-jams and shakes (smoke for the electric ones); win — its result shows (beads
+jams and shakes (smoke or sparks for the electric ones); win — its result shows (beads
 clack, lamps flash, "WIN" on the screen, light cascades). Every periodic
 motion is a whole number of turns or cycles over the loop (t = 1 is t = 0).
 
@@ -403,7 +403,7 @@ def tube_computer(anim, t, side):
     """A vacuum-tube computer of the 1940s: two tall black panels at an angle,
     rows of glowing tubes, dials, patch cables hanging between the plug
     panels. idle: the tubes flicker; win: waves of light run over them;
-    blocked: a row goes dark and smoke rises."""
+    blocked: a row goes dark and shorts out in sparks."""
     sc = Scene()
     base(sc, side)
     S = stand(anim, t)
@@ -439,10 +439,25 @@ def tube_computer(anim, t, side):
     for j, col in enumerate(("#c8302a", "#e8c030", "#2a6ac8")):
         pts = bezier((-0.3 + j * 0.05, 0.6 - j * 0.06, 0.06), (-0.1, 0.3, 0.2), (0.1, 0.3, 0.2), (0.3 - j * 0.05, 0.56 - j * 0.05, 0.06), 7)
         chain(sc, pts, [0.007] * 7, Mat(col, rough=0.5), S, blend=0.003)
-    if anim == "blocked":   # smoke from the dark row
-        for i in range(4):
-            u = (t * 2 + i / 4) % 1
-            sc.add(sd_sphere(0.03 + 0.05 * u), Mat("#6a6a6a", rough=1.0, shadow=False), S * T(-0.1 + 0.07 * i, 0.5 + 0.35 * u, 0.0))
+    if anim == "blocked":   # the dead row shorts out: sparks thrown from its tubes
+        # On each panel, in front of the dark middle row (y = 0.37, tubes at
+        # z = 0.06 in the panel's frame): short bright streaks flying out and up,
+        # each living 30 % of a cycle; 4 cycles per loop, staggered, so u is
+        # periodic in t. (An opaque smoke read as lumps at this size: none.)
+        for pi_, (px, ang) in enumerate(((-0.19, 0.3), (0.19, -0.3))):
+            P = S * T(px, 0, -0.04) * RY(ang)
+            for i in range(3):
+                u = (t * 4 + i * 0.33 + pi_ * 0.15) % 1
+                if u > 0.3:
+                    continue
+                k = u / 0.3
+                x0 = -0.12 + 0.12 * i
+                a = 0.9 + 0.6 * ((i + pi_) % 3) / 2
+                d = 0.02 + 0.12 * k
+                x1, y1, z1 = x0 + d * math.cos(a) * (1 if i % 2 else -1), 0.37 + d * math.sin(a), 0.08 + 0.1 * k
+                x2, y2, z2 = x0 + (x1 - x0) * 0.5, 0.37 + (y1 - 0.37) * 0.5, 0.08 + (z1 - 0.08) * 0.5
+                sc.add(sd_capsule((x2, y2, z2), (x1, y1, z1), 0.007 * (1 - k) + 0.002), glow("#ffc65a", 10.0), P)
+            sc.add(sd_sphere(0.012), glow("#ffe0a0", 6.0 + 6.0 * (math.sin(TAU * 8 * t) > 0)), P * T(-0.03 + 0.06 * pi_, 0.37, 0.07))   # the arc at the short
     return sc
 
 

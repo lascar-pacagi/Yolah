@@ -3,14 +3,13 @@ vitrail_board.py — the "Vitraux" board (assets/themes/18_vitraux.json): a
 cathedral window laid flat, its squares panes of leaded glass.
 
   assets/art/vitraux_clair.*   light square: pale amber "grisaille" glass, a
-                               lattice of diamond quarries in lead, a small
+                               lattice of diamond quarries in thin lead, a small
                                painted quatrefoil in the middle
   assets/art/vitraux_sombre.*  dark square: deep blue glass in irregular pieces,
                                a few ruby and gold ones, a lead net
   assets/art/vitraux_trou.*    hole: a broken pane, dark, jagged shards still
-                               in the lead round its edge, glints running over
-                               them (idle); the pane bursting into coloured
-                               shards (open)
+                               in the lead round its edge (idle, still); the
+                               pane bursting into coloured shards (open)
   assets/art/vitraux_cadre.*   the frame: carved grey stone, a row of trefoil
                                arches, a gilt fillet along the inner edge
   assets/backgrounds/vitraux.jpg   (vitrail_scene.py: the nave at dusk)
@@ -26,6 +25,10 @@ from space import grid, noise2, to_rgba, write_art, bevel, ASSETS, TAU
 from dino_board import smoothstep, C, over
 
 LEAD = "#2a2a30"
+# The lead between the panes of the squares: thinner and lighter than LEAD (a
+# worn grey lead, blended at 75 %), so the glass dominates the board, not the lines.
+TILE_LEAD = "#5a5650"
+TILE_LEAD_K = 0.75
 
 
 def _voronoi(x, y, n, seed):
@@ -45,7 +48,8 @@ def light_tile(S=128):
     x, y = grid(S, S)
     u, v = (x + y) * 2, (x - y) * 2                                              # the diamond lattice (2 × 2 per square)
     fu, fv = torch.remainder(u, 1.0), torch.remainder(v, 1.0)                     # (frac of a negative is negative)
-    lead = (torch.minimum(torch.minimum(fu, 1 - fu), torch.minimum(fv, 1 - fv)) < 0.045).float()
+    dl = torch.minimum(torch.minimum(fu, 1 - fu), torch.minimum(fv, 1 - fv))
+    lead = (1 - smoothstep(0.014, 0.026, dl)) * TILE_LEAD_K                      # thin, antialiased
     cell = torch.floor(u) * 7 + torch.floor(v) * 3
     tone = 0.9 + 0.12 * torch.frac(torch.sin(cell * 12.9898) * 43758.5)
     c = C("#f2e4c0") * tone[None] * (0.92 + 0.12 * noise2(x * 14, y * 40, 1.0, 3))[None]
@@ -57,7 +61,7 @@ def light_tile(S=128):
     lobe = 0.12 + 0.05 * torch.cos(4 * th)
     paint = (torch.abs(r - lobe) < 0.012).float() + (r < 0.03).float()
     c = c * (1 - 0.55 * paint.clamp(0, 1))[None]
-    c = c * (1 - lead)[None] + C(LEAD) * lead[None]
+    c = c * (1 - lead)[None] + C(TILE_LEAD) * lead[None]
     c = c * (1 + bevel(x, y, 0.05) * 0.35)
     return to_rgba(c, torch.ones_like(x))
 
@@ -75,10 +79,10 @@ def dark_tile(S=128):
     for i, h in enumerate(cols):
         c = c + C(h) * (idx == i).float()[None]
     c = c * (0.85 + 0.25 * noise2(x * 20, y * 20, 2.0, 3))[None]
-    lead = (gap < 0.025).float()
+    lead = 1 - smoothstep(0.008, 0.016, gap)
     edge = torch.minimum(torch.minimum(x, y), torch.minimum(1 - x, 1 - y))
-    lead = torch.maximum(lead, (edge < 0.02).float())
-    c = c * (1 - lead)[None] + C(LEAD) * lead[None]
+    lead = torch.maximum(lead, 1 - smoothstep(0.008, 0.014, edge)) * TILE_LEAD_K
+    c = c * (1 - lead)[None] + C(TILE_LEAD) * lead[None]
     c = c * (1 + bevel(x, y, 0.05) * 0.45)
     return to_rgba(c, torch.ones_like(x))
 
@@ -93,7 +97,8 @@ def broken(S=128, frames=1, opening=False):
     r = torch.maximum(u.abs(), v.abs())
     # a jagged inner edge: the shards still held
     saw = torch.abs(torch.remainder(th * 9 / TAU + 0.3 * torch.sin(th * 2), 1.0) - 0.5) * 2              # sharp points, as broken glass
-    jag = 0.5 + 0.32 * saw * (0.7 + 0.3 * noise2(torch.cos(th) * 3, torch.sin(th) * 3, 5.0, 2))
+    # the hole takes most of the square (a narrow ring of shards), so it reads as a hole, not as a pane
+    jag = 0.66 + 0.24 * saw * (0.7 + 0.3 * noise2(torch.cos(th) * 3, torch.sin(th) * 3, 5.0, 2))
     rnd = random.Random(8)
     shards = [(rnd.uniform(0, TAU), rnd.uniform(0.6, 1.2), rnd.choice(["#2448b0", "#b81a28", "#e0a830", "#2a8a4a", "#f2e4c0"])) for _ in range(18)]
     n_frames = 9 if opening else frames
@@ -103,7 +108,8 @@ def broken(S=128, frames=1, opening=False):
         hole = (r < R).float()
         c = C("#0a0a12") * (0.6 + 0.4 * (r / R.clamp_min(1e-3)).clamp(0, 1) ** 2)[None]
         rim = ((r >= R) & (r < 0.97)).float()                                          # the shards left in place
-        sh_col = C("#2448b0") * 0.65 * (0.8 + 0.4 * noise2(torch.cos(th) * 5, torch.sin(th) * 5, 6.0, 1))[None]
+        # the shards: smoky grey glass, unlike the blue of the dark squares (told apart at a glance)
+        sh_col = C("#9a948a") * 0.55 * (0.8 + 0.4 * noise2(torch.cos(th) * 5, torch.sin(th) * 5, 6.0, 1))[None]
         c = c * hole[None] + (sh_col * (0.7 + 0.5 * noise2(u * 6, v * 6, 4.0, 2))[None]) * rim[None]
         crack = (torch.abs(torch.remainder(th * 9 / TAU + 0.3 * torch.sin(th * 2), 1.0) - 0.5) > 0.47).float() * rim   # the cracks between the shards
         lead = ((r - R).abs() < 0.02).float() + (r > 0.97).float() + crack

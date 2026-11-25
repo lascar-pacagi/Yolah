@@ -5,7 +5,7 @@ proportions (heroic.adult), from a goblin thief to an ancient dragon:
   random        Gobelin chapardeur      a hunched goblin, a rusty knife, a stolen sack
   beginner      Orque éclaireur         a lean orc, a fur mantle, a spear
   monte_carlo   Rôdeuse elfe            a hooded elf ranger drawing her longbow
-  basic_minmax  Guerrier orque          black iron, a horned helm, cleaver and shield
+  basic_minmax  Guerrier orque          black iron, a horned helm, a war axe and shield
   mcts          Troll des collines      a hunched hill troll dragging a tree-trunk club
   minmax        Guerrier nain           short and broad, a braided red beard, an iron helm, a two-headed axe
   features      Chaman orque            hides and a wolf pelt, war paint, a skull staff with green fire
@@ -235,10 +235,23 @@ def orc_warrior(anim, t, side):
     sc.add(sd_box(0.12, 0.02, 0.004, 0.003), Mat("#9a1a12", rough=0.6), sh * T(0, 0, 0.02) * RZ(0.8))
     sc.add(sd_box(0.12, 0.02, 0.004, 0.003), Mat("#9a1a12", rough=0.6), sh * T(0, 0, 0.02) * RZ(-0.8))
     sc.add(sd_sphere(0.04), iron("#6a6a6a", 0.3), sh * T(0, 0, 0.02))
-    ax = held(rig["r"], -math.pi if anim == "win" else -1.3)
-    sc.add(sd_capsule((0, -0.05, 0), (0, 0.22, 0), 0.016), wood("#3a2818"), ax)
-    sc.add(sd_box(0.08, 0.13, 0.008, 0.006), iron("#5a5e66", 0.25), ax * T(0.07, 0.2, 0))
-    sc.add(sd_box(0.004, 0.12, 0.009, 0.002), Mat("#d8dce2", metal=1.0, rough=0.15), ax * T(0.15, 0.2, 0))
+    # the war axe: a long haft with leather wraps and an iron butt spike; the
+    # head a broad crescent blade of steel with a bright edge, a back spike, the
+    # edge turned forward (the way it strikes)
+    ax = held(rig["r"], -4.0 if anim == "win" else -1.8)   # held forward, ready to strike; on a win brandished high, pointing forward
+    steel = iron("#c4c8d0", 0.5)
+    hd = ax * RY(-math.pi / 2)                                                               # the head's frame: its +x (the edge) forward
+    sc.add(sd_capsule((0, -0.1, 0), (0, 0.4, 0), 0.017), wood("#3a2818"), ax)
+    for k in range(4):
+        sc.add(sd_torus(0.019, 0.006), leather("#1e140c"), ax * T(0, -0.05 + 0.035 * k, 0))
+    sc.add(sd_cone(0.03, 0.017, 0.002), blk, ax * T(0, -0.13, 0) * RX(math.pi))               # butt spike
+    sc.add(sd_box(0.03, 0.045, 0.024, 0.006), blk, ax * T(0, 0.31, 0))                        # the socket
+    B = hd * T(0.1, 0.31, 0) * RX(math.pi / 2)                                                # the blade's centre; its disk in the plane of the haft and the edge
+    sc.add(sd_plane_cut(sd_cylinder(0.008, 0.13, 0.003), (-1, 0, 0), 0.075), steel, B)          # the crescent
+    sc.add(sd_plane_cut(sd_cylinder(0.004, 0.137, 0.002), (-1, 0, 0), -0.04), Mat("#e4e8ee", metal=1.0, rough=0.12), B)   # its bright edge (the outer arc)
+    sc.add(sd_box(0.05, 0.035, 0.009, 0.004), steel, hd * T(0.04, 0.31, 0))                    # the cheek joining it to the socket
+    sc.add(sd_cone(0.05, 0.014, 0.002), blk, hd * T(-0.06, 0.31, 0) * RZ(math.pi / 2))        # the back spike
+    sc.add(sd_cone(0.03, 0.013, 0.002), blk, ax * T(0, 0.43, 0))                               # the top spike
     return sc
 
 
