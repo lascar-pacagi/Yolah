@@ -727,7 +727,7 @@ private:
     void score_moves(const Yolah&, const Search& s, Move tt_move, const Yolah::MoveList&, int* scores,
                      int depth = 0, bool allow_block = true) const;
     int  territory_after(const Yolah&, Move) const;
-    static bool is_legal(const Yolah&, Move);
+    static bool is_legal_slide(const Yolah&, Move);
     static Move pick_move(Yolah::MoveList&, int* scores, size_t i, size_t n);
     bool is_articulation_move(const Yolah&, Move) const;
     int  block_zone_score(const Yolah&, Move) const;

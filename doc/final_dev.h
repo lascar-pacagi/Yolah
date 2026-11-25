@@ -738,7 +738,7 @@ private:
     void score_moves(const Yolah& yolah, const Search& s, Move tt_move,
                      const Yolah::MoveList& moves, int* scores) const;                          // section 7
     static uint64_t coverage(uint64_t mine, uint64_t occupied);                                 // section 7
-    static bool is_legal(const Yolah& yolah, Move m);                                           // section 7
+    static bool is_legal_slide(const Yolah& yolah, Move m);                                           // section 7
     static Move pick_move(Yolah::MoveList& moves, int* scores, size_t i, size_t n);             // section 7
     void update_history(Search& s, uint8_t player, Move m, int bonus);                          // section 7
 

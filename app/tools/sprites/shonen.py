@@ -562,6 +562,56 @@ def hoo(anim, t, side):
 
 
 # ─── 9 · Kaigen ─────────────────────────────────────────────────────────────
+def muscles(sc, rig, sk):
+    """The anatomy of a bodybuilt fighter on an adult() rig, each muscle its own
+    form joined with a small blend so that the grooves between them stay:
+    pectorals parted by the sternum, sloping to the armpits; the six blocks of
+    the abdomen either side of the linea alba; the obliques; the serratus on the
+    ribs; the trapezius from the neck to the shoulders; the lats widening the
+    back (the V); on each arm the deltoid's three heads, the biceps in front, the
+    triceps behind, the forearm's swell."""
+    T_ = rig["torso"]
+    H, b = rig["H"], rig["bulk"]
+    cy, cz = 0.235 * H, 0.082 * b                                                # the chest's centre and front
+    for sgn in (-1, 1):
+        # pectorals: a broad plate each side, the sternum's groove between them
+        sc.add(sd_ellipsoid(0.078, 0.056, 0.044), sk, T_ * T(0.06 * sgn, cy + 0.012, cz + 0.002) * RZ(-0.22 * sgn), blend=0.004)
+        sc.add(sd_ellipsoid(0.05, 0.03, 0.025), sk, T_ * T(0.1 * sgn, cy + 0.035, cz - 0.03) * RZ(-0.6 * sgn), blend=0.01)   # towards the armpit
+        # abdomen: three rows of blocks, the linea alba between the columns
+        for j in range(3):
+            y = 0.185 * H - 0.042 * j
+            sc.add(sd_ellipsoid(0.028, 0.021, 0.022), sk, T_ * T(0.031 * sgn, y, 0.086 - 0.004 * j), blend=0.003)
+        # obliques and serratus
+        sc.add(sd_ellipsoid(0.034, 0.07, 0.045), sk, T_ * T(0.088 * sgn, 0.12 * H, 0.045) * RZ(0.18 * sgn), blend=0.006)
+        for k in range(3):
+            sc.add(sd_ellipsoid(0.02, 0.012, 0.03), sk, T_ * T(0.115 * sgn, cy - 0.02 - 0.026 * k, 0.05) * RZ(-0.4 * sgn), blend=0.006)
+        # trapezius and lats
+        sc.add(sd_ellipsoid(0.075, 0.03, 0.05), sk, T_ * T(0.07 * sgn, 0.315 * H, -0.015) * RZ(-0.45 * sgn), blend=0.015)
+        sc.add(sd_ellipsoid(0.045, 0.095, 0.06), sk, T_ * T(0.135 * sgn, cy - 0.04, -0.035) * RZ(0.15 * sgn), blend=0.015)
+    up, fo = rig["up"], rig["fo"]
+    for k, sgn in ((0, -1), (1, 1)):
+        U, F = rig["upper"][k], rig["fore"][k]
+        Hd = rig["l" if k == 0 else "r"]
+        # the shoulder joint, fixed to the torso: it ties the arm to the body whatever the arm does
+        sc.add(sd_sphere(0.056), sk, T_ * T(0.14 * b * sgn, 0.29 * H, 0), blend=0.03)
+        # the deltoid: a teardrop capping the shoulder, running down the arm, merging into the joint
+        sc.add(sd_ellipsoid(0.05, 0.066, 0.05), sk, U * T(0.006 * sgn, -0.03, 0.0), blend=0.03)
+        # the upper arm: its core, the biceps in front (the side the forearm folds to), the triceps behind
+        sc.add(sd_capsule((0, 0, 0), (0, -up, 0), 0.034, 0.026), sk, U, blend=0.02)
+        sc.add(sd_ellipsoid(0.033, 0.058, 0.034), sk, U * T(0.0, -up * 0.56, 0.017), blend=0.008)
+        sc.add(sd_ellipsoid(0.034, 0.072, 0.03), sk, U * T(0.003 * sgn, -up * 0.42, -0.018), blend=0.008)
+        sc.add(sd_ellipsoid(0.022, 0.048, 0.022), sk, U * T(0.022 * sgn, -up * 0.36, -0.008), blend=0.006)   # its outer head
+        sc.add(sd_sphere(0.025), sk, U * T(0, -up, -0.004), blend=0.01)                                       # the elbow
+        # the forearm: thick below the elbow, slim at the wrist
+        sc.add(sd_capsule((0, 0, 0), (0, -fo, 0), 0.028, 0.019), sk, F, blend=0.01)
+        sc.add(sd_ellipsoid(0.034, 0.055, 0.03), sk, F * T(0.004 * sgn, -fo * 0.28, 0.006), blend=0.012)
+        # the fist: a rounded block, a row of knuckles at its end, the thumb folded across
+        sc.add(sd_box(0.028, 0.032, 0.025, 0.014), sk, Hd)
+        for kx in range(4):
+            sc.add(sd_sphere(0.009), sk, Hd * T(-0.019 + 0.0127 * kx, -0.03, 0.012), blend=0.004)
+        sc.add(sd_capsule((-sgn * 0.026, 0.004, 0.014), (-sgn * 0.004, -0.02, 0.026), 0.009), sk, Hd, blend=0.004)
+
+
 def kaigen(anim, t, side):
     sc = Scene()
     base(sc, side)
@@ -570,17 +620,15 @@ def kaigen(anim, t, side):
     p.lean += 0.1
     p.l = [0.95, 0.35, 1.55]         # an energy sphere charged at the hip
     p.r = [0.95, 0.35, 1.55]
-    if anim == "win":
-        p.l = [2.65, 0.3, 0.1]
-        p.r = [2.65, 0.3, 0.1]
+    if anim == "win":                # both arms raised in a V, the sphere held high (past the vertical, a negative spread opens the arms)
+        p.l = [2.75, -0.35, 0.2]
+        p.r = [2.75, -0.35, 0.2]
     sk = skin("#dcae8a", 0.35)
     gi = cloth("#e86a1a", 0.75)
     m = {"skin": sk, "top": sk, "legs": gi, "boots": cloth("#1e2a5a"), "arms": sk, "hands": sk}
-    rig = adult(sc, p, m, H=1.08, bulk=1.4, head=0.95)
-    for sgn in (-1, 1):   # muscles: pectorals, abdomen, the gi torn and hanging at the waist
-        sc.add(sd_ellipsoid(0.07, 0.065, 0.03), sk, rig["chest"] * T(0.05 * sgn, 0.005, -0.004), blend=0.02)
-        for j in range(3):
-            sc.add(sd_ellipsoid(0.026, 0.02, 0.012), sk, rig["torso"] * T(0.028 * sgn, 0.17 - 0.035 * j, 0.072), blend=0.01)
+    rig = adult(sc, p, m, H=1.08, bulk=1.4, head=0.95, draw_arms=False)
+    muscles(sc, rig, sk)
+    for sgn in (-1, 1):
         sc.add(sd_torus(0.026, 0.008), cloth("#1e2a5a"), rig["l" if sgn < 0 else "r"] * T(0, 0.05, 0) * RX(math.pi / 2))   # wristbands
     sc.add(sd_torus(0.098, 0.016), cloth("#1e2a5a"), rig["waist"])
     sc.add(sd_box(0.11, 0.05, 0.08, 0.03), gi, rig["waist"] * T(0, -0.03, -0.02), blend=0.02)

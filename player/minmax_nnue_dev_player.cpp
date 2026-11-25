@@ -182,7 +182,7 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
     //
     // No locks: a table entry written by one thread while another reads it can
     // be torn (half old, half new). Rare, and harmless enough: the key check
-    // rejects most of them, and a table move is checked (is_legal / matched
+    // rejects most of them, and a table move is checked (is_legal_slide / matched
     // against the generated moves) before being played.
     std::vector<std::unique_ptr<Search>> searches;
     for (size_t i = 0; i < nb_threads; i++) {
@@ -877,7 +877,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                                   || (options.tt_cut_pv_exact && tt.lower == tt.upper)
                                   || tt.lower > WIN || tt.upper < -WIN)) {
             if (tt.lower >= beta && (!options.tt_depth_asym || tt.depth > depth)) {
-                if (options.tt_bonus > 0 && tt_move != Move::none() && options.history && is_legal(yolah, tt_move)) {   // U10
+                if (options.tt_bonus > 0 && tt_move != Move::none() && options.history && is_legal_slide(yolah, tt_move)) {   // U10
                     const uint8_t player = yolah.current_player();
                     const int b = std::min(16 * depth * depth + 32 * depth, 2000) * options.tt_bonus / 100;
                     update_history(s, player, tt_move, b);
@@ -1074,8 +1074,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     // U (C): the table's move (else killer 1) played without leaving a hole; if even so <= alpha, fail low.
     if (prunable && options.nohole_razor > 0 && options.lazy_accumulator && depth >= options.nohole_razor_depth
         && !s.verifying && s.fly_nest == 0 && s.no_tt == 0 && static_eval <= alpha - options.nohole_razor_guard) {
-        Move m = tt_move != Move::none() && is_legal(yolah, tt_move) ? tt_move : Move::none();
-        if (m == Move::none() && s.killer1[yolah.nb_plies()] != Move::none() && is_legal(yolah, s.killer1[yolah.nb_plies()]))
+        Move m = tt_move != Move::none() && is_legal_slide(yolah, tt_move) ? tt_move : Move::none();
+        if (m == Move::none() && s.killer1[yolah.nb_plies()] != Move::none() && is_legal_slide(yolah, s.killer1[yolah.nb_plies()]))
             m = s.killer1[yolah.nb_plies()];
         if (m != Move::none()) {
             const int d = std::max(0, depth - 1 - (options.nohole_razor_reduction + depth / 4 - 1));
@@ -1137,7 +1137,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     if (options.proxy_cut == 1 && options.proxy_lazy > 0 && prunable && depth >= options.proxy_depth
         && !s.proxy_off && static_eval >= beta && beta + options.proxy_delta < WIN) {
         const Move k = s.killer1[yolah.nb_plies()];
-        if (k != Move::none() && k != tt_move && is_legal(yolah, k)) {
+        if (k != Move::none() && k != tt_move && is_legal_slide(yolah, k)) {
             const int bound = beta + options.proxy_delta;
             const int d = depth - 1 - (options.proxy_reduction + depth / 4 - 1);
             const uint8_t player = yolah.current_player();
@@ -1176,7 +1176,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     //    table's move was searched, so with killers and history updated by
     //    its subtree — fresher information (−4 % nodes, −6 % time).
     //    A table move can be illegal here (two positions with the same hash
-    //    bits, or the entry of another position): is_legal checks it.
+    //    bits, or the entry of another position): is_legal_slide checks it.
     Yolah::MoveList moves;
     // U4 (9): internal iterative reduction — no table move: this node was never
     // searched (or lost), its ordering is poor: one ply less.
@@ -1186,7 +1186,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
     // U4 (8): singular extension / multi-cut on the table move.
     int se_ext = 0;
     if (options.se > 0 && depth >= options.se_depth && tt_move != Move::none() && s.excluded[ply_now] == Move::none()
-        && tt.found && tt.depth >= depth - 3 && tt.lower > -WIN && tt.lower < WIN && is_legal(yolah, tt_move)
+        && tt.found && tt.depth >= depth - 3 && tt.lower > -WIN && tt.lower < WIN && is_legal_slide(yolah, tt_move)
         && s.ext_sum[ply_now] < (options.ext_max > 0 ? options.ext_max : std::max(1, int(s.depth) / 2)) && !s.verifying) {
         const int s_beta = tt.lower - options.se_margin * depth;
         s.excluded[ply_now] = tt_move;
@@ -1201,7 +1201,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
             return TRET(v);
         }
     }
-    const bool tt_first = options.staged && tt_move != Move::none() && is_legal(yolah, tt_move) && s.excluded[ply_now] != tt_move;
+    const bool tt_first = options.staged && tt_move != Move::none() && is_legal_slide(yolah, tt_move) && s.excluded[ply_now] != tt_move;
     bool generated = false;
     if (!tt_first) {
         yolah.moves(moves);
@@ -2557,12 +2557,12 @@ int MinMaxNNUE_DevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash)
         const uint64_t word = e->load(std::memory_order_relaxed);
         if ((word & 1) && (word & KEY_MASK) == key) {
             s.nb_eval_hits++;
-            TR(EVAL, int16_t(uint16_t(word >> 1)), 1);
-            return int16_t(uint16_t(word >> 1));
+            TR(EVAL, int16_t(word >> 1), 1);
+            return int16_t(word >> 1);   // the low 16 bits, signed (modulo 2^16 since C++20); the store keeps its uint16_t: it must not sign-extend into the key
         }
     }
     const int v = network_value(yolah, s);
-    if (e) e->store(key | (uint64_t(uint16_t(int16_t(v))) << 1) | 1, std::memory_order_relaxed);
+    if (e) e->store(key | (uint64_t(uint16_t(v)) << 1) | 1, std::memory_order_relaxed);
     TR(EVAL, v, 0);
     return v;
 }
@@ -3049,7 +3049,7 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
 // destination is free and reachable in a straight line through free squares
 // (the queen attacks of the origin, with the occupied squares as blockers).
 // Yolah::valid only checks the first two.
-bool MinMaxNNUE_DevPlayer::is_legal(const Yolah& yolah, Move m) {
+bool MinMaxNNUE_DevPlayer::is_legal_slide(const Yolah& yolah, Move m) {
     if (m == Move::none()) return false;
     const uint64_t from = uint64_t(1) << m.from_sq(), to = uint64_t(1) << m.to_sq();
     if (!(yolah.bitboard(yolah.current_player()) & from)) return false;
@@ -3276,7 +3276,7 @@ void MinMaxNNUE_DevPlayer::update_history(Search& s, uint8_t player, Move m, int
 void MinMaxNNUE_DevPlayer::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     if (yolah.game_over() || depth == 0) return;
     const Move m = tt_move(hash);
-    if (m == Move::none() || !is_legal(yolah, m)) return;   // a collision can bring another position's move
+    if (m == Move::none() || !is_legal_slide(yolah, m)) return;   // a collision can bring another position's move
     auto player = yolah.current_player();
     cout << m << ' ';
     yolah.play(m);
@@ -3288,7 +3288,7 @@ std::vector<Move> MinMaxNNUE_DevPlayer::principal_variation(Yolah yolah, int max
     uint64_t hash = zobrist::hash(yolah);
     while (int(pv.size()) < max_len && !yolah.game_over()) {
         const Move m = tt_move(hash);
-        if (m == Move::none() || !is_legal(yolah, m)) break;
+        if (m == Move::none() || !is_legal_slide(yolah, m)) break;
         pv.push_back(m);
         hash = zobrist::update(hash, yolah.current_player(), m);
         yolah.play(m);
@@ -3806,7 +3806,7 @@ void MinMaxNNUE_DevPlayer::trace_pv(int line, Yolah yolah, uint64_t hash, int de
     std::vector<int32_t> body{0};
     for (int k = 0; k < depth && !yolah.game_over(); k++) {
         const Move m = tt_move(hash);
-        if (m == Move::none() || !is_legal(yolah, m)) break;
+        if (m == Move::none() || !is_legal_slide(yolah, m)) break;
         body.push_back(m.raw());
         const uint8_t player = yolah.current_player();
         yolah.play(m);

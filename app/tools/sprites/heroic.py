@@ -19,10 +19,13 @@ from legends import Pose, base_pose, held
 HEAD = math.radians(28)          # the figure turns a little towards the camera
 
 
-def adult(sc, p, m, H=1.0, bulk=1.0, head=1.0, hunch=0.0, arm=1.0, leg=1.0, neck=1.0):
+def adult(sc, p, m, H=1.0, bulk=1.0, head=1.0, hunch=0.0, arm=1.0, leg=1.0, neck=1.0, draw_arms=True):
     """Adds legs, pelvis, waist, chest, shoulders, arms and neck. m: materials
     {"skin", "top", "legs", "boots"} and optionally "belly", "arms", "fore",
-    "hands", "neck". Returns the frames and the head radius."""
+    "hands", "neck". Returns the frames and the head radius; "upper" and "fore":
+    the frames of the upper arms and forearms (left, right), their lengths "up"
+    and "fo" (to place muscles on them). draw_arms=False: the arms are not drawn
+    (only their frames), for a figure that draws its own."""
     g = lambda k, d: m.get(k, m[d])
     y0 = BASE_TOP
     body = RY(HEAD + p.shake) * T(0, p.bob + p.jump, 0)
@@ -42,22 +45,25 @@ def adult(sc, p, m, H=1.0, bulk=1.0, head=1.0, hunch=0.0, arm=1.0, leg=1.0, neck
     sc.add(sd_ellipsoid(0.088 * bulk, 0.09 * H, 0.064 * bulk), g("belly", "top"), torso * T(0, 0.12 * H, 0.004), blend=0.03)
     sc.add(sd_ellipsoid(0.135 * bulk, 0.1 * H, 0.082 * bulk), m["top"], torso * T(0, 0.235 * H, 0.006), blend=0.035)
     sh_y = 0.3 * H
-    hands = []
+    hands, uppers, fores = [], [], []
     for sgn, arm_p in ((-1, p.l), (1, p.r)):
         # shoulder pitch (forward +), spread (out +), elbow bend (+), and an optional twist of the upper
         # arm about its own axis (turns the plane in which the elbow bends: a dab's forearm across the face)
         pitch, spread, elbow = arm_p[:3]
         twist = arm_p[3] if len(arm_p) > 3 else 0.0
-        sc.add(sd_sphere(0.052 * bulk), m["top"], torso * T(0.135 * bulk * sgn, sh_y - 0.01, 0), blend=0.02)   # deltoid
         up, fo = 0.17 * H * arm, 0.155 * H * arm
         sh = torso * T(0.15 * bulk * sgn, sh_y - 0.01, 0) * RZ(spread * sgn) * RX(-pitch) * RY(twist * sgn)
-        sc.add(sd_capsule((0, 0, 0), (0, -up, 0), 0.04 * bulk, 0.031 * bulk), g("arms", "skin"), sh)
-        sc.add(sd_ellipsoid(0.036 * bulk, 0.06 * H * arm, 0.036 * bulk), g("arms", "skin"), sh * T(0, -up * 0.45, 0.012), blend=0.015)
         el = sh * T(0, -up, 0) * RX(-elbow)
-        sc.add(sd_capsule((0, 0, 0), (0, -fo, 0), 0.033 * bulk, 0.023 * bulk), g("fore", "arms") if "fore" in m or "arms" in m else m["skin"], el)
         hand = el * T(0, -fo - 0.022 * bulk, 0)
-        sc.add(sd_ellipsoid(0.027 * bulk, 0.034 * bulk, 0.023 * bulk), g("hands", "skin"), hand)
+        if draw_arms:
+            sc.add(sd_sphere(0.052 * bulk), m["top"], torso * T(0.135 * bulk * sgn, sh_y - 0.01, 0), blend=0.02)   # deltoid
+            sc.add(sd_capsule((0, 0, 0), (0, -up, 0), 0.04 * bulk, 0.031 * bulk), g("arms", "skin"), sh)
+            sc.add(sd_ellipsoid(0.036 * bulk, 0.06 * H * arm, 0.036 * bulk), g("arms", "skin"), sh * T(0, -up * 0.45, 0.012), blend=0.015)
+            sc.add(sd_capsule((0, 0, 0), (0, -fo, 0), 0.033 * bulk, 0.023 * bulk), g("fore", "arms") if "fore" in m or "arms" in m else m["skin"], el)
+            sc.add(sd_ellipsoid(0.027 * bulk, 0.034 * bulk, 0.023 * bulk), g("hands", "skin"), hand)
         hands.append(hand)
+        uppers.append(sh)
+        fores.append(el)
     nk = 0.06 * H * neck
     hr = 0.066 * H * head
     # the head above the chest (whose top is at 0.335 H), pushed forward and down by the hunch
@@ -68,7 +74,8 @@ def adult(sc, p, m, H=1.0, bulk=1.0, head=1.0, hunch=0.0, arm=1.0, leg=1.0, neck
     return {"head": hx, "hr": hr, "l": hands[0], "r": hands[1], "torso": torso, "body": body,
             "chest": torso * T(0, 0.235 * H, 0.085 * bulk), "back": torso * T(0, 0.24 * H, -0.085 * bulk),
             "waist": torso * T(0, 0.1 * H, 0), "shoulder": (torso * T(-0.15 * bulk, sh_y, 0), torso * T(0.15 * bulk, sh_y, 0)),
-            "hip_y": hip_y, "H": H, "bulk": bulk}
+            "hip_y": hip_y, "H": H, "bulk": bulk,
+            "upper": uppers, "fore": fores, "up": up, "fo": fo}   # the arms' frames (left, right): y runs down the bone
 
 
 def chain(sc, pts, radii, mat, xf, blend=0.02):

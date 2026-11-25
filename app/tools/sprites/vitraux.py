@@ -116,6 +116,26 @@ def glass(palette, anim, t, cell=0.07, seed=0.0, k0=0.9):
 LEAD_MAT = Mat(LEAD, metal=0.6, rough=0.4)
 
 
+def pane(color, anim, t, k0=0.5):
+    """ONE piece of glass of a single colour (no lead, no Voronoi cells): a face,
+    on which the features are painted. Lit like glass() (the same breathing,
+    wave of light on a win, dull red when blocked)."""
+    c = srgb(color)
+    k = light(anim, t, k0)
+    wave = (t % 1) if anim == "win" else None
+    dim = (0.5 + 0.5 * math.sin(TAU * 4 * t)) * 0.6 if anim == "blocked" else None
+
+    def pat(pl, pw, n):
+        kk = torch.full((pl.shape[0], 1), k, device=DEV, dtype=F)
+        if wave is not None:
+            kk = kk * (1 + 2.5 * torch.exp(-((pl[:, 1:2] - (wave * 1.2 - 0.1)) / 0.08) ** 2))
+        em = c[None, :] * kk
+        if dim is not None:
+            em = em * (1 - dim) + srgb("#801810") * dim * 0.8
+        return {"albedo": (c * 0.35)[None, :].expand(pl.shape[0], 3), "emissive": em, "rough": torch.full((pl.shape[0],), 0.08, device=DEV, dtype=F)}
+    return Mat(color, rough=0.08, clearcoat=1.0, pattern=pat)
+
+
 def stand(anim, t, k=1.0):
     """The pose: a hop (move), a shake (blocked), a small leap (win)."""
     lift, tilt, turn = 0.0, 0.0, 0.0
@@ -516,8 +536,7 @@ def monk(anim, t, side):
     # the head, bent over the page: face, tonsure
     bow = {"win": -0.25, "blocked": 0.75}.get(anim, 0.22)
     H = M * T(0, 0.58, 0.0) * RX(bow) * T(0, 0.055, 0.008)
-    sc.add(sd_sphere(0.058), skin, H)
-    face(sc, H, skin, r=0.058, closed=anim != "win")
+    face(sc, H, anim, t, r=0.058, closed=anim != "win")
     hair = glass(["#5a3a20", "#4a2a18", "#6a4428"], anim, t, cell=0.02, k0=0.35)
     sc.add(sd_torus(0.05, 0.016), hair, H * T(0, 0.022, -0.006) * RX(-0.15))                   # the ring of the tonsure
     # the lectern in front of him: post, feet, the sloping board
@@ -765,17 +784,32 @@ def robe_folds(sc, S, mat, n, y0, y1, r0, r1, spread=0.45, rad=(0.016, 0.028)):
         chain(sc, pts, [rad[0] + (rad[1] - rad[0]) * j / 3 for j in range(4)], mat, S, blend=0.02)
 
 
-def face(sc, H, skin, r=0.062, closed=False):
-    """A face on the head sphere at H (radius r, looking along +z): nose, eyes of
-    lead (closed: a lid line), brows, mouth."""
-    sc.add(sd_ellipsoid(0.008, 0.016, 0.01), skin, H * T(0, -0.006, r * 0.95), blend=0.008)         # the nose
+def face(sc, H, anim, t, r=0.062, closed=False):
+    """The head at H (radius r, looking along +z) as a window shows a face: ONE
+    piece of pale glass (no lead across it), the features painted on it in dark
+    grisaille and lying on its surface: almond eyes of white glass with a dark
+    iris (closed: a lid line), brows almost level, a little higher at the nose
+    (a calm look: brows sloping down to the nose read as anger), the line of the
+    nose, the mouth."""
+    pale = pane(SKIN_P[0], anim, t, 0.5)
+    sc.add(sd_sphere(r), pale, H)
+
+    def on(x, y, lift=0.0):                                             # a frame on the sphere at (x, y), z outwards
+        z = math.sqrt(max(r * r - x * x - y * y, 1e-6))
+        k = (r + lift) / r
+        return H * T(x * k, y * k, z * k) * RY(math.atan2(x, z)) * RX(-math.atan2(y, math.hypot(x, z)))
+    paint = LEAD_MAT
+    white = pane(WHITE_P[0], anim, t, 0.7)
     for sx in (-1, 1):
+        ex, ey = sx * 0.37 * r, 0.12 * r
         if closed:
-            sc.add(sd_ellipsoid(0.014, 0.003, 0.004), LEAD_MAT, H * T(sx * 0.023, 0.008, r * 0.9) * RZ(sx * 0.15))
+            sc.add(sd_ellipsoid(0.2 * r, 0.035 * r, 0.04 * r), paint, on(ex, ey - 0.02 * r) * RZ(sx * 0.12))
         else:
-            sc.add(sd_ellipsoid(0.01, 0.007, 0.005), LEAD_MAT, H * T(sx * 0.023, 0.01, r * 0.88))
-        sc.add(sd_ellipsoid(0.016, 0.003, 0.004), LEAD_MAT, H * T(sx * 0.024, 0.027, r * 0.86) * RZ(sx * 0.2))   # brows
-    sc.add(sd_ellipsoid(0.012, 0.003, 0.004), LEAD_MAT, H * T(0, -0.03, r * 0.85))                     # the mouth
+            sc.add(sd_ellipsoid(0.21 * r, 0.12 * r, 0.04 * r), white, on(ex, ey))
+            sc.add(sd_sphere(0.075 * r), paint, on(ex, ey, 0.025 * r))
+        sc.add(sd_ellipsoid(0.24 * r, 0.035 * r, 0.04 * r), paint, on(sx * 0.38 * r, 0.4 * r) * RZ(-sx * 0.06))   # the brow, almost level, a little higher at the nose
+    sc.add(sd_ellipsoid(0.035 * r, 0.22 * r, 0.04 * r), paint, on(0.04 * r, -0.08 * r))   # the nose
+    sc.add(sd_ellipsoid(0.16 * r, 0.035 * r, 0.04 * r), paint, on(0.0, -0.42 * r))       # the mouth
 
 
 def curls(sc, H, mat, r=0.062, n=9, rows=3, low=-0.2):
@@ -820,8 +854,7 @@ def angel(anim, t, side):
     bow = 0.3 if anim == "blocked" else (-0.15 if anim == "win" else 0.0)
     H = S * T(0, 0.635, 0.0) * RX(bow) * T(0, 0.055, 0.005)
     sc.add(sd_cylinder(0.03, 0.026), skin, S * T(0, 0.635, 0.0))                                # the neck
-    sc.add(sd_sphere(0.062), skin, H)                                                            # the head
-    face(sc, H, skin, closed=True)
+    face(sc, H, anim, t, closed=True)                                                            # the head
     curls(sc, H, glass(GOLD_P, anim, t, cell=0.025, seed=8.0, k0=0.6))
     # the halo: a gold disc behind the head, a ring of light on its rim
     hk = 9.0 if anim == "win" else (1.5 if anim == "blocked" else 3.5)
@@ -950,8 +983,7 @@ def archangel(anim, t, side):
     up = 1.0 if anim == "win" else 0.0
     H = S * T(0, 0.67, 0.0) * RX(-0.12 * up)
     sc.add(sd_cylinder(0.03, 0.026), skin, S * T(0, 0.62, 0))
-    sc.add(sd_sphere(0.06), skin, H)
-    face(sc, H, skin, r=0.06)
+    face(sc, H, anim, t, r=0.06)
     curls(sc, H, glass(["#c87818", "#a86010", "#e09030"], anim, t, cell=0.025, seed=12.0, k0=0.5), r=0.06)
     hk = 10.0 if anim == "win" else (1.5 if anim == "blocked" else 4.0)
     sc.add(sd_cylinder(0.004, 0.105, 0.002), armour, H * T(0, 0.02, -0.065) * RX(math.pi / 2))

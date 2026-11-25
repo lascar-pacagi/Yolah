@@ -1227,7 +1227,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     // Si la table de transposition propose un coup `tt_move` légal ICI, on le
     // cherche seul d'abord (étape 1), sans générer ni noter les autres coups :
     // très souvent il suffit à couper, et la génération est économisée.
-    // `is_legal` est indispensable : l'entrée peut venir d'une autre position
+    // `is_legal_slide` est indispensable : l'entrée peut venir d'une autre position
     // (collision de hachage, ou entrée « déchirée » par une écriture
     // simultanée d'un autre thread, puisque la table n'a pas de verrou).
     // Si le Proxy Cut doit s'exécuter ci-dessous, il générera et triera les
@@ -1238,7 +1238,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
     //     est `tt_move`, et `n = 1` (on suppose au moins ce coup) ;
     //   • `generated` vrai : `moves[0..n)` et `scores[0..n)` sont remplis.
     Yolah::MoveList moves;
-    const bool tt_first = tt_move != Move::none() && is_legal(yolah, tt_move);
+    const bool tt_first = is_legal_slide(yolah, tt_move);
     bool generated = false;
     int  scores[Yolah::MAX_NB_MOVES];
     size_t n = 1;
@@ -1992,12 +1992,29 @@ uint64_t FinalDevPlayer::coverage(uint64_t mine, uint64_t occupied) {
     return c & ~occupied;
 }
 
-// Le coup `m` est-il légal dans `yolah` ? (Sert pour les coups lus dans la
-// table de transposition, qui peuvent venir d'une autre position.)
+// Le coup `m` est-il un DÉPLACEMENT légal dans `yolah` ? (Sert pour les coups
+// lus dans la table de transposition, qui peuvent venir d'une autre position.)
 // Légal = la case de départ porte une pièce du camp au trait, et la case
 // d'arrivée est libre et atteinte en ligne droite sans obstacle.
-// La passe (Move::none()) n'est jamais considérée comme un coup de table légal.
-bool FinalDevPlayer::is_legal(const Yolah& yolah, Move m) {
+// D'où le nom `is_legal_slide` et pas `is_legal` : la passe (Move::none()) est
+// un coup légal quand le joueur n'a plus de déplacement, mais ce n'est pas un
+// déplacement, et elle n'est jamais acceptée ici comme coup de table :
+//   • dans la table, Move::none() ne veut pas dire « passer » mais « pas de
+//     coup connu » : position jamais rangée, ou rangée seulement par des nœuds
+//     où aucun coup n'a battu alpha (6.h range alors `best_move` =
+//     Move::none() ; la table garde l'ancien coup de la position s'il y en
+//     avait un, sinon l'entrée reste sans coup). On ne peut pas distinguer une
+//     vraie passe de ce « rien » ;
+//   • et une passe comme coup de table ne ferait rien gagner : elle n'est
+//     légale que si le joueur n'a aucun coup, ce qu'on ne sait qu'en générant
+//     les coups, justement ce que le coup de table sert à éviter (étape 1 de
+//     6.e). Quand la passe est forcée, la génération la donne seule, et elle
+//     est cherchée tout de suite.
+// (Sans ce test, `is_legal_slide(Move::none())` rendrait aussi faux, mais par
+// accident : la passe se décode en a1 → a1 ; si a1 porte une de nos pièces, la
+// case d'arrivée a1 n'est pas libre, sinon la case de départ n'est pas à nous.
+// Le test rend la règle explicite au lieu de dépendre de ce décodage.)
+bool FinalDevPlayer::is_legal_slide(const Yolah& yolah, Move m) {
     if (m == Move::none()) return false;
     const uint64_t from = uint64_t(1) << m.from_sq();
     const uint64_t to   = uint64_t(1) << m.to_sq();
@@ -2036,6 +2053,18 @@ void FinalDevPlayer::update_history(Search& s, uint8_t player, Move m, int bonus
 //  8. ÉVALUATION NNUE PARESSEUSE (`lazy_accumulator`) & CACHE D'ÉVALUATIONS (D)
 // =============================================================================
 //
+//  Ce que ces deux mécanismes ont rapporté (étape D du travail sur la recherche,
+//  mesurés ensemble, à 0,2 s par coup) :
+//    • ils ne changent PAS l'arbre de recherche, seulement sa vitesse : la pile
+//      d'accumulateurs paresseux fait gagner 11 % de temps ; le cache (2^20
+//      entrées) donne la valeur de 36 % des feuilles et fait gagner 36 % de
+//      temps au total. Le gain d'Elo vient seulement de ce qu'à temps égal la
+//      recherche va plus profond (le réseau NNUE prenait alors environ 51 % des
+//      instructions) ;
+//    • match direct devD contre devC (le joueur juste avant : historique et
+//      contre-coups) : 55,1 % des points, soit environ +36 Elo ; contre le
+//      joueur de départ : devD +163 [+142, +188], devC +113 [+93, +140].
+//
 //  Fonctionnement du cache d'évaluations (`eval_cache`) :
 //    • 2^20 emplacements indexés par les 20 bits de poids faible du hash Zobrist.
 //    • Chaque entrée tient dans UN SEUL mot atomique de 64 bits :
@@ -2046,8 +2075,15 @@ void FinalDevPlayer::update_history(Search& s, uint8_t player, Move m, int bonus
 //      peut jamais être « déchirée » (clé d'une position avec valeur d'une autre),
 //      puisque clé et valeur sont écrites ensemble en une seule opération.
 //    • Une nouvelle valeur écrase toujours l'ancienne (pas de politique de
-//      remplacement). Deux positions différentes ne sont confondues que si
-//      elles ont les mêmes 20 bits bas ET les mêmes 47 bits hauts.
+//      remplacement).
+//    • Quels bits du hash sont vérifiés : l'emplacement est choisi par les bits
+//      0..19, la clé rangée est faite des bits 17..63. Les deux se chevauchent
+//      sur les bits 17..19 (vérifiés deux fois) et couvrent ensemble les 64
+//      bits : deux positions ne sont confondues que si leurs hash de 64 bits
+//      sont IDENTIQUES (une vraie collision Zobrist), jamais par une clé
+//      tronquée. Le chevauchement vient de la place : 17 bits du mot servent à
+//      la valeur (16) et au bit « occupé » (1), il n'en reste que 47 pour la
+//      clé, et 47 + 20 = 67 > 64.
 //    • Le cache garde la valeur BRUTE du réseau ; la correction `corr`, qui
 //      change pendant la recherche, est ajoutée par l'appelant (section 6).
 //
@@ -2078,13 +2114,20 @@ int FinalDevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash) {
     const uint64_t word = slot.load(std::memory_order_relaxed);
     if ((word & 1) && (word & KEY_MASK) == key) {
         s.nb_eval_hits++;
-        // bits 16..1 → uint16_t → int16_t : retrouve la valeur signée.
-        return int16_t(uint16_t(word >> 1));
+        // `word >> 1` met la valeur dans les 16 bits du bas (la clé reste au-dessus).
+        // La conversion en int16_t garde ces 16 bits (modulo 2^16, garanti depuis
+        // C++20) et les relit en complément à deux : la valeur signée revient.
+        return int16_t(word >> 1);
     }
 
     const int v = raw_network_value(yolah, s);
-    // Valeur signée sur 16 bits, décalée d'un bit, + bit « occupé ».
-    slot.store(key | (uint64_t(uint16_t(int16_t(v))) << 1) | 1, std::memory_order_relaxed);
+    // Valeur signée sur 16 bits, décalée d'un bit, + bit « occupé ». Le passage
+    // par uint16_t est indispensable ici : une valeur négative convertie
+    // directement de int en uint64_t serait étendue par le signe (−5 →
+    // 0xFFFF…FFFB) et ses bits à 1 écraseraient la clé dans le `|` ; via
+    // uint16_t (conversion modulo 2^16, toujours définie vers un type non
+    // signé) elle devient 0xFFFB, puis est complétée par des zéros.
+    slot.store(key | (uint64_t(uint16_t(v)) << 1) | 1, std::memory_order_relaxed);
     return v;
 }
 
@@ -2115,16 +2158,48 @@ int FinalDevPlayer::raw_network_value(const Yolah& yolah, Search& s) {
 //    • Clusters de 4 entrées de 16 octets (64 octets = une ligne de cache),
 //      choisis par les bits bas du hachage ; l'entrée est reconnue grâce aux
 //      bits 63..16 du hachage.
-//    • `store` à profondeur PLUS grande que l'entrée : nouvelles bornes
-//      (le meilleur coup connu est gardé si le nouveau résultat n'en a pas) ;
-//      à profondeur ÉGALE : les bornes sont fusionnées (l'intervalle
-//      [lower, upper] ne fait que rétrécir ; si elles se croisent, signe d'une
-//      incohérence due aux élagages, le nouveau résultat remplace l'ancien) ;
-//      à profondeur PLUS FAIBLE : les bornes ne sont pas touchées.
+//    • Une entrée garde deux bornes, `lower` et `upper`, d'UNE valeur : celle
+//      de la position cherchée à la profondeur `depth`. Ce qu'un résultat `v`
+//      obtenu avec la fenêtre (alpha, beta) apprend sur la vraie valeur V est
+//      le théorème de Knuth et Moore (1975), en fail-soft :
+//        v <= alpha          → V <= v   (échec bas : v est un majorant) ;
+//        alpha < v < beta    → V == v   (valeur exacte) ;
+//        v >= beta           → V >= v   (échec haut : v est un minorant).
+//      (En fail-hard, v serait ramené à alpha ou à beta ; en fail-soft il peut
+//      dépasser la fenêtre et donne une borne plus serrée.)
+//      Le code de `store` l'écrit en deux tests : `v > alpha` (cas exact ou
+//      échec haut) donne V >= v, donc un minorant ; `v < beta` (cas exact ou
+//      échec bas) donne V <= v, donc un majorant ; le cas exact remplit les
+//      deux, d'où lower = upper = v.
+//    • `store` à profondeur PLUS grande que l'entrée : nouvelles bornes (une
+//      recherche plus profonde est plus fiable) ; le meilleur coup connu est
+//      gardé si le nouveau résultat n'en a pas (nœud où aucun coup n'a battu
+//      alpha).
+//    • À profondeur ÉGALE : les bornes sont fusionnées, l'intervalle
+//      [lower, upper] ne fait que rétrécir (plus grand minorant, plus petit
+//      majorant). C'est juste parce que les deux résultats encadrent la MÊME
+//      valeur : si les deux sont vrais, elle est dans leur intersection.
+//      Exemple : une recherche en fenêtre (10, 11) coupe avec 23 → [23, +∞] ;
+//      plus tard, même position, même profondeur, fenêtre (30, 31), échec à
+//      27 → [−∞, 27] ; fusion : [23, 27]. Toute fenêtre avec beta ≤ 23 coupe
+//      alors par le minorant, toute fenêtre avec alpha ≥ 27 par le majorant ;
+//      un seul des deux résultats aurait perdu la moitié de l'information.
+//      Le cas est courant : la PVS cherche souvent une position deux fois à
+//      la même profondeur (fenêtre nulle puis pleine), comme les re-recherches
+//      de l'aspiration à la racine.
+//      Limite : l'argument suppose qu'une recherche à profondeur d a UNE valeur.
+//      C'est vrai pour un alpha-bêta pur, pas ici : réductions et élagages
+//      dépendent de la fenêtre, de l'historique et du contenu de la table, et
+//      deux recherches peuvent renvoyer des bornes incompatibles (minorant 30,
+//      majorant 25). Si `lower > upper`, l'une est fausse sans qu'on sache
+//      laquelle : le nouveau résultat remplace l'ancien.
+//    • À profondeur PLUS FAIBLE : les bornes ne sont pas touchées (moins sûres
+//      que celles déjà rangées) ; le résultat n'apporte un coup que si
+//      l'entrée n'en avait pas.
 //    • Remplacement quand le cluster est plein : d'abord les positions plus
 //      « anciennes » que la racine (plus de cases libres), puis la moins profonde.
 //    • Pas de verrou : une entrée peut être lue pendant qu'un autre thread
-//      l'écrit. D'où la vérification `is_legal` des coups lus.
+//      l'écrit. D'où la vérification `is_legal_slide` des coups lus.
 // =============================================================================
 
 FinalDevPlayer::TTView FinalDevPlayer::tt_probe(uint64_t hash) const {
@@ -2135,11 +2210,10 @@ FinalDevPlayer::TTView FinalDevPlayer::tt_probe(uint64_t hash) const {
     return view;
 }
 
-// `fragile = false` : option expérimentale du vrai joueur, inactive dans dev_u9_spsa.
 // Le nombre de cases libres de la position sert au remplacement (voir plus haut).
 void FinalDevPlayer::tt_store(uint64_t hash, const Yolah& yolah, int depth,
                               int alpha, int beta, int value, Move move, bool pv) {
-    yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv, /*fragile=*/false);
+    yolah_table->store(hash, std::popcount(yolah.free_squares()), depth, alpha, beta, value, move, pv);
 }
 
 Move FinalDevPlayer::tt_move(uint64_t hash) const {
@@ -2151,7 +2225,7 @@ Move FinalDevPlayer::tt_move(uint64_t hash) const {
 void FinalDevPlayer::print_pv(Yolah yolah, uint64_t hash, int8_t depth) {
     if (yolah.game_over() || depth <= 0) return;
     const Move m = tt_move(hash);
-    if (m == Move::none() || !is_legal(yolah, m)) return;
+    if (!is_legal_slide(yolah, m)) return;
     const uint8_t player = yolah.current_player();
     cout << m << ' ';
     yolah.play(m);
@@ -2165,7 +2239,7 @@ std::vector<Move> FinalDevPlayer::principal_variation(Yolah yolah, int max_len) 
     uint64_t hash = zobrist::hash(yolah);
     while (int(pv.size()) < max_len && !yolah.game_over()) {
         const Move m = tt_move(hash);
-        if (m == Move::none() || !is_legal(yolah, m)) break;
+        if (!is_legal_slide(yolah, m)) break;
         pv.push_back(m);
         hash = zobrist::update(hash, yolah.current_player(), m);
         yolah.play(m);
