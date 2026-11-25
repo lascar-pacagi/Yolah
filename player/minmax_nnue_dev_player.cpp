@@ -2971,6 +2971,7 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
         const bool kil_first = kil && (options.killer_mode == 0
                                        || (options.killer_mode == 2 && p1 != Move::none() && s.w->cont1[player][p1.to_sq()][m.to_sq()] > 0));
         if (m == tt_move)                 scores[i] = SCORE_TT;
+        else if (options.counter_first && m == counter && counter != Move::none()) scores[i] = SCORE_COUNTER;   // U27
         else if (kil_first && m == s.killer1[ply]) scores[i] = SCORE_KILLER1;
         else if (kil_first)               scores[i] = SCORE_KILLER2;
         else if (kil && options.killer_mode == 1) scores[i] = std::min(hist(m) + options.killer_bonus, SCORE_ARTICULATION - 1);
@@ -3639,6 +3640,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["intercept lmr"] = options.intercept_lmr;
     j["killer2ply"] = options.killer2ply;
     j["killer mode"] = options.killer_mode;
+    j["counter first"] = options.counter_first;
     j["killer bonus"] = options.killer_bonus;
     j["hist prune"] = options.hist_prune;
     j["lmp protect"] = options.lmp_protect;

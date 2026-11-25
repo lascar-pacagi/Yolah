@@ -192,7 +192,7 @@
 //       coups (−4 % de nœuds, −6 % de temps) : s'il coupe, on n'a rien généré.
 //     • Hiérarchie de tri des coups en étape 2 (`score_moves`) :
 //         1. Coup de la table de transposition (`SCORE_TT = 2^30`)
-//         2. Contre-coup (`SCORE_COUNTER = 2^29 − 2`) : le dernier coup ayant
+//         2. Contre-coup (`SCORE_COUNTER = 2^29`) : le dernier coup ayant
 //            réfuté le coup que l'adversaire vient de jouer (`played[ply − 1]`).
 //         3. Coups ordinaires (y compris les deux coups tueurs), triés par la somme :
 //              score(m) = history[us][from][to]                (historique principal)
@@ -451,8 +451,7 @@ private:
     // au plus quelques dizaines de milliers) : ces scores placent le coup de
     // table puis le contre-coup devant tous les coups ordinaires, quoi qu'il arrive.
     static constexpr int SCORE_TT           = 1 << 30;           // coup de la table : toujours 1er
-    static constexpr int SCORE_KILLER1      = 1 << 29;           // (sert de repère ; les killers sont notés comme des coups ordinaires)
-    static constexpr int SCORE_COUNTER      = SCORE_KILLER1 - 2; // contre-coup : 2e
+    static constexpr int SCORE_COUNTER      = 1 << 29;           // contre-coup : 2e
     static constexpr int SCORE_ARTICULATION = 1 << 28; // plafond sous lequel vivent les coups ordinaires
 
     // 9. Historique de correction de l'évaluation statique (U4/U6) — cpp, sections 5 et 6

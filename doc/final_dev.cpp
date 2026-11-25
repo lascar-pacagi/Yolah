@@ -1664,22 +1664,87 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
                     }
 
                     // 3. Mise à jour par « gravité » de l'historique principal (`history`)
-                    //    et de l'historique de continuation à 1 pli (`cont1`) :
+                    //    et de l'historique de continuation à 1 pli (`cont1`).
+                    //
+                    //    Qui reçoit quoi :
                     //    • Le coup `m` qui a provoqué la coupure bêta reçoit `+bonus`.
                     //    • Tous les coups `moves[0..i-1]` placés avant lui reçoivent
-                    //      un malus `-bonus` : ils ont été essayés sans couper (ou sautés
-                    //      par le filtre des poches, qui les laisse aussi à ces indices).
-                    //    Le bonus grandit avec la profondeur (une coupure profonde en dit
-                    //    plus long) : min(16 d² + 34 d, 2166), soit 50 à d = 1, 2166 dès d = 11.
-                    //    (Si la liste n'est pas générée, i = 0 : aucun malus.)
+                    //      un malus `-bonus`, de même taille : ils ont été essayés sans
+                    //      couper. La liste contient aussi les coups SAUTÉS sans être
+                    //      cherchés (filtre des poches scellées, `continue` de la boucle) :
+                    //      ils reçoivent le malus eux aussi. Ne punir que les coups
+                    //      vraiment cherchés (option « cont fix » = 2 du joueur) a été
+                    //      mesuré neutre en U7 (≈ 0 Elo), d'où ce comportement simple.
+                    //    • Si la liste n'est pas générée (le coup de table a coupé seul),
+                    //      i = 0 : aucun malus.
+                    //
+                    //    La taille du bonus, selon la profondeur restante d du nœud :
+                    //        bonus = min(A·d² + B·d, CAP),  A = 16, B = 34, CAP = 2166
+                    //    d :     1    2    3    4    5    6     7     8     9    10   ≥ 11
+                    //    bonus: 50  132  246  392  570  780  1022  1296  1602  1940  2166
+                    //    Pourquoi croissant : une coupure à grande profondeur résume un
+                    //    gros sous-arbre (le coup a tenu face à beaucoup de réponses) et
+                    //    se produit rarement ; une coupure près des feuilles est fréquente
+                    //    et en dit peu. Pourquoi quadratique : le nombre de nœuds sous un
+                    //    nœud croît bien plus vite que linéairement avec d, la forme
+                    //    d² est le compromis classique (même forme que le « stat bonus »
+                    //    des moteurs d'échecs). Pourquoi un plafond : sans lui, une seule
+                    //    coupure profonde (d = 20 : 7080, 43 % de la valeur maximale
+                    //    16384) écraserait ce que des centaines de coupures ont appris ;
+                    //    avec le plafond, une coupure apporte au plus 2166 (13 %).
+                    //
+                    //    D'où viennent les constantes :
+                    //    • 16, 32 et 2000 : valeurs de départ choisies à la main à l'étape
+                    //      C du travail sur la recherche (commit 847ee35 : l'historique y
+                    //      a apporté environ +59 Elo, A+B+historique +117 contre A+B +58),
+                    //      jamais mesurées une à une ;
+                    //    • puis réglées par SPSA avec les 25 autres paramètres de recherche
+                    //      de dev_u9 (config/spsa/dev_u9_params.json : 50 004 paires =
+                    //      100 008 parties à 0,2 s par coup, calendrier de Fishtest,
+                    //      entiers arrondis) ; plages explorées A ∈ [2, 64], B ∈ [0, 128],
+                    //      CAP ∈ [400, 8000], perturbations finales ±2, ±6, ±250.
+                    //      Résultat : A reste à 16, B passe de 32 à 34, CAP de 2000 à 2166.
+                    //      Ces écarts sont de l'ordre de la perturbation : le SPSA dit
+                    //      surtout que les valeurs de départ étaient déjà près d'un
+                    //      optimum plat, pas que 34 vaut mieux que 32.
+                    //
+                    //    La gravité (`update_history`, section 7) : h ← h + b − h·|b|/16384.
+                    //    Exemple à d = 5 (b = 570) : h = 0 → 570 ; h = 8000 → 8292 ; un
+                    //    malus sur h = 8000 → 7152. Plus h est loin de 0, plus un bonus de
+                    //    même signe est amorti et plus un signe contraire le ramène vite.
                     const int bonus = std::min(HIST_BONUS_A * depth * depth + HIST_BONUS_B * depth, HIST_BONUS_CAP);
                     update_history(s, player, m, bonus);
                     for (size_t k = 0; k < i; k++) {
                         update_history(s, player, moves[k], -bonus);
                     }
 
-                    // `cont1` : même bonus et mêmes malus, dans le contexte de la case
-                    // d'arrivée du dernier coup adverse `p1` (s'il est connu).
+                    // `cont1` (historique de continuation à 1 pli, U4 : +32.6 Elo) :
+                    //    cont1[joueur][p1.to][m.to], où `p1` est le coup que l'adversaire
+                    //    vient de jouer (`s.played[ply_now − 1]`). L'entrée dit : « quand
+                    //    l'adversaire vient d'arriver en p1.to, ALLER en m.to coupe
+                    //    souvent ». Contrairement à `history` (indexé par origine et
+                    //    destination du coup, sans contexte), la clé est le couple
+                    //    (destination adverse, notre destination) : la réponse locale à
+                    //    un coup, quelle que soit la pièce qui la joue.
+                    //    Mise à jour : exactement le même `bonus` que `history` pour `m`,
+                    //    le même malus pour les coups `moves[0..i-1]`, et la même gravité.
+                    //    Conséquences de la clé par destination :
+                    //    • deux coups de pièces différentes vers la même case partagent
+                    //      la même entrée ;
+                    //    • si un coup essayé avant `m` va sur la MÊME case que `m`, son
+                    //      malus tombe sur l'entrée qui vient de recevoir le bonus et en
+                    //      annule une partie. Éviter cela (« cont fix » = 1) a été mesuré
+                    //      neutre en U7 : ce n'est pas fait ici.
+                    //    Pas de mise à jour quand `p1` est inconnu (`Move::none()`) :
+                    //    premier pli de la partie, passe de l'adversaire, ou nœud racine
+                    //    (le coup d'avant la racine n'est pas transmis à la recherche
+                    //    dans cette configuration : « root context » désactivé).
+                    //    Contrairement à `history`, `cont1` n'est pas divisé par 2 entre
+                    //    deux coups (le faire, « cont age », a été mesuré neutre) : il
+                    //    s'accumule sur toute la partie et n'est remis à zéro que par
+                    //    `clear_table`. Chaque thread a le sien (`s.w`).
+                    //    À la lecture (section 7, `score_moves`), il s'ajoute à `history`
+                    //    pour ordonner les coups ordinaires.
                     const Move p1 = ply_now > 0 ? s.played[ply_now - 1] : Move::none();
                     if (p1 != Move::none()) {
                         auto upd_cont1 = [&](Move mv, int b) {
@@ -1749,9 +1814,29 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 //         à TOUTES nos pièces capables d'aller en `c5`, quelle que soit la case
 //         d'où venait la pièce adverse !
 //       • Contrairement à `history`, `cont1` n'est PAS divisé par 2 entre deux coups
-//         de la partie (`cont_age = false`), et il intervient uniquement dans le tri
-//         des coups (`score_moves`), pas dans le terme `-hist / 6945` de LMR
-//         (`cont_lmr = false`).
+//         de la partie. Ce n'était pas un choix au départ : la table a été ajoutée
+//         (U4) sans vieillissement, et la revue de code de Gemini l'a relevé. Le
+//         vieillissement a alors été essayé (U7, option « cont age » du joueur,
+//         2000 parties à 0,2 s contre dev_u6) : −3.0 Elo [−12.7, +6.8], et −8.3
+//         [−18.4, +1.7] combiné à la correction des malus. Aucun gain : la table
+//         est restée sans vieillissement. Explication plausible, non vérifiée : la
+//         clé (destination adverse, notre destination) décrit une réponse locale
+//         qui reste valable d'un coup à l'autre, alors que `history` (origine,
+//         destination) dépend davantage de la position du moment ; et la gravité
+//         empêche déjà la table de saturer.
+//       • `cont1` sert uniquement au TRI des coups (`score_moves`), pas au terme
+//         `−hist / 6945` de la réduction LMR (section 4), qui ne lit que `history`.
+//         Deux essais de l'y ajouter :
+//           – U6 « cont lmr » (`cont1` ajouté au terme LMR) : +4.0 Elo
+//             [−10.8, +18.9] sur 864 parties, non significatif ;
+//           – U9 « lmr hist full » (le terme LMR prend tout le score de tri :
+//             history + cont1 + interception) : +13.7 [+3.4, +24.1] sur dev_u6,
+//             mais +2.1 [−7.8, +12.0] une fois les killers notés comme un bonus
+//             (U7 « killer mode » 1 : +17.7 Elo, retenu dans cette configuration).
+//             Explication plausible, non vérifiée : un coup à fort `cont1` est
+//             déjà trié plus tôt, donc moins réduit (son rang i est plus petit) ;
+//             le compter aussi dans le terme LMR revient à le récompenser deux fois.
+//         Sans gain mesurable, le terme LMR est resté sur `history` seul.
 //
 //    2. Le bonus d'interception (`INTERCEPT_BONUS = +2000`, +17.0 Elo avec la
 //       réduction diminuée de la section 6.g) :
@@ -1786,10 +1871,43 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 //
 //  Résumé du score d'un coup (le plus grand est essayé d'abord) :
 //      coup de table        : SCORE_TT = 2^30
-//      contre-coup          : SCORE_COUNTER = 2^29 − 2   (s'il n'est pas aussi un killer)
-//      killer               : min(hist(m) + 4667, 2^28 − 1) + couverture
+//      contre-coup          : SCORE_COUNTER = 2^29       (s'il n'est pas aussi un killer)
+//      killer               : hist(m) + 4667 + couverture
 //      autre coup           : hist(m) + couverture
 //  avec hist(m) = history + cont1 + (interception ? 2000 : 0).
+//
+//  D'où viennent ces nombres :
+//  • Les paliers 2^30, 2^29 et 2^28 ne sont pas réglés : seul leur ORDRE
+//    compte. Ce sont des puissances de 2 choisies très au-dessus de tout score
+//    ordinaire : hist(m) vaut au plus 16384 + 16384 + 2000 = 34768, la
+//    couverture quelques milliers ; 2^28 ≈ 268 millions. Le tri ne fait que
+//    comparer, la taille de l'écart ne joue aucun rôle.
+//  • L'ordre d'origine était l'ordre classique des moteurs d'échecs : coup de
+//    table, puis killer 1 (2^29), killer 2 (2^29 − 1), contre-coup (2^29 − 2),
+//    puis l'historique (étapes A à C du travail sur la recherche, commit
+//    847ee35 pour l'historique et le contre-coup ; le contre-coup y a été mesuré
+//    neutre). Le joueur garde ces valeurs (contre-coup à 2^29 − 2, juste sous
+//    les deux killers) ; ici, sans palier de killers, le contre-coup vaut 2^29 :
+//    même ordre, donc même tri.
+//  • En U7, les killers ont été descendus parmi les coups ordinaires avec un
+//    bonus (« killer mode » 1) : +17.7 Elo contre dev_u6. Le bonus de départ,
+//    4000, a été choisi à la main sans être mesuré ; il vaut environ un quart
+//    de la valeur maximale d'un historique : assez pour passer devant un coup
+//    moyen, pas devant un coup à fort historique et continuation. Le SPSA de
+//    dev_u9 (plage [0, 12000],
+//    perturbation finale ±500) l'a amené à 4667, un écart de l'ordre de la
+//    perturbation. Conséquence : le contre-coup passe désormais DEVANT les
+//    killers, l'inverse de l'ordre classique.
+//  • Un coup à la fois killer et contre-coup est noté comme killer (le test
+//    `kil` vient en premier), donc plus bas qu'un contre-coup seul. Ce n'est
+//    pas un choix : dans l'ordre d'origine, les killers étaient AU-DESSUS du
+//    contre-coup, et tester `kil` d'abord lui donnait le meilleur des deux
+//    scores. Quand U7 a descendu les killers parmi les coups ordinaires,
+//    l'ordre des tests n'a pas été changé, et le cas commun est devenu le
+//    moins bien noté. Ce cas n'a jamais été mesuré à part.
+//  • Le poids de la couverture, 1024 au départ (choisi à la main : une case
+//    gagnée vaut 1/16 de la valeur maximale d'un historique), a été amené à
+//    1038 par le même SPSA (plage [128, 4096], perturbation finale ±100).
 // =============================================================================
 
 void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
@@ -1831,10 +1949,11 @@ void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_mo
             scores[i] = SCORE_TT;
         } else if (kil) {
             // `killer_mode = 1` : les killers restent dans la catégorie des coups
-            // ordinaires (< SCORE_ARTICULATION) avec un bonus de +4667 (KILLER_BONUS) sur `hist(m)`
-            // (testé AVANT le contre-coup : un coup à la fois tueur et contre-coup
-            // est traité en tueur, comme dans le joueur).
-            scores[i] = std::min(hist(m) + KILLER_BONUS, SCORE_ARTICULATION - 1);
+            // ordinaires avec un bonus de +4667 (KILLER_BONUS) sur `hist(m)` ; le
+            // total (au plus 34768 + 4667) reste très loin sous SCORE_ARTICULATION.
+            // Testé AVANT le contre-coup : un coup à la fois tueur et contre-coup
+            // est traité en tueur, comme dans le joueur (voir le résumé plus haut).
+            scores[i] = hist(m) + KILLER_BONUS;
         } else if (m == counter && counter != Move::none()) {
             scores[i] = SCORE_COUNTER;
         } else {

@@ -328,6 +328,7 @@ struct MinMaxNNUE_DevOptions {
     int  killer2ply = 0;                 // ["killer2ply"] U7 (B9): the killer of two plies before, tried after the killers
     int  killer_mode = 0;                // ["killer mode"] U7 (C2): 0 killers first; 1 killers as a bonus of "killer bonus" on the history; 2 killers first only if their continuation is positive
     int  killer_bonus = 4000;            // ["killer bonus"] 
+    bool counter_first = false;          // ["counter first"] U27: the countermove scored as such even when it is also a killer (with "killer mode" 1 a killer is an ordinary move with a bonus, so testing the killer first gave the common case the lower score; 48 % of the countermoves are killers, bench depth 11)
     int  hist_prune = 0;                 // ["hist prune"] U7 (A4): at depth <= 3, non-PV, from the 3rd move: an ordinary move whose history (+ continuation) < −this·depth is pruned (0 off)
     int  lmp_protect = 0;                // ["lmp protect"] U7 (A4): late move pruning keeps the moves whose continuation >= this (0 off)
     int  fp_margin = 0;                  // ["fp margin"] U7 (B6): futility pruning per move at depth <= 3: static + 1000 + this·depth <= alpha, ordinary move: pruned (0 off)

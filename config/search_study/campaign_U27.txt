@@ -1,0 +1,10 @@
+# Campaign U27 (2026-11-25, user's question): a move both countermove and killer.
+#   With "killer mode" 1 (U7, +17.7) a killer is an ordinary move with a bonus (hist + 4667), below the
+#   countermove (2^29 - 2); the killer test comes first, so a move that is both gets the lower score.
+#   48 % of the countermoves are also killers (bench, depth 11: 124 098 of 256 350).
+#   u27_counter_first = dev_u9_spsa with "counter first" true (the countermove scored as such first).
+#   Bench depth 11: nodes x1.009, same move 160/209. 2000 games per line (1000 rounds, balanced book), one thread per player.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-2 nnue/search_study.sh campaign_U27.txt
+# 1: at 0.2 s, 2: at 1 s
+u27_counter_first dev_u9_spsa 200000 1000 271
+u27_counter_first dev_u9_spsa 1000000 1000 272
