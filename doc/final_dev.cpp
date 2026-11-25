@@ -377,7 +377,7 @@ void FinalDevPlayer::iterative_deepening(Yolah yolah, Search& s, uint8_t max_dep
         Yolah::MoveList moves;
         yolah.moves(moves);
         int scores[Yolah::MAX_NB_MOVES];
-        score_moves(yolah, s, tt_move(hash), moves, scores, 63);
+        score_moves(yolah, s, tt_move(hash), moves, scores);
         s.root_moves.clear();
         for (size_t i = 0; i < moves.size(); i++) {
             s.root_moves.push_back({pick_move(moves, scores, i, moves.size())});
@@ -1247,7 +1247,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
         // Pas de coup de table utilisable : on génère et note tout de suite.
         yolah.moves(moves);
         generated = true;
-        score_moves(yolah, s, tt_move, moves, scores, depth);
+        score_moves(yolah, s, tt_move, moves, scores);
         n = moves.size();
     }
 
@@ -1288,7 +1288,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
         if (!generated) {
             yolah.moves(moves);
             generated = true;
-            score_moves(yolah, s, tt_move, moves, scores, depth);
+            score_moves(yolah, s, tt_move, moves, scores);
             n = moves.size();
         }
         // Le témoin est le coup ordinaire (`scores[j] < SCORE_COUNTER` : ni le
@@ -1485,7 +1485,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
                     break;
                 }
             }
-            score_moves(yolah, s, tt_move, moves, scores, depth);
+            score_moves(yolah, s, tt_move, moves, scores);
             n = moves.size();
             if (i >= n) break;   // le coup de table était le seul coup
         }
@@ -1911,8 +1911,7 @@ int FinalDevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int alpha, i
 // =============================================================================
 
 void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_move,
-                                 const Yolah::MoveList& moves, int* scores, int depth) const {
-    const bool     cover     = depth >= COVER_DEPTH;   // toujours vrai ici (depth ≥ 1)
+                                 const Yolah::MoveList& moves, int* scores) const {
     const uint16_t ply       = yolah.nb_plies();
     const uint8_t  player    = yolah.current_player();
     // Dernier coup adverse (Move::none() au premier pli, après une passe, ou
@@ -1924,13 +1923,21 @@ void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_mo
     // Couverture de notre groupe AVANT le coup (une fois par nœud)
     const uint64_t mine0     = yolah.bitboard(player);
     const uint64_t occ0      = ~yolah.free_squares();   // pièces des deux camps + trous
-    const int      c0        = cover ? std::popcount(coverage(mine0, occ0)) : 0;
+    const int      c0        = std::popcount(coverage(mine0, occ0));
 
     // Score d'historique composite (historique principal + continuation 1 pli + interception).
     // Sans dernier coup adverse connu, seul l'historique principal compte.
+    // `m` peut être `Move::none()` (la passe, décodée en a1 → a1) : quand le
+    // joueur au trait n'a aucun coup, `moves()` renvoie une liste d'un seul
+    // coup, la passe. On lit alors des entrées sans rapport avec une passe
+    // (`cont1[joueur][p1.to][a1]`, l'interception sur a1), mais c'est sans
+    // effet : la passe est TOUJOURS seule dans sa liste (`moves()` ne l'ajoute
+    // que si la liste est vide), donc son score ne sert ni au tri ni à la
+    // réduction LMR (le premier coup n'est jamais réduit). D'où l'absence de
+    // test `m != Move::none()` ici.
     auto hist = [&](Move m) {
         int h = s.w->history[player][m.from_sq()][m.to_sq()];
-        if (p1 != Move::none() && m != Move::none()) {
+        if (p1 != Move::none()) {
             h += s.w->cont1[player][p1.to_sq()][m.to_sq()];
             const uint64_t intercept_mask = attacks_bb(p1.to_sq(), yolah.occupied_squares())
                                           | around(square_bb(p1.to_sq()));
@@ -1961,10 +1968,13 @@ void FinalDevPlayer::score_moves(const Yolah& yolah, const Search& s, Move tt_mo
         }
 
         // Terme de couverture (coups ordinaires seulement) : variation du nombre
-        // de cases libres que notre groupe atteint, si l'on joue m.
+        // de cases libres que notre groupe atteint, si l'on joue m. Il s'applique
+        // à tous les nœuds : le joueur a une profondeur minimale (« cover depth »),
+        // mais le SPSA l'a fixée à 1, et `score_moves` n'est jamais appelé sous la
+        // profondeur 1 (les feuilles s'arrêtent en 6.c, avant toute génération).
         // Après m : nos pièces sont (mine0 sans from) + to ; les cases occupées
         // sont occ0 + to (from reste occupée : c'est désormais un trou).
-        if (scores[i] < SCORE_ARTICULATION && cover) {
+        if (scores[i] < SCORE_ARTICULATION) {
             const uint64_t from = square_bb(m.from_sq()), to = square_bb(m.to_sq());
             const uint64_t c1   = coverage((mine0 & ~from) | to, occ0 | to);
             scores[i] += COVER_WEIGHT * (std::popcount(c1) - c0);

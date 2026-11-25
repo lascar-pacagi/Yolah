@@ -1368,7 +1368,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     Move counter = Move::none();
                     if (options.countermove && ply > 0) {
                         const Move prev = s.played[ply - 1];
-                        counter = s.w->countermoves[prev.from_sq()][prev.to_sq()];
+                        if (!options.counter_known || prev != Move::none())   // U28
+                            counter = s.w->countermoves[prev.from_sq()][prev.to_sq()];
                     }
                     for (size_t j = 0; j < n; j++) {
                         const Move m = moves[j];
@@ -2143,7 +2144,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                     // Countermove (C): m refuted the opponent's last move.
                     if (options.countermove && ply > 0) {
                         const Move prev = s.played[ply - 1];
-                        s.w->countermoves[prev.from_sq()][prev.to_sq()] = m;
+                        if (!options.counter_known || prev != Move::none())   // U28
+                            s.w->countermoves[prev.from_sq()][prev.to_sq()] = m;
                         TR(COUNTER, prev.raw(), m.raw());
                     }
                     return TRET(v);
@@ -2933,7 +2935,8 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     Move counter = Move::none();
     if (options.countermove && ply > 0) {
         const Move prev = s.played[ply - 1];
-        counter = s.w->countermoves[prev.from_sq()][prev.to_sq()];
+        if (!options.counter_known || prev != Move::none())   // U28
+            counter = s.w->countermoves[prev.from_sq()][prev.to_sq()];
     }
     // T. Mode 2: the prior of the node's phase added to the history.
     const bool add_prior = !prior.empty() && options.history_prior_mode == 2;
@@ -2942,7 +2945,7 @@ void MinMaxNNUE_DevPlayer::score_moves(const Yolah& yolah, const Search& s, Move
     const Move p1 = ply > 0 ? s.played[ply - 1] : Move::none(), p2 = ply > 1 ? s.played[ply - 2] : Move::none();
     auto hist = [&](Move m) {
         int h = s.w->history[player][m.from_sq()][m.to_sq()] + (add_prior ? prior_of(ph, player, m) : 0);
-        if (options.cont_hist > 0 && p1 != Move::none() && m != Move::none()) h += s.w->cont1[player][p1.to_sq()][m.to_sq()] * options.cont_weight / 100;   // U4 (7)
+        if (options.cont_hist > 0 && p1 != Move::none()) h += s.w->cont1[player][p1.to_sq()][m.to_sq()] * options.cont_weight / 100;   // U4 (7) (a pass m is alone in its list: its score is never used)
         if (options.cont_hist > 1 && p2 != Move::none() && m != Move::none() && !options.cont2_same) h += s.w->cont2[player][p2.to_sq()][m.to_sq()] * options.cont2_weight / 100;
         if (m == Move::none()) return h;
         // U7: more context terms
@@ -3641,6 +3644,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["killer2ply"] = options.killer2ply;
     j["killer mode"] = options.killer_mode;
     j["counter first"] = options.counter_first;
+    j["counter known"] = options.counter_known;
     j["killer bonus"] = options.killer_bonus;
     j["hist prune"] = options.hist_prune;
     j["lmp protect"] = options.lmp_protect;

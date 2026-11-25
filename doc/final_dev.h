@@ -444,7 +444,6 @@ private:
     static constexpr int HIST_BONUS_B     = 34;      //   min(A·d² + B·d, CAP) [16, 32, 2000]
     static constexpr int HIST_BONUS_CAP   = 2166;
     static constexpr int INTERCEPT_BONUS  = 2000;    // coup sur un rayon ou une case voisine de prev.to
-    static constexpr int COVER_DEPTH      = 1;       // couverture à toutes les profondeurs ≥ 1 (U20)
     static constexpr int COVER_WEIGHT     = 1038;    // poids de (couverture après − avant) (U20-U22) [1024]
 
     // Scores spéciaux de tri. Un historique composite reste sous 2^28 (il vaut
@@ -737,7 +736,7 @@ private:
     int  late_move_reduction_of(int depth, size_t i, bool pv_node, bool special, int hist) const; // section 4
 
     void score_moves(const Yolah& yolah, const Search& s, Move tt_move,
-                     const Yolah::MoveList& moves, int* scores, int depth) const;               // section 7
+                     const Yolah::MoveList& moves, int* scores) const;                          // section 7
     static uint64_t coverage(uint64_t mine, uint64_t occupied);                                 // section 7
     static bool is_legal(const Yolah& yolah, Move m);                                           // section 7
     static Move pick_move(Yolah::MoveList& moves, int* scores, size_t i, size_t n);             // section 7

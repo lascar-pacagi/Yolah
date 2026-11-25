@@ -1,0 +1,10 @@
+# Campaign U28 (2026-11-25, user's question): the countermove when the opponent's last move is unknown.
+#   After a pass, or at the root ("root context" off), the last move is Move::none(), which decodes to a1-a1:
+#   the countermove table's entry [0][0] is read and written by all those nodes (a shared "reply to a pass").
+#   u28_counter_known = dev_u9_spsa with "counter known" true: no countermove read or stored there.
+#   Bench depth 11: nodes x1.000, same move 209/209, same value 207/209 (a rare case: expected ~0 Elo).
+#   2000 games per line (1000 rounds, balanced book), one thread per player.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-2 nnue/search_study.sh campaign_U28.txt
+# 1: at 0.2 s, 2: at 1 s
+u28_counter_known dev_u9_spsa 200000 1000 281
+u28_counter_known dev_u9_spsa 1000000 1000 282

@@ -478,6 +478,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.killer2ply = j.value("killer2ply", options.killer2ply);
              options.killer_mode = j.value("killer mode", options.killer_mode);
              options.counter_first = j.value("counter first", options.counter_first);
+             options.counter_known = j.value("counter known", options.counter_known);
              options.killer_bonus = j.value("killer bonus", options.killer_bonus);
              options.hist_prune = j.value("hist prune", options.hist_prune);
              options.lmp_protect = j.value("lmp protect", options.lmp_protect);
