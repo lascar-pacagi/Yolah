@@ -155,6 +155,21 @@ if(ENABLE_TORCH)
     target_link_libraries(endgame_truth PRIVATE ${TORCH_LIBRARIES})
 endif()
 
+# Candidate puzzles from real games for the app's editor (test/puzzle_gen_main.cpp):
+#   ./puzzle_gen ../data/games --out ../app/assets/puzzles [--goals points,collect,first] [--free 10-20]
+add_executable(puzzle_gen test/puzzle_gen_main.cpp)
+target_compile_options(puzzle_gen PRIVATE -Wall -march=native -mavx2 -ffast-math -funroll-loops -fopenmp)
+target_link_options(puzzle_gen PRIVATE -march=native -mavx2 -ffast-math -fopenmp)
+target_include_directories(puzzle_gen PRIVATE ${Boost_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/eigen)
+target_link_libraries(puzzle_gen PRIVATE game misc test player ui optimization data nnue
+    ${Boost_LIBRARIES} TBB::tbb Threads::Threads)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(puzzle_gen PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(ENABLE_TORCH)
+    target_link_libraries(puzzle_gen PRIVATE ${TORCH_LIBRARIES})
+endif()
+
 # Moves of the pieces enclosed in private regions (pruning study):
 # ./private_moves CACHE_DIR [--stride S]
 add_executable(private_moves test/private_moves_main.cpp)

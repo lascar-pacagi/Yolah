@@ -42,7 +42,9 @@ Training (differences with the ResNet script, both necessary for transformers)
 
 YOLAH_TF_ARCH = transformer (default) | resnet_ft (the ResNet 256x30 with this
 from-to policy head, to separate the head from attention) | resnet (the
-ResNet unchanged, trained with this recipe: the fair baseline).
+ResNet unchanged, trained with this recipe: the fair baseline). resnet_ft_cont = resnet_ft
++ the opponent's last move in the policy head (a 5th input plane, YOLAH_TF_HEAD_BLOCKS residual blocks, see ResNetFromToCont).
+YOLAH_TF_CHANNELS / _BLOCKS (256 / 30): the ResNets' size; YOLAH_TF_TRAIN_POS: cap on the training rows.
 
 Usage (inside the AlphaZero image; see transformer_value_policy.sh):
     python3 transformer_value_policy.py train  --cache /cache --out /work
@@ -90,6 +92,7 @@ SAVE_CHUNKS  = int(os.environ.get("YOLAH_TF_SAVE_CHUNKS", "4"))   # checkpoint e
 RES_CHANNELS = int(os.environ.get("YOLAH_TF_CHANNELS", "256"))
 RES_BLOCKS   = int(os.environ.get("YOLAH_TF_BLOCKS", "30"))
 TRAIN_POS    = int(os.environ.get("YOLAH_TF_TRAIN_POS", "0"))
+HEAD_BLOCKS  = int(os.environ.get("YOLAH_TF_HEAD_BLOCKS", "2"))   # resnet_ft_cont: residual blocks of its policy head
 POLICY_DIM = 128
 VALUE_FC   = 256
 # Against memorising the games (2026-11-20: transformer val value mse 0.31 vs 0.11 in training, the
@@ -202,6 +205,47 @@ class ResNetFromTo(R.Net):
         return v, s.flip(1).flip(2).reshape(-1, 64 * 64)
 
 
+class ResNetFromToCont(ResNetFromTo):
+    """
+    resnet_ft + the opponent's last move, in the POLICY HEAD only (2026-11-27, the
+    idea of the NNUE's continuation history: "after a move that lands there, this
+    reply is good"; design: the user's). The input gets a 5th plane, the one-hot
+    cell of the square where the opponent's last move landed (all zero: no last
+    move, i.e. first position of the cache's game or after a pass). The trunk
+    sees the 4 usual planes only, so the value does not depend on the last move.
+    The policy head adds the plane to the trunk's output (a learned vector at
+    that cell, i.e. a concatenation followed by a 1x1 mix), runs `head_blocks`
+    residual blocks of its own over it (4 convolutions 3x3 for 2 blocks: the
+    last move seen up to 4 squares away), then the from-to head of resnet_ft:
+        h = blocks(trunk(x) + E · plane)
+        logit(from, to) = q(h)_from · k(h)_to / √128
+    so q and k themselves depend on the last move, and any interaction between
+    the opponent's move and the reply (from AND to) can be expressed. Input
+    (B, 5, 8, 8): the C++ encoders do not know it yet (the .ts only, no .test.bin).
+    """
+    IN_PLANES = 5
+
+    def __init__(self, channels=256, nb_blocks=30, head_blocks=2):
+        super().__init__(channels=channels, nb_blocks=nb_blocks)
+        self.config = {"arch": "resnet_ft_cont", "channels": channels, "nb_blocks": nb_blocks, "head_blocks": head_blocks}
+        self.last_embed  = nn.Conv2d(1, channels, kernel_size=1, bias=False)
+        self.head_blocks = nn.Sequential(*[R.ResBlock(channels) for _ in range(head_blocks)])
+        self.head_bn     = nn.BatchNorm2d(channels)
+
+    def policy_trunk(self, t, plane):
+        return torch.relu(self.head_bn(self.head_blocks(t + self.last_embed(plane))))
+
+    def forward(self, x):
+        t = self.trunk(x[:, :4])
+        v = torch.relu(self.value_bn(self.value_conv(t))).flatten(1)
+        v = torch.tanh(self.value_fc2(torch.relu(self.value_fc1(v)))).squeeze(-1)
+        h = self.policy_trunk(t, x[:, 4:5])
+        q = self.pol_from(h).reshape(-1, POLICY_DIM, 64)    # cell i = square 63 - i (as the planes)
+        k = self.pol_to(h).reshape(-1, POLICY_DIM, 64)
+        s = q.transpose(1, 2) @ k * (1.0 / math.sqrt(POLICY_DIM))
+        return v, s.flip(1).flip(2).reshape(-1, 64 * 64)
+
+
 class ResNetPlain(R.Net):
     """The ResNet 256x30 unchanged, trained with THIS script's recipe (fair baseline)."""
     def __init__(self, channels=256, nb_blocks=30):
@@ -209,7 +253,8 @@ class ResNetPlain(R.Net):
         self.config = {"arch": "resnet", "channels": channels, "nb_blocks": nb_blocks}
 
 
-ARCH = os.environ.get("YOLAH_TF_ARCH", "transformer")   # transformer | resnet_ft | resnet
+ARCH = os.environ.get("YOLAH_TF_ARCH", "transformer")   # transformer | resnet_ft | resnet_ft_cont | resnet
+LAST_MOVE = ARCH == "resnet_ft_cont"   # the loaders add the 5th plane (set again by eval from the checkpoint)
 AUGMENT   = _auto("YOLAH_TF_AUGMENT", 1, 0)        # a random symmetry of the board (8) per training position
 DROPOUT   = _auto("YOLAH_TF_DROPOUT", 0.1, 0.0)    # in the attention weights and on the residual branches
 DROP_PATH = _auto("YOLAH_TF_DROP_PATH", 0.1, 0.0)  # stochastic depth: a block skipped, up to this rate (last block)
@@ -265,9 +310,12 @@ def make_net(cfg=None):
     arch = cfg.pop("arch", "transformer")
     if arch == "transformer":
         return TransformerNet(**{"dim": DIM, "heads": HEADS, "layers": LAYERS, **cfg})
-    if arch in ("resnet_ft", "resnet"):                   # a checkpoint's config wins over the environment
-        cfg = {"channels": RES_CHANNELS, "nb_blocks": RES_BLOCKS, **cfg}
-        return (ResNetFromTo if arch == "resnet_ft" else ResNetPlain)(**cfg)
+    classes = {"resnet_ft": ResNetFromTo, "resnet_ft_cont": ResNetFromToCont, "resnet": ResNetPlain}
+    if arch in classes:                                   # a checkpoint's config wins over the environment
+        base = {"channels": RES_CHANNELS, "nb_blocks": RES_BLOCKS}
+        if arch == "resnet_ft_cont":
+            base["head_blocks"] = HEAD_BLOCKS
+        return classes[arch](**{**base, **cfg})
     raise ValueError(f"unknown arch {arch}")
 
 
@@ -284,16 +332,26 @@ def load_net(path):
 class _PlanesOfNNUE:
     """Rows of an NNUE cache (N, 193: black, white, holes, turn; cell c = square
     63 - c) seen as the ResNet's (N, 4, 8, 8) planes: the same cells, so
-    positions[a:b] gives what preprocess.py would have written."""
-    def __init__(self, inputs):
-        self.inputs = inputs
-        self.shape = (inputs.shape[0], 4, 8, 8)
+    positions[a:b] gives what preprocess.py would have written.
+    With `policies` (resnet_ft_cont): a 5th plane, the cell where the opponent's
+    last move landed = the move played in the row before (policies[i - 1]),
+    when that row is of the same game (not −1, the last row of a game) and the
+    move is not a pass (0); otherwise the plane is all zero."""
+    def __init__(self, inputs, policies=None):
+        self.inputs, self.policies = inputs, policies
+        self.shape = (inputs.shape[0], 4 if policies is None else 5, 8, 8)
 
     def __getitem__(self, sl):
         a = np.asarray(self.inputs[sl])
-        out = np.empty((len(a), 4, 8, 8), dtype=np.uint8)
+        out = np.zeros((len(a), self.shape[1], 8, 8), dtype=np.uint8)
         out[:, :3] = a[:, :192].reshape(-1, 3, 8, 8)
         out[:, 3] = a[:, 192, None, None]
+        if self.policies is not None:
+            lo, hi, _ = sl.indices(self.shape[0])
+            prev = np.full(hi - lo, -1, dtype=np.int64)
+            prev[1 if lo == 0 else 0:] = self.policies[max(0, lo - 1):hi - 1]
+            rows = np.nonzero(prev > 0)[0]
+            out[:, 4].reshape(-1, 64)[rows, 63 - prev[rows] % 64] = 1
         return out
 
 
@@ -304,6 +362,8 @@ class CacheLoader(R.ChunkedShuffleLoader):
         with open(os.path.join(self.cache_dir, "meta.json")) as f:
             meta = json.load(f)
         if "positions" in meta:
+            if LAST_MOVE:
+                raise ValueError("resnet_ft_cont needs an NNUE cache (the last move from policies.i16)")
             return super()._open()
         n = int(meta["n_positions"])
         pol = os.path.join(self.cache_dir, "policies.i16")
@@ -311,9 +371,9 @@ class CacheLoader(R.ChunkedShuffleLoader):
             raise FileNotFoundError(f"{pol}: run policies_from_nnue_cache.py {self.cache_dir} first")
         inputs = np.memmap(os.path.join(self.cache_dir, meta["inputs"]["path"]), dtype=np.uint8, mode='r',
                            shape=tuple(meta["inputs"]["shape"]))
-        self.positions = _PlanesOfNNUE(inputs)
         self.values = np.memmap(os.path.join(self.cache_dir, meta["values"]["path"]), dtype=np.int8, mode='r', shape=(n,))
         self.policies = np.memmap(pol, dtype=np.int16, mode='r', shape=(n,))
+        self.positions = _PlanesOfNNUE(inputs, self.policies if LAST_MOVE else None)
 
 
 class ResumableLoader(CacheLoader):
@@ -508,6 +568,8 @@ def cmd_eval(args):
         net, _ = R.net_from_state_dict(sd)
     else:
         net = load_net(args.model)
+    global LAST_MOVE
+    LAST_MOVE = net.config.get("arch") == "resnet_ft_cont" if hasattr(net, "config") else False
     net = net.to(device).eval()
     with open(os.path.join(args.cache, "meta.json")) as f:
         n_total = int(json.load(f)["n_positions"])
@@ -527,10 +589,14 @@ def cmd_eval(args):
 def cmd_export(args):
     net = load_net(args.model).eval()
     base = os.path.splitext(args.model)[0]
+    planes = getattr(net, "IN_PLANES", 4)
     with torch.no_grad():
-        traced = torch.jit.trace(net, torch.zeros(1, 4, 8, 8))
+        traced = torch.jit.trace(net, torch.zeros(1, planes, 8, 8))
     traced.save(base + ".ts")
-    print(f"wrote {base}.ts")
+    print(f"wrote {base}.ts (input (B, {planes}, 8, 8))")
+    if planes != 4:
+        print("no .test.bin: its format (and the C++ encoders) have no last move yet")
+        return
     import resnet_export as E
     E.export_test_vectors(net, base + ".test.bin", 32)
 
@@ -592,6 +658,45 @@ def _check_augment(n=4000, seed=1):
     return n
 
 
+def _check_cont(x):
+    """resnet_ft_cont: the 5th plane (the last move's landing cell) read from policies.i16 as
+    the loader does, and the head's logits equal to their direct square-order computation."""
+    inputs = np.zeros((6, 193), np.uint8)
+    pol = np.array([12 * 64 + 40, -1, 3 * 64 + 7, 0, 63 * 64 + 0, 5], np.int16)   # −1: end of a game, 0: a pass
+    planes = _PlanesOfNNUE(inputs, pol)
+    got = [np.nonzero(planes[i:i + 1][0, 4].reshape(-1))[0].tolist() for i in range(6)]
+    assert got == [[], [63 - 40], [], [63 - 7], [], [63 - 0]], got
+    assert (planes[0:6][:, 4] == np.stack([planes[i:i + 1][0, 4] for i in range(6)])).all()
+    torch.manual_seed(1)
+    net = ResNetFromToCont(channels=32, nb_blocks=2, head_blocks=2).eval()
+    with torch.no_grad():
+        for m in net.modules():                              # BatchNorm statistics away from identity
+            if isinstance(m, nn.BatchNorm2d):
+                m.running_mean.normal_(0, 0.1); m.running_var.uniform_(0.5, 2.0)
+        x5 = torch.cat([x, torch.zeros(3, 1, 8, 8)], 1)
+        for b, sq in enumerate([None, 17, 63]):
+            if sq is not None:
+                x5[b, 4].view(-1)[63 - sq] = 1
+        v, p = net(x5)
+        t = net.trunk(x)
+        h = net.policy_trunk(t, x5[:, 4:5])
+        q, k = net.pol_from(h).flatten(2), net.pol_to(h).flatten(2)
+        for b in range(3):
+            for (fr, to) in [(0, 63), (12, 5), (63, 0)]:
+                d = (q[b, :, 63 - fr] * k[b, :, 63 - to]).sum() / math.sqrt(POLICY_DIM)
+                assert torch.allclose(d, p[b, fr * 64 + to], atol=1e-4), ("resnet_ft_cont", b, fr, to)
+        # the value ignores the last move; the policy does not
+        x5b = x5.clone()
+        x5b[:, 4] = 0
+        x5b[:, 4].view(3, -1)[:, 63 - 30] = 1
+        v2, p2 = net(x5b)
+        assert torch.allclose(v, v2, atol=1e-6) and not torch.allclose(p, p2, atol=1e-3)
+        tr = torch.jit.trace(net, torch.zeros(1, 5, 8, 8))
+        assert torch.allclose(tr(x5)[1], p, atol=1e-4)
+    print(f"resnet_ft_cont: last-move plane from policies.i16 and head logits checked; "
+          f"256x30 {sum(p_.numel() for p_ in ResNetFromToCont().parameters()):,} params")
+
+
 def cmd_selftest(args):
     print(f"augmentation: {_check_augment()} random positions, the transformed move legal in each")
     torch.manual_seed(0)
@@ -627,6 +732,7 @@ def cmd_selftest(args):
             assert torch.allclose(direct, pr[:, fr * 64 + to], atol=1e-4), ("resnet_ft", fr, to)
         trf = torch.jit.trace(rf, torch.zeros(1, 4, 8, 8))
         assert torch.allclose(trf(x)[1], pr, atol=1e-4)
+    _check_cont(x)
     traced = torch.jit.trace(net, torch.zeros(1, 4, 8, 8))
     vt, pt = traced(x)
     assert torch.allclose(vt, v, atol=1e-5) and torch.allclose(pt, p, atol=1e-4), "trace"

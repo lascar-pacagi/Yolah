@@ -19,6 +19,9 @@
 #         ARCH=resnet_ft CHANNELS=$c TRAIN_POS=200000000 BASE_DIR=$HOME/TransformerVP/ladder TAG=_c$c \
 #             sbatch --job-name=ladder_$c -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
 #     done
+#     resnet_ft + the opponent's last move in the policy head (HEAD_BLOCKS=2 residual blocks; compare with ladder _c256):
+#         ARCH=resnet_ft_cont TRAIN_POS=200000000 BASE_DIR=$HOME/TransformerVP/ladder TAG=_c256 \
+#             sbatch --job-name=ladder_cont -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
 #     then STAGE=eval BASE_DIR=$HOME/TransformerVP/ladder sbatch -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
 #
 # First, once (CPU, ~1 h: writes CACHE_DIR/policies.i16, 2 GB):
@@ -58,7 +61,7 @@ fi
 run_py() {
     singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" --bind "${BASE_DIR}:/base" \
         --bind "${CACHE_DIR}:/cache" \
-        --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS:-2},YOLAH_TF_LR=${YOLAH_TF_LR:-5e-4},YOLAH_TF_BATCH=${YOLAH_TF_BATCH:-1024},YOLAH_TF_ARCH=${ARCH},YOLAH_TF_CHANNELS=${CHANNELS:-256},YOLAH_TF_BLOCKS=${BLOCKS:-30},YOLAH_TF_TRAIN_POS=${TRAIN_POS:-0}" \
+        --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS:-2},YOLAH_TF_LR=${YOLAH_TF_LR:-5e-4},YOLAH_TF_BATCH=${YOLAH_TF_BATCH:-1024},YOLAH_TF_ARCH=${ARCH},YOLAH_TF_CHANNELS=${CHANNELS:-256},YOLAH_TF_BLOCKS=${BLOCKS:-30},YOLAH_TF_TRAIN_POS=${TRAIN_POS:-0},YOLAH_TF_HEAD_BLOCKS=${HEAD_BLOCKS:-2}" \
         "${SIF}" bash -c "cd /Yolah/nnue && python3 transformer_value_policy.py $*"
 }
 
