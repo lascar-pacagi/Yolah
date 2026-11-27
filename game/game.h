@@ -57,6 +57,7 @@ public:
       Move* begin() { return moveList; }
       Move* end() { return last; }
       size_t size() const { return last - moveList; }
+      void resize(size_t n) { last = moveList + n; }   // keeps the first n moves (n ≤ size())
       const Move& operator[](size_t i) const { return moveList[i]; }
       Move& operator[](size_t i) { return moveList[i]; }
       Move* data() { return moveList; }

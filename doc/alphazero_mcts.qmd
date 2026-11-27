@@ -539,6 +539,18 @@ Terminal positions skip the network entirely and back up the exact result
 $\{-1,0,+1\}$ from `terminal_value`, which compares the two scores from the
 point of view of the player to move.
 
+With the option `score utility` $u > 0$ (default 0), a finished game with
+score difference $d$ is worth $(1-u)\,\mathrm{sign}(d) + u\tanh(d/\text{score scale})$
+instead: once the game is decided, the search still prefers the larger
+margin. Only finished games carry this term; the network predicts no score.
+The app's MCTS players use $u = 0.05$, scale 10 (`config/hybrid/resnet.cfg`),
+measured at about +4 Elo with larger win margins.
+
+An optional hook, `az::LeafValue` (`player/leaf_minimax.h`, set by the
+`leaf minimax` block of a player's settings), replaces the network's value of
+a leaf late in the game by a short minimax search of the dev player, before the
+cache, the expansion and the backup. It is off by default.
+
 ## Virtual loss, batching and collisions
 
 A single leaf per network call would leave a GPU idle 99 % of the time. Each
@@ -843,6 +855,7 @@ and fields of `az::SearchParams` (underscores).
 | `min visit prop for lcb` | 0.20 | eligibility threshold, as a fraction of the leader |
 | `policy target pruning` | true | invert PUCT to undo the forced playouts |
 | `reuse tree` | true | re-root instead of starting from scratch |
+| `score utility` / `score scale` | 0.0 / 10 | a finished game is worth $(1-u)\,\mathrm{sign}(d) + u\tanh(d/\text{scale})$ |
 
 ## Self-play
 

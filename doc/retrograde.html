@@ -1,0 +1,722 @@
+<meta charset="utf-8">
+<title>Yolah Retrograde Analysis</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a sticky table of contents on the left (wide screens), one reading column of ~70 characters,
+   code, diagrams and widgets allowed to run wider than the text column. */
+:root {
+  --paper: #f3f5f7;
+  --panel: #ffffff;
+  --ink: #17202b;
+  --ink-2: #4b5667;
+  --ink-3: #7a8494;
+  --rule: #d8dde4;
+  --accent: #2c55c9;
+  --accent-soft: #e3e9fa;
+  --black-pc: #c0701a;
+  --black-soft: #f6e3cc;
+  --white-pc: #117f74;
+  --white-soft: #cfeee9;
+  --hole: #4d5563;
+  --neutral: #b7bec9;
+  --good: #2e8a3e;
+  --bad: #c2412d;
+  --code-bg: #111821;
+  --code-ink: #dbe2ea;
+  --code-dim: #7f8b9b;
+  --code-kw: #ff9e64;
+  --code-ty: #7dcfff;
+  --code-fn: #9ece6a;
+  --code-num: #e0af68;
+  --code-str: #c3e88d;
+  --code-com: #6c7a8c;
+  --code-pre: #bb9af7;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Literata", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --measure: 70ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+    --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+    --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+    --code-bg: #0a0f15; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1319; --panel: #151c25; --ink: #e2e7ee; --ink-2: #a2adbb; --ink-3: #758092; --rule: #273140;
+  --accent: #84a2ff; --accent-soft: #1d2a4a; --black-pc: #eaa04c; --black-soft: #3c2a15; --white-pc: #45c7b6;
+  --white-soft: #123a36; --hole: #8b94a3; --neutral: #4c5564; --good: #5cc46c; --bad: #ef6f5a;
+  --code-bg: #0a0f15; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.62;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.page { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 1050px) { .page { grid-template-columns: minmax(0, 1fr); gap: 0; } nav.toc { display: none; } }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; max-height: 100vh; overflow-y: auto; padding: 28px 0 40px; font-family: var(--font-display); font-size: 13.5px; }
+nav.toc .toc-title { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+nav.toc ol ol { padding-left: 14px; margin: 2px 0 6px; }
+nav.toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 2px 8px; border-left: 2px solid transparent; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-left-color: var(--accent); outline: none; }
+nav.toc ol ol a { font-size: 12.5px; color: var(--ink-3); }
+main { min-width: 0; padding-top: 28px; }
+.col { max-width: var(--measure); }
+.wide { max-width: 980px; }
+header.hero { padding: 24px 0 8px; border-bottom: 1px solid var(--rule); margin-bottom: 32px; }
+.eyebrow { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 5vw, 54px); line-height: 1.04; letter-spacing: -.02em; margin: 10px 0 14px; text-wrap: balance; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; margin: 0 0 20px; }
+h2 { font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -.01em; line-height: 1.15; margin: 64px 0 14px; padding-top: 18px; border-top: 3px solid var(--ink); text-wrap: balance; }
+h2 .num, h3 .num { color: var(--accent); margin-right: .4em; font-variant-numeric: tabular-nums; }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 21px; margin: 40px 0 8px; text-wrap: balance; }
+h4 { font-family: var(--font-display); font-weight: 700; font-size: 16px; margin: 24px 0 4px; color: var(--ink-2); }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+code, kbd { font-family: var(--font-mono); font-size: .84em; background: var(--accent-soft); padding: .08em .32em; border-radius: 4px; }
+ul, ol { padding-left: 1.3em; margin: 0 0 14px; }
+li { margin: 3px 0; }
+.note { border-left: 3px solid var(--accent); padding: 8px 14px; background: var(--panel); margin: 18px 0; font-size: 15.5px; color: var(--ink-2); }
+.note strong { color: var(--ink); }
+table { border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.tbl { overflow-x: auto; margin: 14px 0 20px; }
+th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-display); font-weight: 700; font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); border-bottom: 2px solid var(--ink); }
+td code { white-space: nowrap; }
+.num-r { text-align: right; padding-right: 16px; }
+.formula { font-family: var(--font-mono); font-size: 15px; background: var(--panel); border: 1px solid var(--rule); padding: 10px 14px; margin: 12px 0 18px; overflow-x: auto; white-space: pre; line-height: 1.5; }
+figure { margin: 22px 0 26px; }
+figcaption { font-family: var(--font-display); font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+figure.code { margin: 16px 0 22px; max-width: 980px; }
+figure.code .code-head { font-family: var(--font-mono); font-size: 12px; color: var(--code-dim); background: var(--code-bg); padding: 8px 14px 0; border-radius: 8px 8px 0 0; }
+figure.code pre { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 10px 14px 14px; border-radius: 0 0 8px 8px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.55; tab-size: 4; }
+figure.code pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+.hljs-keyword, .hljs-built_in { color: var(--code-kw); }
+.hljs-type { color: var(--code-ty); }
+.hljs-title, .hljs-title.function_ { color: var(--code-fn); }
+.hljs-number, .hljs-literal { color: var(--code-num); }
+.hljs-string { color: var(--code-str); }
+.hljs-comment { color: var(--code-com); font-style: italic; }
+.hljs-meta, .hljs-meta .hljs-keyword { color: var(--code-pre); }
+.diagram { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 18px 0 8px; }
+.diagram svg { display: block; max-width: none; }
+.diagram svg text { font-family: var(--font-display); fill: var(--ink); }
+.widget { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; margin: 20px 0 8px; max-width: 980px; }
+.widget-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.widget-title { font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: .03em; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font-family: var(--font-display); font-weight: 600; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+button.primary:hover { color: var(--panel); filter: brightness(1.08); }
+label { font-family: var(--font-display); font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+input[type=range] { accent-color: var(--accent); width: 150px; }
+.readout { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); background: var(--paper); border-radius: 6px; padding: 8px 12px; margin-top: 10px; white-space: pre-wrap; overflow-x: auto; }
+.log { font-family: var(--font-display); font-size: 14px; color: var(--ink); min-height: 2.8em; margin-top: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: var(--font-display); font-size: 12.5px; color: var(--ink-2); margin-top: 10px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+.twocol { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; align-items: start; }
+.twocol > * { min-width: 0; }
+.board-wrap { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.board-wrap > * { min-width: 0; }
+.tag { display: inline-block; font-family: var(--font-display); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); vertical-align: 2px; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 18px 0 8px; max-width: 980px; }
+.stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.stat b { display: block; font-family: var(--font-display); font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat span { font-family: var(--font-display); font-size: 12.5px; color: var(--ink-3); }
+details.mobile-toc { display: none; margin: 8px 0 20px; font-family: var(--font-display); font-size: 14px; }
+@media (max-width: 1050px) { details.mobile-toc { display: block; } }
+details.mobile-toc summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+details.mobile-toc ol { columns: 1; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="page">
+<div class="page">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol id="toc-list"></ol>
+</nav>
+<main>
+<header class="hero">
+  <div class="eyebrow">Yolah · retrograde analysis · player/solo_region.{h,cpp} · test/solo_retro_main.cpp · test/solo_retro_gpu.cu</div>
+  <h1>Yolah Retrograde Analysis</h1>
+  <p class="lede">Chess endgame tables count the positions with few pieces. In Yolah eight pieces stay to the end and only the free space shrinks: tables of whole positions are out of reach. What is small is the <strong>private region</strong>, the free squares one side only can still reach. This page solves them exactly, builds their table backwards, layer by layer, on the CPU and on the GPU, and uses them in the exact solver, the minimax and the MCTS. The code, commented line by line in French: <code>doc/final_retro.{h,cpp}</code> and <code>doc/final_retro_gpu.cu</code>.</p>
+  <div class="stat-row">
+    <div class="stat"><b>97 %</b><span>of the private regions of real games have at most 6 squares</span></div>
+    <div class="stat"><b>88.8 M</b><span>states in the table (≤ 9 squares, 1–2 pieces), built in 11 s on a GPU</span></div>
+    <div class="stat"><b>×4.4</b><span>the exact solver on 8 threads, with the regions</span></div>
+    <div class="stat"><b>0</b><span>mismatches in the checks</span></div>
+  </div>
+</header>
+<details class="mobile-toc"><summary>Contents</summary><ol id="toc-list-m"></ol></details>
+
+<section id="s1">
+<h2><span class="num">1</span>Why regions</h2>
+<div class="col">
+<p>A table of every position with only 4 free squares would hold about 1.4 × 10<sup>16</sup> entries (<code>doc/solving.qmd</code>): the holes that bound the free space can be anywhere. But late positions fall apart. A queen move only crosses free squares, and two consecutive squares of a line are neighbours (8-connectivity): a piece only ever moves inside the <strong>regions</strong> of free squares it touches, and regions never merge, since squares only stop being free. A region touched by the pieces of one side only is <strong>private</strong> for good: an opponent piece can only move to free squares of its own regions, and a square next to ours would belong to ours.</p>
+<p>Measured on 12 000 games of the dev player's data (<code>data/games</code>):</p>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th class="num-r">Free squares</th><th class="num-r">Free space that is private</th><th class="num-r">Positions entirely private</th><th class="num-r">Largest private region (mean)</th></tr></thead>
+<tbody>
+<tr><td class="num-r">35</td><td class="num-r">1.1 %</td><td class="num-r">0 %</td><td class="num-r">0.4</td></tr>
+<tr><td class="num-r">30</td><td class="num-r">5.0 %</td><td class="num-r">0 %</td><td class="num-r">1.3</td></tr>
+<tr><td class="num-r">25</td><td class="num-r">17.9 %</td><td class="num-r">0.2 %</td><td class="num-r">3.1</td></tr>
+<tr><td class="num-r">20</td><td class="num-r">44.2 %</td><td class="num-r">5.5 %</td><td class="num-r">4.4</td></tr>
+<tr><td class="num-r">15</td><td class="num-r">70.3 %</td><td class="num-r">39.5 %</td><td class="num-r">4.4</td></tr>
+<tr><td class="num-r">10</td><td class="num-r">77.0 %</td><td class="num-r">84.1 %</td><td class="num-r">3.4</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>The private regions are small: 42 % have 1 square, 88 % at most 4, 97 % at most 6, 99.8 % at most 10; 85 % are touched by one piece, 13 % by two.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="num">2</span>Clusters and reserves</h2>
+<div class="col">
+<p>A piece touching two regions will go into one <em>or</em> the other: such regions are not independent. A <strong>cluster</strong> is a set of regions joined by the pieces that touch several of them, with those pieces (union-find over the regions). A private cluster is a one-player puzzle; its <strong>value</strong> is the largest number of moves its side can still make in it. It depends neither on the rest of the board nor on <em>when</em> the moves are made: a side whose private clusters are worth M owns M points and M tempi it can spend whenever it likes, a <strong>reserve</strong>.</p>
+</div>
+<div class="diagram wide" id="d-cluster"></div>
+<div class="col">
+<p>Two exact consequences, used by the players:</p>
+<ul>
+<li>a position where nothing is contested is settled: its remaining value is the reserve of the side to move minus the opponent's, without any search (checked on 11 585 all-private positions of real games against the exact endgame solver: 0 mismatch);</li>
+<li>in a private cluster of the side to move, one move is enough to search: one that keeps the largest reserve. Two such moves lead to equivalent positions (only the reserve counts); the other moves of the cluster shrink it.</li>
+</ul>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/solo_region.cpp · clusters">
+int clusters(uint64_t free, uint64_t pieces, Cluster out[64]) {
+    uint64_t reg[64];
+    const int nr = regions(free, reg);
+    // Union-find over the regions: a piece touching several joins them.
+    int parent[64];
+    for (int i = 0; i < nr; i++) parent[i] = i;
+    auto find = [&](int i) { while (parent[i] != i) i = parent[i] = parent[parent[i]]; return i; };
+    uint64_t touch[64];
+    for (int i = 0; i < nr; i++) touch[i] = grow(reg[i]);
+    for (uint64_t ps = pieces; ps; ps &= ps - 1) {
+        const uint64_t bit = ps & -ps;
+        int first = -1;
+        for (int i = 0; i < nr; i++)
+            if (touch[i] & bit) {
+                if (first < 0) first = i;
+                else parent[find(i)] = find(first);
+            }
+    }
+    int n = 0, index[64];
+    for (int i = 0; i < nr; i++) index[i] = -1;
+    for (int i = 0; i < nr; i++) {
+        const int r = find(i);
+        if (index[r] < 0) { index[r] = n; out[n++] = Cluster{}; }
+        out[index[r]].free |= reg[i];
+    }
+    // The pieces of each cluster (those touching it); clusters without a piece are dropped.
+    int m = 0;
+    for (int c = 0; c < n; c++) {
+        out[c].pieces = grow(out[c].free) & pieces;
+        if (out[c].pieces) out[m++] = out[c];
+    }
+    return m;
+}
+</script>
+</section>
+
+<section id="s3">
+<h2><span class="num">3</span>The value of a cluster</h2>
+<div class="col">
+<p>value(cluster) = max over its moves of 1 + value(what is left), 0 without a move. After a move the cluster may split: the values of the parts add up. The search keeps its results in memory, keyed by the <strong>canonical form</strong>: queen lines depend neither on where a shape stands nor on the 8 symmetries of the square, so the key is the smallest of the 8 transformed shapes (built from three reflections: ranks, files, diagonal), translated to the corner. And it stops as soon as a sequence fills every square: nothing can do better (82 % of the table's states fill their region). Measured: 0.2 µs per position of a real game for all its clusters, with a direct-mapped cache of the clusters as they stand on the board in front of the canonical form.</p>
+</div>
+<div class="diagram wide" id="d-sym"></div>
+<script type="text/x-code" data-lang="cpp" data-title="player/solo_region.cpp · canonical">
+Key canonical(uint64_t free, uint64_t pieces) {
+    Key best{~uint64_t(0), ~uint64_t(0)};
+    uint64_t f = free, p = pieces;
+    for (int d = 0; d < 2; d++) {
+        for (int v = 0; v < 2; v++) {
+            for (int h = 0; h < 2; h++) {
+                uint64_t ff = f, pp = p;
+                to_corner(ff, pp);
+                if (ff < best.free || (ff == best.free && pp < best.pieces)) best = {ff, pp};
+                f = mirror_horizontal(f);
+                p = mirror_horizontal(p);
+            }
+            f = flip_vertical(f);
+            p = flip_vertical(p);
+        }
+        f = flip_diagonal(f);
+        p = flip_diagonal(p);
+    }
+    return best;
+}
+</script>
+<script type="text/x-code" data-lang="cpp" data-title="player/solo_region.cpp · Solver::cluster_value">
+int Solver::cluster_value(uint64_t free, uint64_t pieces) {
+    Raw& r = raw[(free * 0x9E3779B97F4A7C15ull ^ pieces * 0xC2B2AE3D27D4EB4Full) >> (64 - RAW_BITS)];
+    if (r.value >= 0 && r.free == free && r.pieces == pieces) return r.value;
+    const int v = [&]() -> int {
+    const Key k = canonical(free, pieces);
+    if (auto it = memo.find(k); it != memo.end()) return it->second;
+    ++nb_nodes;
+    if (over || (budget_left >= 0 && --budget_left < 0)) { over = true; return 0; }
+    const uint64_t occupied = ~free;
+    const int most = std::popcount(free);   // one move per free square at most
+    int best = 0;
+    for (uint64_t ps = pieces; ps && best < most && !over; ps &= ps - 1) {
+        const Square from = Square(std::countr_zero(ps));
+        const uint64_t from_bit = ps & -ps;
+        for (uint64_t to = attacks_bb(from, occupied) & free; to && best < most && !over; to &= to - 1) {
+            const uint64_t to_bit = to & -to;
+            // The destination is no longer free; the origin becomes a hole.
+            best = std::max(best, 1 + value(free & ~to_bit, (pieces & ~from_bit) | to_bit));
+        }
+    }
+    if (over) return 0;   // unfinished: kept nowhere
+    if (keep_full || best < most) memo.emplace(k, int8_t(best));
+    return best;
+    }();
+    if (over) return 0;
+    r = {free, pieces, int8_t(v)};
+    return v;
+}
+</script>
+</section>
+
+<section id="s4">
+<h2><span class="num">4</span>The table, backwards (CPU)</h2>
+<div class="col">
+<p>Retrograde analysis computes from the end of the game backwards: in chess, from the mates. Here the states are ranked in <strong>layers</strong> by their number of free squares, and a move fills one square: the value of a state of layer n only needs states of lower layers. Computing layer 1, then 2, …, each layer finds everything it needs already solved. The shapes of layer n are grown from those of layer n − 1 (one more square next to the shape, at each placement near the corner where it fits on the board); the pieces stand on the squares around. The shape counts are those of the literature for 8-connected polyominoes (“polyplets”): 1, 2, 5, 22, 94, 524, 3 031, 18 770, 116 452 (with the board's limits) for 1 to 9 squares.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="test/solo_retro_main.cpp · the layers">
+    for (int n = 1; n <= MAX_FREE; n++) {
+        // The states of layer n: each shape, at each placement, with 1..MAX_PIECES
+        // pieces on the board squares around it.
+        std::unordered_set<solo::Key, KH> states;
+        for (uint64_t sh : shapes)
+            for (uint64_t f : placements(sh)) {
+                std::vector<uint64_t> ring;
+                for (uint64_t r = grow(f) & ~f; r; r &= r - 1) ring.push_back(r & -r);
+                const int m = int(ring.size());
+                for (int a = 0; a < m; a++) {
+                    states.insert(solo::canonical(f, ring[a]));
+                    if (MAX_PIECES >= 2)
+                        for (int b = a + 1; b < m; b++) {
+                            states.insert(solo::canonical(f, ring[a] | ring[b]));
+                            if (MAX_PIECES >= 3)
+                                for (int c = b + 1; c < m; c++) states.insert(solo::canonical(f, ring[a] | ring[b] | ring[c]));
+                        }
+                }
+            }
+        // Their values: every move leads to layers below, already solved.
+        std::vector<solo::Key> layer(states.begin(), states.end());
+        std::sort(layer.begin(), layer.end(), [](const solo::Key& x, const solo::Key& y) { return x.free != y.free ? x.free < y.free : x.pieces < y.pieces; });
+        int vmax = 0;
+        long long hist[64] = {};
+        for (const solo::Key& k : layer) {
+            const int v = solver.value(k.free, k.pieces);
+            vmax = std::max(vmax, v);
+            hist[v]++;
+            if (v < n) table_keys.push_back(k);
+        }
+        nb_states += layer.size();
+        const double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        std::printf("layer %2d: %8zu shapes, %10zu states, values ≤ %d (", n, shapes.size(), layer.size(), vmax);
+        for (int v = 0; v <= vmax; v++) std::printf("%s%lld", v ? " " : "", hist[v]);
+        std::printf("), exceptions so far %zu, %.1f s\n", table_keys.size(), el);
+        std::fflush(stdout);
+        if (n == MAX_FREE) break;
+        // The shapes of layer n + 1.
+        std::unordered_set<uint64_t> next;
+        for (uint64_t sh : shapes)
+            for (uint64_t f : placements(sh))
+                for (uint64_t add = grow(f) & ~f; add; add &= add - 1) next.insert(solo::canonical(f | (add & -add), 0).free);
+        shapes.assign(next.begin(), next.end());
+    }
+</script>
+<div class="tbl wide"><table>
+<thead><tr><th class="num-r">Layer (free squares)</th><th class="num-r">Shapes</th><th class="num-r">States (1–2 pieces)</th><th class="num-r">Exceptions (value &lt; squares)</th></tr></thead>
+<tbody>
+<tr><td class="num-r">6</td><td class="num-r">524</td><td class="num-r">119 673</td><td class="num-r">7 884</td></tr>
+<tr><td class="num-r">7</td><td class="num-r">3 031</td><td class="num-r">912 515</td><td class="num-r">89 226</td></tr>
+<tr><td class="num-r">8</td><td class="num-r">18 770</td><td class="num-r">6 848 857</td><td class="num-r">951 214</td></tr>
+<tr><td class="num-r">9</td><td class="num-r">116 452</td><td class="num-r">49 671 530</td><td class="num-r">9 286 045</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>Up to 9 squares: 57.6 M states in 3 minutes on one core (4.7 GB). Since most states fill their region, the table keeps only the exceptions (10.3 M, 175 MB in <code>data/solo_regions_9_2.bin</code>), the value of the others being their number of squares.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="num">5</span>The same table on the GPU</h2>
+<div class="col">
+<p>A GPU runs the same small program (a <em>kernel</em>) on thousands of threads at once, each finding its own element from its block and thread numbers; it has its own memory, and the copies from and to it cost. A recursive search with a shared hash table does not fit; layers do. Three steps:</p>
+<ol>
+<li><strong>seeds</strong> (CPU): every single-region state, canonical;</li>
+<li><strong>descent</strong>, layer N to 1: one thread per state plays every move and writes its children, normalised (the free squares no piece can reach and the pieces that cannot move removed: they change nothing) and canonical; sorted and deduplicated on the GPU (thrust), they join the layer of their number of squares. Every layer thus holds what the layers above will need;</li>
+<li><strong>ascent</strong>, layer 1 to N: one thread per state tries every move, finds the child in its layer by binary search (the layers are sorted), and keeps max(1 + its value).</li>
+</ol>
+</div>
+<div class="diagram wide" id="d-gpu"></div>
+<script type="text/x-code" data-lang="cpp" data-title="test/solo_retro_gpu.cu · children_kernel">
+__global__ void children_kernel(const K* layer, size_t n, K* out) {
+    const size_t i = blockIdx.x * size_t(blockDim.x) + threadIdx.x;
+    if (i >= n) return;
+    const K s = layer[i];
+    int k = 0;
+    for (unsigned long long ps = s.p; ps; ps &= ps - 1) {
+        const int from = ctz(ps);
+        for (unsigned long long t = slides(from, s.f); t; t &= t - 1)
+            if (k < MAX_CHILDREN) out[i * MAX_CHILDREN + k++] = child_of(s, from, ctz(t));
+    }
+    for (; k < MAX_CHILDREN; k++) out[i * MAX_CHILDREN + k] = K{~0ULL, ~0ULL};
+}
+</script>
+<script type="text/x-code" data-lang="cpp" data-title="test/solo_retro_gpu.cu · the descent: compact, sort, keep the next layer on the GPU">
+        const size_t chunk = size_t(1) << 20;
+        thrust::device_vector<K> acc;
+        for (size_t start = 0; start < layer[n].size(); start += chunk) {
+            const size_t m = std::min(chunk, layer[n].size() - start);
+            thrust::device_vector<K> out(m * MAX_CHILDREN);
+            children_kernel<<<(m + 255) / 256, 256>>>(thrust::raw_pointer_cast(layer[n].data()) + start, m, thrust::raw_pointer_cast(out.data()));
+            out.erase(thrust::remove_if(out.begin(), out.end(), IsEmpty{}), out.end());   // compact first: most slots are empty
+            sort_unique(out);
+            // The children of layer n − 1 stay on the GPU, the others go to the CPU.
+            auto mid = thrust::stable_partition(out.begin(), out.end(), InLayer{n - 1});
+            thrust::host_vector<K> rest(mid, out.end());
+            for (const K& c : rest) {
+                const int m2 = std::popcount(c.f);
+                if (m2 >= 1) pending[m2].push_back(c);   // m2 = 0: worth 0, no table needed
+            }
+            out.erase(mid, out.end());
+            thrust::device_vector<K> merged(acc.size() + out.size());
+            thrust::merge(acc.begin(), acc.end(), out.begin(), out.end(), merged.begin());
+            merged.erase(thrust::unique(merged.begin(), merged.end()), merged.end());
+            acc.swap(merged);
+        }
+        if (n >= 2) {   // into layer n − 1's pending list
+            thrust::host_vector<K> h = acc;
+            pending[n - 1].insert(pending[n - 1].end(), h.begin(), h.end());
+        }
+</script>
+<script type="text/x-code" data-lang="cpp" data-title="test/solo_retro_gpu.cu · lookup">
+__device__ int lookup(const Layers& L, K c) {
+    const int m = popc(c.f);
+    if (m == 0) return 0;
+    const K* a = L.keys[m];
+    size_t lo = 0, hi = L.sizes[m];
+    while (lo < hi) {
+        const size_t mid = (lo + hi) / 2;
+        if (a[mid] < c) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo < L.sizes[m] && a[lo] == c ? L.values[m][lo] : -100;   // −100: missing (a bug)
+}
+</script>
+<script type="text/x-code" data-lang="cpp" data-title="test/solo_retro_gpu.cu · value_kernel">
+__global__ void value_kernel(const K* layer, size_t n, Layers L, signed char* values, int* missing) {
+    const size_t i = blockIdx.x * size_t(blockDim.x) + threadIdx.x;
+    if (i >= n) return;
+    const K s = layer[i];
+    const int most = popc(s.f);
+    int best = 0;
+    for (unsigned long long ps = s.p; ps && best < most; ps &= ps - 1) {
+        const int from = ctz(ps);
+        for (unsigned long long t = slides(from, s.f); t && best < most; t &= t - 1) {
+            const int v = lookup(L, child_of(s, from, ctz(t)));
+            if (v < 0) { atomicAdd(missing, 1); continue; }
+            if (1 + v > best) best = 1 + v;
+        }
+    }
+    values[i] = (signed char)best;
+}
+</script>
+<div class="tbl wide"><table>
+<thead><tr><th>Table</th><th class="num-r">States</th><th class="num-r">GPU descent</th><th class="num-r">GPU values</th><th class="num-r">CPU</th></tr></thead>
+<tbody>
+<tr><td>≤ 8 squares, 1–2 pieces</td><td class="num-r">11.8 M</td><td class="num-r">1.4 s</td><td class="num-r">0.02 s</td><td class="num-r">18.6 s (6.8 M single-region states)</td></tr>
+<tr><td>≤ 9 squares, 1–2 pieces</td><td class="num-r">88.8 M</td><td class="num-r">11 s</td><td class="num-r">0.14 s</td><td class="num-r">181 s (57.6 M)</td></tr>
+<tr><td>≤ 10 squares, 1 piece</td><td class="num-r">30.2 M</td><td class="num-r">3.4 s</td><td class="num-r">0.05 s</td><td class="num-r">—</td></tr>
+</tbody></table></div>
+<div class="col">
+<p>(RTX 3080; the CPU enumeration of the seeds, single-threaded, adds 20 s at 9 squares.) The first GPU version took 556 s at 9 squares, slower than the CPU: each chunk sorted 108 slots per state, almost all empty, and sent every chunk's children back to the CPU, duplicates between chunks included. Compacting before sorting (<code>remove_if</code>) and merging the next layer's children on the GPU (<code>merge</code> + <code>unique</code>) brought it to 11 s; computing the values themselves was never the problem (0.14 s for 88.8 M states). The next step up, 10 squares with 2 pieces (335 M placements), would need a parallel seed enumeration and care with the card's 10 GB.</p>
+<p>Checks: the GPU's canonical form of every seed is the seed (the GPU and the CPU compute the same forms), no child is ever missing, and 2 000 states of each layer recomputed by the CPU solver give the same values.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="num">6</span>In the players</h2>
+<h3 id="s6-solver"><span class="num">6.1</span>The exact solver</h3>
+<div class="col">
+<p>Option <code>regions</code> of <code>EndgameSolver</code> (on in the app: “Vérifier”, the hints, the early end of the puzzles, “Solveur exact”): the leaf when nothing is contested, and one move per private cluster; a cheap test first (the squares each side can reach), the cluster solver of each thread kept between solves.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/endgame_solver.cpp · regions_step">
+bool EndgameSolver::regions_step(Worker& w, const Yolah& yolah, Yolah::MoveList& moves, int& value) {
+    // First the cheap test: the free squares each side can reach (two flood
+    // fills). A region one side only reaches is in its reach and not in the
+    // other's: none, and there is nothing to do (the common case early on).
+    const uint64_t free = yolah.free_squares();
+    const uint64_t rb = reach(yolah.bitboard(Yolah::BLACK), free), rw = reach(yolah.bitboard(Yolah::WHITE), free);
+    if ((rb ^ rw) == 0) return false;
+    const solo::Split sp = solo::split(yolah);
+    const int us = yolah.current_player();
+    if (sp.contested == 0) {
+        // Every region private (or touched by nobody): each side plays alone.
+        int m[2] = {0, 0};
+        for (int side = 0; side < 2; side++)
+            for (const solo::Cluster& c : sp.priv[side]) m[side] += w.solo->value(c.free, c.pieces);
+        value = m[us] - m[1 - us];
+        return true;
+    }
+    // One move per private cluster of the side to move: the first that keeps its
+    // largest reserve (value − 1 after it). Its pieces only touch that cluster.
+    Move keep[64];
+    uint64_t pieces_of[64];
+    int nc = 0;
+    for (const solo::Cluster& c : sp.priv[us]) {
+        const int v = w.solo->value(c.free, c.pieces);
+        Move best = Move::none();
+        for (Move m : moves) {
+            const uint64_t from = uint64_t(1) << m.from_sq(), to = uint64_t(1) << m.to_sq();
+            if (!(c.pieces & from)) continue;
+            if (w.solo->value(c.free & ~to, (c.pieces & ~from) | to) == v - 1) { best = m; break; }
+        }
+        keep[nc] = best;
+        pieces_of[nc++] = c.pieces;
+    }
+    if (nc == 0) return false;
+    size_t n = 0;
+    for (size_t i = 0; i < moves.size(); i++) {
+        const Move m = moves[i];
+        const uint64_t from = uint64_t(1) << m.from_sq();
+        bool drop = false;
+        for (int c = 0; c < nc; c++)
+            if (pieces_of[c] & from) { drop = m != keep[c]; break; }
+        if (!drop) moves[n++] = m;
+    }
+    moves.resize(n);
+    return false;
+}
+</script>
+<div class="tbl wide"><table>
+<thead><tr><th>100 positions of 22 to 26 free squares (real games)</th><th class="num-r">without</th><th class="num-r">with regions</th><th class="num-r">speed-up</th></tr></thead>
+<tbody>
+<tr><td>1 thread</td><td class="num-r">150 s, 2 599 M nodes</td><td class="num-r">61 s, 336 M nodes</td><td class="num-r">2.5</td></tr>
+<tr><td>8 threads</td><td class="num-r">67 s, 10 115 M nodes</td><td class="num-r">15 s, 501 M nodes</td><td class="num-r">4.4</td></tr>
+</tbody></table></div>
+<h3 id="s6-dev"><span class="num">6.2</span>The minimax (dev player)</h3>
+<div class="col">
+<p>The dev player already had both ideas: <code>reserve</code> (one move per sealed pocket, kept: +10 Elo in U5) and <code>split solve</code> (the exact leaf, U4 neutral, −12 with reserve in U5). Its harvests were computed by <code>harvest_exact</code>, a new memo per call. Option <code>solo</code> computes them with the cluster solver of each thread, kept between moves. On the bench (209 positions, depth 11): with <code>reserve</code>, the same search (nodes ×1.000, same moves 209/209), time ×0.96; with <code>split solve</code>, time ×1.39 the old way (why it lost), ×0.98 with <code>solo</code>. Campaign U29 (<code>config/search_study/campaign_U29.txt</code>): <code>u29_solo</code> and <code>u29_solo_split</code> against dev_u9_spsa at 0.2 s and 1 s, 2000 games each.</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · harvest">
+int MinMaxNNUE_DevPlayer::harvest(const Search& s, uint64_t pieces, uint64_t region) const {
+    if (options.solo && s.solo) return s.solo->value_budget(region, pieces, options.split_budget);
+    return harvest_exact(pieces, region, options.split_budget);
+}
+</script>
+<h3 id="s6-mcts"><span class="num">6.3</span>The MCTS</h3>
+<div class="col">
+<p>Option <code>regions</code> of the AlphaZero search: a leaf where nothing is contested is a finished game for the search (never expanded), worth the exact final difference with the same score utility as the real ends; the root keeps the usual test, so a move is always chosen. Match: <code>nnue/az_regions_match.sh</code> (the app's AlphaZero network with the option against itself without, 2000 games over 5 GPUs, both with the app's score utility).</p>
+</div>
+<script type="text/x-code" data-lang="cpp" data-title="player/alphazero_mcts.cpp · settled">
+bool Search::settled(const Yolah& state) const {
+    if (state.game_over()) return true;
+    if (!prm.regions) return false;
+    const uint64_t free = state.free_squares();
+    return (reach(state.bitboard(Yolah::BLACK), free) & reach(state.bitboard(Yolah::WHITE), free)) == 0;
+}
+</script>
+</section>
+
+<section id="s7">
+<h2><span class="num">7</span>Checks and files</h2>
+<div class="col">
+<ul>
+<li><code>test/solo_region_check.cpp</code>: the cluster values against the exact endgame solver on the all-private positions of real games (7 744 / 2 000 games, 0 mismatch).</li>
+<li><code>test/solo_retro_main.cpp</code>: the CPU table, a sample against a fresh solver (5 000 states, 0 wrong).</li>
+<li><code>test/solo_retro_gpu.sh</code>: the GPU table, its canonical forms against the CPU's, its values against the CPU solver (18 000 states at 9 squares, 0 wrong).</li>
+<li><code>test/final_retro_check.sh</code>: the commented copy <code>doc/final_retro.cpp</code> against the real code (55 278 positions: same splits, canonical forms and values; 11 585 all-private positions against the exact solver; its table of 1.05 M states against the real solver: 0 mismatch).</li>
+<li><code>test/final_retro_gpu_check.sh</code>: the commented copy <code>doc/final_retro_gpu.cu</code> gives the same output as <code>test/solo_retro_gpu.cu</code>.</li>
+<li>The exact solver with <code>regions</code>: 2 983 positions of 9 to 12 free squares against a plain negamax, 500 positions of 22 to 26 against the solver without it (0 difference).</li>
+</ul>
+</div>
+</section>
+<footer class="col" style="margin-top:56px; padding-top:14px; border-top:1px solid var(--rule); font-family:var(--font-display); font-size:13px; color:var(--ink-3)">
+Repository state: November 2026, the retrograde analysis project. Measures on an i7-12700K and an RTX 3080 (WSL2).
+</footer>
+</main>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker>
+    <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+    <marker id="arr-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--good)"/></marker>
+  </defs>
+</svg>
+<style>
+.dg-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+.dg-box.k-acc { fill: var(--accent-soft); stroke: var(--accent); }
+.dg-box.k-b { fill: var(--black-soft); stroke: var(--black-pc); }
+.dg-box.k-w { fill: var(--white-soft); stroke: var(--white-pc); }
+.dg-box.k-good { fill: var(--paper); stroke: var(--good); stroke-width: 1.6; }
+.dg-box.k-dim { fill: var(--panel); stroke: var(--rule); stroke-dasharray: 4 3; }
+.dg-t { font-size: 13px; font-weight: 700; fill: var(--ink); }
+.dg-s { font-size: 11.5px; fill: var(--ink-2); }
+.dg-m { font-family: var(--font-mono) !important; font-size: 11px; fill: var(--ink-2); }
+.dg-a { stroke: var(--ink-3); stroke-width: 1.4; fill: none; marker-end: url(#arr); }
+.dg-a.acc { stroke: var(--accent); marker-end: url(#arr-acc); }
+.dg-a.good { stroke: var(--good); marker-end: url(#arr-good); }
+.dg-a.dash { stroke-dasharray: 5 4; }
+.dg-lbl { font-size: 11px; fill: var(--ink-3); font-weight: 600; }
+.dg-ret { font-size: 11px; fill: var(--good); font-weight: 700; }
+.cells { display: grid; gap: 2px; font-family: var(--font-mono); font-size: 10.5px; margin: 4px 0 10px; }
+.cell { min-width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; color: var(--ink); font-variant-numeric: tabular-nums; padding: 0 2px; }
+.cell.z { color: var(--ink-3); }
+.cell.hl { background: var(--accent-soft); border-color: var(--accent); }
+.cell.ok { background: var(--white-soft); border-color: var(--white-pc); }
+.cell.wt { background: var(--black-soft); border-color: var(--black-pc); }
+.reg-row { display: flex; gap: 8px; align-items: center; }
+.reg-name { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); width: 120px; flex: none; text-align: right; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* ── code blocks ─────────────────────────────────────────────────────────── */
+document.querySelectorAll('script[type="text/x-code"]').forEach(sc => {
+  const fig = document.createElement("figure");
+  fig.className = "code";
+  const head = document.createElement("div");
+  head.className = "code-head";
+  head.textContent = sc.dataset.title || "";
+  const pre = document.createElement("pre");
+  const code = document.createElement("code");
+  code.className = "language-" + (sc.dataset.lang || "cpp");
+  code.textContent = sc.textContent.replace(/^\n/, "").replace(/\s+$/, "");
+  pre.appendChild(code);
+  fig.appendChild(head);
+  fig.appendChild(pre);
+  sc.replaceWith(fig);
+  try { if (window.hljs) window.hljs.highlightElement(code); } catch (e) { /* plain text */ }
+});
+
+/* ── table of contents ───────────────────────────────────────────────────── */
+(function toc() {
+  const lists = [$("toc-list"), $("toc-list-m")];
+  const label = h => { const n = h.querySelector(".num"); return n ? n.textContent + "  " + h.textContent.slice(n.textContent.length) : h.textContent; };
+  document.querySelectorAll("main section").forEach(sec => {
+    const h2 = sec.querySelector("h2");
+    if (!h2) return;
+    lists.forEach(list => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "#" + sec.id;
+      a.textContent = label(h2);
+      li.appendChild(a);
+      const subs = sec.querySelectorAll("h3[id]");
+      if (subs.length) {
+        const ol = document.createElement("ol");
+        subs.forEach(h3 => {
+          const l2 = document.createElement("li");
+          const a2 = document.createElement("a");
+          a2.href = "#" + h3.id;
+          a2.textContent = label(h3);
+          l2.appendChild(a2);
+          ol.appendChild(l2);
+        });
+        li.appendChild(ol);
+      }
+      list.appendChild(li);
+    });
+  });
+})();
+
+/* ── SVG diagram helpers ─────────────────────────────────────────────────── */
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function B(x, y, w, h, title, sub, kind) {
+  let s = `<rect class="dg-box ${kind || ""}" x="${x}" y="${y}" width="${w}" height="${h}" rx="7"/>`;
+  const lines = sub ? (Array.isArray(sub) ? sub : [sub]) : [];
+  const total = 16 + lines.length * 14;
+  let ty = y + h / 2 - total / 2 + 12;
+  s += `<text class="dg-t" x="${x + w / 2}" y="${ty}" text-anchor="middle">${esc(title)}</text>`;
+  lines.forEach((l, i) => { s += `<text class="dg-s" x="${x + w / 2}" y="${ty + 15 + i * 14}" text-anchor="middle">${esc(l)}</text>`; });
+  return s;
+}
+function A(x1, y1, x2, y2, cls, label, lx, ly) {
+  let s = `<path class="dg-a ${cls || ""}" d="M${x1},${y1} L${x2},${y2}"/>`;
+  if (label) s += `<text class="dg-lbl" x="${lx ?? (x1 + x2) / 2 + 4}" y="${ly ?? (y1 + y2) / 2 - 4}">${esc(label)}</text>`;
+  return s;
+}
+function P(d, cls) { return `<path class="dg-a ${cls || ""}" d="${d}"/>`; }
+function T(x, y, text, cls, anchor) { return `<text class="${cls || "dg-s"}" x="${x}" y="${y}" text-anchor="${anchor || "start"}">${esc(text)}</text>`; }
+function svg(id, w, h, body, label) {
+  const el = $(id);
+  if (el) el.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label || id)}">${body}</svg>`;
+}
+
+
+
+/* 2 a cluster */
+(function () {
+  let s = "";
+  const q = 30, x0 = 20, y0 = 30;
+  // a 6 x 4 board: F free, H hole, N black piece, W white piece
+  const rows = ["FFHHFF", "FNHHFF", "HHHHWF", "FFHFFF"];
+  rows.forEach((r, j) => r.split("").forEach((c, i) => {
+    const k = c === "F" ? "" : c === "H" ? "k-dim" : c === "N" ? "k-b" : "k-w";
+    s += `<rect class="dg-box ${k}" x="${x0 + i * q}" y="${y0 + j * q}" width="${q - 2}" height="${q - 2}" rx="4"/>`;
+    if (c === "N" || c === "W") s += T(x0 + i * q + q / 2 - 1, y0 + j * q + q / 2 + 4, c === "N" ? "B" : "W", "dg-t", "middle");
+  }));
+  s += T(x0 + 200, y0 + 12, "left region: touched by the black piece only: PRIVATE", "dg-lbl");
+  s += T(x0 + 200, y0 + 30, "its value: the most moves black can still make there (3: it fills it)", "dg-s");
+  s += T(x0 + 200, y0 + 56, "right region: touched by the white piece only: private to white", "dg-lbl");
+  s += T(x0 + 200, y0 + 92, "nothing contested: remaining = reserve(side to move) − reserve(opponent)", "dg-ret");
+  svg("d-cluster", 720, 160, s, "private regions");
+})();
+
+/* 3 the 8 symmetries */
+(function () {
+  let s = "";
+  const shape = [[0,0],[1,0],[2,0],[2,1]];
+  const tf = [p => p, p => [2 - p[0], p[1]], p => [p[0], 2 - p[1]], p => [2 - p[0], 2 - p[1]],
+              p => [p[1], p[0]], p => [2 - p[1], p[0]], p => [p[1], 2 - p[0]], p => [2 - p[1], 2 - p[0]]];
+  tf.forEach((f, k) => {
+    const pts = shape.map(f);
+    const mx = Math.min(...pts.map(p => p[0])), my = Math.min(...pts.map(p => p[1]));
+    const ox = 14 + k * 86, oy = 20;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) s += `<rect class="dg-box k-dim" x="${ox + i * 22}" y="${oy + j * 22}" width="20" height="20" rx="3"/>`;
+    pts.forEach(p => { s += `<rect class="dg-box ${k === 0 ? "k-acc" : ""}" x="${ox + (p[0] - mx) * 22}" y="${oy + (2 - (p[1] - my)) * 22}" width="20" height="20" rx="3"/>`; });
+  });
+  s += T(14, 112, "the same shape under the 8 symmetries, each translated to the corner: the smallest bitboard is its key", "dg-lbl");
+  svg("d-sym", 720, 125, s, "the 8 symmetries");
+})();
+
+/* 5 GPU */
+(function () {
+  let s = "";
+  s += B(10, 20, 170, 50, "seeds (CPU)", ["single-region states"], "");
+  s += A(180, 45, 220, 45);
+  s += B(220, 10, 220, 70, "descent N → 1 (GPU)", ["1 thread per state: children,", "normalised, canonical; sort, unique"], "k-w");
+  s += A(440, 45, 480, 45);
+  s += B(480, 10, 230, 70, "ascent 1 → N (GPU)", ["1 thread per state: max over moves", "of 1 + value(child) (binary search)"], "k-acc");
+  s += T(220, 104, "layer n only needs the layers below: a move fills one square", "dg-lbl");
+  svg("d-gpu", 720, 115, s, "the GPU table");
+})();
+
+const rerender = () => (window.__rerender || []).forEach(f => { try { f(); } catch (e) { /* ignore */ } });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender); } catch (e) { /* old browsers */ }
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+

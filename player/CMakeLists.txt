@@ -4,10 +4,10 @@ set(PLAYER_SOURCES
     heuristic.cpp basic_minmax_player.cpp transposition_table.cpp
     heuristic_weights_learner.cpp player.cpp
     minmax_player.cpp minmax_player2.cpp minmax_nnue_player.cpp minmax_nnue_quantized_player.cpp yolah_features.cpp
-    minmax_nnue_baseline_player.cpp minmax_nnue_dev_player.cpp endgame_solver.cpp search_table.cpp
+    minmax_nnue_baseline_player.cpp minmax_nnue_dev_player.cpp endgame_solver.cpp solo_region.cpp search_table.cpp
     features_net_player.cpp
     alphazero_mcts.cpp alphazero_mcts_player.cpp alphazero_selfplay.cpp
-    hybrid_player.cpp leaf_minimax.cpp
+    hybrid_player.cpp leaf_minimax.cpp solver_player.cpp
 )
 
 # Add AlphaZero player if CUDA is enabled

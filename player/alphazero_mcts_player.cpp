@@ -55,6 +55,7 @@ az::SearchParams AlphaZeroMCTSPlayer::search_params(const json& j) {
     p.temperature_cutoff = j.value("temperature cutoff", p.temperature_cutoff);
     p.score_utility      = j.value("score utility", p.score_utility);
     p.score_scale        = j.value("score scale", p.score_scale);
+    p.regions            = j.value("regions", p.regions);
     p.reuse_tree         = j.value("reuse tree", true);
     p.seed               = j.value("seed", uint64_t(0));
     return p;

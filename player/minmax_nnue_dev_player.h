@@ -404,6 +404,10 @@ struct MinMaxNNUE_DevOptions {
     int  split_solve = 0;                // ["split solve"] 1 once no region of free squares is reached by both sides: the exact value (each side's longest harvest, solved exactly)
     int  split_max_free = 36;            // ["split max free"] 
     int  split_budget = 200000;          // ["split budget"]   nodes per harvest problem
+    int  solo = 0;                       // ["solo"] 1 the harvests ("reserve", "split solve") by the cluster solver of
+                                         //   player/solo_region.h (memory kept between moves, canonical up to the 8
+                                         //   symmetries, early exit on a full fill) instead of harvest_exact (a new memo
+                                         //   per call); same values, faster
     int  pocket = 0;                     // ["pocket"] 2 one move per private region (only we reach it) at non-PV nodes, the others pruned
     int  pocket_depth = 3;               // ["pocket depth"] 
     int  qs = 0;                         // ["qs"] 3 quiescence: 1 tension moves (an opponent piece left with <= 1 free neighbour, or a move of our piece with <= 2) with stand pat; 2 mobility, no stand pat: a side with <= "qs moves" moves plays them all
@@ -620,6 +624,8 @@ private:
     };
     const size_t nb_threads;
     std::vector<std::unique_ptr<Worker>> workers;
+    // "solo": one cluster solver per thread, kept between moves (the Workers are reset).
+    std::vector<std::unique_ptr<solo::Solver>> solos;
 
     struct RootMove {
         Move     move;
@@ -636,6 +642,7 @@ private:
     struct Search {
         int     id      = 0;      // thread number, 0 = the main thread
         Worker* w       = nullptr;
+        solo::Solver* solo = nullptr;     // "solo": the cluster solver of this thread
         uint64_t nb_evals = 0, nb_eval_hits = 0;
         // Aspiration statistics (search_bench): root attempts, failed ones,
         // fail highs right after a fail low, nodes spent in failed attempts.
@@ -715,6 +722,7 @@ private:
     int  raw_network_value(const Yolah& yolah, Search& s);
     void update_accumulator(const int16_t* in, int16_t* out, uint8_t player, Move m, NNUE_Persp::RefreshCache* cache) const;
     int  negamax(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);
+    int  harvest(const Search& s, uint64_t pieces, uint64_t region) const;   // "solo" or harvest_exact
     int  negamax_fly(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);   // U: the stronger reply
     int  fly_static(Yolah& yolah, Search&, uint64_t hash, int jumps, bool ordinary_only);
     int  negamax_nohole(Yolah& yolah, Search&, uint64_t hash, int alpha, int beta, int depth);   // U (D)

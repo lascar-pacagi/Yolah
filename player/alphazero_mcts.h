@@ -200,6 +200,11 @@ struct SearchParams {
     // 0 = off (pure win/draw/loss).
     float    score_utility    = 0.0f;
     float    score_scale      = 10.0f;
+    // "regions": a leaf where no region of free squares is contested any more is
+    // treated as a finished game: each side will make exactly its private
+    // reserve of moves (player/solo_region.h), so the final difference is known
+    // and the exact value replaces the network's (the node is never expanded).
+    bool     regions          = false;
 
     // ── misc ──
     bool     reuse_tree       = true;
@@ -308,6 +313,8 @@ private:
     void  backup(const PathStep* path, size_t length, float leaf_value);
     void  undo_pending(const PathStep* path, size_t length);
     float terminal_value(const Yolah& state) const;
+    // A finished game, or (regions) one whose result is settled: nothing contested.
+    bool settled(const Yolah& state) const;
     // result
     SearchResult make_result(const Yolah& state, double seconds, uint64_t sims,
                              uint64_t collisions, Worker& w) const;

@@ -38,6 +38,7 @@ MinMaxNNUE_DevPlayer::MinMaxNNUE_DevPlayer(uint64_t microseconds, size_t tt_size
       nnue_q_parameters_filename(nnue_q_parameters_filename), options(options), verbose(verbose),
       nb_threads(std::max<size_t>(1, nb_threads)) {
     for (size_t i = 0; i < this->nb_threads; i++) workers.push_back(std::make_unique<Worker>());
+    for (size_t i = 0; i < this->nb_threads; i++) solos.push_back(std::make_unique<solo::Solver>());
     if (NNUE_Persp::is_persp_file(nnue_q_parameters_filename))
         persp = std::make_unique<NNUE_Persp>(nnue_q_parameters_filename);
     else
@@ -189,6 +190,7 @@ MinMaxNNUE_DevPlayer::Result MinMaxNNUE_DevPlayer::search(const Yolah& yolah, ui
         auto s = std::make_unique<Search>();
         s->id = int(i);
         s->w = workers[i].get();
+        s->solo = solos[i].get();
         // The root's accumulator: computed from scratch, the only one that is.
         if (options.lazy_accumulator) {
             net_init(yolah, s->accs[yolah.nb_plies()]);
@@ -709,6 +711,12 @@ static int harvest_exact(uint64_t pieces, uint64_t region, int budget) {
     int64_t b = budget;
     return harvest_exact_rec(pieces, region, memo, b);
 }
+// The longest harvest of `pieces` in `region`: by the cluster solver ("solo") or
+// by harvest_exact; −1 beyond the budget.
+int MinMaxNNUE_DevPlayer::harvest(const Search& s, uint64_t pieces, uint64_t region) const {
+    if (options.solo && s.solo) return s.solo->value_budget(region, pieces, options.split_budget);
+    return harvest_exact(pieces, region, options.split_budget);
+}
 // 1: the exact final difference (side to move) once the sides are separated;
 // false if they are not, or beyond the budget (search_bench checks it).
 bool split_score(const Yolah& yolah, int budget, int& diff) {
@@ -904,8 +912,8 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
         const uint64_t free = yolah.free_squares();
         const uint64_t ru = region_reach(yolah.bitboard(us), free), rt = region_reach(yolah.bitboard(them), free);
         if ((ru & rt) == 0) {
-            const int lu = harvest_exact(yolah.bitboard(us), ru, options.split_budget);
-            const int lt = lu < 0 ? -1 : harvest_exact(yolah.bitboard(them), rt, options.split_budget);
+            const int lu = harvest(s, yolah.bitboard(us), ru);
+            const int lt = lu < 0 ? -1 : harvest(s, yolah.bitboard(them), rt);
             if (lu >= 0 && lt >= 0) {
                 const int d = yolah.score(us) + lu - lt;
                 const int v = d > 0 ? WIN + d : d < 0 ? d - WIN : 0;
@@ -1645,14 +1653,14 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
                 if (nb & comp) { pieces |= q; if (nb & ~comp) sealed = false; }
             }
             if (!sealed || !pieces) continue;
-            const int h = harvest_exact(pieces, comp, options.split_budget);
+            const int h = harvest(s, pieces, comp);
             if (h <= 0) continue;
             Move keep = Move::none();
             for (uint64_t b = pieces; b && keep == Move::none();) {
                 const Square from = pop_lsb(b);
                 for (uint64_t t = attacks_bb(from, occupied) & comp; t;) {
                     const Square to = pop_lsb(t);
-                    if (harvest_exact(pieces ^ square_bb(from) ^ square_bb(to), comp & ~square_bb(to), options.split_budget) == h - 1) {
+                    if (harvest(s, pieces ^ square_bb(from) ^ square_bb(to), comp & ~square_bb(to)) == h - 1) {
                         keep = Move(from, to);
                         break;
                     }
@@ -3708,6 +3716,7 @@ json MinMaxNNUE_DevPlayer::config() {
     j["split solve"] = options.split_solve;
     j["split max free"] = options.split_max_free;
     j["split budget"] = options.split_budget;
+    j["solo"] = options.solo;
     j["pocket"] = options.pocket;
     j["pocket depth"] = options.pocket_depth;
     j["qs"] = options.qs;

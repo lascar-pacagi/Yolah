@@ -16,6 +16,7 @@
 #include "features_net_player.h"
 #include "alphazero_mcts_player.h"
 #include "hybrid_player.h"
+#include "solver_player.h"
 #ifdef ENABLE_CUDA
 #include "alphazero_player.h"
 #endif
@@ -542,6 +543,7 @@ unique_ptr<Player> Player::create(const json& j) {
              options.split_solve = j.value("split solve", options.split_solve);
              options.split_max_free = j.value("split max free", options.split_max_free);
              options.split_budget = j.value("split budget", options.split_budget);
+             options.solo = j.value("solo", options.solo);
              options.pocket = j.value("pocket", options.pocket);
              options.pocket_depth = j.value("pocket depth", options.pocket_depth);
              options.qs = j.value("qs", options.qs);
@@ -680,6 +682,13 @@ unique_ptr<Player> Player::create(const json& j) {
             [](const json& j) {
                 // Keys are validated by the constructor (see alphazero_mcts_player.h).
                 return make_unique<AlphaZeroMCTSPlayer>(j);
+            }
+        },
+        {
+            "SolverPlayer",
+            [](const json& j) {
+                // The exact endgame solver, with a fallback player (see solver_player.h).
+                return make_unique<SolverPlayer>(j);
             }
         },
         {

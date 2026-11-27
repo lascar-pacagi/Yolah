@@ -14,6 +14,9 @@
   //                other relative paths to the repository)
   //   torch overrides   the same, only when the application is built with libtorch
   //   missing hint shown when the weights file does not exist
+  //   puzzles only true: offered as a puzzle's opponent only, not in the new-game screen
+  //   fallback overrides  for a player built on another (SolverPlayer's "fallback": a .cfg
+  //                file name, read and embedded), keys replacing those of that .cfg
 //   params       what the player may change before a game (button "Régler"): a key of the
 //                configuration, a label, an optional help line and unit, the values offered
 //                ("threads": 1 to the cores of the computer; booleans: no / yes); the default is
@@ -55,6 +58,9 @@
       "config": "search_study/dev_u9_spsa.cfg", "overrides": { "tt size": 128, "nb threads": 4 },
       "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "tt size", "label": "Table de transposition", "unit": "Mo", "values": [16, 32, 64, 128, 256, 512, 1024], "help": "mémoire des positions déjà vues" } ],
       "description": "Le minimax le plus travaillé : PVS, fenêtres d'aspiration adaptatives, réductions, élagage, solveur de fin de partie, et un réseau NNUE vu du camp au trait (une première couche par phase, 8 têtes de phase, caractéristiques d'espace). Il ordonne ses coups selon la réponse au dernier coup adverse (historique de continuation, interception) et selon l'espace que ses pièces atteignent ensemble, et compte les poches qu'il est seul à pouvoir remplir comme des réserves de coups. Ses constantes de recherche ont été réglées par SPSA, sur 100 000 parties contre lui-même." },
+    { "id": "solver", "name": "Solveur exact", "family": "fin de partie calculée jusqu'au bout", "elo": 3570, "sprite": "fig_sentinel",
+      "config": "solver_player.cfg", "time factor": 3, "puzzles only": true, "fallback overrides": { "tt size": 128, "nb threads": 4 },
+      "description": "Quand il reste au plus 36 cases libres, il calcule la partie jusqu'à la fin, coup par coup, et joue un coup qui lui donne le meilleur score final possible : contre lui, un puzzle ne se gagne pas par chance, il faut la solution. Avant, ou si le calcul ne finit pas à temps (3 fois le temps choisi), c'est le Minimax NNUE dev qui joue." },
     { "id": "resnet", "name": "MCTS ResNet", "family": "MCTS + réseau convolutif", "elo": 3600, "sprite": "fig_android",
       "config": "az_vs_nnue/resnet_supervised.cfg", "params": [ { "key": "nb threads", "label": "Cœurs (threads)", "values": "threads", "help": "calculs en parallèle" }, { "key": "batch size", "label": "Positions par lot", "values": [8, 16, 32, 64, 128], "help": "évaluées ensemble par le réseau" } ],
       "description": "Recherche Monte Carlo guidée par un réseau convolutif résiduel (30 blocs de 256 filtres) qui estime la position et les coups probables. Sur GPU avec libtorch ; sur CPU sinon, bien plus lent, donc plus faible à temps égal. Il cherche d'abord la victoire (voir MCTS), mais quand sa recherche voit la fin de la partie, il préfère aussi gagner par plus de points.",

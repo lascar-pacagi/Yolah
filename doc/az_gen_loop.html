@@ -166,7 +166,7 @@ details.mobile-toc ol { columns: 1; }
 <ol>
 <li><strong>selfplay</strong>: az<sub>G−1</sub> plays games against itself with the MCTS search until 12.5 M positions are recorded. Every move is recorded. Positions with at most 22 free squares get the solver's exact result.</li>
 <li><strong>train</strong>: az<sub>G−1</sub> trains for 10 epochs on these 12.5 M positions plus 37.5 M positions drawn from the pool, then becomes az<sub>G</sub>.</li>
-<li><strong>eval</strong>: az<sub>G</sub> plays against az<sub>G−1</sub> and against az<sub>0</sub>.</li>
+<li><strong>eval</strong>: az<sub>G</sub> plays 2000 games against az<sub>0</sub>.</li>
 <li><strong>next</strong>: submits generation G + 1 as soon as az<sub>G</sub> exists, while the evaluation is still playing.</li>
 </ol>
 <p>Generation 0 is ResNet<sub>1</sub> of the distillation loop (section 7), which beat its predecessor by +22 Elo.</p>
@@ -217,7 +217,8 @@ details.mobile-toc ol { columns: 1; }
 <tr><td><code>EPOCHS</code>, <code>LR</code></td><td class="num-r">10, 5e-5</td><td>epochs of a training, peak learning rate</td></tr>
 <tr><td><code>Q_WEIGHT</code></td><td class="num-r">0</td><td>value target (1 − q) · z + q · root_q on non-exact rows (0: z alone)</td></tr>
 <tr><td><code>FAST_POLICY_WEIGHT</code></td><td class="num-r">0</td><td>weight of the fast searches' rows in the policy loss</td></tr>
-<tr><td><code>EVAL_GAMES</code>, <code>EVAL_SECONDS</code></td><td class="num-r">400, 1</td><td>games of each match, seconds per move</td></tr>
+<tr><td><code>EVAL_GAMES</code>, <code>EVAL_TASKS</code>, <code>EVAL_SECONDS</code></td><td class="num-r">2000, 5, 1</td><td>games of the evaluation match, GPUs sharing them, seconds per move</td></tr>
+<tr><td><code>EVAL_REF</code></td><td class="num-r">0</td><td>the opponent generation (<code>EVAL_REF=2</code>: az<sub>G</sub> against az<sub>2</sub>)</td></tr>
 <tr><td><code>START_PT</code>, <code>START_TS</code></td><td class="num-r">ResNet<sub>1</sub></td><td>generation 0: <code>~/DistillLoop/round_001/resnet.{pt,ts}</code></td></tr>
 <tr><td><code>AUTO</code>, <code>MAX_GEN</code></td><td class="num-r">1, 20</td><td>submit the next generation automatically, up to generation 20</td></tr>
 <tr><td><code>GPU_EXCLUDE</code></td><td class="num-r">crn22</td><td>GPU nodes to avoid (crn22 refuses containers)</td></tr>
@@ -530,7 +531,15 @@ p_loss = (w * ce).sum() / w.sum().clamp_min(1e-6)
 <section id="s5">
 <h2><span class="num">5</span>Measuring the progress</h2>
 <div class="col">
-<p>After the training, two matches of the MCTS player with <code>alphazero_match.sh</code>, each on a GPU: az<sub>G</sub> against az<sub>G−1</sub> (task 0) and az<sub>G</sub> against az<sub>0</sub> (task 1, from generation 2 on). Each match is 400 games at 1 s per move, from the balanced openings of <code>config/openings/balanced.txt</code>, each opening played with both colours. The results go to <code>ROOT/matches.csv</code>, one line per match with the score and the Elo, and the games to <code>ROOT/evals/</code>. The match against the previous generation says whether the last generation still helped; the match against generation 0 adds up the generations.</p>
+<p>After the training, one match of the MCTS player with <code>alphazero_match.sh</code>: az<sub>G</sub> against az<sub>0</sub>, 2000 games at 1 s per move, from the balanced openings of <code>config/openings/balanced.txt</code>, each opening played with both colours. The games are split over a GPU array of 5 tasks of 400 games (the games of a task are played one after the other; each task shuffles the openings with its own seed). Each task writes one line to <code>ROOT/matches.csv</code> and its games to <code>ROOT/evals/</code>; <code>az_gen_loop.sh status</code> sums the lines of each pair. Why 2000 games against az<sub>0</sub> rather than 400 against az<sub>G−1</sub>: about 81 % of the games are draws, and 400 games could not tell two neighbouring generations apart (at 81 % draws, the 95 % interval is about ±15 Elo over 400 games and ±7 over 2000, for a gain of a few points per generation). Against a fixed opponent the gains add up. <code>EVAL_REF=K</code> plays against az<sub>K</sub> instead (a direct match with a neighbouring generation), and <code>EVAL_AFTER=JOBID</code> submits a lone evaluation after a given job.</p>
+<div class="tbl wide"><table>
+<thead><tr><th>Against az<sub>0</sub>, 1 s per move</th><th class="num-r">Games</th><th class="num-r">Elo</th><th class="num-r">95 % interval</th></tr></thead>
+<tbody>
+<tr><td>az<sub>1</sub></td><td class="num-r">400</td><td class="num-r">+8</td><td class="num-r">[−5, +21]</td></tr>
+<tr><td>az<sub>2</sub></td><td class="num-r">2000</td><td class="num-r">+11</td><td class="num-r">[+4, +17]</td></tr>
+<tr><td>az<sub>3</sub></td><td class="num-r">2000</td><td class="num-r">+3</td><td class="num-r">[−3, +10]</td></tr>
+</tbody></table></div>
+<p>Results as of 2026-11-26: the loop barely improves the network.</p>
 </div>
 </section>
 
@@ -545,7 +554,7 @@ p_loss = (w * ce).sum() / w.sum().clamp_min(1e-6)
 <tbody>
 <tr><td>selfplay</td><td>GPU array of 4 tasks, 12 CPUs, 64 GB, 7 days</td><td>–</td><td><code>gen_G/selfplay/*.bin</code></td></tr>
 <tr><td>train</td><td>1 GPU, 8 CPUs, 96 GB, 4 days</td><td>every selfplay task (afterok)</td><td><code>models/az_G.{pt,ts}</code>, <code>train_log.jsonl</code></td></tr>
-<tr><td>eval</td><td>GPU array of 2 tasks (1 for G = 1), 8 CPUs, 16 GB, 16 h</td><td>train</td><td><code>matches.csv</code>, <code>evals/</code></td></tr>
+<tr><td>eval</td><td>GPU array of 5 tasks (<code>EVAL_TASKS</code>), 8 CPUs, 16 GB, 16 h</td><td>train</td><td><code>matches.csv</code>, <code>evals/</code></td></tr>
 <tr><td>next</td><td>CPU, 1 CPU, 10 min</td><td>train</td><td>submits generation G + 1</td></tr>
 </tbody></table></div>
 <div class="col">
@@ -735,7 +744,7 @@ function svg(id, w, h, body, label) {
   s += A(560, 246, 600, 246);
   s += B(600, 214, 250, 64, "az_G", ["models/az_G.{pt,ts}"], "k-acc");
   s += A(725, 214, 725, 184, "dash");
-  s += B(600, 120, 250, 64, "3. eval (GPU)", ["az_G vs az_G−1 and vs az_0,", "400 games, 1 s per move"], "k-dim");
+  s += B(600, 120, 250, 64, "3. eval (5 GPUs)", ["az_G vs az_0,", "2000 games, 1 s per move"], "k-dim");
   s += P("M850,246 L870,246 L870,8 L140,8 L140,19", "acc");
   s += T(420, 4 + 18, "4. next: generation G + 1 plays with az_G", "dg-lbl");
   svg("d-gen", 890, 290, s, "one generation of the loop");
@@ -851,7 +860,7 @@ function svg(id, w, h, body, label) {
   s += A(160, 95, 200, 95);
   s += B(200, 70, 130, 50, "train", "GPU, 4 days", "k-w");
   s += A(265, 120, 265, 170);
-  s += B(195, 170, 140, 44, "eval", "GPU array 0–1", "k-dim");
+  s += B(195, 170, 140, 44, "eval", "GPU array 0–4", "k-dim");
   s += A(330, 95, 380, 95, "acc");
   s += B(380, 70, 170, 50, "next", ["submits G + 1"], "k-acc");
   s += P("M465,70 L465,30 L85,30 L85,69", "acc");

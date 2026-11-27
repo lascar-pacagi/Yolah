@@ -688,7 +688,7 @@ if (nb > 0) {
     // ── 3. expand ... ──
     for (size_t i = 0; i < nb; i++) {
         Worker::Leaf& leaf = w.leaves[i];
-        const nn::Result& r = w.results[i];
+        nn::Result& r = w.results[i];
         priors_from_logits(r, leaf.moves.size(), priors);
         cache->store(leaf.hash, leaf.moves.size(), r.value, priors);
         expand(*leaf.node, leaf.moves, priors, r.value);
@@ -701,6 +701,7 @@ if (nb > 0) {
     simulations.fetch_add(w.descents.size(), std::memory_order_relaxed);
 }
 </script>
+<div class="note"><strong>An optional leaf value.</strong> The search can take an <code>az::LeafValue</code> hook (<code>player/leaf_minimax.h</code>, campaign H2): when it is set, a leaf late in the game gets the value of a short <code>dev_u9_spsa</code> search instead of the network's, written into <code>r.value</code> before the cache, the expansion and the back-ups. Without the hook (the default, and the app) nothing changes.</div>
 
 <h3 id="s5-vloss"><span class="num">5.2</span>Virtual loss and collisions</h3>
 <div class="col">

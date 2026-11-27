@@ -1,0 +1,15 @@
+# Campaign U29 (2026-11-27, retrograde analysis project, step D for the dev player): the private regions
+# solved by the cluster solver of player/solo_region.h (memory kept between moves, canonical up to the 8
+# symmetries, early exit on a full fill) instead of harvest_exact (a new memo per call).
+#   u29_solo        = dev_u9_spsa + "solo": the reserves' harvests by the cluster solver. The same search
+#                     (bench depth 11: nodes x1.000, same value and move 209/209), time x0.96.
+#   u29_solo_split  = + "split solve" (U4 idea 1, U5 res_split −12): once no region is reached by both sides,
+#                     the exact value. With harvest_exact it cost time x1.39 on the bench (why it lost);
+#                     with the cluster solver x0.98 (nodes x0.99, same move 168/209: the values become exact).
+#   2000 games per line (1000 rounds, balanced book), one thread per player.
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-4 nnue/search_study.sh campaign_U29.txt
+# 1-2: at 0.2 s, 3-4: at 1 s
+u29_solo dev_u9_spsa 200000 1000 291
+u29_solo_split dev_u9_spsa 200000 1000 292
+u29_solo dev_u9_spsa 1000000 1000 293
+u29_solo_split dev_u9_spsa 1000000 1000 294

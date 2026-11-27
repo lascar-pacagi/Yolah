@@ -1,6 +1,7 @@
 // alphazero_mcts.cpp — see alphazero_mcts.h for the algorithm overview.
 #include "alphazero_mcts.h"
 #include "misc.h"
+#include "solo_region.h"
 #include "zobrist.h"
 #include <algorithm>
 #include <cmath>
@@ -124,9 +125,36 @@ namespace {
     }
 }
 
+namespace {
+// The free squares `pieces` can still reach (8-connected flood fill through free squares).
+uint64_t reach(uint64_t pieces, uint64_t free) {
+    constexpr uint64_t NOT_A = 0xfefefefefefefefeULL, NOT_H = 0x7f7f7f7f7f7f7f7fULL;
+    auto grow = [](uint64_t b) { const uint64_t row = b | ((b << 1) & NOT_A) | ((b >> 1) & NOT_H); return row | (row << 8) | (row >> 8); };
+    uint64_t r = grow(pieces) & free, prev = 0;
+    while (r != prev) { prev = r; r = grow(r) & free; }
+    return r;
+}
+// One cluster solver per thread, kept from search to search (its memory grows).
+thread_local solo::Solver tl_solo;
+}
+
+bool Search::settled(const Yolah& state) const {
+    if (state.game_over()) return true;
+    if (!prm.regions) return false;
+    const uint64_t free = state.free_squares();
+    return (reach(state.bitboard(Yolah::BLACK), free) & reach(state.bitboard(Yolah::WHITE), free)) == 0;
+}
+
 float Search::terminal_value(const Yolah& state) const {
     const auto [black, white] = state.score();
-    const int diff = (state.current_player() == Yolah::BLACK ? 1 : -1) * (int(black) - int(white));
+    int diff = (state.current_player() == Yolah::BLACK ? 1 : -1) * (int(black) - int(white));
+    if (prm.regions && !state.game_over()) {
+        // Settled: each side makes its whole private reserve, in any order.
+        const uint64_t free = state.free_squares();
+        const int us = state.current_player();
+        diff += tl_solo.value(reach(state.bitboard(us), free), state.bitboard(us))
+              - tl_solo.value(reach(state.bitboard(1 - us), free), state.bitboard(1 - us));
+    }
     const float outcome = diff > 0 ? 1.0f : (diff < 0 ? -1.0f : 0.0f);
     if (prm.score_utility <= 0.0f) return outcome;
     return (1.0f - prm.score_utility) * outcome + prm.score_utility * std::tanh(float(diff) / prm.score_scale);
@@ -543,7 +571,7 @@ void Search::run_worker(Worker& w, const Yolah& root_position) {
                     if (node->state.compare_exchange_strong(expected, EXPANDING, std::memory_order_acq_rel,
                                                             std::memory_order_acquire)) {
                         ++gathered_visits;
-                        if (state.game_over()) {
+                        if (settled(state)) {   // finished, or (regions) its result known
                             node->state.store(TERMINAL, std::memory_order_release);
                             backup(path, len, terminal_value(state));
                             simulations.fetch_add(1, std::memory_order_relaxed);

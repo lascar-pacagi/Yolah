@@ -16,8 +16,9 @@
 //
 //  Le vrai code est réparti dans deux fichiers :
 //    player/endgame_solver.{h,cpp}   le solveur (classe EndgameSolver), partagé
-//                                    avec l'auto-apprentissage AlphaZero et le
-//                                    joueur hybride (feuilles prouvées)
+//                                    avec l'auto-apprentissage AlphaZero, le
+//                                    joueur hybride (feuilles prouvées) et le
+//                                    joueur « Solveur exact » des puzzles
 //    app/yolah_app.cpp               PuzzleCheck et puzzle_check_start : le
 //                                    verdict, calculé dans un thread à part,
 //                                    avec un budget de temps (section
@@ -25,8 +26,18 @@
 //  Le solveur y a des options que l'éditeur n'utilise pas : la « règle du
 //  passe » (fausse pour les puzzles, voir plus bas), trois ordres de coups
 //  au choix, une taille de table, une limite de nœuds. Ici il ne reste que
-//  la configuration de l'éditeur : pas de règle du passe, ordre « le plus
-//  rapide d'abord », table de 2^22 entrées, force brute à ≤ 6 cases libres.
+//  la configuration de l'éditeur pour l'objectif « points » : pas de règle
+//  du passe, ordre « le plus rapide d'abord », force brute à ≤ 6 cases
+//  libres, et UN seul thread.
+//  Ce que cette copie ne reprend pas (voir player/endgame_solver.h) :
+//    • les objectifs à cibles (EndgameGoal : récolter des cibles, atteindre
+//      une cible en premier) : seul le gain d'un coup change ;
+//    • la recherche sur plusieurs threads (EndgameSolver::split, « young
+//      brothers wait ») : l'éditeur prouve le verdict sur 8 threads au plus
+//      (≈ 5 fois plus vite), avec une table partagée sans verrou (clé XOR
+//      donnée), et compte les coups clés en parallèle, un solveur par
+//      thread. Avec un seul thread, le solveur du joueur visite toujours les
+//      mêmes nœuds que celui-ci.
 //  Le thread et le budget de temps restent dans l'app (ce sont de
 //  l'interface) ; ici, l'arrêt se demande par un drapeau `stop`.
 //
@@ -138,9 +149,10 @@
 //      reste ainsi en gagné/nul/perdu (rapide).
 //    • Faisable : le joueur gagne contre TOUTE défense (preuve).
 //      Impossible : la meilleure défense l'en empêche (preuve).
-//      Inconnu : trop de cases libres (> MAX_FREE = 36 : on n'essaie même
-//      pas), ou arrêt avant la fin (budget de 10 s de l'app, bouton
-//      « Arrêter »).
+//      Inconnu : trop de cases libres (> MAX_FREE = 36 ici : on n'essaie même
+//      pas), ou arrêt avant la fin (bouton « Arrêter », budget de l'app).
+//      L'app a depuis relevé ces limites : 44 cases libres et 10 minutes, la
+//      preuve sur plusieurs threads (voir doc/final_ybwc.h).
 //    • Quand le joueur a le trait, on compte ses COUPS CLÉS : les coups après
 //      lesquels l'objectif reste atteint. Un bon puzzle n'en a souvent qu'un.
 //      (Chaque coup demande une recherche de plus ; la table, partagée,

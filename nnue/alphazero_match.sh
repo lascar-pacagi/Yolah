@@ -78,6 +78,7 @@ if [[ -n "${B_TS:-}" ]]; then NAME_B="${B_NAME:-B}"; fi
 [[ "${NAME_A}" != "${NAME_B}" || -z "${A_TS:-}${B_TS:-}" ]] || { echo "ERROR: A_NAME and B_NAME must differ"; exit 1; }
 SET_ARGS=()
 if [[ -n "${SET_A:-}" ]]; then IFS=';' read -ra KVS <<< "${SET_A}"; for kv in "${KVS[@]}"; do SET_ARGS+=(--set-a "${kv}"); done; fi
+if [[ -n "${SET_B:-}" ]]; then IFS=';' read -ra KVS <<< "${SET_B}"; for kv in "${KVS[@]}"; do SET_ARGS+=(--set-b "${kv}"); done; fi
 LABEL_A="${NAME_A}${TAG:++${TAG}}"   # the name of A in the results
 
 echo "════════════════════════════════════════════════════════════════"
@@ -85,6 +86,7 @@ echo "  Job        : ${JOB} on $(hostname), GPU ${CUDA_VISIBLE_DEVICES:-?}"
 echo "  Work dir   : ${WORK_DIR}"
 echo "  Match      : A = ${LABEL_A} (${A_TS:-${A}})  vs  B = ${NAME_B} (${B_TS:-${B}})"
 [[ -n "${SET_A:-}" ]] && echo "  A's settings: ${SET_A}"
+[[ -n "${SET_B:-}" ]] && echo "  B's settings: ${SET_B}"
 if [[ "${BOOK}" == "none" ]]; then BOOK_ARGS=(); OPENINGS="${OPENING_PLIES}-ply random openings"
 else BOOK_ARGS=(--book "${BOOK}"); OPENINGS="openings of ${BOOK}"; fi
 echo "  Games      : ${GAMES} (${OPENINGS}, both colours), ${SECONDS_PER_MOVE} s/move"

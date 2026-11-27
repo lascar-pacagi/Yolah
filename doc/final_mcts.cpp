@@ -708,9 +708,10 @@ void Search::root_play_values(std::vector<ChildStat>& children) const {
     for (const ChildStat& c : children) total += static_cast<float>(c.visits);
     for (ChildStat& c : children) c.play_value = static_cast<float>(c.visits);
 
-    // Le « meilleur » b : le plus de visites, en en décomptant une (la dernière
-    // peut être une valeur aberrante : v·(v − 1)/v = v − 1 pour v ≥ 1), plus
-    // 2 × l'a priori pour départager. (KataGo : « non-LCB best ».)
+    // Le « meilleur » b : le coup qui maximise max(0, v − 1) + 2·P (écrit ici
+    // v·max(0, v − 1)/max(1, v) comme dans KataGo) — le plus visité, départagé
+    // par l'a priori P, mais où v = 1 compte comme 0 afin qu'une unique visite
+    // ne suffise pas à détrôner un coup de meilleur a priori. (« non-LCB best ».)
     size_t best = 0;
     {
         float best_goodness = -1e30f;

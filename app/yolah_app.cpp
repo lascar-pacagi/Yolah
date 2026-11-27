@@ -116,6 +116,7 @@
 #include <bit>
 #include <chrono>
 #include <condition_variable>
+#include <unordered_set>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -437,21 +438,25 @@ public:
     Yolah start, pos;
     std::vector<Move> history;
 
+    // A game stopped before its end (a puzzle whose outcome is settled: PuzzleOutcome).
+    bool stopped = false;
     void reset(const Yolah& s = Yolah()) {
         start = pos = s;
         history.clear();
+        stopped = false;
     }
     void play(Move m) {
         pos.play(m);
         history.push_back(m);
     }
     bool undo() {
+        stopped = false;
         if (history.empty()) return false;
         pos.undo(history.back());
         history.pop_back();
         return true;
     }
-    bool over() const { return pos.game_over(); }
+    bool over() const { return stopped || pos.game_over(); }
     int to_move() const { return pos.current_player(); }
     int score(int side) const {
         auto [b, w] = pos.score();
@@ -508,6 +513,7 @@ struct AiSpec {
     std::string reason;   // why it is not available
     std::vector<AiParam> params;   // what the player may set (AiParam)
     bool threads_set = false;      // "nb threads" chosen by the player: not capped
+    bool puzzles_only = false;     // "puzzles only": an opponent of the puzzles, not offered for a game (the exact solver)
 };
 
 int hardware_threads() { return std::max(2u, std::thread::hardware_concurrency()); }
@@ -627,6 +633,7 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
         if (e.contains("elo by depth") && e["elo by depth"].is_object()) s.elo_by = e["elo by depth"];
         s.time_factor = jnum(e, "time factor", 1);
         s.random_moves = jnum(e, "random moves", 0);
+        s.puzzles_only = e.value("puzzles only", false);
         s.config = load_json(g_paths.root / "config" / s.config_file);
         if (!s.config.is_object()) {
             s.reason = tr("configuration introuvable : config/") + s.config_file;
@@ -638,6 +645,17 @@ std::vector<AiSpec> load_roster(const fs::path& file) {
                 for (auto& [k, v] : e[key].items()) s.config[k] = v;
         };
         apply("overrides");
+        // A player built on another one (SolverPlayer's "fallback"): that configuration,
+        // read from its file and embedded, with its network path resolved like the others.
+        if (s.config.contains("fallback") && s.config["fallback"].is_string()) {
+            json f = load_json(g_paths.root / "config" / s.config["fallback"].get<std::string>());
+            if (f.is_object()) {
+                if (f.contains("weights") && f["weights"].is_string()) f["weights"] = resolve_engine_path(f["weights"].get<std::string>()).string();
+                if (e.contains("fallback overrides") && e["fallback overrides"].is_object())
+                    for (auto& [k, v] : e["fallback overrides"].items()) f[k] = v;
+                s.config["fallback"] = f;
+            } else s.config.erase("fallback");
+        }
 #ifdef YOLAH_APP_TORCH
         apply("torch overrides");
 #endif
@@ -3339,7 +3357,12 @@ struct Input {
     std::vector<std::pair<std::string, std::string>> files;   // (purpose, path)
     std::vector<SDL_Keycode> keys;   // keys pressed this frame
     std::string text;                // characters typed this frame (UTF-8, SDL_EVENT_TEXT_INPUT)
-    int backspaces = 0;              // Backspace presses this frame, key repeats included
+    int clicks = 1;                  // the left press of this frame: 1 single, 2 double, 3 triple click (SDL counts them)
+    // The editing keys of the text fields this frame, key repeats included, with
+    // the modifiers held: ← → Home End Backspace Delete, and with Ctrl (or ⌘):
+    // A C X V Z Y.
+    struct EditKey { SDL_Keycode key; SDL_Keymod mod; };
+    std::vector<EditKey> edit_keys;
     bool key(SDL_Keycode k) const { return std::find(keys.begin(), keys.end(), k) != keys.end(); }
     void eat(SDL_Keycode k) { keys.erase(std::remove(keys.begin(), keys.end(), k), keys.end()); }
 };
@@ -3362,6 +3385,15 @@ public:
     float dt = 0;
     bool hovering = false;    // a clickable widget is under the mouse (hand cursor)
     std::string focus;        // the text field being typed in ("" = none)
+    // The focused text field's editing state: the caret and the other end of the
+    // selection (bytes, at UTF-8 character boundaries; anchor == caret: no
+    // selection), a drag selecting with the mouse, and its undo / redo history.
+    size_t caret = 0, anchor = 0;
+    bool selecting = false;
+    struct TextState { std::string value; size_t caret; };
+    std::vector<TextState> undo_stack, redo_stack;
+    std::string history_of;   // the field the history belongs to
+    bool last_typed = false;  // the last change was typing (typing in a row is one undo step)
     bool blocked = false;     // a modal box is open: widgets outside it ignore the mouse
 
     float anim(const std::string& id, bool target, float speed = 14) {
@@ -3448,38 +3480,191 @@ public:
     // A one-line text field: click to type; Enter, Escape or a click elsewhere
     // to stop. SDL only sends typed text between SDL_StartTextInput and
     // SDL_StopTextInput (see SDL_AppIterate, which follows `focus`).
+    // A text field, edited as in any application:
+    //   mouse   a click puts the caret at the clicked character (with Shift: extends
+    //           the selection); dragging selects; a double click selects the word,
+    //           a triple click the whole text;
+    //   keys    ← → by character, with Ctrl by word, with Shift extending the
+    //           selection; Home / End; Backspace / Delete (with Ctrl: a word);
+    //           Ctrl+A selects all, Ctrl+C / X / V copy, cut, paste (the system
+    //           clipboard), Ctrl+Z / Y (or Ctrl+Shift+Z) undo and redo;
+    //   typing replaces the selection; Enter or Escape leaves the field.
     bool text_field(const std::string& id, Box b, std::string& value, const std::string& placeholder, float font = 17) {
         bool h = hover(b);
         if (h) hovering = true;
+        const float fs = font * s, ty = b.center().y - text.line_height(Font::Regular, fs) * 0.45f;
+        const float avail = b.w - 26 * s;
+        auto prev_char = [&](size_t k) { if (k == 0) return k; k--; while (k > 0 && (uint8_t(value[k]) & 0xC0) == 0x80) k--; return k; };
+        auto next_char = [&](size_t k) { if (k >= value.size()) return value.size(); k++; while (k < value.size() && (uint8_t(value[k]) & 0xC0) == 0x80) k++; return k; };
+        // A word character: a letter or digit (any non-ASCII byte counts as a letter).
+        auto word_at = [&](size_t k) { const unsigned char c = value[k]; return c >= 0x80 || std::isalnum(c) || c == '_'; };
+        auto prev_word = [&](size_t k) {   // start of the word before k (skipping the separators)
+            while (k > 0 && !word_at(prev_char(k))) k = prev_char(k);
+            while (k > 0 && word_at(prev_char(k))) k = prev_char(k);
+            return k;
+        };
+        auto next_word = [&](size_t k) {   // end of the word after k
+            while (k < value.size() && !word_at(k)) k = next_char(k);
+            while (k < value.size() && word_at(k)) k = next_char(k);
+            return k;
+        };
+        // The part of the text shown starts at `first`, as far right as needed for the caret to show.
+        auto first_shown = [&](size_t c) {
+            size_t first = 0;
+            while (first < c && text.width(Font::Regular, fs, value.substr(first, c - first)) > avail) first = next_char(first);
+            return first;
+        };
+        // The character boundary nearest to the mouse's x, the text shown from `first`.
+        auto index_at = [&](size_t first, float mx) {
+            size_t k = first;
+            while (k < value.size() && b.x + 12 * s + text.width(Font::Regular, fs, value.substr(first, next_char(k) - first))
+                                           - 0.5f * text.width(Font::Regular, fs, value.substr(k, next_char(k) - k)) < mx)
+                k = next_char(k);
+            return k;
+        };
+        const bool was = focus == id;
         if (in.pressed && !blocked) {
-            if (h) focus = id;
-            else if (focus == id) focus.clear();
+            if (h) {
+                focus = id;
+                if (history_of != id) { undo_stack.clear(); redo_stack.clear(); history_of = id; last_typed = false; }
+                const size_t first = was ? first_shown(std::min(caret, value.size())) : first_shown(value.size());
+                const size_t k = index_at(first, in.mouse.x);
+                const bool shift = SDL_GetModState() & SDL_KMOD_SHIFT;
+                if (in.clicks >= 3) { anchor = 0; caret = value.size(); selecting = false; }
+                else if (in.clicks == 2) {   // the word under the mouse (or the separators)
+                    size_t a = k, c = k;
+                    const bool w = k < value.size() ? word_at(k) : (k > 0 && word_at(prev_char(k)));
+                    while (a > 0 && word_at(prev_char(a)) == w) a = prev_char(a);
+                    while (c < value.size() && word_at(c) == w) c = next_char(c);
+                    anchor = a; caret = c; selecting = false;
+                } else {
+                    caret = k;
+                    if (!(shift && was)) anchor = k;
+                    selecting = true;
+                }
+            } else if (was) focus.clear();
         }
         const bool f = focus == id;
+        if (!in.down) selecting = false;
+        if (f && selecting && in.down)   // dragging: the caret follows the mouse, the anchor stays
+            caret = index_at(first_shown(std::min(caret, value.size())), in.mouse.x);
         bool changed = false;
         if (f) {
-            if (!in.text.empty()) { value += in.text; changed = true; }
-            for (int i = 0; i < in.backspaces && !value.empty(); i++) {
-                size_t k = value.size() - 1;
-                while (k > 0 && (uint8_t(value[k]) & 0xC0) == 0x80) k--;   // a whole UTF-8 character
-                value.erase(k);
+            caret = std::min(caret, value.size());
+            anchor = std::min(anchor, value.size());
+            auto sel_lo = [&] { return std::min(caret, anchor); };
+            auto sel_hi = [&] { return std::max(caret, anchor); };
+            // Before a change: the state goes to the undo history (typing in a row: once).
+            auto remember = [&](bool typing) {
+                if (!(typing && last_typed)) { undo_stack.push_back({value, caret}); if (undo_stack.size() > 200) undo_stack.erase(undo_stack.begin()); }
+                redo_stack.clear();
+                last_typed = typing;
+            };
+            auto erase_selection = [&] {
+                value.erase(sel_lo(), sel_hi() - sel_lo());
+                caret = anchor = sel_lo();
+            };
+            for (const Input::EditKey& e : in.edit_keys) {
+                const bool shift = e.mod & SDL_KMOD_SHIFT, ctrl = e.mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI);
+                const bool has_sel = caret != anchor;
+                auto move_to = [&](size_t k) { caret = k; if (!shift) anchor = k; };
+                switch (e.key) {
+                case SDLK_LEFT:
+                    if (has_sel && !shift && !ctrl) move_to(sel_lo());
+                    else move_to(ctrl ? prev_word(caret) : prev_char(caret));
+                    last_typed = false;
+                    break;
+                case SDLK_RIGHT:
+                    if (has_sel && !shift && !ctrl) move_to(sel_hi());
+                    else move_to(ctrl ? next_word(caret) : next_char(caret));
+                    last_typed = false;
+                    break;
+                case SDLK_HOME: move_to(0); last_typed = false; break;
+                case SDLK_END: move_to(value.size()); last_typed = false; break;
+                case SDLK_BACKSPACE:
+                case SDLK_DELETE:
+                    if (!has_sel) {   // select what the key removes: a character, or a word with Ctrl
+                        if (e.key == SDLK_BACKSPACE) anchor = ctrl ? prev_word(caret) : prev_char(caret);
+                        else anchor = ctrl ? next_word(caret) : next_char(caret);
+                    }
+                    if (caret != anchor) { remember(false); erase_selection(); changed = true; }
+                    break;
+                case SDLK_A: anchor = 0; caret = value.size(); break;
+                case SDLK_C:
+                case SDLK_X:
+                    if (has_sel) {
+                        SDL_SetClipboardText(value.substr(sel_lo(), sel_hi() - sel_lo()).c_str());
+                        if (e.key == SDLK_X) { remember(false); erase_selection(); changed = true; }
+                    }
+                    break;
+                case SDLK_V:
+                    if (char* clip = SDL_GetClipboardText()) {
+                        std::string t = clip;
+                        SDL_free(clip);
+                        std::replace(t.begin(), t.end(), '\n', ' ');   // one line
+                        t.erase(std::remove(t.begin(), t.end(), '\r'), t.end());
+                        if (!t.empty()) {
+                            remember(false);
+                            erase_selection();
+                            value.insert(caret, t);
+                            caret = anchor = caret + t.size();
+                            changed = true;
+                        }
+                    }
+                    break;
+                case SDLK_Z:
+                case SDLK_Y: {
+                    const bool redo = e.key == SDLK_Y || shift;
+                    auto& from = redo ? redo_stack : undo_stack;
+                    auto& to = redo ? undo_stack : redo_stack;
+                    if (!from.empty()) {
+                        to.push_back({value, caret});
+                        value = from.back().value;
+                        caret = anchor = std::min(from.back().caret, value.size());
+                        from.pop_back();
+                        changed = true;
+                    }
+                    last_typed = false;
+                    break;
+                }
+                default: break;
+                }
+            }
+            if (!in.text.empty()) {
+                remember(true);
+                erase_selection();
+                value.insert(caret, in.text);
+                caret = anchor = caret + in.text.size();
                 changed = true;
             }
             if (in.key(SDLK_RETURN) || in.key(SDLK_ESCAPE)) { focus.clear(); in.eat(SDLK_RETURN); in.eat(SDLK_ESCAPE); }
         }
         draw::round_box(b, 8 * s, hex(0x0f141c, 230));
         draw::round_frame(b, 8 * s, f ? 2 * s : 1, f ? pal::accent : pal::panel_border);
-        const float fs = font * s, ty = b.center().y - text.line_height(Font::Regular, fs) * 0.45f;
-        std::string shown = value;   // the end of the text when it is too long
-        while (!shown.empty() && text.width(Font::Regular, fs, shown) > b.w - 26 * s) {
-            shown.erase(0, 1);
-            while (!shown.empty() && (uint8_t(shown[0]) & 0xC0) == 0x80) shown.erase(0, 1);
-        }
-        if (value.empty() && !f) {
-            text.draw(Font::Regular, fs, placeholder, {b.x + 12 * s, ty}, pal::faint);
+        if (value.empty() && !f) {   // the placeholder, cut with "…" to the field's width
+            std::string ph = placeholder;
+            if (text.width(Font::Regular, fs, ph) > avail) {
+                while (!ph.empty() && text.width(Font::Regular, fs, ph + "\xE2\x80\xA6") > avail) {
+                    ph.pop_back();
+                    while (!ph.empty() && (uint8_t(ph.back()) & 0xC0) == 0x80) ph.pop_back();
+                    if (!ph.empty() && uint8_t(ph.back()) >= 0xC0) ph.pop_back();   // a lead byte left alone
+                }
+                ph += "\xE2\x80\xA6";
+            }
+            text.draw(Font::Regular, fs, ph, {b.x + 12 * s, ty}, pal::faint);
         } else {
-            float w = text.draw(Font::Regular, fs, shown, {b.x + 12 * s, ty}, pal::text);
-            if (f && std::fmod(now_seconds(), 1.0) < 0.55) draw::rect({b.x + 13 * s + w, ty + 2 * s, 2 * s, fs * 1.05f}, pal::accent);
+            const size_t c = f ? caret : value.size();
+            const size_t first = first_shown(c);
+            size_t last = c;   // after the caret: as much as fits
+            while (last < value.size() && text.width(Font::Regular, fs, value.substr(first, next_char(last) - first)) <= avail) last = next_char(last);
+            auto x_of = [&](size_t k) { k = std::clamp(k, first, last); return b.x + 12 * s + text.width(Font::Regular, fs, value.substr(first, k - first)); };
+            if (f && caret != anchor) {   // the selection, behind the text
+                const float x0 = x_of(std::min(caret, anchor)), x1 = x_of(std::max(caret, anchor));
+                draw::rect({x0, ty, x1 - x0, fs * 1.15f}, with_alpha(pal::accent, 0.35f));
+            }
+            text.draw(Font::Regular, fs, value.substr(first, last - first), {b.x + 12 * s, ty}, pal::text);
+            if (f && std::fmod(now_seconds(), 1.0) < 0.55)
+                draw::rect({x_of(c), ty + 2 * s, 2 * s, fs * 1.05f}, pal::accent);
         }
         return changed;
     }
@@ -3499,6 +3684,12 @@ public:
             draw::circle(a.center(), a.h * 0.4f, with_alpha(pal::accent, 0.15f + 0.5f * an));
             text.draw(Font::Black, font * 1.2f * s, k ? "\xE2\x80\xBA" : "\xE2\x80\xB9", {a.center().x, a.center().y - text.line_height(Font::Black, font * 1.2f * s) * 0.5f}, pal::text, Align::Center);
             if (h && in.released) idx = (idx + (k ? 1 : int(names.size()) - 1)) % int(names.size());
+        }
+        // The mouse wheel over the value scrolls the choices (long lists: the goals go up to 50).
+        if (hover(v) && in.wheel != 0 && !blocked) {
+            const int step = in.wheel > 0 ? -1 : 1, n = int(names.size());
+            idx = std::clamp(idx + step, 0, n - 1);
+            in.wheel = 0;
         }
         std::string shown = names[std::clamp(idx, 0, int(names.size()) - 1)];
         while (shown.size() > 3 && text.width(Font::Bold, font * s, shown) > vw - 2.4f * v.h) shown = shown.substr(0, shown.size() - 4) + "\xE2\x80\xA6";
@@ -3904,17 +4095,39 @@ const std::vector<std::pair<std::string, std::string>> HOLE_STYLES = {
     {"pit", "Selon le th\xC3\xA8me"}, {"lava", "Lave"}, {"water", "Eau"}, {"void", "Vide \xC3\xA9toil\xC3\xA9"}, {"ice", "Glace"}, {"bush", "Buisson"}};
 
 constexpr int MAX_BONUS = 20;   // a puzzle's starting points per side: 0..MAX_BONUS
+constexpr int MAX_END_DELAY = 3;   // a puzzle stops at most this many player moves after its outcome is settled
 struct Puzzle {
     std::string id, name = "Nouveau puzzle", text;
     std::array<char, 64> cells{};   // by square (a1 = 0): '.' free, '#' hole, 'B' black, 'W' white
     int to_move = BLACK, human = BLACK;
     std::string opponent = "dev";
-    int margin = 1;                 // win by at least this many points
+    int margin = 1;                 // win by at least this many points (Collect: targets)
+    // The goal: Points (the score, win by `margin`), Collect (take at least `margin`
+    // more targets than the opponent: a target is taken by the piece that lands on
+    // it; equal: a draw, not reached), First (be the first to land on a target;
+    // nobody: a draw). The target goals need the exact solver as opponent
+    // (puzzle_opponent): the other AIs play for points.
+    enum Goal { Points = 0, Collect = 1, First = 2 };
+    int goal = Points;
+    uint64_t targets = 0;           // the target squares (a1 = bit 0)
     // Points each side starts with (BLACK, WHITE): written into the position's
     // score, so every AI sees them at the end of the game and in its exact
     // endgame search (not in its mid-game evaluation, which reads the board only).
     std::array<int, 2> bonus{0, 0};
     int time_index = 1;             // index in TIMES
+    // When the game stops early (PuzzleOutcome): −1 = played to the end; k ≥ 0 =
+    // k moves of the player after the outcome is settled (0: at once).
+    // end_win: the goal is CERTAIN (no moves of either side can prevent it);
+    // end_loss: the goal is out of reach against the best defence.
+    int end_win = -1, end_loss = -1;
+    // The player can no longer move (blocked for good) and the opponent can no
+    // longer catch up (even filling every free square it can reach): won at once,
+    // rather than watching the opponent play alone to the end.
+    bool win_when_blocked = false;
+    // The goal's sentence under the introduction and in the game panel: "" = the
+    // automatic one (goal_text); goal_hidden: none at all.
+    std::string goal_custom;
+    bool goal_hidden = false;
     std::string theme, hole_style = "pit", sprite_black, sprite_white, background;
     // Drawings of the workshop placed on this puzzle's board.
     std::map<int, std::string> tiles;   // square → a "tile" drawing over it
@@ -3939,7 +4152,14 @@ json puzzle_to_json(const Puzzle& p) {
     return {{"name", p.name}, {"text", p.text}, {"board", rows}, {"to move", p.to_move == BLACK ? "black" : "white"},
             {"player", p.human == BLACK ? "black" : "white"}, {"opponent", p.opponent}, {"margin", p.margin},
             {"bonus black", p.bonus[BLACK]}, {"bonus white", p.bonus[WHITE]},
-            {"time index", p.time_index}, {"theme", p.theme}, {"hole style", p.hole_style},
+            {"goal", p.goal == Puzzle::Collect ? "collect" : p.goal == Puzzle::First ? "first" : "points"},
+            {"targets", [&] {
+                 json t = json::array();
+                 for (int sq = 0; sq < 64; sq++)
+                     if (p.targets >> sq & 1) t.push_back(std::string{char('a' + sq % 8), char('1' + sq / 8)});
+                 return t;
+             }()},
+            {"time index", p.time_index}, {"end on win", p.end_win}, {"end on loss", p.end_loss}, {"win when blocked", p.win_when_blocked}, {"goal text", p.goal_custom}, {"hide goal", p.goal_hidden}, {"theme", p.theme}, {"hole style", p.hole_style},
             {"sprite black", p.sprite_black}, {"sprite white", p.sprite_white}, {"background", p.background},
             {"tiles", [&] {
                  json t = json::object();
@@ -3972,6 +4192,21 @@ Puzzle puzzle_from_json(const json& j, const std::string& id) {
     p.bonus[BLACK] = std::clamp(int(jnum(j, "bonus black", 0)), 0, MAX_BONUS);
     p.bonus[WHITE] = std::clamp(int(jnum(j, "bonus white", 0)), 0, MAX_BONUS);
     p.time_index = std::clamp(int(jnum(j, "time index", 1)), 0, int(TIMES.size()) - 1);
+    {
+        const std::string g = jstr(j, "goal", "points");
+        p.goal = g == "collect" ? Puzzle::Collect : g == "first" ? Puzzle::First : Puzzle::Points;
+    }
+    if (j.contains("targets") && j["targets"].is_array())
+        for (auto& t : j["targets"])
+            if (t.is_string() && t.get<std::string>().size() == 2) {
+                const std::string k = t.get<std::string>();
+                if (k[0] >= 'a' && k[0] <= 'h' && k[1] >= '1' && k[1] <= '8') p.targets |= uint64_t(1) << ((k[1] - '1') * 8 + (k[0] - 'a'));
+            }
+    p.end_win = std::clamp(int(jnum(j, "end on win", -1)), -1, MAX_END_DELAY);
+    p.end_loss = std::clamp(int(jnum(j, "end on loss", -1)), -1, MAX_END_DELAY);
+    p.win_when_blocked = j.value("win when blocked", false);
+    p.goal_custom = jstr(j, "goal text");
+    p.goal_hidden = j.value("hide goal", false);
     p.theme = jstr(j, "theme");
     p.hole_style = jstr(j, "hole style", "pit");
     p.sprite_black = jstr(j, "sprite black");
@@ -4003,8 +4238,82 @@ std::string puzzle_problem(const Puzzle& p) {
     if (p.count('B') != 4) return strf("Il faut exactement 4 pions noirs (il y en a %d).", p.count('B'));
     if (p.count('W') != 4) return strf("Il faut exactement 4 pions blancs (il y en a %d).", p.count('W'));
     if (puzzle_position(p).game_over()) return "Personne ne peut bouger : la partie serait d\xC3\xA9j\xC3\xA0 finie.";
+    if (p.goal != Puzzle::Points && (p.targets & puzzle_position(p).free_squares()) == 0) return "Placez au moins une cible sur une case libre (pinceau Cible).";
     return "";
 }
+// The opponent of a puzzle: its AI, or the exact solver for the target goals
+// (the other AIs play for points and would not defend them).
+std::string puzzle_opponent(const Puzzle& p) { return p.goal == Puzzle::Points ? p.opponent : "solver"; }
+// The targets taken so far by each side: the destinations of the moves on a target.
+std::array<int, 2> targets_taken(const Puzzle& p, const Match& m) {
+    std::array<int, 2> t{0, 0};
+    for (size_t i = 0; i < m.history.size(); i++)
+        if (m.history[i] != Move::none() && (p.targets >> m.history[i].to_sq() & 1)) t[m.side_of(i)]++;
+    return t;
+}
+// The exact solver set for a puzzle's goal.
+EndgameSolver::Options puzzle_solver_options(const Puzzle& p, int tt_bits) {
+    EndgameSolver::Options opt;
+    opt.pass_rule = false;   // a puzzle's starting bonus can let a blocked player win
+    opt.tt_bits = tt_bits;
+    opt.goal = p.goal == Puzzle::Collect ? EndgameGoal::Collect : p.goal == Puzzle::First ? EndgameGoal::First : EndgameGoal::Points;
+    // The private regions as exact reserves (Points goal): on positions of 22 to 26
+    // free squares from real games, 2.5× faster on one thread, 4.4× on eight.
+    opt.regions = true;
+    opt.targets = p.targets;
+    return opt;
+}
+// Whether the player reaches the goal from y with perfect play on both sides:
+// > 0 reached, ≤ 0 not (0: a draw). taken: the targets taken so far (Collect).
+// "At least N more" is "more", the opponent given N − 1 more: then only the
+// sign is needed (win / draw / loss), far cheaper than the exact value.
+int puzzle_lead(EndgameSolver& solver, const Yolah& y0, const Puzzle& p, std::array<int, 2> taken, const std::atomic_bool* stop, bool& ok) {
+    const int human = p.human, stm = y0.current_player();
+    const int sign = stm == human ? 1 : -1;
+    EndgameSolver::Result r;
+    if (p.goal == Puzzle::Points) {
+        Yolah y = y0;
+        auto [b, w] = y.score();
+        (human == BLACK ? w : b) += uint16_t(p.margin - 1);
+        y.set_state(y.bitboard(BLACK), y.bitboard(WHITE), y.empty_bitboard(), b, w, y.nb_plies());
+        r = solver.solve(y, true, stop);
+    } else {
+        const int current = p.goal == Puzzle::Collect ? sign * (taken[human] - taken[1 - human] - (p.margin - 1)) : 0;
+        r = solver.solve(y0, true, stop, &current);
+    }
+    ok = r.complete;
+    return sign * r.value;
+}
+// The targets of a puzzle on a board: a red target on a square still free; once
+// taken, a small badge of the taker's colour in the square's corner (the square
+// holds its piece, then a hole). m: the game (who took what), nullptr in the editor.
+const Rgba TARGET_RED = hex(0xff4d4d);
+// force: also with the Points goal (the editor's "Cible" brush shows them).
+void draw_targets(const BoardView& board, const Puzzle& p, const Yolah& pos, const Match* m, bool force = false) {
+    if ((p.goal == Puzzle::Points && !force) || !p.targets) return;
+    const float q = board.sq();
+    for (int sq = 0; sq < 64; sq++) {
+        if (!(p.targets >> sq & 1)) continue;
+        int owner = -1;
+        if (m)
+            for (size_t i = 0; i < m->history.size(); i++)
+                if (m->history[i] != Move::none() && m->history[i].to_sq() == sq) owner = m->side_of(i);
+        const Box c = board.square(sq);
+        if (owner >= 0) {
+            const V2 b{c.right() - q * 0.17f, c.y + q * 0.17f};
+            draw::circle(b, q * 0.14f, hex(0x000000, 140));
+            draw::circle(b, q * 0.11f, owner == BLACK ? hex(0x1b1f27) : hex(0xf4f6fa));
+            draw::ring(b, q * 0.11f, q * 0.03f, TARGET_RED);
+        } else if (pos.free_squares() >> sq & 1) {
+            const V2 o = c.center();
+            draw::circle(o, q * 0.36f, hex(0x000000, 70));
+            draw::ring(o, q * 0.32f, q * 0.06f, TARGET_RED);
+            draw::ring(o, q * 0.19f, q * 0.05f, hex(0xffffff, 230));
+            draw::circle(o, q * 0.09f, TARGET_RED);
+        }
+    }
+}
+
 // ─── Puzzle verification (the editor's "Vérifier") ───────────────────────────
 // The exact endgame solver (player/endgame_solver.h) searches the puzzle to the
 // end of the game, in a thread of its own, within a time budget. Verdicts:
@@ -4019,9 +4328,68 @@ std::string puzzle_problem(const Puzzle& p) {
 // The solver's "pass rule" is switched off: it says that a player who must
 // pass has lost, which is only true when the scores come from normal play; a
 // puzzle's starting bonus can let a blocked player win.
+uint64_t reachable_free(const Yolah& y, int side);   // (below, with the early end)
+
+// The player's moves from `pos` (the player to move) after which the goal is
+// still reached with perfect play: 1 yes, 0 no, −1 no proof (stopped). taken:
+// the targets taken so far. One proof per move, independent of the others:
+// spread over the cores, each thread with its own solver (and table), taking
+// the next move until none is left. Used by "Vérifier" (the key moves) and by
+// the puzzle's "Indice". `moves` receives the moves, in the same order.
+std::vector<int> prove_moves(const Puzzle& p, const Yolah& pos, std::array<int, 2> taken, const std::atomic_bool* stop, Yolah::MoveList& moves) {
+    Yolah y = pos;
+    y.moves(moves);
+    const size_t n = moves.size();
+    std::vector<int> key(n, 0);
+    std::atomic<size_t> next{0};
+    auto prove = [&] {
+        EndgameSolver s(puzzle_solver_options(p, 21));
+        for (size_t i; (i = next.fetch_add(1)) < n;) {
+            const Move m = moves[i];
+            const bool hit = m != Move::none() && (p.targets >> m.to_sq() & 1) && p.goal != Puzzle::Points;
+            if (hit && p.goal == Puzzle::First) { key[i] = 1; continue; }   // on a target: won at once
+            Yolah c = y;
+            c.play(m);
+            std::array<int, 2> t = taken;
+            if (hit) t[p.human]++;
+            bool ok = false;
+            const int d = puzzle_lead(s, c, p, t, stop, ok);
+            key[i] = !ok ? -1 : d > 0;
+        }
+    };
+    const int nb_threads = std::clamp(hardware_threads() - 2, 1, int(std::max<size_t>(n, 1)));
+    std::vector<std::thread> helpers;
+    for (int k = 1; k < nb_threads; k++) helpers.emplace_back(prove);
+    prove();
+    for (auto& h : helpers) h.join();
+    return key;
+}
+
+// The puzzle's "Indice": the moves that still reach the goal from the position
+// the player has to play, proved in a thread (prove_moves), within a budget.
+struct PuzzleHint {
+    static constexpr double BUDGET = 20.0;   // seconds
+    uint64_t token = 0;                      // the position (GameState::token)
+    std::atomic_bool stop{false}, done{false};
+    std::vector<Move> keys;                  // written before `done`
+    bool unknown = false;                    // no proof in time, or too many free squares
+    bool shown = false;                      // the list has been told (notify)
+    std::thread worker, watchdog;
+    std::mutex m;
+    std::condition_variable cv;
+    ~PuzzleHint() {
+        { std::lock_guard lk(m); stop = true; }
+        cv.notify_all();
+        if (worker.joinable()) worker.join();
+        if (watchdog.joinable()) watchdog.join();
+    }
+};
+
 struct PuzzleCheck {
-    static constexpr int MAX_FREE = 36;          // more free squares: no attempt, "Inconnu"
-    static constexpr double BUDGET = 10.0;       // seconds
+    // A generous budget: in the editor, how long the proof takes tells how hard
+    // the puzzle is; a second click on the button ("Arrêter") stops it at any time.
+    static constexpr int MAX_FREE = 44;          // more free squares: no attempt, "Inconnu"
+    static constexpr double BUDGET = 600.0;      // seconds
     enum class Verdict { Running, Feasible, Impossible, Unknown };
     std::string key;                             // the puzzle as checked (puzzle_check_key)
     std::atomic_bool stop{false}, done{false};
@@ -4049,7 +4417,7 @@ struct PuzzleCheck {
 
 // What the verdict depends on: the board, who moves, who plays, the goal and the bonuses.
 std::string puzzle_check_key(const Puzzle& p) {
-    return std::string(p.cells.begin(), p.cells.end()) + strf("|%d|%d|%d|%d|%d", p.to_move, p.human, p.margin, p.bonus[BLACK], p.bonus[WHITE]);
+    return std::string(p.cells.begin(), p.cells.end()) + strf("|%d|%d|%d|%d|%d|%d|%llx", p.to_move, p.human, p.margin, p.bonus[BLACK], p.bonus[WHITE], p.goal, (unsigned long long)p.targets);
 }
 
 std::shared_ptr<PuzzleCheck> puzzle_check_start(const Puzzle& p, double now) {
@@ -4066,10 +4434,12 @@ std::shared_ptr<PuzzleCheck> puzzle_check_start(const Puzzle& p, double now) {
     }
     const int human = p.human, margin = p.margin;
     PuzzleCheck* j = job.get();   // the threads end before the job is destroyed (its destructor joins them)
-    j->worker = std::thread([j, pos, human, margin, free_sq] {
-        EndgameSolver::Options opt;
-        opt.pass_rule = false;
-        opt.tt_bits = 22;
+    j->worker = std::thread([j, pos, human, margin, free_sq, p] {
+        // The main proof shares its work between threads (EndgameSolver::split):
+        // measured ≈ 3× faster with 4 to 8 threads; beyond 8 the work searched in
+        // vain (after a winning move) grows faster than the cores it uses.
+        EndgameSolver::Options opt = puzzle_solver_options(p, 23);   // 2^23 entries of 16 bytes: 128 MB
+        opt.threads = std::clamp(hardware_threads() - 2, 1, 8);
         EndgameSolver solver(opt);
         auto finish = [&](PuzzleCheck::Verdict v, std::string t) {
             j->text = std::move(t);
@@ -4082,39 +4452,37 @@ std::shared_ptr<PuzzleCheck> puzzle_check_start(const Puzzle& p, double now) {
             finish(PuzzleCheck::Verdict::Unknown, el < PuzzleCheck::BUDGET - 0.2 ? std::string(tr("V\xC3\xA9rification arr\xC3\xAAt\xC3\xA9" "e."))
                                                                              : strf("Inconnu : pas de preuve en %.0f s (%d cases libres).", PuzzleCheck::BUDGET, free_sq));
         };
-        // Whether the player reaches the goal with perfect play on both sides: the
-        // sign of the final lead (player − opponent) once the opponent has been
-        // given margin − 1 more points (> 0: reached, 0: draw, < 0: lost).
-        auto lead = [&](const Yolah& y0, bool& ok) {
-            Yolah y = y0;
-            auto [b, w] = y.score();
-            (human == BLACK ? w : b) += uint16_t(margin - 1);
-            y.set_state(y.bitboard(BLACK), y.bitboard(WHITE), y.empty_bitboard(), b, w, y.nb_plies());
-            auto r = solver.solve(y, true, &j->stop);
-            ok = r.complete;
-            return y.current_player() == human ? r.value : -r.value;
-        };
+        // Whether the player reaches the goal with perfect play on both sides
+        // (puzzle_lead: > 0 reached, 0 draw, < 0 lost).
+        auto lead = [&](const Yolah& y0, std::array<int, 2> taken, bool& ok) { return puzzle_lead(solver, y0, p, taken, &j->stop, ok); };
         bool ok = false;
-        const int d = lead(pos, ok);
+        const int d = lead(pos, {0, 0}, ok);
         if (!ok) return unknown();
         const bool feasible = d > 0;
         std::string t;
-        if (margin <= 1) t = feasible ? tr("le joueur gagne contre toute d\xC3\xA9" "fense") : (d == 0 ? tr("la meilleure d\xC3\xA9" "fense obtient le nul") : tr("la meilleure d\xC3\xA9" "fense gagne"));
+        if (p.goal == Puzzle::First) t = feasible ? tr("le joueur atteint une cible le premier contre toute d\xC3\xA9" "fense") : tr("la meilleure d\xC3\xA9" "fense l'en emp\xC3\xAA" "che");
+        else if (p.goal == Puzzle::Collect) t = feasible ? (margin <= 1 ? std::string(tr("le joueur prend plus de cibles contre toute d\xC3\xA9" "fense")) : strf("le joueur prend %d cibles de plus contre toute d\xC3\xA9" "fense", margin))
+                                                         : std::string(tr("la meilleure d\xC3\xA9" "fense l'en emp\xC3\xAA" "che"));
+        else if (margin <= 1) t = feasible ? tr("le joueur gagne contre toute d\xC3\xA9" "fense") : (d == 0 ? tr("la meilleure d\xC3\xA9" "fense obtient le nul") : tr("la meilleure d\xC3\xA9" "fense gagne"));
         else t = feasible ? strf("le joueur gagne de %d ou plus contre toute d\xC3\xA9" "fense", margin) : strf("la meilleure d\xC3\xA9" "fense emp\xC3\xAA" "che de gagner de %d", margin);
-        if (pos.current_player() == human) {
-            // The key moves: those after which the goal is still reached.
+        // The opponent blocked from the start: there is no defence, only a number of moves.
+        if (p.goal == Puzzle::Points && reachable_free(pos, 1 - human) == 0) {
+            const int needed = margin - (p.bonus[human] - p.bonus[1 - human]);
+            t = feasible ? strf("le joueur peut jouer les %d coups demand\xC3\xA9s", needed)
+                         : strf("le joueur ne peut pas jouer %d coups, m\xC3\xAAme au mieux", needed);
+        }
+        if (pos.current_player() == human && feasible) {
+            // The key moves: those after which the goal is still reached (none when
+            // the puzzle is impossible). One proof per move, independent of the
+            // others: spread over the cores, each thread with its own solver (and
+            // table), taking the next move to prove until there are none left.
             Yolah::MoveList moves;
-            Yolah y = pos;
-            y.moves(moves);
+            const std::vector<int> key = prove_moves(p, pos, {0, 0}, &j->stop, moves);
+            const size_t n = moves.size();
             std::vector<Move> keys;
-            for (Move m : moves) {
-                Yolah c = y;
-                c.play(m);
-                bool ok2 = false;
-                const int dc = lead(c, ok2);
-                if (!ok2) return finish(feasible ? PuzzleCheck::Verdict::Feasible : PuzzleCheck::Verdict::Impossible,
-                                        std::string(tr(feasible ? "Faisable : " : "Impossible : ")) + t + tr(" (coups cl\xC3\xA9s non compt\xC3\xA9s : temps \xC3\xA9" "coul\xC3\xA9)."));
-                if (dc > 0) keys.push_back(m);
+            for (size_t i = 0; i < n; i++) {
+                if (key[i] < 0) return finish(PuzzleCheck::Verdict::Feasible, std::string(tr("Faisable : ")) + t + tr(" (coups cl\xC3\xA9s non compt\xC3\xA9s : temps \xC3\xA9" "coul\xC3\xA9)."));
+                if (key[i] > 0) keys.push_back(moves[i]);
             }
             if (feasible) {
                 std::string list;
@@ -4131,6 +4499,145 @@ std::shared_ptr<PuzzleCheck> puzzle_check_start(const Puzzle& p, double now) {
         std::unique_lock lk(j->m);
         j->cv.wait_for(lk, std::chrono::duration<double>(PuzzleCheck::BUDGET), [j] { return j->done.load() || j->stop.load(); });
         j->stop = true;   // the solver sees it and returns incomplete
+    });
+    return job;
+}
+
+std::unique_ptr<PuzzleHint> puzzle_hint_start(const Puzzle& p, const Yolah& pos, uint64_t token, std::array<int, 2> taken) {
+    auto job = std::make_unique<PuzzleHint>();
+    job->token = token;
+    PuzzleHint* j = job.get();   // the threads end before the job is destroyed (its destructor joins them)
+    if (std::popcount(pos.free_squares()) > PuzzleCheck::MAX_FREE) {   // too early for an exact answer
+        j->unknown = true;
+        j->done = true;
+        return job;
+    }
+    j->worker = std::thread([j, p, pos, taken] {
+        Yolah::MoveList moves;
+        const std::vector<int> key = prove_moves(p, pos, taken, &j->stop, moves);
+        for (size_t i = 0; i < moves.size(); i++) {
+            if (key[i] < 0) { j->unknown = true; j->keys.clear(); break; }
+            if (key[i] > 0) j->keys.push_back(moves[i]);
+        }
+        { std::lock_guard lk(j->m); j->done = true; }
+        j->cv.notify_all();
+    });
+    j->watchdog = std::thread([j] {
+        std::unique_lock lk(j->m);
+        j->cv.wait_for(lk, std::chrono::duration<double>(PuzzleHint::BUDGET), [j] { return j->done.load() || j->stop.load(); });
+        j->stop = true;
+    });
+    return job;
+}
+
+// ─── Early end of a puzzle (Puzzle::end_win, end_loss) ──────────────────────
+// After each move of a puzzle that asks for it, a thread settles the outcome of
+// the new position, within a time budget:
+//   Win   the goal is CERTAIN: no moves of either side can prevent it (not
+//         merely reachable with perfect play: a feasible puzzle is that from
+//         its first move, and must still be played);
+//   Loss  the goal is out of reach against the best defence (the exact solver,
+//         as "Vérifier": the player's best play no longer reaches it);
+//   Open  neither (proved); Unknown: no answer within the budget.
+// The game then stops when the same outcome has lasted for the puzzle's number
+// of player moves (game_logic).
+struct PuzzleOutcome {
+    static constexpr int MAX_FREE = 36;          // more free squares: the solver is not tried (Loss)
+    static constexpr double BUDGET = 4.0;        // seconds per position
+    enum Result : int { Unknown = 0, Win = 1, Loss = -1, Open = 2, Running = 3 };
+    uint64_t token = 0;                          // the position (GameState::token)
+    int player_moves = 0;                        // the player's moves (passes included) before it
+    std::atomic_int result{Running};
+    std::atomic_bool stop{false};
+    bool used = false;                           // game_logic has read the result
+    std::thread worker, watchdog;
+    std::mutex m;
+    std::condition_variable cv;
+    void finish(Result r) {
+        { std::lock_guard lk(m); result = r; }
+        cv.notify_all();
+    }
+    ~PuzzleOutcome() {
+        { std::lock_guard lk(m); stop = true; }
+        cv.notify_all();
+        if (worker.joinable()) worker.join();
+        if (watchdog.joinable()) watchdog.join();
+    }
+};
+
+// The free squares a side can still ever move to: the free regions (king
+// steps through free squares) next to its pieces. A move lands on a free square
+// of such a region, and squares never become free again, so the side's moves to
+// come are at most this many (and its targets to take, at most those in it).
+uint64_t reachable_free(const Yolah& y, int side) {
+    const uint64_t free = y.free_squares();
+    uint64_t r = shift_all_directions(y.bitboard(side)) & free, prev = 0;
+    while (r != prev) { prev = r; r |= shift_all_directions(r) & free; }
+    return r;
+}
+
+// Whether some game from y (any moves of both sides) ends with the player's
+// lead below the puzzle's margin. me: the player's lead now, in the goal's unit
+// (Points: points, Collect: targets). No: the goal is certain. Bounds first: the
+// opponent gains at most what its reachable free squares hold (squares, or
+// targets), the player at most what his hold. `certain` remembers the positions
+// (with their lead) already proved certain. Sets `aborted` when the stop flag
+// ends the search (the answer is then meaningless).
+bool can_fail(const Yolah& y, int me, const Puzzle& p, std::unordered_set<uint64_t>& certain, const std::atomic_bool& stop, bool& aborted, uint64_t& nodes) {
+    if (aborted || ((++nodes & 1023) == 0 && stop.load(std::memory_order_relaxed))) { aborted = true; return false; }
+    const int human = p.human, margin = p.margin;
+    if (y.game_over()) return me < margin;
+    const uint64_t mask = p.goal == Puzzle::Collect ? p.targets : ~uint64_t(0);
+    if (me - std::popcount(reachable_free(y, 1 - human) & mask) >= margin) return false;
+    if (me + std::popcount(reachable_free(y, human) & mask) < margin) return true;
+    const uint64_t key = zobrist::hash(y) ^ (uint64_t(uint32_t(me + 1000)) * 0x9E3779B97F4A7C15ull);
+    if (certain.count(key)) return false;
+    Yolah::MoveList moves;
+    y.moves(moves);
+    const int sign = y.current_player() == human ? 1 : -1;
+    for (Move mv : moves) {
+        const bool gain = mv != Move::none() && (p.goal == Puzzle::Points || (p.targets >> mv.to_sq() & 1));
+        Yolah c = y;
+        c.play(mv);
+        if (can_fail(c, me + (gain ? sign : 0), p, certain, stop, aborted, nodes)) return true;
+        if (aborted) return false;
+    }
+    certain.insert(key);
+    return false;
+}
+
+std::unique_ptr<PuzzleOutcome> puzzle_outcome_start(const Puzzle& p, const Yolah& pos, uint64_t token, int player_moves, std::array<int, 2> taken) {
+    auto job = std::make_unique<PuzzleOutcome>();
+    job->token = token;
+    job->player_moves = player_moves;
+    PuzzleOutcome* j = job.get();   // the threads end before the job is destroyed (its destructor joins them)
+    // "Won in advance" has no meaning for First: the game ends on the target.
+    const bool want_win = p.end_win >= 0 && p.goal != Puzzle::First, want_loss = p.end_loss >= 0;
+    j->worker = std::thread([j, pos, p, want_win, want_loss, taken] {
+        if (want_loss && std::popcount(pos.free_squares()) <= PuzzleOutcome::MAX_FREE) {
+            // As "Vérifier": the goal with perfect play (≤ 0: out of reach).
+            EndgameSolver solver(puzzle_solver_options(p, 21));
+            bool ok = false;
+            const int d = puzzle_lead(solver, pos, p, taken, &j->stop, ok);
+            if (!ok) return j->finish(PuzzleOutcome::Unknown);
+            if (d <= 0) return j->finish(PuzzleOutcome::Loss);
+            if (!want_win) return j->finish(PuzzleOutcome::Open);
+        }
+        if (want_win) {
+            std::unordered_set<uint64_t> certain;
+            bool aborted = false;
+            uint64_t nodes = 0;
+            const int lead = p.goal == Puzzle::Collect ? taken[p.human] - taken[1 - p.human] : pos.score(uint8_t(p.human));
+            const bool fail = can_fail(pos, lead, p, certain, j->stop, aborted, nodes);
+            if (aborted) return j->finish(PuzzleOutcome::Unknown);
+            return j->finish(fail ? PuzzleOutcome::Open : PuzzleOutcome::Win);
+        }
+        j->finish(PuzzleOutcome::Unknown);   // too many free squares for the solver
+    });
+    j->watchdog = std::thread([j] {
+        std::unique_lock lk(j->m);
+        j->cv.wait_for(lk, std::chrono::duration<double>(PuzzleOutcome::BUDGET), [j] { return j->result.load() != PuzzleOutcome::Running || j->stop.load(); });
+        j->stop = true;
     });
     return job;
 }
@@ -4600,6 +5107,14 @@ struct App {
         bool from_editor = false;         // a test from the editor
         bool intro = false;               // the introduction card is shown
         bool recorded = false;            // the result was saved
+        // The early end (Puzzle::end_win, end_loss): the job on the current position,
+        // the outcome that lasts and since how many player moves, the final one.
+        std::unique_ptr<PuzzleOutcome> outcome_job;
+        int streak = 0, streak_from = 0;  // PuzzleOutcome::Win / Loss (0: none)
+        int settled = 0;                  // Win / Loss when the game was stopped early
+        // The puzzle's "Indice": the job on the position it was asked in, and whether it is shown.
+        std::unique_ptr<PuzzleHint> hint_job;
+        bool hint_on = false;
     } game;
 
     // The tutorial scene (@@SCENE_TUTORIAL).
@@ -4656,6 +5171,7 @@ struct App {
         std::string level_selected;       // the level whose name is edited
         std::set<std::string> open_levels;   // levels unfolded in the list
         std::string tester;               // the AI playing the player's side in "AI against AI"
+        std::string tester_opp;           // the opponent's AI there ("" = the puzzle's opponent)
         int tool = 1;                     // 0 free square, 1 hole, 2 black piece, 3 white piece, 4 special square, 5 decoration
         std::string tile_art, decor_art;  // the drawings of the brushes "Case" ("" = the theme's square) and "Décor"
         int decor_size = 2;               // index in DECOR_SIZES
@@ -4667,13 +5183,19 @@ struct App {
         bool painting = false;            // the button went down on the board
         int painted = -1;                 // the last square painted by a drag
         bool erasing = false;             // this stroke removes (right button, or it started on what the brush puts)
+        int piece_from = -1;              // the square of the piece pressed on (it may be dragged elsewhere)
+        bool piece_moving = false;        // the mouse has left that square, button held: a move
+        std::string drag_pid, drag_level; // the puzzle pressed on in the list, and the level of its row ("" = none)
+        V2 drag_start{};                  // where the press was
+        bool dragging = false;            // the mouse has moved: the puzzle follows it
         bool confirm_delete = false;
         std::string confirm_level;        // the level whose deletion waits for a second click
         // The "new puzzle" dialog: start from the starting position or from any puzzle.
         bool choose_new = false;
         std::string new_level;            // the level the new puzzle goes into
         float new_scroll = 0;
-        std::shared_ptr<PuzzleCheck> check;   // the last "Vérifier" (running or done)
+            std::shared_ptr<PuzzleCheck> check;   // the last "Vérifier" (running or done)
+        int panel_tab = 0;                // the right panel: 0 the rules, 1 the look
     } editor;
 
     // The workshop (@@SCENE_STUDIO): pixel drawings and board themes.
@@ -5023,7 +5545,12 @@ struct App {
                 const json none = json::object();
                 const json& opts = !g.puzzle_mode && settings.ai_options.contains(sl.who) ? settings.ai_options[sl.who] : none;
                 AiSpec eff = with_options(*sl.spec, opts);
-                sl.agent = std::make_unique<AiAgent>(game_config(eff, seconds), eff.random_moves);
+                json cfg = game_config(eff, seconds);
+                if (g.puzzle_mode && g.puzzle.goal != Puzzle::Points) {   // the solver plays for the puzzle's goal
+                    cfg["goal"] = g.puzzle.goal == Puzzle::Collect ? "collect" : "first";
+                    cfg["targets"] = std::to_string(g.puzzle.targets);
+                }
+                sl.agent = std::make_unique<AiAgent>(cfg, eff.random_moves);
             }
             else
                 sl.spec = nullptr;   // unknown or unavailable AI: a human plays it
@@ -5040,7 +5567,9 @@ struct App {
     void play_move(Move m) {
         auto& g = game;
         const int side = g.match.to_move();
-        const bool first_pass = m == Move::none() && !g.match.has_passed(side);
+        // Told once; not in a puzzle whose side is blocked from the start (the
+        // puzzle is built that way, there is nothing to tell).
+        const bool first_pass = m == Move::none() && !g.match.has_passed(side) && !(g.puzzle_mode && reachable_free(g.match.start, side) == 0);
         g.match.play(m);
         // How hard the square breaks: the player's strength (Elo 600 → 0, 2250 → 1; the human: 0.6).
         const Slot& sl = g.slot[side];
@@ -5071,15 +5600,20 @@ struct App {
         g.board.anim = {};
         g.board.selected = -1;
         g.over = false;
+        g.outcome_job.reset();
+        g.streak = g.streak_from = g.settled = 0;
+        g.hint_on = false;
         g.token++;
     }
 };
 App* g_app = nullptr;
 void start_lesson(App& a, int i);
 int first_lesson_to_do(const App& a);
-void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai = "");
+void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai = "",
+                  const std::string& opponent_ai = "");
 void draw_image_background(App& a, const std::string& file, uint8_t dim = 70, bool vignette = true, const Theme* th = nullptr);
 std::string goal_text(const App& a, const Puzzle& p);
+std::string auto_goal_text(const App& a, const Puzzle& p);
 
 // Drawn behind every scene: the theme's gradient, a vignette, faint shapes.
 // th: the board theme whose scenery is drawn (default: the player's).
@@ -6615,7 +7149,7 @@ void scene_menu(App& a) {
     const float s = a.s;
     draw_background(a);
     // Pieces drifting around the title: the sprites of the roster.
-    const int n = int(a.roster.size()) + 1;
+    const int n = int(a.roster.size()) + 1;   // (the puzzles' solver too: it has a figurine)
     for (int i = 0; i < n; i++) {
         float ang = float(a.time) * 0.12f + i * 2 * float(M_PI) / n;
         float rx = a.w * 0.40f, ry = a.h * 0.36f;
@@ -6674,6 +7208,7 @@ void scene_setup(App& a) {
     std::vector<Entry> entries;
     entries.push_back({"human", "Humain", "Vous jouez \xC3\xA0 la souris", "human", true, "", "Cliquez sur un de vos pions puis sur la case d'arriv\xC3\xA9" "e, ou faites-le glisser."});
     for (auto& ai : a.roster) {
+        if (ai.puzzles_only) continue;   // the exact solver: for the puzzles only
         const bool set = a.settings.ai_options.contains(ai.id);
         entries.push_back({ai.id, ai.name, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", shown_elo(ai, set ? a.settings.ai_options[ai.id] : json()), tr(ai.family).c_str()),
                            ai.sprite, ai.available, ai.reason, ai.description});
@@ -6852,17 +7387,84 @@ void draw_ai_params(App& a) {
 // Each frame: (1) the logic — whose turn, AI searches, passes, end of game,
 // analysis; (2) the layout; (3) the drawing: evaluation bar, board, side
 // panel (players, tabs, buttons), end-of-game box.
+// The early end of a puzzle: a PuzzleOutcome job on each new position; the game
+// stops when the same outcome (Win or Loss) has lasted for the puzzle's number
+// of player moves (0: at once). Open breaks the streak; Unknown leaves it as it is.
+// Whether the puzzle being played is won: stopped early, by its outcome; else
+// by its goal at the end of the game (a draw never reaches a goal).
+bool puzzle_goal_met(const App& a) {
+    const auto& g = a.game;
+    const Puzzle& p = g.puzzle;
+    if (g.match.stopped) return g.settled == PuzzleOutcome::Win;
+    if (p.goal == Puzzle::Collect) {
+        const auto t = targets_taken(p, g.match);
+        return t[p.human] - t[1 - p.human] >= p.margin;
+    }
+    if (p.goal == Puzzle::First) return false;   // the game ended without a target reached
+    return g.match.score(p.human) - g.match.score(1 - p.human) >= p.margin;
+}
+
+void puzzle_early_end(App& a) {
+    auto& g = a.game;
+    const Puzzle& p = g.puzzle;
+    int player_moves = 0;
+    for (size_t i = 0; i < g.match.history.size(); i++) player_moves += g.match.side_of(i) == p.human;
+    if (!g.outcome_job || g.outcome_job->token != g.token)
+        g.outcome_job = puzzle_outcome_start(p, g.match.pos, g.token, player_moves, targets_taken(p, g.match));
+    PuzzleOutcome& j = *g.outcome_job;
+    const int r = j.result.load();
+    if (r == PuzzleOutcome::Running || j.used) return;
+    j.used = true;
+    if (r == PuzzleOutcome::Unknown) return;
+    if (r == PuzzleOutcome::Open) { g.streak = 0; return; }
+    if (r != g.streak) { g.streak = r; g.streak_from = j.player_moves; }
+    const int delay = r == PuzzleOutcome::Win ? p.end_win : p.end_loss;
+    if (delay >= 0 && j.player_moves - g.streak_from >= delay) {
+        g.settled = r;
+        g.match.stopped = true;
+        for (auto& sl : g.slot)
+            if (sl.agent) sl.agent->cancel();
+    }
+}
+
 void game_logic(App& a) {
     auto& g = a.game;
     const bool anim = g.board.animating(a.time);
     if (g.intro) return;   // a puzzle's introduction card
+    // First: the move that lands on a target ends the game, won for its player.
+    if (g.puzzle_mode && g.puzzle.goal == Puzzle::First && !g.match.over() && !g.match.history.empty()) {
+        const Move last = g.match.history.back();
+        if (last != Move::none() && (g.puzzle.targets >> last.to_sq() & 1)) {
+            g.settled = g.match.side_of(g.match.history.size() - 1) == g.puzzle.human ? PuzzleOutcome::Win : PuzzleOutcome::Loss;
+            g.match.stopped = true;
+            for (auto& sl : g.slot)
+                if (sl.agent) sl.agent->cancel();
+        }
+    }
+    // Blocked but winning (Puzzle::win_when_blocked): the player has no free square
+    // left to move to, and its lead minus all the opponent can still gain (every
+    // free square, or every target, of the regions next to its pieces) reaches the
+    // goal. Cheap: checked after every move, the bound tightens as the opponent plays.
+    if (g.puzzle_mode && g.puzzle.win_when_blocked && g.puzzle.goal != Puzzle::First && !g.match.over()
+        && reachable_free(g.match.pos, g.puzzle.human) == 0) {
+        const Puzzle& p = g.puzzle;
+        const auto taken = targets_taken(p, g.match);
+        const int me = p.goal == Puzzle::Collect ? taken[p.human] - taken[1 - p.human] : g.match.score(p.human) - g.match.score(1 - p.human);
+        const uint64_t mask = p.goal == Puzzle::Collect ? p.targets : ~uint64_t(0);
+        if (me - std::popcount(reachable_free(g.match.pos, 1 - p.human) & mask) >= p.margin) {
+            g.settled = PuzzleOutcome::Win;
+            g.match.stopped = true;
+            for (auto& sl : g.slot)
+                if (sl.agent) sl.agent->cancel();
+        }
+    }
+    if (g.puzzle_mode && (g.puzzle.end_win >= 0 || g.puzzle.end_loss >= 0) && !g.match.over()) puzzle_early_end(a);
     if (g.match.over()) {
         if (!g.over && !anim) {
             g.over = true;
             g.over_t = a.time;
-            if (g.puzzle_mode) {   // the goal: win by at least `margin`
-                int margin = g.match.score(g.puzzle.human) - g.match.score(1 - g.puzzle.human);
-                bool ok = margin >= g.puzzle.margin;
+            if (g.puzzle_mode) {   // the goal: win by at least `margin` (or settled early)
+                bool ok = puzzle_goal_met(a);
                 if (ok && !g.from_editor && !a.solved(g.puzzle.id)) {
                     a.settings.puzzles_done.push_back(g.puzzle.id);
                     a.save_settings();
@@ -6882,7 +7484,9 @@ void game_logic(App& a) {
     Slot& sl = g.slot[side];
     if (must_pass(g.match.pos)) {
         // the first pass waits a moment (the message); the next ones are immediate
-        if (g.pass_at < 0) g.pass_at = a.time + (g.match.has_passed(side) ? 0.0 : 0.8);
+        // The first pass waits for its message; none (no wait) for a puzzle side blocked from the start.
+        const bool silent = g.puzzle_mode && reachable_free(g.match.start, side) == 0;
+        if (g.pass_at < 0) g.pass_at = a.time + (g.match.has_passed(side) || silent ? 0.0 : 0.8);
         if (a.time >= g.pass_at) {
             g.pass_at = -1;
             a.play_move(Move::none());
@@ -6977,7 +7581,11 @@ void draw_player_card(App& a, Box b, int side, bool active) {
         status = strf("dernier coup : %.2f s", sl.last_seconds);
     }
     a.text.draw(Font::Regular, 14 * s, status, {tx, b.y + 60 * s}, active ? a.theme().accent : pal::faint);
-    a.text.draw(Font::Black, 40 * s, std::to_string(g.match.score(side)), {b.right() - 20 * s, b.center().y - 26 * s}, pal::text, Align::Right);
+    if (g.puzzle_mode && g.puzzle.goal == Puzzle::Collect) {   // what counts: the targets taken (the points below them)
+        const auto t = targets_taken(g.puzzle, g.match);
+        a.text.draw(Font::Black, 40 * s, std::to_string(t[side]), {b.right() - 20 * s, b.center().y - 34 * s}, TARGET_RED, Align::Right);
+        a.text.draw(Font::Regular, 13 * s, strf("cibles \xE2\x80\xA2 %d points", g.match.score(side)), {b.right() - 20 * s, b.center().y + 14 * s}, pal::faint, Align::Right);
+    } else a.text.draw(Font::Black, 40 * s, std::to_string(g.match.score(side)), {b.right() - 20 * s, b.center().y - 26 * s}, pal::text, Align::Right);
 }
 
 void tab_moves(App& a, Box b) {
@@ -7105,13 +7713,35 @@ void draw_puzzle_over(App& a, Box area, float k) {
     const float s = a.s;
     const Puzzle& p = g.puzzle;
     int margin = g.match.score(p.human) - g.match.score(1 - p.human);
-    bool ok = margin >= p.margin;
+    bool ok = puzzle_goal_met(a);
+    const auto taken = targets_taken(p, g.match);
     Box card{area.center().x - 250 * s, area.center().y - 160 * s + (1 - k) * 40 * s, 500 * s, 320 * s};
     a.ui.panel(card, 22, with_alpha(pal::panel, k));
     const bool ai_test = !g.slot[p.human].human();
     a.text.draw_shadowed(Font::Title, 34 * s, ai_test ? (ok ? "L'IA r\xC3\xA9ussit le puzzle" : "L'IA \xC3\xA9" "choue") : (ok ? "Puzzle r\xC3\xA9ussi !" : "Pas encore\xE2\x80\xA6"), {card.center().x, card.y + 28 * s}, with_alpha(ok ? pal::good : pal::text, k), Align::Center, hex(0x000000, 100), 2 * s);
-    a.text.draw(Font::Black, 50 * s, strf("%d \xE2\x80\x93 %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 84 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
-    a.text.draw(Font::Regular, 16 * s, strf("Avance du joueur : %+d \xE2\x80\xA2 objectif : %+d", margin, p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    if (p.goal == Puzzle::Collect)   // the targets taken, which decide
+        a.text.draw(Font::Black, 50 * s, strf("%d \xE2\x80\x93 %d", taken[BLACK], taken[WHITE]), {card.center().x, card.y + 84 * s}, with_alpha(TARGET_RED, k), Align::Center);
+    else a.text.draw(Font::Black, 50 * s, strf("%d \xE2\x80\x93 %d", g.match.score(BLACK), g.match.score(WHITE)), {card.center().x, card.y + 84 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
+    if (p.goal == Puzzle::First)
+        a.text.draw(Font::Regular, 16 * s, !g.match.stopped ? std::string(tr("Personne n'a atteint de cible.")) : strf("Les %s ont atteint une cible en premier.", side_name(g.settled == PuzzleOutcome::Win ? p.human : 1 - p.human)),
+                    {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    else if (p.goal == Puzzle::Collect && !g.match.stopped)
+        a.text.draw(Font::Regular, 16 * s, strf("Cibles prises (Noirs \xE2\x80\x93 Blancs) \xE2\x80\xA2 objectif : %+d pour le joueur", p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    else if (g.match.stopped)   // stopped early: why, rather than a final lead (blocked for good: that says it all)
+        a.text.draw(Font::Regular, 16 * s, ok ? (reachable_free(g.match.pos, p.human) == 0 ? (ai_test ? "Bloqu\xC3\xA9, mais l'adversaire ne peut plus rattraper le joueur." : "Tu ne peux plus bouger, mais l'adversaire ne peut plus te rattraper.")
+                                                    : "Victoire certaine : plus rien ne peut emp\xC3\xAA" "cher l'objectif.")
+                                              : reachable_free(g.match.pos, p.human) == 0 ? (ai_test ? "Les pions du joueur ne peuvent plus bouger." : "Tes pions ne peuvent plus bouger.")
+                                                                                          : reachable_free(g.match.start, 1 - p.human) == 0
+                                                                                                ? "Il ne reste plus assez de coups possibles pour atteindre l'objectif."   // played alone: no defence
+                                                                                                : "L'objectif est hors d'atteinte contre la meilleure d\xC3\xA9" "fense.",
+                    {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    else if (reachable_free(g.match.start, 1 - p.human) == 0) {   // played alone: moves, not a lead
+        int played = 0;
+        for (size_t i = 0; i < g.match.history.size(); i++) played += g.match.side_of(i) == p.human && g.match.history[i] != Move::none();
+        const int needed = p.margin - (p.bonus[p.human] - p.bonus[1 - p.human]);
+        a.text.draw(Font::Regular, 16 * s, strf("Coups jou\xC3\xA9s : %d \xE2\x80\xA2 objectif : %d", played, needed), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
+    }
+    else a.text.draw(Font::Regular, 16 * s, strf("Avance du joueur : %+d \xE2\x80\xA2 objectif : %+d", margin, p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
     // The next puzzle of the level.
     const Level* lvl = nullptr;
     for (auto& l : a.levels) if (l.id == g.level) lvl = &l;
@@ -7135,7 +7765,7 @@ void draw_puzzle_over(App& a, Box area, float k) {
         }
     } else if (a.ui.button("pz_retry", {card.x + 24 * s, by, bw, 50 * s}, "R\xC3\xA9" "essayer", ok ? Style::Normal : Style::Primary, true, 17)) {
         Puzzle again = p;
-        start_puzzle(a, again, g.level, g.level_pos, g.from_editor, ai_test ? g.slot[p.human].who : "");
+        start_puzzle(a, again, g.level, g.level_pos, g.from_editor, ai_test ? g.slot[p.human].who : "", ai_test ? g.slot[1 - p.human].who : "");
         a.game.intro = false;   // a retry goes straight to the board
         return;
     }
@@ -7172,11 +7802,24 @@ void scene_game(App& a) {
     if (g.puzzle_mode && g.intro) {
         draw_image_background(a, g.puzzle.background, 0, false, &a.game_theme());   // the whole window, as it is
         float k = ease_out_cubic(float((a.time - a.scene_t0) / 0.6));
-        Box card{a.w * 0.5f - 420 * s, a.h * 0.5f - 145 * s + (1 - k) * 60 * s, 840 * s, 290 * s};   // centred in the window
+        // The title the biggest; the introduction and the goal below it, at one size
+        // (the goal in bold and in the theme's colour), each wrapped on its lines.
+        const float body = 22 * s;
+        const Box text_box{0, 0, 740 * s, 0};
+        const std::string goal = goal_text(a, g.puzzle);
+        const float lh = a.text.line_height(Font::Regular, body) * 1.25f / 1.2f;
+        const float intro_h = g.puzzle.text.empty() ? 0 : lh * a.text.wrap(Font::Regular, body, g.puzzle.text, text_box.w).size();
+        const float goal_h = goal.empty() ? 0 : lh * a.text.wrap(Font::Bold, body, goal, text_box.w).size();   // hidden goal: no line
+        const float card_h = 100 * s + intro_h + (intro_h > 0 && goal_h > 0 ? 18 * s : 0) + goal_h + 110 * s;
+        Box card{a.w * 0.5f - 420 * s, a.h * 0.5f - card_h / 2 + (1 - k) * 60 * s, 840 * s, card_h};   // centred in the window
         a.ui.panel(card, 24, hex(0x10151d, uint8_t(225 * k)));
-        a.text.draw_shadowed(Font::Title, 40 * s, g.puzzle.name, {card.center().x, card.y + 26 * s}, with_alpha(pal::text, k), Align::Center, hex(0x000000, 120), 3 * s);
-        a.text.paragraph(Font::Regular, 18 * s, g.puzzle.text, {card.x + 50 * s, card.y + 92 * s, card.w - 100 * s, 60 * s}, with_alpha(pal::dim, k), 1.25f, Align::Center);
-        a.text.draw(Font::Bold, 18 * s, goal_text(a, g.puzzle), {card.center().x, card.y + 160 * s}, with_alpha(a.game_theme().accent, k), Align::Center);
+        a.text.draw_shadowed(Font::Title, 44 * s, g.puzzle.name, {card.center().x, card.y + 26 * s}, with_alpha(pal::text, k), Align::Center, hex(0x000000, 120), 3 * s);
+        float ty = card.y + 100 * s;
+        if (intro_h > 0) {
+            a.text.paragraph(Font::Regular, body, g.puzzle.text, {card.center().x - text_box.w / 2, ty, text_box.w, intro_h}, with_alpha(pal::text, k), 1.25f, Align::Center);
+            ty += intro_h + 18 * s;
+        }
+        if (goal_h > 0) a.text.paragraph(Font::Bold, body, goal, {card.center().x - text_box.w / 2, ty, text_box.w, goal_h}, with_alpha(a.game_theme().accent, k), 1.25f, Align::Center);
         if (a.ui.button("pz_start", {card.center().x + 10 * s, card.bottom() - 74 * s, 220 * s, 52 * s}, "Commencer", Style::Primary) || a.in.key(SDLK_RETURN)) {
             g.intro = false;
             a.scene_t0 = a.time;
@@ -7267,8 +7910,34 @@ void scene_game(App& a) {
         }
         if (a.view.pv) look.pv = snap.pv;
     }
+    // The puzzle's "Indice": one of the moves that still reach the goal on the board,
+    // the list in a message (once).
+    if (g.puzzle_mode && g.hint_job && g.hint_job->token != g.token) {   // a move was played: the hint was for before
+        g.hint_job.reset();   // stops its search (it would take the cores from the AI)
+        g.hint_on = false;
+    }
+    if (g.puzzle_mode && g.hint_on && g.hint_job) {
+        PuzzleHint& h = *g.hint_job;
+        if (false) {}
+        else if (h.done && !h.shown) {
+            h.shown = true;
+            if (h.unknown) a.notify_at(std::popcount(g.match.pos.free_squares()) > PuzzleCheck::MAX_FREE
+                                           ? "Indice : trop t\xC3\xB4t dans la partie pour un calcul exact." : "Indice : pas de r\xC3\xA9ponse dans le temps imparti.",
+                                       g.board.area.center());
+            else if (h.keys.empty()) a.notify_at("Indice : plus aucun coup ne permet d'atteindre l'objectif.", g.board.area.center());
+            else {
+                std::string list;
+                for (size_t i = 0; i < h.keys.size() && i < 5; i++) list += (i ? ", " : "") + move_name(h.keys[i]);
+                if (h.keys.size() > 5) list += ", \xE2\x80\xA6";
+                a.notify_at(h.keys.size() == 1 ? strf("Indice : un seul bon coup, %s", list.c_str())
+                                               : strf("Indice : %zu bons coups, %s", h.keys.size(), list.c_str()), g.board.area.center());
+            }
+        }
+        if (g.hint_on && h.done && !h.keys.empty()) { look.hint = h.keys.front(); look.hint_label = "indice"; }
+    }
     if (human_turn && g.board.hover_sq >= 0 && (g.match.pos.bitboard(side) >> g.board.hover_sq & 1)) a.ui.hovering = true;
     g.board.draw(a.text, a.board_textures, a.game_theme(), g.match.pos, look, a.time, s);
+    if (g.puzzle_mode) draw_targets(g.board, g.puzzle, g.match.pos, &g.match);
     a.fx.update(float(a.ui.dt));
     a.fx.draw(a.text);
 
@@ -7281,7 +7950,7 @@ void scene_game(App& a) {
     draw_player_card(a, card_top, top_side, side == top_side && !g.match.over());
     draw_player_card(a, card_bottom, 1 - top_side, side != top_side && !g.match.over());
     float tabs_y = card_top.bottom() + 14 * s;
-    if (g.puzzle_mode) {   // the puzzle's goal, always in sight
+    if (g.puzzle_mode && !goal_text(a, g.puzzle).empty()) {   // the puzzle's goal, always in sight (unless hidden)
         a.text.paragraph(Font::Bold, 15 * s, tr("Objectif : ") + goal_text(a, g.puzzle), {panel.x + 24 * s, tabs_y, panel.w - 48 * s, 44 * s}, a.game_theme().accent);
         tabs_y += 48 * s;
     }
@@ -7298,6 +7967,19 @@ void scene_game(App& a) {
     auto bbox = [&](int i) { return Box{buttons.x + i * (bw + 6 * s), buttons.y, bw, buttons.h}; };
     if (ai_vs_ai) {
         if (a.ui.button("g_pause", bbox(0), g.paused ? "Reprendre" : "Pause", g.paused ? Style::Primary : Style::Normal, true, 16)) g.paused = !g.paused;
+    } else if (g.puzzle_mode) {
+        // The puzzle's hint: the exact solver on the position the player has to play.
+        const bool can = human_turn && !g.match.over();
+        if (a.ui.button("g_hintb", bbox(0), "Indice", g.hint_on ? Style::Primary : Style::Normal, can, 16)) {
+            if (g.hint_on) g.hint_on = false;
+            else {
+                if (!g.hint_job || g.hint_job->token != g.token)
+                    g.hint_job = puzzle_hint_start(g.puzzle, g.match.pos, g.token, targets_taken(g.puzzle, g.match));
+                else g.hint_job->shown = false;   // asked again: the list again
+                g.hint_on = true;
+                if (!g.hint_job->done) a.notify_at("Indice : recherche des bons coups\xE2\x80\xA6", g.board.area.center());
+            }
+        }
     } else if (a.ui.button("g_hintb", bbox(0), "Indice", a.view.hint && help ? Style::Primary : Style::Normal, help, 16)) {
         a.view.hint = !a.view.hint;
     }
@@ -7307,7 +7989,15 @@ void scene_game(App& a) {
         a.go(Scene::Setup);
         return;
     }
-    if (a.ui.button("g_menu", bbox(g.puzzle_mode ? 3 : 4), g.puzzle_mode ? "Quitter" : "Menu", Style::Ghost, true, 16)) {
+    if (g.puzzle_mode && a.ui.button("g_restart", bbox(3), "Recommencer", Style::Normal, !g.match.history.empty(), 15)) {
+        // From the start again, the same players (an AI on the player's side in a test), no introduction.
+        Puzzle again = g.puzzle;
+        const bool ai_test = !g.slot[again.human].human();
+        start_puzzle(a, again, g.level, g.level_pos, g.from_editor, ai_test ? g.slot[again.human].who : "", ai_test ? g.slot[1 - again.human].who : "");
+        a.game.intro = false;
+        return;
+    }
+    if (a.ui.button("g_menu", bbox(4), g.puzzle_mode ? "Quitter" : "Menu", Style::Ghost, true, 16)) {
         if (g.puzzle_mode) leave_puzzle(a);
         else a.go(Scene::Menu);
         return;
@@ -8020,10 +8710,13 @@ void scene_tutorial(App& a) {
 // its look; the introduction card first (scene_game shows it while
 // game.intro is set), and at the end the goal is checked (draw_game_over).
 // player_ai: an AI plays the player's side (the editor's "AI against AI" test).
-void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai) {
+// opponent_ai: another AI for the opponent (the editor's "AI against AI"); ignored
+// with the target goals, which need the exact solver.
+void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bool from_editor, const std::string& player_ai, const std::string& opponent_ai) {
     std::string who[2];
-    who[p.human] = player_ai.empty() ? "human" : player_ai;
-    who[1 - p.human] = p.opponent;
+    // The target goals: the exact solver on both sides that an AI plays (puzzle_opponent).
+    who[p.human] = player_ai.empty() ? "human" : (p.goal == Puzzle::Points ? player_ai : "solver");
+    who[1 - p.human] = p.goal == Puzzle::Points && !opponent_ai.empty() ? opponent_ai : puzzle_opponent(p);
     a.game.puzzle_mode = true;   // before launch: the look of the first frames
     a.game.puzzle = p;
     a.launch(puzzle_position(p), who[BLACK], who[WHITE], TIMES[p.time_index]);
@@ -8035,16 +8728,42 @@ void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bo
     g.from_editor = from_editor;
     g.intro = true;
     g.recorded = false;
+    g.outcome_job.reset();
+    g.streak = g.streak_from = g.settled = 0;
+    g.hint_job.reset();
+    g.hint_on = false;
     g.board.flipped = p.human == WHITE;
 }
+// The sentence shown: hidden, the designer's own, or the automatic one.
 std::string goal_text(const App& a, const Puzzle& p) {
-    const AiSpec* ai = a.ai(p.opponent);
-    std::string vs = ai ? tr(ai->name) : p.opponent;
+    if (p.goal_hidden) return "";
+    if (!p.goal_custom.empty()) return p.goal_custom;
+    return auto_goal_text(a, p);
+}
+// The goal said by the program, from the goal, the sides and the starting points.
+std::string auto_goal_text(const App& a, const Puzzle& p) {
+    const std::string opp = puzzle_opponent(p);
+    const AiSpec* ai = a.ai(opp);
+    std::string vs = ai ? tr(ai->name) : opp;
+    if (p.goal == Puzzle::Collect)
+        return p.margin <= 1 ? strf("Prends plus de cibles que %s avec les %s : une cible est \xC3\xA0 celui qui s'y pose le premier.", vs.c_str(), side_name(p.human))
+                             : strf("Prends au moins %d cibles de plus que %s avec les %s : une cible est \xC3\xA0 celui qui s'y pose le premier.", p.margin, vs.c_str(), side_name(p.human));
+    if (p.goal == Puzzle::First)
+        return strf("Pose-toi sur une cible avant %s, avec les %s.", vs.c_str(), side_name(p.human));
+    // The opponent blocked from the start: the player plays alone, and the goal is a
+    // number of moves (the lead asked for, minus the lead the bonuses already give).
+    if (reachable_free(puzzle_position(p), 1 - p.human) == 0) {
+        const int needed = p.margin - (p.bonus[p.human] - p.bonus[1 - p.human]);
+        if (needed <= 0) return strf("L'adversaire est bloqu\xC3\xA9 : avec les %s, tu as d\xC3\xA9j\xC3\xA0 l'avance demand\xC3\xA9" "e.", side_name(p.human));
+        return strf("L'adversaire est bloqu\xC3\xA9 : joue %d coup%s avec les %s.", needed, needed > 1 ? "s" : "", side_name(p.human));
+    }
     std::string t = p.margin <= 1 ? strf("Gagne avec les %s contre %s.", side_name(p.human), vs.c_str())
                                   : strf("Gagne avec les %s contre %s, avec au moins %d points d'avance.", side_name(p.human), vs.c_str(), p.margin);
-    const int mine = p.bonus[p.human], theirs = p.bonus[1 - p.human];
-    if (mine > 0) t += " " + (mine == 1 ? std::string(tr("Tu pars avec 1 point.")) : strf("Tu pars avec %d points.", mine));
-    if (theirs > 0) t += " " + (theirs == 1 ? std::string(tr("L'adversaire part avec 1 point.")) : strf("L'adversaire part avec %d points.", theirs));
+    // The starting points, as a lead: what matters is the difference.
+    const int mine = p.bonus[p.human], theirs = p.bonus[1 - p.human], lead = mine - theirs;
+    if (lead > 0) t += " " + (lead == 1 ? std::string(tr("Tu pars avec 1 point d'avance.")) : strf("Tu pars avec %d points d'avance.", lead));
+    else if (lead < 0) t += " " + (lead == -1 ? std::string(tr("L'adversaire part avec 1 point d'avance.")) : strf("L'adversaire part avec %d points d'avance.", -lead));
+    else if (mine > 0) t += " " + strf("Chaque camp part avec %d point%s.", mine, mine > 1 ? "s" : "");
     return t;
 }
 
@@ -8063,9 +8782,10 @@ void draw_image_background(App& a, const std::string& file, uint8_t dim, bool vi
     if (vignette) draw::vignette({0, 0, float(a.w), float(a.h)}, a.s, 50);
 }
 
-// A small picture of a puzzle: its squares, holes and pieces.
+// A small picture of a puzzle: its squares, holes and pieces, always on the
+// light wooden board ("bois"), where the holes and pieces read best at this size.
 void draw_mini_board(App& a, Box b, const Puzzle& p) {
-    const Theme& t = a.theme_or(p.theme);
+    const Theme& t = a.theme_or("bois");
     draw::round_box(b.inset(-6 * a.s), 8 * a.s, t.frame_top, t.frame_bottom);
     SDL_FRect dst = b.frect();
     SDL_RenderTexture(a.renderer, a.board_textures.get(t, int(b.w)), nullptr, &dst);
@@ -8075,6 +8795,7 @@ void draw_mini_board(App& a, Box b, const Puzzle& p) {
         if (p.cells[sq] == '#') draw::round_box(c.inset(q * 0.08f), q * 0.2f, shade(t.hole, -0.3f), shade(t.hole, 0.12f));
         else if (p.cells[sq] == 'B') draw::circle_lit(c.center(), q * 0.38f, c.center() + V2{-q * 0.12f, -q * 0.14f}, hex(0x5b6170), hex(0x0a0c11));
         else if (p.cells[sq] == 'W') draw::circle_lit(c.center(), q * 0.38f, c.center() + V2{-q * 0.12f, -q * 0.14f}, hex(0xffffff), hex(0xb9bec8));
+        else if (p.goal != Puzzle::Points && (p.targets >> sq & 1)) { draw::ring(c.center(), q * 0.3f, q * 0.1f, TARGET_RED); draw::circle(c.center(), q * 0.1f, TARGET_RED); }
     }
 }
 
@@ -8089,8 +8810,7 @@ void scene_puzzles(App& a) {
         else { a.go(Scene::Menu); return; }
     }
     st.tab = 0;
-    if (a.ui.button("to_editor", {60 * s, 118 * s, 360 * s, 44 * s}, "Cr\xC3\xA9" "er ou modifier des puzzles et des niveaux", Style::Normal, true, 15)) { a.go(Scene::Editor); return; }
-    Box area{60 * s, 180 * s, a.w - 120 * s, a.h - 210 * s};
+    Box area{60 * s, 140 * s, a.w - 120 * s, a.h - 170 * s};
 
     if (st.tab == 0 && st.open_level.empty()) {
         // The levels, plus every puzzle in one list.
@@ -8163,13 +8883,16 @@ void scene_puzzles(App& a) {
             }
             a.text.draw(Font::Black, 15 * s, strf("%zu.", i + 1), {c.x + 16 * s, c.bottom() - 74 * s}, a.theme().accent);
             a.text.draw(Font::Bold, 17 * s, p->name, {c.x + 44 * s, c.bottom() - 76 * s}, pal::text);
-            a.text.draw(Font::Regular, 13 * s, ok ? "r\xC3\xA9ussi" : (p->margin > 1 ? strf("gagner de %d+", p->margin) : std::string("gagner")),
+            a.text.draw(Font::Regular, 13 * s, ok ? "r\xC3\xA9ussi" : p->goal == Puzzle::First ? std::string("premi\xC3\xA8re cible")
+                                                    : p->goal == Puzzle::Collect ? (p->margin > 1 ? strf("%d cibles de plus", p->margin) : std::string("plus de cibles"))
+                                                    : (p->margin > 1 ? strf("gagner de %d+", p->margin) : std::string("gagner")),
                         {c.x + 44 * s, c.bottom() - 50 * s}, ok ? pal::good : pal::dim);
             if (ok) draw_emblem("check", {c.right() - 30 * s, c.bottom() - 56 * s}, 12 * s, pal::good);
             if (h && a.in.released) { draw::clip(nullptr); start_puzzle(a, *p, any_order ? "" : l.id, int(i), false); return; }
         }
         draw::clip(nullptr);
-        if (l.puzzles.empty()) a.text.draw(Font::Regular, 16 * s, "Ce niveau est vide.", {grid.x, grid.y}, pal::faint);
+        if (l.puzzles.empty())
+            a.text.draw(Font::Regular, 16 * s, "Ce niveau est vide : dans l'\xC3\xA9" "diteur, choisissez-le dans \xC2\xAB Niveau \xC2\xBB d'un puzzle, ou glissez-y un puzzle de la liste.", {grid.x, grid.y}, pal::faint);
     }
 }
 
@@ -8458,8 +9181,8 @@ void scene_editor(App& a) {
         return;
     }
     if (a.ui.focus.empty() && !modal)
-        for (int k = 0; k < 6; k++)
-            if (a.in.key(SDLK_1 + k)) ed.tool = k;   // keys 1-6: the brushes
+        for (int k = 0; k < 7; k++)
+            if (a.in.key(SDLK_1 + k)) ed.tool = k;   // keys 1-7: the brushes
 
     const float margin = 26 * s, tree_w = 330 * s, panel_w = 440 * s, top = 100 * s;
     Box tree{margin, top, tree_w, a.h - top - margin};
@@ -8467,6 +9190,8 @@ void scene_editor(App& a) {
     Box mid{tree.right() + margin, top, panel.x - tree.right() - 2 * margin, a.h - top - margin};
 
     // ── left: levels and puzzles ──
+    const bool was_blocked = a.ui.blocked;
+    if (ed.dragging) a.ui.blocked = true;   // while a puzzle is dragged, the rows' buttons and headers do not react
     a.ui.panel(tree);
     a.text.draw(Font::Black, 18 * s, "Niveaux et puzzles", {tree.x + 16 * s, tree.y + 14 * s}, pal::text);
     Box list{tree.x + 8 * s, tree.y + 48 * s, tree.w - 16 * s, tree.h - 168 * s};
@@ -8476,20 +9201,35 @@ void scene_editor(App& a) {
     std::string action, action_level, action_puzzle;   // done after the loop (the lists may change)
     int move_dir = 0;
     draw::clip(&list);
+    // Drag and drop of the puzzles: where a dragged puzzle can land. A row: before
+    // or after it (index), in its level; a level's header or its "+" row: at the
+    // end of that level (index −1); "Hors niveau": out of the level it came from.
+    struct DropSlot { Box box; std::string level; int index; };
+    std::vector<DropSlot> slots;
     auto puzzle_row = [&](const std::string& pid, const std::string& lid, int idx, int count) {
         Box r{list.x + 18 * s, y, list.w - 18 * s, rh - 3 * s};
         const Puzzle* pz = a.find_puzzle(pid);
         bool cur = pid == p.id && lid == ed.level;
         bool h = a.ui.hover(r) && list.contains(a.in.mouse);
         if (h) a.ui.hovering = true;
+        slots.push_back({r, lid, idx});
+        // A press on the row (not on its buttons) may start a drag.
+        if (h && a.in.pressed && pz && !(cur && !lid.empty() && a.in.mouse.x > r.right() - 96 * s)) {
+            ed.drag_pid = pid;
+            ed.drag_level = lid;
+            ed.drag_start = a.in.mouse;
+            ed.dragging = false;
+        }
+        const bool dragged = ed.dragging && ed.drag_pid == pid && ed.drag_level == lid;
+        if (dragged) draw::round_box(r, 7 * s, hex(0xffffff, 18));
         draw::round_box(r, 7 * s, with_alpha(cur ? a.theme().accent : hex(0xffffff), cur ? 0.3f : (h ? 0.08f : 0.0f)));
-        a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, pz ? pz->name : pid + tr(" (introuvable)"), {r.x + 10 * s, r.y + 8 * s}, pz ? pal::text : pal::bad);
+        a.text.draw(cur ? Font::Bold : Font::Regular, 14 * s, pz ? pz->name : pid + tr(" (introuvable)"), {r.x + 10 * s, r.y + 8 * s}, pz ? (dragged ? pal::faint : pal::text) : pal::bad);
         if (cur && !lid.empty()) {
             // × : out of this level (the puzzle itself stays, in "Hors niveau" if no level has it).
             if (a.ui.button("mx" + pid, {r.right() - 92 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xC3\x97", Style::Ghost, true, 15)) { action = "unlink"; action_level = lid; action_puzzle = pid; }
             if (idx > 0 && a.ui.button("mu" + pid, {r.right() - 62 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xE2\x86\x91", Style::Ghost, true, 14)) { action = "move"; action_level = lid; action_puzzle = pid; move_dir = -1; }
             if (idx + 1 < count && a.ui.button("md" + pid, {r.right() - 32 * s, r.y + 2 * s, 28 * s, r.h - 4 * s}, "\xE2\x86\x93", Style::Ghost, true, 14)) { action = "move"; action_level = lid; action_puzzle = pid; move_dir = 1; }
-        } else if (h && a.in.released && pz) { action = "open"; action_level = lid; action_puzzle = pid; }
+        } else if (h && a.in.released && pz && !ed.dragging) { action = "open"; action_level = lid; action_puzzle = pid; }
         y += rh;
     };
     std::set<std::string> in_level;
@@ -8500,6 +9240,7 @@ void scene_editor(App& a) {
         bool h = a.ui.hover(hr) && list.contains(a.in.mouse);
         if (h) a.ui.hovering = true;
         draw::round_box(hr, 7 * s, with_alpha(hex(0xffffff), sel ? 0.12f : (h ? 0.06f : 0.03f)));
+        slots.push_back({hr, l.id, -1});
         {   // a small triangle: pointing down when unfolded
             V2 c{hr.x + 15 * s, hr.center().y};
             float t = 5 * s;
@@ -8527,6 +9268,7 @@ void scene_editor(App& a) {
                 puzzle_row(l.puzzles[i], l.id, int(i), int(l.puzzles.size()));
             }
             Box add{list.x + 18 * s, y, list.w - 18 * s, rh - 4 * s};
+            slots.push_back({add, l.id, -1});
             if (a.ui.button("addp" + l.id, add, "+ nouveau puzzle dans ce niveau\xE2\x80\xA6", Style::Ghost, true, 13)) { action = "new"; action_level = l.id; }
             y += rh;
             if (p.id.size() && std::find(l.puzzles.begin(), l.puzzles.end(), p.id) == l.puzzles.end()) {
@@ -8540,12 +9282,41 @@ void scene_editor(App& a) {
     // Puzzles in no level.
     std::vector<std::string> loose;
     for (auto& pz : a.puzzles) if (!in_level.count(pz.id)) loose.push_back(pz.id);
-    if (!loose.empty()) {
+    if (!loose.empty() || ed.dragging) {
+        slots.push_back({{list.x, y, list.w, rh}, "", -1});
         a.text.draw(Font::Bold, 13 * s, "Hors niveau", {list.x + 6 * s, y + 10 * s}, pal::faint);
         y += rh;
         for (size_t i = 0; i < loose.size(); i++) puzzle_row(loose[i], "", int(i), int(loose.size()));
     }
+    // The drag: started once the mouse has moved a few pixels, button held.
+    if (!ed.drag_pid.empty()) {
+        if (a.in.down && !ed.dragging && std::hypot(a.in.mouse.x - ed.drag_start.x, a.in.mouse.y - ed.drag_start.y) > 6 * s) ed.dragging = true;
+        const DropSlot* target = nullptr;
+        for (auto& sl : slots)
+            if (a.in.mouse.y >= sl.box.y && a.in.mouse.y < sl.box.y + rh && list.contains(a.in.mouse)) target = &sl;
+        int index = -1;   // where in the target level (−1: at its end)
+        if (target && target->index >= 0 && !target->level.empty()) index = target->index + (a.in.mouse.y > target->box.center().y ? 1 : 0);
+        if (ed.dragging && target) {   // where it would land: a line between two rows, or the level's header lit
+            if (index >= 0) {
+                const float ly = index > target->index ? target->box.bottom() + 1 * s : target->box.y - 2 * s;
+                draw::round_box({target->box.x, ly - 1.5f * s, target->box.w, 3 * s}, 1.5f * s, a.theme().accent);
+            } else draw::round_frame(target->box, 7 * s, 2 * s, a.theme().accent);
+        }
+        if (ed.dragging) {
+            const Puzzle* dz = a.find_puzzle(ed.drag_pid);
+            const std::string label = dz ? dz->name : ed.drag_pid;
+            const float tw = a.text.width(Font::Bold, 14 * s, label);
+            draw::round_box({a.in.mouse.x + 10 * s, a.in.mouse.y - 12 * s, tw + 20 * s, 26 * s}, 8 * s, with_alpha(a.theme().accent, 0.85f));
+            a.text.draw(Font::Bold, 14 * s, label, {a.in.mouse.x + 20 * s, a.in.mouse.y - 8 * s}, hex(0x1a1206));
+        }
+        if (!a.in.down) {
+            if (ed.dragging && target) { action = "drop"; action_puzzle = ed.drag_pid; action_level = target->level; move_dir = index; }
+            ed.drag_pid.clear();
+            ed.dragging = false;
+        }
+    }
     draw::clip(nullptr);
+    a.ui.blocked = was_blocked;
     float content = y + ed.scroll - list.y;
     ed.scroll = std::clamp(ed.scroll, 0.0f, std::max(0.0f, content - list.h));
     // The selected level: its name, editable.
@@ -8567,16 +9338,20 @@ void scene_editor(App& a) {
     if (a.ui.button("lv_new", {tree.x + 12 * s, tree.bottom() - 60 * s, tree.w - 24 * s, 48 * s}, "+ Nouveau niveau", Style::Normal, true, 16)) action = "newlevel";
 
     // ── middle: brushes and board ──
-    const char* names[6] = {"Libre", "Trou", "Noir", "Blanc", "Case", "D\xC3\xA9" "cor"};
-    float tbw = (mid.w - 5 * 6 * s) / 6;
-    for (int i = 0; i < 6; i++) {
+    const char* names[7] = {"Libre", "Trou", "Noir", "Blanc", "Case", "D\xC3\xA9" "cor", "Cible"};
+    float tbw = (mid.w - 6 * 6 * s) / 7;
+    for (int i = 0; i < 7; i++) {
         Box r{mid.x + i * (tbw + 6 * s), mid.y, tbw, 44 * s};
         if (a.ui.button("tool" + std::to_string(i), r, "", ed.tool == i ? Style::Primary : Style::Normal)) ed.tool = i;
         V2 ic{r.x + 20 * s, r.center().y};
         if (i == 0) draw::round_box({ic.x - 10 * s, ic.y - 10 * s, 20 * s, 20 * s}, 4 * s, a.theme_or(p.theme).light);
         else if (i == 1) draw::round_box({ic.x - 10 * s, ic.y - 10 * s, 20 * s, 20 * s}, 4 * s, hex(0x0d0f12));
         else if (i <= 3) draw::circle_lit(ic, 10 * s, ic + V2{-3 * s, -3 * s}, i == 2 ? hex(0x5b6170) : hex(0xffffff), i == 2 ? hex(0x0a0c11) : hex(0xb9bec8));
-        else {
+        else if (i == 6) {   // a target
+            draw::ring(ic, 9 * s, 2.5f * s, TARGET_RED);
+            draw::ring(ic, 5 * s, 2 * s, hex(0xffffff));
+            draw::circle(ic, 2.5f * s, TARGET_RED);
+        } else {
             Art* ia = find_art(i == 4 ? ed.tile_art : ed.decor_art);
             Box ib{ic.x - 11 * s, ic.y - 11 * s, 22 * s, 22 * s};
             if (ia) draw_art(*ia, "idle", a.time, ib);
@@ -8634,6 +9409,10 @@ void scene_editor(App& a) {
         }
         hint2(row2.x + row2.w * 0.53f, "re-clic ou", "clic droit : retirer");
         if (a.ui.button("ed_tiles_clear", {row2.right() - 120 * s, row2.y, 120 * s, row2.h}, "Tout effacer", Style::Ghost, !p.tiles.empty(), 13)) p.tiles.clear();
+    } else if (ed.tool == 6) {
+        a.text.draw(Font::Regular, 14 * s, "Clic : poser ou retirer une cible (sur une case libre)", {row2.x + 8 * s, row2.y + 10 * s}, pal::dim);
+        if (p.goal == Puzzle::Points) a.text.draw(Font::Regular, 12 * s, "sans effet avec l'objectif Gagner", {row2.x + row2.w * 0.62f, row2.y + 12 * s}, pal::faint);
+        if (a.ui.button("ed_targets_clear", {row2.right() - 120 * s, row2.y, 120 * s, row2.h}, "Tout retirer", Style::Ghost, p.targets != 0, 13)) p.targets = 0;
     } else {
         art_choice("ed_decor", "decor", ed.decor_art, {row2.x, row2.y, row2.w * 0.33f, row2.h}, "D\xC3\xA9" "cor");
         std::vector<std::string> sz;
@@ -8652,25 +9431,57 @@ void scene_editor(App& a) {
     // The stroke's mode is decided on the press: the right button removes, and so
     // does a click on a square that already has what the brush puts there (a
     // hole with "Trou", the same drawing with "Case"): clicking twice undoes.
-    if (a.in.pressed || a.in.rpressed) {
-        ed.painting = hover_sq >= 0;
-        ed.erasing = a.in.rpressed;
-        if (hover_sq >= 0 && a.in.pressed) {
-            if (ed.tool == 1) ed.erasing = p.cells[hover_sq] == '#';
+    // A piece can be moved with the mouse whatever the brush (except "Décor"):
+    // pressed on a piece, the button held and released on another square. The
+    // brush's action waits for the release: a press and release on the same
+    // square is an ordinary click.
+    auto stroke_mode = [&](int sq, bool right) {   // decided on the press (or on the delayed click)
+        ed.erasing = right;
+        if (sq >= 0 && !right) {
+            if (ed.tool == 1) ed.erasing = p.cells[sq] == '#';
             else if (ed.tool == 4) {
-                auto it = p.tiles.find(hover_sq);
+                auto it = p.tiles.find(sq);
                 ed.erasing = ed.tile_art.empty() || (it != p.tiles.end() && it->second == ed.tile_art);   // the theme's square: always removes
             }
         }
+    };
+    bool click = a.in.pressed;   // the press that paints (a piece's press is delayed to its release)
+    if (a.in.pressed && hover_sq >= 0 && ed.tool <= 4 && (p.cells[hover_sq] == 'B' || p.cells[hover_sq] == 'W')) {
+        ed.piece_from = hover_sq;
+        ed.piece_moving = false;
+        ed.painting = false;
+        click = false;
+    } else if (a.in.pressed || a.in.rpressed) {
+        ed.painting = hover_sq >= 0;
+        stroke_mode(hover_sq, a.in.rpressed);
     }
-    if (!a.in.down && !a.in.rdown) { ed.painting = false; ed.painted = -1; }
-    if (ed.tool <= 3 && ed.painting && hover_sq >= 0 && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1 || ed.erasing)) {
+    if (ed.piece_from >= 0) {
+        if (a.in.down && hover_sq != ed.piece_from) ed.piece_moving = true;
+        if (!a.in.down) {   // released
+            const int from = ed.piece_from;
+            ed.piece_from = -1;
+            if (ed.piece_moving) {
+                if (hover_sq >= 0 && hover_sq != from) {   // onto another piece: they swap; elsewhere the origin becomes free
+                    const char moved = p.cells[from], there = p.cells[hover_sq];
+                    p.cells[hover_sq] = moved;
+                    p.cells[from] = (there == 'B' || there == 'W') ? there : '.';
+                }
+            } else if (hover_sq == from) {   // a click: the brush's action, as on a press
+                click = true;
+                ed.painting = true;
+                stroke_mode(from, false);
+            }
+            ed.piece_moving = false;
+        }
+    }
+    if (!a.in.down && !a.in.rdown && !click) { ed.painting = false; ed.painted = -1; }
+    if (ed.tool <= 3 && ed.painting && hover_sq >= 0 && hover_sq != ed.painted && (click || ed.tool <= 1 || ed.erasing)) {
         ed.painted = hover_sq;
         const char want = ed.erasing ? '.' : ed.tool == 0 ? '.' : ed.tool == 1 ? '#' : ed.tool == 2 ? 'B' : 'W';   // removing = back to a free square
         char& c = p.cells[hover_sq];
         if ((want == 'B' || want == 'W') && c != want && p.count(want) >= 4)
             a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord (pinceau Libre).", tr(want == 'B' ? "noirs" : "blancs").c_str()));
-        else if (a.in.pressed && (want == 'B' || want == 'W') && c == want) c = '.';   // a click on a piece removes it
+        else if (click && (want == 'B' || want == 'W') && c == want) c = '.';   // a click on a piece removes it
         else c = want;
         if (ed.tool == 0 || ed.erasing) p.tiles.erase(hover_sq);   // "Libre" and removing: the theme's own square again
     }
@@ -8678,6 +9489,19 @@ void scene_editor(App& a) {
         if (ed.erasing) p.tiles.erase(hover_sq);
         else if (!ed.tile_art.empty()) p.tiles[hover_sq] = ed.tile_art;
     }
+    if (ed.tool == 6 && ed.painting && hover_sq >= 0 && hover_sq != ed.painted) {   // targets: put, or removed by a stroke started on one
+        ed.painted = hover_sq;
+        const uint64_t bit = uint64_t(1) << hover_sq;
+        if (click) ed.erasing = ed.erasing || (p.targets & bit);
+        if (ed.erasing) p.targets &= ~bit;
+        else if (p.cells[hover_sq] == '.') p.targets |= bit;
+    }
+    {   // a target lives on a free square only: covered by a hole or a piece, it goes
+        uint64_t free = 0;
+        for (int sq = 0; sq < 64; sq++) if (p.cells[sq] == '.') free |= uint64_t(1) << sq;
+        if (!(ed.piece_moving && ed.piece_from >= 0)) p.targets &= free;
+    }
+    if (click && !a.in.down) { ed.painting = false; ed.painted = -1; }   // the delayed click paints once
     if (ed.tool == 5 && !modal) {   // decorations: anywhere on the board or around it
         const float q = ed.board.sq();
         Box zone = ed.board.area.inset(-frame - 10 * s);
@@ -8718,10 +9542,11 @@ void scene_editor(App& a) {
             else if (p.cells[sq] == 'W') w |= bit;
             else if (p.cells[sq] == '#') e |= bit;
         }
+        if (ed.piece_moving && ed.piece_from >= 0) { b &= ~(uint64_t(1) << ed.piece_from); w &= ~(uint64_t(1) << ed.piece_from); }   // it follows the mouse
         shown.set_state(b, w, e, 0, 0, p.to_move == BLACK ? 0 : 1);
     }
     ed.board.flipped = false;
-    const AiSpec* opp = a.ai(p.opponent);
+    const AiSpec* opp = a.ai(puzzle_opponent(p));
     // The sprite of each side: the puzzle's, or the first unit of the set of its board.
     const SpriteDef& sb = !p.sprite_black.empty() ? a.sprite(p.sprite_black)
                                                   : *a.board_units(a.theme_or(p.theme), BLACK, p.human == BLACK ? "human" : (opp ? opp->id : "dev")).front();
@@ -8734,7 +9559,12 @@ void scene_editor(App& a) {
     look.tiles = &p.tiles;
     look.decor = &p.decor;
     ed.board.draw(a.text, a.board_textures, a.theme_or(p.theme), shown, look, a.time, s);
-    if (hover_sq >= 0 && ed.tool <= 4) draw::round_frame(ed.board.square(hover_sq).inset(2 * s), 6 * s, 3 * s, hex(0xffd36b, 220));
+    draw_targets(ed.board, p, shown, nullptr, ed.tool == 6);
+    if (hover_sq >= 0 && (ed.tool <= 4 || ed.tool == 6)) draw::round_frame(ed.board.square(hover_sq).inset(2 * s), 6 * s, 3 * s, hex(0xffd36b, 220));
+    if (ed.piece_moving && ed.piece_from >= 0) {   // the piece being moved, under the mouse
+        const int side = p.cells[ed.piece_from] == 'B' ? BLACK : WHITE;
+        draw_piece(side == BLACK ? sb : sw, side, a.in.mouse, ed.board.sq() * 0.42f, 0, a.time, 1, p.human == side);
+    }
     if (ed.tool == 5)   // the decorations' boxes
         for (size_t i = 0; i < p.decor.size(); i++) {
             const float q = ed.board.sq(), w2 = p.decor[i].scale * q;
@@ -8749,7 +9579,7 @@ void scene_editor(App& a) {
     if (ed.check && problem.empty() && ed.check->key == puzzle_check_key(p)) {
         using V = PuzzleCheck::Verdict;
         if (!ed.check->done) {
-            status = strf("V\xC3\xA9rification\xE2\x80\xA6 %.0f s", a.time - ed.check->start);
+            status = strf("V\xC3\xA9rification\xE2\x80\xA6 %.0f s (cliquez sur Arr\xC3\xAAter pour l'interrompre)", a.time - ed.check->start);
             status_col = pal::dim;
         } else {
             status = ed.check->text;
@@ -8771,74 +9601,160 @@ void scene_editor(App& a) {
     y += 60 * s;
     a.text.draw(Font::Bold, 13 * s, "Introduction (montr\xC3\xA9" "e avant le puzzle)", {x, y}, pal::dim);
     a.ui.text_field("ed_text", {x, y + 18 * s, w, 36 * s}, p.text, "Une phrase pour pr\xC3\xA9senter le d\xC3\xA9" "fi", 15);
-    y += 62 * s;
-    std::vector<std::string> ai_names, ai_ids;
-    int ai_idx = 0;
-    for (auto& ai : a.roster)
-        if (ai.available) { if (ai.id == p.opponent) ai_idx = int(ai_ids.size()); ai_ids.push_back(ai.id); ai_names.push_back(ai.name); }
-    if (!ai_ids.empty()) p.opponent = ai_ids[a.ui.cycler("ed_ai", {x, y, w, 36 * s}, "IA adverse", ai_names, ai_idx)];
-    y += 42 * s;
-    a.text.draw(Font::Regular, 16 * s, "Le joueur a", {x, y + 8 * s}, pal::dim);
-    p.human = a.ui.segmented("ed_human", {x + w * 0.38f, y, w * 0.62f, 34 * s}, {"les Noirs", "les Blancs"}, p.human, 15);
-    y += 40 * s;
-    a.text.draw(Font::Regular, 16 * s, "Commence", {x, y + 8 * s}, pal::dim);
-    p.to_move = a.ui.segmented("ed_tomove", {x + w * 0.38f, y, w * 0.62f, 34 * s}, {"Noirs", "Blancs"}, p.to_move, 15);
-    y += 40 * s;
-    std::vector<std::string> goals;
-    for (int m = 1; m <= 12; m++) goals.push_back(m == 1 ? "Gagner" : strf("Gagner de %d+", m));
-    p.margin = 1 + a.ui.cycler("ed_goal", {x, y, w, 34 * s}, "Objectif", goals, p.margin - 1);
-    y += 40 * s;
-    {   // the starting points of each side (a handicap, or "win by N" that the AI really defends)
-        std::vector<std::string> pts;
-        for (int k = 0; k <= MAX_BONUS; k++) pts.push_back(k == 0 ? "0" : strf("+%d", k));
-        p.bonus[BLACK] = a.ui.cycler("ed_bonus_b", {x, y, w, 34 * s}, "Bonus des Noirs", pts, p.bonus[BLACK]);
-        y += 40 * s;
-        p.bonus[WHITE] = a.ui.cycler("ed_bonus_w", {x, y, w, 34 * s}, "Bonus des Blancs", pts, p.bonus[WHITE]);
-    }
-    y += 40 * s;
-    a.text.draw(Font::Regular, 16 * s, "Temps de l'IA", {x, y + 8 * s}, pal::dim);
-    p.time_index = a.ui.segmented("ed_time", {x + w * 0.38f, y, w * 0.62f, 34 * s}, TIME_LABELS, p.time_index, 14);
-    y += 46 * s;
-    std::vector<std::string> th_names = {"Th\xC3\xA8me du joueur"};
-    int th_idx = 0;
-    for (size_t i = 0; i < a.themes.size(); i++) { th_names.push_back(a.themes[i].name); if (a.themes[i].id == p.theme) th_idx = int(i) + 1; }
-    int ti = a.ui.cycler("ed_theme", {x, y, w, 34 * s}, "Th\xC3\xA8me", th_names, th_idx);
-    if (ti != th_idx) {   // a new theme: its board, holes, scenery and pieces (the puzzle's own choices are reset)
-        p.theme = ti == 0 ? "" : a.themes[ti - 1].id;
-        p.hole_style = "pit";
-        p.background.clear();
-        p.sprite_black.clear();
-        p.sprite_white.clear();
-    }
-    y += 40 * s;
-    std::vector<std::string> hs_names, hs_ids;
-    int hs_idx = 0;
-    for (auto& [id, name] : HOLE_STYLES) { hs_ids.push_back(id); hs_names.push_back(name); }
-    for (Art* ha : arts_of("hole")) { hs_ids.push_back("art:" + ha->id); hs_names.push_back(ha->name + tr(" (dessin)")); }
-    for (size_t i = 0; i < hs_ids.size(); i++) if (hs_ids[i] == p.hole_style) hs_idx = int(i);
-    p.hole_style = hs_ids[a.ui.cycler("ed_holes", {x, y, w, 34 * s}, "Trous", hs_names, hs_idx)];
-    y += 40 * s;
-    std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Selon le th\xC3\xA8me"};
-    int bg_idx = 0;
-    for (size_t i = 0; i < bgs.size(); i++) { bg_names.push_back(bgs[i]); if (bgs[i] == p.background) bg_idx = int(i) + 1; }
-    const float lw = 96 * s;
-    int bi = a.ui.cycler("ed_bg", {x, y, w - lw - 8 * s, 34 * s}, "Image de fond", bg_names, bg_idx);
-    p.background = bi == 0 ? "" : bgs[bi - 1];
-    if (a.ui.button("ed_bg_load", {x + w - lw, y, lw, 34 * s}, "Charger\xE2\x80\xA6", Style::Normal, true, 13)) a.choose_image("puzzle-background");
-    y += 42 * s;
-    for (int side : {BLACK, WHITE}) {
-        Box r{x + side * (w / 2 + 4 * s), y, w / 2 - 4 * s, 46 * s};
-        const std::string& id = side == BLACK ? p.sprite_black : p.sprite_white;
-        const SpriteDef& cur = side == BLACK ? sb : sw;
-        if (a.ui.button(side == BLACK ? "ed_sb" : "ed_sw", r, "", Style::Normal)) {
-            Puzzle* pp = &p;
-            bool black = side == BLACK;
-            a.open_picker(strf("Sprite des pions %s du puzzle", tr(black ? "noirs" : "blancs").c_str()), cur.id, p.human == side,
-                          [pp, black](const std::string& sid) { (black ? pp->sprite_black : pp->sprite_white) = sid; });
+    y += 58 * s;
+    // The goal's sentence, under the introduction: empty = the automatic one (shown
+    // greyed in the field); "Masquer" = none at all.
+    {
+        const float hw = 96 * s;
+        if (!p.goal_hidden) {
+            const Box gb{x, y, w - hw - 8 * s, 34 * s};
+            const std::string automatic = auto_goal_text(a, p);
+            // A click on the empty field: the automatic sentence becomes its text, to be
+            // edited rather than retyped (the click then places the caret in it).
+            if (a.in.pressed && !a.ui.blocked && a.ui.hover(gb) && a.ui.focus != "ed_goal_text" && p.goal_custom.empty()) p.goal_custom = automatic;
+            a.ui.text_field("ed_goal_text", gb, p.goal_custom, automatic, 14);
+            // Left unchanged: automatic again (it follows the goal's settings).
+            if (a.ui.focus != "ed_goal_text" && p.goal_custom == automatic) p.goal_custom.clear();
         }
-        draw_piece(cur, side, {r.x + 24 * s, r.center().y}, 16 * s, 0, a.time, 1, p.human == side);
-        a.text.draw(Font::Bold, 13 * s, side == BLACK ? "Pions noirs" : "Pions blancs", {r.x + 46 * s, r.y + 7 * s}, pal::text);
-        a.text.draw(Font::Regular, 12 * s, id.empty() ? "par d\xC3\xA9" "faut" : cur.name, {r.x + 46 * s, r.y + 25 * s}, pal::dim);
+        else {
+            draw::round_box({x, y, w - hw - 8 * s, 34 * s}, 8 * s, hex(0x0f141c, 230));
+            a.text.draw(Font::Regular, 14 * s, "(objectif masqu\xC3\xA9)", {x + 12 * s, y + 8 * s}, pal::faint);
+        }
+        if (a.ui.button("ed_goal_hide", {x + w - hw, y, hw, 34 * s}, p.goal_hidden ? "Afficher" : "Masquer", Style::Ghost, true, 13)) p.goal_hidden = !p.goal_hidden;
+    }
+    y += 42 * s;
+    // Two pages: the rules of the puzzle, and its presentation (level and look).
+    ed.panel_tab = a.ui.segmented("ed_ptab", {x, y, w, 32 * s}, {"R\xC3\xA8gles", "Pr\xC3\xA9sentation"}, ed.panel_tab, 14);
+    y += 38 * s;
+    if (ed.panel_tab == 0) {
+        std::vector<std::string> ai_names, ai_ids;
+        int ai_idx = 0;
+        for (auto& ai : a.roster)
+            if (ai.available) { if (ai.id == p.opponent) ai_idx = int(ai_ids.size()); ai_ids.push_back(ai.id); ai_names.push_back(ai.name); }
+        if (p.goal != Puzzle::Points)   // the target goals: only the exact solver plays for them (puzzle_opponent)
+            a.ui.cycler("ed_ai_forced", {x, y, w, 36 * s}, "IA adverse", {"Solveur exact (impos\xC3\xA9)"}, 0);
+        else if (!ai_ids.empty()) p.opponent = ai_ids[a.ui.cycler("ed_ai", {x, y, w, 36 * s}, "IA adverse", ai_names, ai_idx)];
+        y += 38 * s;
+        a.text.draw(Font::Regular, 16 * s, "Le joueur a", {x, y + 8 * s}, pal::dim);
+        p.human = a.ui.segmented("ed_human", {x + w * 0.38f, y, w * 0.62f, 34 * s}, {"les Noirs", "les Blancs"}, p.human, 15);
+        y += 37 * s;
+        a.text.draw(Font::Regular, 16 * s, "Commence", {x, y + 8 * s}, pal::dim);
+        p.to_move = a.ui.segmented("ed_tomove", {x + w * 0.38f, y, w * 0.62f, 34 * s}, {"Noirs", "Blancs"}, p.to_move, 15);
+        y += 37 * s;
+        {   // the goal: win by N points (1..MAX_MARGIN: a puzzle played alone, "make as many
+            // moves as you can", needs big ones), take N more targets (1..3), or reach a target first
+            constexpr int MAX_MARGIN = 50;
+            std::vector<std::string> goals;
+            for (int m = 1; m <= MAX_MARGIN; m++) goals.push_back(m == 1 ? "Gagner" : strf("Gagner de %d+", m));
+            for (int m = 1; m <= 3; m++) goals.push_back(m == 1 ? "Plus de cibles" : strf("%d cibles de plus", m));
+            goals.push_back("Premi\xC3\xA8re cible");
+            const int cur = p.goal == Puzzle::Points ? std::clamp(p.margin, 1, MAX_MARGIN) - 1
+                          : p.goal == Puzzle::Collect ? MAX_MARGIN - 1 + std::clamp(p.margin, 1, 3) : MAX_MARGIN + 3;
+            const int gi = a.ui.cycler("ed_goal", {x, y, w, 34 * s}, "Objectif", goals, cur);
+            if (gi != cur) {
+                if (gi < MAX_MARGIN) { p.goal = Puzzle::Points; p.margin = gi + 1; }
+                else if (gi < MAX_MARGIN + 3) { p.goal = Puzzle::Collect; p.margin = gi - MAX_MARGIN + 1; }
+                else { p.goal = Puzzle::First; p.margin = 1; }
+            }
+        }
+        y += 37 * s;
+        if (p.goal != Puzzle::Points) {   // the bonus counts points: nothing to do with the targets
+            a.text.paragraph(Font::Regular, 13 * s, "Cibles : posez-les avec le pinceau Cible. Les bonus de points sont sans effet ici.", {x, y + 2 * s, w, 34 * s}, pal::faint);
+            y += 37 * s;
+        } else {   // the starting points of each side (a handicap, or "win by N" that the AI really defends)
+            std::vector<std::string> pts;
+            for (int k = 0; k <= MAX_BONUS; k++) pts.push_back(k == 0 ? "0" : strf("+%d", k));
+            // One row: "Bonus", then Noirs ‹ › and Blancs ‹ ›.
+            a.text.draw(Font::Regular, 16 * s, "Bonus", {x, y + 8 * s}, pal::dim);
+            const float bx = x + 64 * s, bw = (w - 64 * s - 8 * s) / 2;
+            p.bonus[BLACK] = a.ui.cycler("ed_bonus_b", {bx, y, bw, 34 * s}, "Noirs", pts, p.bonus[BLACK], 14);
+            p.bonus[WHITE] = a.ui.cycler("ed_bonus_w", {bx + bw + 8 * s, y, bw, 34 * s}, "Blancs", pts, p.bonus[WHITE], 14);
+            y += 37 * s;
+        }
+        a.text.draw(Font::Regular, 16 * s, "Temps de l'IA", {x, y + 8 * s}, pal::dim);
+        p.time_index = a.ui.segmented("ed_time", {x + w * 0.38f, y, w * 0.62f, 34 * s}, TIME_LABELS, p.time_index, 14);
+        y += 39 * s;
+        {   // the early end: when the outcome is settled (PuzzleOutcome), at once or a few moves later
+            std::vector<std::string> ends{"jusqu'au bout", "aussit\xC3\xB4t"};
+            for (int k = 1; k <= MAX_END_DELAY; k++) ends.push_back(strf("%d coup%s apr\xC3\xA8s", k, k > 1 ? "s" : ""));
+            if (p.goal == Puzzle::First)   // the game ends on the target anyway
+                a.text.draw(Font::Regular, 14 * s, "Premi\xC3\xA8re cible : la partie s'arr\xC3\xAAte sur la cible.", {x, y + 9 * s}, pal::faint);
+            else p.end_win = a.ui.cycler("ed_end_win", {x, y, w, 34 * s}, "Si gagn\xC3\xA9" " d'avance", ends, p.end_win + 1) - 1;
+            y += 37 * s;
+            p.end_loss = a.ui.cycler("ed_end_loss", {x, y, w, 34 * s}, "Si perdu d'avance", ends, p.end_loss + 1) - 1;
+            y += 37 * s;
+            if (p.goal != Puzzle::First) a.ui.toggle("ed_win_blocked", {x, y, w, 30 * s}, "Bloqu\xC3\xA9 mais gagnant : victoire", p.win_when_blocked, 16);
+        }
+    } else {
+        {   // the level the puzzle belongs to: a puzzle in no level can only be played from "Tous les puzzles"
+            std::vector<std::string> lv_names{"Hors niveau"};
+            int lv_idx = 0;
+            for (size_t i = 0; i < a.levels.size(); i++) {
+                lv_names.push_back(a.levels[i].name);
+                const auto& ps = a.levels[i].puzzles;
+                const bool has = std::find(ps.begin(), ps.end(), p.id) != ps.end();
+                if (has && (lv_idx == 0 || a.levels[i].id == ed.level)) lv_idx = int(i) + 1;
+            }
+            const int li = a.ui.cycler("ed_level", {x, y, w, 34 * s}, "Niveau", lv_names, lv_idx);
+            if (li != lv_idx) {   // moved: out of the level it was in, at the end of the new one
+                if (editor_dirty(a) || p.id.empty()) editor_save(a);
+                if (lv_idx > 0) {
+                    Level& from = a.levels[lv_idx - 1];
+                    from.puzzles.erase(std::remove(from.puzzles.begin(), from.puzzles.end(), p.id), from.puzzles.end());
+                    save_level(from);
+                }
+                ed.level.clear();
+                if (li > 0) {
+                    Level& to = a.levels[li - 1];
+                    if (std::find(to.puzzles.begin(), to.puzzles.end(), p.id) == to.puzzles.end()) to.puzzles.push_back(p.id);
+                    save_level(to);
+                    ed.level = to.id;
+                    ed.open_levels.insert(to.id);
+                }
+            }
+        }
+        y += 40 * s;
+        std::vector<std::string> th_names = {"Th\xC3\xA8me du joueur"};
+        int th_idx = 0;
+        for (size_t i = 0; i < a.themes.size(); i++) { th_names.push_back(a.themes[i].name); if (a.themes[i].id == p.theme) th_idx = int(i) + 1; }
+        int ti = a.ui.cycler("ed_theme", {x, y, w, 34 * s}, "Th\xC3\xA8me", th_names, th_idx);
+        if (ti != th_idx) {   // a new theme: its board, holes, scenery and pieces (the puzzle's own choices are reset)
+            p.theme = ti == 0 ? "" : a.themes[ti - 1].id;
+            p.hole_style = "pit";
+            p.background.clear();
+            p.sprite_black.clear();
+            p.sprite_white.clear();
+        }
+        y += 40 * s;
+        std::vector<std::string> hs_names, hs_ids;
+        int hs_idx = 0;
+        for (auto& [id, name] : HOLE_STYLES) { hs_ids.push_back(id); hs_names.push_back(name); }
+        for (Art* ha : arts_of("hole")) { hs_ids.push_back("art:" + ha->id); hs_names.push_back(ha->name + tr(" (dessin)")); }
+        for (size_t i = 0; i < hs_ids.size(); i++) if (hs_ids[i] == p.hole_style) hs_idx = int(i);
+        p.hole_style = hs_ids[a.ui.cycler("ed_holes", {x, y, w, 34 * s}, "Trous", hs_names, hs_idx)];
+        y += 40 * s;
+        std::vector<std::string> bgs = list_backgrounds(), bg_names = {"Selon le th\xC3\xA8me"};
+        int bg_idx = 0;
+        for (size_t i = 0; i < bgs.size(); i++) { bg_names.push_back(bgs[i]); if (bgs[i] == p.background) bg_idx = int(i) + 1; }
+        const float lw = 96 * s;
+        int bi = a.ui.cycler("ed_bg", {x, y, w - lw - 8 * s, 34 * s}, "Image de fond", bg_names, bg_idx);
+        p.background = bi == 0 ? "" : bgs[bi - 1];
+        if (a.ui.button("ed_bg_load", {x + w - lw, y, lw, 34 * s}, "Charger\xE2\x80\xA6", Style::Normal, true, 13)) a.choose_image("puzzle-background");
+        y += 42 * s;
+        for (int side : {BLACK, WHITE}) {
+            Box r{x + side * (w / 2 + 4 * s), y, w / 2 - 4 * s, 46 * s};
+            const std::string& id = side == BLACK ? p.sprite_black : p.sprite_white;
+            const SpriteDef& cur = side == BLACK ? sb : sw;
+            if (a.ui.button(side == BLACK ? "ed_sb" : "ed_sw", r, "", Style::Normal)) {
+                Puzzle* pp = &p;
+                bool black = side == BLACK;
+                a.open_picker(strf("Sprite des pions %s du puzzle", tr(black ? "noirs" : "blancs").c_str()), cur.id, p.human == side,
+                              [pp, black](const std::string& sid) { (black ? pp->sprite_black : pp->sprite_white) = sid; });
+            }
+            draw_piece(cur, side, {r.x + 24 * s, r.center().y}, 16 * s, 0, a.time, 1, p.human == side);
+            a.text.draw(Font::Bold, 13 * s, side == BLACK ? "Pions noirs" : "Pions blancs", {r.x + 46 * s, r.y + 7 * s}, pal::text);
+            a.text.draw(Font::Regular, 12 * s, id.empty() ? "par d\xC3\xA9" "faut" : cur.name, {r.x + 46 * s, r.y + 25 * s}, pal::dim);
+        }
     }
     y += 54 * s;
     // The workshop (Atelier) is put aside for now.
@@ -8849,7 +9765,7 @@ void scene_editor(App& a) {
     //     return;
     // }
     // Tests.
-    Box tb{x, panel.bottom() - 178 * s, w, 104 * s};
+    Box tb{x, panel.bottom() - 206 * s, w, 134 * s};
     draw::round_box(tb, 12 * s, hex(0x0f141c, 200));
     a.text.draw(Font::Bold, 14 * s, "Tester ce puzzle", {tb.x + 12 * s, tb.y + 8 * s}, pal::dim);
     std::vector<std::string> me_names, me_ids;
@@ -8858,21 +9774,31 @@ void scene_editor(App& a) {
         if (ai.available) { if (ai.id == ed.tester) me_idx = int(me_ids.size()); me_ids.push_back(ai.id); me_names.push_back(ai.name); }
     if (ed.tester.empty() && !me_ids.empty()) me_idx = int(me_ids.size()) - 1;
     float half = (tb.w - 30 * s) / 2;
-    if (a.ui.button("ed_play", {tb.x + 10 * s, tb.y + 32 * s, half, 62 * s}, "Moi contre l'IA", Style::Primary, problem.empty(), 16)) {
+    if (a.ui.button("ed_play", {tb.x + 10 * s, tb.y + 32 * s, half, 34 * s}, "Moi contre l'IA", Style::Primary, problem.empty(), 16)) {
         editor_save(a);
         start_puzzle(a, p, "", -1, true);
         return;
     }
-    Box ab{tb.x + 20 * s + half, tb.y + 32 * s, half, 62 * s};
+    Box ab{tb.x + 20 * s + half, tb.y + 32 * s, half, 34 * s};
     if (!me_ids.empty()) {
-        if (a.ui.button("ed_ai_vs_ai", {ab.x, ab.y, ab.w, 34 * s}, "IA contre IA", Style::Normal, problem.empty(), 15)) {
+        // "IA contre IA": the AI of each side. The opponent's, by default the puzzle's
+        // opponent; the target goals impose the exact solver on both (puzzle_opponent).
+        int opp_idx = 0;
+        const std::string opp_id = ed.tester_opp.empty() ? p.opponent : ed.tester_opp;
+        for (size_t i = 0; i < me_ids.size(); i++) if (me_ids[i] == opp_id) opp_idx = int(i);
+        if (a.ui.button("ed_ai_vs_ai", ab, "IA contre IA", Style::Normal, problem.empty(), 15)) {
             editor_save(a);
-            start_puzzle(a, p, "", -1, true, me_ids[me_idx]);
+            start_puzzle(a, p, "", -1, true, me_ids[me_idx], me_ids[opp_idx]);
             return;
         }
-        // The AI playing the player's side.
-        int k = a.ui.cycler("ed_tester", {ab.x, ab.y + 38 * s, ab.w, 24 * s}, "", me_names, me_idx, 12);
-        ed.tester = me_ids[k];
+        const float cy = tb.y + 72 * s;
+        if (p.goal != Puzzle::Points) {
+            a.text.draw(Font::Regular, 13 * s, "Objectif \xC3\xA0 cibles : le solveur exact joue des deux c\xC3\xB4t\xC3\xA9s.", {tb.x + 12 * s, cy + 18 * s}, pal::faint);
+        } else {
+            ed.tester = me_ids[a.ui.cycler("ed_tester", {tb.x + 10 * s, cy, tb.w - 20 * s, 26 * s}, "IA du joueur", me_names, me_idx, 13)];
+            const int k = a.ui.cycler("ed_tester_opp", {tb.x + 10 * s, cy + 30 * s, tb.w - 20 * s, 26 * s}, "IA adverse", me_names, opp_idx, 13);
+            if (k != opp_idx) ed.tester_opp = me_ids[k];
+        }
     }
     // File actions.
     Box fb{x, panel.bottom() - 62 * s, w, 46 * s};
@@ -8946,6 +9872,28 @@ void scene_editor(App& a) {
         ed.confirm_level.clear();
         a.reload_puzzles();
         a.notify("Niveau supprim\xC3\xA9 ; ses puzzles sont dans \xC2\xAB Hors niveau \xC2\xBB s'ils n'ont plus de niveau.");
+    } else if (action == "drop") {   // a puzzle dragged in the list: out of its level, into the target one (move_dir: the index, −1 the end)
+        const std::string from = ed.drag_level;
+        int index = move_dir;
+        for (auto& l : a.levels)
+            if (l.id == from && from != action_level) {
+                l.puzzles.erase(std::remove(l.puzzles.begin(), l.puzzles.end(), action_puzzle), l.puzzles.end());
+                save_level(l);
+            }
+        for (auto& l : a.levels)
+            if (l.id == action_level) {
+                auto it = std::find(l.puzzles.begin(), l.puzzles.end(), action_puzzle);
+                if (it != l.puzzles.end()) {   // already there (a move inside the level, or a copy of it): taken out first
+                    const int old = int(it - l.puzzles.begin());
+                    l.puzzles.erase(it);
+                    if (index > old) index--;
+                }
+                if (index < 0 || index > int(l.puzzles.size())) index = int(l.puzzles.size());
+                l.puzzles.insert(l.puzzles.begin() + index, action_puzzle);
+                save_level(l);
+                ed.open_levels.insert(l.id);
+            }
+        if (action_puzzle == p.id) ed.level = action_level;
     } else if (action == "add") {
         for (auto& l : a.levels)
             if (l.id == action_level) { l.puzzles.push_back(p.id); save_level(l); }
@@ -8973,6 +9921,7 @@ void scene_editor(App& a) {
         ed.open_levels.insert(l.id);
         ed.level_selected = l.id;
         a.ui.focus = "lv_name";
+        a.ui.caret = a.ui.anchor = std::string::npos;   // at the end of the name
         a.notify("Niveau cr\xC3\xA9\xC3\xA9 : donnez-lui un nom, puis ajoutez des puzzles.");
     } else if (action == "dup") {
         if (editor_dirty(a) && !p.id.empty()) editor_save(a);
@@ -10156,7 +11105,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {
     case SDL_EVENT_QUIT: return SDL_APP_SUCCESS;
     case SDL_EVENT_MOUSE_MOTION: a->in.mouse = {e->motion.x, e->motion.y}; break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        if (e->button.button == SDL_BUTTON_LEFT) { a->in.down = true; a->in.pressed = true; a->in.mouse = {e->button.x, e->button.y}; }
+        if (e->button.button == SDL_BUTTON_LEFT) { a->in.down = true; a->in.pressed = true; a->in.clicks = e->button.clicks; a->in.mouse = {e->button.x, e->button.y}; }
         if (e->button.button == SDL_BUTTON_RIGHT) { a->in.rdown = true; a->in.rpressed = true; a->in.mouse = {e->button.x, e->button.y}; }
         break;
     case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -10170,7 +11119,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* e) {
     case SDL_EVENT_MOUSE_WHEEL: a->in.wheel += e->wheel.y; break;
     case SDL_EVENT_KEY_DOWN:
         if (!e->key.repeat) a->in.keys.push_back(e->key.key);
-        if (e->key.key == SDLK_BACKSPACE) a->in.backspaces++;
+        {
+            const SDL_Keycode k = e->key.key;
+            const bool ctrl = e->key.mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI);
+            if (k == SDLK_LEFT || k == SDLK_RIGHT || k == SDLK_HOME || k == SDLK_END || k == SDLK_DELETE || k == SDLK_BACKSPACE
+                || (ctrl && (k == SDLK_A || k == SDLK_C || k == SDLK_X || k == SDLK_V || k == SDLK_Z || k == SDLK_Y)))
+                a->in.edit_keys.push_back({k, e->key.mod});
+        }
         break;
     case SDL_EVENT_TEXT_INPUT: a->in.text += e->text.text; break;
     default: break;
@@ -10219,7 +11174,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
         a->in.wheel = 0;
         a->in.keys.clear();
         a->in.text.clear();
-        a->in.backspaces = 0;
+        a->in.edit_keys.clear();
     }
     switch (a->scene) {
     case Scene::Menu: scene_menu(*a); break;
@@ -10302,7 +11257,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     a->in.files.clear();
     a->in.keys.clear();
     a->in.text.clear();
-    a->in.backspaces = 0;
+    a->in.edit_keys.clear();
     return SDL_APP_CONTINUE;
 }
 

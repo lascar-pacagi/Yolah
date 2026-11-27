@@ -628,12 +628,12 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
 
 <h3 id="s3-staged"><span class="num">3.5</span>Staged move generation</h3>
 <div class="col">
-<p>The table's move is the best move of an earlier search of this position. It often cuts at once, and then the other moves are never needed. So it is searched <strong>first, before the other moves are even generated</strong>; they are generated and scored only if it does not cut (stage 2, at <code>i = 1</code> in the loop). A table move can be illegal (two positions sharing hash bits), so <code>is_legal</code> checks it: the piece must be on the origin and the destination reachable by a queen move. In pure alpha-beta the tree is the same as without stages; with reductions the other moves are scored after the table's move was searched, with fresher killers and history (−4 % nodes, −6 % time).</p>
+<p>The table's move is the best move of an earlier search of this position. It often cuts at once, and then the other moves are never needed. So it is searched <strong>first, before the other moves are even generated</strong>; they are generated and scored only if it does not cut (stage 2, at <code>i = 1</code> in the loop). A table move can be illegal (two positions sharing hash bits), so <code>is_legal_slide</code> checks it: the piece must be on the origin and the destination reachable by a queen move. In pure alpha-beta the tree is the same as without stages; with reductions the other moves are scored after the table's move was searched, with fresher killers and history (−4 % nodes, −6 % time).</p>
 <p>The proxy cut of the next section needs the full list: when it runs, it generates and scores the moves itself, and the loop then starts with the full list.</p>
 </div>
-<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax, stage 1 and is_legal (excerpt)">
+<script type="text/x-code" data-lang="cpp" data-title="player/minmax_nnue_dev_player.cpp · negamax, stage 1 and is_legal_slide (excerpt)">
     Yolah::MoveList moves;
-    const bool tt_first = tt_move != Move::none() && is_legal(yolah, tt_move);
+    const bool tt_first = tt_move != Move::none() && is_legal_slide(yolah, tt_move);
     bool generated = false;
     if (!tt_first) {
         yolah.moves(moves);
@@ -648,7 +648,7 @@ int MinMaxNNUE_DevPlayer::negamax(Yolah& yolah, Search& s, uint64_t hash, int al
 
 // A move of the side to move is legal if its piece is on the origin and the
 // destination is free and reachable in a straight line through free squares.
-bool MinMaxNNUE_DevPlayer::is_legal(const Yolah& yolah, Move m) {
+bool MinMaxNNUE_DevPlayer::is_legal_slide(const Yolah& yolah, Move m) {
     if (m == Move::none()) return false;
     const uint64_t from = uint64_t(1) << m.from_sq(), to = uint64_t(1) << m.to_sq();
     if (!(yolah.bitboard(yolah.current_player()) & from)) return false;
@@ -1375,7 +1375,7 @@ void SearchTable::store(uint64_t hash, int free, int depth, int alpha, int beta,
 <p>Threads read and write the table at every node; a lock per entry would cost more than it saves. So the table is written without locks, and two threads may write the same 16-byte entry at the same moment, leaving a <strong>torn</strong> entry: half of one store, half of another. This is rare, and the search is built to survive it, as it already survives two positions that share the same key bits:</p>
 <ul>
 <li>the key check (bits 63–16 of the hash) rejects most torn entries;</li>
-<li>a table move is never played blindly: <code>is_legal</code> checks that the side to move has a piece on the origin and that the destination is free and reachable through free squares, before the move is searched first (section 3.5); a killer is checked the same way before it serves as the proxy cut's witness (section 3.6);</li>
+<li>a table move is never played blindly: <code>is_legal_slide</code> checks that the side to move has a piece on the origin and that the destination is free and reachable through free squares, before the move is searched first (section 3.5); a killer is checked the same way before it serves as the proxy cut's witness (section 3.6);</li>
 <li>a wrong bound can at worst cut one node wrongly, as a hash collision would; it does not crash anything.</li>
 </ul>
 <p>The evaluation cache has no such problem: each entry is one 64-bit word, key and value together, read and written by single atomic operations (section 7.1). The <code>stop</code> flag is an <code>std::atomic_bool</code> read with relaxed ordering.</p>
@@ -1424,11 +1424,11 @@ int MinMaxNNUE_DevPlayer::evaluate(const Yolah& yolah, Search& s, uint64_t hash)
         const uint64_t word = e->load(std::memory_order_relaxed);
         if ((word & 1) && (word & KEY_MASK) == key) {
             s.nb_eval_hits++;
-            return int16_t(uint16_t(word >> 1));
+            return int16_t(word >> 1);   // the low 16 bits, signed (modulo 2^16 since C++20); the store keeps its uint16_t: it must not sign-extend into the key
         }
     }
     const int v = network_value(yolah, s);      // = raw_network_value (no tempo, no grain)
-    if (e) e->store(key | (uint64_t(uint16_t(int16_t(v))) << 1) | 1, std::memory_order_relaxed);
+    if (e) e->store(key | (uint64_t(uint16_t(v)) << 1) | 1, std::memory_order_relaxed);
     return v;
 }
 </script>

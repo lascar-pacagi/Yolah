@@ -20,7 +20,7 @@ else.
 
 ### `player/alphazero_mcts.h` {#sec-src-player-alphazero-mcts-h}
 
-*317 lines.*
+*349 lines.*
 
 The public surface: the parameter block, what a search reports, and the class.
 The header comment is the algorithm overview — the same one @sec-puct through
@@ -240,6 +240,17 @@ struct SearchParams {
     float    playout_cap_fast_prob = 0.0f;
     uint64_t nb_simulations_fast   = 0;
 
+    // ── score utility (KataGo-like) ──
+    // The value of a finished game is ±1 for a win/loss, 0 for a draw. With
+    // score_utility u > 0 it becomes (1 − u)·sign(d) + u·tanh(d / score_scale),
+    // d the final point margin for the player to move: still in [−1, 1], a win
+    // still beats a draw, but among won (or lost) endings the bigger margin is
+    // preferred, so the search keeps playing purposeful moves once the game is
+    // decided. Only finished games carry it (the network predicts no score).
+    // 0 = off (pure win/draw/loss).
+    float    score_utility    = 0.0f;
+    float    score_scale      = 10.0f;
+
     // ── misc ──
     bool     reuse_tree       = true;
     uint64_t seed             = 0;           // 0 = random_device
@@ -251,7 +262,9 @@ struct ChildStat {
     uint32_t visits;    // edge visits N(s,a), before any pruning
     float q;            // Q(s,a) for the side to move at the root, ∈ [-1, 1]
     float q2;           // mean of Q² over the child's visits (for the LCB variance)
-    float play_value;   // visits after policy target pruning / LCB adjustment
+    float play_value;   // visits after policy target pruning / LCB adjustment (the greedy move choice)
+    float target;       // visits after policy target pruning only: the training target π and the
+                        // opening-phase sampling (KataGo extracts the policy target without LCB)
     float lcb;          // Q(s,a) − lcb_stdevs · σ(Q), or -2 if not computed
 };
 
@@ -276,6 +289,18 @@ struct SearchResult {
     std::string to_string(size_t max_children = 8) const;
 };
 
+// Another value for the leaves (player/leaf_minimax.h: a short minimax NNUE
+// search late in the game). Called by the search thread that gathered the
+// leaf, right after the network evaluated it: returns true and sets `value`
+// (for the side to move at `state`, in [−1, 1]) to replace the network's
+// value; false keeps it. The priors stay the network's. `thread` is the
+// search thread's index (0 .. nb_threads − 1), so that each thread can own
+// its engine. The value replaced is also the one stored in the network cache.
+struct LeafValue {
+    virtual ~LeafValue() = default;
+    virtual bool value(size_t thread, const Yolah& state, float net_value, float& value) = 0;
+};
+
 class Search {
 public:
     Search(nn::Evaluator& evaluator, const SearchParams& params, std::pmr::memory_resource* memory);
@@ -294,6 +319,8 @@ public:
     SearchParams&       params()       { return prm; }
     const SearchParams& params() const { return prm; }
     size_t nb_nodes() const { return node_count.load(std::memory_order_relaxed); }
+    // The leaves' other value (null = the network's only). Not owned.
+    void set_leaf_value(LeafValue* lv) { leaf_value = lv; }
 
 private:
     struct Node;
@@ -330,13 +357,14 @@ private:
     void  expand(Node& node, const Yolah::MoveList& moves, const float* priors, float value);
     void  backup(const PathStep* path, size_t length, float leaf_value);
     void  undo_pending(const PathStep* path, size_t length);
-    static float terminal_value(const Yolah& state);
+    float terminal_value(const Yolah& state) const;
     // result
     SearchResult make_result(const Yolah& state, double seconds, uint64_t sims,
                              uint64_t collisions, Worker& w) const;
     void root_play_values(std::vector<ChildStat>& children) const;
 
     nn::Evaluator& evaluator;
+    LeafValue* leaf_value = nullptr;
     SearchParams prm;
     std::pmr::polymorphic_allocator<> alloc;
     Shard shards[NB_SHARDS];
@@ -357,8 +385,12 @@ private:
     std::chrono::steady_clock::time_point deadline;
     uint64_t sim_budget = 0;               // simulations for the current search (playout cap)
     bool     full_search = true;           // false = fast search: no noise, no forced playouts
-    PRNG     rng;                          // search-level PRNG (playout cap randomization)
+    // base_seed first: rng is initialised from it (members are initialised in
+    // declaration order). With seed 0 both used to differ only in base_seed:
+    // rng started from a constant, so every self-play game drew the same
+    // sequence of full / fast searches.
     uint64_t base_seed;
+    PRNG     rng;                          // search-level PRNG (playout cap randomization)
     uint64_t search_counter = 0;
 };
 
@@ -370,7 +402,7 @@ private:
 
 ### `player/alphazero_mcts.cpp` {#sec-src-player-alphazero-mcts-cpp}
 
-*857 lines.*
+*877 lines.*
 
 The implementation, in the order the search uses it: the graph representation,
 the node table and its garbage collection, re-rooting, the selection rule, the
@@ -500,6 +532,7 @@ struct Search::Worker {
         uint32_t path_len;
     };
     PRNG prng;
+    size_t id = 0;                       // the thread's index (LeafValue)
     std::vector<Leaf> leaves;            // distinct leaves to evaluate
     std::vector<Descent> descents;       // one per gathered visit
     std::vector<PathStep> paths;         // (batch_size + 1) × MAX_PATH steps
@@ -545,17 +578,20 @@ namespace {
     }
 }
 
-float Search::terminal_value(const Yolah& state) {
+float Search::terminal_value(const Yolah& state) const {
     const auto [black, white] = state.score();
     const int diff = (state.current_player() == Yolah::BLACK ? 1 : -1) * (int(black) - int(white));
-    return diff > 0 ? 1.0f : (diff < 0 ? -1.0f : 0.0f);
+    const float outcome = diff > 0 ? 1.0f : (diff < 0 ? -1.0f : 0.0f);
+    if (prm.score_utility <= 0.0f) return outcome;
+    return (1.0f - prm.score_utility) * outcome + prm.score_utility * std::tanh(float(diff) / prm.score_scale);
 }
 
 // ── construction / node table ──────────────────────────────────────────────
 Search::Search(nn::Evaluator& evaluator, const SearchParams& params, std::pmr::memory_resource* memory)
     : evaluator(evaluator), prm(params), alloc(memory),
-      rng(params.seed ? params.seed : 0x2545F4914F6CDD1Dull),
-      base_seed(params.seed ? params.seed : std::random_device{}()) {
+      base_seed(params.seed ? params.seed
+                            : (uint64_t(std::random_device{}()) << 32 | std::random_device{}())),
+      rng((base_seed ^ 0x2545F4914F6CDD1Dull) | 1) {
     if (prm.microseconds == 0 && prm.nb_simulations == 0)
         throw std::invalid_argument("az::Search: either microseconds or nb_simulations must be > 0");
     prm.nb_threads = std::max<size_t>(1, prm.nb_threads);
@@ -813,7 +849,10 @@ uint32_t Search::select_child(const Node& node, bool is_root) const {
                 q = (child->w.load(std::memory_order_relaxed) - static_cast<float>(cp)) / (cn + cp);
         }
         float score = q + explore_scaling * p / (1.0f + n_eff);
-        if (forced && n_eff > 0 && static_cast<float>(n_eff) < std::sqrt(forced_scale * p))
+        // (n > 0: a COMPLETED visit. With n + pending, a child chosen once in
+        // this batch got the bonus at once, and the next descents of the batch
+        // rode along on the same unevaluated leaf, backing up its value again.)
+        if (forced && n > 0 && static_cast<float>(n_eff) < std::sqrt(forced_scale * p))
             score += 1e6f;
         if (score > best_score) { best_score = score; best = i; }
     }
@@ -1025,7 +1064,14 @@ void Search::run_worker(Worker& w, const Yolah& root_position) {
             // ── 3. expand ... ──
             for (size_t i = 0; i < nb; i++) {
                 Worker::Leaf& leaf = w.leaves[i];
-                const nn::Result& r = w.results[i];
+                nn::Result& r = w.results[i];
+                // Another value for the leaf (LeafValue: a minimax late in the
+                // game): it replaces the network's here, so the cache, the
+                // expansion and the back-ups below all use it.
+                if (leaf_value) {
+                    float v;
+                    if (leaf_value->value(w.id, leaf.state, r.value, v)) r.value = v;
+                }
                 priors_from_logits(r, leaf.moves.size(), priors);
                 cache->store(leaf.hash, leaf.moves.size(), r.value, priors);
                 expand(*leaf.node, leaf.moves, priors, r.value);
@@ -1073,6 +1119,7 @@ SearchResult Search::search(const Yolah& state) {
         // Distinct, non-zero seeds per thread and per search.
         const uint64_t seed = (base_seed + 0x9E3779B97F4A7C15ull * (search_counter * prm.nb_threads + t + 1)) | 1;
         workers.push_back(std::make_unique<Worker>(seed, prm.batch_size));
+        workers.back()->id = t;
     }
     ++search_counter;
 
@@ -1102,7 +1149,10 @@ SearchResult Search::search(const Yolah& state) {
 
 // Play values of the root's moves: the edge visits, with the forced playouts
 // taken back out (KataGo's getReducedPlaySelectionWeight) and the LCB bonus
-// applied. They serve both as the training target π and as the move choice.
+// applied: the greedy move choice. Before the LCB step they are copied to
+// `target`: the training target π and the opening-phase sampling (the LCB
+// gives its winner up to 25× another child's value — it says which move to
+// play, not how the visits were distributed).
 void Search::root_play_values(std::vector<ChildStat>& children) const {
     const size_t nb = children.size();
     if (nb == 0) return;
@@ -1144,6 +1194,8 @@ void Search::root_play_values(std::vector<ChildStat>& children) const {
             c.play_value = std::min(c.play_value, std::ceil(std::max(0.0f, wanted)));
         }
     }
+
+    for (ChildStat& c : children) c.target = c.play_value;
 
     // ── 3. LCB: give the best lower bound enough play value to be chosen ──
     if (!prm.use_lcb || total <= 0.0f) return;
@@ -1224,13 +1276,13 @@ SearchResult Search::make_result(const Yolah& state, double seconds, uint64_t si
     });
     if (res.children.empty()) return res;   // terminal root
 
-    // Training target π: the play values, normalised. If the search could not
-    // complete a single simulation, fall back to the priors.
+    // Training target π: the play values before the LCB step, normalised. If
+    // the search could not complete a single simulation, fall back to the priors.
     float total = 0.0f;
-    for (const ChildStat& c : res.children) total += c.play_value;
+    for (const ChildStat& c : res.children) total += c.target;
     res.policy.resize(res.children.size());
     for (size_t i = 0; i < res.children.size(); i++)
-        res.policy[i] = total > 0 ? res.children[i].play_value / total : res.children[i].prior;
+        res.policy[i] = total > 0 ? res.children[i].target / total : res.children[i].prior;
 
     // Move choice: the best play value or, in the self-play opening phase, a
     // sample ∝ π^(1/τ).
@@ -1239,7 +1291,7 @@ SearchResult Search::make_result(const Yolah& state, double seconds, uint64_t si
         std::vector<double> weights(res.children.size());
         double sum = 0.0;
         for (size_t i = 0; i < weights.size(); i++) {
-            weights[i] = std::pow(static_cast<double>(res.children[i].play_value), 1.0 / prm.temperature);
+            weights[i] = std::pow(static_cast<double>(res.children[i].target), 1.0 / prm.temperature);
             sum += weights[i];
         }
         double r = (w.prng.rand<uint64_t>() >> 11) * 0x1.0p-53 * sum;
@@ -1282,7 +1334,7 @@ std::string SearchResult::to_string(size_t max_children) const {
 
 ### `player/alphazero_mcts_player.h` {#sec-src-player-alphazero-mcts-player-h}
 
-*92 lines.*
+*99 lines.*
 
 The `Player` wrapper. The header comment is the authoritative JSON schema — the
 parameter reference in @sec-parameters is the same list with the defaults spelled
@@ -1337,7 +1389,9 @@ out.
 //   "reuse tree": true,
 //   "nn cache": 64,                   // MB of transposition cache for network outputs (0 = off)
 //   "seed": 0,
-//   "verbose": false                  // print the root statistics after every move
+//   "verbose": false,                 // print the root statistics after every move
+//   "leaf minimax": { ... }           // optional: late leaves valued by a minimax NNUE search
+//                                     //   (player/leaf_minimax.h, campaign H2)
 // }
 // Only "microseconds" (or "nb simulations") and "weights" are mandatory.
 //
@@ -1359,6 +1413,7 @@ out.
 #include "nn_evaluator.h"
 #include <memory>
 #include <memory_resource>
+class LeafMinimax;
 #include <string>
 
 class AlphaZeroMCTSPlayer : public Player {
@@ -1387,6 +1442,10 @@ private:
     bool verbose;
     std::pmr::synchronized_pool_resource memory;
     std::unique_ptr<nn::Evaluator> net;
+    std::unique_ptr<LeafMinimax> leaf_mm;   // before searcher: destroyed after it
+    // per game, with a leaf minimax: new leaves (network evaluations) and seconds of the moves before / from its "min ply"
+    uint64_t sims_early = 0, sims_late = 0;
+    double   secs_early = 0, secs_late = 0;
     std::unique_ptr<az::Search> searcher;
     az::SearchResult last;
 };
@@ -1397,7 +1456,7 @@ private:
 
 ### `player/alphazero_mcts_player.cpp` {#sec-src-player-alphazero-mcts-player-cpp}
 
-*149 lines.*
+*173 lines.*
 
 JSON in, `SearchParams` out, plus the decision of whether to wrap the backend in
 a `BatchingEvaluator`. The only subtlety is the ordering in the constructor: the
@@ -1416,6 +1475,7 @@ resource it allocated the graph from — hence the explicit destructor.
 ``` {.cpp .numberLines}
 #include "alphazero_mcts_player.h"
 #include "batched_evaluator.h"
+#include "leaf_minimax.h"
 #include <iostream>
 #include <stdexcept>
 #include <thread>
@@ -1468,6 +1528,8 @@ az::SearchParams AlphaZeroMCTSPlayer::search_params(const json& j) {
     p.dirichlet_epsilon  = j.value("dirichlet epsilon", p.dirichlet_epsilon);
     p.temperature        = j.value("temperature", p.temperature);
     p.temperature_cutoff = j.value("temperature cutoff", p.temperature_cutoff);
+    p.score_utility      = j.value("score utility", p.score_utility);
+    p.score_scale        = j.value("score scale", p.score_scale);
     p.reuse_tree         = j.value("reuse tree", true);
     p.seed               = j.value("seed", uint64_t(0));
     return p;
@@ -1492,6 +1554,10 @@ AlphaZeroMCTSPlayer::AlphaZeroMCTSPlayer(const json& j) : cfg(j) {
         net = std::move(backend);
     }
     searcher = std::make_unique<az::Search>(*net, p, &memory);
+    if (j.contains("leaf minimax")) {
+        leaf_mm = std::make_unique<LeafMinimax>(j["leaf minimax"], p.nb_threads, p.score_utility, p.score_scale);
+        searcher->set_leaf_value(leaf_mm.get());
+    }
 }
 
 AlphaZeroMCTSPlayer::~AlphaZeroMCTSPlayer() {
@@ -1501,12 +1567,28 @@ AlphaZeroMCTSPlayer::~AlphaZeroMCTSPlayer() {
 
 Move AlphaZeroMCTSPlayer::play(Yolah yolah) {
     last = searcher->search(yolah);
-    if (verbose) std::cout << last.to_string() << std::flush;
+    if (leaf_mm) {
+        // the root's subtree reaches the leaf minimax's plies from a few plies before them: "late" = the
+        // moves whose root is at most 4 plies before "min ply"
+        const bool late = yolah.nb_plies() + 4 >= cfg["leaf minimax"].value("min ply", 30);
+        (late ? sims_late : sims_early) += last.nb_evaluations;   // new leaves (network calls), not the simulations: late in the game most of these back up finished games
+        (late ? secs_late : secs_early) += last.seconds;
+    }
+    if (verbose) std::cout << last.to_string() << (leaf_mm ? leaf_mm->stats() : std::string()) << std::flush;
     return last.best_move;
 }
 
 void AlphaZeroMCTSPlayer::game_over(Yolah) {
     searcher->reset();
+    if (leaf_mm) {
+        // one line per game on stderr (the tournament's log): what the leaf searches cost
+        std::cerr << "[leaf minimax] new leaves/s " << uint64_t(sims_early / std::max(secs_early, 1e-9))
+                  << " before, " << uint64_t(sims_late / std::max(secs_late, 1e-9)) << " from min ply - 4; "
+                  << leaf_mm->stats() << std::flush;
+        sims_early = sims_late = 0;
+        secs_early = secs_late = 0;
+        leaf_mm->new_game();
+    }
 }
 
 void AlphaZeroMCTSPlayer::reload_weights(const std::string& filename) {
@@ -1518,7 +1600,8 @@ void AlphaZeroMCTSPlayer::reload_weights(const std::string& filename) {
 }
 
 std::string AlphaZeroMCTSPlayer::info() {
-    return "alphazero mcts player (PUCT + value/policy resnet, " + net->info() + ")";
+    return "alphazero mcts player (PUCT + value/policy resnet, " + net->info() + ")"
+         + (leaf_mm ? " + leaf minimax from ply " + std::to_string(cfg["leaf minimax"].value("min ply", 30)) : "");
 }
 
 json AlphaZeroMCTSPlayer::config() {
@@ -1904,7 +1987,7 @@ std::unique_ptr<Evaluator> make_evaluator(const json& j) {
 
 ### `nnue/batched_evaluator.h` {#sec-src-nnue-batched-evaluator-h}
 
-*85 lines.*
+*89 lines.*
 
 The wrapper that merges several search threads into one backend call. The
 header comment explains the three conditions that fire a batch; the empty-request
@@ -1997,6 +2080,10 @@ private:
     size_t queued_positions = 0;
     size_t waiting_clients = 0;
     bool stop = false;
+    // The backend is running a batch (the mutex is released meanwhile):
+    // reload() waits for the end of it.
+    bool evaluating = false;
+    std::condition_variable cv_idle;
     std::thread worker;
 
     // Scratch owned by the worker.
@@ -2012,7 +2099,7 @@ private:
 
 ### `nnue/batched_evaluator.cpp` {#sec-src-nnue-batched-evaluator-cpp}
 
-*98 lines.*
+*108 lines.*
 
 The queue. FIFO, so no client can starve; the worker fires on whichever of the
 three conditions comes first, and `reload` takes the same lock as the worker so
@@ -2050,7 +2137,11 @@ std::string BatchingEvaluator::info() const {
 
 void BatchingEvaluator::reload(const std::string& weights_filename) {
     // Serialise with the worker: no batch may be running while weights change.
-    std::lock_guard lock(mutex);
+    // The worker releases the mutex while the backend evaluates, so holding it
+    // is not enough: wait for the batch in flight to end (the worker cannot
+    // start another one while we hold the mutex).
+    std::unique_lock lock(mutex);
+    cv_idle.wait(lock, [&] { return !evaluating; });
     impl->reload(weights_filename);
 }
 
@@ -2067,7 +2158,9 @@ void BatchingEvaluator::evaluate(std::span<const Request> in, std::span<Result> 
     ++waiting_clients;
     cv_worker.notify_one();
     cv_clients.wait(lock, [&] { return job.done; });
-    --waiting_clients;
+    // (waiting_clients was decremented by the worker when the job was done:
+    // decremented here, after the wake-up, the worker could already be
+    // deciding on the next batch with the finished clients still counted.)
 }
 
 void BatchingEvaluator::worker_loop() {
@@ -2102,9 +2195,12 @@ void BatchingEvaluator::worker_loop() {
 
         // Run the backend without holding the lock so clients can keep queueing.
         if (!batch_in.empty()) {
+            evaluating = true;
             lock.unlock();
             impl->evaluate(batch_in, std::span<Result>(batch_out.data(), batch_in.size()));
             lock.lock();
+            evaluating = false;
+            cv_idle.notify_all();
         }
 
         size_t offset = 0;
@@ -2113,6 +2209,7 @@ void BatchingEvaluator::worker_loop() {
             offset += j->in.size();
             j->done = true;
         }
+        waiting_clients -= taken.size();
         cv_clients.notify_all();
     }
 }
@@ -2640,7 +2737,7 @@ private:
 
 ### `nnue/resnet_torch.cpp` {#sec-src-nnue-resnet-torch-cpp}
 
-*87 lines.*
+*89 lines.*
 
 Load the traced module, stage the batch into a pinned CPU tensor, one forward,
 read the two outputs back. The mutex serialises forwards — callers are batched
@@ -2688,8 +2785,10 @@ void ResNetTorch::load(const std::string& module_filename) {
     module.eval();
     if (fp16) module.to(torch::kHalf);
     filename = module_filename;
-    // Warm up cuDNN / the executor on the shapes the search is likely to use.
+    // Warm up cuDNN / the executor on the shapes the search is likely to use,
+    // in the mode evaluate() runs in.
     torch::NoGradGuard no_grad;
+    c10::InferenceMode inference;
     for (int64_t n : {int64_t(1), int64_t(8), int64_t(32), int64_t(128), int64_t(preferred_batch)}) {
         torch::Tensor x = torch::zeros({n, PLANES, 8, 8}, torch::TensorOptions().dtype(fp16 ? torch::kHalf : torch::kFloat32).device(device));
         module.forward({x});
@@ -2755,7 +2854,7 @@ choice when the cache fits in page cache).
 
 ### `nnue/cnn_resnet_value_policy_chunked.py` {#sec-src-nnue-cnn-resnet-value-policy-chunked-py}
 
-*875 lines.*
+*876 lines.*
 
 The network definition, the encoding, and the training loop.
 
@@ -3253,6 +3352,12 @@ class Net(nn.Module):
     def forward(self, x):
         return self.heads(self.trunk(x))
 
+    def clip(self):
+        # No-op: kept so the training loop can call model.clip() uniformly
+        # across networks (the NNUE variants clamp weights here for int8
+        # quantization; this CNN does not need it).
+        pass
+
 
 def net_from_state_dict(sd, cls=None, strict=True):
     """
@@ -3266,12 +3371,6 @@ def net_from_state_dict(sd, cls=None, strict=True):
                        num_actions=sd["policy_fc.weight"].shape[0],
                        global_pool="value_gp_fc.weight" in sd)
     return net, net.load_state_dict(sd, strict=strict)
-
-    def clip(self):
-        # No-op: kept so the training loop can call model.clip() uniformly
-        # across networks (the NNUE variants clamp weights here for int8
-        # quantization; this CNN does not need it).
-        pass
 
 
 # ── Training configuration ──────────────────────────────────────────────────
@@ -3598,7 +3697,8 @@ class TrainerDDP:
             self._validate(epoch)
             if self.gpu_id == 0 and epoch % self.save_every == 0:
                 self._save_checkpoint(epoch)
-        self._save_checkpoint(nb_epochs - 1)    # always save the final model
+        if self.gpu_id == 0:
+            self._save_checkpoint(nb_epochs - 1)    # always save the final model (rank 0 only)
 
 
 def main(rank, world_size, batch_size, cache_dir):
@@ -4266,7 +4366,7 @@ two search configurations, and the cluster image and job scripts.
 
 ### `player/alphazero_selfplay.h` {#sec-src-player-alphazero-selfplay-h}
 
-*115 lines.*
+*130 lines.*
 
 The row format and the self-play entry point. `TrainingSample` is written to
 disk as is (336 bytes, no padding — the `static_assert`s guard that) and read by
@@ -4332,13 +4432,19 @@ struct TrainingSample {
     uint8_t  turn;                       // 0 = black to move, 1 = white
     int8_t   z;                          // outcome for the side to move: -1, 0, +1
     uint8_t  nb_moves;                   // entries used in action[] / prob[]
-    uint8_t  flags;                      // reserved (0)
+    uint8_t  flags;                      // SAMPLE_FAST | SAMPLE_EXACT (0 in the learning loop's rows)
     float    root_q;                     // search value of the root, side to move
     uint32_t model_step;                 // trainer step of the network that searched
     uint16_t action[Yolah::MAX_NB_MOVES];  // policy index from*64+to (nn::action_index)
     uint16_t prob[Yolah::MAX_NB_MOVES];    // π(action) · 65535, rounded
 };
 static_assert(sizeof(TrainingSample) == 336, "keep in sync with alphazero_learn.py");
+
+// TrainingSample::flags (SelfPlayOptions::record_fast / exact_free).
+enum SampleFlags : uint8_t {
+    SAMPLE_FAST  = 1,   // a fast search of playout cap randomization: π is noisy (few visits, no noise)
+    SAMPLE_EXACT = 2,   // z is the exact result of the position (the endgame solver), not the game's
+};
 
 // Future ownership of a square, relative to the side to move at the sample.
 enum OwnershipCode : uint8_t {
@@ -4392,6 +4498,15 @@ struct SelfPlayOptions {
     // when the trainer's job is over, no new network comes and they stop
     // instead of burning GPU hours on an outdated one.
     double      max_stale_hours = 0;
+    // The generations loop (nnue/az_gen_loop.sh):
+    uint64_t    max_samples    = 0;      // stop after this many recorded samples (0 = no limit)
+    bool        record_fast    = false;  // record the fast searches too (flags SAMPLE_FAST)
+    // z of the positions with at most exact_free free squares = their exact
+    // result by the endgame solver (win / draw / loss, at most exact_ms per
+    // position; from the end of the game backwards, until one is not solved
+    // in time), flags SAMPLE_EXACT. 0 = off: z is the game's result.
+    int         exact_free     = 0;
+    int         exact_ms       = 300;
 };
 
 // Plays until `stop` is set (or max_games). Unfinished games are dropped;
@@ -4406,7 +4521,7 @@ void run_selfplay(const SelfPlayOptions& options, const std::atomic<bool>& stop)
 
 ### `player/alphazero_selfplay.cpp` {#sec-src-player-alphazero-selfplay-cpp}
 
-*328 lines.*
+*406 lines.*
 
 One thread per game, all sharing one `BatchingEvaluator`; the calling thread is
 the supervisor (hot swap, periodic flush, statistics). Games stopped mid-way are
@@ -4425,6 +4540,8 @@ dropped; finished ones always reach the disk before `run_selfplay` returns.
 #include "alphazero_selfplay.h"
 #include "alphazero_mcts_player.h"
 #include "batched_evaluator.h"
+#include "endgame_solver.h"
+#include <condition_variable>
 #include <unistd.h>
 #include <algorithm>
 #include <chrono>
@@ -4436,6 +4553,7 @@ dropped; finished ones always reach the disk before `run_selfplay` returns.
 #include <iostream>
 #include <memory_resource>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -4596,6 +4714,25 @@ TrainingSampleAux with_ownership(const TrainingSample& s, const uint8_t leaver[6
     return a;
 }
 
+// The exact result (win / draw / loss) for the side to move, or nothing if
+// the solver needs more than `ms` milliseconds.
+std::optional<int8_t> solve_wld(EndgameSolver& solver, const Yolah& y, int ms) {
+    std::atomic_bool stop{false};
+    std::mutex m;
+    std::condition_variable cv;
+    bool finished = false;
+    std::thread dog([&] {
+        std::unique_lock lk(m);
+        if (!cv.wait_for(lk, std::chrono::milliseconds(ms), [&] { return finished; })) stop = true;
+    });
+    const EndgameSolver::Result r = solver.solve(y, true, &stop);
+    { std::lock_guard lk(m); finished = true; }
+    cv.notify_one();
+    dog.join();
+    if (!r.complete) return std::nullopt;
+    return static_cast<int8_t>((r.value > 0) - (r.value < 0));
+}
+
 } // namespace
 
 void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
@@ -4622,7 +4759,15 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
     std::atomic<uint32_t> model_step{static_cast<uint32_t>(model.step)};
     std::atomic<uint64_t> games_started{0}, games_done{0}, samples_done{0}, plies_done{0};
     std::atomic<uint64_t> evaluations{0}, black_wins{0}, white_wins{0};
+    std::atomic<uint64_t> fast_done{0}, exact_done{0}, exact_flipped{0}, exact_timeouts{0};
     std::atomic<size_t>   active{nb_games};
+    // Game threads busy with the endgame solver: they ask for no evaluation.
+    std::atomic<size_t>   solving{0};
+    // The clients the batcher waits for (a momentary miscount only costs its max_wait).
+    auto update_clients = [&] {
+        const size_t a = active.load(), b = solving.load();
+        evaluator.set_nb_clients(a > b ? a - b : 0);
+    };
     // The games stop on `halt`: set by the caller's `stop` or by staleness.
     std::atomic<bool>     halt{false};
     // Record the auxiliary targets (latest.json "aux"; re-read at every poll).
@@ -4634,16 +4779,28 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                              nb_games, merged, params.nb_simulations, params.nb_simulations_fast,
                              params.playout_cap_fast_prob, model.step, evaluator.info(),
                              model.aux ? "on" : "off") << std::flush;
+    if (opt.max_samples || opt.record_fast || opt.exact_free)
+        std::cout << std::format("selfplay: at most {} samples, fast searches {}, exact results at most {} free squares ({} ms)\n",
+                                 opt.max_samples, opt.record_fast ? "recorded" : "not recorded",
+                                 opt.exact_free, opt.exact_ms) << std::flush;
 
-    auto game_loop = [&] {
+    auto game_loop = [&](size_t index) {
         std::pmr::synchronized_pool_resource memory;
+        // The endgame solver of this game thread (32 MB of table), if asked.
+        std::unique_ptr<EndgameSolver> solver;
+        if (opt.exact_free > 0) solver = std::make_unique<EndgameSolver>();
         {
-            Search search(evaluator, params, &memory);
+            // A fixed seed (reproducible runs) still differs from game to game.
+            SearchParams game_params = params;
+            if (game_params.seed) game_params.seed += index + 1;
+            Search search(evaluator, game_params, &memory);
             uint64_t seen = generation.load();
             while (!halt.load()) {
                 if (opt.max_games && games_started.fetch_add(1) >= opt.max_games) break;
                 Yolah y;
                 std::vector<TrainingSample> samples;
+                // The positions of the samples the solver may label (few free squares).
+                std::vector<std::pair<size_t, Yolah>> endgame;
                 // Who left each square during this game (auxiliary targets).
                 uint8_t leaver[64];
                 std::fill(std::begin(leaver), std::end(leaver), uint8_t(0xFF));
@@ -4659,8 +4816,12 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                     }
                     const SearchResult r = search.search(y);
                     evaluations.fetch_add(r.nb_evaluations, std::memory_order_relaxed);
-                    if (r.full_search && !r.children.empty())
+                    if ((r.full_search || opt.record_fast) && !r.children.empty()) {
                         samples.push_back(make_sample(y, r, model_step.load()));
+                        if (!r.full_search) samples.back().flags |= SAMPLE_FAST;
+                        if (solver && std::popcount(y.free_squares()) <= opt.exact_free)
+                            endgame.emplace_back(samples.size() - 1, y);
+                    }
                     if (r.best_move != Move::none())   // a pass leaves no hole
                         leaver[static_cast<int>(r.best_move.from_sq())] = y.current_player();
                     y.play(r.best_move);
@@ -4673,10 +4834,35 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
                     const int d = s.turn == Yolah::BLACK ? black_diff : -black_diff;
                     s.z = static_cast<int8_t>((d > 0) - (d < 0));
                 }
+                if (solver && !endgame.empty()) {
+                    // This thread asks for no evaluation while it solves: the
+                    // batcher must not wait for it.
+                    solving.fetch_add(1);
+                    update_clients();
+                    solver->clear();
+                    // From the end backwards (easiest first, and the table
+                    // helps the next ones), until one is not solved in time.
+                    for (auto it = endgame.rbegin(); it != endgame.rend(); ++it) {
+                        const std::optional<int8_t> e = solve_wld(*solver, it->second, opt.exact_ms);
+                        if (!e) { exact_timeouts.fetch_add(1); break; }
+                        TrainingSample& s = samples[it->first];
+                        if (*e != s.z) exact_flipped.fetch_add(1);
+                        s.z = *e;
+                        s.flags |= SAMPLE_EXACT;
+                        exact_done.fetch_add(1);
+                    }
+                    solving.fetch_sub(1);
+                    update_clients();
+                }
+                for (const TrainingSample& s : samples)
+                    if (s.flags & SAMPLE_FAST) fast_done.fetch_add(1, std::memory_order_relaxed);
                 if (black_diff > 0) black_wins.fetch_add(1);
                 if (black_diff < 0) white_wins.fetch_add(1);
                 plies_done.fetch_add(y.nb_plies());
-                samples_done.fetch_add(samples.size());
+                if (opt.max_samples && samples_done.fetch_add(samples.size()) + samples.size() >= opt.max_samples)
+                    halt.store(true);            // this game is still written; the unfinished ones are dropped
+                else if (!opt.max_samples)
+                    samples_done.fetch_add(samples.size());
                 games_done.fetch_add(1);
                 if (record_aux.load()) {
                     std::vector<TrainingSampleAux> rows;
@@ -4689,11 +4875,12 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
             }
         }
         // Fewer clients: the batcher must stop waiting for this one.
-        evaluator.set_nb_clients(active.fetch_sub(1) - 1);
+        active.fetch_sub(1);
+        update_clients();
     };
 
     std::vector<std::jthread> threads;
-    for (size_t i = 0; i < nb_games; i++) threads.emplace_back(game_loop);
+    for (size_t i = 0; i < nb_games; i++) threads.emplace_back(game_loop, i);
 
     // Supervisor: hot-swap the network, flush old samples, report.
     const double start = now_seconds();
@@ -4735,10 +4922,14 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
             const uint64_t g = games_done.load(), s = samples_done.load(), e = evaluations.load();
             const double dt = t - last_report;
             std::cout << std::format("selfplay: {:.1f}h  games {} (+{:.2f}/s)  samples {} (+{:.1f}/s)  "
-                                     "evals/s {:.0f}  avg plies {:.1f}  black wins {:.1f}%  white wins {:.1f}%\n",
+                                     "evals/s {:.0f}  avg plies {:.1f}  black wins {:.1f}%  white wins {:.1f}%{}\n",
                                      (t - start) / 3600, g, (g - last_games) / dt, s, (s - last_samples) / dt,
                                      (e - last_evals) / dt, g ? double(plies_done.load()) / g : 0.0,
-                                     g ? 100.0 * black_wins.load() / g : 0.0, g ? 100.0 * white_wins.load() / g : 0.0)
+                                     g ? 100.0 * black_wins.load() / g : 0.0, g ? 100.0 * white_wins.load() / g : 0.0,
+                                     (opt.record_fast || opt.exact_free)
+                                         ? std::format("  fast {}  exact {} (z changed {}, timeouts {})", fast_done.load(),
+                                                       exact_done.load(), exact_flipped.load(), exact_timeouts.load())
+                                         : std::string())
                       << std::flush;
             last_report = t;
             last_games = g; last_samples = s; last_evals = e;
@@ -4746,7 +4937,9 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
     }
     threads.clear();   // join (the game threads watch `halt` / max_games)
     writer.flush();
-    std::cout << std::format("selfplay: done, {} games, {} samples\n", games_done.load(), samples_done.load()) << std::flush;
+    std::cout << std::format("selfplay: done, {} games, {} samples ({} fast, {} exact, z changed by the solver {}, timeouts {})\n",
+                             games_done.load(), samples_done.load(), fast_done.load(), exact_done.load(),
+                             exact_flipped.load(), exact_timeouts.load()) << std::flush;
 }
 
 } // namespace az
@@ -4755,7 +4948,7 @@ void run_selfplay(const SelfPlayOptions& opt, const std::atomic<bool>& stop) {
 
 ### `test/alphazero_learn_main.cpp` {#sec-src-test-alphazero-learn-main-cpp}
 
-*263 lines.*
+*273 lines.*
 
 The `alphazero_learn` binary. `selfplay` wraps `run_selfplay` with a signal
 handler; `match` plays two networks against each other, each opening once with
@@ -4777,6 +4970,7 @@ and writes the full record as JSON.
 //
 //   alphazero_learn selfplay --config ../config/alphazero_mcts_selfplay_player.cfg --work <dir>
 //         [--games 128] [--max-games 0] [--flush-samples 2000] [--flush-seconds 600]
+//         [--max-samples N] [--record-fast] [--exact-free 22] [--exact-ms 300]   (nnue/az_gen_loop.sh)
 //         [--poll 30] [--report 300] [--max-stale-hours 0] [--tag name] [--set 'key=value' ...]
 //     Plays self-play games with the network named in <dir>/latest.json (hot-
 //     swapped when it changes) and writes training samples to <dir>/selfplay/.
@@ -4857,6 +5051,10 @@ int selfplay_main(Args& a) {
         else if (o == "--report") opt.report_seconds = std::stod(a.next(o));
         else if (o == "--max-stale-hours") opt.max_stale_hours = std::stod(a.next(o));
         else if (o == "--tag") opt.tag = a.next(o);
+        else if (o == "--max-samples") opt.max_samples = std::stoull(a.next(o));
+        else if (o == "--record-fast") opt.record_fast = true;
+        else if (o == "--exact-free") opt.exact_free = std::stoi(a.next(o));
+        else if (o == "--exact-ms") opt.exact_ms = std::stoi(a.next(o));
         else if (o == "--set") sets.push_back(a.next(o));
         else { std::cerr << "unknown option " << o << "\n"; return 2; }
     }
@@ -4916,7 +5114,7 @@ int match_main(Args& a) {
     string config, model_a, model_b, out, book_path;
     size_t games = 10, opening_plies = 4;
     uint64_t time_us = 2'000'000, seed = 1;
-    std::vector<string> sets;
+    std::vector<string> sets, sets_a, sets_b;
     while (a.more()) {
         const string o = a.next("");
         if (o == "--config") config = a.next(o);
@@ -4929,6 +5127,8 @@ int match_main(Args& a) {
         else if (o == "--seed") seed = std::stoull(a.next(o));
         else if (o == "--out") out = a.next(o);
         else if (o == "--set") sets.push_back(a.next(o));
+        else if (o == "--set-a") sets_a.push_back(a.next(o));   // A's player only (B keeps the config)
+        else if (o == "--set-b") sets_b.push_back(a.next(o));
         else { std::cerr << "unknown option " << o << "\n"; return 2; }
     }
     if (config.empty() || model_a.empty() || model_b.empty()) {
@@ -4942,6 +5142,8 @@ int match_main(Args& a) {
     json cfg_a = cfg, cfg_b = cfg;
     cfg_a["weights"] = model_a;
     cfg_b["weights"] = model_b;
+    for (const string& kv : sets_a) apply_set(cfg_a, kv);
+    for (const string& kv : sets_b) apply_set(cfg_b, kv);
     AlphaZeroMCTSPlayer player_a(cfg_a), player_b(cfg_b);
 
     std::mt19937_64 rng(seed);
@@ -5003,6 +5205,7 @@ int match_main(Args& a) {
     const double score = games ? (wins + 0.5 * draws) / games : 0.0;
     json res = {{"a", model_a}, {"b", model_b}, {"games", games}, {"time_us", time_us},
                 {"opening_plies", opening_plies}, {"book", book_path}, {"seed", seed},
+                {"set_a", sets_a}, {"set_b", sets_b},
                 {"wins", wins}, {"draws", draws}, {"losses", losses}, {"score", score},
                 {"records", records}};
     if (!out.empty()) {
@@ -5442,7 +5645,7 @@ int main(int argc, char* argv[]) {
 
 ### `nnue/alphazero_learn.py` {#sec-src-nnue-alphazero-learn-py}
 
-*969 lines.*
+*998 lines.*
 
 The trainer, which is also the orchestrator: it starts the self-play processes
 and the evaluation thread, trains, exports and checkpoints. Read `main` last:
@@ -5749,6 +5952,9 @@ class BatchMaker:
         # π was quantised to 16 bits per move: renormalise so it sums to 1.
         probs = torch.from_numpy(rows["prob"].astype(np.float32)).to(dev)
         probs = probs / probs.sum(1, keepdim=True).clamp_min(1.0)
+        # Number of legal moves per row (--legal-softmax): actions[:, :nb_moves]
+        # are the legal moves, the rest is padding.
+        self.nb_moves = torch.from_numpy(rows["nb_moves"].astype(np.int64)).to(dev)
         z = torch.from_numpy(rows["z"].astype(np.float32)).to(dev)
         if self.q_weight > 0:
             # root_q is the value the full search found for this position,
@@ -5845,6 +6051,7 @@ class State:
     def __init__(self, work):
         self.path = os.path.join(work, "state.json")
         self.lock = threading.Lock()
+        self.in_match = set()     # steps whose .ts a running match needs (not saved)
         self.d = {"step": 0, "samples_trained": 0, "exports": [0], "pending_evals": [],
                   "evaluated": [0], "elo": {"0": 0.0}}
         if os.path.exists(self.path):
@@ -5951,6 +6158,16 @@ class Evaluator(threading.Thread):
         return ts
 
     def run_match(self, step, opp):
+        a = self.args
+        with self.state.lock:     # cleanup_models must not delete these .ts meanwhile
+            self.state.in_match = {step, opp}
+        try:
+            return self._run_match(step, opp)
+        finally:
+            with self.state.lock:
+                self.state.in_match = set()
+
+    def _run_match(self, step, opp):
         a = self.args
         ts_a = self.ensure_ts(step)
         ts_b = self.ensure_ts(opp)
@@ -6080,6 +6297,8 @@ def main():
     ap.add_argument("--amp", choices=["auto", "bf16", "fp16"], default="auto",
                     help="mixed precision of the trainer (auto: bf16 on Ampere+, fp16 before)")
     # KataGo's auxiliary heads (alphazero_aux.py). Off: everything as before.
+    ap.add_argument("--legal-softmax", action="store_true",
+                    help="policy loss: softmax over the legal moves only (as the search), not the 4096 logits")
     ap.add_argument("--aux", action="store_true",
                     help="train the ownership and score-margin heads (self-play records their targets)")
     ap.add_argument("--own-weight", type=float, default=1.5,
@@ -6127,6 +6346,12 @@ def main():
         src_sd = load_state_dict(args.init_model)
     else:
         src_sd = ckpt["model"]
+        if bool(ckpt.get("aux", False)) != args.aux and ckpt.get("ema") is not None:
+            # Variant switch (below): the weight average restarts from the new
+            # network, so start from the average (the exported weights), not
+            # from the last SGD step's raw weights.
+            src_sd = {k[7:]: v for k, v in ckpt["ema"].items() if k.startswith("module.")}
+            log("variant switch: starting from the weight average (EMA)")
     # Variant: with --aux the network carries the auxiliary heads. A run can
     # switch between the variants from one job to the next: the shared
     # parameters are kept, the auxiliary heads start from scratch (or are
@@ -6247,7 +6472,7 @@ def main():
             return
         with state.lock:
             evaluated = list(state.d["evaluated"])
-            live = {0, state.d["exports"][-1], *state.d["pending_evals"]}
+            live = {0, state.d["exports"][-1], *state.d["pending_evals"], *state.in_match}
             keep_pt = live | set(evaluated)
             keep_ts = live | set(evaluated[-1:])
             exports = list(state.d["exports"])
@@ -6326,7 +6551,14 @@ def main():
         # Policy: cross-entropy with the soft target π, -Σ_a π(a) log p(a|s).
         # The softmax runs over the 4096 logits; π lives on the legal moves
         # only (sparse: `actions` are their indices, the padding has π = 0).
-        logp = F.log_softmax(logits.float(), dim=1).gather(1, actions)
+        if args.legal_softmax:
+            # Softmax over the legal moves only, as the search does
+            # (Search::priors_from_logits): the illegal logits get no gradient.
+            legal = logits.float().gather(1, actions)
+            pad = torch.arange(actions.size(1), device=device)[None, :] >= make_batch.nb_moves[:, None]
+            logp = F.log_softmax(legal.masked_fill(pad, float("-inf")), dim=1).masked_fill(pad, 0.0)
+        else:
+            logp = F.log_softmax(logits.float(), dim=1).gather(1, actions)
         p_loss = -(probs * logp).sum(1).mean()
         # Value: squared error against the game result z ∈ {-1, 0, +1}.
         v_loss = F.mse_loss(v, z)
@@ -6819,7 +7051,7 @@ build_alphazero_learn() {
     local targets="${*:-alphazero_learn}"
     mkdir -p "${WORK_DIR}/build"
     echo "[$(date '+%F %T')] === Building ${targets} in ${BUILD_DIR} ==="
-    run bash -c "set -e
+    run bash -c "set -eo pipefail
         exec 9> /work/build/.lock_${CPU_TAG}
         flock 9
         mkdir -p ${BUILD_DIR}
@@ -7033,7 +7265,7 @@ fi
 
 ### `nnue/alphazero_match.sh` {#sec-src-nnue-alphazero-match-sh}
 
-*140 lines.*
+*157 lines.*
 
 A long match between two networks of a run, on its own GPU, with the score's
 95 % confidence interval — the precise measurement the 20-game evaluations
@@ -7051,10 +7283,15 @@ cannot give (@sec-eval).
 #     sbatch --export=ALL,A=7168,B=4096 alphazero_match.sh
 #     sbatch --export=ALL,GAMES=400,MOVE_SECONDS=1 alphazero_match.sh
 #     sbatch --export=ALL,BOOK=none alphazero_match.sh   # random openings, as before
+#     SET_A="score utility=0.05;score scale=10" TAG=su0.05 sbatch --export=ALL,A=271360,B=271360 alphazero_match.sh
+#                                 # A's player with other settings (";"-separated key=value), TAG in A's name
 #
 # A and B are training steps (the numbers of models/az_<step>), or "latest"
 # (the network self-play is using) or "initial" (step 0). A network whose .ts
 # was pruned by the run is re-traced from its .pt.
+# Or any two TorchScript networks with the MCTS's I/O, outside the run (e.g. the
+# transformer_value_policy.py runs): A_TS / B_TS = their paths on the host,
+# A_NAME / B_NAME = their names in the results (nnue/tf_match.sh does this).
 #
 # Both players use config/alphazero_mcts_eval_player.cfg (no noise, no
 # sampling). Games come in pairs: one opening, played once with each colour.
@@ -7095,7 +7332,9 @@ SEED="${SEED:-${SLURM_JOB_ID:-$$}}"
 JOB="${SLURM_JOB_ID:-$$}"
 
 (( GAMES % 2 == 0 )) || { echo "ERROR: GAMES must be even (pairs of games)"; exit 1; }
-[[ -f "${WORK_DIR}/latest.json" ]] || { echo "ERROR: no run in ${WORK_DIR} (latest.json missing)"; exit 1; }
+if [[ -z "${A_TS:-}" || -z "${B_TS:-}" ]]; then
+    [[ -f "${WORK_DIR}/latest.json" ]] || { echo "ERROR: no run in ${WORK_DIR} (latest.json missing)"; exit 1; }
+fi
 
 # "latest" / "initial" / a step → a step number.
 resolve() {
@@ -7109,11 +7348,18 @@ STEP_A=$(resolve "${A}")
 STEP_B=$(resolve "${B}")
 NAME_A=$(printf "az_%08d" "${STEP_A}")
 NAME_B=$(printf "az_%08d" "${STEP_B}")
+if [[ -n "${A_TS:-}" ]]; then NAME_A="${A_NAME:-A}"; fi
+if [[ -n "${B_TS:-}" ]]; then NAME_B="${B_NAME:-B}"; fi
+[[ "${NAME_A}" != "${NAME_B}" || -z "${A_TS:-}${B_TS:-}" ]] || { echo "ERROR: A_NAME and B_NAME must differ"; exit 1; }
+SET_ARGS=()
+if [[ -n "${SET_A:-}" ]]; then IFS=';' read -ra KVS <<< "${SET_A}"; for kv in "${KVS[@]}"; do SET_ARGS+=(--set-a "${kv}"); done; fi
+LABEL_A="${NAME_A}${TAG:++${TAG}}"   # the name of A in the results
 
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job        : ${JOB} on $(hostname), GPU ${CUDA_VISIBLE_DEVICES:-?}"
 echo "  Work dir   : ${WORK_DIR}"
-echo "  Match      : A = ${NAME_A} (${A})  vs  B = ${NAME_B} (${B})"
+echo "  Match      : A = ${LABEL_A} (${A_TS:-${A}})  vs  B = ${NAME_B} (${B_TS:-${B}})"
+[[ -n "${SET_A:-}" ]] && echo "  A's settings: ${SET_A}"
 if [[ "${BOOK}" == "none" ]]; then BOOK_ARGS=(); OPENINGS="${OPENING_PLIES}-ply random openings"
 else BOOK_ARGS=(--book "${BOOK}"); OPENINGS="openings of ${BOOK}"; fi
 echo "  Games      : ${GAMES} (${OPENINGS}, both colours), ${SECONDS_PER_MOVE} s/move"
@@ -7126,8 +7372,11 @@ build_alphazero_learn
 # .ts files at every export and must not remove one in the middle of the match.
 MDIR="/work/evals/match_${JOB}"
 mkdir -p "${WORK_DIR}/evals/match_${JOB}"
-run bash -c "set -e; cd /Yolah/nnue
-    for S in ${STEP_A} ${STEP_B}; do
+STEPS=()                                  # the run's networks to copy (A_TS / B_TS: copied here)
+if [[ -n "${A_TS:-}" ]]; then cp "${A_TS}" "${WORK_DIR}/evals/match_${JOB}/${NAME_A}.ts"; else STEPS+=("${STEP_A}"); fi
+if [[ -n "${B_TS:-}" ]]; then cp "${B_TS}" "${WORK_DIR}/evals/match_${JOB}/${NAME_B}.ts"; else STEPS+=("${STEP_B}"); fi
+(( ${#STEPS[@]} == 0 )) || run bash -c "set -e; cd /Yolah/nnue
+    for S in ${STEPS[*]}; do
         NAME=\$(printf 'az_%08d' \$S)
         if [[ -f /work/models/\$NAME.ts ]]; then
             cp /work/models/\$NAME.ts ${MDIR}/\$NAME.ts
@@ -7146,14 +7395,14 @@ export_model(make_net(load_state_dict('/work/models/\$NAME.pt')), '${MDIR}', \$S
         fi
     done"
 
-OUT="/work/evals/match_${NAME_A}_vs_${NAME_B}_${JOB}.json"
+OUT="/work/evals/match_${LABEL_A}_vs_${NAME_B}_${JOB}.json"
 TIME_US=$(awk -v s="${SECONDS_PER_MOVE}" 'BEGIN { printf "%d", s * 1000000 }')
 echo "[$(date '+%F %T')] === Match ==="
 start_in_container ${BUILD_DIR}/alphazero_learn match \
     --config /Yolah/config/alphazero_mcts_eval_player.cfg \
     --a "${MDIR}/${NAME_A}.ts" --b "${MDIR}/${NAME_B}.ts" \
     --games "${GAMES}" --time "${TIME_US}" --opening-plies "${OPENING_PLIES}" \
-    "${BOOK_ARGS[@]}" --seed "${SEED}" --out "${OUT}"
+    "${BOOK_ARGS[@]}" ${SET_ARGS[@]+"${SET_ARGS[@]}"} --seed "${SEED}" --out "${OUT}"
 wait_forwarding_signals
 rm -rf "${WORK_DIR}/evals/match_${JOB}"
 [[ "${RC}" == "0" ]] || { echo "match failed (exit code ${RC})"; exit "${RC}"; }
@@ -7161,11 +7410,11 @@ rm -rf "${WORK_DIR}/evals/match_${JOB}"
 # ── Result: score, Elo difference and its 95 % confidence interval ──────────
 # Per-game results x ∈ {1, ½, 0}: mean s, variance E[x²] − s², standard error
 # √(var/n). The interval of s maps to Elo through Δ = 400·log10(s/(1−s)).
-RES="${WORK_DIR}/evals/match_${NAME_A}_vs_${NAME_B}_${JOB}.json"
+RES="${WORK_DIR}/evals/match_${LABEL_A}_vs_${NAME_B}_${JOB}.json"
 # By name: the JSON keys are written in alphabetical order, not W/D/L.
 count() { grep -oE "\"$1\": *[0-9]+" "${RES}" | head -1 | grep -oE '[0-9]+$'; }
 W=$(count wins); D=$(count draws); L=$(count losses)
-awk -v w="$W" -v d="$D" -v l="$L" -v a="${NAME_A}" -v b="${NAME_B}" -v t="${SECONDS_PER_MOVE}" \
+awk -v w="$W" -v d="$D" -v l="$L" -v a="${LABEL_A}" -v b="${NAME_B}" -v t="${SECONDS_PER_MOVE}" \
     -v csv="${WORK_DIR}/matches.csv" -v date="$(date '+%F %T')" 'BEGIN {
     n = w + d + l; s = (w + d / 2) / n
     var = (w + d / 4) / n - s * s; se = sqrt(var / n)
