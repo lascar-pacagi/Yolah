@@ -14,6 +14,13 @@
 #     done
 #     GPUS: --gres=gpu:2 works as is (DDP on the node's GPUs)
 #
+# Size ladder (does a bigger resnet_ft still help? 200 M training positions, 2 epochs, same val):
+#     for c in 256 360 512; do
+#         ARCH=resnet_ft CHANNELS=$c TRAIN_POS=200000000 BASE_DIR=$HOME/TransformerVP/ladder TAG=_c$c \
+#             sbatch --job-name=ladder_$c -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
+#     done
+#     then STAGE=eval BASE_DIR=$HOME/TransformerVP/ladder sbatch -p insa-gpu --gres=gpu:1 --exclude=crn22,crn23 nnue/transformer_value_policy.sh
+#
 # First, once (CPU, ~1 h: writes CACHE_DIR/policies.i16, 2 GB):
 #     STAGE=policies sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 nnue/transformer_value_policy.sh
 #
@@ -51,7 +58,7 @@ fi
 run_py() {
     singularity exec --nv "${WSL_BIND[@]}" --bind "${YOLAH_DIR}:/Yolah" --bind "${WORK_DIR}:/work" --bind "${BASE_DIR}:/base" \
         --bind "${CACHE_DIR}:/cache" \
-        --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS:-2},YOLAH_TF_LR=${YOLAH_TF_LR:-5e-4},YOLAH_TF_BATCH=${YOLAH_TF_BATCH:-1024},YOLAH_TF_ARCH=${ARCH}" \
+        --env "YOLAH_NB_EPOCHS=${YOLAH_NB_EPOCHS:-2},YOLAH_TF_LR=${YOLAH_TF_LR:-5e-4},YOLAH_TF_BATCH=${YOLAH_TF_BATCH:-1024},YOLAH_TF_ARCH=${ARCH},YOLAH_TF_CHANNELS=${CHANNELS:-256},YOLAH_TF_BLOCKS=${BLOCKS:-30},YOLAH_TF_TRAIN_POS=${TRAIN_POS:-0}" \
         "${SIF}" bash -c "cd /Yolah/nnue && python3 transformer_value_policy.py $*"
 }
 

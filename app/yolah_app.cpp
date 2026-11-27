@@ -530,6 +530,12 @@ int shown_elo(const AiSpec& ai, const json& opts) {
     }
     return ai.elo;
 }
+// What the interface says of an AI's strength: "Elo ≈ N", or, for the exact
+// solver of the puzzles, "jeu parfait" (it proves its moves: no rating).
+std::string elo_label(const AiSpec& ai, const json& opts) {
+    if (ai.puzzles_only) return tr("jeu parfait");
+    return strf("Elo \xE2\x89\x88 %d", shown_elo(ai, opts));
+}
 
 // The roster's "params" of an AI, then the two settings every AI but the random
 // one has (time factor, random moves). A default missing from the values is
@@ -3802,10 +3808,22 @@ public:
             if (own(hover_sq)) {
                 selected = drag_from = hover_sq;
                 press_pos = in.mouse;
-            } else if (selected >= 0) {
-                Move m{Square(selected), Square(hover_sq)};
-                if (is_legal(pos, m)) result = m;
-                else selected = -1;
+            } else {
+                // A click on a destination: the selected piece's move if it can go
+                // there; else the move of the only piece that can (none or several:
+                // nothing, the piece has to be chosen first).
+                if (selected >= 0 && is_legal(pos, Move{Square(selected), Square(hover_sq)})) result = Move{Square(selected), Square(hover_sq)};
+                else {
+                    Yolah::MoveList moves;
+                    Yolah y = pos;
+                    y.moves(moves);
+                    int found = 0;
+                    Move only = Move::none();
+                    for (Move m : moves)
+                        if (m != Move::none() && m.to_sq() == hover_sq) { found++; only = m; }
+                    if (found == 1) result = only;
+                    selected = -1;
+                }
             }
         }
         if (in.down && drag_from >= 0 && length(in.mouse - press_pos) > sq() * 0.15f) dragging = true;
@@ -4120,10 +4138,11 @@ struct Puzzle {
     // end_win: the goal is CERTAIN (no moves of either side can prevent it);
     // end_loss: the goal is out of reach against the best defence.
     int end_win = -1, end_loss = -1;
-    // The player can no longer move (blocked for good) and the opponent can no
-    // longer catch up (even filling every free square it can reach): won at once,
-    // rather than watching the opponent play alone to the end.
-    bool win_when_blocked = false;
+    // A side that can no longer move (blocked for good): stop at once rather than
+    // watch the other side play alone to the end. The result is then the exact one
+    // with the best play of the side that can still move (puzzle_lead).
+    // stop_blocked: when the player is blocked; stop_ai_blocked: when the opponent is.
+    bool stop_blocked = false, stop_ai_blocked = false;
     // The goal's sentence under the introduction and in the game panel: "" = the
     // automatic one (goal_text); goal_hidden: none at all.
     std::string goal_custom;
@@ -4159,7 +4178,7 @@ json puzzle_to_json(const Puzzle& p) {
                      if (p.targets >> sq & 1) t.push_back(std::string{char('a' + sq % 8), char('1' + sq / 8)});
                  return t;
              }()},
-            {"time index", p.time_index}, {"end on win", p.end_win}, {"end on loss", p.end_loss}, {"win when blocked", p.win_when_blocked}, {"goal text", p.goal_custom}, {"hide goal", p.goal_hidden}, {"theme", p.theme}, {"hole style", p.hole_style},
+            {"time index", p.time_index}, {"end on win", p.end_win}, {"end on loss", p.end_loss}, {"stop when blocked", p.stop_blocked}, {"stop when ai blocked", p.stop_ai_blocked},  {"goal text", p.goal_custom}, {"hide goal", p.goal_hidden}, {"theme", p.theme}, {"hole style", p.hole_style},
             {"sprite black", p.sprite_black}, {"sprite white", p.sprite_white}, {"background", p.background},
             {"tiles", [&] {
                  json t = json::object();
@@ -4204,7 +4223,8 @@ Puzzle puzzle_from_json(const json& j, const std::string& id) {
             }
     p.end_win = std::clamp(int(jnum(j, "end on win", -1)), -1, MAX_END_DELAY);
     p.end_loss = std::clamp(int(jnum(j, "end on loss", -1)), -1, MAX_END_DELAY);
-    p.win_when_blocked = j.value("win when blocked", false);
+    p.stop_blocked = j.value("stop when blocked", false) || j.value("win when blocked", false) || j.value("lose when blocked", false);   // (older names)
+    p.stop_ai_blocked = j.value("stop when ai blocked", false);
     p.goal_custom = jstr(j, "goal text");
     p.goal_hidden = j.value("hide goal", false);
     p.theme = jstr(j, "theme");
@@ -4614,6 +4634,16 @@ std::unique_ptr<PuzzleOutcome> puzzle_outcome_start(const Puzzle& p, const Yolah
     // "Won in advance" has no meaning for First: the game ends on the target.
     const bool want_win = p.end_win >= 0 && p.goal != Puzzle::First, want_loss = p.end_loss >= 0;
     j->worker = std::thread([j, pos, p, want_win, want_loss, taken] {
+        // The player blocked for good: settled without a search, at any size. Its
+        // lead can only shrink (lost if already below the goal; First: no target can
+        // be reached any more); won if even the opponent filling every free square
+        // (or taking every target) of its regions cannot bring it below the goal.
+        if (reachable_free(pos, p.human) == 0) {
+            const int me = p.goal == Puzzle::Collect ? taken[p.human] - taken[1 - p.human] : pos.score(uint8_t(p.human));
+            const uint64_t mask = p.goal == Puzzle::Collect ? p.targets : ~uint64_t(0);
+            if (want_loss && (p.goal == Puzzle::First || me < p.margin)) return j->finish(PuzzleOutcome::Loss);
+            if (want_win && me - std::popcount(reachable_free(pos, 1 - p.human) & mask) >= p.margin) return j->finish(PuzzleOutcome::Win);
+        }
         if (want_loss && std::popcount(pos.free_squares()) <= PuzzleOutcome::MAX_FREE) {
             // As "Vérifier": the goal with perfect play (≤ 0: out of reach).
             EndgameSolver solver(puzzle_solver_options(p, 21));
@@ -5112,6 +5142,7 @@ struct App {
         std::unique_ptr<PuzzleOutcome> outcome_job;
         int streak = 0, streak_from = 0;  // PuzzleOutcome::Win / Loss (0: none)
         int settled = 0;                  // Win / Loss when the game was stopped early
+        uint64_t blocked_checked = 0;     // the position whose "blocked" stop was tried (Puzzle::stop_blocked)
         // The puzzle's "Indice": the job on the position it was asked in, and whether it is shown.
         std::unique_ptr<PuzzleHint> hint_job;
         bool hint_on = false;
@@ -5603,6 +5634,7 @@ struct App {
         g.outcome_job.reset();
         g.streak = g.streak_from = g.settled = 0;
         g.hint_on = false;
+        g.blocked_checked = 0;
         g.token++;
     }
 };
@@ -7064,7 +7096,7 @@ void draw_course(App& a) {
         Box sb{x, top, W, sum_h};
         draw::round_box(sb, 16 * s, hex(0x1d2532), hex(0x171d28));
         a.text.draw(Font::Title, 30 * s, spec->name, {sb.x + 20 * s, sb.y + 16 * s}, pal::text);
-        a.text.draw(Font::Regular, 16 * s, strf("%s \xE2\x80\xA2 Elo \xE2\x89\x88 %d", tr(spec->family).c_str(), spec->elo), {sb.right() - 20 * s, sb.y + 28 * s}, pal::accent, Align::Right);
+        a.text.draw(Font::Regular, 16 * s, tr(spec->family) + " \xE2\x80\xA2 " + elo_label(*spec, json()), {sb.right() - 20 * s, sb.y + 28 * s}, pal::accent, Align::Right);
         a.text.paragraph(Font::Regular, 18 * s, summary, {sb.x + 20 * s, sb.y + 64 * s, W - 40 * s, sum_h}, pal::text, 1.3f);
     }
     for (size_t c = 0; c < chs.size(); c++) {
@@ -7441,21 +7473,25 @@ void game_logic(App& a) {
                 if (sl.agent) sl.agent->cancel();
         }
     }
-    // Blocked but winning (Puzzle::win_when_blocked): the player has no free square
-    // left to move to, and its lead minus all the opponent can still gain (every
-    // free square, or every target, of the regions next to its pieces) reaches the
-    // goal. Cheap: checked after every move, the bound tightens as the opponent plays.
-    if (g.puzzle_mode && g.puzzle.win_when_blocked && g.puzzle.goal != Puzzle::First && !g.match.over()
-        && reachable_free(g.match.pos, g.puzzle.human) == 0) {
+    // A side blocked for good (Puzzle::stop_blocked, stop_ai_blocked): the result with
+    // the best play of the other side, by the exact solver (Points: instant, the
+    // regions are all private to the side that can move), within a node budget;
+    // without an answer the game goes on. Tried once per position.
+    if (g.puzzle_mode && (g.puzzle.stop_blocked || g.puzzle.stop_ai_blocked) && !g.match.over() && g.blocked_checked != g.token) {
+        g.blocked_checked = g.token;
         const Puzzle& p = g.puzzle;
-        const auto taken = targets_taken(p, g.match);
-        const int me = p.goal == Puzzle::Collect ? taken[p.human] - taken[1 - p.human] : g.match.score(p.human) - g.match.score(1 - p.human);
-        const uint64_t mask = p.goal == Puzzle::Collect ? p.targets : ~uint64_t(0);
-        if (me - std::popcount(reachable_free(g.match.pos, 1 - p.human) & mask) >= p.margin) {
-            g.settled = PuzzleOutcome::Win;
-            g.match.stopped = true;
-            for (auto& sl : g.slot)
-                if (sl.agent) sl.agent->cancel();
+        const bool me_blocked = reachable_free(g.match.pos, p.human) == 0, ai_blocked = reachable_free(g.match.pos, 1 - p.human) == 0;
+        if ((me_blocked && p.stop_blocked) || (ai_blocked && p.stop_ai_blocked)) {
+            EndgameSolver solver(puzzle_solver_options(p, 20));
+            solver.set_node_limit(4000000);
+            bool ok = false;
+            const int d = puzzle_lead(solver, g.match.pos, p, targets_taken(p, g.match), nullptr, ok);
+            if (ok) {
+                g.settled = d > 0 ? PuzzleOutcome::Win : PuzzleOutcome::Loss;
+                g.match.stopped = true;
+                for (auto& sl : g.slot)
+                    if (sl.agent) sl.agent->cancel();
+            }
         }
     }
     if (g.puzzle_mode && (g.puzzle.end_win >= 0 || g.puzzle.end_loss >= 0) && !g.match.over()) puzzle_early_end(a);
@@ -7567,7 +7603,8 @@ void draw_player_card(App& a, Box b, int side, bool active) {
     draw_piece(a.game_sprite(side), side, {b.x + 18 * s + pr, b.center().y}, pr, 0.3f * k, a.time, 1, sl.human());
     float tx = b.x + 34 * s + 2 * pr;
     a.text.draw(Font::Bold, 19 * s, a.slot_name(sl), {tx, b.y + 14 * s}, pal::text);
-    std::string sub = sl.human() ? strf("Humain \xE2\x80\xA2 %s", side_name(side)) : strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s", shown_elo(*sl.spec, (a.settings.ai_options.contains(sl.who) ? a.settings.ai_options[sl.who] : json())), side_name(side));
+    std::string sub = sl.human() ? strf("Humain \xE2\x80\xA2 %s", side_name(side))
+                                 : elo_label(*sl.spec, a.settings.ai_options.contains(sl.who) ? a.settings.ai_options[sl.who] : json()) + " \xE2\x80\xA2 " + side_name(side);
     a.text.draw(Font::Regular, 14 * s, sub, {tx, b.y + 40 * s}, pal::dim);
     std::string status;
     if (active && !g.match.over()) {
@@ -7683,7 +7720,7 @@ void tab_ai(App& a, Box b) {
         any = true;
         draw_piece(a.game_sprite(side), side, {b.x + 24 * s, y + 24 * s}, 22 * s, 0, a.time);
         a.text.draw(Font::Bold, 18 * s, sl.spec->name, {b.x + 58 * s, y + 2 * s}, pal::text);
-        a.text.draw(Font::Regular, 14 * s, strf("Elo \xE2\x89\x88 %d \xE2\x80\xA2 %s \xE2\x80\xA2 joue les %s", shown_elo(*sl.spec, (a.settings.ai_options.contains(sl.who) ? a.settings.ai_options[sl.who] : json())), tr(sl.spec->family).c_str(), side_name(side)),
+        a.text.draw(Font::Regular, 14 * s, elo_label(*sl.spec, a.settings.ai_options.contains(sl.who) ? a.settings.ai_options[sl.who] : json()) + strf(" \xE2\x80\xA2 %s \xE2\x80\xA2 joue les %s", tr(sl.spec->family).c_str(), side_name(side)),
                     {b.x + 58 * s, y + 26 * s}, pal::dim);
         y += 56 * s;
         float hgt = a.text.paragraph(Font::Regular, 14 * s, sl.spec->description, {b.x, y, b.w, 120 * s}, pal::text);
@@ -7729,9 +7766,12 @@ void draw_puzzle_over(App& a, Box area, float k) {
         a.text.draw(Font::Regular, 16 * s, strf("Cibles prises (Noirs \xE2\x80\x93 Blancs) \xE2\x80\xA2 objectif : %+d pour le joueur", p.margin), {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
     else if (g.match.stopped)   // stopped early: why, rather than a final lead (blocked for good: that says it all)
         a.text.draw(Font::Regular, 16 * s, ok ? (reachable_free(g.match.pos, p.human) == 0 ? (ai_test ? "Bloqu\xC3\xA9, mais l'adversaire ne peut plus rattraper le joueur." : "Tu ne peux plus bouger, mais l'adversaire ne peut plus te rattraper.")
+                                                    : reachable_free(g.match.pos, 1 - p.human) == 0 ? "L'adversaire ne peut plus bouger : l'objectif est atteint en jouant au mieux."
                                                     : "Victoire certaine : plus rien ne peut emp\xC3\xAA" "cher l'objectif.")
                                               : reachable_free(g.match.pos, p.human) == 0 ? (ai_test ? "Les pions du joueur ne peuvent plus bouger." : "Tes pions ne peuvent plus bouger.")
-                                                                                          : reachable_free(g.match.start, 1 - p.human) == 0
+                                                                                          : reachable_free(g.match.pos, 1 - p.human) == 0 && reachable_free(g.match.start, 1 - p.human) != 0
+                                                                                                ? "L'adversaire ne peut plus bouger, mais l'objectif est hors d'atteinte."
+                                                                                                : reachable_free(g.match.start, 1 - p.human) == 0
                                                                                                 ? "Il ne reste plus assez de coups possibles pour atteindre l'objectif."   // played alone: no defence
                                                                                                 : "L'objectif est hors d'atteinte contre la meilleure d\xC3\xA9" "fense.",
                     {card.center().x, card.y + 150 * s}, with_alpha(pal::dim, k), Align::Center);
@@ -8732,13 +8772,22 @@ void start_puzzle(App& a, const Puzzle& p, const std::string& level, int pos, bo
     g.streak = g.streak_from = g.settled = 0;
     g.hint_job.reset();
     g.hint_on = false;
+    g.blocked_checked = 0;
     g.board.flipped = p.human == WHITE;
 }
 // The sentence shown: hidden, the designer's own, or the automatic one.
 std::string goal_text(const App& a, const Puzzle& p) {
     if (p.goal_hidden) return "";
     if (!p.goal_custom.empty()) return p.goal_custom;
-    return auto_goal_text(a, p);
+    // The automatic one with the number of free squares at the end of its first
+    // sentence: "Gagne avec les Noirs contre X (31 cases libres)."
+    std::string t = auto_goal_text(a, p);
+    const int free_sq = std::popcount(puzzle_position(p).free_squares());
+    const size_t dot = t.find('.');
+    const std::string count = strf(" (%d case%s libre%s)", free_sq, free_sq > 1 ? "s" : "", free_sq > 1 ? "s" : "");
+    if (dot == std::string::npos) t += count;
+    else t.insert(dot, count);
+    return t;
 }
 // The goal said by the program, from the goal, the sides and the starting points.
 std::string auto_goal_text(const App& a, const Puzzle& p) {
@@ -9683,7 +9732,14 @@ void scene_editor(App& a) {
             y += 37 * s;
             p.end_loss = a.ui.cycler("ed_end_loss", {x, y, w, 34 * s}, "Si perdu d'avance", ends, p.end_loss + 1) - 1;
             y += 37 * s;
-            if (p.goal != Puzzle::First) a.ui.toggle("ed_win_blocked", {x, y, w, 30 * s}, "Bloqu\xC3\xA9 mais gagnant : victoire", p.win_when_blocked, 16);
+        }
+        {   // a side blocked for good: stop at once (the exact result) or let the other play on
+            const std::vector<std::string> opts{"continuer", "arr\xC3\xAAter si je suis bloqu\xC3\xA9", "arr\xC3\xAAter si l'IA est bloqu\xC3\xA9" "e", "arr\xC3\xAAter dans les deux cas"};
+            const int cur = (p.stop_blocked ? 1 : 0) + (p.stop_ai_blocked ? 2 : 0);
+            const int k = a.ui.cycler("ed_blocked", {x, y, w, 34 * s}, "Si bloqu\xC3\xA9", opts, cur, 14);
+            p.stop_blocked = k & 1;
+            p.stop_ai_blocked = k & 2;
+            y += 37 * s;
         }
     } else {
         {   // the level the puzzle belongs to: a puzzle in no level can only be played from "Tous les puzzles"

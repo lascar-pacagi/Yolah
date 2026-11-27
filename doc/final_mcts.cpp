@@ -85,8 +85,28 @@ struct Search::PathStep {
     Edge* edge;
 };
 
-// L'état propre à un thread de recherche : ses tampons, réutilisés d'un lot
-// à l'autre (aucune allocation pendant la recherche).
+// Worker : les tableaux de travail d'UN thread de recherche.
+//
+// Chaque thread fait des lots : il lance jusqu'à batch_size descentes, note
+// où chacune s'est arrêtée, envoie les feuilles au réseau en une fois, puis
+// remonte les valeurs (section 6). Pour un lot, il lui faut de la place :
+//   leaves    les feuilles à évaluer (position, coups légaux) ;
+//   descents  pour chaque descente, sa feuille et la longueur de son chemin ;
+//   paths     le chemin de chaque descente (les nœuds et arêtes traversés,
+//             pour la remontée) ;
+//   requests  ce qu'on envoie au réseau, results ce qu'il répond.
+//
+// « Propre à un thread » : chaque thread a SON Worker. Personne d'autre n'y
+// écrit, donc aucun verrou n'est nécessaire pour ces tableaux.
+//
+// « Réutilisés d'un lot à l'autre » : ils sont alloués UNE fois, à la
+// création du Worker, à la taille d'un lot (reserve, ou taille fixe pour
+// paths et results). À chaque lot, on les vide (clear garde la mémoire déjà
+// réservée) et on les remplit de nouveau. Il n'y a donc aucun new ni malloc
+// pendant la recherche : une allocation coûte cher (des centaines de
+// nanosecondes, et plusieurs threads qui allouent en même temps se gênent
+// dans l'allocateur), alors qu'un lot ne dure que quelques millisecondes et
+// qu'il y en a des milliers par coup.
 struct Search::Worker {
     // Un chemin racine → feuille a au plus autant de plis que la partie (120)
     // plus la racine ; +8 de marge.

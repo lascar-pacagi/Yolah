@@ -14,7 +14,8 @@
   //                other relative paths to the repository)
   //   torch overrides   the same, only when the application is built with libtorch
   //   missing hint shown when the weights file does not exist
-  //   puzzles only true: offered as a puzzle's opponent only, not in the new-game screen
+  //   puzzles only true: offered as a puzzle's opponent only, not in the new-game screen; its Elo is not
+  //                shown (the interface says "jeu parfait"), only used for the effects
   //   fallback overrides  for a player built on another (SolverPlayer's "fallback": a .cfg
   //                file name, read and embedded), keys replacing those of that .cfg
 //   params       what the player may change before a game (button "Régler"): a key of the

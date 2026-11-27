@@ -85,6 +85,11 @@ WARMUP     = 2000
 WEIGHT_DECAY = 0.05
 CHUNK        = int(os.environ.get("YOLAH_TF_CHUNK", str(R.CHUNK_SIZE)))   # positions per chunk (tests: small)
 SAVE_CHUNKS  = int(os.environ.get("YOLAH_TF_SAVE_CHUNKS", "4"))   # checkpoint every 4 chunks per rank
+# Size ladder (2026-11-27): the ResNets' width and depth (256x30 = 35.5 M params, 360x30 ≈ 70 M,
+# 512x30 ≈ 141 M), and a cap on the training positions (0: all of the 95 % train split).
+RES_CHANNELS = int(os.environ.get("YOLAH_TF_CHANNELS", "256"))
+RES_BLOCKS   = int(os.environ.get("YOLAH_TF_BLOCKS", "30"))
+TRAIN_POS    = int(os.environ.get("YOLAH_TF_TRAIN_POS", "0"))
 POLICY_DIM = 128
 VALUE_FC   = 256
 # Against memorising the games (2026-11-20: transformer val value mse 0.31 vs 0.11 in training, the
@@ -260,10 +265,9 @@ def make_net(cfg=None):
     arch = cfg.pop("arch", "transformer")
     if arch == "transformer":
         return TransformerNet(**{"dim": DIM, "heads": HEADS, "layers": LAYERS, **cfg})
-    if arch == "resnet_ft":
-        return ResNetFromTo(**cfg)
-    if arch == "resnet":
-        return ResNetPlain(**cfg)
+    if arch in ("resnet_ft", "resnet"):                   # a checkpoint's config wins over the environment
+        cfg = {"channels": RES_CHANNELS, "nb_blocks": RES_BLOCKS, **cfg}
+        return (ResNetFromTo if arch == "resnet_ft" else ResNetPlain)(**cfg)
     raise ValueError(f"unknown arch {arch}")
 
 
@@ -391,8 +395,11 @@ def train_worker(rank, world, args):
     with open(os.path.join(args.cache, "meta.json")) as f:
         n_total = int(json.load(f)["n_positions"])
     n_train = int(0.95 * n_total)
+    val_start = n_train                                   # the validation set never moves
+    if TRAIN_POS:
+        n_train = min(n_train, max(1, TRAIN_POS // CHUNK) * CHUNK)
     train_loader = ResumableLoader(args.cache, 0, n_train, BATCH, rank, world, chunk_size=CHUNK, shuffle=True)
-    val_loader   = CacheLoader(args.cache, n_train, n_total, BATCH, rank, world, chunk_size=CHUNK, shuffle=False)
+    val_loader   = CacheLoader(args.cache, val_start, n_total, BATCH, rank, world, chunk_size=CHUNK, shuffle=False)
     per_epoch = len(train_loader)
     total = NB_EPOCHS * per_epoch
     if rank == 0:
