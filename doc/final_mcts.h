@@ -764,15 +764,26 @@ struct ChildStat {
     // valeurs d'une recherche ne sont ni indépendantes (les visites suivent
     // les mêmes chemins) ni gaussiennes ; 5 est une marge de sécurité large,
     // pour qu'un coup ne gagne par la LCB que si son avance est nette.
-    // Quels coups ont une lcb. La LCB se fait en deux temps (section 7) :
-    //   1. CHOISIR le gagnant, parmi les seuls « candidats » (au moins 20 % de
-    //      la valeur de jeu du plus visité) : celui de plus grande lcb ;
-    //   2. lui donner une valeur de jeu assez grande pour passer devant TOUS
-    //      les autres coups, candidats ou non ; pour chacun, le calcul se sert
-    //      de SA lcb (l'écart entre sa borne et celle du gagnant).
-    // Il faut donc la lcb de tous les coups visités, pas seulement celle des
-    // candidats. Dans l'exemple, b2-b5 (75 < 200) n'est pas candidat, mais sa
-    // lcb −0.133 sert à l'étape 2 : elle donne 3.28 × 75 = 246.
+    // Quels coups ont une lcb. L'étape LCB (section 7) part des valeurs de
+    // jeu élaguées (1 000 / 400 / 75 / 0) et ne modifie que celle d'UN coup :
+    //   1. CHOISIR le gagnant parmi les « candidats » (valeur de jeu ≥ 20 % de
+    //      celle du plus visité, ici ≥ 200 : c3-c6 et e4-e7) : celui de plus
+    //      grande lcb, e4-e7 (0.100 contre 0.037) ;
+    //   2. REMPLACER sa valeur de jeu (400) par une valeur assez grande pour
+    //      passer devant tous les autres coups visités, candidats ou non. Pour
+    //      chaque autre coup, on calcule la valeur dont le gagnant aurait
+    //      besoin pour le dépasser ; elle dépend de l'écart entre la lcb de ce
+    //      coup et celle du gagnant (détail à play_value) :
+    //          contre c3-c6 (lcb 0.037, valeur 1 000) : besoin 2 778
+    //          contre b2-b5 (lcb −0.133, valeur 75)  : besoin 246
+    //      et le gagnant reçoit le plus grand besoin : 2 778.
+    // Il faut donc la lcb de TOUS les coups visités, pas seulement celle des
+    // candidats : b2-b5 n'est pas candidat, mais sa lcb sert au calcul de
+    // son besoin. Les autres coups ne changent pas : c3-c6 garde 1 000,
+    // b2-b5 garde 75.
+    // Attention à ne pas confondre avec `target` : target est pris AVANT
+    // cette étape, donc celui de e4-e7 reste 400, alors que sa valeur de jeu
+    // devient 2 778. La LCB change le coup joué, pas la cible de politique.
     // −2 (impossible, hors de [−1, 1]) veut dire « pas de lcb » :
     //   • coup jamais visité : pas de moyenne, donc pas de borne (h1-h3) ;
     //   • LCB désactivée (use_lcb = false) ou aucune visite à la racine :
@@ -802,13 +813,21 @@ struct ChildStat {
     // en dessous des deux autres), PUCT ne lui en aurait donné que 75 : les
     // 45 autres, il ne les a eues que parce qu'il paraissait meilleur au
     // début. L'élagage ne lui compte donc que 75 (calcul au point c).
-    // Ici cela ne change pas le coup joué ; cela change la cible de politique
-    // en self-play, et cela peut changer le choix : la LCB (point d) ne
-    // choisit que parmi les « candidats », les coups dont la valeur de jeu
-    // APRÈS élagage atteint au moins 20 % de celle du plus visité (ici
-    // 20 % × 1 000 = 200). Un coup de 250 visites élagué à 150 n'est plus
-    // candidat : la LCB ne peut plus le faire jouer, même si sa borne est la
-    // meilleure. (b2-b5 n'est candidat ni avant, 120, ni après, 75.)
+    // À quoi sert l'élagage : surtout à la cible de politique en self-play
+    // (target), pour que le réseau n'apprenne pas à aimer b2-b5 à cause de
+    // visites qui ne disaient rien de sa valeur. Sur le coup joué, son effet
+    // passe par la LCB (point d), qui ne choisit son gagnant que parmi les
+    // « candidats » : les coups dont la valeur de jeu, APRÈS élagage, atteint
+    // 20 % de celle du plus visité (ici 200). Un coup élagué sous ce seuil
+    // n'est plus candidat ; il ne peut donc plus être promu par la LCB, et
+    // garde sa valeur de jeu élaguée, plus petite que celle du plus visité :
+    // il n'est pas joué. (b2-b5 n'est candidat ni avant, 120, ni après, 75.)
+    // En pratique, ce cas ne touche presque jamais un coup qui aurait gagné
+    // la LCB : un coup n'est élagué que si son Q est sous score(b) = Q_b +
+    // E·P_b/(1 + N_b), donc à peine au-dessus de Q_b (de 0.025 ici) ; et,
+    // moins visité que b, il a un rayon plus grand ; sa borne est alors
+    // presque toujours sous celle de b. L'effet de l'élagage sur le coup
+    // joué est donc rare.
     //
     // ── Les détails, sur l'exemple ──────────────────────────────────────────
     // La racine de l'exemple (en tête de ChildStat), avec ce dont les calculs

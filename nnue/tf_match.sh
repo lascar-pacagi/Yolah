@@ -16,6 +16,11 @@
 #     MOVE_SECONDS=0.2 bash ~/Yolah/nnue/tf_match.sh # another time per move
 #     bash ~/Yolah/nnue/tf_match.sh status           # sum of the tasks so far
 #     A_RUN=transformer B_RUN=resnet_ft bash ~/Yolah/nnue/tf_match.sh   # other runs of BASE_DIR
+#     A_RUN=resnet_ft B_RUN=app bash ~/Yolah/nnue/tf_match.sh           # against the app's ResNet
+#
+# A run name is a directory of BASE_DIR (its transformer.ts), or "app": the
+# app's MCTS ResNet (nnue/cnn_resnet_256x30_value_policy.ts, original 2-channel
+# policy head; exported from its .pt, which git keeps, at the first use).
 #
 # status (also while the tasks run: it reads their logs): each task's games so
 # far, A's W/D/L, score and Elo with its 95 % interval. JOB=<array job id>
@@ -70,8 +75,18 @@ EOF
     exit 0
 fi
 
-A_TS="${BASE_DIR}/${A_RUN}/transformer.ts"
-B_TS="${BASE_DIR}/${B_RUN}/transformer.ts"
+ts_of() { if [[ "$1" == app ]]; then echo "${YOLAH_DIR}/nnue/cnn_resnet_256x30_value_policy.ts"; else echo "${BASE_DIR}/$1/transformer.ts"; fi; }
+A_TS=$(ts_of "${A_RUN}")
+B_TS=$(ts_of "${B_RUN}")
+APP_TS=$(ts_of app)
+if [[ ( "${A_RUN}" == app || "${B_RUN}" == app ) && ! -s "${APP_TS}" ]]; then
+    # git keeps the .pt only: trace the .ts once (CPU, about a minute), in the AlphaZero image.
+    SIF="${SIF:-${HOME}/AlphaZeroLearn/alphazero_learn.sif}"
+    echo "exporting ${APP_TS} from its .pt"
+    singularity exec --bind "${YOLAH_DIR}:/Yolah" "${SIF}" \
+        bash -c "cd /Yolah/nnue && python3 resnet_export.py cnn_resnet_256x30_value_policy.pt" \
+        || { echo "export failed; run it on a compute node: srun -p insa-cpu singularity exec --bind ${YOLAH_DIR}:/Yolah ${SIF} bash -c 'cd /Yolah/nnue && python3 resnet_export.py cnn_resnet_256x30_value_policy.pt'" >&2; exit 1; }
+fi
 for f in "${A_TS}" "${B_TS}"; do
     [[ -s "${f}" ]] || { echo "missing: ${f} (training not finished, or not exported)" >&2; exit 1; }
 done
