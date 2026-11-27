@@ -14,6 +14,9 @@
 # A and B are training steps (the numbers of models/az_<step>), or "latest"
 # (the network self-play is using) or "initial" (step 0). A network whose .ts
 # was pruned by the run is re-traced from its .pt.
+# Or any two TorchScript networks with the MCTS's I/O, outside the run (e.g. the
+# transformer_value_policy.py runs): A_TS / B_TS = their paths on the host,
+# A_NAME / B_NAME = their names in the results (nnue/tf_match.sh does this).
 #
 # Both players use config/alphazero_mcts_eval_player.cfg (no noise, no
 # sampling). Games come in pairs: one opening, played once with each colour.
@@ -54,7 +57,9 @@ SEED="${SEED:-${SLURM_JOB_ID:-$$}}"
 JOB="${SLURM_JOB_ID:-$$}"
 
 (( GAMES % 2 == 0 )) || { echo "ERROR: GAMES must be even (pairs of games)"; exit 1; }
-[[ -f "${WORK_DIR}/latest.json" ]] || { echo "ERROR: no run in ${WORK_DIR} (latest.json missing)"; exit 1; }
+if [[ -z "${A_TS:-}" || -z "${B_TS:-}" ]]; then
+    [[ -f "${WORK_DIR}/latest.json" ]] || { echo "ERROR: no run in ${WORK_DIR} (latest.json missing)"; exit 1; }
+fi
 
 # "latest" / "initial" / a step → a step number.
 resolve() {
@@ -68,6 +73,9 @@ STEP_A=$(resolve "${A}")
 STEP_B=$(resolve "${B}")
 NAME_A=$(printf "az_%08d" "${STEP_A}")
 NAME_B=$(printf "az_%08d" "${STEP_B}")
+if [[ -n "${A_TS:-}" ]]; then NAME_A="${A_NAME:-A}"; fi
+if [[ -n "${B_TS:-}" ]]; then NAME_B="${B_NAME:-B}"; fi
+[[ "${NAME_A}" != "${NAME_B}" || -z "${A_TS:-}${B_TS:-}" ]] || { echo "ERROR: A_NAME and B_NAME must differ"; exit 1; }
 SET_ARGS=()
 if [[ -n "${SET_A:-}" ]]; then IFS=';' read -ra KVS <<< "${SET_A}"; for kv in "${KVS[@]}"; do SET_ARGS+=(--set-a "${kv}"); done; fi
 LABEL_A="${NAME_A}${TAG:++${TAG}}"   # the name of A in the results
@@ -75,7 +83,7 @@ LABEL_A="${NAME_A}${TAG:++${TAG}}"   # the name of A in the results
 echo "════════════════════════════════════════════════════════════════"
 echo "  Job        : ${JOB} on $(hostname), GPU ${CUDA_VISIBLE_DEVICES:-?}"
 echo "  Work dir   : ${WORK_DIR}"
-echo "  Match      : A = ${LABEL_A} (${A})  vs  B = ${NAME_B} (${B})"
+echo "  Match      : A = ${LABEL_A} (${A_TS:-${A}})  vs  B = ${NAME_B} (${B_TS:-${B}})"
 [[ -n "${SET_A:-}" ]] && echo "  A's settings: ${SET_A}"
 if [[ "${BOOK}" == "none" ]]; then BOOK_ARGS=(); OPENINGS="${OPENING_PLIES}-ply random openings"
 else BOOK_ARGS=(--book "${BOOK}"); OPENINGS="openings of ${BOOK}"; fi
@@ -89,8 +97,11 @@ build_alphazero_learn
 # .ts files at every export and must not remove one in the middle of the match.
 MDIR="/work/evals/match_${JOB}"
 mkdir -p "${WORK_DIR}/evals/match_${JOB}"
-run bash -c "set -e; cd /Yolah/nnue
-    for S in ${STEP_A} ${STEP_B}; do
+STEPS=()                                  # the run's networks to copy (A_TS / B_TS: copied here)
+if [[ -n "${A_TS:-}" ]]; then cp "${A_TS}" "${WORK_DIR}/evals/match_${JOB}/${NAME_A}.ts"; else STEPS+=("${STEP_A}"); fi
+if [[ -n "${B_TS:-}" ]]; then cp "${B_TS}" "${WORK_DIR}/evals/match_${JOB}/${NAME_B}.ts"; else STEPS+=("${STEP_B}"); fi
+(( ${#STEPS[@]} == 0 )) || run bash -c "set -e; cd /Yolah/nnue
+    for S in ${STEPS[*]}; do
         NAME=\$(printf 'az_%08d' \$S)
         if [[ -f /work/models/\$NAME.ts ]]; then
             cp /work/models/\$NAME.ts ${MDIR}/\$NAME.ts

@@ -4657,13 +4657,16 @@ struct App {
         std::set<std::string> open_levels;   // levels unfolded in the list
         std::string tester;               // the AI playing the player's side in "AI against AI"
         int tool = 1;                     // 0 free square, 1 hole, 2 black piece, 3 white piece, 4 special square, 5 decoration
-        std::string tile_art, decor_art;  // the drawings of the brushes "Case" and "Décor"
+        std::string tile_art, decor_art;  // the drawings of the brushes "Case" ("" = the theme's square) and "Décor"
         int decor_size = 2;               // index in DECOR_SIZES
         int decor_drag = -1;              // the decoration being moved
+        int decor_click = -1;             // the decoration of the last click, and its time: a second click on it soon after removes it
+        double decor_click_time = -10;
         float scroll = 0;
         BoardView board;
         bool painting = false;            // the button went down on the board
         int painted = -1;                 // the last square painted by a drag
+        bool erasing = false;             // this stroke removes (right button, or it started on what the brush puts)
         bool confirm_delete = false;
         std::string confirm_level;        // the level whose deletion waits for a second click
         // The "new puzzle" dialog: start from the starting position or from any puzzle.
@@ -8577,6 +8580,7 @@ void scene_editor(App& a) {
             Art* ia = find_art(i == 4 ? ed.tile_art : ed.decor_art);
             Box ib{ic.x - 11 * s, ic.y - 11 * s, 22 * s, 22 * s};
             if (ia) draw_art(*ia, "idle", a.time, ib);
+            else if (i == 4) draw::round_box(ib.inset(1 * s), 4 * s, a.theme_or(p.theme).light);   // the theme's square
             else draw::round_frame(ib, 4 * s, 1.5f * s, pal::dim);
         }
         a.text.draw(Font::Bold, 15 * s, names[i], {r.x + 38 * s, r.center().y - 9 * s}, ed.tool == i ? hex(0x1a1206) : pal::text);
@@ -8595,10 +8599,20 @@ void scene_editor(App& a) {
         for (size_t i = 0; i < list.size(); i++) { nm.push_back(list[i]->name); if (list[i]->id == cur) idx = int(i); }
         cur = list[a.ui.cycler(id, b, label, nm, idx, 14)]->id;
     };
+    // A dark backing: the row's labels and hints sit over the theme's background picture.
+    draw::round_box({row2.x - 4 * s, row2.y - 3 * s, row2.w + 8 * s, row2.h + 6 * s}, 10 * s, hex(0x0d1118, 215));
+    // A hint on two short lines, right of the row's choices.
+    auto hint2 = [&](float x, const char* l1, const char* l2) {
+        a.text.draw(Font::Regular, 12 * s, l1, {x, row2.y + 3 * s}, pal::dim);
+        a.text.draw(Font::Regular, 12 * s, l2, {x, row2.y + 19 * s}, pal::dim);
+    };
     if (ed.tool <= 3) {
         float bw2 = (row2.w - 18 * s) / 4;
-        if (a.ui.button("ed_fill", {row2.x, row2.y, bw2, row2.h}, "Tout noircir", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '.') c = '#';
-        if (a.ui.button("ed_clear", {row2.x + bw2 + 6 * s, row2.y, bw2, row2.h}, "Tout vider", Style::Ghost, true, 14)) for (auto& c : p.cells) if (c == '#') c = '.';
+        if (a.ui.button("ed_fill", {row2.x, row2.y, bw2, row2.h}, "Tout noircir", Style::Ghost, true, 14)) for (auto& c : p.cells) c = '#';   // pieces too: a blank board to carve
+        if (a.ui.button("ed_clear", {row2.x + bw2 + 6 * s, row2.y, bw2, row2.h}, "Tout vider", Style::Ghost, true, 14)) {   // pieces and drawn squares too: the theme's empty board
+            for (auto& c : p.cells) c = '.';
+            p.tiles.clear();
+        }
         if (a.ui.button("ed_start", {row2.x + 2 * (bw2 + 6 * s), row2.y, bw2, row2.h}, "D\xC3\xA9part", Style::Ghost, true, 14)) p.cells = Puzzle().cells;
         // Verify: prove the puzzle feasible or not (PuzzleCheck); a second click while it runs stops it.
         const bool running = ed.check && !ed.check->done;
@@ -8608,14 +8622,24 @@ void scene_editor(App& a) {
             else ed.check = puzzle_check_start(p, a.time);
         }
     } else if (ed.tool == 4) {
-        art_choice("ed_tile", "tile", ed.tile_art, {row2.x, row2.y, row2.w * 0.5f, row2.h}, "Case");
-        a.text.draw(Font::Regular, 13 * s, "clic : peindre \xE2\x80\xA2 clic droit : effacer", {row2.x + row2.w * 0.52f, row2.y + 11 * s}, pal::faint);
+        // The first choice, and the default, is the theme's own square: painting
+        // with it removes the drawings, the square looks as the theme has it.
+        {
+            auto list = arts_of("tile");
+            std::vector<std::string> nm{"Celle du th\xC3\xA8me"};
+            int idx = 0;
+            for (size_t i = 0; i < list.size(); i++) { nm.push_back(list[i]->name); if (list[i]->id == ed.tile_art) idx = int(i) + 1; }
+            const int pick = a.ui.cycler("ed_tile", {row2.x, row2.y, row2.w * 0.5f, row2.h}, "Case", nm, idx, 14);
+            ed.tile_art = pick == 0 ? std::string() : list[pick - 1]->id;
+        }
+        hint2(row2.x + row2.w * 0.53f, "re-clic ou", "clic droit : retirer");
         if (a.ui.button("ed_tiles_clear", {row2.right() - 120 * s, row2.y, 120 * s, row2.h}, "Tout effacer", Style::Ghost, !p.tiles.empty(), 13)) p.tiles.clear();
     } else {
-        art_choice("ed_decor", "decor", ed.decor_art, {row2.x, row2.y, row2.w * 0.4f, row2.h}, "D\xC3\xA9" "cor");
+        art_choice("ed_decor", "decor", ed.decor_art, {row2.x, row2.y, row2.w * 0.33f, row2.h}, "D\xC3\xA9" "cor");
         std::vector<std::string> sz;
         for (float k : DECOR_SIZES) sz.push_back(strf("%g case%s", k, k > 1 ? "s" : ""));
-        ed.decor_size = a.ui.cycler("ed_dsize", {row2.x + row2.w * 0.42f, row2.y, row2.w * 0.3f, row2.h}, "Taille", sz, ed.decor_size, 14);
+        ed.decor_size = a.ui.cycler("ed_dsize", {row2.x + row2.w * 0.34f, row2.y, row2.w * 0.3f, row2.h}, "Taille", sz, ed.decor_size, 14);
+        hint2(row2.x + row2.w * 0.655f, "double-clic ou", "clic droit : retirer");
         if (a.ui.button("ed_decor_clear", {row2.right() - 120 * s, row2.y, 120 * s, row2.h}, "Tout retirer", Style::Ghost, !p.decor.empty(), 13)) p.decor.clear();
     }
     const float frame = 26 * s;
@@ -8625,19 +8649,33 @@ void scene_editor(App& a) {
     // Painting: a press on the board starts it; while the button is held, the
     // brush paints every square the mouse passes over (pieces: on the press only).
     int hover_sq = modal ? -1 : ed.board.at(a.in.mouse);
-    if (a.in.pressed || a.in.rpressed) ed.painting = hover_sq >= 0;
+    // The stroke's mode is decided on the press: the right button removes, and so
+    // does a click on a square that already has what the brush puts there (a
+    // hole with "Trou", the same drawing with "Case"): clicking twice undoes.
+    if (a.in.pressed || a.in.rpressed) {
+        ed.painting = hover_sq >= 0;
+        ed.erasing = a.in.rpressed;
+        if (hover_sq >= 0 && a.in.pressed) {
+            if (ed.tool == 1) ed.erasing = p.cells[hover_sq] == '#';
+            else if (ed.tool == 4) {
+                auto it = p.tiles.find(hover_sq);
+                ed.erasing = ed.tile_art.empty() || (it != p.tiles.end() && it->second == ed.tile_art);   // the theme's square: always removes
+            }
+        }
+    }
     if (!a.in.down && !a.in.rdown) { ed.painting = false; ed.painted = -1; }
-    if (ed.tool <= 3 && ed.painting && hover_sq >= 0 && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1)) {
+    if (ed.tool <= 3 && ed.painting && hover_sq >= 0 && hover_sq != ed.painted && (a.in.pressed || ed.tool <= 1 || ed.erasing)) {
         ed.painted = hover_sq;
-        const char want = ed.tool == 0 ? '.' : ed.tool == 1 ? '#' : ed.tool == 2 ? 'B' : 'W';
+        const char want = ed.erasing ? '.' : ed.tool == 0 ? '.' : ed.tool == 1 ? '#' : ed.tool == 2 ? 'B' : 'W';   // removing = back to a free square
         char& c = p.cells[hover_sq];
         if ((want == 'B' || want == 'W') && c != want && p.count(want) >= 4)
             a.notify(strf("D\xC3\xA9j\xC3\xA0 4 pions %s : retirez-en un d'abord (pinceau Libre).", tr(want == 'B' ? "noirs" : "blancs").c_str()));
         else if (a.in.pressed && (want == 'B' || want == 'W') && c == want) c = '.';   // a click on a piece removes it
         else c = want;
+        if (ed.tool == 0 || ed.erasing) p.tiles.erase(hover_sq);   // "Libre" and removing: the theme's own square again
     }
-    if (ed.tool == 4 && ed.painting && hover_sq >= 0) {   // special squares: painted (left) or erased (right)
-        if (a.in.rdown) p.tiles.erase(hover_sq);
+    if (ed.tool == 4 && ed.painting && hover_sq >= 0) {   // special squares: painted, or removed (back to the theme's square)
+        if (ed.erasing) p.tiles.erase(hover_sq);
         else if (!ed.tile_art.empty()) p.tiles[hover_sq] = ed.tile_art;
     }
     if (ed.tool == 5 && !modal) {   // decorations: anywhere on the board or around it
@@ -8649,13 +8687,19 @@ void scene_editor(App& a) {
             if (std::abs(m.x - p.decor[i].x) < p.decor[i].scale * 0.5f && std::abs(m.y - p.decor[i].y) < p.decor[i].scale * 0.5f) hit = i;
         if (zone.contains(a.in.mouse)) {
             a.ui.hovering = true;
-            if (a.in.rpressed && hit >= 0) p.decor.erase(p.decor.begin() + hit);
-            else if (a.in.pressed) {
+            // Removing: right click, or a second click on the same decoration within 0.4 s.
+            const bool second = a.in.pressed && hit >= 0 && hit == ed.decor_click && a.time - ed.decor_click_time < 0.4;
+            if ((a.in.rpressed || second) && hit >= 0) {
+                p.decor.erase(p.decor.begin() + hit);
+                ed.decor_drag = ed.decor_click = -1;
+            } else if (a.in.pressed) {
                 if (hit >= 0) ed.decor_drag = hit;
                 else if (!ed.decor_art.empty()) {
                     p.decor.push_back({ed.decor_art, m.x, m.y, DECOR_SIZES[ed.decor_size]});
                     ed.decor_drag = int(p.decor.size()) - 1;
                 }
+                ed.decor_click = ed.decor_drag;
+                ed.decor_click_time = a.time;
             }
         }
         if (ed.decor_drag >= 0 && ed.decor_drag < int(p.decor.size()) && a.in.down) {
@@ -8712,7 +8756,11 @@ void scene_editor(App& a) {
             status_col = ed.check->verdict == V::Feasible ? pal::good : ed.check->verdict == V::Impossible ? pal::bad : pal::dim;
         }
     }
-    a.text.draw(Font::Bold, 15 * s, status, {mid.center().x, ed.board.area.bottom() + frame + 4 * s}, status_col, Align::Center);
+    {   // on a dark backing: over the theme's background picture, a coloured text alone is unreadable
+        const float tw = a.text.width(Font::Bold, 15 * s, status), ty = ed.board.area.bottom() + frame + 2 * s;
+        draw::round_box({mid.center().x - tw / 2 - 12 * s, ty - 2 * s, tw + 24 * s, 26 * s}, 13 * s, hex(0x0d1118, 225));
+        a.text.draw(Font::Bold, 15 * s, status, {mid.center().x, ed.board.area.bottom() + frame + 4 * s}, status_col, Align::Center);
+    }
 
     // ── right: settings and tests ──
     a.ui.panel(panel);
