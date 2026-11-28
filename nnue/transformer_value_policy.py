@@ -451,6 +451,14 @@ def train_worker(rank, world, args):
     torch.cuda.set_device(rank)
     device = torch.device("cuda", rank)
     amp_dtype = torch.bfloat16 if torch.cuda.get_device_capability(rank)[0] >= 8 else torch.float16
+    if os.environ.get("YOLAH_TF_AMP") in ("fp16", "bf16"):      # tests: force one
+        amp_dtype = torch.float16 if os.environ["YOLAH_TF_AMP"] == "fp16" else torch.bfloat16
+    # fp16 (GPUs before Ampere, e.g. the RTX 8000) needs loss scaling, bf16 does not: without
+    # it, the 512x30 run (2026-11-28, job 806515 on crn21) went to NaN at step ~40k. The
+    # scaler skips a step whose gradients are not finite and lowers its scale.
+    scaler = torch.amp.GradScaler("cuda", enabled=amp_dtype == torch.float16)
+    if rank == 0:
+        print(f"GPU {torch.cuda.get_device_name(rank)}, autocast {amp_dtype}, loss scaling {scaler.is_enabled()}", flush=True)
 
     with open(os.path.join(args.cache, "meta.json")) as f:
         n_total = int(json.load(f)["n_positions"])
@@ -478,6 +486,8 @@ def train_worker(rank, world, args):
         net.load_state_dict(ck["model"])
         opt.load_state_dict(ck["opt"])
         step = ck["step"]
+        if "scaler" in ck and scaler.is_enabled():
+            scaler.load_state_dict(ck["scaler"])
     if rank == 0:
         print(f"dataset {n_total:,} positions, train {n_train:,}; {world} GPU(s), batch {BATCH}/GPU; "
               f"{per_epoch:,} steps/epoch, {NB_EPOCHS} epochs; params {sum(p.numel() for p in net.parameters()):,}; "
@@ -494,7 +504,13 @@ def train_worker(rank, world, args):
     def save(tag=None):
         if rank != 0:
             return
-        ck = {"model": net.state_dict(), "opt": opt.state_dict(), "step": step, "config": net.config}
+        if not all(torch.isfinite(p).all() for p in net.parameters()):
+            # never overwrite a good checkpoint with a diverged network: a resubmitted job
+            # then restarts from the last finite one
+            print(f"step {step:,}: parameters not finite, checkpoint NOT written", flush=True)
+            return
+        ck = {"model": net.state_dict(), "opt": opt.state_dict(), "step": step, "config": net.config,
+              "scaler": scaler.state_dict()}
         tmp = ck_path + ".tmp"
         torch.save(ck, tmp)
         os.replace(tmp, ck_path)
@@ -522,9 +538,11 @@ def train_worker(rank, world, args):
                 v_pred, p_logits = model(X)
             v_loss, p_loss = losses(v_pred, p_logits, v_t, p_t)
             opt.zero_grad(set_to_none=True)
-            (v_loss + p_loss).backward()
+            scaler.scale(v_loss + p_loss).backward()
+            scaler.unscale_(opt)                           # clip the true gradients
             torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
-            opt.step()
+            scaler.step(opt)                               # skipped if a gradient is inf / NaN (fp16)
+            scaler.update()
             step += 1
             if step % 200 == 0:
                 meter.add(v_pred.detach().float(), p_logits.detach(), v_t, p_t, v_loss.detach(), p_loss.detach())

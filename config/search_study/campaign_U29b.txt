@@ -1,0 +1,8 @@
+# Campaign U29b (2026-11-28): U29's u29_solo_split extended from 1000 to 2000 rounds (4000 games),
+# same seeds as U29 tasks 2 and 4 (same book order; the results files of U29 are resumed).
+# U29 (2000 games each): u29_solo +2.1 [-7.2, +11.3] (0.2 s), +3.1 [-5.4, +11.6] (1 s);
+#                        u29_solo_split +8.2 [-1.5, +17.8] (0.2 s), +5.0 [-3.1, +13.2] (1 s).
+#   BOOK=/Yolah/config/openings/balanced.txt sbatch -p insa-cpu --exclude=crn04,crn05,crn06,crn07,crn13,crn14,crn15 --array=1-2 nnue/search_study.sh campaign_U29b.txt
+# 1: at 0.2 s, 2: at 1 s
+u29_solo_split dev_u9_spsa 200000 2000 292
+u29_solo_split dev_u9_spsa 1000000 2000 294
